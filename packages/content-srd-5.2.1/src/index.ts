@@ -21,9 +21,9 @@ import {
 } from "./character-content.js";
 import {
   ArmorReferenceSchema, ConditionReferenceSchema, ContentAttributionSchema, EquipmentReferenceSchema,
-  RuleReferenceSchema, SkillReferenceSchema, SpellReferenceSchema, SRD_SKILL_ABILITY,
+  LanguageReferenceSchema, RuleReferenceSchema, SkillReferenceSchema, SpellReferenceSchema, SRD_SKILL_ABILITY,
   WeaponPropertyReferenceSchema, WeaponReferenceSchema,
-  type ArmorReference, type ConditionReference, type ContentAttribution, type EquipmentReference, type RuleReference,
+  type ArmorReference, type ConditionReference, type ContentAttribution, type EquipmentReference, type LanguageReference, type RuleReference,
   type SkillReference, type SpellReference, type WeaponPropertyReference, type WeaponReference
 } from "./schemas.js";
 
@@ -80,6 +80,17 @@ export function loadSkills(): readonly SkillReference[] {
 }
 
 /**
+ * The 19 SRD 5.2.1 languages (10 Standard, 9 Rare), each tagged with the table it is printed in.
+ *
+ * Published as a bundle rather than left as prose because a choice needs a LIST: without this the
+ * `species-languages` budget every character is owed ("Common plus two languages") had no options and
+ * was therefore never offered at all. See `LanguageReferenceSchema`.
+ */
+export function loadLanguages(): readonly LanguageReference[] {
+  return loadBundle("languages.v1.json", z.array(LanguageReferenceSchema));
+}
+
+/**
  * The full addable-equipment catalog: the vendored gear/tools/packs/focus bundle plus every weapon
  * and armor mapped from their own bundles into the unified shape. Sorted by name. Extensible - the
  * homebrew update adds entries alongside these.
@@ -101,7 +112,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
   // consumer still falls back to `category`) and what makes an open homebrew category derive AC.
   const weapons: EquipmentReference[] = loadWeapons().filter((weapon) => !weapon.improvised).map((weapon) => ({
     id: weapon.id, name: weapon.name, source: weapon.source, category: "weapon", slot: "weapon", costGp: null, weightLb: null, description: null,
-    weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet }, armor: null,
+    weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet, mastery: weapon.mastery }, armor: null,
     ...mundane()
   }));
   const armor: EquipmentReference[] = loadArmor().map((piece) => ({

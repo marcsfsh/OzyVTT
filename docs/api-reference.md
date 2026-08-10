@@ -106,6 +106,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
+| `actor.rechoose` | `actor:write` |
 | `actor.spend-hit-dice` | `actor:write` |
 | `character.set-slot` | `actor:write` |
 | `character.set-prepared` | `actor:write` |
@@ -114,6 +115,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.set-identity` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
 | `character.create` | `actor:write` |
+| `character.generate` | `actor:write` |
 | `builder.set-policy` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
@@ -605,6 +607,8 @@ Applies damage (temporary hit points absorb first). Optional typed `parts` run t
 | `parts` | object[] | no | Typed components; the server applies the target's defenses and returns the breakdown |
 | `parts[].amount` | integer (0–1000) | yes |  |
 | `parts[].type` | string | yes |  |
+| `damageType` | string | no | OPTIONAL type for the manual `amount` path. Absent or "untyped" keeps the exact, defence-free correction; naming a type (one of the 13 SRD slugs, or a homebrew one - the vocabulary is open) runs it through resistance/immunity/vulnerability. Ignored when `parts` is present |
+| `damageOverride` | integer (0–1000) | no | A hand-entered total that REPLACES what was rolled while keeping its types: the server re-weights `parts` to this number, so an amended hit still meets the target's defences |
 | `sourceActorId` | string (uuid) | no |  |
 | `sourceActionId` | string (pattern) | no |  |
 | `sourceName` | string | no |  |
@@ -812,6 +816,7 @@ Answers a pending saving throw by server roll or manual total; on commit the out
 | `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | For method=roll: the answerer's explicit advantage/disadvantage choice; wins over the engine's aggregated sources (2d20kh1 / 2d20kl1) |
 | `commit` | boolean | no | false previews the outcome without applying damage/conditions Default: `true`. |
 | `legendaryResistance` | boolean | no | GM only, commit only: spend a Legendary Resistance use to turn a failed save into a success (a natural success spends nothing) Default: `false`. |
+| `damageOverride` | integer (0–1000) | no | Hand-entered damage replacing the auto-rolled proposal, applied BEFORE the success halving and keeping the proposal's damage types. A player may amend only their own claimed character's save |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1042,6 +1047,25 @@ Toggles the underwater environment on the live encounter (GM-grade only; SRD Und
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/actors/{actorId}/rechoose`
+
+Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `offer` | string (pattern) | yes | The offer key whose answer is being re-made - the same key the build already uses ("feature:circle-of-the-land-spells") |
+| `id` | string (pattern) | yes | The new answer. Must be one the original pick could itself have chosen; the server resolves that list from the content and a client cannot widen it |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/actors/{actorId}/rest`
 
 Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.
@@ -1230,6 +1254,24 @@ Creates a character from CHOICES rather than a finished sheet - the GM always, a
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/characters/random`
+
+Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `level` | integer (1–20) | yes | Character level to roll up; refused above the table's builderPolicy.maxLevel |
+| `classId` | string (pattern) | no | Class to build; omit to draw one from the catalog the caller may read |
+| `name` | string | no | Name to use verbatim; omit to draw one from the rolled species' own name bundle |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/actors/{actorId}/rebuild`
 
 Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.
@@ -1353,6 +1395,7 @@ Sets the character-builder table policy (GM-grade only; task-packet decision 10)
 | `customFormula` | string \| null | no | The GM's custom roll formula (e.g. 3d6, 2d6+6), validated through the server dice grammar and 1-30 bounds; null clears it. Omitting the field keeps the stored formula |
 | `maxLevel` | integer (1–20) | no | Highest character level this table builds to (default 20). Enforced by the builder AND by the sheet's identity edit; omitting the field keeps the stored cap |
 | `playerBuilder` | `open` \| `gm-only` | no | Whether players may run the character builder themselves (default open). Stored policy: character creation is still GM-gated at this version, and the projected value is what a player's wizard reads to know whether its door is open. Omitting the field keeps the stored setting |
+| `playerRandom` | `open` \| `gm-only` | no | Whether players may roll a RANDOM character themselves. Default gm-only - the opposite of playerBuilder, because a generator is one tap that fills a roster slot rather than eight considered steps. Omitting the field keeps the stored setting |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1997,6 +2040,14 @@ The skill catalog: reference text plus the ability each check uses, as data - th
 **Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
 
 **Responses:** `200` Catalog entries - envelope of `ContentSkillsData` · errors `401` `403`
+
+### `GET /api/v1/content/languages`
+
+The language catalog: the SRD's Standard and Rare language tables as data, each row tagged with the table it is printed in. The builder's "Common plus two languages" budget resolves against this - as prose it could not be offered at all. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentLanguagesData` · errors `401` `403`
 
 ### `GET /api/v1/content/spells`
 
@@ -3266,7 +3317,7 @@ Creates a quest, and appends its first history record in the SAME transaction - 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `title` | string | yes |  |
-| `status` | `active` \| `completed` \| `failed` | no |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | no | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 | `playerBody` | string | no |  |
 | `gmBody` | string | no |  |
 | `objectives` | CodexQuestObjective[] | no |  |
@@ -3300,7 +3351,7 @@ Edits a quest; an omitted field is left alone. **A status change also appends a 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `title` | string | no |  |
-| `status` | `active` \| `completed` \| `failed` | no |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | no | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 | `playerBody` | string | no |  |
 | `gmBody` | string | no |  |
 | `objectives` | CodexQuestObjective[] | no |  |
@@ -3408,6 +3459,7 @@ Replaces the world calendar and reflows every dated record's sort instant and la
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `yearName` | string | yes |  |
+| `eras` | CodexCalendarEra[] | no | Optional so a caller written before eras existed is not met with a 400. It is replaced like every other field on this route: omitting it CLEARS the stored eras. |
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | no |  |
@@ -3584,6 +3636,7 @@ The world's calendar as the **GM** receives it. The campaign has two clocks (M11
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `yearName` | string | yes |  |
+| `eras` | CodexCalendarEra[] | yes | The world's named eras, ascending by `startYear`. Empty on every calendar written before eras existed, which is exactly today's rendering: `yearName` stays the trailing suffix. Where an era applies it LEADS the year instead ("Third Age 1492"). |
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | yes | The GM's own clock - where the campaign is now. Null until a date is set. Never reaches a player by any path. |
@@ -3594,6 +3647,15 @@ The world's calendar as the **GM** receives it. The campaign has two clocks (M11
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `calendar` | CodexCalendar | yes |  |
+
+### `CodexCalendarEra`
+
+A named era, running from `startYear` until the next era begins (`5f`). A date's era is DERIVED - the last era whose `startYear` the date's year has reached - and is never stored on the date, so adding one re-labels existing records without rewriting any of them. Sorted ascending by `startYear` on the way in.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `startYear` | integer (-100000–100000) | yes |  |
 
 ### `CodexCalendarMonth`
 
@@ -3609,6 +3671,7 @@ The world calendar as a PLAYER receives it. `currentDate` keeps its name and its
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `yearName` | string | yes |  |
+| `eras` | CodexCalendarEra[] | yes | Projected, never filtered: an era is STRUCTURE on the same footing as `months` and `weekdays`, which a player has always received. It carries no clock - `currentDate` is still the published date and the only one on this object. |
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | yes | The PUBLISHED date. Null until the GM publishes one. |
@@ -4242,7 +4305,7 @@ One quest: a thread the party is pulling on, and whether it is still open. Two l
 | --- | --- | --- | --- |
 | `id` | string (uuid) | yes |  |
 | `title` | string | yes | The quest's name - the line that appears on the dashboard's open-quests card. |
-| `status` | `active` \| `completed` \| `failed` | yes | Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the `active` ones. |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the OPEN ones - `not-started` and `active`. |
 | `playerBody` | string | yes | The player-facing description (markdown). Reaches a revealed quest's player projection as `body`. |
 | `gmBody` | string | yes | GM-only notes (markdown). NEVER present in a player projection, revealed or not - revealing a quest publishes its player body, never its GM body. It is also kept out of the player search index, because a HIT on a GM-only phrase leaks the phrase even when the body itself is never returned. |
 | `objectives` | CodexQuestObjective[] | yes | The ordered checklist. Player-facing in full - order is content, not incidental. |
@@ -4261,12 +4324,12 @@ One quest: a thread the party is pulling on, and whether it is still open. Two l
 
 ### `CodexQuestHistoryPayload`
 
-D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest starting is an event) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.
+D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest entering the log is an event, whether or not the party has begun it) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `questId` | string (uuid) | yes |  |
-| `status` | `active` \| `completed` \| `failed` | yes | The status REACHED, not a delta - the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened". |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | The status REACHED, not a delta - the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened". |
 
 ### `CodexQuestHistoryPlayerPayload`
 
@@ -4275,7 +4338,7 @@ A quest-history record as a PLAYER sees it. The whole ROW is hidden unless the q
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `questId` | string \| null | yes | Nulled unless that quest is revealed - a second line of defence behind the whole-row gate, the same arrangement a standing payload's `factionPageId` uses. |
-| `status` | `active` \| `completed` \| `failed` | yes |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 
 ### `CodexQuestListData`
 
@@ -4300,7 +4363,7 @@ A quest as a PLAYER receives it. `status` is KEPT - this is the one place a ques
 | --- | --- | --- | --- |
 | `id` | string (uuid) | yes |  |
 | `title` | string | yes |  |
-| `status` | `active` \| `completed` \| `failed` | yes |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 | `body` | string | yes | The quest's `playerBody`. |
 | `objectives` | CodexQuestObjective[] | yes |  |
 | `entityIds` | string (uuid)[] | yes | Filtered to the revealed subset. |
@@ -4635,6 +4698,16 @@ One of the following:
 | `equipment[].armor` | object \| null | yes | Populated for armor and shields only |
 | `attribution` | string | yes |  |
 
+### `ContentExtraPick`
+
+ONE pick budget a feature or a chosen option raises. `offer` is the offer key the wizard and the server share verbatim (class-cantrips, class-spells, class-skills, class-tools, background-skills, background-tools, background-languages, species-languages, or feature:<featureId>); the printed level row and every grant naming it are SUMMED, so two features each granting +1 yield +2.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `offer` | string | yes | The offer key whose capacity this raises |
+| `amount` | integer \| null | yes | How many extra picks, as a flat number; null when `scaling` states it instead |
+| `scaling` | HomebrewExtraPickScaling \| null | yes | The budget follows a printed class-table column instead of a constant - Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6. Resolved against the same level table on both sides. Null for a flat grant. |
+
 ### `ContentFeatsData`
 
 | Field | Type | Required | Notes |
@@ -4665,8 +4738,10 @@ The browse-and-pick projection of a bundle FeatureRecord. Prose is the display s
 | `level` | integer \| null | yes | The class/subclass level the feature lands at; null when it is not level-gated (species traits, feats) |
 | `description` | string | yes |  |
 | `tags` | string (pattern)[] | yes | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
-| `choice` | ContentFeatureChoice \| null | yes | The pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking. |
+| `choice` | ContentFeatureChoice \| null | yes | The FIRST pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking. |
+| `choices` | ContentFeatureChoice[] | yes | EVERY pick this feature asks for, in authored order - one record may owe more than one, with different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell, and reading only `choice` is what silently dropped the spell. Empty when the feature asks for nothing. |
 | `grantedAtLevels` | integer (1–20)[] | yes | Every level at which the owning class's table grants this feature - the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features). |
+| `extraPicks` | ContentExtraPick[] | yes | Budgets this feature RAISES rather than picks it asks for. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable. |
 
 ### `ContentFeatureChoice`
 
@@ -4679,6 +4754,8 @@ One pick a feature asks for. Options arrive either as plain ids in `from`, as an
 | `from` | string (pattern)[] | yes | Explicit option ids; empty when fromCatalog names an open list instead |
 | `fromCatalog` | string \| null | yes | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer \| null | yes | Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling — a picker that ignores it offers spells the server then rejects |
+| `minSpellLevel` | integer \| null | yes | Floor on a spell pick's level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell rather than "6 or lower"). null when the pick has no floor |
+| `fromPicks` | object \| null | yes | The options are the character's OWN earlier answers rather than a catalog - "choose one of your known Warlock cantrips that deals damage". null for every ordinary pick. |
 | `options` | ContentFeatureOption[] | yes | Inline options with their authored names and any nested pick; empty when the options are plain ids or come from a catalog |
 
 ### `ContentFeatureOption`
@@ -4690,7 +4767,21 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `id` | string (pattern) | yes |  |
 | `name` | string | yes |  |
 | `description` | string | yes |  |
-| `choice` | ContentFeatureChoice \| null | yes | A nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
+| `requires` | object \| null | yes | The earlier answer that makes this option legal, or null when it is always offerable. "The option you chose for Blessed Strikes grows more powerful": the later feature's options are gated on a pick already in the ledger. When gating leaves exactly as many legal options as the capacity, the answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it. |
+| `choice` | ContentFeatureChoice \| null | yes | The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
+| `choices` | ContentFeatureChoice[] | yes | EVERY nested pick this option owes, in authored order. |
+| `extraPicks` | ContentExtraPick[] | yes | Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget. |
+
+### `ContentLanguagesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `languages` | object[] | yes |  |
+| `languages[].id` | string | yes |  |
+| `languages[].name` | string | yes |  |
+| `languages[].description` | string | yes |  |
+| `languages[].table` | string | yes | Which SRD table the language is printed in - "standard" (widespread) or "rare" (secret or planar). An open slug: a homebrew table needs no schema change. The base "Common plus two languages" budget draws from `standard`; Druidic and Thieves' Cant are `rare` and arrive from a class feature |
+| `attribution` | string | yes | The bundle's canonical CC BY 4.0 statement - ADR-0015 requires it on any surface that displays this content |
 
 ### `ContentMonsterActionsData`
 
@@ -4772,6 +4863,8 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `spells[].school` | string | yes |  |
 | `spells[].castingTime` | string | yes |  |
 | `spells[].rangeText` | string \| null | yes |  |
+| `spells[].attackRoll` | boolean | yes | Whether casting it rolls an attack. One of the three closed `fromPicks` predicates - "a cantrip that requires an attack roll" (Repelling Blast) |
+| `spells[].rangeFeet` | integer \| null | yes | Range in FEET when the printed range IS a distance, else null (Self and Touch are not ranges of zero). Read by the `ranged` predicate - "a cantrip with a range of 10+ feet" (Eldritch Spear) |
 | `spells[].componentsText` | string | yes | "V, S, M (a pinch of soot)", or "None" |
 | `spells[].duration` | string | yes |  |
 | `spells[].concentration` | boolean | yes |  |
@@ -4958,12 +5051,13 @@ A background. In SRD 5.2.1 this is where ability increases and the origin feat l
 
 ### `HomebrewChoiceList`
 
-A "choose N from this list" proficiency grant (class skills, background tools).
+A "choose N from this list" proficiency grant (class skills, background tools, species languages). Needs a non-empty `from` or a `fromCatalog` whenever `choose` is above zero - a budget with no source can never be satisfied and the wizard could not be finished.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `choose` | integer (0–10) | yes |  |
 | `from` | string (pattern)[] | no |  |
+| `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time ("standard-languages", "tools", "skills") |
 
 ### `HomebrewClassLevelRow`
 
@@ -4982,10 +5076,11 @@ ONE row of a class's 20-level table. `features` lists the ids granted at that le
 | `spellsKnown` | integer (0–40) | no |  |
 | `preparedFormula` | string | no | The prepared-spell rule as data ("<ability> modifier + <class> level") so a homebrew class prints its own wording |
 | `preparedCount` | integer (0–60) | no |  |
-| `classResources` | object[] | no | Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3) |
+| `classResources` | object[] | no | Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3). A PRINTED COLUMN, not a namespace: the live pool the engine spends is `actor.actionUses[uses.pool ?? action.id]`, and an id here reaches it only by matching a `uses.pool` on the same class. Mark a column that is genuinely only ink with `display: true` |
 | `classResources[].id` | string (pattern) | yes |  |
 | `classResources[].name` | string | yes |  |
 | `classResources[].amount` | integer (0–999) \| string | yes | A count, or a dice string |
+| `classResources[].display` | boolean | no | This column is ink only - no live pool answers to this id, and none is expected to |
 
 ### `HomebrewClassRecord`
 
@@ -5080,6 +5175,15 @@ Resistance to the listed damage types.
 | `type` | const `"damage-resistance"` | yes |  |
 | `damageTypes` | string[] | yes |  |
 
+### `HomebrewEffectDamageVulnerability`
+
+Vulnerability to the listed damage types - double damage, and the mirror of `damage-resistance`. Resistance and vulnerability to the SAME type cancel to normal damage rather than compounding (SRD 5.2.1).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-vulnerability"` | yes |  |
+| `damageTypes` | string[] | yes |  |
+
 ### `HomebrewEffectDurationEncounter`
 
 Until the encounter ends.
@@ -5153,6 +5257,7 @@ One of the following, discriminated by `type`:
 
 - `HomebrewEffectDamageBonus`
 - `HomebrewEffectDamageResistance`
+- `HomebrewEffectDamageVulnerability`
 - `HomebrewEffectAttackAdvantage`
 - `HomebrewEffectIncomingAttackAdvantage`
 - `HomebrewEffectAttackDisadvantage`
@@ -5242,6 +5347,26 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `damageType` | string | yes |  |
 | `rangeFeet` | integer \| null | yes |  |
 | `longRangeFeet` | integer \| null | yes | Attacks past `rangeFeet` up to this roll at disadvantage |
+| `mastery` | `cleave` \| `graze` \| `nick` \| `push` \| `sap` \| `slow` \| `topple` \| `vex` | no | The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery. |
+
+### `HomebrewExtraPick`
+
+ONE budget a feature or a chosen option RAISES. `offer` is the offer key the wizard and the server already share verbatim - `class-cantrips`, `class-spells`, `class-skills`, `class-tools`, `background-skills`, `background-tools`, `background-languages`, `species-languages`, or `feature:<featureId>` - not a new namespace and not a closed enum. A key naming no budget the build actually has is a LOUD rejection at creation, never a silent zero: an authored grant that quietly adds nothing is the failure this vocabulary exists to end.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `offer` | string (pattern) | yes | The offer key whose capacity this raises |
+| `amount` | integer (1–5) | no | How many extra picks, as a flat number. Additive across every source that names the same budget. Exactly one of `amount` and `scaling` is authored - a defaulted amount beside a scaling rule would be indistinguishable from an authored one, and "the flat amount was silently ignored" is the failure this vocabulary exists to end |
+| `scaling` | HomebrewExtraPickScaling | no | How many extra picks, read off the class table's own printed column instead of a constant. The budget then follows the column at every level |
+
+### `HomebrewExtraPickScaling`
+
+A pick budget that FOLLOWS A PRINTED COLUMN - the same fourth way `HomebrewFeatureUses` scales a feature's uses, applied to capacity. `class-resource-growth` yields how far the named `classResources` column has grown above its first printed value at this character's level, so the feature's own `choose` plus the growth is the printed total: Eldritch Invocations runs 1 -> 10 and Weapon Mastery 3 -> 6 (Fighter) and 2 -> 4 (Barbarian). Repeat grants cannot express these - the column steps at levels where the SRD prints no feature heading to carry a grant at all.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | `class-resource-growth` | yes |  |
+| `id` | string (pattern) | yes | The `classResources.id` of the printed column (eldritch-invocations, weapon-mastery) |
 
 ### `HomebrewFeatRecord`
 
@@ -5276,6 +5401,9 @@ THE shared feature record: a class feature, a subclass feature, a species trait,
 | `level` | integer (1–20) | no | Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats) |
 | `description` | string | yes |  |
 | `choice` | HomebrewFeatureChoice | no | A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible |
+| `choices` | HomebrewFeatureChoice[] | no | SEVERAL picks, when one record promises more than one - Magic Initiate's "two cantrips ... and one level 1 spell", Deft Explorer's Expertise plus two languages. Mutually exclusive with `choice`, which stays the way almost every record is authored |
+| `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
+| `replaces` | HomebrewReplaceableChoice[] | no | Picks this lets the character RE-MAKE later - "whenever you finish a Long Rest, choose one type of land". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
 | `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
@@ -5312,6 +5440,7 @@ A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Br
 | `legendary.cost` | integer (1–5) | yes |  |
 | `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
 | `spellSlot.level` | integer (1–9) | yes |  |
+| `spellId` | string (pattern) | no | WHICH spell this action is a casting of. Identity only - every number the action rolls is already on the action itself - so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed |
 | `attack` | HomebrewFeatureAttack | no |  |
 | `save` | HomebrewFeatureSave | no |  |
 | `damageByLevel` | object[] | no | Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite) |
@@ -5344,6 +5473,11 @@ A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an ope
 | `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `minSpellLevel` | integer (0–9) | no | Floor on a spell pick's level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact |
+| `fromPicks` | object | no | THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - "choose one of your known Warlock cantrips that deals damage". `offer` names the budget holding them, in the same key namespace extraPicks uses; `where` is a CLOSED predicate slug, never an expression. Resolves to a non-empty list or DEFERS, exactly as an unresolvable fromCatalog does. |
+| `fromPicks.offer` | string (pattern) | yes |  |
+| `fromPicks.where` | `deals-damage` \| `attack-roll` \| `ranged` | no |  |
+| `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 | `options` | HomebrewFeatureOption[] | no | Options carrying their own mechanics. Mutually exclusive with `from` |
 
@@ -5406,7 +5540,13 @@ ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeat
 | `id` | string (pattern) | yes |  |
 | `name` | string | yes |  |
 | `description` | string | yes |  |
-| `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen (Thaumaturge's extra Cleric cantrip) |
+| `requires` | object | no | This option is legal only when an EARLIER answer says so - "the option you chose for Blessed Strikes grows more powerful". `offer` is the same offer-key namespace `extraPicks` uses. When gating leaves exactly as many legal options as the capacity, the survivors are ADOPTED and no pick is rendered: the answer is a consequence, not a choice. |
+| `requires.offer` | string (pattern) | yes |  |
+| `requires.id` | string (pattern) | yes |  |
+| `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen, from a list of its own |
+| `choices` | HomebrewFeatureOptionChoice[] | no | SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice` |
+| `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
+| `replaces` | HomebrewReplaceableChoice[] | no | Picks this lets the character RE-MAKE later - "whenever you finish a Long Rest, choose one type of land". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
 | `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
@@ -5425,6 +5565,11 @@ THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureCho
 | `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `minSpellLevel` | integer (0–9) | no | Floor on a spell pick's level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact |
+| `fromPicks` | object | no | THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - "choose one of your known Warlock cantrips that deals damage". `offer` names the budget holding them, in the same key namespace extraPicks uses; `where` is a CLOSED predicate slug, never an expression. Resolves to a non-empty list or DEFERS, exactly as an unresolvable fromCatalog does. |
+| `fromPicks.offer` | string (pattern) | yes |  |
+| `fromPicks.where` | `deals-damage` \| `attack-roll` \| `ranged` | no |  |
+| `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 
 ### `HomebrewFeatureSave`
@@ -5453,7 +5598,7 @@ Uses a feature gets back on a rest, as DATA rather than a formula language. Eith
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `limit` | integer (1–20) | no | A flat count |
-| `scaling` | HomebrewUsesByProficiency \| HomebrewUsesByAbility \| HomebrewUsesByLevel | no | The three ways 5e actually scales a feature's uses. |
+| `scaling` | HomebrewUsesByProficiency \| HomebrewUsesByAbility \| HomebrewUsesByLevel \| HomebrewUsesByClassResource | no | The four ways 5e actually scales a feature's uses. |
 | `per` | `turn` \| `encounter` \| `short-rest` \| `long-rest` | yes |  |
 | `pool` | string (pattern) | no | Shares ONE counter across every feature carrying the same pool id |
 
@@ -5840,6 +5985,16 @@ The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `va
 | `valid` | boolean | yes |  |
 | `usageCount` | integer (≥ 0) | yes | How many characters took this record; 0 is the common case |
 
+### `HomebrewReplaceableChoice`
+
+ONE "you can replace…" clause. `offer` is the same offer-key namespace `extraPicks` uses, and a key naming no pick this build has is a loud build rejection. `when: "level-up"` is a build-time permission over the choices ledger (the replaced row is deleted, never tombstoned); `"short-rest"` / `"long-rest"` are runtime state on the actor, set by actor.rechoose and cleared by the matching rest - a short-rest clause is satisfied by a long rest too.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `offer` | string (pattern) | yes |  |
+| `when` | `level-up` \| `short-rest` \| `long-rest` | yes |  |
+| `amount` | integer (1–5) | no | How many of that offer's answers may be swapped at once Default: `1`. |
+
 ### `HomebrewRiderAttackBonus`
 
 A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit was the action's printed bonus plus exhaustion and nothing else could reach it.
@@ -5853,12 +6008,13 @@ A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's t
 
 ### `HomebrewRiderExtraDamage`
 
-Extra TYPED damage as dice. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer, and an attack's `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults false because 5e does not double dice added after the attack.
+Extra TYPED damage. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer with no type, and an attack's `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry one either. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the BEARER's modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage") - a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish rather than stored to silently add nothing. `doubleOnCritical` defaults false because 5e does not double dice added after the attack, and an ability modifier is never doubled at all.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `type` | const `"extra-damage"` | yes |  |
-| `formula` | string (pattern) | yes | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `formula` | string (pattern) | no | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `abilityModifier` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
 | `damageType` | string | yes |  |
 | `doubleOnCritical` | boolean | no | Default: `false`. |
 | `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
@@ -5878,7 +6034,7 @@ Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather
 
 ### `HomebrewRiderTrigger`
 
-WHEN a rider applies. Thirty named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty branches below cover all thirty names.
+WHEN a rider applies. Thirty-one named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty-one branches below cover all thirty-one names.
 
 One of the following, discriminated by `type`:
 
@@ -5899,6 +6055,7 @@ One of the following, discriminated by `type`:
 - `HomebrewTriggerSkillIs`
 - `HomebrewTriggerSpellSchoolIs`
 - `HomebrewTriggerSpellLevelIs`
+- `HomebrewTriggerSpellIdIs`
 - `HomebrewTriggerVersusCreatureType`
 - `HomebrewTriggerVersusSize`
 - `HomebrewTriggerVersusCondition`
@@ -6064,6 +6221,7 @@ A stat block's action, in the exact `ActionSchema` vocabulary the live rules eng
 | `legendary.cost` | integer (1–5) | yes |  |
 | `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
 | `spellSlot.level` | integer (1–9) | yes |  |
+| `spellId` | string (pattern) | no | WHICH spell this action is a casting of. Identity only - every number the action rolls is already on the action itself - so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed |
 | `attack` | object | no | A printed to-hit bonus - the stat block knows its own numbers |
 | `attack.bonus` | integer | yes |  |
 | `attack.reachFeet` | integer (≥ 1) | no |  |
@@ -6145,6 +6303,15 @@ FILTER. Narrows a check moment to these skills (Gloves of Thievery: sleight-of-h
 | --- | --- | --- | --- |
 | `type` | const `"skill-is"` | yes |  |
 | `skills` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerSpellIdIs`
+
+FILTER. Narrows a spell moment to these SPECIFIC spells. `spell-school-is` and `spell-level-is` name categories; a printed "when you cast Eldritch Blast" names one record, and no combination of school and level picks out one cantrip. Matches an action's `spellId` - the spell the action IS - so it fires on the cast actions an item's `casts` entries synthesise and on any feature action naming its spell. An action with no `spellId` never matches.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-id-is"` | yes |  |
+| `spellIds` | string (pattern)[] | yes |  |
 
 ### `HomebrewTriggerSpellLevelIs`
 
@@ -6301,6 +6468,15 @@ Uses equal to an ability modifier, floored at `minimum`.
 | `type` | const `"ability-modifier"` | yes |  |
 | `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
 | `minimum` | integer (0–5) | no | Default: `1`. |
+
+### `HomebrewUsesByClassResource`
+
+Read the count straight off THIS class table's printed column, by `classResources.id`. The one the other three cannot say: Rage, Bardic Inspiration and Channel Divinity step on a schedule that is neither the proficiency bonus nor an ability modifier, and re-typing the printed column into a `by-level` table beside the column it duplicates is the second copy that drifts. A resource whose printed amount is a DICE STRING (Sneak Attack "3d6") is damage, not a count of uses, and resolves to no uses at all.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"class-resource"` | yes |  |
+| `id` | string (pattern) | yes |  |
 
 ### `HomebrewUsesByLevel`
 

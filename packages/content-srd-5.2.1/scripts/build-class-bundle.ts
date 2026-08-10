@@ -15,6 +15,7 @@
  * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -41,8 +42,52 @@ const strip = (value: string) =>
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, "'")
     .replace(/\s+/g, " ").trim();
 
+/**
+ * ONE HTML table, as a sentence.
+ *
+ * Every cell is prefixed with its own column heading, so the rendering is self-describing rather
+ * than positional: a player reading "Druid Level 2: Known Forms 4, Max CR 1/4, Fly Speed No" needs
+ * no column order in their head. Rows join with "; " because descriptions are collapsed to a single
+ * line downstream and a table cannot be laid out there.
+ *
+ * A TWO-COLUMN table labels only its first cell. "Sorcerer Level 3: Alter Self, Chromatic Orb" is
+ * unambiguous, and the alternative ("Sorcerer Level 3: Spells Alter Self, ...") reads like a typo -
+ * every spell-by-level table in the SRD's subclasses is this shape, so it is worth the special case.
+ */
+function tableAsText(html: string): string {
+  const cells = (row: string, tag: "th" | "td") =>
+    [...row.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "g"))].map((cell) => strip(cell[1]));
+  const head = html.match(/<thead>([\s\S]*?)<\/thead>/)?.[1] ?? "";
+  const columns = cells(head, "th");
+  const bodyRows = [...(html.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? html).matchAll(/<tr>([\s\S]*?)<\/tr>/g)];
+  const lines: string[] = [];
+  for (const [, row] of bodyRows) {
+    const values = cells(row, "td");
+    if (values.length === 0) continue;
+    const labelled = values.map((value, index) =>
+      (columns[index] && (index === 0 || values.length > 2) ? `${columns[index]} ${value}` : value));
+    lines.push(labelled.length === 1 ? labelled[0] : `${labelled[0]}: ${labelled.slice(1).join(", ")}`);
+  }
+  const text = lines.join("; ");
+  return text === "" ? "" : `${text}.`;
+}
+
+/**
+ * THE TABLES ARE CONTENT, NOT DECORATION - and dropping them truncated five features mid-sentence.
+ *
+ * Every parser below used to `.replace(/<table>[\s\S]*?<\/table>/g, " ")`, which is why Draconic
+ * Spells, Fiend Spells, Oath of Devotion Spells and Circle of the Land Spells each ended at the word
+ * "table" with the spells they promise nowhere in the record, and why Nature's Ward, Wild Shape and
+ * Font of Magic lost theirs too. The table IS the promise in all seven; a description that stops
+ * before it is not shorter prose, it is a feature that does not say what it does.
+ */
+const withTables = (value: string) => value.replace(/<table>[\s\S]*?<\/table>/g, (html) => ` ${tableAsText(html)} `);
+
 const slug = (value: string) =>
   strip(value).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** `#### Level 7: Remarkable Athlete` -> [, level, name]. Read by BOTH the class and subclass parsers. */
+const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;
 
 /** A dash-only table cell means "nothing at this level" in the printed tables. */
 const blank = (cell: string) => {
@@ -120,8 +165,7 @@ function optionSection(body: string, heading: string) {
   const options: { id: string; name: string; description: string }[] = [];
   for (let i = 1; i < parts.length; i += 2) {
     const name = strip(parts[i]);
-    const description = parts[i + 1]
-      .replace(/<table>[\s\S]*?<\/table>/g, " ")
+    const description = withTables(parts[i + 1])
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
     if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000) });
@@ -129,27 +173,74 @@ function optionSection(body: string, heading: string) {
   return options;
 }
 
-/** Feature prose keyed by slug, from the `###`/`####` headings that follow the tables. */
+/**
+ * Feature prose keyed by slug, from the `###`/`####` headings that follow the tables.
+ *
+ * Keyed under BOTH the raw heading slug and the `Level N:`-stripped one. The source prints
+ * `#### Level 1: Rage`, which slugs to `level-1-rage`, while the level TABLE names the feature
+ * `rage` - so every generated class asked for `rage`, missed, and fell through to the
+ * "See the <Class> class description in SRD 5.2.1." stub. 149 of 185 class features shipped that
+ * way: Monk 23/23, Barbarian 20/20, Rogue 19/19, Ranger 18/18, Paladin 18/18, Druid 14/14,
+ * Warlock 13/13, Bard 13/13, Sorcerer 11/11. The prose was never missing; the key was wrong.
+ * The subclass parser has always stripped the prefix first (`LEVEL_HEADING`).
+ *
+ * Both keys are kept rather than only the stripped one, because a heading with no `Level N:`
+ * prefix must still resolve, and because a class's own prose may reference either form.
+ */
 function featureProse(body: string): Map<string, string> {
   const out = new Map<string, string>();
   const parts = body.split(/^#{3,4} (.+)$/m);
   for (let i = 1; i < parts.length; i += 2) {
     const heading = strip(parts[i]);
-    const text = parts[i + 1]
-      .split(/\n#{3,6} /)[0]
-      .replace(/<table>[\s\S]*?<\/table>/g, " ")
+    const text = withTables(parts[i + 1].split(/\n#{3,6} /)[0])
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
-    if (text) out.set(slug(heading), text);
+    if (!text) continue;
+    const bare = heading.match(LEVEL_HEADING)?.[2];
+    // First write wins: the source prints "Level 4: Ability Score Improvement" at 4, 8, 12, 16 and
+    // 19 with identical bodies, and the bare key must not end up holding the last copy's stray text.
+    for (const key of [slug(heading), ...(bare ? [slug(bare)] : [])]) {
+      if (!out.has(key)) out.set(key, text);
+    }
   }
   return out;
+}
+
+/**
+ * The last resort before the stub: the LONGEST heading slug that is a hyphen-boundary prefix of the
+ * feature id.
+ *
+ * One printed heading can name a family the level table then splits. Warlock's table grants
+ * "Mystic Arcanum (level 6 spell)" at 11 and again at 13/15/17 for levels 7/8/9 - four feature ids -
+ * under the single heading `#### Level 11: Mystic Arcanum`, whose own body says so ("as shown in the
+ * Warlock Features table"). Prefixing at a hyphen boundary keeps this from over-matching: nothing
+ * resolves unless a whole leading segment sequence matches, so `brutal-strike` cannot claim
+ * `improved-brutal-strike`.
+ */
+function proseByPrefix(prose: Map<string, string>, featureId: string): string | undefined {
+  let best: string | undefined;
+  for (const key of prose.keys()) {
+    if (!featureId.startsWith(`${key}-`)) continue;
+    if (best === undefined || key.length > best.length) best = key;
+  }
+  return best === undefined ? undefined : prose.get(best);
 }
 
 // ---------------------------------------------------------------------------------------------
 // Per-class configuration the printed text cannot supply deterministically
 // ---------------------------------------------------------------------------------------------
 
-type ResourceSpec = { id: string; name: string; dice?: boolean };
+/**
+ * One printed resource column. `display` marks a column that is INK ONLY - no live `uses.pool`
+ * answers to its id, and none is expected to.
+ *
+ * Every column below carries it today, and that is a statement of fact rather than a policy: the
+ * nine generated classes have no authored mechanics at all yet (Stage 4), so not one of these ids
+ * is spendable. `class-resource-pools.test.ts` holds each id to "matches a pool OR says it is
+ * display", so as Stage 4 wires Rage or Bardic Inspiration to a real pool, the flag comes off HERE
+ * and the test starts requiring the pool it now names.
+ */
+type ResourceSpec = { id: string; name: string; dice?: boolean; display?: boolean };
 type ClassConfig = {
   /** See BLURBS. */
   blurb?: { summary: string; description: string };
@@ -228,9 +319,9 @@ const CONFIG: Record<string, ClassConfig> = {
   barbarian: {
     subclassLevel: 3,
     columns: {
-      Rages: { id: "rage", name: "Rages" },
-      "Rage Damage": { id: "rage-damage", name: "Rage Damage" },
-      "Weapon Mastery": { id: "weapon-mastery", name: "Weapon Mastery" }
+      Rages: { id: "rage", name: "Rages", display: true },
+      "Rage Damage": { id: "rage-damage", name: "Rage Damage", display: true },
+      "Weapon Mastery": { id: "weapon-mastery", name: "Weapon Mastery", display: true }
     },
     choices: {
       "weapon-mastery": weaponMastery(2),
@@ -242,7 +333,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: true, focus: "arcane-focus", multiclassProgression: "full", spellListId: "bard" },
     columns: {
-      "Bardic Die": { id: "bardic-inspiration", name: "Bardic Die", dice: true },
+      "Bardic Die": { id: "bardic-inspiration", name: "Bardic Die", dice: true, display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared"
     },
@@ -257,7 +348,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: "druidic-focus", multiclassProgression: "full", spellListId: "druid" },
     columns: {
-      "Wild Shape": { id: "wild-shape", name: "Wild Shape" },
+      "Wild Shape": { id: "wild-shape", name: "Wild Shape", display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared"
     },
@@ -269,9 +360,9 @@ const CONFIG: Record<string, ClassConfig> = {
   monk: {
     subclassLevel: 3,
     columns: {
-      "Martial Arts": { id: "martial-arts", name: "Martial Arts", dice: true },
-      "Focus Points": { id: "focus-points", name: "Focus Points" },
-      "Unarmored Movement": { id: "unarmored-movement", name: "Unarmored Movement" }
+      "Martial Arts": { id: "martial-arts", name: "Martial Arts", dice: true, display: true },
+      "Focus Points": { id: "focus-points", name: "Focus Points", display: true },
+      "Unarmored Movement": { id: "unarmored-movement", name: "Unarmored Movement", display: true }
     },
     choices: {
       "ability-score-improvement": asiChoice,
@@ -282,11 +373,13 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: false, focus: "holy-symbol", multiclassProgression: "half", spellListId: "paladin" },
     columns: {
-      "Channel Divinity": { id: "channel-divinity", name: "Channel Divinity" },
+      "Channel Divinity": { id: "channel-divinity", name: "Channel Divinity", display: true },
       "Prepared Spells": "prepared"
     },
     choices: {
-      "fighting-style": { kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" },
+      // `fighting-style` is authored in the OVERLAY for Paladin and Ranger, not here: theirs is a
+      // catalog PLUS one bespoke option (Blessed Warrior / Druidic Warrior) and `CONFIG.choices`
+      // cannot carry inline options at all. Fighter's, which is the plain catalog, stays hand-authored.
       "weapon-mastery": weaponMastery(2),
       "ability-score-improvement": asiChoice,
       "paladin-subclass": { kind: "subclass", choose: 1, fromCatalog: "paladin-subclasses" }
@@ -296,11 +389,11 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: "druidic-focus", multiclassProgression: "half", spellListId: "ranger" },
     columns: {
-      "Favored Enemy": { id: "favored-enemy", name: "Favored Enemy" },
+      "Favored Enemy": { id: "favored-enemy", name: "Favored Enemy", display: true },
       "Prepared Spells": "prepared"
     },
     choices: {
-      "fighting-style": { kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" },
+      // See the Paladin note above - Ranger's Druidic Warrior is the same shape.
       "weapon-mastery": weaponMastery(2),
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "ability-score-improvement": asiChoice,
@@ -309,7 +402,7 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   rogue: {
     subclassLevel: 3,
-    columns: { "Sneak Attack": { id: "sneak-attack", name: "Sneak Attack", dice: true } },
+    columns: { "Sneak Attack": { id: "sneak-attack", name: "Sneak Attack", dice: true, display: true } },
     choices: {
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "weapon-mastery": weaponMastery(2),
@@ -321,7 +414,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: false, focus: "arcane-focus", multiclassProgression: "full", spellListId: "sorcerer" },
     columns: {
-      "Sorcery Points": { id: "sorcery-points", name: "Sorcery Points" },
+      "Sorcery Points": { id: "sorcery-points", name: "Sorcery Points", display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared"
     },
@@ -335,7 +428,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: true, focus: "arcane-focus", multiclassProgression: "pact", spellListId: "warlock" },
     columns: {
-      "Eldritch Invocations": { id: "eldritch-invocations", name: "Eldritch Invocations" },
+      "Eldritch Invocations": { id: "eldritch-invocations", name: "Eldritch Invocations", display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared",
       "Spell Slots": "pact-slots",
@@ -489,6 +582,7 @@ for (const section of sections()) parsed.set(section.name.toLowerCase(), parseCl
 /** Build the 20 level rows plus the feature ids each row grants. */
 function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
   const { columns, rows } = entry.table;
+  const entryId = entry.id;
   /** feature id -> the FIRST level that grants it, for FeatureRecord.level. */
   const featureIds = new Map<string, number>();
   const table: ClassLevelRow[] = rows.map((cells) => {
@@ -520,12 +614,22 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       if (spec === "pact-level") { pact = { ...(pact ?? { level: 1, slots: 0 }), level: intOf(cell) ?? 1 }; return; }
       const amount = spec.dice ? strip(cell).toLowerCase().replace(/^d/, "1d") : intOf(cell);
       if (amount === null || amount === "") return;
-      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount });
+      // `display: true` says "ink only", and it comes off the moment the MECHANICS OVERLAY wires the
+      // column to a real pool - see `LIVE_CLASS_RESOURCES`. Deriving it here rather than editing
+      // fourteen column specs keeps one statement of which columns are live.
+      const live = (LIVE_CLASS_RESOURCES[entryId] ?? []).includes(spec.id);
+      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount, ...(spec.display && !live ? { display: true } : {}) });
     });
     // The features column is positional: always index 2 in every printed class table. A level that
     // grants nothing prints an em dash, which slugs to "" - drop those rather than emit a blank id.
+    //
+    // "Subclass feature" is dropped too. It is the table's REMINDER that the chosen subclass grants
+    // something at this level, not a class feature: the SRD prints no heading for it, so it can have
+    // no prose, and the real feature lives on the subclass record. All three hand-authored classes
+    // already omit it - `character-content.test.ts` pins Cleric's levels 6 and 17 as EMPTY rows - so
+    // the nine generated classes carrying a prose-less `subclass-feature` trait were the outlier.
     const named = strip(cells[2] ?? "").split(",").map((part) => part.trim()).filter(Boolean);
-    row.features = named.map((label) => slug(label)).filter(Boolean);
+    row.features = named.map((label) => slug(label)).filter((id) => id && id !== "subclass-feature");
     for (const id of row.features as string[]) featureIds.set(id, (featureIds.get(id) ?? row.level) as number);
     if (sawSlot && slots.some((count) => count > 0)) row.spellSlots = slots;
     if (pact) row.pactSlots = pact;
@@ -537,6 +641,8 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
 const built: unknown[] = [];
 const builtSubclasses: unknown[] = [];
 const report: string[] = [];
+/** Overlay keys that matched no generated feature - a renamed id whose riders would otherwise vanish. */
+const overlayMisses: string[] = [];
 
 for (const [id, entry] of parsed) {
   if (HAND_AUTHORED.has(id)) continue;
@@ -554,6 +660,7 @@ for (const [id, entry] of parsed) {
   const features = [...featureIds].map(([featureId, level]) => {
     const description = entry.prose.get(featureId)
       ?? entry.prose.get(featureId.replace(new RegExp(`^${id}-`), ""))
+      ?? proseByPrefix(entry.prose, featureId)
       ?? `See the ${entry.name} class description in SRD 5.2.1.`;
     const configured = config.choices?.[featureId];
     const choice = configured?.optionsFrom
@@ -602,11 +709,23 @@ for (const [id, entry] of parsed) {
     levelTable: table,
     features
   };
+  // THE MECHANICS OVERLAY. The SRD markdown carries no riders - there is no sentence in it that says
+  // `{type: "damage-resistance", ...}` - so the prose is generated and the mechanics are authored,
+  // and they meet HERE rather than by freezing the class into HAND_AUTHORED and hand-maintaining its
+  // 20-odd descriptions to gain somewhere to hang three lines. See `class-mechanics/overlay.ts`.
+  overlayMisses.push(...applyMechanics(id, features, CLASS_MECHANICS));
+  // PARSE THE FINISHED RECORD. The overlay is hand-authored TypeScript merged into generated data,
+  // so this is the one point where the two are checked together - an authoring mistake stops the
+  // build here rather than surfacing as a load failure in whatever runs next.
+  ClassReferenceSchema.parse(record);
   built.push(record);
-  report.push(`${entry.name}: ${table.length} rows, ${features.length} features, ${equipment.length} equipment options`);
+  const overlaid = Object.keys(CLASS_MECHANICS[id] ?? {}).length;
+  report.push(`${entry.name}: ${table.length} rows, ${features.length} features, ${equipment.length} equipment options${overlaid ? `, ${overlaid} with mechanics` : ""}`);
 }
 
 console.log(report.join("\n"));
+// The overlay-miss check waits for the SUBCLASS loop below, so a subclass key that matches nothing
+// fails the same way a class key does. `unresolvedItems` is class-only and can be checked now.
 if (unresolvedItems.length) {
   console.error(`\nUnresolved equipment ids (${unresolvedItems.length}):`);
   for (const item of unresolvedItems) console.error(`  ${item}`);
@@ -616,9 +735,6 @@ if (unresolvedItems.length) {
 // ---------------------------------------------------------------------------------------------
 // Subclasses
 // ---------------------------------------------------------------------------------------------
-
-/** `#### Level 7: Remarkable Athlete` -> { level, name }. */
-const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;
 
 /**
  * Bundle features that deliberately have no counterpart heading in the source, and why.
@@ -656,8 +772,7 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
   for (let i = 1; i < parts.length; i += 2) {
     const match = strip(parts[i]).match(LEVEL_HEADING);
     if (!match) continue;
-    const description = parts[i + 1]
-      .replace(/<table>[\s\S]*?<\/table>/g, " ")
+    const description = withTables(parts[i + 1])
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
     if (!description) continue;
@@ -669,14 +784,27 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
 for (const [id, entry] of parsed) {
   if (HAND_AUTHORED.has(id)) continue;
   const { title, intro, features } = parseSubclass(entry);
-  builtSubclasses.push({
-    id: slug(title), name: title, source: "srd", classId: id,
+  const subclassId = slug(title);
+  const record = {
+    id: subclassId, name: title, source: "srd", classId: id,
     subclassLevel: CONFIG[id].subclassLevel,
     summary: intro.split(". ")[0].slice(0, 200) || `${title}, the SRD 5.2.1 ${entry.name} subclass.`,
     description: intro.slice(0, 4000) || `${title}.`,
     features
-  });
+  };
+  // THE SUBCLASS HALF OF THE OVERLAY, keyed on (subclassId, featureId) exactly as the class half is
+  // keyed on (classId, featureId). It was declared and never merged, which meant nine of the twelve
+  // subclasses had NO authoring surface for a rider at all - the three that did were only reachable
+  // because their class is HAND_AUTHORED and the whole record is carried over verbatim.
+  overlayMisses.push(...applyMechanics(subclassId, features, SUBCLASS_MECHANICS));
+  // Parsed for the same reason a class is: an authoring mistake in hand-written TypeScript merged
+  // into generated data stops the build here rather than surfacing as a load failure later.
+  SubclassReferenceSchema.parse(record);
+  builtSubclasses.push(record);
+  const overlaid = Object.keys(SUBCLASS_MECHANICS[subclassId] ?? {}).length;
+  if (overlaid) console.log(`${title}: ${features.length} features, ${overlaid} with mechanics`);
 }
+
 
 // ---------------------------------------------------------------------------------------------
 // Cross-check: the hand-authored three, re-parsed from this source
@@ -691,6 +819,45 @@ const existingClasses = (JSON.parse(readFileSync(join(bundles, "classes.v1.json"
 const existingSubclassRecords = (JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as {
   id: string; name: string; classId: string; features: { id: string; level?: number }[];
 }[]).filter((record) => HAND_AUTHORED.has(record.classId));
+
+/**
+ * THE OVERLAY REACHES ALL TWELVE CLASSES, not the nine the ETL generates.
+ *
+ * `applyMechanics` used to run only inside the generation loop, so Cleric, Fighter and Wizard - the
+ * three whose records are carried through verbatim - could not use the overlay at all. That is why
+ * Thaumaturge's extra cantrip had to be hand-edited straight into `classes.v1.json`, and it is why
+ * three of the four Stage-4 authoring lanes would otherwise have had to edit that same 20,000-line
+ * file. The merge point differs and nothing else does:
+ *
+ *   - a GENERATED record is rebuilt from the markdown every run, so the overlay is the only home
+ *     its riders have and it is re-applied from scratch each time;
+ *   - a HAND_AUTHORED record's prose IS `classes.v1.json`, which this script reads and writes, so
+ *     the overlay's contribution is written back into its own input. `applyMechanics` therefore
+ *     refuses to overwrite a value already on the record: the merge only ADDS, and a rider that
+ *     disagrees with the file stops the build naming both homes rather than picking a winner.
+ *
+ * Both records are re-parsed below, exactly as the generated ones are.
+ */
+for (const record of existingClasses) {
+  overlayMisses.push(...applyMechanics(record.id, record.features, CLASS_MECHANICS));
+  ClassReferenceSchema.parse(record);
+  const overlaid = Object.keys(CLASS_MECHANICS[record.id] ?? {}).length;
+  if (overlaid) console.log(`${record.name} (hand-authored): ${overlaid} feature(s) with overlay mechanics`);
+}
+for (const record of existingSubclassRecords) {
+  overlayMisses.push(...applyMechanics(record.id, record.features, SUBCLASS_MECHANICS));
+  SubclassReferenceSchema.parse(record);
+}
+// A rider authored against a feature id no record emits is the silent drop this whole area exists
+// to end, so it fails the build rather than quietly producing a record without its mechanics. All
+// four merges report here - generated class, generated subclass, hand-authored class, hand-authored
+// subclass - so a key that matches nothing fails identically wherever it was authored.
+if (overlayMisses.length) {
+  console.error(`\nMechanics overlay keys matching no feature (${overlayMisses.length}):`);
+  for (const key of overlayMisses) console.error(`  ${key}`);
+  process.exit(1);
+}
+
 const disagreements: string[] = [];
 for (const record of existingClasses) {
   const entry = parsed.get(record.id);
@@ -777,6 +944,31 @@ const classesOut = z.array(ClassReferenceSchema).safeParse(allClasses);
 if (!classesOut.success) fail("classes", classesOut.error);
 const subclassesOut = z.array(SubclassReferenceSchema).safeParse(allSubclasses);
 if (!subclassesOut.success) fail("subclasses", subclassesOut.error);
+
+/**
+ * THE STUB CAN NEVER SHIP AGAIN.
+ *
+ * `featureProse`'s fallback is a pointer at a document the player does not have, and for a year it
+ * was the description of 149 of 185 class features because of a single slug mismatch - a silent
+ * degradation that looked like missing content and was actually a missing key. A build that emits
+ * even one of these has lost prose it was holding, so it fails here rather than writing the bundle.
+ * If a feature genuinely has no printed text, give it real text; do not re-add a fallback.
+ */
+const STUB_DESCRIPTION = /^See the .* in SRD 5\.2\.1\.$/;
+const stubs = [
+  ...allClasses.flatMap((record) => (record as ClassReference).features
+    .filter((feature) => STUB_DESCRIPTION.test(feature.description))
+    .map((feature) => `${(record as ClassReference).id}.${feature.id}`)),
+  ...allSubclasses.flatMap((record) => ((record as { id: string; features: { id: string; description: string }[] }).features ?? [])
+    .filter((feature) => STUB_DESCRIPTION.test(feature.description))
+    .map((feature) => `${(record as { id: string }).id}.${feature.id}`))
+];
+if (stubs.length) {
+  console.error(`\n${stubs.length} emitted feature description(s) are the "See the ... in SRD 5.2.1." STUB, not real prose:`);
+  for (const line of stubs.slice(0, 40)) console.error(`  ${line}`);
+  console.error("A stub means featureProse could not key the heading. Fix the keying (see featureProse); do not lower this bar.");
+  process.exit(1);
+}
 
 writeFileSync(join(bundles, "classes.v1.json"), `${JSON.stringify(allClasses, null, 1)}\n`);
 writeFileSync(join(bundles, "subclasses.v1.json"), `${JSON.stringify(allSubclasses, null, 1)}\n`);

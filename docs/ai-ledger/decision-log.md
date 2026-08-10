@@ -13,6 +13,144 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-10 — the remaining program: twenty client rulings, and one home for decisions
+
+**Context.** The feature-implementations branch (PR #55) closed 17 vocabulary-parity units across
+Waves 0–2, then a five-round discovery pass (19 agents) re-measured the remaining 22 units and found
+the plan's premise inverted — only two are "add a control" work — plus ~80 API-authorable
+capabilities the editor cannot reach. The client answered nine rounds of structured questions on
+2026-08-10. The full rulings, the measured findings and the four program plans live in
+`docs/product/remaining-program-plan.md` and `docs/product/plan-{content,api,engine,mastery}-program.md`;
+this entry records what is *durable* so it cannot be relitigated from memory.
+
+**The rulings that bind future work:**
+
+- **The branch splits.** Waves 0–2 merge to `main` as PR #55; the remaining programs run on a fresh
+  branch with **one PR per measured batch**. No more 34k-line unreviewed landings.
+- **The done bar is fixed:** an engine-outcome far-end proof, non-vacuity probes at **both** control
+  and value level, and a 375px touch pass for anything with UI. Every late bug this program caught
+  was caught by one of the three.
+- **Review is interleaved**, not terminal: every batch closes with a hostile adversarial review
+  hunting **built-but-unwired mechanisms and vacuous tests** specifically, plus a QA-fix and polish
+  pass; Areas 2–4's missing reviews are back-filled.
+- **A control with no SRD author is a defect, not a deliverable** (reaffirmed). The content program
+  authors the **full SRD magic-item list** (258 items, generated bundle + four overlay lanes), which
+  supplies real carriers to every zero-author unit — the harness's "not a lone record" rule stands
+  unchanged rather than gaining exemptions.
+- **The API parity guard is an HTTP round-trip** — the real router, the real store, the real publish
+  gate, and a deep-equal between the API-stored body and the editor-reproduced one. It lands
+  **before** the capability units so they land under it. `docs/product/vocabulary-parity-audit.md`
+  stops being hand-edited and is regenerated from the guard.
+- **`vex` and `slow` are real mastery units** with the same four-part contract as U34–U37; U38 stays
+  gated on all eight slugs reaching. "Unblocked by another unit" is not "implemented".
+- **U33 keeps its relabels and drops both destructive halves** — deleting an enum member that stored
+  records still carry (silent parse loss from every catalog), and removing a wire field with 44
+  authors. Breaking removals need migrations and their own decision, never a sweep.
+- **Baked characters get a versioned rebuild**: `schemaVersion` bumps, a per-sheet stale notice, and
+  a bulk GM action. Nothing rebuilds silently mid-campaign.
+- **Risky units run alone**: U22 (an `EffectInstanceSchema` field reaches every player by default),
+  U36 (cleave's second target must route through `canPlayerTarget` — client-supplied, never
+  server-chosen), U37 (push writes token position through `moveEncounterToken` only, with no client
+  input), and U19/U25's projection changes — each a dedicated agent plus a viewer-safety audit
+  before merge.
+- **The hand-authored overlay collision is ruled once**: adopt the content planner's `clears` verb
+  on `FeatureMechanics` (idempotent; a build error unless the same feature re-authors the key)
+  rather than hand-editing bundles or special-casing `choice`.
+- **U17's freeze is lifted**: the Stage-4 CONFIG freeze was documentation-only and Stage 4 is done.
+  Delete the stale `magical-secrets` row from `CONFIG.bard.choices` and author `widensPicks` through
+  the overlay — the engine plan costs the alternatives and cites why each loses.
+- **CI gets one verdict per commit**: seed the dice in `typed-damage-feed.test.ts`, then dedupe the
+  workflow's two concurrency groups. Six of thirty sampled commits disagreed with themselves.
+
+**The numbering migration.** This log is the **single home for decisions**; a D-number that does not
+resolve here does not exist. `docs/product/feature-implementations-plan.md` carries a file-local
+D1–D8 (2026-08-07) that collides with two older schemes quoted elsewhere; those numbers are now read
+as **"register D1"…"register D8"**, the register carries a pointer to this entry, and the five of
+them that never reached this log are hereby logged by reference: register D1 (all twelve classes
+ship), D2 (pinch-to-zoom), D4 (H1 — packages typecheck their own tests; **the packages/schemas half
+was never delivered** and is batch-0 work), D5 (schema gaps close by addition, not exemption), D7
+(the GM's damage entry gains an optional type — **server half only; the client half is owed** and
+runs before any new unit, with issue `4b`'s client half beside it). Future decisions: dated entries
+here, no parallel numbering anywhere.
+
+## 2026-08-09 — the calendar's two clocks are independent, and an era is derived from the year
+
+Client report (`5f`): *"Your date and Players' date give no indication of how to set them, setting a date
+sets **both** at once, and there is no era field."* Three rulings, one of which **reverses a dated decision
+in this log** and is recorded here rather than edited quietly into the code it contradicts.
+
+- **REVERSED: K7's auto-publish now covers seeding ONLY.** `writeCalendar` published the first campaign date
+  a codex was ever given. K7's reasoning — v15 backfills `published_*` for pre-M11 campaigns, so a post-M11
+  one would otherwise set a date and leave every player blank — was sound, and its scope was too wide. A GM
+  who has run a campaign for months, never published a date, and finally sets one **while prepping** had it
+  broadcast to the table by a write that says nothing about publishing. That is what the client reported as
+  "setting a date sets both at once", and no arrangement of the UI could have decoupled it, because the
+  coupling was one line in the store. Auto-publish now requires `isUnusedCodex()` — no pages, journal, maps,
+  markers, quests, sessions, standing, connections or folders — which is the case K7 was actually protecting:
+  a codex being **set up** rather than run. `importBundle` is unaffected; it wipes every table and then
+  writes the bundle's own published date over the result. (`apps/server/src/codex-store.ts`, `writeCalendar`.)
+- **Publish is always visible, disabled when there is nothing to publish.** It used to render only while the
+  clocks had diverged (`CalendarView.tsx`). Combined with the auto-publish above, that meant that **from the
+  unset state there was no visible publish act at all** — the GM set a date, the server published it, the
+  clocks agreed, and no control ever appeared. Two clocks with no visible act between them read as one clock
+  with two readouts, and that absence, not the server line alone, is why they felt welded. A disabled button
+  with the reason beside it protects against a no-op click without concealing that the act exists.
+- **The GM's clock is a door; the players' is not.** "Not set" was plain text, and the only way in was a
+  ghost "Edit calendar" button opening the world's structure, where the date is the *fourth* field. It is now
+  a button opening a dedicated date editor (`CampaignDateEditor`). The players' clock deliberately gains no
+  such affordance: **D11-H stands** — the published date is a COPY made by `publishCampaignDate()` and by
+  nothing else, so a "set the players' date" control is one that cannot exist. Its one door is Publish.
+- **An era is DERIVED from the year, never stored on a date.** `CodexCalendar.eras` is a list of
+  `{name, startYear}` inside `calendar_json`; a date's era is the last era whose start its year has reached.
+  So the whole migration is `normalizeCalendar` reading `eras ?? []` — no `ALTER`, no backfill, no stored
+  date rewritten, and an existing calendar upgrades by being read. The rejected alternative (an `era` field on
+  `CodexInWorldDate`) needs `in_world_era` on two tables plus three `published_*` siblings, a backfill that
+  must **invent** a value for every date already written, and it makes `calendar_instant` ambiguous. Eras are
+  **projected to both audiences, never filtered** — structure on the footing of `months` and `weekdays`, which
+  a player has always received. `yearName` ("Era suffix") is kept and unchanged: with no eras defined, every
+  label is byte-identical to what it was. Where an era applies it **leads** the year — "Third Age 1492" —
+  which is the "suffix rather than a leading component" defect the report named.
+
+## 2026-08-09 — a quest has five statuses, "open" means not finished, and a new quest is Not started
+
+Client report (`5d`): *"Quests need to expand their status options, it at least needs 'Not started'
+and 'Canceled'."* `CodexQuestStatus` is now
+`"not-started" | "active" | "completed" | "failed" | "canceled"`, in lifecycle order. Two rulings
+came with it, and both **reverse a position this repo had written down**, so they are dated here
+rather than quietly edited into the code they contradict.
+
+- **`canceled` is not a synonym for `failed`, and does not wear `danger`.** A lead the party never
+  took up did not fail. Recording it as a failure both misreports the campaign and puts a red badge
+  on something nobody lost, so the tone silently contradicting the word beside it is the specific
+  defect this avoids. `not-started` and `canceled` share `neutral` — the two states that want no
+  attention (`apps/client/src/codex/quests.ts`, `questStatusTone`).
+- **REVERSED: the default for a new quest is `not-started`, not `active`.** A quest record is created
+  the moment a lead is NAMED — `CodexQuestCreateRequest` requires nothing but a title, precisely so a
+  rumour can be written down mid-session — and a rumour nobody has acted on is not an active quest.
+  With three statuses `active` was the least wrong of them; now that "not started" exists, keeping it
+  would mean the honest state is the one a GM must select by hand. Nothing is lost from the dashboard
+  because of the next ruling. (`apps/server/src/codex-store.ts`, `questStatus`.)
+- **REVERSED: "open" is NOT FINISHED — `not-started` or `active`.** `openQuests`' docblock asserted
+  "open is `active`, and nothing else"; that reading is retired and the docblock now says so
+  (`apps/client/src/codex/quests.ts`). The card is headed "Open quests", not "In progress", and a
+  lead is open. The decisive consequence: with the new default, the old reading would have meant a GM
+  writes down a quest and watches it never appear on Home. The three TERMINAL states — `completed`,
+  `failed`, `canceled` — are what leaves the card.
+- **Existing campaigns are unaffected, by construction.** Migration **v26** rewrites no stored status,
+  so no quest that was closed yesterday is open today. It is the SECOND table rebuild in
+  `codex-store.ts` and it follows the 2026-07-29 entry below (*"M11: rebuild the journal table rather
+  than drop its CHECK"*) rather than re-deciding it: SQLite cannot widen a `CHECK` in place, and
+  dropping it would leave `questStatus()` guarding the process but not the file. The copying `SELECT`
+  is column-for-column with no `CASE` and no default, and `codex_quests_status` is recreated with the
+  table.
+- **The chronicle verbs are player-facing copy, not internal labels.** `QUEST_EVENT_VERB`
+  (`apps/client/src/codex/chronicle.ts`) completes the sentence `<Quest title> ___` on the party's own
+  timeline, so the two additions were chosen on how that sentence reads: **"has not started"** (true
+  at creation AND when a GM pushes a quest back, which "was noted" would not be) and **"was
+  canceled"** — the passive is not optional, because "The Amber Bargain canceled" reads as the quest
+  doing the cancelling. Same discipline the file already states for "reopened": say the payload, never
+  guess the sequence.
+
 ## 2026-08-03 — One Language: the play glossary, and where it is kept honest
 
 The play-facing unification (D1–D33; the full decision record is the engagement's master plan,
@@ -444,6 +582,12 @@ expected red on handoff.** The first is simpler and is what the rule should have
 
 ## 2026-07-29 — M11: the first campaign date a codex is ever given publishes itself
 
+> **SUPERSEDED (2026-08-09, D6 — "the calendar's two clocks are independent", top of this file).** The
+> reasoning below stands; its **scope** was too wide. Auto-publish now fires only for a codex holding **no
+> records at all** — the seeding case this entry was actually protecting — because on a campaign that
+> already exists, the first date is set while *prepping*, and prep is private. The narrowing is
+> `isUnusedCodex()` in `apps/server/src/codex-store.ts`.
+
 O-1 makes the GM's clock private, and migration v15 backfills the published date so an existing campaign
 sees no change. A campaign created *after* M11 has nothing to backfill — so the GM would set "Current
 date — the world's now" and every player's date would stay blank, with the only explanation living on a
@@ -800,7 +944,9 @@ traced path.
 6. **A required argument beats a safe default when you want an audit.** `forAudience(audience)` and
    `isMintedHomebrewId(id, type)` both take required arguments so `tsc` names every call site. Known
    limit: `apps/server`'s tsconfig includes only `src`, so the property stops at the test boundary —
-   a stale test call compiles and fails at runtime instead.
+   a stale test call compiles and fails at runtime instead. **Reversed 2026-08-07** (plan decision
+   D4): `apps/server/tsconfig.json` is `"include": ["src", "test"]`, the 50 latent errors this hid
+   are fixed, and the property now holds across the whole workspace.
 
 **On process, from the same pass.** Five HIGH defects survived nine commits, four planning documents
 and six research intakes; not one was found by reading. Each came from running the flow — duplicate

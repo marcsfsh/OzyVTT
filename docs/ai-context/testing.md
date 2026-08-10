@@ -103,6 +103,14 @@ automated does.**
   and a live dev server, so it is a thing you run, not a thing that runs. The shell lock
   took the whole table green (staged pane regions absorb unconverted surfaces), so any red
   cell is a regression; the (g)/(h) ratchets carry the remaining conversion debt.
+- **Map gestures:** `node scripts/map-stability-audit.mjs` (the stage holds its exact box when a
+  token is released, the docked panel owns one scroller inside one frame, the ⋯ menu's plate stays
+  behind its rows) and `node scripts/pinch-zoom-audit.mjs` (two fingers zoom the battle map, and a
+  second finger aborts the gesture underneath it without committing anything, per gesture kind at
+  375×667 and 320×568). Both drive **multi-touch through CDP** and a real GM session on a real
+  fight, and both MUTATE the server — point `DATA_DIR` at a throwaway copy. The pinch audit runs
+  every case twice, uninterrupted first, and fails if the uninterrupted run commits nothing: an
+  "it wrote nothing" assertion is worthless without a control that writes.
 
 Say what you ran and what you saw. A tier you did not execute is not verification, and
 "should work now" is not a result.
@@ -114,6 +122,11 @@ Say what you ran and what you saw. A tier you did not execute is not verificatio
   are focused unit tests.
 - **`@vtt/web` has a test suite**: Vitest + **jsdom** + Testing Library, configured in
   `apps/client/vitest.config.ts` with shims in `apps/client/test/setup.ts`.
+  `vitest.config.ts` runs **two projects**: `dom` (jsdom + `test/setup.ts`, every
+  `*.test.{ts,tsx}`) and `node` (plain Node, no setup file, `*.mirror.test.ts` only) — a mirror
+  test imports the SERVER's modules to prove the wizard and the authoritative build agree, and
+  the server's store reaches for `node:sqlite`, which vite will not bundle for a browser
+  environment. Reach for `node` only for that; a component test belongs in `dom`.
   **What it does and does not prove.** jsdom omits several APIs this app uses. `setup.ts` shims
   native `<dialog>` `showModal`/`close`, `setPointerCapture`, `scrollIntoView`, `scrollTo`,
   `ResizeObserver` and `matchMedia` so components can render. **`SVGSVGElement.getScreenCTM` is

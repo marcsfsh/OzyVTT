@@ -284,10 +284,12 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(withRiders);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // Eleven variants: the eight that existed plus the three shared with FeatureModifierSchema.
-    expect(EffectModifierSchema.options).toHaveLength(11);
+    // Twelve variants: the eight that existed, the three shared with FeatureModifierSchema, and
+    // `damage-vulnerability` - the mirror of `damage-resistance`, without which nothing in the game
+    // could make a player character vulnerable to a damage type.
+    expect(EffectModifierSchema.options).toHaveLength(12);
     // ...and the JSON twin declares exactly as many branches, which is the lockstep this test buys.
-    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(11);
+    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(12);
   });
 
   it("normalises every advantage shape through ONE function, so no consumer branches on eleven", () => {
@@ -303,7 +305,7 @@ describe("actor definition v1", () => {
     expect(toRollModes(EffectModifierSchema.parse({ type: "attack-bonus", amount: 1 }))).toEqual([]);
   });
 
-  it("declares thirty named triggers, every one classified and accepted by the JSON twin", () => {
+  it("declares thirty-one named triggers, every one classified and accepted by the JSON twin", () => {
     // One sample per trigger. The JSON twin folds the eleven parameterless moments into a single
     // enum branch, so a branch COUNT would not prove agreement - running every name through both
     // documents does. A trigger added to Zod and forgotten in the mirror fails right here.
@@ -319,20 +321,21 @@ describe("actor definition v1", () => {
       "attack-kind-is": { kinds: ["opportunity"] }, "weapon-property-is": { properties: ["finesse"] },
       "damage-type-is": { damageTypes: ["fire"] }, "ability-is": { abilities: ["dex"] },
       "skill-is": { skills: ["stealth"] }, "spell-school-is": { schools: ["evocation"] },
-      "spell-level-is": { levels: [0, 3] }, "versus-creature-type": { creatureTypes: ["undead"] },
+      "spell-level-is": { levels: [0, 3] }, "spell-id-is": { spellIds: ["eldritch-blast"] },
+      "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large"] }, "versus-condition": { conditionIds: ["prone"] }
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(30);
+    expect(declared).toHaveLength(31);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
-    // Six static gates, three dynamic gates, eleven moments, ten filters - and every trigger is
+    // Six static gates, three dynamic gates, eleven moments, eleven filters - and every trigger is
     // classified, because an unclassified one would silently evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
     expect(kinds.filter((kind) => kind === undefined)).toEqual([]);
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
     expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
     expect(kinds.filter((kind) => kind === "moment")).toHaveLength(11);
-    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(10);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(11);
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };

@@ -19,7 +19,17 @@ export type AdjustedDamagePart = Readonly<{
   adjustment: "resistance" | "immunity" | "vulnerability" | null;
 }>;
 
-const normalizeType = (type: string) => type.trim().toLowerCase();
+/**
+ * THE ONE damage-type normaliser, exported so both halves of the vocabulary share it.
+ *
+ * The engine matches types by this form, and the homebrew editor writes them; a second copy anywhere
+ * is a silent-inertness bug ("Fire" resisted by nothing). It lives HERE rather than beside
+ * `DAMAGE_TYPE_IDS` because `@vtt/content-srd-5.2.1` depends on this package and not the reverse -
+ * declaring it there and importing it here would be a dependency cycle. That package re-exports it.
+ */
+export const normalizeDamageType = (type: string): string => type.trim().toLowerCase();
+
+const normalizeType = normalizeDamageType;
 
 /**
  * SRD order per part: immunity zeroes, resistance halves rounding down, vulnerability doubles.
@@ -39,6 +49,45 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
     if (vulnerable && !resistant) return { type: part.type, amount: part.amount, adjusted: part.amount * 2, adjustment: "vulnerability" as const };
     return { type: part.type, amount: part.amount, adjusted: part.amount, adjustment: null };
   });
+}
+
+/**
+ * Flat reduction ("reduce the damage by 3" - Heavy Armor Master, Armor of Gleaming) is the LAST step
+ * and the only one that is not per-type: it applies once to the total the per-type adjustments
+ * produced, and it floors at 0 rather than turning damage into healing.
+ *
+ * Per TOTAL rather than per part because the SRD phrases it against "the damage" one attack deals,
+ * not against each damage die's own type. `adjustDamageParts` has already run when this is called, so
+ * a resistance halves BEFORE the reduction subtracts - which is the order that makes a resisted hit
+ * survivable rather than the reverse.
+ */
+export function reduceDamageTotal(total: number, reduction: number): number {
+  return reduction <= 0 ? total : Math.max(0, total - reduction);
+}
+
+/**
+ * A HAND-ENTERED TOTAL, re-weighted across the types that were actually rolled.
+ *
+ * The alternative - what every amend path did before this - is to send the number as an untyped
+ * total, which skips the defence pipeline entirely: the GM corrects 17 to 12 and the fire-resistant
+ * target suddenly takes all 12. Scaling keeps every type, so the amended hit is still fire, still
+ * halved, and still explains itself.
+ *
+ * Exact by construction: each part floors to its share and the whole remainder lands on the largest
+ * one, so the result always sums to `total`. An empty or zero-valued proposal has nothing to weight
+ * by, so the number goes on a single part carrying the first type it can see.
+ */
+export function rescaleDamageParts(parts: readonly DamagePart[], total: number): DamagePart[] {
+  const target = Math.max(0, Math.trunc(total));
+  const rolled = parts.reduce((sum, part) => sum + part.amount, 0);
+  if (parts.length === 0) return [];
+  if (parts.length === 1 || rolled <= 0) return [{ type: parts[0].type, amount: target }];
+  const scaled = parts.map((part) => ({ type: part.type, amount: Math.floor((part.amount * target) / rolled) }));
+  const remainder = target - scaled.reduce((sum, part) => sum + part.amount, 0);
+  let largest = 0;
+  for (let index = 1; index < parts.length; index += 1) if (parts[index].amount > parts[largest].amount) largest = index;
+  scaled[largest] = { type: scaled[largest].type, amount: scaled[largest].amount + remainder };
+  return scaled;
 }
 
 export type RollModeSource = Readonly<{ source: string; label: string }>;

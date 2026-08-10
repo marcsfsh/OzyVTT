@@ -1,8 +1,8 @@
 import {
-  CatalogChoiceError, resolveCatalogChoice,
+  CatalogChoiceError, extraPickAmount, resolveCatalogChoice, resolvePickChoice,
   type BuilderAbilityMethod, type BuilderPolicy, type CatalogChoiceOption, type ContentBackgroundSummary,
-  type ContentClassSummary, type ContentFeatSummary, type ContentFeatureSummary, type ContentSpeciesSummary,
-  type ContentSubclassSummary
+  type ContentChoiceList, type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary,
+  type ContentFeatureSummary, type ContentSpeciesSummary, type ContentSubclassSummary
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import {
@@ -121,21 +121,53 @@ export type BuilderOffer = Readonly<{
   unavailable: Readonly<Record<string, string>> | null;
 }>;
 
+/**
+ * EVERY pick a feature owes, the client's mirror of the content package's `featurePicks`.
+ *
+ * `choice` is the first and `choices` is the whole list; a record authored either way reads the same
+ * here. Reading only `choice` is what silently dropped Magic Initiate's level-1 spell.
+ */
+const featurePicksOf = (feature: ContentFeatureSummary): readonly NonNullable<ContentFeatureSummary["choice"]>[] =>
+  feature.choices.length > 0 ? feature.choices : (feature.choice ? [feature.choice] : []);
+
 const optionsOfIds = (ids: readonly string[], nameOf: (id: string) => string): CatalogChoiceOption[] =>
   ids.map((id) => ({ id, name: nameOf(id) }));
 
 const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 
 /** Resolve a feature's choice to concrete options, never throwing: a gap becomes `unresolvable`. */
-function resolveChoice(choice: NonNullable<ContentFeatureSummary["choice"]>, catalogs: BuilderCatalogs, nameOf: (id: string) => string):
-{ options: CatalogChoiceOption[]; unresolvable: string | null } {
-  if (choice.from.length > 0) return { options: optionsOfIds(choice.from, nameOf), unresolvable: null };
-  if (!choice.fromCatalog) return { options: [], unresolvable: "this pick names no option list." };
+function resolveChoice(
+  choice: NonNullable<ContentFeatureSummary["choice"]>, catalogs: BuilderCatalogs, nameOf: (id: string) => string,
+  answersFor: (offer: string) => readonly string[]
+): { options: CatalogChoiceOption[]; unresolvable: string | null } {
+  // THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS ("one of your known Warlock cantrips that
+  // deals damage"). Resolved by the same function the server re-validates with, over the draft's own
+  // answers - so the wizard offers exactly the eligible cantrips and no others. A pick made too
+  // early (no cantrips chosen yet) DEFERS with the resolver's message rather than showing an empty list.
+  if (choice.fromPicks) {
+    try {
+      return { options: resolvePickChoice(choice.fromPicks, answersFor(choice.fromPicks.offer), catalogs.choice), unresolvable: null };
+    } catch (error) {
+      if (!(error instanceof CatalogChoiceError)) throw error;
+      return { options: [], unresolvable: error.message };
+    }
+  }
+  const named = choice.from.length > 0 ? optionsOfIds(choice.from, nameOf) : [];
+  // A CATALOG **PLUS** ONE BESPOKE OPTION. `from` used to short-circuit, so "a Fighting Style feat
+  // OR Blessed Warrior (two Cleric cantrips)" was unsayable and Paladin's and Ranger's variants were
+  // simply unpickable. The two are UNIONED instead, inline entries first (they are the authored
+  // ones and carry their own mechanics), and an id in both keeps its inline record.
+  if (!choice.fromCatalog) {
+    return named.length > 0 ? { options: named, unresolvable: null } : { options: [], unresolvable: "this pick names no option list." };
+  }
   try {
-    return { options: resolveCatalogChoice(choice.fromCatalog, catalogs.choice), unresolvable: null };
+    const catalog = resolveCatalogChoice(choice.fromCatalog, catalogs.choice);
+    const inline = new Set(named.map((option) => option.id));
+    return { options: [...named, ...catalog.filter((option) => !inline.has(option.id))], unresolvable: null };
   } catch (error) {
-    if (error instanceof CatalogChoiceError) return { options: [], unresolvable: error.message };
-    throw error;
+    if (!(error instanceof CatalogChoiceError)) throw error;
+    // A content gap in the catalog half must not take the bespoke half down with it.
+    return named.length > 0 ? { options: named, unresolvable: null } : { options: [], unresolvable: error.message };
   }
 }
 
@@ -281,6 +313,31 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       if (!heldProficiencies.has(id)) heldProficiencies.set(id, `already chosen for "${label}"`);
     }
   };
+  /**
+   * WHAT AN EARLIER GRANT OF THE SAME FEATURE ALREADY SPENT - budget key -> option id -> reason.
+   *
+   * The one place the wizard deliberately disagrees with the server about offer SHAPE. A class
+   * feature granted at two levels (Bard's Expertise at 3 and 9, Rogue's at 1 and 6, Sorcerer's
+   * Metamagic at 2, 10 and 17) becomes TWO offers here, one per grant level, and that split is
+   * load-bearing: `buildChoiceRows` stamps each row with its offer's level and `level-ledger.ts`
+   * reads a stored row back by matching `(level, kind, classId, featureId)`, so a ledger that put
+   * every Expertise at level 3 would be un-prefillable in the level-up flow. The server keeps ONE
+   * offer of capacity `choose x count` and says so in `grantedClassFeatures`' own comment.
+   *
+   * What was missing is the consequence of that: because the server has ONE offer, its `matchRow`
+   * refuses a repeated id (`character-build.ts` - `candidate.repeatable || !candidate.taken.includes`),
+   * while nothing here stopped the two sibling offers from taking the same card off one shared
+   * option list. `PROVENANCE_KINDS` excludes `expertise`, and `withExpertiseReach` greys only the
+   * skills you are NOT proficient in - never the one the sibling offer just spent. So a Bard 9,
+   * Rogue 6 or Sorcerer 10 could finish the wizard and be REFUSED at Create with
+   * `The "expertise" pick "acrobatics" exceeds what this build may choose (Expertise: 4)`.
+   *
+   * Keyed on `budgetKeyOf`, which strips the "#n" repeat suffix, so the siblings that share one
+   * server offer are exactly the ones that share an entry here - and `feature:<id>@<level>` (the ASI
+   * keys) never collide, which is right: the server mints one offer per CHOSEN feat, each with its
+   * own capacity, so repeating an ability there is legal and must stay offered.
+   */
+  const spentByRepeat = new Map<string, Map<string, string>>();
   const featRepeats = (id: string) => {
     const feat = catalogs.choice.feats.find((entry) => entry.id === id);
     if (!feat?.repeatable) return false;
@@ -288,8 +345,43 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     // whose own choice draws from a `<list>-spells` catalog is Magic Initiate, whose repeat clause
     // reads "a different spell list each time" - and here a spell list IS a separate feat id, so
     // repeating the SAME id is not legal however the `repeatable` flag reads.
-    return !(feat.feature.choice?.fromCatalog?.endsWith("-spells") ?? false);
+    return !featurePicksOf(feat.feature).some((pick) => pick.fromCatalog?.endsWith("-spells") ?? false);
   };
+  /**
+   * EXTRA PICKS - offer key -> how many picks the granted features have ADDED to it.
+   *
+   * The mirror of `character-build.ts`'s `extraPickBudgets`, keyed identically (the offer key both
+   * sides already share), summed identically, and applied to the same capacities. A divergence
+   * between the two is always the bug: this side decides what the player may pick and the server
+   * re-validates it, so offering one more than the server allows refuses the build at Create, and
+   * offering one fewer makes the promise in the feature's own text unselectable.
+   *
+   * Applied as a POST-PASS (`withGrantedPicks`, below) rather than at each `offers.push`, because a
+   * grant is discovered in step order while the budget it raises may already have been built: the
+   * class skills offer is step 3 and the feature that raises it is step 4.
+   */
+  const extraPicks = new Map<string, number>();
+  const addExtraPicks = (grants: readonly ContentExtraPickSummary[] | undefined, times: number) => {
+    // `extraPickAmount` is the SHARED resolver, so a budget that follows the printed column
+    // (Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6) is computed by ONE function on both
+    // sides. A grant with no class in the draft yet scales off an empty table and adds nothing.
+    const table = context.classRecord?.levelTable ?? [];
+    for (const grant of grants ?? []) {
+      extraPicks.set(grant.offer, (extraPicks.get(grant.offer) ?? 0) + extraPickAmount(grant, table, draft.level) * times);
+    }
+  };
+  /**
+   * IS THE EARLIER ANSWER A GATE NAMES ALREADY IN THE DRAFT - the client's mirror of the server's
+   * `ledgerAnswered`, which reads the submitted ledger instead.
+   *
+   * Keyed on the offer key both sides already share. The `#n` uniquifying suffix is stripped (the
+   * same normalization `budgetKeyOf` performs for budgets) so a repeated offer still answers its gate.
+   */
+  const answeredInDraft = (gate: Readonly<{ offer: string; id: string }>): boolean =>
+    answersInDraft(gate.offer).includes(gate.id);
+  /** Every answer this budget already holds - the draft-side mirror of the server's `answersFor`. */
+  const answersInDraft = (offer: string): readonly string[] =>
+    Object.entries(draft.picks).flatMap(([key, ids]) => budgetKeyOf(key).split("@")[0] === offer ? ids : []);
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   // An OPTION is named, not abbreviated: this string is the card's title and the review's value, and
@@ -302,29 +394,66 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
         : kind === "ability-score" ? (ABILITIES.includes(id as Ability) ? ABILITY_LABELS[id as Ability] : titleize(id))
           : titleize(id);
 
-  const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: { choose: number; from: readonly string[] } | null | undefined, classId: string | null) => {
+  const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: ContentChoiceList | { choose: number; from: readonly string[]; fromCatalog?: string | null } | null | undefined, classId: string | null) => {
     if (!list || list.choose <= 0) return;
     const offerKey = uniqueKey(key);
-    const options = optionsOfIds(list.from, nameOfKind(kind));
+    // A "choose N" LIST may name an open catalog too, exactly as a feature's choice may. The species
+    // language budget ("Common plus two languages from the Standard Languages table") is nineteen ids
+    // that would otherwise be copied onto all nine species; `fromCatalog` keeps one source of truth,
+    // resolved through the SAME function the server validates the submitted row with.
+    const named = optionsOfIds(list.from, nameOfKind(kind));
+    let options = named;
+    let unresolvable: string | null = null;
+    if (list.fromCatalog) {
+      try {
+        const catalog = resolveCatalogChoice(list.fromCatalog, catalogs.choice);
+        const inline = new Set(named.map((option) => option.id));
+        options = [...named, ...catalog.filter((option) => !inline.has(option.id))];
+      } catch (error) {
+        if (!(error instanceof CatalogChoiceError)) throw error;
+        if (named.length === 0) unresolvable = error.message;
+      }
+    }
     offers.push({
       key: offerKey, step, featureId: null, kind, label, help: null, capacity: list.choose,
-      options, maxSpellLevel: null, level: 1, classId, unresolvable: null,
+      options, maxSpellLevel: null, level: 1, classId, unresolvable,
       unavailable: unavailableOf(kind, options)
     });
     recordHeld(offerKey, kind, label);
   };
 
-  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, capacity?: number) => {
-    const choice = feature.choice;
-    if (!choice || choice.choose <= 0) return;
-    const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind));
-    // A `maxSpellLevel` ceiling is a hard filter (Evocation Savant is level 2 and under), and the
-    // two spell kinds do not overlap: "cantrip" means level 0, "spell" means 1+. Offering a cantrip
-    // under a "spell" pick would record it at the wrong level on the sheet.
+  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, times = 1) => {
+    // BEFORE the early return: a feature may raise a budget without asking for a pick of its own
+    // ("you gain one additional skill from your class's list" has no choice card, only a bigger one
+    // on the class step). Collecting inside the offer branch would drop exactly those.
+    addExtraPicks(feature.extraPicks, times);
+    // EVERY pick the record owes, mirroring the server's `featurePicks` loop. Magic Initiate owes two
+    // cantrips AND one level-1 spell; reading only the first is what silently dropped the spell. The
+    // first pick keeps the plain key so a parked draft still resolves; later ones take "/2", "/3",
+    // which `budgetKeyOf` deliberately does NOT collapse (a "#n" repeat means the same pick again,
+    // a "/n" means a DIFFERENT pick on the same record, and only the former shares a budget).
+    const picks = featurePicksOf(feature);
+    picks.forEach((choice, index) =>
+      featurePickOffer(index === 0 ? key : `${key}/${index + 1}`, step, feature, choice, level, classId, times));
+  };
+
+  const featurePickOffer = (
+    key: string, step: OfferStep, feature: ContentFeatureSummary, choice: NonNullable<ContentFeatureSummary["choice"]>,
+    level: number, classId: string | null, times = 1
+  ) => {
+    if (choice.choose <= 0) return;
+    const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind), answersInDraft);
+    // A `maxSpellLevel` ceiling is a hard filter (Evocation Savant is level 2 and under), `minSpellLevel`
+    // is its floor (Mystic Arcanum is EXACTLY a level-6 spell, not "6 or lower"), and the two spell
+    // kinds do not overlap: "cantrip" means level 0, "spell" means 1+. Offering a cantrip under a
+    // "spell" pick would record it at the wrong level on the sheet. The same window the server's
+    // `withinSpellWindow` enforces - offering outside it refuses the build at Create.
     const ceiling = choice.maxSpellLevel;
+    const floor = choice.minSpellLevel;
     const filtered = options.filter((option) => {
       const spellLevel = option.level;
       if (ceiling != null && (spellLevel ?? 0) > ceiling) return false;
+      if (floor != null && (spellLevel ?? 0) < floor) return false;
       if (spellLevel == null) return true;
       if (choice.kind === "cantrip") return spellLevel === 0;
       if (choice.kind === "spell") return spellLevel >= 1;
@@ -332,22 +461,83 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
     // Drop the feats this build already carries (see `heldFeatIds`); "asi" is the built-in
     // raise-two-scores shorthand, never a feat, so it is never filtered out.
-    const offerable = FEAT_KINDS.has(choice.kind)
+    let offerable = FEAT_KINDS.has(choice.kind)
       ? filtered.filter((option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id))
       : filtered;
+    /**
+     * AN OPTION GATED ON AN EARLIER ANSWER (`requires`), mirroring the server exactly.
+     *
+     * Improved Blessed Strikes offers two halves and the Cleric's level-7 answer already decided
+     * which applies. An option whose gate is unmet is dropped; and when the survivors exactly fill
+     * the capacity the answer is a CONSEQUENCE, not a choice, so no card is rendered at all - a pick
+     * with one option on it is worse than the prose it replaces. The server adopts the same
+     * survivors, so the two agree without the player touching anything.
+     */
+    const gatedOptions = choice.options ?? [];
+    if (gatedOptions.some((option) => option.requires)) {
+      const legal = gatedOptions.filter((option) => !option.requires || answeredInDraft(option.requires));
+      if (legal.length === choice.choose * times) {
+        for (const option of legal) addExtraPicks(option.extraPicks, times);
+        return;
+      }
+      offerable = offerable.filter((option) => legal.some((candidate) => candidate.id === option.id));
+    }
     const offerKey = uniqueKey(key);
+    // A feature the class table grants MORE THAN ONCE is one offer on the server and several here
+    // (see `spentByRepeat`), so its siblings share a budget key and must not share an answer.
+    const budgetKey = feature.grantedAtLevels.length > 1 ? budgetKeyOf(offerKey) : null;
+    const spent = budgetKey ? spentByRepeat.get(budgetKey) : undefined;
+    const held = unavailableOf(choice.kind, offerable);
+    let unavailable = held;
+    if (spent && spent.size > 0) {
+      const merged: Record<string, string> = { ...held };
+      for (const option of offerable) {
+        const reason = spent.get(option.id);
+        if (reason && !merged[option.id]) merged[option.id] = reason;
+      }
+      unavailable = merged;
+    }
     offers.push({
       key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
-      capacity: capacity ?? choice.choose,
+      capacity: choice.choose * times,
       options: offerable,
       maxSpellLevel: ceiling ?? null, level, classId, unresolvable,
-      unavailable: unavailableOf(choice.kind, offerable)
+      unavailable
     });
     if (FEAT_KINDS.has(choice.kind)) {
       for (const id of draft.picks[offerKey] ?? []) if (id !== ASI_SHORTHAND) heldFeatIds.add(id);
     }
+    // AFTER the push, exactly as `recordHeld` is: an offer never greys out its own answers, or a
+    // chosen card could not be tapped again to un-choose it.
+    if (budgetKey) {
+      const running = spentByRepeat.get(budgetKey) ?? new Map<string, string>();
+      for (const id of draft.picks[offerKey] ?? []) {
+        if (!running.has(id)) running.set(id, `already chosen for ${feature.name} at level ${level}`);
+      }
+      spentByRepeat.set(budgetKey, running);
+    }
     recordHeld(offerKey, choice.kind, feature.name);
+    /**
+     * A CHOSEN INLINE OPTION IS A FEATURE, so its own picks and budget grants are the client's
+     * mirror of the server's pass A2 - and until now only half of that mirror existed.
+     *
+     * `extraPicks` was read (Divine Order's Thaumaturge grants the extra Cleric cantrip). The
+     * option's own `choice` was NOT: Blessed Warrior's two Cleric cantrips, Druidic Warrior's two
+     * Druid cantrips, Pact of the Blade's weapon and Pact of the Tome's cantrips were all offered by
+     * the server and rendered by nobody, so taking one produced a build the server refused with
+     * "needs N pick(s)" and no card anywhere to answer it. Keyed on the OPTION's id, which is
+     * exactly the key the server's pass A2 gives it.
+     */
+    const picked = new Set(draft.picks[offerKey] ?? []);
+    for (const option of choice.options ?? []) {
+      if (!picked.has(option.id)) continue;
+      addExtraPicks(option.extraPicks, times);
+      const nested = option.choices.length > 0 ? option.choices : (option.choice ? [option.choice] : []);
+      const asFeature = { ...feature, id: option.id, name: option.name, description: option.description };
+      nested.forEach((pick, index) =>
+        featurePickOffer(index === 0 ? `feature:${option.id}` : `feature:${option.id}/${index + 1}`, step, asFeature, pick, level, classId, times));
+    }
   };
 
   // ---- Step 1: species. Its traits' picks, its language choices, and (when the species prints
@@ -400,23 +590,41 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
         if (at <= draft.level) featureOffer(`feature:${feature.id}`, "features", feature, at, context.classRecord.id);
       }
     }
-    // A chosen feat's OWN feature can ask for picks (Magic Initiate's cantrips, the ASI feat's two
-    // ability points). Those second-order offers exist only once the parent feat is chosen - exactly
-    // the server's two-pass order. Picking the same feat twice adds capacity rather than a duplicate.
+    /**
+     * A chosen feat's OWN feature can ask for picks (Magic Initiate's cantrips, the ASI feat's two
+     * ability points). Those second-order offers exist only once the parent feat is chosen - exactly
+     * the server's two-pass order.
+     *
+     * ONE OFFER PER INSTANCE, never one offer of N times the capacity. The server mints exactly one
+     * per chosen feat (`character-build.ts`: `for (const [index, feat] of chosenFeats.entries())
+     * featureOffer(feat.feature, 1, [], chosenFeatSteps[index])`), and this side used to merge them:
+     * four Ability Score Improvement feats became a single `ability-score` offer of capacity 8.
+     *
+     * That is not a shape the wizard can answer. `ChoiceGrid` is a checkbox group - a card cannot be
+     * selected twice - and `repeatable` lives on `ContentFeatSummary` but NOT on
+     * `ContentFeatureChoiceSummary`, so it never crosses the wire and this side cannot know a repeat
+     * was legal. Against the ASI feat's six ability cards the step read "6 of 8 chosen" with every
+     * card selected, `offerFilled`'s equality never held, and Next never enabled: taking the ASI feat
+     * at every improvement - the ordinary play pattern, and one of only two cards the SRD's ASI level
+     * offers - made every class uncompletable at 16 and 20 (and Fighter from 12).
+     *
+     * Splitting also fixes the arithmetic for free: `uniqueKey` gives the repeats "#2", "#3", ... and
+     * `budgetKeyOf` strips that suffix, so `extraPicks` still sum onto one budget exactly as the
+     * server's `count` multiplication did.
+     *
+     * Every taken feat is passed on, not only the ones that ask a question, because the server folds
+     * `grantExtraPicks(feat.feature, 1)` over ALL of them - a feat that raises a budget without
+     * asking for a pick of its own must raise it here too, or the wizard under-offers what the
+     * server then demands.
+     */
     const takenFeatIds = offers
       .filter((offer) => FEAT_KINDS.has(offer.kind))
       .flatMap((offer) => (draft.picks[offer.key] ?? []).map((id) => ({ id, step: offer.step, level: offer.level, classId: offer.classId })));
-    const byFeature = new Map<string, { feat: ContentFeatSummary; step: OfferStep; level: number; classId: string | null; count: number }>();
     for (const taken of takenFeatIds) {
       if (taken.id === ASI_SHORTHAND) continue;
       const feat = catalogs.choice.feats.find((entry) => entry.id === taken.id);
-      if (!feat?.feature.choice) continue;
-      const existing = byFeature.get(feat.feature.id);
-      if (existing) existing.count += 1;
-      else byFeature.set(feat.feature.id, { feat, step: taken.step, level: taken.level, classId: taken.classId, count: 1 });
-    }
-    for (const entry of byFeature.values()) {
-      featureOffer(`feature:${entry.feat.feature.id}`, entry.step, entry.feat.feature, entry.level, entry.classId, entry.feat.feature.choice!.choose * entry.count);
+      if (!feat) continue;
+      featureOffer(`feature:${feat.feature.id}`, taken.step, feat.feature, taken.level, taken.classId);
     }
 
     // The class's own spell budgets, from its printed level row. These are the UNTAGGED rows the
@@ -469,7 +677,32 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
   }
 
-  return withExpertiseReach(offers, context, catalogs, draft);
+  return withGrantedPicks(withExpertiseReach(offers, context, catalogs, draft), extraPicks);
+}
+
+/** An offer's key with any uniquifying "#n" suffix removed - what an `extraPicks` grant names. */
+const budgetKeyOf = (key: string) => key.replace(/#\d+$/, "");
+
+/**
+ * CAPACITY IS THE PRINTED BUDGET PLUS WHAT WAS GRANTED - the composition step, applied once every
+ * offer exists.
+ *
+ * Cleric level 1 prints three cantrips; Divine Order's Thaumaturge reads "you know one extra cantrip
+ * from the Cleric spell list". Reading `capacity` solely off the level row made that fourth cantrip
+ * unselectable - the content was right, the wizard simply had no way for a feature to reach the
+ * number. Every budget-raising promise in the SRD (an extra skill, an extra prepared spell, an extra
+ * language, expertise) has the same shape and now lands through the same sum.
+ *
+ * A grant naming no offer is ignored HERE and rejected loudly by the server, which owns the
+ * authority (CLAUDE.md rule 2): it is an authoring mistake, not a player error, and there is nothing
+ * useful the wizard can render for it.
+ */
+function withGrantedPicks(offers: readonly BuilderOffer[], extraPicks: ReadonlyMap<string, number>): BuilderOffer[] {
+  if (extraPicks.size === 0) return [...offers];
+  return offers.map((offer) => {
+    const granted = extraPicks.get(budgetKeyOf(offer.key)) ?? 0;
+    return granted === 0 ? offer : { ...offer, capacity: offer.capacity + granted };
+  });
 }
 
 /**
@@ -506,16 +739,20 @@ function withExpertiseReach(
   }
   return offers.map((offer) => {
     if (offer.kind !== "expertise") return offer;
-    const unavailable: Record<string, string> = {};
+    const notProficient: Record<string, string> = {};
     for (const option of offer.options) {
-      if (!proficient.has(option.id)) unavailable[option.id] = "not one of your proficiencies";
+      if (!proficient.has(option.id)) notProficient[option.id] = "not one of your proficiencies";
     }
     // Never grey an offer into a dead end. A build with none of these skills yet - or one whose
     // proficiency came from a feature grant the client cannot see, since riders stay server-side -
     // gets the old fully-enabled list and the server's message, which is strictly today's behaviour.
     // Greying everything would repeat the exact mistake this function exists to avoid.
-    if (Object.keys(unavailable).length === offer.options.length) return offer;
-    return { ...offer, unavailable };
+    if (Object.keys(notProficient).length === offer.options.length) return offer;
+    // MERGED, not assigned. Expertise is granted twice by three classes, and the sibling grant's
+    // "already chosen for Expertise at level 3" (see `spentByRepeat`) lives in `offer.unavailable`
+    // by the time this pass runs - overwriting it here is what let a Bard 9 spend the same skill
+    // twice and be refused at Create. The more specific reason wins where both apply.
+    return { ...offer, unavailable: { ...notProficient, ...offer.unavailable } };
   });
 }
 

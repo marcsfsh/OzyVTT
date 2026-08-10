@@ -11,8 +11,10 @@
  * fires has no other way to find out.
  */
 
+import { RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../lib/ids";
-import { SUB_OBJECT_DEFAULTS } from "./defaults";
+import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
+import { featureFields } from "./FeatureEditor";
 import { getAt } from "./paths";
 import { basicsSection, damagePartsField, diceValidate, humanise, inContainer, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
 import type { HomebrewType } from "./types";
@@ -159,16 +161,33 @@ const proficiencyFields = (): readonly FieldDef[] => [
   { key: "toolProficiencies", label: "Tool proficiencies", kind: "tags", suggestions: (ctx) => ctx.equipment.filter((entry) => entry.keywords === "tool").map((entry) => entry.id) }
 ];
 
-/** `key` is the record's own: every type stores a LIST under `features` (or `traits`)
-    except a feat, which is one `FeatureRecord` under a singular `feature`. The renderer
-    is the same either way — `FeatureEditor`'s `single` mode reads the object. */
+/**
+ * `key` is the record's own: every type stores a LIST under `features` (or `traits`)
+ * except a feat, which is one `FeatureRecord` under a singular `feature`. The renderer
+ * is the same either way — `FeatureEditor`'s `single` mode reads the object.
+ *
+ * **`rows` on a `custom` field, and why it is not a lie (R1).** `FieldRenderer`'s custom
+ * branch never reads `rows`, so this changes nothing about what renders. What it changes
+ * is that `fieldsOf` and `fieldsWithin` can see INSIDE a bespoke component: before it,
+ * every control `FeatureEditor` draws was invisible to `applyField` in both directions,
+ * and the whole pick family therefore had no way to be tested through both paths. The
+ * list is `FeatureEditor`'s own — the same objects it renders — so declaring it here
+ * cannot drift from what a GM sees. It is the same call `riderFieldsForTest` makes from
+ * the other side of the same problem.
+ */
 const featuresField = (label: string, key = "features", blurbless = false): FieldDef => ({
   key,
   label,
   kind: "custom",
   custom: "features",
   wide: true,
-  help: blurbless ? undefined : "What the record actually does."
+  help: blurbless ? undefined : "What the record actually does.",
+  rows: featureFields(),
+  /* What `FeatureEditor`'s Add button mints, minus the one thing only the component can
+     know: a CLASS feature also arrives at `DEFAULT_GRANT_LEVEL`, because a class's grant
+     lives in `levelTable[].features[]` and the level chips write both halves in one edit.
+     A feature minted here is granted nowhere until that control says otherwise. */
+  newRow: () => blankFeature()
 });
 
 /* -------------------------------------------------------------------- class ----- */
@@ -488,7 +507,9 @@ const SPELL_SCHEMA: HomebrewSchema = {
           kind: "group",
           rows: [
             { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate },
-            { key: "damage.types", label: "Types", kind: "tags", suggestions: (ctx) => ctx.damageTypes }
+            // `3d`, site 1 of 9. A spell may deal two types at once (Ice Knife), so this is a list —
+            // and `pick` reads on a list exactly as it does on a single value.
+            { key: "damage.types", label: "Types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes }
           ]
         },
         {
@@ -591,10 +612,6 @@ const SLOTS = [
   opt("none", "Just carried", "Everything else")
 ];
 
-/** The six printed rarities, as SLUGS: `rarity` is an open `ContentIdSchema` in the schema, so the
-    control offers these and still accepts "unique" or "table-only". */
-const RARITY_IDS: readonly string[] = ["common", "uncommon", "rare", "very-rare", "legendary", "artifact"];
-
 /** Turning magic off must take the whole magic half with it. Left behind, `isMagic: false`
     plus an orphan rider is a record `.strict()` rejects and a GM cannot see to fix. */
 const MAGIC_KEYS = ["isMagic", "rarity", "attunement", "cursed", "casts", "grantsFeatIds", "modifiers", "grants", "uses", "actions", "effects", "tags"];
@@ -646,7 +663,13 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
         // An OPEN slug in the schema, so a CLOSED select was the inverse of the usual bug: the six
         // printed rarities and no way to write "unique". Complete list plus other, like every other
         // open-slug field in the editor.
-        { key: "rarity", label: "Rarity", suggestions: RARITY_IDS, placeholder: "uncommon", emptyValue: "omit", visibleWhen: (draft) => draft.isMagic === true },
+        //
+        // `pick` is the second half of that repair and the client's own `3a`. Offering the list was
+        // never the problem — READING it was: `kind: "text"` + `suggestions` is an `<input list>`,
+        // which has no visible affordance on any browser and renders as NOTHING on iOS Safari, so a
+        // complete vocabulary shipped as a bare box. Still text, still open, still takes "unique";
+        // the list is simply on screen now. See `FieldDef.pick`.
+        { key: "rarity", label: "Rarity", pick: true, suggestions: RARITY_IDS, placeholder: "uncommon", emptyValue: "omit", visibleWhen: (draft) => draft.isMagic === true },
         {
           key: "attunement.required",
           label: "Requires attunement",
@@ -740,7 +763,8 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
       fields: inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
         { key: "weapon.category", label: "Weapon kind", kind: "select", options: [opt("simple", "Simple"), opt("martial", "Martial")] },
         { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
-        { key: "weapon.damageType", label: "Damage type", placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
+        // `3d`, site 2 of 9 — and the one the client's own mace goes through.
+        { key: "weapon.damageType", label: "Damage type", pick: true, placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
         { key: "weapon.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", emptyValue: "null", help: "Leave both empty for a melee weapon." },
         { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft", emptyValue: "null" }
       ])
@@ -810,9 +834,16 @@ const MONSTER_SCHEMA: HomebrewSchema = {
         { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice." },
         { key: "proficiencyBonus", label: "Proficiency bonus", kind: "number", min: 0, max: 12 },
         { key: "initiativeBonus", label: "Initiative bonus", kind: "number", min: -20, max: 30, allowNegative: true },
-        { key: "damageResistances", label: "Damage resistances", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
-        { key: "damageImmunities", label: "Damage immunities", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
-        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
+        // `3d`, sites 3–5 of 9. Typing "Fire" or "flame" into any of these used to store a value the
+        // typed-defence pass never matches — silently, at play time, on the one field a monster's
+        // whole defensive identity hangs on.
+        { key: "damageResistances", label: "Damage resistances", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        { key: "damageImmunities", label: "Damage immunities", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        // NOT `pick` — deliberately, and it is the one visible seam this unit leaves. `3d` is the
+        // damage-type vocabulary; conditions are their own row with their own both-paths test, and
+        // turning the flag on here would ship a control this unit does not prove. One line, whenever
+        // that unit runs.
         { key: "conditionImmunities", label: "Condition immunities", kind: "tags", suggestions: (ctx) => ctx.conditions }
       ]
     },

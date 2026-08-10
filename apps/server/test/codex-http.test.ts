@@ -82,8 +82,8 @@ const del = (base: string, path: string, headers: Record<string, string>, payloa
  * is `apps/server/test/realtime-presence.test.ts`, which observes the real emit and pins its key set.
  *
  * The compile-time half is `notifyChanged: () => void` on `CodexRouterOptions` plus
- * `CodexChangedEvent = { codexRevision }` in `@vtt/domain`; neither is checked by this suite
- * (`apps/server/test` is not typechecked), so the argument list is asserted here.
+ * `CodexChangedEvent = { codexRevision }` in `@vtt/domain`. `apps/server/test` IS typechecked now,
+ * so the compiler holds the signature; this asserts the RUNTIME argument list, which it cannot.
  */
 describe("codex:changed carries no content (D22, router half)", () => {
   it("calls its notifier with no arguments at all, whichever surface was written", async () => {
@@ -1317,6 +1317,70 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
     expect((await get(base, `/api/v1/codex/quests/${secretId}`, GM)).status).toBe(200);
   });
 
+  /**
+   * 5d, end to end: the two statuses added in v26 travel the WHOLE pipeline — route schema, store, SQL
+   * CHECK, quest projection and chronicle projection — and arrive at a PLAYER as themselves.
+   *
+   * Every link here has its own way of silently swallowing a new status. `QuestStatusSchema` would 400 it
+   * at the door; the v14 CHECK would reject the INSERT if v26 had not run; `coerceQuestStatus` would read
+   * either one back as a bland "active" if the read path were left behind. None of those three failures
+   * shows up in a type error, and the last one shows up nowhere at all — which is why this asserts on the
+   * PLAYER's copy after a round trip rather than on the create call's return value.
+   *
+   * The chronicle half is the part a player actually READS: `questEventLabel` on the client turns this
+   * payload into "<title> has not started" / "<title> was canceled", so a status that reached the quest
+   * record but not the timeline would leave the party's own history saying the wrong thing.
+   */
+  it("carries not-started and canceled the whole way to a player, on the quest AND on the chronicle", async () => {
+    const { base } = await fixture();
+    const timeline = async (headers: Record<string, string>) =>
+      (await body(await get(base, "/api/v1/codex/timeline", headers))).data.records as Json[];
+    const questRows = async (headers: Record<string, string>) => (await timeline(headers)).filter((row) => row.kind === "quest");
+
+    // No `status` in the create body: the DEFAULT is what lands, and since 5d that is `not-started`.
+    const created = await body(await post(base, "/api/v1/codex/quests", GM, { title: "A rumour in Vallaki", playerBody: "Someone is buying coffins.", gmBody: GM_BODY }));
+    const questId = created.data.quest.id as string;
+    expect(created.data.quest.status).toBe("not-started");
+    await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: true });
+
+    // The PLAYER's copy of the quest, re-read through the player route rather than echoed back.
+    const asPlayer = async () => (await body(await get(base, `/api/v1/codex/quests/${questId}`, PLAYER))).data.quest as Json;
+    expect((await asPlayer()).status).toBe("not-started");
+
+    // ...and the player's CHRONICLE row for it. R5's create record is hidden by default, so reveal it —
+    // the whole-row quest gate is already satisfied because the quest itself is revealed above.
+    const recordFor = async (status: string) => (await questRows(GM)).find((row) => (row.payload as Json).status === status)!;
+    const startRecord = await recordFor("not-started");
+    expect(startRecord, "R5 writes a history record on create, carrying the status the quest was created in").toBeDefined();
+    await post(base, `/api/v1/codex/journal/${startRecord.id}/reveal`, GM, { revealed: true });
+    const playerStart = (await questRows(PLAYER))[0]!;
+    expect((playerStart.payload as Json).status, "the row a player reads as “… has not started”").toBe("not-started");
+    expect((playerStart.payload as Json).questId).toBe(questId);
+
+    // Now the other end of the lifecycle, through the ordinary PATCH.
+    const canceled = await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "canceled" });
+    expect(canceled.status).toBe(200);
+    expect((await asPlayer()).status).toBe("canceled");
+    // A status change appends a SECOND history record carrying the status reached.
+    expect(await questRows(GM)).toHaveLength(2);
+    await post(base, `/api/v1/codex/journal/${(await recordFor("canceled")).id}/reveal`, GM, { revealed: true });
+    // Sorted, deliberately: `fixture()` freezes the clock, so both records share a date and the timeline
+    // falls through to its own tiebreak. ORDER is asserted in `codex-store.test.ts`, where the clock
+    // ticks; the claim here is that BOTH statuses reached the party's timeline as themselves.
+    const playerRows = await questRows(PLAYER);
+    expect(playerRows.map((row) => (row.payload as Json).status).sort(), "both statuses on the party's own timeline").toEqual(["canceled", "not-started"]);
+
+    // Every intermediate status is accepted by the route too, so the widening is the whole enum and not
+    // the two literals this test happens to name.
+    for (const status of ["active", "completed", "failed", "not-started"]) {
+      expect((await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status })).status, status).toBe(200);
+      expect((await asPlayer()).status, status).toBe(status);
+    }
+    // ...and a status outside the five is still a 400 at the door, so `.strict()` did not become a pass-through.
+    expect((await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "cancelled" })).status).toBe(400);
+    expect((await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "abandoned" })).status).toBe(400);
+  });
+
   it("hands a player only the linked entities that are themselves revealed", async () => {
     const { base } = await fixture();
     const shown = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", revealedToPlayers: true }));
@@ -1455,7 +1519,10 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect(playerCalendar.currentDate).toEqual({ year: 1492, month: 0, day: 10 });
     // On the serialized body: the GM's clock parts (month 1, day 20) are nowhere in what the player received,
     // under any key, and neither is the `publishedDate` key that would duplicate their own `currentDate`.
-    expect(Object.keys(playerCalendar).sort()).toEqual(["currentDate", "months", "weekdays", "yearName"]);
+    // `eras` joined this list in `5f`(iii) and is structure, not a clock - see `codex-projections.ts`. The
+    // assertion stays EXACT rather than becoming a subset check: naming every key is what makes adding one
+    // a decision somebody had to write down.
+    expect(Object.keys(playerCalendar).sort()).toEqual(["currentDate", "eras", "months", "weekdays", "yearName"]);
     expect(JSON.stringify(playerCalendar.currentDate)).not.toContain("20");
 
     // Publishing catches the party up, through the one route that does it.
@@ -1556,14 +1623,60 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect((await body(applied)).data.calendar.currentDate).toEqual({ year: 1492, month: 0, day: 18 });
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });
     // Applying moved the GM's clock and NOT the party's - only publish does that (D11-H). The party is on
-    // the FIRST date this codex was given, which publishes itself; every move after that one is private,
-    // and applying downtime is such a move. Asserting the party is on day 10 rather than merely "not day
-    // 18" is the stronger claim: it proves the two clocks diverged, not just that one of them is empty.
+    // the first date this codex was given: the PUT above landed on an empty codex, which is the seeding case
+    // D6 kept auto-publish for, so day 10 reached them. Every move after that one is private, and applying
+    // downtime is such a move. Asserting the party is on day 10 rather than merely "not day 18" is the
+    // stronger claim: it proves the two clocks diverged, not just that one of them is empty.
     expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });
 
     const again = await post(base, `/api/v1/codex/journal/${created.entry.id}/apply-downtime`, GM, {});
     expect([400, 409]).toContain(again.status);
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });   // and still nothing moved
+  });
+
+  /**
+   * **D6 (2026-08-09), the reversal of K7's scope.** The test above is the half of K7 that survives: a codex
+   * with nothing in it is being SET UP, and its first date is a starting position. This is the half that is
+   * gone - a campaign that already exists gets its first date set while PREPPING, and prep is private.
+   *
+   * The client reported this as "setting a date sets both at once", and it was never a client bug: one line
+   * in `writeCalendar` copied the GM's clock to the party's, so no arrangement of the Calendar UI could have
+   * decoupled them. The party is told the date by `POST /codex/calendar/publish` and by nothing else.
+   *
+   * Two arms, because "the party did not move" is only half the claim worth making. The second arm proves
+   * the publish route still works from this state, so the fix is a decoupling and not a lockout.
+   */
+  it("does NOT publish the first date of a codex that already holds records, and publishes on request", async () => {
+    const { base } = await fixture();
+    // One record, authored before any date exists - the ordinary shape of a campaign started without a calendar.
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "The party met in Daggerford." });
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    const gmCalendar = await calendar(base, GM);
+    expect(gmCalendar.currentDate).toEqual({ year: 1492, month: 0, day: 10 });   // the GM's clock moved...
+    expect(gmCalendar.publishedDate).toBeNull();                                 // ...and the party's did not
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+    // Moving it again is private too - the first write is not a special case that merely deferred by one.
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 3 } });
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+
+    // ...and the one deliberate act still does exactly what it always did.
+    expect((await post(base, "/api/v1/codex/calendar/publish", GM, {})).status).toBe(200);
+    expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 1, day: 3 });
+  });
+
+  /**
+   * The seeding exemption is about the CODEX being empty, not about the journal being empty: a GM who
+   * builds the world first (a page, a map, a quest) and dates it afterwards is prepping, not seeding.
+   * Without this, `isUnusedCodex` could be narrowed back to one table and the suite would not notice.
+   */
+  it("treats a codex holding only a page as in use, so its first date stays private", async () => {
+    const { base } = await fixture();
+    await post(base, "/api/v1/codex/pages", GM, { title: "Daggerford", entityType: "location" });
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    expect((await calendar(base, GM)).publishedDate).toBeNull();
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
   });
 
   /**

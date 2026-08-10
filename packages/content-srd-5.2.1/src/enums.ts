@@ -22,6 +22,17 @@
  * other option" rule). A closed control over an open slug is the inverse bug and is just as wrong.
  */
 
+/**
+ * THE normaliser every damage-type write and every damage-type read shares, re-exported rather than
+ * re-implemented.
+ *
+ * It is DECLARED in `@vtt/rules-5e` (`combat.ts`) and only re-exported here. This package depends on
+ * that one, so declaring it beside `DAMAGE_TYPE_IDS` and importing it there would be a dependency
+ * cycle - and two normalisers is exactly the drift this list exists to prevent: an editor that stores
+ * `"Fire "` against an engine that matches `"fire"` is silently inert at the table.
+ */
+export { normalizeDamageType } from "@vtt/rules-5e";
+
 /** The 13 SRD damage types, in bundle order. */
 export const DAMAGE_TYPE_IDS: readonly string[] = Object.freeze([
   "acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic",
@@ -66,4 +77,32 @@ export const WEAPON_MASTERY_IDS: readonly string[] = Object.freeze([
     homebrew "relic" needs no schema change, so these are suggestions and never a closed list. */
 export const GEAR_CATEGORY_IDS: readonly string[] = Object.freeze([
   "adventuring-gear", "ammunition", "consumable", "equipment-pack", "focus", "tool"
+]);
+
+/**
+ * The magic-item rarity ladder, plus `varies` for the tables that print it.
+ *
+ * **This is the one list in this file that is NOT a projection of a bundle, and the exception is
+ * written here rather than left to be discovered.** Measured at the time of writing: **0 of the 132
+ * records in `equipment.v1.json` declare `rarity` at all**, and `rules.v1.json` names the words only
+ * in prose. So `test/enums.test.ts` cannot assert equality against a bundle the way it does for the
+ * six lists above; it asserts CONTAINMENT instead — every rarity any bundled record declares is a
+ * member here — which is the strongest true statement available and becomes non-vacuous the day the
+ * first magic item lands.
+ *
+ * It lives here anyway, and not beside the one form that reads it, for two reasons that outlive the
+ * drift test:
+ *
+ *  - the column it fills is in THIS package (`EquipmentReferenceSchema.rarity`, an open
+ *    `ContentIdSchema`), so the constant and the schema it serves are one import apart rather than
+ *    one workspace apart;
+ *  - it is a printed-rules vocabulary, and a client-local literal is exactly the shape that made
+ *    "ten of the thirteen damage types" possible. The homebrew editor is not the only surface that
+ *    will want it.
+ *
+ * OPEN, like `school` and `category`: a GM must still be able to write "unique" or "table-only", so
+ * every control over it offers this list AND takes free text.
+ */
+export const RARITY_IDS: readonly string[] = Object.freeze([
+  "common", "uncommon", "rare", "very-rare", "legendary", "artifact", "varies"
 ]);

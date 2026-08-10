@@ -29,6 +29,13 @@ export interface ComboboxProps {
    * (a connection label, a downtime "who" that is not a page yet). The id handed back is the raw text.
    */
   allowFreeText?: boolean;
+  /**
+   * Ids of text the CALLER renders beside this control and the input must be described by — a hint
+   * line, a "you are at the limit" sentence. `TagInput` owns both when it wears this control as its
+   * entry box, and without this passthrough that text is on screen and absent from the accessibility
+   * tree, which is the half of a hint that matters to the people who most need it.
+   */
+  describedBy?: string;
 }
 
 /**
@@ -42,7 +49,7 @@ export interface ComboboxProps {
  * a stacked list must use; a route-2 `::after` would overhang into the row below and steal its taps.
  */
 export function Combobox({
-  options, value, onChange, placeholder = "Search…", ariaLabel, id, disabled = false, limit = 8, className, allowFreeText = false
+  options, value, onChange, placeholder = "Search…", ariaLabel, id, disabled = false, limit = 8, className, allowFreeText = false, describedBy
 }: ComboboxProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -59,6 +66,26 @@ export function Combobox({
 
   const pick = (nextId: string) => { onChange(nextId); setQuery(""); setOpen(false); setActive(0); };
 
+  /**
+   * **Leaving the box keeps what was typed — but only where typed text is a value.**
+   *
+   * `allowFreeText` says unmatched text IS the value; discarding it because focus moved contradicts
+   * that, and it is the difference between a text box and this control on the one gesture people
+   * actually make. Type "unique" into an open-slug field, tap the next field, and the old
+   * `<input>` would have kept it while this control silently kept nothing — with no error, because
+   * nothing went wrong.
+   *
+   * An exact label match commits the OPTION's id rather than the words: a page picker in free-text
+   * mode must not store "Ireena" where `p1` belongs. Without `allowFreeText` the query is discarded
+   * exactly as before — a picker over a closed set must not invent members.
+   */
+  const commitOnBlur = () => {
+    const text = query.trim();
+    if (!allowFreeText || text === "") return;
+    const exact = options.find((option) => option.label.toLowerCase() === text.toLowerCase());
+    pick(exact ? exact.id : text);
+  };
+
   if (selected || freeText) {
     return (
       <div className={cx("nh-combobox", className)}>
@@ -74,7 +101,7 @@ export function Combobox({
   }
 
   return (
-    <div className={cx("nh-combobox", className)} ref={boxRef} onBlur={(event) => { if (!boxRef.current?.contains(event.relatedTarget as Node)) setOpen(false); }}>
+    <div className={cx("nh-combobox", className)} ref={boxRef} onBlur={(event) => { if (!boxRef.current?.contains(event.relatedTarget as Node)) { setOpen(false); commitOnBlur(); } }}>
       <input
         id={id}
         className="nh-input nh-combobox-input"
@@ -83,11 +110,25 @@ export function Combobox({
         aria-expanded={open && matches.length > 0}
         aria-controls={listId}
         aria-autocomplete="list"
+        aria-describedby={describedBy || undefined}
         autoComplete="off"
         disabled={disabled}
         value={query}
         placeholder={placeholder}
         onFocus={() => setOpen(true)}
+        /**
+         * **Tapping the box reopens the list, even when it never lost focus.**
+         *
+         * `onFocus` alone was enough while every caller held ONE value: pick something and the input
+         * is replaced by its chip, so the next interaction starts from an unfocused control. It stops
+         * being enough the moment a caller collects SEVERAL — `TagInput`'s chooser keeps `value` at
+         * null and stays mounted, and `pick()` closes the list while the option's `onMouseDown`
+         * preventDefault deliberately leaves focus on the input. A GM adding a second damage
+         * resistance therefore tapped the same box and got nothing at all, which is the very defect
+         * the visible list exists to end. Idempotent from an unfocused start: focus fires first and
+         * sets the same flag.
+         */
+        onClick={() => setOpen(true)}
         onChange={(event) => { setQuery(event.target.value); setOpen(true); setActive(0); }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") { event.preventDefault(); setActive((index) => Math.min(index + 1, matches.length - 1)); }

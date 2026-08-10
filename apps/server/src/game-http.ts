@@ -265,6 +265,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
   router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
   router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorRechoose), ...command("actor.rechoose", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpendHitDice), ...command("actor.spend-hit-dice", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetSlot), ...command("character.set-slot", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetPrepared), ...command("character.set-prepared", actorIdParam));
@@ -273,6 +274,9 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetProficiencies), ...command("character.set-proficiencies", actorIdParam));
   router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
+  // Registered BEFORE nothing in particular - `/characters/random` is a literal segment under a
+  // collection with no `{id}` route beneath it, so ordering is not load-bearing here.
+  router.post(expressPath(GAME_PATHS.charactersRandom), ...command("character.generate"));
   router.post(expressPath(GAME_PATHS.characterRebuild), ...command("character.rebuild", (req) => ({ actorId: req.params.actorId })));
   router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
   router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));
@@ -341,6 +345,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   // Rules catalogs: public SRD reference, so these accept a player session too (the operations enforce
   // that themselves - no requireGmGrade). The bestiary above is the deliberate GM-only exception.
   router.get(expressPath(CONTENT_PATHS.skills), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSkills(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.languages), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentLanguages(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.spells), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSpells(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.equipment), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentEquipment(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.classes), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentClasses(res.locals.principal as GamePrincipal)));

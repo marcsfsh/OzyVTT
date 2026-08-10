@@ -110,9 +110,24 @@ export const WeaponReferenceSchema = z.object({
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
-  longRangeFeet: z.number().int().positive().nullable()
+  longRangeFeet: z.number().int().positive().nullable(),
+  /**
+   * The weapon table's MASTERY column - every SRD weapon has exactly one, and there are exactly
+   * eight in the whole system. Closed rather than an open slug on purpose: a mastery is not a label,
+   * it is a named behaviour the engine implements, so an unknown one would parse and then do nothing
+   * - the "built but unwired" failure this repo keeps finding. A typo fails the bundle load instead.
+   *
+   * OPTIONAL, and deliberately so: all 38 SRD rows carry one and a test pins that, but a GM's
+   * homebrew weapon may legitimately have none, and a schema that forced a choice would make them
+   * pick a behaviour at random. Usable only by a character who has unlocked it for that weapon
+   * (Weapon Mastery); the gate lives with the reader, not here.
+   */
+  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional()
 });
 export type WeaponReference = z.infer<typeof WeaponReferenceSchema>;
+/** The eight SRD mastery properties, for a consumer that needs to enumerate or validate them. */
+export const WEAPON_MASTERY_IDS = z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).options;
+export type WeaponMasteryId = WeaponReference["mastery"];
 
 export const WeaponPropertyReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -200,6 +215,24 @@ export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
  * row would reach the player the instant they picked the item up - which is what makes hiding a
  * cursed item's mechanics structural rather than a `delete` someone has to remember.
  */
+/**
+ * The weapon stats a unified equipment row carries, NAMED rather than inlined - and the name is
+ * load-bearing, not style. `EquipmentReferenceSchema` is the largest object in this package, and
+ * inlining one more property here pushed `z.infer` past TypeScript's expansion budget: the compiler
+ * silently truncated a DIFFERENT inferred type two packages away, and `packages/domain`'s
+ * `catalog-choice.ts` stopped seeing `SpellReference.attackRoll` and `.rangeFeet` at all. A named
+ * schema gives the inference one alias to reuse instead of re-expanding the shape at every use.
+ */
+const EquipmentWeaponStatsSchema = z.object({
+  category: z.enum(["simple", "martial"]),
+  damageDice: z.string().max(20),
+  damageType: z.string().max(40),
+  rangeFeet: z.number().int().positive().nullable(),
+  longRangeFeet: z.number().int().positive().nullable(),
+  /** OPTIONAL here, unlike the weapon table: gear and homebrew rows map through this same shape and have no mastery. */
+  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional()
+});
+
 export const EquipmentReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),
@@ -219,7 +252,7 @@ export const EquipmentReferenceSchema = z.object({
   costGp: z.number().nonnegative().max(1_000_000).nullable(),
   weightLb: z.number().nonnegative().max(1000).nullable(),
   description: z.string().max(2000).nullable(),
-  weapon: z.object({ category: z.enum(["simple", "martial"]), damageDice: z.string().max(20), damageType: z.string().max(40), rangeFeet: z.number().int().positive().nullable(), longRangeFeet: z.number().int().positive().nullable() }).nullable().optional(),
+  weapon: EquipmentWeaponStatsSchema.nullable().optional(),
   armor: z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).nullable().optional(),
 
   // ---- the magic-item vocabulary ---------------------------------------------------------------
@@ -312,6 +345,24 @@ export type ContentAttribution = z.infer<typeof ContentAttributionSchema>;
  */
 export const SkillReferenceSchema = ConditionReferenceSchema.extend({ ability: AbilityShortSchema.optional() });
 export type SkillReference = z.infer<typeof SkillReferenceSchema>;
+
+/**
+ * A LANGUAGE, as data rather than prose.
+ *
+ * The SRD's Standard and Rare language tables lived only inside a paragraph of `rules.v1.json`, and
+ * the consequence was not cosmetic: `languageChoices` on a species or background had no list to draw
+ * from, so **"Common plus two languages" - which Character Creation owes every character - was never
+ * offered to anybody**, and Deft Explorer's and Thieves' Cant's language picks had nothing to raise.
+ *
+ * `table` is the SRD's own split and it is what a choice narrows on: the base budget draws from
+ * `standard`, while `druidic` and `thieves-cant` are `rare` and arrive as grants from a class
+ * feature. It is an OPEN slug, not an enum, so a homebrew "planar" table needs no schema edit.
+ */
+export const LanguageReferenceSchema = ConditionReferenceSchema.extend({
+  /** Which SRD table the language is printed in - "standard" (widespread) or "rare" (secret/planar). */
+  table: z.string().regex(/^[a-z0-9-]+$/).max(40).default("standard")
+});
+export type LanguageReference = z.infer<typeof LanguageReferenceSchema>;
 
 /** The printed SRD 5.2.1 skill->ability table, used ONLY when a bundle row omits its own `ability`. */
 export const SRD_SKILL_ABILITY: Readonly<Record<string, z.infer<typeof AbilityShortSchema>>> = Object.freeze({

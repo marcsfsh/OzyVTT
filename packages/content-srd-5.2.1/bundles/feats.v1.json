@@ -33,12 +33,20 @@
       "tags": [
         "spellcasting"
       ],
-      "choice": {
-        "kind": "cantrip",
-        "choose": 2,
-        "fromCatalog": "cleric-spells",
-        "maxSpellLevel": 0
-      },
+      "choices": [
+        {
+          "kind": "cantrip",
+          "choose": 2,
+          "fromCatalog": "cleric-spells",
+          "maxSpellLevel": 0
+        },
+        {
+          "kind": "spell",
+          "choose": 1,
+          "fromCatalog": "cleric-spells",
+          "maxSpellLevel": 1
+        }
+      ],
       "uses": {
         "limit": 1,
         "per": "long-rest"
@@ -64,12 +72,20 @@
       "tags": [
         "spellcasting"
       ],
-      "choice": {
-        "kind": "cantrip",
-        "choose": 2,
-        "fromCatalog": "druid-spells",
-        "maxSpellLevel": 0
-      },
+      "choices": [
+        {
+          "kind": "cantrip",
+          "choose": 2,
+          "fromCatalog": "druid-spells",
+          "maxSpellLevel": 0
+        },
+        {
+          "kind": "spell",
+          "choose": 1,
+          "fromCatalog": "druid-spells",
+          "maxSpellLevel": 1
+        }
+      ],
       "uses": {
         "limit": 1,
         "per": "long-rest"
@@ -95,12 +111,20 @@
       "tags": [
         "spellcasting"
       ],
-      "choice": {
-        "kind": "cantrip",
-        "choose": 2,
-        "fromCatalog": "wizard-spells",
-        "maxSpellLevel": 0
-      },
+      "choices": [
+        {
+          "kind": "cantrip",
+          "choose": 2,
+          "fromCatalog": "wizard-spells",
+          "maxSpellLevel": 0
+        },
+        {
+          "kind": "spell",
+          "choose": 1,
+          "fromCatalog": "wizard-spells",
+          "maxSpellLevel": 1
+        }
+      ],
       "uses": {
         "limit": 1,
         "per": "long-rest"
@@ -137,7 +161,7 @@
       "choice": {
         "kind": "skill-or-tool",
         "choose": 3,
-        "fromCatalog": "skills"
+        "fromCatalog": "skills-or-tools"
       }
     }
   },
@@ -317,6 +341,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "str",
           "dex",
@@ -353,6 +378,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "str",
           "dex",
@@ -385,6 +411,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "str",
           "dex",
@@ -421,6 +448,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "str",
           "dex"
@@ -452,6 +480,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "int",
           "wis",
@@ -481,6 +510,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "str",
           "dex",
@@ -513,6 +543,7 @@
       "choice": {
         "kind": "ability-score",
         "choose": 1,
+        "maximum": 30,
         "from": [
           "str",
           "dex",

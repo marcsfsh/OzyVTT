@@ -36,6 +36,8 @@ const fighter = (over: Partial<CharacterCreateRequestInput> = {}): CharacterCrea
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
@@ -44,6 +46,7 @@ const fighter = (over: Partial<CharacterCreateRequestInput> = {}): CharacterCrea
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+    { level: 4, classId: "fighter", kind: "weapon-mastery", id: "rapier" },
     { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
     { level: 4, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },

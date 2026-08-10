@@ -203,7 +203,36 @@ export type FieldDef = Readonly<{
   searchable?: boolean;
   /** `kind: "select"` + `searchable` — which catalog to pick from. */
   catalog?: "spells" | "equipment";
-  suggestions?: readonly string[] | ((ctx: SchemaContext) => readonly string[]);
+  /** `draft` is the whole record, so a list can be derived from what the GM has already
+      authored — the `extraPicks` offer box suggests `feature:<id>` over the record's own
+      features. Most callbacks ignore it. */
+  suggestions?: readonly string[] | ((ctx: SchemaContext, draft: Draft) => readonly string[]);
+  /**
+   * **`suggestions` — render the CHOOSER instead of a bare box with a `<datalist>`.**
+   *
+   * A renderer flag, not a twelfth `FieldKind`, per the standing rule at the top of this file: the
+   * field is still `text` or still `tags`, still writes the same string or the same array of them,
+   * and still takes a word the SRD has never heard of. What changes is that the list is visible.
+   *
+   * The bug it repairs is the one an `<input list>` cannot: a `<datalist>` has **no affordance at
+   * all** — no arrow, no border cue, nothing that says a list exists — and iOS Safari renders it as
+   * *nothing*, so on a phone the complete vocabulary this repo went to the trouble of shipping is
+   * simply invisible. `Combobox` with `allowFreeText` is the same contract with the list on screen:
+   * every value one tap away, `--tap-min` rows, and unmatched text still handed back as itself.
+   *
+   * **It reads on both control kinds, and it had to.** The client reported it twice — item rarity
+   * (`3a`, one value) and damage types (`3d`, nine sites, six of which are lists — the monster's
+   * three defence rows, a spell's damage types, the `damage-type-is` gate and the damage-type
+   * grants). Had `pick` stayed a `text`-only flag, two thirds of `3d` would have needed a second
+   * mechanism to say the same thing, and the two would have drifted. `kind: "tags"` renders
+   * `TagInput`, which wears the same `Combobox` as its entry box under the same flag.
+   *
+   * Requires `suggestions`; a `pick` field with no list is a chooser over nothing, which is why
+   * `vocabularies.test.ts` censuses it. It is deliberately NOT automatic-on-`suggestions`: see
+   * `TagInputProps.pick` for the two different things a suggestion list means at two kinds of call
+   * site (a canonical vocabulary versus a corpus of what already exists).
+   */
+  pick?: boolean;
 
   min?: number;
   max?: number;
@@ -212,7 +241,15 @@ export type FieldDef = Readonly<{
   allowDecimal?: boolean;
   allowNegative?: boolean;
 
-  /** `kind: "rows" | "group"` — the nested fields. For `rows`, keys are relative to the row. */
+  /**
+   * `kind: "rows" | "group"` — the nested fields. For `rows`, keys are relative to the row.
+   *
+   * A `kind: "custom"` field may declare them too, and one does: `featuresField` mounts
+   * `FeatureEditor`'s own list. The renderer ignores it there — a custom field draws
+   * itself — but `fieldsOf`/`fieldsWithin` walk it, which is the only way the authoring
+   * harness can see inside a bespoke component. A control it cannot see is a control no
+   * both-paths test can drive, in either direction.
+   */
   rows?: readonly FieldDef[];
   /** `kind: "rows"` — a STABLE id, never the index. */
   rowKey?: (row: unknown, index: number) => string;
@@ -287,8 +324,12 @@ export const diceValidate = (value: unknown): string | null => {
 
 /**
  * Multi-term damage as a FIELD FACTORY, not a kind (see the standing rule above).
- * Four call sites: a granted action's damage, a weapon's extra damage, a spell's
- * damage, and an item-cast's damage — one helper, one shape, one set of labels.
+ *
+ * ONE call site as of this writing — `actionsField()` in `RiderEditor.tsx`, which every carrier that
+ * mounts riders shows once per action, so a monster's Bite and a magic sword's granted action are the
+ * same four controls. *(The docblock used to claim four; measured at HEAD, `grep -c damagePartsField`
+ * finds one mount. A spell's damage is `damage.roll` + `damage.types` in `schemas.ts`, a different
+ * shape, and there is no separate weapon or item-cast mount. Corrected rather than softened.)*
  */
 export function damagePartsField(
   key: string,
@@ -313,7 +354,9 @@ export function damagePartsField(
     },
     rows: [
       { key: "formula", label: "Formula", placeholder: "1d6", validate: diceValidate },
-      { key: "type", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
+      // `3d`, site 8 of 9. The column is an open slug and stays one — a homebrew "void" damage type
+      // must remain authorable — so this is `pick` on `text`, never a closed select.
+      { key: "type", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
     ]
   };
 }
@@ -434,10 +477,40 @@ export function resolveOptions(field: FieldDef, ctx: SchemaContext, draft: Draft
   return typeof options === "function" ? options(ctx, draft) : options;
 }
 
-export function resolveSuggestions(field: FieldDef, ctx: SchemaContext): readonly string[] {
+export function resolveSuggestions(field: FieldDef, ctx: SchemaContext, draft: Draft = {}): readonly string[] {
   const { suggestions } = field;
   if (!suggestions) return [];
-  return typeof suggestions === "function" ? suggestions(ctx) : suggestions;
+  return typeof suggestions === "function" ? suggestions(ctx, draft) : suggestions;
+}
+
+/**
+ * What a `pick` row READS as: `"very-rare"` → "Very Rare", `"fire"` → "Fire".
+ *
+ * A derived label rather than a hand-written map, because a map is a second list to keep in step
+ * with the first — the exact drift `RARITY_IDS`/`DAMAGE_TYPE_IDS` were centralised to end. Every
+ * vocabulary these controls offer is a lowercase-hyphen slug of ordinary English words, so one rule
+ * covers all of them and a new list is readable the day it lands with nothing to remember.
+ *
+ * The VALUE is untouched: the slug is what is picked, stored and matched on. This is display only.
+ * A field that needs a label the slug cannot produce is a `kind: "select"` with `options`, which is
+ * what that member is for.
+ */
+export function suggestionLabel(slug: string): string {
+  return slug.split("-").map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word)).join(" ");
+}
+
+/**
+ * Free text typed into a `pick` control, as the SLUG its column takes.
+ *
+ * Every field that carries `pick` writes an open slug — `ContentIdSchema` is `/^[a-z0-9-]+$/`, and
+ * `rarity`, `category` and the damage types are all that shape. A GM who types "Very Rare" rather
+ * than picking it means the rung, not a new one, and without this the record is silently
+ * unpublishable at a gate that names a regex. Whitespace collapses to the hyphen the slug uses and
+ * case is dropped; nothing else is removed, because deleting characters a GM typed is how a value
+ * becomes something they never wrote.
+ */
+export function pickValue(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
 /** Every visible field of a section, flattened through `group` but NOT through `rows`

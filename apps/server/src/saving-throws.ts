@@ -1,5 +1,5 @@
-import type { AbilityId, Actor, GameState, PendingSave, RollRecord } from "@vtt/domain";
-import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
+import type { AbilityId, Actor, DamageApplication, GameState, PendingSave, RollRecord } from "@vtt/domain";
+import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, rescaleDamageParts, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
@@ -21,6 +21,15 @@ export type SaveAnswerDependencies = Readonly<{
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean;
+  /**
+   * THE TYPED BREAKDOWN of the damage this save applied - the thing `appliedDamage` alone could never
+   * explain. `answerSave` used to fold `outcome.application` into a bare number and drop the rest, so
+   * a fire-resistant target's halved save damage arrived at the table as a smaller number with no
+   * reason attached; the client could not have rendered one if it wanted to. Absent when no damage
+   * landed, and `flatReduction` rides with it because it is the step `parts` cannot show.
+   */
+  parts?: DamageApplication["parts"];
+  flatReduction?: number;
   /** The condition that forced an automatic failure (Paralyzed etc. on a Str/Dex save); null when the die was rolled. */
   autoFailed?: string | null;
   /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
@@ -215,7 +224,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
  */
-export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false, explicitRollMode?: "advantage" | "disadvantage" | "normal"): { outcome: SaveOutcome; events: EffectNarration[] } {
+export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false, explicitRollMode?: "advantage" | "disadvantage" | "normal", damageOverride?: number): { outcome: SaveOutcome; events: EffectNarration[] } {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
@@ -280,15 +289,33 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
       legendaryNote = `${target.name} uses Legendary Resistance to succeed (${perDay - spentSoFar - 1} of ${perDay} remaining).`;
     }
   }
+  // Issue `4b`: the damage was auto-rolled the moment the action resolved and there was no door to
+  // amend it - not as GM, and not when the table rolls physical dice. The amendment lands HERE,
+  // before the success maths, so "half on a success" halves the number the answerer actually meant.
+  // The proposal's TYPES survive it (`rescaleDamageParts`), which is the whole point: an amended 12
+  // is still 12 fire against a fire-resistant target, not 12 untyped that ignores the resistance.
+  //
+  // ROLE BOUNDARY, stated rather than inherited: a player may amend only their own claimed
+  // character's save. `adjustableActor` above already refuses any other target for a player scope,
+  // so the rule is the same one that governs answering the save at all - named here so it cannot be
+  // widened by accident.
+  if (damageOverride !== undefined) {
+    if (!Number.isInteger(damageOverride) || damageOverride < 0 || damageOverride > 1000) throw new CommandRejectedError("Enter the damage as a whole number from 0 to 1000.");
+    if (scope.role === "player" && target.ownerSessionId !== scope.sessionId) throw new CommandRejectedError("You can only amend your own character's save damage.");
+  }
+  const proposedTotal = damageOverride ?? pending.proposedDamage;
   // Typed parts (ADR-0020) halve per part on success and run the defense pipeline on application;
   // saves persisted before the field fall back to the untyped total.
-  const parts = pending.proposedDamageParts;
+  const proposed = pending.proposedDamageParts;
+  const parts = proposed && proposed.length > 0 && damageOverride !== undefined
+    ? rescaleDamageParts(proposed, damageOverride)
+    : proposed;
   const outcomeParts = parts && parts.length > 0
     ? (!success ? parts : pending.halfOnSuccess ? parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })) : [])
     : null;
   const outcomeDamage = outcomeParts !== null
     ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-    : (!success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0));
+    : (!success ? proposedTotal : (pending.halfOnSuccess ? Math.floor(proposedTotal / 2) : 0));
   const outcomeCondition = !success && pending.conditionId !== null;
 
   // Preview (commit=false): the die roll is still recorded for the table so everyone sees it, but the
@@ -300,10 +327,13 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
   if (autoFailed !== null) events.push({ kind: "condition", text: `${target.name} automatically fails the ${pending.ability.toUpperCase()} save (${conditionLabel(autoFailed)}).`, actorId: target.id });
   let appliedDamage = 0;
+  let application: DamageApplication | null = null;
   let conditionApplied = false;
   if (outcomeDamage > 0) {
     const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), newId: deps.newRollId, now: deps.now, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
     appliedDamage = outcome.application.totalApplied;
+    // The whole application travels, not just its total: this is the call site that dropped it.
+    application = outcome.application;
     events.push(...outcome.events);
   }
   if (outcomeCondition && pending.conditionId) {
@@ -340,7 +370,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
   }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
-  return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}) }, events };
+  return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}), ...(application ? { parts: application.parts, ...(application.flatReduction ? { flatReduction: application.flatReduction } : {}) } : {}) }, events };
 }
 
 /** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */

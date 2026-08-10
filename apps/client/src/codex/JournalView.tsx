@@ -7,6 +7,7 @@ import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { CodexEditor } from "./CodexEditor";
+import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
 import { sessionByNumber, sessionTitle } from "./sessions";
 import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
 
@@ -35,13 +36,19 @@ import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
 const COMPOSER_KINDS = ["entry", "deadline", "downtime", "milestone"] as const;
 type ComposerKind = (typeof COMPOSER_KINDS)[number];
 /** The words each shape uses. The KIND labels come from `CHRONICLE_KIND_META`, so the composer's switch
-    and the rows it produces can never call the same record two different things. */
-const COMPOSER_COPY: Readonly<Record<ComposerKind, Readonly<{ heading: string; textLabel: string; textPlaceholder: string; submit: string }>>> = {
-  entry: { heading: "New journal entry", textLabel: "Player-facing summary", textPlaceholder: "What players know about this", submit: "Add entry" },
+    and the rows it produces can never call the same record two different things.
+
+    **There is no per-kind label for the player layer any more.** Each kind used to name its own player
+    side — "Player-facing summary", "What will happen", "What the party knows" twice — which made the
+    same toggle read differently on four screens of one view. The layer is named once, by
+    `TwoLayerBodyTabs`; what stays per-kind is the PLACEHOLDER, which is an example of what to write
+    rather than a name for the layer it is written into. */
+const COMPOSER_COPY: Readonly<Record<ComposerKind, Readonly<{ heading: string; textPlaceholder: string; submit: string }>>> = {
+  entry: { heading: "New journal entry", textPlaceholder: "What players know about this", submit: "Add entry" },
   // D11-C: a deadline stores no payload — WHAT will happen is this text, WHEN is the record's own date.
-  deadline: { heading: "New deadline", textLabel: "What will happen", textPlaceholder: "The duke's ultimatum expires", submit: "Add deadline" },
-  downtime: { heading: "New downtime", textLabel: "What the party knows", textPlaceholder: "How the time was spent", submit: "Log downtime" },
-  milestone: { heading: "New milestone", textLabel: "What the party knows", textPlaceholder: "What players know about this level", submit: "Record milestone" }
+  deadline: { heading: "New deadline", textPlaceholder: "The duke's ultimatum expires", submit: "Add deadline" },
+  downtime: { heading: "New downtime", textPlaceholder: "How the time was spent", submit: "Log downtime" },
+  milestone: { heading: "New milestone", textPlaceholder: "What players know about this level", submit: "Record milestone" }
 };
 /** The server's bounds, stated here too, so a slip is a disabled field rather than a generic 400. */
 const DOWNTIME_TEXT_MAX = 120;
@@ -75,7 +82,6 @@ const LENS_KEY = "codex-chronicle-lens";
  */
 const JOURNAL_DETAILS_KEY = "codex-journal-details";
 const JOURNAL_DETAILS_ID = "codex-journal-details";
-type ComposerBodyTab = "player" | "gm";
 /**
  * OWNER DECISION (2026-07-30): the prep-clock reveal warning is switchable off, and the switch is per
  * DEVICE — `localStorage`, like every other GM reading preference in this app (`vtt.show-occupied`,
@@ -161,7 +167,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   const [notice, setNotice] = useState<NoticeMessage>(null);
   /** The reveal warning's own switch (see `REVEAL_WARN_KEY`). State, not a raw read, so turning it back on re-arms without a reload. */
   const [revealWarn, setRevealWarn] = useState(readRevealWarn);
-  const [bodyTab, setBodyTab] = useState<ComposerBodyTab>("player");
+  const [bodyTab, setBodyTab] = useState<BodyLayer>("player");
   const detailsRef = useRef<HTMLElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(() => {
     try { return localStorage.getItem(JOURNAL_DETAILS_KEY) === "open"; } catch { return false; }
@@ -475,21 +481,19 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           </div>
         )}
         {/* Ruling 57: one body at a time, the page editor's own control and the page editor's own words
-            for the two layers. The player-facing label changes with the kind (an entry's "summary" is a
-            deadline's "what will happen"), so the switch carries the kind's word rather than a generic one. */}
-        <div className="codex-body-bar">
-          <SegmentedControl ariaLabel="Which layer to write" value={bodyTab} onChange={(value) => setBodyTab(value as ComposerBodyTab)}
-            options={[{ value: "player", label: COMPOSER_COPY[draft.kind].textLabel }, { value: "gm", label: "GM-only notes" }]} />
+            for the two layers — now literally the same component, so "the page editor's own words" can no
+            longer become four kinds' four different words the next time a kind is added. */}
+        <TwoLayerBodyTabs value={bodyTab} onChange={setBodyTab}>
           {bodyTab === "gm" && <GmOnlyTag />}
-        </div>
+        </TwoLayerBodyTabs>
         {/* D13: the SAME writing surface a page body gets, so `[[links]]` typed into a journal entry
             autocomplete and join the connection graph instead of silently doing nothing. */}
         {bodyTab === "player"
           ? <CodexEditor id="j-player" token={gmToken} value={draft.playerText} onChange={(playerText) => set({ playerText })}
-              ariaLabel={COMPOSER_COPY[draft.kind].textLabel} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder}
+              ariaLabel={BODY_LAYER.player.label} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder}
               pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} rows={7} />
           : <CodexEditor id="j-gm" token={gmToken} value={draft.gmText} onChange={(gmText) => set({ gmText })}
-              ariaLabel="GM-only notes" placeholder="Notes hidden from players"
+              ariaLabel={BODY_LAYER.gm.label} placeholder="Notes hidden from players"
               pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} gmLayer rows={7} />}
         {/* A deadline's date is not optional metadata, it is half the record — so say so where the button
             will not arm, rather than letting the GM discover it as a save failure. The date now lives in

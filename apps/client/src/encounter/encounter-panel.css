@@ -422,21 +422,47 @@
    menu reads as a popover, not a modal. Above the enlarged map (z-40); the menu sits above it. */
 .encounter-menu-backdrop { position: fixed; inset: 0; z-index: 41; }
 /* Anchored under the ⋯ button via inline top/left/width/max-height computed from the button rect. */
-/* `.scroll-y` rides this in EncounterPanel's markup (check (h)). The 85vh cap stays: this is a fixed
-   overlay layer, which is the one place §7 rule 2 keeps the idiom. */
-/* Ruling 52: a menu takes the panel material with a BRIGHTER rim, so a floating surface reads as
+/* THE FRAME AND THE SCROLLER ARE TWO BOXES NOW (`4g`). This one is the frame and it does not scroll;
+   `.encounter-menu-body` below carries `.scroll-y` in EncounterPanel's markup (check (h)).
+   THE SPLIT IS THE FIX. `.encounter-menu::before` (:1538) is the plate, the rim and the chamfer, and
+   it is `position: absolute; inset: -1px` — an absolutely-positioned child of a SCROLL CONTAINER is
+   sized to the scrollport and rides the scroll, which is the same fact `.scene-prep-picklist`
+   (scene-prep.css:15-19) already states in the other direction, keeping its edge as a real border
+   because of it. While this element was itself the scroller the frame scrolled away from its own
+   contents: measured as GM at 1280x900 with 25 roster actors, 674px of menu over 787px of overflow,
+   and at full scroll the plate sat at -569..105 against a menu box at 218..892 — nothing behind any
+   visible row, so every one of them painted straight onto the turn order's action cards. That is
+   the reported screenshot, and no amount of z-index or fill would have fixed it: the box was in the
+   wrong place, not the wrong colour.
+   The 85vh cap stays: this is a fixed overlay layer, which is the one place §7 rule 2 keeps the idiom.
+   Ruling 52: a menu takes the panel material with a BRIGHTER rim, so a floating surface reads as
    one step in front of the panel it opened from. */
-.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); display: grid; gap: .6rem; padding: .7rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
+.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); display: flex; flex-direction: column; padding: .7rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
+/* The grid and the gap were the menu's; they belong to whatever holds the rows. `min-height: 0` is
+   what lets it shrink inside the capped column instead of pushing the frame past its own cap. */
+.encounter-menu-body { display: grid; gap: .6rem; min-height: 0; }
 /* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
 .encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
 .encounter-menu .rules-mode-control select { width: 100%; }
 .encounter-menu .environment-control { margin: 0; }
 .menu-section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid var(--line); }
 .menu-section-title { margin: 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-/* No nested scroll here: the menu itself scrolls now, so the add list flows as part of that single
-   scroll region (was a second scrollbar-in-a-scrollbar the GM had to fight). */
+/* No nested scroll here: the menu's body scrolls, so the add list flows as part of that single
+   scroll region (was a second scrollbar-in-a-scrollbar the GM had to fight). What bounds the list
+   instead is `RECENT_COUNT` and the disclosure below — a cap, not a viewport. */
 .menu-add-list { display: grid; gap: .3rem; }
 .menu-empty-note { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+/* `Recent`, pre-collapsed, ten monsters deep (D3). The same disclosure scene prep opens onto the same
+   `lastUsedAt` order, so the two doors into a fight agree; the shape is `.scene-prep-recent`'s
+   (scene-prep.css:33-40) — a bordered 44px row with the caret at the far edge, because `display: flex`
+   on a <summary> suppresses the native marker and a bare bold label reads as a heading, not a control. */
+.menu-add-recent > summary { min-height: var(--tap-min); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: .3rem var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; list-style: none; }
+.menu-add-recent > summary::-webkit-details-marker { display: none; }
+.menu-add-recent > summary::after { content: "▾"; color: var(--text-muted); font-weight: 400; letter-spacing: 0; }
+.menu-add-recent[open] > summary::after { content: "▴"; }
+.menu-add-recent > summary:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
+.menu-add-recent > summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.menu-add-recent[open] > summary { margin-bottom: .35rem; }
 .menu-add-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: var(--fs-sm); color: var(--text-dim); }
 .menu-add-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-add-row button { flex: none; padding: .3rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }

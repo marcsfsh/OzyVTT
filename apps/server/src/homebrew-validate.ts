@@ -2,10 +2,10 @@ import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } f
 import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
 import { type ActorDefinition } from "@vtt/schemas";
 import {
-  HOMEBREW_BODY_SCHEMAS,
+  featurePicks, HOMEBREW_BODY_SCHEMAS,
   resolveSpellLists, spellListMemberIds,
   type BackgroundReference, type ClassReference, type ContentSpellcasting, type FeatReference,
-  type FeatureChoice, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
+  type FeatureChoice, type FeatureModifier, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
   type SpellListReference, type SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import { STATBLOCK_EXTENSION, statblockFacts, type ContentView } from "./content-library.js";
@@ -213,7 +213,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
     // offers from the LEVEL TABLE ALONE and never makes a matching one - so Create fails with
     // `No feature "..." offers a "skill" choice.` and the character can never be made. Refuse it
     // here, where the GM can fix it, and say which of the two edits fixes it.
-    if (feature.choice && granted === 0) {
+    if (featurePicks(feature).length > 0 && granted === 0) {
       checks.add(["features", index], `"${feature.name}" asks the player to choose, but no level in the table grants it - the character builder would offer the pick and then refuse to create the character. Add "${feature.id}" to a level in the level table, or remove its choice.`);
       return;
     }
@@ -264,21 +264,23 @@ function speciesIssues(entry: SpeciesReference, checks: Checks) {
     // choice on a lineage trait is offered for EVERY lineage and the build then rejects the picks the
     // player could not have avoided making. Refuse it rather than ship an uncreatable species.
     lineage.traits.forEach((trait, traitIndex) => {
-      if (trait.choice) checks.add(["lineages", index, "traits", traitIndex, "choice"], `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet - move the choice up to a species trait.`);
+      if (featurePicks(trait).length > 0) checks.add(["lineages", index, "traits", traitIndex, "choice"], `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet - move the choice up to a species trait.`);
     });
   });
 
   const self: SelfCatalog = { slug: `${entry.id}-lineages`, count: entry.lineages.length, whenEmpty: `"${entry.name}" asks for a lineage but declares none.` };
   entry.traits.forEach((trait, index) => {
     featureIssues(trait, ["traits", index], checks, 1, self);
-    const choice = trait.choice;
-    if (!choice) return;
-    if (choice.fromCatalog !== `${entry.id}-lineages` && choice.kind !== "lineage") return;
-    // `character-build.ts` finds the chosen lineage by looking for a choice row whose `kind` is the
-    // LITERAL string "lineage". Any other kind validates, records the pick, and silently never grants
-    // the lineage's traits - precisely the class of failure this gate exists for.
-    if (choice.kind !== "lineage") checks.add(["traits", index, "choice", "kind"], `A lineage pick must use the kind "lineage" (this one uses "${choice.kind}"), or the chosen lineage's traits are silently never granted.`);
-    if (choice.fromCatalog !== `${entry.id}-lineages`) checks.add(["traits", index, "choice", "fromCatalog"], `A lineage pick must read from "${entry.id}-lineages" (this one reads "${choice.fromCatalog ?? "an inline list"}").`);
+    const plural = (trait.choices?.length ?? 0) > 0;
+    featurePicks(trait).forEach((choice, pickIndex) => {
+      const pickPath: Path = plural ? ["traits", index, "choices", pickIndex] : ["traits", index, "choice"];
+      if (choice.fromCatalog !== `${entry.id}-lineages` && choice.kind !== "lineage") return;
+      // `character-build.ts` finds the chosen lineage by looking for a choice row whose `kind` is the
+      // LITERAL string "lineage". Any other kind validates, records the pick, and silently never grants
+      // the lineage's traits - precisely the class of failure this gate exists for.
+      if (choice.kind !== "lineage") checks.add([...pickPath, "kind"], `A lineage pick must use the kind "lineage" (this one uses "${choice.kind}"), or the chosen lineage's traits are silently never granted.`);
+      if (choice.fromCatalog !== `${entry.id}-lineages`) checks.add([...pickPath, "fromCatalog"], `A lineage pick must read from "${entry.id}-lineages" (this one reads "${choice.fromCatalog ?? "an inline list"}").`);
+    });
   });
 }
 
@@ -366,11 +368,41 @@ function spellcastingIssues(spellcasting: ContentSpellcasting | undefined, owner
   }
 }
 
-/** Every `fromCatalog` slug a feature - or one of its inline options - names must resolve to a NON-EMPTY list. */
+/** Every `fromCatalog` slug a feature - or one of its inline options - names must resolve to a NON-EMPTY
+    list. EVERY pick is walked, whichever spelling holds it: a plural record's second block can name a
+    broken catalog as easily as a singular's one, and the paths must name the spelling the record used
+    (`choice` for the singular, `choices[i]` for the plural) or the issue points at a key the body
+    does not have. */
 function featureIssues(feature: FeatureRecord, path: Path, checks: Checks, grants: number, self: SelfCatalog = undefined) {
-  choiceIssues(feature.choice, [...path, "choice"], feature.name, checks, grants, self);
-  (feature.choice?.options ?? []).forEach((option, index) => {
-    choiceIssues(option.choice, [...path, "choice", "options", index, "choice"], `${feature.name} / ${option.name}`, checks, grants, self);
+  const plural = (feature.choices?.length ?? 0) > 0;
+  featurePicks(feature).forEach((pick, pickIndex) => {
+    const pickPath: Path = plural ? [...path, "choices", pickIndex] : [...path, "choice"];
+    choiceIssues(pick, pickPath, feature.name, checks, grants, self);
+    (pick.options ?? []).forEach((option, index) => {
+      const optionPlural = (option.choices?.length ?? 0) > 0;
+      featurePicks(option).forEach((nested, nestedIndex) => {
+        choiceIssues(nested, optionPlural ? [...pickPath, "options", index, "choices", nestedIndex] : [...pickPath, "options", index, "choice"], `${feature.name} / ${option.name}`, checks, grants, self);
+      });
+      riderIssues(option.modifiers, [...pickPath, "options", index, "modifiers"], `${feature.name} / ${option.name}`, checks);
+    });
+  });
+  riderIssues(feature.modifiers, [...path, "modifiers"], feature.name, checks);
+}
+
+/**
+ * A rider that PARSES but can contribute nothing. `extra-damage` carries two independent ways to say
+ * how much - dice (`formula`) and the bearer's own `abilityModifier` - and both are optional, because
+ * either alone is a real printed effect. Neither is not: it stores, publishes, collects at the right
+ * moment, and adds zero, which is the silent-drop failure this whole area exists to end. The schema
+ * cannot say it (a `.superRefine` inside a `z.discriminatedUnion` is not legal in Zod 3), so it is
+ * refused HERE, at publish, which is where the codebase already puts authoring errors.
+ */
+function riderIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
+  (modifiers ?? []).forEach((modifier, index) => {
+    if (modifier.type !== "extra-damage") return;
+    if (modifier.formula === undefined && modifier.abilityModifier === undefined) {
+      checks.add([...path, index], `"${label}" has an extra-damage rider with neither a dice \`formula\` nor an \`abilityModifier\`, so it would add nothing.`);
+    }
   });
 }
 

@@ -1,7 +1,8 @@
-import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
+import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentLanguageSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
-import { applySpellListOverlay, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import { applySpellListOverlay, featurePicks, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadLanguages, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import type { CharacterFeatureRef, FeatureRecordLike } from "./equipment-derivation.js";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -64,6 +65,7 @@ export interface ContentView {
   conditionSummaries(): readonly ContentConditionSummary[];
   hasCondition(conditionId: string): boolean;
   skillSummaries(): readonly ContentSkillSummary[];
+  languageSummaries(): readonly ContentLanguageSummary[];
   spellSummaries(): readonly ContentSpellSummary[];
   equipmentSummaries(): readonly ContentEquipmentSummary[];
   classSummaries(): readonly ContentClassSummary[];
@@ -89,6 +91,8 @@ export interface ContentView {
   speciesRecord(id: string): SpeciesReference | undefined;
   backgroundRecord(id: string): BackgroundReference | undefined;
   featRecord(id: string): FeatReference | undefined;
+  /** The class/subclass/species/lineage/background feature (or inline option) a sheet's `character.features` entry names - the read that lets a feature's ROLL-TIME riders reach the table. */
+  featureRecord(ref: CharacterFeatureRef): FeatureRecordLike | undefined;
   equipmentRecord(id: string): EquipmentReference | undefined;
   spellRecord(id: string): SpellReference | undefined;
 }
@@ -102,9 +106,9 @@ export interface ContentView {
  * `forAudience(audience)` with a REQUIRED argument, so `tsc` enumerates every call site in `src`
  * and the compiler becomes the auditor. A defaulted `audience = "player"` parameter would be safer
  * by default but would still let a new call site silently miss the decision; a required argument
- * cannot be missed. (`apps/server/tsconfig.json` includes only `src`, so call sites under `test/`
- * are caught by the suite rather than the compiler - which is why the visibility regression test
- * enumerates the operations object itself instead of trusting a hand-written list.)
+ * cannot be missed. (`apps/server/tsconfig.json` now includes `test` as well, so the compiler
+ * enumerates test call sites too - the visibility regression test still enumerates the operations
+ * object itself rather than a hand-written list, because that catches a MISSING call, not a wrong one.)
  */
 export class ContentLibrary {
   readonly attribution: string;
@@ -220,26 +224,54 @@ function slotCastingOptions(options: SpellReference["castingOptions"]): ContentS
  * nested choice on the wire the wizard reports the step complete and the server refuses the build.
  * Riders (actions/grants/modifiers/uses) stay server-side - only what the player must SEE travels.
  */
-const choiceSummaryOf = (choice: FeatureRecord["choice"]): ContentFeatureSummary["choice"] => choice
+type WireChoice = NonNullable<ContentFeatureSummary["choice"]>;
+/** `{offer, amount}` or `{offer, scaling}` - one of the two, filled out for a wire type that has both. */
+const extraPickSummaryOf = (grants: FeatureRecord["extraPicks"]): ContentFeatureSummary["extraPicks"] =>
+  grants.map((grant) => ({ offer: grant.offer, amount: grant.amount ?? null, scaling: grant.scaling ?? null }));
+
+const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null => choice
   ? {
-      kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null,
-      options: (choice.options ?? []).map((option) => ({
-        id: option.id, name: option.name, description: option.description,
+      kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null,
+      fromPicks: choice.fromPicks ? { offer: choice.fromPicks.offer, where: choice.fromPicks.where ?? null } : null,
+      options: (choice.options ?? []).map((option) => {
         // One level of nesting only, matching the schema's own bound: a nested choice cannot itself carry options.
-        choice: option.choice ? { kind: option.choice.kind, choose: option.choice.choose, from: option.choice.from ?? [], fromCatalog: option.choice.fromCatalog ?? null, maxSpellLevel: option.choice.maxSpellLevel ?? null, options: [] } : null
-      }))
+        const nested = featurePicks(option).map((pick) => ({
+          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, minSpellLevel: pick.minSpellLevel ?? null,
+          fromPicks: pick.fromPicks ? { offer: pick.fromPicks.offer, where: pick.fromPicks.where ?? null } : null, options: []
+        }));
+        return {
+          id: option.id, name: option.name, description: option.description,
+          // The gate travels for the same reason `choice` does: the wizard has to filter the option
+          // list the way the server will, or it renders a pick the server refuses (or, worse, hides
+          // the only legal one). See `FeatureOptionSchema.requires`.
+          requires: option.requires ? { offer: option.requires.offer, id: option.requires.id } : null,
+          choice: nested[0] ?? null,
+          choices: nested,
+          // The budget a CHOSEN option raises. Travels for the same reason its `choice` does: without
+          // it the wizard caps the player at the printed level row and the extra pick Thaumaturge
+          // promises ("one extra cantrip from the Cleric spell list") cannot be selected at all.
+          extraPicks: extraPickSummaryOf(option.extraPicks)
+        };
+      })
     }
   : null;
 
-const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => ({
-  id: feature.id,
-  name: feature.name,
-  level: feature.level ?? null,
-  description: feature.description,
-  tags: feature.tags,
-  choice: choiceSummaryOf(feature.choice),
-  grantedAtLevels
-});
+const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => {
+  // EVERY pick, not just the first: a record may owe several (Magic Initiate's two cantrips AND its
+  // level-1 spell), and `choice` is kept as the first so callers that only ever wanted one are unchanged.
+  const picks = featurePicks(feature).map((pick) => choiceSummaryOf(pick)!);
+  return {
+    id: feature.id,
+    name: feature.name,
+    level: feature.level ?? null,
+    description: feature.description,
+    tags: feature.tags,
+    choice: picks[0] ?? null,
+    choices: picks,
+    grantedAtLevels,
+    extraPicks: extraPickSummaryOf(feature.extraPicks)
+  };
+};
 
 /** feature id -> every level row that grants it, in order. The client's repeat count. */
 const grantLevelsOf = (levelTable: ClassReference["levelTable"]): ReadonlyMap<string, number[]> => {
@@ -292,8 +324,8 @@ export function statblockFacts(definition: ActorDefinition): { challengeRating: 
 }
 
 /** A bundle "choose N from" list -> the wire shape (null = the record offers no such choice). */
-const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[] }> | undefined): ContentChoiceList | null =>
-  list ? { choose: list.choose, from: list.from } : null;
+const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[]; fromCatalog?: string }> | undefined): ContentChoiceList | null =>
+  list ? { choose: list.choose, from: list.from, fromCatalog: list.fromCatalog ?? null } : null;
 /** A class/subclass spellcasting header -> the wire shape. The structured riders stay server-side as ever; this is the caster step's display data plus the spell-list link. */
 const spellcastingSummaryOf = (spellcasting: ContentSpellcasting | undefined): ContentSpellcastingSummary | null =>
   spellcasting
@@ -433,10 +465,22 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     id: skill.id, name: skill.name, description: skill.description, ability: skill.ability ?? null
   }));
 
+  // The 19 SRD languages with the table each is printed in. Published as DATA (not prose in the
+  // rules text) because a `languageChoices` budget needs a list: without one, "Common plus two
+  // languages" - owed to every character by Character Creation - was never offered to anybody.
+  const languageSummaries: readonly ContentLanguageSummary[] = loadLanguages().map((language) => ({
+    id: language.id, name: language.name, description: language.description, table: language.table
+  }));
+
   const spellSummaries: readonly ContentSpellSummary[] = spells
     .map((spell) => ({
       id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
       rangeText: spell.range.text, componentsText: spellComponentsText(spell.components), duration: spell.duration,
+      // Two facts the `fromPicks` predicates read (Repelling Blast wants an attack roll, Eldritch
+      // Spear a range of 10+ feet). Feet only when the printed range IS a distance - Self and Touch
+      // are not ranges of zero, they are not ranges.
+      attackRoll: spell.attackRoll,
+      rangeFeet: spell.range.unit === "feet" || spell.range.unit === "foot" ? spell.range.distance : null,
       concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel,
       // The spell-list link (which class lists this spell is on) - what the builder's spell step
       // filters by, paired with the class record's spellcasting.spellListId. Dropping this severed
@@ -476,6 +520,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     conditionSummaries,
     conditionIds: new Set(conditionSummaries.map((condition) => condition.id)),
     skillSummaries,
+    languageSummaries,
     spellSummaries,
     equipmentSummaries,
     classSummaries: classes.map(classSummaryOf).sort(byName) as readonly ContentClassSummary[],
@@ -496,10 +541,52 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     speciesRecords: new Map(species.map((entry) => [entry.id, entry])),
     backgroundRecords: new Map(backgrounds.map((entry) => [entry.id, entry])),
     featRecords: new Map(feats.map((entry) => [entry.id, entry])),
+    featureRecords: featureIndexOf(classes, subclasses, species, backgrounds),
     equipmentRecords: new Map(equipment.map((entry) => [entry.id, entry])),
     spellRecords: new Map(spells.map((entry) => [entry.id, entry]))
   };
 }
+
+/**
+ * Every class / subclass / species / lineage / background FEATURE, plus every inline choice OPTION,
+ * addressable by the `{kind, sourceId, id}` triple a sheet's `character.features` records (issue
+ * `2e` - a feature's 13 roll-time riders reach the table only if the sheet can name the record).
+ *
+ * KEYED ON ALL THREE, not on the id. A bare id is genuinely ambiguous in the bundled SRD alone:
+ * `unarmored-defense` is both a Barbarian and a Monk feature and the two differ mechanically,
+ * `weapon-mastery` belongs to five classes, `spellcasting` to seven, `epic-boon` to all twelve.
+ * An id-keyed map would hand a Monk the Barbarian's riders - silently, and only sometimes.
+ *
+ * First write wins on a duplicate key, so the index is deterministic whatever order homebrew merges
+ * in; an exact triple collision would mean two records claiming the same identity, which the
+ * homebrew id rules already prevent.
+ */
+function featureIndexOf(
+  classes: readonly ClassReference[], subclasses: readonly SubclassReference[],
+  species: readonly SpeciesReference[], backgrounds: readonly BackgroundReference[]
+): Map<string, FeatureRecordLike> {
+  const index = new Map<string, FeatureRecordLike>();
+  const put = (kind: CharacterFeatureRef["kind"], sourceId: string, feature: FeatureRecord) => {
+    const key = featureKey({ kind, sourceId, id: feature.id });
+    if (!index.has(key)) index.set(key, feature as FeatureRecordLike);
+    // A feature's inline options carry the identical `featureRiders` vocabulary and are chosen the
+    // same way; the builder records them as kind "option" under their PARENT FEATURE's id.
+    for (const option of feature.choice?.options ?? []) {
+      const optionKey = featureKey({ kind: "option", sourceId: feature.id, id: option.id });
+      if (!index.has(optionKey)) index.set(optionKey, option as unknown as FeatureRecordLike);
+    }
+  };
+  for (const entry of classes) for (const feature of entry.features) put("class", entry.id, feature);
+  for (const entry of subclasses) for (const feature of entry.features) put("subclass", entry.id, feature);
+  for (const entry of species) {
+    for (const trait of entry.traits) put("species", entry.id, trait);
+    for (const lineage of entry.lineages) for (const trait of lineage.traits) put("lineage", lineage.id, trait);
+  }
+  for (const entry of backgrounds) for (const feature of entry.features) put("background", entry.id, feature);
+  return index;
+}
+
+const featureKey = (ref: CharacterFeatureRef) => `${ref.kind} ${ref.sourceId} ${ref.id}`;
 
 type CatalogData = ReturnType<typeof buildCatalogData>;
 
@@ -514,6 +601,7 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     conditionSummaries: () => data.conditionSummaries,
     hasCondition: (conditionId) => data.conditionIds.has(conditionId),
     skillSummaries: () => data.skillSummaries,
+    languageSummaries: () => data.languageSummaries,
     spellSummaries: () => data.spellSummaries,
     equipmentSummaries: () => data.equipmentSummaries,
     classSummaries: () => data.classSummaries,
@@ -525,13 +613,14 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     monsterSummaries: () => data.monsterSummaries,
     monster: (definitionId) => data.monstersById.get(definitionId),
     monsterActionSummaries: (definitionId) => data.monstersById.get(definitionId)?.actions.map(actionSummaryOf),
-    catalogChoiceCatalogs: () => ({ classes: data.classSummaries, subclasses: data.subclassSummaries, species: data.speciesSummaries, feats: data.featSummaries, spells: data.spellSummaries, equipment: data.equipmentSummaries, skills: data.skillSummaries }),
+    catalogChoiceCatalogs: () => ({ classes: data.classSummaries, subclasses: data.subclassSummaries, species: data.speciesSummaries, feats: data.featSummaries, spells: data.spellSummaries, equipment: data.equipmentSummaries, skills: data.skillSummaries, languages: data.languageSummaries }),
     classProgressionTable: () => data.progressionTable,
     classRecord: (id) => data.classRecords.get(id),
     subclassRecord: (id) => data.subclassRecords.get(id),
     speciesRecord: (id) => data.speciesRecords.get(id),
     backgroundRecord: (id) => data.backgroundRecords.get(id),
     featRecord: (id) => data.featRecords.get(id),
+    featureRecord: (ref) => data.featureRecords.get(featureKey(ref)),
     equipmentRecord: (id) => data.equipmentRecords.get(id),
     spellRecord: (id) => data.spellRecords.get(id)
   };

@@ -8,7 +8,7 @@ import {
 import {
   ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema, FeatureChoiceSchema, FeatureModifierSchema,
   FeatureRecordSchema, NamePoolReferenceSchema, RiderWhenSchema, SpeciesReferenceSchema,
-  loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadNames, loadSkills,
+  loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadLanguages, loadNames, loadSkills,
   loadSpecies, loadSpells, loadSubclasses, namesForSpecies, riderLayer, subclassesForClass,
   type FeatureRecord
 } from "../src/index.js";
@@ -450,32 +450,32 @@ describe("character-builder content records", () => {
     expect(authored.length).toBeGreaterThanOrEqual(15);
     const skillCount = loadSkills().length;
     const weaponCount = loadEquipment().filter((item) => item.category === "weapon").length;
+    const toolCount = loadEquipment().filter((item) => item.category === "tool").length;
+    const languages = loadLanguages();
+    /**
+     * Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored
+     * slug must land in a family AND resolve to a non-empty option list, or a wizard step dead-ends.
+     * Recursive, because the grammar has one combinator - `<a>-or-<b>` is the union of its parts, and
+     * a union is legal as long as at least one part resolves.
+     */
+    const resolvesNonEmpty = (slug: string): boolean => {
+      if (slug.includes("-or-")) {
+        const parts = slug.split("-or-");
+        return parts.every((part) => part.length > 0) && parts.some(resolvesNonEmpty);
+      }
+      if (slug === "skills") return skillCount > 0;
+      if (slug === "weapons") return weaponCount > 0;
+      if (slug === "tools") return toolCount > 0;
+      if (slug === "languages") return languages.length > 0;
+      if (slug.endsWith("-languages")) return languages.some((entry) => entry.table === slug.slice(0, -"-languages".length));
+      if (slug.endsWith("-spells")) return spells.some((spell) => spell.classes.includes(slug.slice(0, -"-spells".length)));
+      if (slug.endsWith("-subclasses")) return subclassesForClass(slug.slice(0, -"-subclasses".length)).length > 0;
+      if (slug.endsWith("-feats")) return feats.some((feat) => feat.category === slug.slice(0, -"-feats".length));
+      if (slug.endsWith("-lineages")) return (species.find((entry) => entry.id === slug.slice(0, -"-lineages".length))?.lineages.length ?? 0) > 0;
+      return false;
+    };
     for (const { owner, slug } of authored) {
-      // Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored
-      // slug must land in a family AND resolve to a non-empty option list, or a wizard step dead-ends.
-      if (slug === "skills") { expect(skillCount, owner).toBeGreaterThan(0); continue; }
-      if (slug === "weapons") { expect(weaponCount, owner).toBeGreaterThan(0); continue; }
-      if (slug.endsWith("-spells")) {
-        const listId = slug.slice(0, -"-spells".length);
-        expect(spells.some((spell) => spell.classes.includes(listId)), `${owner} -> ${slug}`).toBe(true);
-        continue;
-      }
-      if (slug.endsWith("-subclasses")) {
-        const classId = slug.slice(0, -"-subclasses".length);
-        expect(subclassesForClass(classId).length, `${owner} -> ${slug}`).toBeGreaterThan(0);
-        continue;
-      }
-      if (slug.endsWith("-feats")) {
-        const category = slug.slice(0, -"-feats".length);
-        expect(feats.some((feat) => feat.category === category), `${owner} -> ${slug}`).toBe(true);
-        continue;
-      }
-      if (slug.endsWith("-lineages")) {
-        const speciesId = slug.slice(0, -"-lineages".length);
-        expect(species.find((entry) => entry.id === speciesId)?.lineages.length ?? 0, `${owner} -> ${slug}`).toBeGreaterThan(0);
-        continue;
-      }
-      expect.fail(`${owner}: fromCatalog "${slug}" matches no documented slug family`);
+      expect(resolvesNonEmpty(slug), `${owner}: fromCatalog "${slug}" matches no documented slug family, or resolves to nothing`).toBe(true);
     }
   });
 
@@ -583,9 +583,17 @@ describe("character-builder content records", () => {
     // A Protector Cleric's PROFICIENCIES are the class's plus the option's - the SRD's printed result.
     expect([...cleric.weaponProficiencies, ...protector.grants!.weapons]).toEqual(["simple", "martial"]);
     expect([...cleric.armorProficiencies, ...protector.grants!.armor]).toEqual(["light", "medium", "shields", "heavy"]);
+    // Thaumaturge RAISES the Cleric cantrip budget rather than opening a pick of its own. The text
+    // says "you know one EXTRA cantrip from the Cleric spell list" - one budget, one card, one number
+    // - and a separate second-order choice was the only way to say it before `extraPicks` existed.
+    // It also cannot be scoped as a choice in the general case ("your class's skill list" is not a
+    // catalog slug), which is why the budget-raising form is the one Stage 4 authors against.
     const thaumaturge = order.find((option) => option.id === "thaumaturge")!;
-    expect(thaumaturge.choice).toMatchObject({ kind: "cantrip", choose: 1, fromCatalog: "cleric-spells", maxSpellLevel: 0 });
+    expect(thaumaturge.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
+    expect(thaumaturge.choice).toBeUndefined();
     expect(thaumaturge.grants).toBeUndefined();
+    // Protector raises nothing: the field is empty, not absent, so a reader never has to guard it.
+    expect(protector.extraPicks).toEqual([]);
 
     // Blessed Strikes: Divine Strike is a once-per-turn rollable that grows 1d8 -> 2d8 at level 14.
     const strikes = optionsOf(cleric, "blessed-strikes");
@@ -708,6 +716,128 @@ describe("character-builder content records", () => {
     });
   });
 });
+
+/**
+ * `2a` - every class presents its actual features. The observed symptom was Warlock's class step
+ * reading "See the warlock class description in SRD 5.2.1."; the cause was a slug mismatch in the
+ * ETL (`scripts/build-class-bundle.ts`, `featureProse`), which keyed `#### Level 1: Rage` under
+ * `level-1-rage` while the level table asked for `rage`. **149 of 185** class features shipped the
+ * stub - Monk 23/23, Barbarian 20/20, Rogue 19/19, Ranger 18/18, Paladin 18/18, Druid 14/14,
+ * Warlock 13/13, Bard 13/13, Sorcerer 11/11 - and the prose was in the bundle source the whole time.
+ *
+ * The build now REFUSES to write a bundle containing one. This is the read-side half of that bar:
+ * the build guards regeneration, this guards the committed artefact, and the two fail independently.
+ */
+describe("2a - no class or subclass feature falls back to a pointer at an external document", () => {
+  const STUB = /^See the .* in SRD 5\.2\.1\.$/;
+  const classes = loadClasses();
+  const subclasses = loadSubclasses();
+
+  it("has zero stub descriptions across every class and subclass feature", () => {
+    const offenders = [
+      ...classes.flatMap((record) => record.features.filter((f) => STUB.test(f.description)).map((f) => `${record.id}.${f.id}`)),
+      ...subclasses.flatMap((record) => record.features.filter((f) => STUB.test(f.description)).map((f) => `${record.id}.${f.id}`))
+    ];
+    expect(offenders, `these features carry the SRD-pointer stub instead of prose:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("gives every feature real prose, not a placeholder", () => {
+    // The floor is 40, not 60: `paladin.aura-expansion` is 51 characters and is the SRD's COMPLETE
+    // printed text ("Your Aura of Protection is now a 30-foot Emanation."). A 60-character bar would
+    // have failed on correct content, which is the wrong kind of test.
+    for (const record of [...classes, ...subclasses]) {
+      for (const feature of record.features) {
+        expect(feature.description.length, `${record.id}.${feature.id} is ${feature.description.length} chars: "${feature.description}"`)
+          .toBeGreaterThanOrEqual(40);
+      }
+    }
+  });
+
+  it("recovers the specific prose the report named, for the nine ETL-generated classes", () => {
+    const proseOf = (classId: string, featureId: string) =>
+      classes.find((record) => record.id === classId)!.features.find((feature) => feature.id === featureId)!.description;
+    expect(proseOf("warlock", "pact-magic")).toContain("you have formed a pact with a mysterious entity");
+    expect(proseOf("warlock", "eldritch-invocations")).toContain("pieces of forbidden knowledge");
+    expect(proseOf("barbarian", "rage")).toContain("a primal power called Rage");
+    expect(proseOf("monk", "martial-arts")).toContain("Unarmed Strike");
+    expect(proseOf("rogue", "sneak-attack")).toContain("Sneak Attack");
+    // Negative control: the three HAND_AUTHORED classes are skipped by the ETL and must be untouched.
+    expect(proseOf("cleric", "channel-divinity")).toContain("Channel Divinity");
+    expect(proseOf("wizard", "arcane-recovery")).toContain("regain some of your magical energy by studying your spellbook");
+  });
+
+  it("keys one printed heading onto the whole family the level table splits it into", () => {
+    // Warlock's table grants four Mystic Arcanum slots (levels 11/13/15/17) under ONE heading.
+    const warlock = classes.find((record) => record.id === "warlock")!;
+    const arcana = warlock.features.filter((feature) => feature.id.startsWith("mystic-arcanum-"));
+    expect(arcana.map((feature) => feature.level)).toEqual([11, 13, 15, 17]);
+    for (const feature of arcana) expect(feature.description).toContain("a magical secret called an arcanum");
+  });
+
+  it('drops the table\'s "Subclass feature" reminder rows, as the hand-authored three already do', () => {
+    // It is not a class feature: the SRD prints no heading for it, so it can carry no prose, and the
+    // real feature is on the subclass record. Cleric's empty levels 6 and 17 are the oracle.
+    for (const record of classes) {
+      expect(record.features.map((feature) => feature.id), record.id).not.toContain("subclass-feature");
+      for (const row of record.levelTable) expect(row.features, `${record.id} L${row.level}`).not.toContain("subclass-feature");
+    }
+    const barbarian = classes.find((record) => record.id === "barbarian")!;
+    expect(barbarian.levelTable[5].features).toEqual([]); // level 6 printed "Subclass feature" alone
+  });
+});
+
+/**
+ * THE TWO STRUCTURAL BLOCKERS THE PRE-STAGE-4 AUDIT NAMED, held open from the read side.
+ *
+ * Both were invisible to every existing test: a subclass overlay that is never merged and a table
+ * that is thrown away both produce records that PARSE, so only an assertion about the content itself
+ * can tell the difference. These are the committed artefact's half - `build-class-bundle.ts` guards
+ * regeneration, and the two fail independently.
+ */
+describe("the subclass authoring surface, and the tables the parser used to throw away", () => {
+  const classes = loadClasses();
+  const subclasses = loadSubclasses();
+  // Readonly in BOTH dimensions: `loadClasses`/`loadSubclasses` return `readonly ClassReference[]`,
+  // and a mutable parameter type made this helper uncallable with them - invisible while the package
+  // did not typecheck `test/`.
+  const featureOf = (records: readonly { id: string; features: readonly FeatureRecord[] }[], recordId: string, featureId: string) =>
+    records.find((record) => record.id === recordId)!.features.find((feature) => feature.id === featureId)!;
+
+  it("merges SUBCLASS_MECHANICS into an ETL-GENERATED subclass", () => {
+    // Draconic Sorcery is generated (Sorcerer is not HAND_AUTHORED), so before the ETL imported
+    // SUBCLASS_MECHANICS there was no way for this rider to exist at all. Champion / Evoker / Life
+    // Domain are NOT the proof - their class is hand-authored and the whole record is copied through.
+    const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
+    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: false, when: [] }]);
+  });
+
+  it("carries the spell tables of the four subclass spell features into their descriptions", () => {
+    // Each of these used to end at the word "table", with the spells it promises nowhere in the
+    // record - one truncation per subclass that grants spells by level.
+    const draconic = featureOf(subclasses, "draconic-sorcery", "draconic-spells").description;
+    expect(draconic).toContain("Sorcerer Level 3: Alter Self, Chromatic Orb, Command, Dragon's Breath");
+    expect(draconic).toContain("Sorcerer Level 9: Legend Lore, Summon Dragon");
+    expect(featureOf(subclasses, "fiend-patron", "fiend-spells").description).toContain("Warlock Level 5: Fireball, Stinking Cloud");
+    expect(featureOf(subclasses, "oath-of-devotion", "oath-of-devotion-spells").description).toContain("Paladin Level 3: Protection from Evil and Good, Shield of Faith");
+    const land = featureOf(subclasses, "circle-of-the-land", "circle-of-the-land-spells").description;
+    for (const type of ["Arid Land", "Polar Land", "Temperate Land", "Tropical Land"]) expect(land).toContain(type);
+    expect(land).toContain("Druid Level 9: Insect Plague");
+  });
+
+  it("carries a CLASS feature's table too - the same parser bug, one level up", () => {
+    expect(featureOf(classes, "druid", "wild-shape").description).toContain("Druid Level 8: Known Forms 8, Max CR 1, Fly Speed Yes");
+    expect(featureOf(classes, "sorcerer", "font-of-magic").description).toContain("Spell Slot Level 5: Sorcery Point Cost 7, Min. Sorcerer Level 9");
+  });
+
+  it("leaves no subclass spell feature ending on the word that introduced its table", () => {
+    // The shape of the bug, not one instance of it: "...as shown in the X table." followed by nothing.
+    const truncated = subclasses.flatMap((record) => record.features
+      .filter((feature) => /\btables?\.?$/i.test(feature.description.trim()) || /\bSpells$/.test(feature.description.trim()))
+      .map((feature) => `${record.id}.${feature.id}`));
+    expect(truncated, `these descriptions stop at their table:\n  ${truncated.join("\n  ")}`).toEqual([]);
+  });
+});
+
 
 describe("content-record schema guards", () => {
   const fighter = loadClasses().find((entry) => entry.id === "fighter")!;

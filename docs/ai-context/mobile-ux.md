@@ -9,9 +9,14 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
   (`apps/client/src/**/*.css`) and in the shared tokens (`packages/ui/src/styles/`). There is
   no central responsive stylesheet, and adding one is not the fix.
 - Gesture logic: `apps/client/src/scene/EncounterMap.tsx` (the encounter pointer gesture state
-  machine: pan / token / measure via `setPointerCapture`) and
+  machine: pan / token / measure / fog / annotation via `setPointerCapture`, **plus pinch**) and
   `apps/client/src/codex/MapSurface.tsx` (the Codex atlas pan/zoom surface, same
-  `imagePointFromClient` convention).
+  `imagePointFromClient` convention). Both keep a `pointers` ref keyed by `pointerId` — pointer
+  capture makes a single-pointer gesture, so the second finger is invisible without one.
+  **On the encounter map a second finger ABORTS whatever was in flight** (capture released,
+  long-press timer cleared, `gesture` set to null — which is what discards the preview, since
+  every preview there is derived from `gesture`), so no token move, fog stroke, measurement or
+  shape is ever committed by a pinch. Proved by `scripts/pinch-zoom-audit.mjs`, not by reading.
 - Decision record: `docs/adr/0014-device-support.md`.
 
 ## Responsive conventions

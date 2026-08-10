@@ -1,5 +1,5 @@
 import { makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { Actor, ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
 import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -55,6 +55,15 @@ export function spendHitDice(state: GameState, actorId: string, faces: readonly 
   return { healed, events, conModifier };
 }
 
+/**
+ * WHICH RE-CHOICES A REST ENDS. A short rest clears the overrides that named it; a long rest clears
+ * everything, exactly as it refreshes every use pool rather than only the long-rest ones.
+ */
+function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
+  if (kind === "long") return {};
+  return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
+}
+
 export function applyRest(state: GameState, actorId: string, kind: "long" | "short", resolveDefinition: (definitionId: string) => ActorDefinition | undefined, catalog?: EquipmentCatalog): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -72,6 +81,10 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
         actor.actionUses = rest;
       }
     }
+    // A pick re-made "whenever you finish a Short or Long Rest" lapses here, so the next rest is a
+    // fresh decision rather than a standing one (ruling A's rest-time half). The build's own answer
+    // stands again until the character chooses.
+    actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
     return events;
   }
   for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
@@ -82,6 +95,8 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
   actor.actionUses = {};
+  // BOTH kinds lapse on a long rest, the same nesting a short-rest use pool has.
+  actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
   if (exhaustion) {
     if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");

@@ -22,6 +22,7 @@ import { useState } from "react";
 import { Combobox } from "./Combobox";
 import { Drawer } from "./Drawer";
 import { MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "./MarkdownEditor";
+import { TagInput } from "./TagInput";
 
 describe("Drawer", () => {
   it("renders titled, closeable, non-modal, and inert while closed", async () => {
@@ -388,6 +389,31 @@ describe("Combobox", () => {
     expect(screen.getByRole("button", { name: "Clear Vex the Bold" })).toBeInTheDocument();
   });
 
+  it("allowFreeText: leaving the box keeps what was typed, and an exact label commits the id", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <>
+        <Combobox options={OPTIONS} value={null} onChange={onChange} allowFreeText ariaLabel="Rarity" />
+        <button type="button">elsewhere</button>
+      </>
+    );
+
+    // The gesture people actually make: type, then move to the next field. Enter was the ONLY way to
+    // commit, so an open-slug field rendered through this control silently kept nothing — with no
+    // error, because nothing went wrong. That is worse than the bare text box it replaced.
+    await user.type(screen.getByRole("combobox", { name: "Rarity" }), "unique");
+    await user.click(screen.getByRole("button", { name: "elsewhere" }));
+    expect(onChange).toHaveBeenCalledWith("unique");
+
+    // ...and text that IS an option's label commits the OPTION, so a picker in free-text mode cannot
+    // store "Ireena" where `p1` belongs.
+    onChange.mockClear();
+    await user.type(screen.getByRole("combobox", { name: "Rarity" }), "ireena");
+    await user.click(screen.getByRole("button", { name: "elsewhere" }));
+    expect(onChange).toHaveBeenCalledWith("p1");
+  });
+
   it("without allowFreeText, unmatched text is not a value", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -431,5 +457,100 @@ describe("Combobox", () => {
 
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(input).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("reopens on a tap even when it never lost focus — the multi-value case", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Combobox options={OPTIONS} value={null} onChange={onChange} ariaLabel="Filter by tag" />);
+
+    const input = screen.getByRole("combobox", { name: "Filter by tag" });
+    await user.click(input);
+    await user.click(screen.getByRole("option", { name: /Ireena/ }));
+    expect(onChange).toHaveBeenCalledWith("p1");
+    expect(input).toHaveAttribute("aria-expanded", "false");
+
+    // The option's `onMouseDown` preventDefault deliberately leaves focus on the input, so `onFocus`
+    // can never fire again — and a caller that keeps `value` at null (a `TagInput` collecting several)
+    // stays mounted on this very input. Without the click handler the next tap did nothing at all,
+    // which is precisely the "there is no list here" defect the visible list exists to end.
+    await user.click(input);
+    expect(input).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+/**
+ * `TagInput` in `pick` mode — the multi-value half of the client's `3a`/`3d` report.
+ *
+ * The single-value repair (`Combobox` behind `FieldDef.pick`) landed first and covered one field.
+ * Six of the nine damage-type sites are LISTS, and a list rendered its vocabulary into a `<datalist>`:
+ * no arrow, no cue, and nothing at all on iOS Safari. So the same chooser became this control's entry
+ * box, opt-in, because `suggestions` means two different things at two kinds of call site — a
+ * canonical vocabulary a GM should be choosing from, versus a corpus of tags that already exist, where
+ * the normal act is to type a new one and a menu of prior tags would be a wall.
+ */
+describe("TagInput", () => {
+  const TYPES = ["acid", "cold", "fire", "lightning"];
+
+  it("without `pick` it is the datalist it always was — no listbox, no menu", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { container } = render(<TagInput values={[]} onChange={onChange} suggestions={TYPES} ariaLabel="Damage resistances" />);
+
+    // The Codex's tag fields are this call, and they must stay this call: their suggestions are every
+    // tag the campaign already uses, which is a hint, not a set to choose from.
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(container.querySelector("datalist")).not.toBeNull();
+    await user.type(screen.getByLabelText("Damage resistances"), "fire{Enter}");
+    expect(onChange).toHaveBeenCalledWith(["fire"]);
+  });
+
+  it("with `pick` the whole list is on screen, by its printed name, before anything is typed", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <TagInput values={[]} onChange={vi.fn()} suggestions={TYPES} pick optionLabel={(value) => value.toUpperCase()} ariaLabel="Damage resistances" />
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Damage resistances" }));
+    expect(within(screen.getByRole("listbox", { name: "Damage resistances" })).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["ACID", "COLD", "FIRE", "LIGHTNING"]);
+    // The invisible half is GONE rather than merely supplemented — two lists over one field is two
+    // things to keep in step.
+    expect(container.querySelector("datalist")).toBeNull();
+  });
+
+  it("with `pick` it still takes a word the list has never heard of, normalised the same way", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TagInput values={["fire"]} onChange={onChange} suggestions={TYPES} pick ariaLabel="Damage resistances" />);
+
+    // The open half. `slugify` is the primitive's own normalizer and it runs on the picked path and
+    // the typed path alike, so "Void Fire" cannot become a second spelling of anything.
+    await user.type(screen.getByRole("combobox", { name: "Damage resistances" }), "Void Fire{Enter}");
+    expect(onChange).toHaveBeenCalledWith(["fire", "void-fire"]);
+  });
+
+  it("with `pick`, what is already chosen leaves the menu — and the chip keeps its ✕", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<TagInput values={["fire"]} onChange={onChange} suggestions={TYPES} pick ariaLabel="Damage resistances" />);
+
+    await user.click(screen.getByRole("combobox", { name: "Damage resistances" }));
+    const shown = within(screen.getByRole("listbox", { name: "Damage resistances" })).getAllByRole("option").map((option) => option.textContent);
+    expect(shown).toEqual(["acid", "cold", "lightning"]);
+
+    // Removal is the chip's ✕ in both modes, which matters because `pick` gives up Backspace-on-empty:
+    // the entry box is `Combobox`'s and its keyboard belongs to the listbox.
+    await user.click(screen.getByRole("button", { name: "Remove fire" }));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("`pick` with no list falls back to the plain box rather than a chooser over nothing", () => {
+    render(<TagInput values={[]} onChange={vi.fn()} suggestions={[]} pick ariaLabel="Which languages" />);
+
+    // "Show the list when there is one" — the sentence a caller that sets `pick` for a whole control
+    // (`GrantsEditor`, where the vocabulary changes with the row's kind) needs to stay true.
+    expect(screen.queryByRole("combobox", { name: "Which languages" })).toBeNull();
+    expect(screen.getByLabelText("Which languages")).toBeInTheDocument();
   });
 });

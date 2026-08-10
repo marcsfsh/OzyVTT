@@ -69,6 +69,19 @@ export const ApplyDamageSchema = z.object({
   actorId: z.string().uuid(),
   amount: z.number().int().min(1).max(1000),
   parts: z.array(z.object({ amount: z.number().int().min(0).max(1000), type: z.string().min(1).max(40) }).strict()).min(1).max(9).optional(),
+  /**
+   * D7: the manual entry's OPTIONAL damage type. Absent or `"untyped"` is today's fast path exactly;
+   * naming a type runs `amount` through resistance/immunity/vulnerability. Open text on purpose - the
+   * SRD thirteen are a suggestion list, never a gate, so a homebrew type still matches a homebrew
+   * defence. Ignored when `parts` is present.
+   */
+  damageType: z.string().trim().min(1).max(40).optional(),
+  /**
+   * A hand-entered total that REPLACES what was rolled while keeping its types (the server re-weights
+   * `parts` to it). The amend used to be expressed by dropping `parts` and sending a bare `amount`,
+   * which skipped every defence.
+   */
+  damageOverride: z.number().int().min(0).max(1000).optional(),
   sourceActorId: z.string().uuid().optional(),
   sourceActionId: z.string().regex(/^[a-z0-9-]+$/).max(120).optional(),
   sourceName: z.string().min(1).max(120).optional(),
@@ -109,7 +122,7 @@ export const ActionResolveSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, { message: "Supply either a natural d20 or a final total, not both." });
-export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), expectedRevision: z.number().int().nonnegative().optional() }).strict()
+export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), /** Issue `4b`: the damage this save applies, hand-entered instead of the auto-rolled proposal. Applied BEFORE the success halving, and the proposal's damage TYPES are kept (re-weighted), so an amended number still meets the target's resistances. A player may amend only their own claimed character's save - the same boundary that governs answering it at all. */ damageOverride: z.number().int().min(0).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Answer a pending reaction prompt: use (spend the reaction - halve the parked damage, or swing the opportunity attack) or decline. `actionId` picks the melee action for a leaves-reach answer (default: first melee attack, else Unarmed Strike). */
@@ -136,6 +149,8 @@ export const EffectAddSchema = z.object({
   modifiers: z.array(z.discriminatedUnion("type", [
     z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
     z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20) }).strict(),
+    /** The mirror of the line above, and the only channel by which anything can make a target vulnerable. */
+    z.object({ type: z.literal("damage-vulnerability"), damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20) }).strict(),
     z.object({ type: z.literal("attack-advantage") }).strict(),
     z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
     z.object({ type: z.literal("attack-disadvantage") }).strict(),
@@ -227,6 +242,14 @@ export const FogPaintSchema = z.object({
 }).strict();
 export const FogResetSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.enum(["long", "short"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * RE-MAKE A PICK a feature says may be re-made on a rest (`replaces`, ruling A's runtime half):
+ * Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either.
+ *
+ * `offer` is the offer key the build already uses; `id` is the new answer, which must be one the
+ * original pick could itself have chosen. GM any actor; a player only their claimed character.
+ */
+export const ActorRechooseSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), offer: z.string().regex(/^[a-z0-9-]+(:[a-z0-9-]+)?$/).max(80), id: z.string().regex(/^[a-z0-9-]+$/).max(80), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), count: z.number().int().min(1).max(40), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetSlotSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -268,6 +291,25 @@ export const CharacterCreateSchema = z.object({
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.string().uuid() }).strict();
 
 /**
+ * ROLL A WHOLE CHARACTER (issue `2d`). The wire carries only what the caller actually decides -
+ * which class (or none, for "surprise me") and at what level - because every other decision is the
+ * SERVER's to make: the standard array's distribution, the species, the background, the subclass,
+ * the skills, the feats, the spells and the equipment all come out of `context.random` inside the
+ * command (CLAUDE.md rule 2, D14). A client that sent its own picks would be a builder, not a
+ * generator, and `character.create` is already that door.
+ *
+ * `name` is optional and trimmed like the builder's; omitted, the server draws one from the
+ * species' own name bundle - which is the bit the wizard still does with `Math.random`.
+ */
+export const CharacterGenerateSchema = z.object({
+  commandId: z.string().uuid(),
+  level: z.number().int().min(1).max(20),
+  classId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
+  name: z.string().trim().min(1).max(120).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
  * Roll six ability scores SERVER-SIDE (D14). The builder used to roll them in the browser, which is
  * a rule-2 violation the ledger has carried for months; the dice now come from the same authority
  * every other roll does, and land in the table feed like any other roll.
@@ -291,6 +333,8 @@ export const BuilderSetPolicySchema = z.object({
   maxLevel: z.number().int().min(1).max(20).optional(),
   /** Whether players may run the builder themselves; omitted keeps the stored setting. */
   playerBuilder: z.enum(["open", "gm-only"]).optional(),
+  /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
+  playerRandom: z.enum(["open", "gm-only"]).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().superRefine((payload, context) => {
   if (new Set(payload.allowedAbilityMethods).size !== payload.allowedAbilityMethods.length) {

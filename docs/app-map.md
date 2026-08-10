@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 86 commands · 190 HTTP paths
+- 11 GameState fields · 88 commands · 193 HTTP paths
 
 ## GameState shape
 
@@ -44,6 +44,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `actor.apply-damage` | `actor:write` |
 | `actor.heal` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
+| `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.rest` | `actor:write` |
 | `actor.set-archived` | `actor:write` |
@@ -70,6 +71,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `character.claim` | `actor:write` |
 | `character.create` | `actor:write` |
 | `character.force-release` | `actor:write` |
+| `character.generate` | `actor:write` |
 | `character.rebuild` | `actor:write` |
 | `character.release` | `actor:write` |
 | `character.resolve-import` | `actor:write` |
@@ -186,6 +188,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/content/conditions`
 - `GET /api/v1/content/equipment`
 - `GET /api/v1/content/feats`
+- `GET /api/v1/content/languages`
 - `GET /api/v1/content/monsters`
 - `GET /api/v1/content/monsters/{definitionId}`
 - `GET /api/v1/content/monsters/{definitionId}/actions`
@@ -219,6 +222,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
 - `POST /api/v1/game/actors/{actorId}/rebuild`
+- `POST /api/v1/game/actors/{actorId}/rechoose`
 - `POST /api/v1/game/actors/{actorId}/rest`
 - `POST /api/v1/game/actors/{actorId}/sheet-preview`
 - `POST /api/v1/game/actors/{actorId}/size`
@@ -241,6 +245,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/character-imports`
 - `POST /api/v1/game/character-imports/{importId}/resolve`
 - `POST /api/v1/game/characters`
+- `POST /api/v1/game/characters/random`
 - `POST /api/v1/game/claims`
 - `POST /api/v1/game/claims/{actorId}/force-release`
 - `POST /api/v1/game/claims/release`

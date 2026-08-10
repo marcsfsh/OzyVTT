@@ -70,7 +70,18 @@ export const FeatureUsesSchema = z.object({
   scaling: z.discriminatedUnion("type", [
     z.object({ type: z.literal("proficiency-bonus") }).strict(),
     z.object({ type: z.literal("ability-modifier"), ability: AbilitySchema, minimum: z.number().int().min(0).max(5).default(1) }).strict(),
-    z.object({ type: z.literal("by-level"), table: z.array(z.object({ level: ContentLevelSchema, limit: z.number().int().min(0).max(99) }).strict()).min(1).max(20) }).strict()
+    z.object({ type: z.literal("by-level"), table: z.array(z.object({ level: ContentLevelSchema, limit: z.number().int().min(0).max(99) }).strict()).min(1).max(20) }).strict(),
+    /**
+     * Read the count straight off the CLASS TABLE's printed column for this level, by
+     * `classResources.id`. The fourth way 5e scales uses, and the one the other three cannot say:
+     * Rage, Bardic Inspiration and Channel Divinity all step on a schedule that is neither the
+     * proficiency bonus nor an ability modifier, and re-typing the printed column into a `by-level`
+     * table beside the printed column it duplicates is exactly the second copy that drifts.
+     *
+     * A resource whose printed amount is a DICE STRING (Sneak Attack "3d6") is not a count of uses
+     * and resolves to 0, which is the same "no uses" a `by-level` table with no matching row gives.
+     */
+    z.object({ type: z.literal("class-resource"), id: ContentIdSchema }).strict()
   ]).optional(),
   per: z.enum(["turn", "encounter", "short-rest", "long-rest"]),
   pool: ContentIdSchema.optional()
@@ -276,6 +287,141 @@ export const featureRiders = {
   modifiers: z.array(FeatureModifierSchema).max(8).default([])
 } as const;
 
+/**
+ * WHICH PICK BUDGET an `extraPicks` grant raises.
+ *
+ * Deliberately NOT a closed enum, and deliberately NOT a new namespace: this is the OFFER KEY the
+ * wizard and the server already agree on, spelled the same on both sides -
+ * `class-cantrips`, `class-spells`, `class-skills`, `class-tools`, `background-skills`,
+ * `background-tools`, `background-languages`, `species-languages`, or `feature:<featureId>` for a
+ * specific feature's own pick. The colon is why this cannot be `ContentIdSchema`.
+ *
+ * A key naming no budget THIS build actually has is a loud build rejection, never a silent no-op -
+ * an authored grant that quietly adds zero is the exact failure this vocabulary exists to end. The
+ * check lives on the server (`character-build.ts`), against the offers it really built, rather than
+ * against a second hand-maintained list of legal keys that would drift away from them.
+ */
+export const PickBudgetKeySchema = z.string()
+  .regex(/^[a-z0-9-]+(:[a-z0-9-]+)?$/, "A pick budget names an offer key (\"class-cantrips\") or a feature's own pick (\"feature:expertise\").")
+  .max(80);
+
+/**
+ * The eight budgets a fixed key may name — the schema's own docblock, as code, so the two consumers
+ * that offer or check them read ONE list: `character-build.ts` re-exports it as `NAMED_PICK_BUDGETS`
+ * (its rejection sentences and offer keys), and the homebrew editor suggests exactly these on an
+ * `extraPicks` row's offer box. It lives beside `PickBudgetKeySchema` for the same reason
+ * `DAMAGE_TYPE_IDS` lives in this package: a client-local copy is a second list that drifts.
+ *
+ * NOT a closed enum, deliberately — `feature:<featureId>` is the ninth, open form, validated by the
+ * server against the features the build really has.
+ */
+export const NAMED_PICK_BUDGET_KEYS = [
+  "class-skills", "class-tools", "background-skills", "background-tools",
+  "background-languages", "species-languages", "class-cantrips", "class-spells"
+] as const;
+
+/**
+ * ONE extra pick a feature (or a chosen option) adds to a budget that already exists.
+ *
+ * `amount` composes by ADDITION across every source: two features each granting +1 to the same
+ * budget yield +2, because the printed level row and every grant are summed rather than one winning.
+ */
+export const ExtraPickSchema = z.object({
+  offer: PickBudgetKeySchema,
+  amount: z.number().int().min(1).max(5).optional(),
+  /**
+   * HOW MUCH, WHEN THE PRINTED TABLE ANSWERS THAT - the same fourth way `FeatureUsesSchema` scales
+   * a feature's USES, applied to a pick BUDGET.
+   *
+   * `class-resource-growth` reads the class table's own column and yields **how far it has grown
+   * above its first printed value** at this character's level. Growth, not the value, because
+   * composition here is ADDITION over the feature's own `choose`: Eldritch Invocations prints 1 at
+   * level 1 and 10 at level 20, so `choose: 1` plus a growth of 9 is exactly ten - and Weapon
+   * Mastery's 3 -> 6 (Fighter) and 2 -> 4 (Barbarian) land the same way.
+   *
+   * WHY NOT REPEAT-GRANTS. `grantedAtLevels x choose` already grows a budget, and it cannot express
+   * these: the Invocations column steps by +2 at levels 2 and 5, a level row may list a feature only
+   * once, and **the SRD prints no feature heading at L2/L5/L7/L9/L12/L15/L18 to carry a grant at
+   * all**. Inventing marker features would be inventing content the source does not have. Reading
+   * the printed column needs no carrier - the feature granted at level 1 carries it, and the number
+   * moves with the character's level.
+   *
+   * A column whose printed amount is a DICE STRING (Sneak Attack "3d6") is not a count and resolves
+   * to 0, exactly as `FeatureUsesSchema`'s `class-resource` treats it.
+   */
+  scaling: z.object({
+    type: z.literal("class-resource-growth"),
+    /** The `classResources.id` of the printed column - `eldritch-invocations`, `weapon-mastery`. */
+    id: ContentIdSchema
+  }).strict().optional()
+}).strict().superRefine((grant, context) => {
+  // Exactly one, and `amount` has no default for precisely this reason: a defaulted 1 beside a
+  // `scaling` is indistinguishable from an authored 1, and "the flat amount was silently ignored"
+  // is the class of silent failure this whole vocabulary exists to end.
+  if ((grant.amount === undefined) === (grant.scaling === undefined)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "An extra pick states either a flat `amount` or a `scaling` rule - exactly one." });
+  }
+});
+export type ExtraPick = z.infer<typeof ExtraPickSchema>;
+
+/**
+ * EXTRA PICKS - the rider by which a feature raises a pick BUDGET rather than granting an outcome.
+ *
+ * "You know one extra cantrip from the Cleric spell list" (Divine Order: Thaumaturge), "you gain
+ * proficiency in one additional skill from your class's list", "you may prepare one more spell".
+ * Every one of those promises a pick the player still gets to MAKE, from a list that already exists
+ * and is already scoped correctly - so none of them can be said with `grants` (which names an
+ * outcome, not an opportunity) and none can be said with a second `choice` either, because there is
+ * no catalog slug meaning "your class's skill list" or "your class's spell list at your slot level".
+ *
+ * WHY IT IS NOT IN `featureRiders`. That block is spread into `EquipmentReferenceSchema` too, and a
+ * pick budget is the one thing an ITEM must never carry: picks are made once at build time and
+ * written to the provenance ledger, so a +1 that comes off with the cloak would strand a chosen
+ * skill with nothing granting it. Declaring `extraPicks` beside `choice` on the two carriers that
+ * are BUILT rather than equipped makes that structural instead of a refusal list.
+ *
+ * WHY IT CROSSES THE WIRE, when riders deliberately do not. `grants`, `modifiers`, `actions` and
+ * `uses` are outcomes the SERVER applies, so the wizard never sees them. `extraPicks` is an input to
+ * PICKING - the same category as `choice`, `maxSpellLevel` and `grantedAtLevels`, all of which cross
+ * for the same reason: a wizard that cannot see it offers too few picks, reports the step complete,
+ * and the server refuses the build (or, worse, the player simply cannot take what the text promised).
+ */
+const extraPicksField = z.array(ExtraPickSchema).max(4).default([]);
+
+/**
+ * ONE "you can replace…" clause - the largest unmodelled family in the content (33 of them).
+ *
+ * "Whenever you gain a Cleric level you can replace one cantrip"; "whenever you finish a Long Rest,
+ * change your Weapon Mastery choices"; "choose one type of land … whenever you finish a Long Rest".
+ *
+ * IT IS NOT A BUDGET INCREASE, which is why `extraPicks` cannot say it: nothing is added. It EDITS a
+ * row of `character.choices[]`, the provenance ledger level-up and respec are both built on - so
+ * `offer` is the same offer-key namespace `extraPicks` uses (one vocabulary, and the same loud
+ * "names no budget this build has" rejection), and `amount` is how many of that offer's rows may be
+ * swapped at once.
+ *
+ * `when` is the thing that splits it in two, and the halves live in different places:
+ *
+ *   - `"level-up"` is a BUILD-TIME permission. The ledger is rewritten and the character rebuilt, so
+ *     the two rules that make it safe are the ones the builder already enforces: a row may never be
+ *     stamped above the character's own level, and an offer may never hold more rows than its
+ *     capacity (`matchRow`). What was missing was the DECLARATION - nothing told a level-up surface
+ *     that the swap was permitted at all. The replaced row is DELETED, never tombstoned, because the
+ *     ledger's job is to describe the character that exists.
+ *   - `"short-rest"` / `"long-rest"` are RUNTIME state. A Barbarian re-choosing weapon masteries on a
+ *     rest must not need a rebuild, and a GM must be able to watch it happen mid-session, so the
+ *     answer lives with `actor.actionUses` as `actor.choiceOverrides` - set by a command, cleared by
+ *     the matching rest. A short-rest clause is satisfied by a long rest too, exactly as a
+ *     short-rest use pool is.
+ */
+export const ReplaceableChoiceSchema = z.object({
+  offer: PickBudgetKeySchema,
+  when: z.enum(["level-up", "short-rest", "long-rest"]),
+  amount: z.number().int().min(1).max(5).default(1)
+}).strict();
+export type ReplaceableChoice = z.infer<typeof ReplaceableChoiceSchema>;
+const replacesField = z.array(ReplaceableChoiceSchema).max(4).default([]);
+
 /** The fields that describe WHAT is being picked, shared by a feature's choice and an option's own. */
 const featureChoiceBase = {
   kind: ContentIdSchema,
@@ -288,8 +434,51 @@ const featureChoiceBase = {
   from: z.array(ContentIdSchema).min(1, "An explicit `from` list must name at least one option (omit it entirely to use `fromCatalog` or `options`).").max(80).optional(),
   /** An open catalog slug the wizard resolves at pick time ("skills", "feats", "wizard-spells"). */
   fromCatalog: ContentIdSchema.optional(),
+  /**
+   * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - the third source, beside `from` and
+   * `fromCatalog`.
+   *
+   * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast, Eldritch Spear,
+   * Repelling Blast). No catalog can say that: the list is the ledger, narrowed by a predicate over
+   * what was chosen. `offer` names the budget holding those answers (`class-cantrips`,
+   * `feature:<id>`) in the same key namespace `extraPicks` uses.
+   *
+   * `where` is a CLOSED slug list and never an expression (ADR-0008). Three, because three is what
+   * the SRD asks for and each is a field the spell catalog already carries.
+   *
+   * It resolves to a non-empty list or DEFERS, exactly as an unresolvable `fromCatalog` does - a
+   * Warlock who has not chosen their cantrips yet is not shown an empty picker, and a row that
+   * targets the deferred pick is still refused with the reason.
+   */
+  fromPicks: z.object({
+    offer: PickBudgetKeySchema,
+    where: z.enum(["deals-damage", "attack-roll", "ranged"]).optional()
+  }).strict().optional(),
   /** Only options at or below this level are legal (spell picks). */
   maxSpellLevel: z.number().int().min(0).max(9).optional(),
+  /**
+   * Only options at or ABOVE this level are legal - the FLOOR to `maxSpellLevel`'s ceiling.
+   *
+   * Mystic Arcanum reads "choose one level 6 Warlock spell as this arcanum", not "level 6 or lower":
+   * with a ceiling alone a level-11 Warlock could spend their level-6 arcanum on Eldritch Blast. Set
+   * both to the same number and the pick is EXACTLY that level, which is what all four arcana want.
+   *
+   * Read by the same two consumers `maxSpellLevel` is (`character-build.ts` matchRow,
+   * `build-payload.ts` featurePickOffer), and it crosses the wire for the same reason: a wizard that
+   * cannot see the floor offers spells the server then rejects.
+   */
+  minSpellLevel: z.number().int().min(0).max(9).optional(),
+  /**
+   * The ceiling an ability-score pick from THIS choice may raise a score to; absent = the SRD's 20.
+   *
+   * The sibling of `ability-score`'s own `maximum` (the modifier variant above), and it has to exist
+   * separately because the two are different mechanisms: a modifier RAISES a named ability by a fixed
+   * amount, while a choice lets the player pick WHICH ability - and the epic boons do the second.
+   * "Increase one ability score by 1, to a maximum of 30" was previously unsayable: the offer
+   * consumer hard-clamped every chosen point at 20, so all seven epic-boon feats silently did nothing
+   * for a character already at 20 - which is precisely the character who has one.
+   */
+  maximum: z.number().int().min(1).max(30).optional(),
   /** The same option may be picked more than once (Expertise across levels). */
   repeatable: z.boolean().default(false)
 } as const;
@@ -299,10 +488,57 @@ const featureChoiceBase = {
  * your choice). Deliberately depth-limited: an option's own choice may name ids or a catalog slug
  * but cannot nest a further `options` list, so the vocabulary is bounded and non-recursive.
  */
+/** A floor above its own ceiling offers nothing at all - the silent-empty-picker failure, at author time. */
+const spellLevelWindow = (choice: { minSpellLevel?: number; maxSpellLevel?: number }, context: z.RefinementCtx) => {
+  if (choice.minSpellLevel !== undefined && choice.maxSpellLevel !== undefined && choice.minSpellLevel > choice.maxSpellLevel) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom, path: ["minSpellLevel"],
+      message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel} - no spell can satisfy both.`
+    });
+  }
+};
+
 export const FeatureOptionChoiceSchema = z.object(featureChoiceBase).strict().superRefine((choice, context) => {
-  if (!choice.from && !choice.fromCatalog) context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs either an explicit `from` list or a `fromCatalog` slug." });
+  if (!choice.from && !choice.fromCatalog && !choice.fromPicks) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, a `fromCatalog` slug, or a `fromPicks` source." });
+  }
+  spellLevelWindow(choice, context);
 });
 export type FeatureOptionChoice = z.infer<typeof FeatureOptionChoiceSchema>;
+
+/**
+ * ONE RECORD, SEVERAL PICKS - authored as `choices`, read through `featurePicks`.
+ *
+ * `choice` was singular, and with it a single `kind` and a single `maxSpellLevel`, which is why
+ * Magic Initiate **silently dropped its level-1 spell**: all three variants author
+ * `{kind: "cantrip", choose: 2, maxSpellLevel: 0}` against text reading "two cantrips ... you also
+ * choose one level 1 spell from that list". Two of the four SRD backgrounds hand a Magic Initiate to
+ * a level-1 character (Acolyte -> Cleric, Sage -> Wizard), so half of all first-level characters met
+ * this before they reached the class step. Deft Explorer (one Expertise AND two languages) and Pact
+ * of the Tome (three cantrips AND two rituals) are the same shape.
+ *
+ * `choice` STAYS, and stays the way almost every record is authored: one pick is the overwhelming
+ * case and `choice` reads better than a one-element array. Both consumers go through `featurePicks`,
+ * so neither has to know which form a record used - and the pair is mutually exclusive rather than
+ * merged, because "which of the two is the real list" has no good silent answer.
+ */
+const oneChoiceForm = (record: { choice?: unknown; choices?: unknown }, context: z.RefinementCtx) => {
+  if (record.choice !== undefined && record.choices !== undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["choices"], message: "Author `choice` (one pick) or `choices` (several) - never both." });
+  }
+};
+
+/**
+ * EVERY pick a feature or an option asks for, whichever form it was authored in.
+ *
+ * The single accessor both consumers use, so a record authored with `choices` reaches the wizard and
+ * the server's validator identically to one authored with `choice`, and adding the plural form
+ * needed no change at either call site beyond looping.
+ */
+export function featurePicks<Choice>(record: { choice?: Choice; choices?: Choice[] }): readonly Choice[] {
+  if (record.choices && record.choices.length > 0) return record.choices;
+  return record.choice ? [record.choice] : [];
+}
 
 /**
  * ONE pickable option that carries its OWN mechanics. This is the fix for options-as-bare-strings:
@@ -319,10 +555,34 @@ export const FeatureOptionSchema = z.object({
   name: z.string().min(1).max(120),
   /** Printed text for this option. Always the display source of truth; riders only add mechanics. */
   description: z.string().min(1).max(20000),
-  /** A pick this OPTION asks for once chosen (Thaumaturge's extra Cleric cantrip). */
+  /**
+   * THIS OPTION IS ONLY LEGAL WHEN AN EARLIER ANSWER SAYS SO - the read-back the SRD keeps asking for.
+   *
+   * "The option you chose for Blessed Strikes grows more powerful" (Improved Blessed Strikes),
+   * "Improved Elemental Fury", Nature's Ward's resistance "associated with your current land choice".
+   * Each is one later feature whose mechanics are DETERMINED by a pick already in the ledger, and
+   * before this they were prose because a rider could not read an earlier row.
+   *
+   * `offer` is the same offer-key namespace `extraPicks` uses (`feature:<featureId>`, or a named
+   * budget), and `id` is the option that must have been taken there.
+   *
+   * AND IT IS NOT A PICK. When gating leaves exactly as many legal options as the choice's capacity,
+   * the answer is not a choice at all - it is a consequence - so both consumers ADOPT the survivors
+   * and render nothing. That is what keeps the ruling from costing the wizard a card with one option
+   * on it, which is worse than the prose it replaces. The adopted option's riders and its printed
+   * text land on the sheet exactly as a chosen option's do.
+   */
+  requires: z.object({ offer: PickBudgetKeySchema, id: ContentIdSchema }).strict().optional(),
+  /** A pick this OPTION asks for once chosen, from a list of its own. */
   choice: FeatureOptionChoiceSchema.optional(),
+  /** SEVERAL picks this option asks for; see `FeatureRecordSchema.choices`. Author one or the other. */
+  choices: z.array(FeatureOptionChoiceSchema).min(1).max(4).optional(),
+  /** Budgets this option RAISES once chosen (Thaumaturge's extra Cleric cantrip). */
+  extraPicks: extraPicksField,
+  /** Picks this option lets the character RE-MAKE later (see `ReplaceableChoiceSchema`). */
+  replaces: replacesField,
   ...featureRiders
-}).strict();
+}).strict().superRefine(oneChoiceForm);
 export type FeatureOption = z.infer<typeof FeatureOptionSchema>;
 
 /**
@@ -348,8 +608,8 @@ export const FeatureChoiceSchema = z.object({
   /** Options carrying their own mechanics. Mutually exclusive with `from`, which is derived from these. */
   options: z.array(FeatureOptionSchema).min(1).max(40).optional()
 }).strict().superRefine((choice, context) => {
-  if (!choice.from && !choice.fromCatalog && !choice.options) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, inline `options`, or a `fromCatalog` slug." });
+  if (!choice.from && !choice.fromCatalog && !choice.options && !choice.fromPicks) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, inline `options`, a `fromCatalog` slug, or a `fromPicks` source." });
   }
   if (choice.from && choice.options) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["from"], message: "Author `options` alone - `from` is derived from the option ids." });
@@ -358,6 +618,7 @@ export const FeatureChoiceSchema = z.object({
     const duplicate = choice.options.find((option, index) => choice.options!.findIndex((other) => other.id === option.id) !== index);
     if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: `Duplicate option id "${duplicate.id}".` });
   }
+  spellLevelWindow(choice, context);
 }).transform((choice) => {
   // Early return rather than a rewritten object, so `from` stays an OPTIONAL property on the output
   // type. Spreading a `from: string[] | undefined` back in would make it required-with-undefined,
@@ -382,21 +643,46 @@ export const FeatureRecordSchema = z.object({
   description: z.string().min(1).max(20000),
   /** A pick this feature asks the player to make; writes a `choices[]` row. */
   choice: FeatureChoiceSchema.optional(),
+  /**
+   * SEVERAL picks, when one record promises more than one - Magic Initiate's "two cantrips ... and
+   * one level 1 spell", Deft Explorer's Expertise plus two languages, Pact of the Tome's three
+   * cantrips plus two rituals. Mutually exclusive with `choice`; read both through `featurePicks`.
+   */
+  choices: z.array(FeatureChoiceSchema).min(1).max(4).optional(),
+  /** Budgets this feature RAISES - one extra cantrip, one extra skill, one more prepared spell. */
+  extraPicks: extraPicksField,
+  /** Picks this feature lets the character RE-MAKE later - on a level-up, or on a rest (see `ReplaceableChoiceSchema`). */
+  replaces: replacesField,
   ...featureRiders,
   /** This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17). */
   replacesFeatureId: ContentIdSchema.optional()
-}).strict();
+}).strict().superRefine(oneChoiceForm);
 export type FeatureRecord = z.infer<typeof FeatureRecordSchema>;
 
 // ---------------------------------------------------------------------------------------------
 // Class
 // ---------------------------------------------------------------------------------------------
 
-/** A "choose N from this list" proficiency grant (class skills, background tools). */
+/**
+ * A "choose N from this list" proficiency grant (class skills, background tools, species languages).
+ *
+ * `fromCatalog` is the same open catalog slug a feature's `choice` takes, resolved through the same
+ * `resolveCatalogChoice` on both sides. It exists because the base language budget every character is
+ * owed reads "Common plus two languages **from the Standard Languages table**" - a list of nineteen
+ * ids that would otherwise be copied onto all nine species and drift the first time one changed.
+ * Author one or the other, or both (the offer is their union, exactly as a feature's choice is).
+ */
 export const ChoiceListSchema = z.object({
   choose: z.number().int().min(0).max(10),
-  from: z.array(ContentIdSchema).max(60).default([])
-}).strict();
+  from: z.array(ContentIdSchema).max(60).default([]),
+  fromCatalog: ContentIdSchema.optional()
+}).strict().superRefine((list, context) => {
+  // A budget with no source offers nothing, so the build can never satisfy it - the silent
+  // unfinishable-wizard failure, caught at parse time instead of at Create.
+  if (list.choose > 0 && list.from.length === 0 && !list.fromCatalog) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A \"choose N\" list needs a non-empty `from` list or a `fromCatalog` slug - otherwise the pick has no options and the build can never be completed." });
+  }
+});
 
 /** A named starting-equipment bundle ("A: chain mail and a martial weapon", "C: 155 gp"). */
 export const StartingEquipmentOptionSchema = z.object({
@@ -430,10 +716,22 @@ export const ClassLevelRowSchema = z.object({
    */
   preparedFormula: z.string().max(60).optional(),
   preparedCount: z.number().int().min(0).max(60).optional(),
-  /** Named per-level resources; `amount` is a count or a dice string ("3d6" for Sneak Attack). */
+  /**
+   * Named per-level resources; `amount` is a count or a dice string ("3d6" for Sneak Attack).
+   *
+   * THIS IS A PRINTED COLUMN, NOT A NAMESPACE. The live pool the engine spends and re-arms is
+   * `actor.actionUses[uses.pool ?? action.id]`, and these ids reach it only BY CONVENTION: a
+   * `classResources.id` that matches a `uses.pool` on the same class names the same thing, and the
+   * `class-resource` use-scaling reads its amount. `display: true` is the explicit opt-out for a
+   * column that is genuinely only ink - Sneak Attack's dice, the Monk's unarmored movement, a
+   * mastery count - and `class-resource-pools.test.ts` holds every id to one or the other, so a
+   * resource that LOOKS spendable and is wired to nothing cannot ship unannounced.
+   */
   classResources: z.array(z.object({
     id: ContentIdSchema, name: z.string().min(1).max(60),
-    amount: z.union([z.number().int().min(0).max(999), z.string().min(1).max(20)])
+    amount: z.union([z.number().int().min(0).max(999), z.string().min(1).max(20)]),
+    /** This column is ink only - no live pool answers to this id, and none is expected to. */
+    display: z.boolean().optional()
   }).strict()).max(8).default([])
 }).strict();
 export type ClassLevelRow = z.infer<typeof ClassLevelRowSchema>;

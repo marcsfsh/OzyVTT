@@ -359,6 +359,28 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
  */
 function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: GmView; gmToken: string; onPreviewPlayers: () => void }>) {
   const { toast } = useToast();
+  const builder = state.builderPolicy;
+  /**
+   * `playerRandom` is a PLAYERS setting, not a builder one, which is why it is here rather than
+   * beside "Players can build & level their own characters" in *The table*. The question it asks is
+   * about the people at this table — may they help themselves to a character — and the answer is no
+   * until the GM says otherwise (issue `2d`). The GM's own door is never gated by it.
+   *
+   * The other four `builderPolicy` fields ride along on every write because `builder.set-policy`
+   * requires `allowedAbilityMethods` and treats the rest as "omitted keeps the stored value".
+   */
+  const setPlayerRandom = (open: boolean) => {
+    socket.emit("builder:set-policy", {
+      commandId: newId(),
+      allowedAbilityMethods: builder.allowedAbilityMethods,
+      customFormula: builder.customFormula,
+      maxLevel: builder.maxLevel,
+      playerBuilder: builder.playerBuilder,
+      playerRandom: open ? "open" : "gm-only"
+    }, (result: Ack) => {
+      if (!result.ok) toast(result.message ?? "That setting was rejected.", { tone: "error" });
+    });
+  };
   const [tokenFor, setTokenFor] = useState<Readonly<{ id: string; name: string; definitionId?: string; assetId: string | null }> | null>(null);
   const claimed = state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived && actor.ownerSessionId !== null);
 
@@ -370,6 +392,13 @@ function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: Gm
   };
 
   return <Group id="players" label="Players" gmOnly>
+    <Row title="Random characters" help="You can always roll one. This is about whether they can." stacked>
+      <Switch
+        checked={builder.playerRandom === "open"}
+        onChange={setPlayerRandom}
+        label="Players can roll a random character for themselves"
+      />
+    </Row>
     {claimed.length === 0
       ? <p className="settings-empty">No players connected yet.</p>
       : <ul className="settings-players">

@@ -14,6 +14,54 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
+- **[combat/weapons] A Rapier rolls off Strength, and every reach weapon threatens at five feet.**
+  `weaponAbilityModifier` and `weaponAction` already read `finesse`, `thrown` and `reach` off
+  `weapon.properties` — and no SRD weapon carries a `properties` array, so the readers run against an
+  empty column. Finesse weapons never use Dexterity; Glaive, Halberd, Lance, Pike and Whip all have
+  5-foot reach. Found 2026-08-10 by PLANNER-CONTENT; the vendored SRD Weapons table already carries
+  the data (70 property assignments, joined 38/38). Owner: content program **C3**
+  (`docs/product/plan-content-program.md`).
+
+- **[content/etl] Regenerating the bundles silently deletes every weapon's mastery.** The `mastery`
+  column in `weapons.v1.json` has no ETL home — measured in a scratch copy, `npm run build-bundle`
+  drops it from all 38 rows, nothing pins it (`bundle.test.ts` checks category and damage only), and
+  the build stays green. That column is the whole data basis of the mastery program. **Do not
+  regenerate bundles** until content program **C1** lands the parser for the already-vendored SRD
+  Weapons table.
+
+- **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
+  `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces
+  the Constitution/Wisdom AC path instead of adding +2 to it. Found 2026-08-10 by PLANNER-ENGINE.
+  Owner: engine program **U28** (`docs/product/plan-engine-program.md`), together with
+  `unarmored-defense.allowShield` (2 SRD authors: Barbarian `true`, Monk `false`).
+
+- **[homebrew/editor] The "inherit the damage type" empty box mints unpublishable records.**
+  `RiderEditor`'s extra-damage row documents an empty `damageType` as "same as the weapon's", and
+  `blankModifier` seeds exactly that — but the schema refuses both `""` ("String must contain at
+  least 1 character") and absence ("Required"), and the reader fallback that would honour the inherit
+  is unreachable. Every extra-damage row the editor mints fails publish with no client message.
+  Owner: engine program **U23+U30** (merged).
+
+- **[homebrew/editor] Tapping "Add a spread" makes a background unpublishable.** The
+  `abilityOptions.spreads` control mints `{amounts:[2,1]}` plus a `label` key against a schema of
+  bare number arrays — the shape is refused at publish and the editor offers no way to author the
+  legal one. Found 2026-08-10 by PLANNER-API. Owner: API program **D3**
+  (`docs/product/plan-api-program.md`).
+
+- **[homebrew/sheet] A homebrew monster's typed resistances bite mechanically and render blank.**
+  The engine applies `damageResistances`/`damageImmunities` from the typed columns, but the sheet
+  renders the `open5e.srd-2024` extension prose — which a homebrew record does not carry — so the
+  defenses work in the fight and are invisible on the card. Found 2026-08-10 by PLANNER-API; logged
+  here rather than folded into a unit. Unowned.
+
+- **[api/homebrew] Three API contract defects, planned as API program F1–F4.** (1) The server never
+  stamps `source: "homebrew"`, so an API-authored record publishes badged as bundled SRD content —
+  and eight false doc descriptions say the opposite while the summary shape says something different
+  again inside the same response. (2) Publishing a monster hard-requires two
+  `extensions["open5e.srd-2024"]` keys that appear zero times in the published contract. (3) The
+  closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
+  slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
+
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and
   migration v17 bounded revision growth with a global switch plus a coalescing window, with
@@ -114,13 +162,6 @@ Format: `[area] — description — suspected cause / status`.
   spec asks for. The stricter alternative — refusing to demote a faction that has standing — was rejected as
   the worse trade: it blocks an ordinary edit to protect a rule nothing depends on.
 
-- **[repo/tooling] `apps/server/test/**` is not typechecked by anything.** `apps/server/tsconfig.json` is
-  `"include": ["src"]`, so `npm run check` sees no server test file. There are **41 pre-existing type errors**
-  across nine non-codex test files (`character-build` 14, `combat-rules-regression` 9,
-  `viewer-presentation` 8, …), and M12 briefly added four more to M11's downtime assertions that no command
-  in the repo would have reported. Found by an agent typechecking with a temporary config. Fixing the 41 is
-  its own job; the gap itself is worth knowing about before trusting "check is clean" for a test-only change.
-
 - **[codex/client] `clampStanding(Infinity)` returns 0, not 100.** `Math.trunc(Infinity)` is not finite, so
   a non-finite value falls through to the `Uninvested` centre rather than the `Exalted` end. Not reachable
   from the bounded number input; documented as intentional in the helper. Recorded because "an overflowing
@@ -187,6 +228,45 @@ Format: `[area] — description — suspected cause / status`.
   rather than all of it. Flattening them to `martial` would have handed a Rogue a greatsword.
   Nothing consumes the qualifier yet, so equipment filtering by proficiency is not enforced.
 
+### Bounded out of the 2026-08-08 built-but-unwired pass (found, measured, not fixed)
+
+Three P1s were fixed there — the builder now mints an action per damaging CANTRIP with `spellId` set
+(so Agonizing Blast reaches a real Warlock), a Monk gets a Martial Arts Unarmed Strike that Extra
+Attack can multiply, and a generated character's ledger prefills a level-up like a hand-built one.
+These are the pieces those fixes deliberately stopped short of, each with the reason it stopped.
+
+- **[character-builder] Only CANTRIPS become actions; a LEVELED spell still has none, so it has no
+  `spells[].actionId`, no `spellId`, and casting it from the sheet is still a client-side damage
+  roll.** The blocker is the slot, and it is measured rather than assumed: an action would have to
+  carry `spellSlot`, and no field on the finished sheet says which slot a spell spends. A **Warlock
+  5's only slots are LEVEL 3** (`pactSlots` replaces the `spellSlots` column outright), so
+  `spellSlot` taken from the spell's own level refuses a level-1 Bane the character may legally cast;
+  and **Ascendant Step's Levitate** is a granted casting the SRD says costs no slot at all, yet on
+  `spells[]` it is indistinguishable from a prepared one (both `alwaysPrepared`). Omitting
+  `spellSlot` instead is worse: it would put a slot-free cast of every leveled spell in the Actions
+  runner. Wants a per-spell "which pool pays for this" field, not a bigger `cantripActionFor`.
+- **[character-builder] Cantrip damage does not scale with character level.** Fire Bolt rolls 1d10 at
+  level 11 where the SRD prints 3d10, and Eldritch Blast fires one beam at 5 where it prints two. The
+  content already carries the rows (`castingOptions` `player_level_5/11/17`, with `damageRoll` and
+  `targetCount`), and **nothing reads them**: the sheet's `spellEffectAt` consults `castingOptions`
+  only when the cast level exceeds the spell's own, which is never true for a cantrip. So the minted
+  action deliberately matches the base die the sheet prints beside it — fixing one without the other
+  puts two different numbers on one row. Fix both together: `spellEffectAt` and `cantripActionFor`.
+- **[character-builder] Martial Arts reaches the Unarmed Strike but not MONK WEAPONS.** "You can roll
+  1d6 in place of the normal damage of your Unarmed Strike **or Monk weapons**" and "Dexterous
+  Attacks" both apply to Simple Melee and Light Martial Melee weapons too. Measured on a real
+  generated Monk 5 (DEX 15 / STR 12): `Quarterstaff +4 (1d6+1)` — Strength, and the printed 1d8
+  nowhere. The strike could be minted by the builder because the builder holds both the printed
+  column and the finished scores; a weapon swing is derived at READ time by `deriveEquipment`, which
+  holds no class table and so cannot know the die. Wants the die on the definition (or the class row
+  reachable from the derivation), not a hard-coded "if monk" in `weaponAbilityModifier`.
+- **[rules-engine] Flurry of Blows grants no swings.** Its two Unarmed Strikes now name something the
+  engine can roll, but nothing grants them: `ActionSchema.multiattack` is the field that would, and
+  `evaluateActionEconomy` opens a component instance only for an `activation: "action"` on the
+  bearer's own turn. Declaring `multiattack` on a bonus action would look wired and hand out nothing,
+  which is worse than the prose. The GM adjudicates it today through the rules dial like any other
+  unmodelled economy call. Wants a bonus-action component pool.
+
 ### Deferred by the 2026-07-27 readiness pass (found, scoped, not fixed)
 
 The polish pass was bounded to small/medium lift; these were found by it and left, each for a stated
@@ -208,15 +288,35 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   the real fix.
 - **[rules-5e] Third-caster multiclass rounding** is unverified against the SRD's rounding rule for
   Eldritch Knight / Arcane Trickster style progressions.
-- **[character-builder] Step 4's *arrival* state is still heavy at high level.** Measured per class
-  2026-07-27 (the earlier "~306 cards" figure was wrong — it is class-dependent): **Fighter L20 = 10
-  offers / 62 cards**; **Wizard L20 = 12 offers / 467 cards**. The worst case is 467, materially
-  worse than filed. The composition is the real story — "Wizard prepared spells" is choose 25 of 203,
-  and because collapse is (correctly) derived from `picks.length === capacity`, that one grid stays
-  fully expanded until the 25th spell is picked, so a Wizard 20 sits above 200 cards for the whole
-  step. `5c32df9` fixed the *answered* state (24,222px → 1,933px at L20) and that fix is real; the
-  arrival state is untouched. Cutting it means progressive disclosure — a design change, not a
-  density fix.
+- **[character-builder] Step 4 is dense at high level — but no longer tall. CLOSED as a height bug
+  2026-08-07; the card COUNT stands.** Measured per class 2026-07-27 (the earlier "~306 cards" figure
+  was wrong — it is class-dependent): **Fighter L20 = 10 offers / 62 cards**; **Wizard L20 = 12
+  offers / 467 cards**, and 467 is still what a Wizard 20 is asked to read. What changed is that the
+  cards no longer set the step's height. `5c32df9`'s answered-state fix (24,222px → 1,933px) worked
+  by UNMOUNTING an answered offer's grid, which the client then reported as its own defect (issue
+  `1`: a player could not see what they had not chosen). The fold is gone and `ChoiceGrid bounded`
+  caps each card list at 21rem instead, so both states are bounded rather than one being traded for
+  the other. Re-measured 2026-08-07 in Chromium 1194 by driving the real wizard to a fully answered
+  Wizard 20 features step and reading `.cb-step` scrollHeight — 14 offers / 468 cards:
+
+  | | 1280px | 375px |
+  |---|---|---|
+  | arrival, before | 13,434px | — |
+  | arrival, now | **3,522px** | 4,032px |
+  | answered, now | **5,076px** | 5,922px |
+  | answered, cap lifted | 12,766px | 32,200px |
+
+  The answered step is now shorter than the same step used to be on ARRIVAL, so nothing in the flow
+  is taller than it already was. What is left is genuinely a density question — 467 cards to read —
+  and cutting that means progressive disclosure, a design change rather than a CSS one.
+
+  **The table moved down on 2026-08-07 and the reason is the choice card, not the cap.** Issue `2g`
+  re-opened (the card was double the reference control's height, and the pairing was ambiguous), and
+  compacting it took ~34px off every card with a description. Same script, same browser, same
+  fully-answered Wizard 20: arrival 3,705 → 3,522 at 1280 and 4,117 → 4,032 at 375; answered
+  5,238 → 5,076 and 5,971 → 5,922; cap lifted 17,089 → 12,766 and 44,957 → 32,200. The two "before"
+  figures at 375 are this run's own measurement of the previous commit, which is why they differ by
+  a few dozen pixels from the ones first recorded — quote the pair from one run, never across two.
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device
@@ -255,6 +355,13 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   unreproduced measurement. If it is taken up, the fix is `row-gap: var(--space-5)` (20px → exactly 44
   centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
   actually wraps.
+  **Re-measured 2026-08-08 on a denser case and the verdict is unchanged.** `3d` gave every
+  damage-type `TagInput` a visible chooser, so thirteen chips are now thirteen taps rather than
+  thirteen typed words — the wrap case is much easier to reach than it was. Probed at 375px on a
+  homebrew monster carrying all 13 damage resistances plus 6 immunities: **19 ✕s across 4 wrapped
+  rows, every one 44×44 with reach 45**, and the same decisive tap 10px above a wrapped row's ✕
+  removed that chip's own tag ("poison"), not the row above's. Second independent non-reproduction;
+  still deliberately not fixed, and `TagInput.css` is untouched by that unit.
 
 - **[codex/store] Migration v15 is not idempotent, and its failure mode is "the codex will not open".**
   Re-running it (only reachable if its `codex_schema_migrations` row is lost) aborts on
@@ -365,6 +472,42 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   and each control is scrolled to the centre before hit-testing (`scripts/tap-audit.mjs:185-187`). The
   "25-59 per surface" range this entry quoted described a column that no longer exists.
 
+- **[content/vocabulary] Three rider gaps Stage 4 lane B4 hit and authored around, each blocking a
+  record that would otherwise be sayable.** All three are authoring limits, not defects in shipped
+  behaviour, and each has a record standing on it today:
+  (1) **Wizard's Spell Mastery is still authored as ONE `choice`** — "choose a level 1 AND a level
+  2 spell" ships as a single pick with `maxSpellLevel: 2`, so a Wizard may take two level-1 spells.
+  The limit that forced it is gone: `overlay.ts`'s `FeatureMechanics` carries `choices` in both of
+  its unions and the homebrew editor authors the plural form (U12, 2026-08-09), so the record can
+  now be re-authored from `wizard.ts`; it has not been.
+  (2) **`ExtraDamageVariantSchema` requires `damageType`** and has no "same type as the triggering
+  damage" form, so Evoker's Empowered Evocation ("add your Intelligence modifier to one damage roll
+  of any Wizard Evocation spell") has no correct type to author — Fireball is Fire, Lightning Bolt is
+  Lightning.
+  (3) **Two rider filters are authorable but have no producer, so they fail closed.**
+  `RiderContext.spellSchool` is declared in `packages/rules-5e/src/riders.ts` and set by nothing, so
+  `spell-school-is` never matches; and `attackKindsOf` in `apps/server/src/action-resolution.ts`
+  derives melee/ranged/thrown/unarmed/reaction and never "spell", so `attack-kind-is: ["spell"]`
+  never matches either. Both would ship inert if authored, which is why Innate Sorcery's advantage
+  and Empowered Evocation stay prose.
+
+- **[server/test] `typed-damage-feed.test.ts`'s two reaction cases fail at random, roughly once in
+  a few dozen full-suite runs.** Both `explains the halved reaction damage when the reaction is USED`
+  and its sibling `... when the reaction is DECLINED` have each failed once, on different runs, for
+  three different agents on 2026-08-09. **Running the file alone does NOT clear it, and the entry
+  used to say it did** — "5 consecutive clean runs of the file at `7d386d9`" was a small sample, not
+  a property: measured again at `13656ca`, the DECLINED case failed **1 of 3** isolated runs of the
+  file on its own. So isolation is evidence about the rate and not a test that distinguishes flake
+  from regression; run it several times. The fixture's bite rolls an **unseeded** `4d6 + 6`
+  (`apps/server/test/typed-damage-feed.test.ts:56`) and both cases then assert a feed string built
+  from whatever it rolled, so the assertion's expected text changes run to run. The mechanism past
+  that is **not proven** — do not treat a red run here as a regression until you have re-run the file
+  alone several times. One asymmetry worth checking first: the USED case guards the parked prompt with
+  `expect(prompt, "the bite parked no reaction prompt").toBeDefined()` and the DECLINED case
+  dereferences `prompt.proposedDamage` with no guard, so if the bite can ever fail to park a prompt,
+  the two cases fail differently. Fix: seed the roll, or force the dice the way
+  `warlock-sorcerer-wizard.test.ts` does.
+
 ## Unverified — needs a browser, a contrast check, or a runtime repro
 
 These entries could not be confirmed *or* refuted by reading the code, so they are held here
@@ -388,16 +531,6 @@ for a layout or pointer claim, a contrast calculator against
   nine false failures before it was understood. The browser pass therefore runs its two pin checks at
   desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
   rather than clicked.
-
-- **[replay/player] A player watching a shared replay sees "Map unavailable — you don't have access to
-  this map".** Measured 2026-08-05 (B3), GM and player side by side on the same archive at
-  `/replays/3`: the GM's stage renders the battle map, the player's renders `.replay-stage-missing` at
-  every viewport. The player replay projection carries `combat.mapAssetId`, but the asset read behind
-  `useAuthorizedMapImage` refuses a player session for a map that is not the live one — so the turn
-  order and log arrive and the picture never does. **Not a viewer-safety leak** (the failure is
-  closed, not open) and not introduced by the frame recompose, which measured it in both directions
-  before and after. Server-side: the fix is in the archive's asset authorization, not in
-  `replay/ReplayPanel.tsx`.
 
 - **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;

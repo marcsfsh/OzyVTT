@@ -15,6 +15,7 @@
 import { useId } from "react";
 import {
   Chip,
+  Combobox,
   Field,
   FieldGrid,
   Input,
@@ -28,7 +29,10 @@ import {
 } from "@vtt/ui";
 import { CatalogPicker } from "./CatalogPicker";
 import { getAt, setAt } from "./paths";
-import { groupOptions, resolveOptions, resolveSuggestions, type Draft, type FieldDef, type SchemaContext } from "./schema";
+import {
+  groupOptions, pickValue, resolveOptions, resolveSuggestions, suggestionLabel,
+  type Draft, type FieldDef, type SchemaContext
+} from "./schema";
 
 export type CustomRenderer = (args: {
   field: FieldDef;
@@ -250,7 +254,17 @@ export function FieldRenderer(props: FieldRendererProps) {
           ariaLabel={field.label}
           values={asStrings(raw)}
           onChange={(next) => set(next)}
-          suggestions={resolveSuggestions(field, ctx)}
+          suggestions={resolveSuggestions(field, ctx, draft)}
+          /* THE SAME FLAG THE TEXT BRANCH READS, meaning the same thing: put the list on screen.
+             Six of the client's nine `3d` sites are lists rather than single values — the monster's
+             three defence rows, a spell's damage types, the `damage-type-is` gate, the damage-type
+             grants — so a `text`-only `pick` would have left two thirds of one reported issue needing
+             a second mechanism. Still `TagInput`, still `slugify`, still free entry: `pick` changes
+             what a GM can SEE, never what the field accepts. See `FieldDef.pick`. */
+          pick={field.pick}
+          /* Derived, never a second list: `"very-rare"` reads "Very Rare" by one rule, so a
+             vocabulary that grows a member is readable the day it lands with nothing to remember. */
+          optionLabel={suggestionLabel}
           placeholder={field.placeholder}
           max={field.max}
           maxReachedReason={field.maxRowsReason}
@@ -355,7 +369,43 @@ export function FieldRenderer(props: FieldRendererProps) {
        * was a bare box a GM had to spell "bludgeoning" into from memory. Reading it here is the
        * whole fix; no new `FieldKind`, per the standing rule at the top of `schema.ts`.
        */
-      const suggestions = resolveSuggestions(field, ctx);
+      const suggestions = resolveSuggestions(field, ctx, draft);
+
+      /**
+       * **`pick`: the same contract, with the list on screen.** See `FieldDef.pick`.
+       *
+       * A `<datalist>` is complete and invisible — no arrow, no cue, and on iOS Safari no control at
+       * all — so "Rarity" read as a bare box a GM had to spell "very-rare" into from memory. The
+       * chooser shows the whole vocabulary, keeps `allowFreeText` so an open slug stays open, and
+       * takes the 44px floor on every row (`Combobox.css`, route 1).
+       *
+       * Empty is the ABSENT value, not `""`: clearing the chip goes through `setEmpty()`, which is
+       * what `emptyValue` already means everywhere else in this file.
+       */
+      if (field.pick && suggestions.length > 0) {
+        return wrap(
+          <Combobox
+            id={fieldId}
+            ariaLabel={field.label}
+            options={suggestions.map((suggestion) => ({ id: suggestion, label: suggestionLabel(suggestion) }))}
+            value={asString(raw) || null}
+            placeholder={field.placeholder ? suggestionLabel(field.placeholder) : undefined}
+            disabled={isDisabled}
+            /* THE WHOLE LIST, not `Combobox`'s default page of 8. A `pick` field's suggestions are a
+               COMPLETE bounded vocabulary — 7 rarities, 13 damage types — and paging one to 8 would
+               reintroduce "ten of the thirteen damage types" at the renderer having just fixed it at
+               the constant. Rarity never noticed because 7 < 8. `.nh-combobox-list` scrolls at 17rem;
+               a field whose list is a 339-entry catalog is `searchable` + `CatalogPicker`, not this. */
+            limit={suggestions.length}
+            allowFreeText
+            /* The id handed back is either a slug from the list or the raw words typed; `pickValue`
+               makes the second case the same shape as the first, so "Very Rare" typed by hand is
+               the rung and not an unpublishable string. */
+            onChange={(next) => (next === null ? setEmpty() : set(pickValue(next)))}
+          />
+        );
+      }
+
       const listId = suggestions.length > 0 ? `${fieldId}-list` : undefined;
       return wrap(
         <>

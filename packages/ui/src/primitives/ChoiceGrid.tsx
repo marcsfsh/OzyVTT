@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cx } from "./util";
 import { Input } from "./forms";
-import { IconSearch, IconWarning } from "./icons";
+import { IconInfo, IconSearch, IconWarning } from "./icons";
 import { ChoiceCard } from "./ChoiceCard";
 import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 import "./ChoiceGrid.css";
@@ -45,6 +45,37 @@ export interface ChoiceGridProps {
   /** The reason shown on locked cards at capacity. */
   maxReachedReason?: ReactNode;
 
+  /**
+   * READ about an option without answering with it. Present ⇒ every card grows a sibling control
+   * that calls this with the option's value; the grid never touches `value` / `values` for it.
+   *
+   * This is the only honest shape for a multi-select list of 203 spells: the rules a player needs
+   * in order to choose cannot live inside the card (a `ChoiceCard` IS a button, so nothing
+   * interactive nests in it) and cannot expand inline (that pushes the rest of the list off a
+   * phone). The caller opens whatever reference it owns — a `Modal`, never a `Drawer`, because a
+   * stray tap beside a scrimless overlay must not land on a card.
+   */
+  onInspect?: (value: string) => void;
+  /** Accessible name for that control. Defaults to "About <title>". */
+  inspectLabel?: (option: ChoiceOption) => string;
+
+  /**
+   * Cap the card list and scroll it INSIDE the grid, instead of letting it push the page.
+   *
+   * This is the alternative to hiding options once a choose-N list is full, and it exists because
+   * hiding them was the bug: a player must be able to see what they did NOT take, at every list
+   * length, and a chosen card must stay tappable so the pick can be swapped. Unmounting the grid
+   * bought page height at the cost of both. A `max-height` buys the same height and costs neither
+   * — every option stays mounted, greyable and reachable, and the search box above it (which
+   * outlives the cap, being a sibling) is what makes a 203-card region navigable.
+   *
+   * The cap rides `.nh-choicegrid-items` itself rather than a wrapper, which is only safe because
+   * a `max-height` is NOT a definite block size: the grid's auto rows still size from their cards
+   * (the same reading `map-picker.css` measured at 320/375/560/561/1280). The region is declared
+   * with `.scroll-y` in the markup, per design-language.md §7.
+   */
+  bounded?: boolean;
+
   searchable?: boolean;
   searchPlaceholder?: string;
   /** Debounce for the search box, ms. 0 filters on every keystroke. */
@@ -86,6 +117,8 @@ export interface ChoiceGridProps {
 export function ChoiceGrid({
   options, value, onChange, ariaLabel,
   selection = "single", values, onToggle, max, maxReachedReason,
+  onInspect, inspectLabel = (option) => `About ${option.title}`,
+  bounded = false,
   searchable = true, searchPlaceholder = "Search…", searchDelay = 160,
   facets, facetValue, onFacetChange, facetLabel = "Filter", facetAllValue = "all",
   emptyTitle = "No matches", emptyText = "Try a different search or clear the filters.", emptyAction,
@@ -219,7 +252,13 @@ export function ChoiceGrid({
             {emptyAction}
           </div>
         ) : (
-          <div className="nh-choicegrid-items" role={multiple ? "group" : "radiogroup"} aria-label={ariaLabel}>
+          // `.scroll-y` IS THE DECLARATION, and it belongs in the markup — a bare `overflow-y` in
+          // the stylesheet is an undeclared region (design-language.md §7, ratchet (h)).
+          <div
+            className={cx("nh-choicegrid-items", bounded && "nh-choicegrid-items--bounded", bounded && "scroll-y")}
+            role={multiple ? "group" : "radiogroup"}
+            aria-label={ariaLabel}
+          >
             {shown.map((option) => {
               const byCapacity = capacityLocked(option);
               const locked = option.disabled === true || byCapacity;
@@ -247,6 +286,17 @@ export function ChoiceGrid({
                      card points at the one notice above instead of carrying a copy of it. */
                   disabledReason={option.disabled === true ? option.disabledReason : undefined}
                   {...(byCapacity && showLockedNotice ? { "aria-describedby": lockedNoticeId } : {})}
+                  /* Reading is never locked. A card can be at capacity — the whole reason a player
+                     wants to read the two they did not take — so the reference control stays live
+                     on a disabled card, and it is the one thing on it that is. */
+                  action={onInspect
+                    ? <button
+                        type="button"
+                        className="nh-choice-info interactive"
+                        aria-label={inspectLabel(option)}
+                        onClick={() => onInspect(option.value)}
+                      ><IconInfo /></button>
+                    : undefined}
                 />
               );
             })}

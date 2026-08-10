@@ -47,7 +47,7 @@
  * The five sentence shapes the readiness pass deleted at source do not come back.
  */
 
-import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
+import { featurePicks, HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
 import { forStorage } from "./defaults";
 import { getAt } from "./paths";
 // One vocabulary, one place it is spelled: the gating list's kinds come from the form
@@ -179,7 +179,7 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
   const granted = new Set<string>();
   for (const row of table) for (const id of Array.isArray(row.features) ? (row.features as string[]) : []) granted.add(id);
   for (const entry of featuresOf(draft)) {
-    if (!entry?.choice || typeof entry.id !== "string" || granted.has(entry.id)) continue;
+    if (draftPicksOf(entry).length === 0 || typeof entry.id !== "string" || granted.has(entry.id)) continue;
     return {
       text: `Give “${entry.name || "an unnamed feature"}” a level. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
       sectionId: "features"
@@ -187,6 +187,11 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
   }
   return null;
 }
+
+/** Every pick a draft feature asks for, whichever spelling holds it — `featurePicks`, the
+    server's own accessor, so this file and `character-build.ts` read the pair identically. */
+const draftPicksOf = (entry: Record<string, unknown> | undefined): ReadonlyArray<Record<string, unknown>> =>
+  entry ? featurePicks(entry as { choice?: Record<string, unknown>; choices?: Record<string, unknown>[] }) : [];
 
 /**
  * A slug DERIVED FROM THE RECORD'S OWN ID — `<own id>-subclasses`, `<own id>-lineages`.
@@ -216,15 +221,18 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
     time, which is the single hardest homebrew failure to diagnose from the outside. */
 function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): BlockedReason | null {
   for (const entry of featuresOf(draft)) {
-    const choice = entry?.choice as Record<string, unknown> | undefined;
-    const slug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
-    if (!slug || namesOwnRecord(slug, ctx.recordId)) continue;
-    const result = ctx.resolveCatalog(slug);
-    if ("error" in result) {
-      return {
-        text: `Fix the catalog for “${entry.name || "an unnamed feature"}” — it matches nothing, so the choice would be skipped.`,
-        sectionId
-      };
+    // EVERY pick, not just the first: a plural feature's second block can name a broken
+    // catalog as easily as a singular's one block can.
+    for (const choice of draftPicksOf(entry)) {
+      const slug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
+      if (!slug || namesOwnRecord(slug, ctx.recordId)) continue;
+      const result = ctx.resolveCatalog(slug);
+      if ("error" in result) {
+        return {
+          text: `Fix the catalog for “${entry.name || "an unnamed feature"}” — it matches nothing, so the choice would be skipped.`,
+          sectionId
+        };
+      }
     }
   }
   return null;

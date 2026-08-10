@@ -27,11 +27,12 @@ const speciesSummary = (id: string, lineages: readonly string[]): ContentSpecies
 const featSummary = (id: string, category: string): ContentFeatSummary => ({
   id, name: id, source: "srd", summary: null, description: null, category, repeatable: false,
   prerequisiteLevel: null, prerequisiteAbilities: [], prerequisiteRequires: [], prerequisiteText: null,
-  feature: { id, name: id, level: null, description: "x", tags: [], choice: null }
+  feature: { id, name: id, level: null, description: "x", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [] }
 });
 const spellSummary = (id: string, level: number, classes: readonly string[]): ContentSpellSummary => ({
   id, name: id, level, school: "evocation", castingTime: "1 action", rangeText: null, componentsText: "V", duration: "Instantaneous",
-  concentration: false, ritual: false, description: "x", higherLevel: null, classes, damageRoll: null, damageTypes: [], castingOptions: []
+  concentration: false, ritual: false, description: "x", higherLevel: null, classes, damageRoll: null, damageTypes: [],
+  attackRoll: false, rangeFeet: null, castingOptions: []
 });
 const equipmentSummary = (id: string, category: ContentEquipmentSummary["category"]): ContentEquipmentSummary => ({
   id, name: id, category, costGp: null, weightLb: null, description: null,
@@ -45,12 +46,58 @@ const catalogs: CatalogChoiceCatalogs = {
   species: [speciesSummary("elf", ["drow", "high-elf", "wood-elf"]), speciesSummary("human", [])],
   feats: [featSummary("alert", "origin"), featSummary("archery", "fighting-style"), featSummary("tough", "origin")],
   spells: [spellSummary("fire-bolt", 0, ["wizard"]), spellSummary("magic-missile", 1, ["wizard"]), spellSummary("cure-wounds", 1, ["cleric"])],
-  equipment: [equipmentSummary("longsword", "weapon"), equipmentSummary("shield", "shield"), equipmentSummary("rope", "adventuring-gear")],
+  equipment: [
+    equipmentSummary("longsword", "weapon"), equipmentSummary("shield", "shield"), equipmentSummary("rope", "adventuring-gear"),
+    equipmentSummary("thieves-tools", "tool"), equipmentSummary("smiths-tools", "tool")
+  ],
   skills: [
     { id: "athletics", name: "Athletics", description: "x", ability: "str" },
     { id: "stealth", name: "Stealth", description: "x", ability: "dex" }
+  ],
+  languages: [
+    { id: "common", name: "Common", description: "x", table: "standard" },
+    { id: "dwarvish", name: "Dwarvish", description: "x", table: "standard" },
+    { id: "druidic", name: "Druidic", description: "x", table: "rare" }
   ]
 };
+
+describe("resolveCatalogChoice - tools, languages and the union combinator (ruling C)", () => {
+  it("resolves tools off the equipment catalog, the way weapons already did", () => {
+    // Skilled's "or tools" half (audit row 60) needed a FAMILY, not a new bundle: `equipment.v1.json`
+    // already publishes 35 rows with `category: "tool"` and the ids are the ones `grants.tools` names.
+    expect(resolveCatalogChoice("tools", catalogs).map((option) => option.id)).toEqual(["thieves-tools", "smiths-tools"]);
+    expect(resolveCatalogChoice("tools", catalogs).map((option) => option.id)).not.toContain("longsword");
+  });
+
+  it("resolves the whole language list, and narrows to ONE printed SRD table", () => {
+    expect(resolveCatalogChoice("languages", catalogs).map((option) => option.id)).toEqual(["common", "dwarvish", "druidic"]);
+    // The base "Common plus two languages" budget draws from STANDARD only. Druidic and Thieves' Cant
+    // are rare and arrive from a class feature - offering them at level 1 would hand out a secret language.
+    expect(resolveCatalogChoice("standard-languages", catalogs).map((option) => option.id)).toEqual(["common", "dwarvish"]);
+    expect(resolveCatalogChoice("rare-languages", catalogs).map((option) => option.id)).toEqual(["druidic"]);
+  });
+
+  it("throws, rather than offering an empty picker, for a table nobody prints", () => {
+    expect(() => resolveCatalogChoice("planar-languages", catalogs)).toThrowError(CatalogChoiceError);
+    expect(() => resolveCatalogChoice("planar-languages", catalogs)).toThrowError(/No languages are printed in the "planar" table/);
+  });
+
+  it("unions the families a `-or-` slug names, in order, de-duplicated by id", () => {
+    // Skilled: "any combination of three skills or tools".
+    expect(resolveCatalogChoice("skills-or-tools", catalogs).map((option) => option.id))
+      .toEqual(["athletics", "stealth", "thieves-tools", "smiths-tools"]);
+    // Magical Discoveries: "the Cleric, Druid, or Wizard spell list, or any combination thereof".
+    expect(resolveCatalogChoice("wizard-spells-or-cleric-spells", catalogs).map((option) => option.id))
+      .toEqual(["fire-bolt", "magic-missile", "cure-wounds"]);
+    // A part that is itself a content gap contributes nothing instead of taking the union down.
+    expect(resolveCatalogChoice("skills-or-bard-spells", catalogs).map((option) => option.id)).toEqual(["athletics", "stealth"]);
+  });
+
+  it("still throws when EVERY part of a union is a gap - a union of nothing is nothing", () => {
+    expect(() => resolveCatalogChoice("bard-spells-or-rogue-spells", catalogs)).toThrowError(CatalogChoiceError);
+    expect(() => resolveCatalogChoice("bard-spells-or-rogue-spells", catalogs)).toThrowError(/None of "bard-spells", "rogue-spells" resolved/);
+  });
+});
 
 describe("resolveCatalogChoice", () => {
   it("resolves the skills catalog", () => {

@@ -1,9 +1,11 @@
 import type { Actor, DamageApplication, GameState, HealthBand } from "@vtt/domain";
-import { adjustDamageParts, damageWhileDying, droppedToZero, type DamagePart } from "@vtt/rules-5e";
+import { adjustDamageParts, collectRiders, damageWhileDying, droppedToZero, normalizeDamageType, reduceDamageTotal, rescaleDamageParts, sumRiders, type DamagePart } from "@vtt/rules-5e";
+import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyConditionDirect, endConcentrationSustainedBy, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
-import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog } from "./equipment-derivation.js";
+import { choiceOverrideDefenses } from "./choice-overrides.js";
+import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
 /** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
 export type ActorScope = { role: "gm" } | { role: "player"; sessionId: string };
@@ -22,10 +24,26 @@ export function adjustableActor(state: GameState, actorId: string, scope: ActorS
 }
 
 export type DamageInput = Readonly<{
-  /** Untyped total - the manual path (no defense math). Ignored when `parts` is present. */
+  /** Untyped total - the manual path (no defense math unless `damageType` names one). Ignored when `parts` is present. */
   amount: number;
   /** Typed components from a resolved action; the engine applies immunity → resistance → vulnerability. */
   parts?: readonly DamagePart[];
+  /**
+   * D7 - the GM's manual entry names a type. Absent, blank, or `"untyped"` keeps today's fast path
+   * byte for byte; anything else turns the bare `amount` into one typed part and runs the full
+   * defence pipeline. Ignored when `parts` is present, which already carries its own types.
+   *
+   * This is the entry point the table uses most, and the reason "fire damage isn't fire damage" was
+   * true even after every other path was correct.
+   */
+  damageType?: string;
+  /**
+   * A HAND-ENTERED total that replaces what was rolled, WITHOUT losing the types. Every amend path
+   * used to express this by dropping `parts` and sending a bare number, which skipped the defence
+   * maths - so a corrected 12 landed in full on a target that resists it. `rescaleDamageParts`
+   * re-weights the rolled types to this total instead.
+   */
+  damageOverride?: number;
   critical?: boolean;
   sourceName?: string | null;
   /** Knocking out a creature (SRD): a nonlethal drop to 0 leaves it Unconscious and stable instead of dying/defeated. */
@@ -47,11 +65,90 @@ export type DamageDeps = Readonly<{
 }>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
-function definitionDefenses(definition: ActorDefinition | undefined) {
+const SRD_DAMAGE_TYPES = new Set(DAMAGE_TYPE_IDS);
+/** The resolver's own sentinel for "this damage has no type" - a live fourteenth value, not one of the SRD's thirteen. */
+export const UNTYPED_DAMAGE = "untyped";
+
+/**
+ * Is this the canonical slug of one of the SRD's thirteen damage types?
+ *
+ * NEVER a gate: the vocabulary is open on purpose, so a homebrew type must still reach the maths and
+ * match a homebrew defence. It exists so the GM's own log line can say when a hand-typed word matches
+ * nothing in the SRD - "a slug typed one character wrong is silently inert at play time, which is the
+ * single hardest homebrew failure to diagnose" (`enums.ts`). Reading the canonical list here is also
+ * what keeps the server from growing a fourteenth copy of it.
+ */
+export function isSrdDamageType(type: string): boolean {
+  return SRD_DAMAGE_TYPES.has(normalizeDamageType(type));
+}
+
+/**
+ * The typed parts this input really applies, or `null` for the untyped fast path.
+ *
+ * Three shapes fold into one here: the resolver's typed `parts`, those same parts re-weighted to a
+ * hand-entered total, and the GM's manual `amount` under a named type.
+ */
+export function damagePartsOf(input: DamageInput): readonly DamagePart[] | null {
+  if (input.parts && input.parts.length > 0) {
+    return input.damageOverride === undefined ? input.parts : rescaleDamageParts(input.parts, input.damageOverride);
+  }
+  const named = input.damageType === undefined ? "" : normalizeDamageType(input.damageType);
+  if (named === "" || named === UNTYPED_DAMAGE) return null;
+  return [{ amount: input.damageOverride ?? input.amount, type: named }];
+}
+
+/**
+ * THE damage-adjustment detail line - "17 bludgeoning → 8, resistance: Rage" - in ONE place.
+ *
+ * It was copy-pasted three times in `game-operations.ts` and missing entirely from the three call
+ * sites that discarded `application.parts` (`save.answer` and both reaction paths). That is how "fire
+ * damage isn't fire damage" could be true at the table while the engine halved correctly: the number
+ * changed and nothing said why. Returns "" when nothing adjusted the hit, so every caller can append
+ * it unconditionally and an unchanged number is never explained.
+ */
+export function damageAdjustmentDetail(application: Readonly<{ parts: DamageApplication["parts"]; flatReduction?: number }>): string {
+  const clauses = application.parts
+    .filter((part) => part.adjustment !== null)
+    .map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`);
+  // The flat step is named separately because it is not per-type: it comes after the halving, once.
+  if ((application.flatReduction ?? 0) > 0) clauses.push(`then -${application.flatReduction}, reduction`);
+  return clauses.length > 0 ? ` (${clauses.join("; ")})` : "";
+}
+
+/**
+ * FLAT REDUCTION, collected from the same rider carriers every other numeric read uses.
+ *
+ * `damage-reduction` was authored, validated, stored, carried and read by NOTHING - it was the one
+ * rider whose disposition said `"unread"` for the honest reason that no incoming-damage path
+ * collected riders at all. This is that collector, and it is the only one that runs on the RECEIVING
+ * side of a hit.
+ *
+ * Two passes, because the vocabulary allows both spellings and the SRD needs both: the STANDING set
+ * (a rider that names no moment - "you always take 3 less") and the `on-taking-damage` moment, whose
+ * `damage-type-is` filter is what makes "reduce fire damage by 3" expressible at all. The incoming
+ * types are handed to the collector so that filter can match; the total the caller then reduces is
+ * the whole hit, per `reduceDamageTotal`'s own rule.
+ */
+function damageReductionFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): number {
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const onTakingDamage = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-taking-damage", damageTypes });
+  return sumRiders(standing, "damage-reduction") + sumRiders(onTakingDamage, "damage-reduction");
+}
+
+/**
+ * The stat block's own defences, minus anything a rest-time re-choice superseded.
+ *
+ * The subtraction is the half that is easy to miss: a chosen inline option's grants are BAKED into
+ * the definition at build time, so without it a Warlock who re-chose Fiendish Resilience would keep
+ * the type they abandoned and gain the new one - two resistances from a "choose one" feature.
+ */
+function definitionDefenses(definition: ActorDefinition | undefined, superseded: ReadonlySet<string> = new Set()) {
+  const keep = (list: readonly string[] | undefined) =>
+    superseded.size === 0 ? list ?? [] : (list ?? []).filter((id) => !superseded.has(normalizeDamageType(id)));
   return {
-    resistances: definition?.damageResistances ?? [],
-    immunities: definition?.damageImmunities ?? [],
-    vulnerabilities: definition?.damageVulnerabilities ?? []
+    resistances: keep(definition?.damageResistances),
+    immunities: keep(definition?.damageImmunities),
+    vulnerabilities: keep(definition?.damageVulnerabilities)
   };
 }
 
@@ -68,19 +165,26 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
 
   let totalRequested: number;
   let totalAdjusted: number;
+  let flatReduction = 0;
   let parts: DamageApplication["parts"] = [];
-  if (input.parts && input.parts.length > 0) {
+  const typed = damagePartsOf(input);
+  if (typed !== null) {
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
-    const innate = definitionDefenses(definition);
+    // A rest-time re-choice REPLACES the build-time pick, so this both adds and subtracts: a Warlock
+    // who built Fiendish Resilience on cold and re-chose fire must lose cold and gain fire.
+    const fromChoices = choiceOverrideDefenses(definition, actor.choiceOverrides, deps?.catalog?.featureRecord);
+    const innate = definitionDefenses(definition, fromChoices.suppressed);
     const fromEffects = effectDamageDefenses(actor);
     // Item grants: derived whole from (definition, inventory, catalog) like every other item
     // contribution, so taking the ring off removes the resistance on the very next hit.
     const fromItems = deps?.catalog ? deriveEquipment(actor, definition, deps.catalog) : EMPTY_DERIVATION;
     const itemResistances = fromItems.damageResistances.map((entry) => entry.id);
     const itemImmunities = fromItems.damageImmunities.map((entry) => entry.id);
+    const itemVulnerabilities = fromItems.damageVulnerabilities.map((entry) => entry.id);
     const itemSourceOf = (type: string): string | null => {
       const source = fromItems.damageImmunities.find((entry) => entry.id.toLowerCase() === type)
-        ?? fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type);
+        ?? fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type)
+        ?? fromItems.damageVulnerabilities.find((entry) => entry.id.toLowerCase() === type);
       if (!source) return null;
       return fromItems.sources.find((row) => row.itemId === source.sourceItemId)?.itemName ?? source.sourceItemId;
     };
@@ -88,35 +192,45 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
-    const adjusted = adjustDamageParts(input.parts, {
-      resistances: [...innate.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
-      immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...itemImmunities],
-      vulnerabilities: innate.vulnerabilities,
+    const adjusted = adjustDamageParts(typed, {
+      resistances: [...innate.resistances, ...fromChoices.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
+      immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...fromChoices.immunities, ...itemImmunities],
+      // All three channels, so a curse and a cursed item can make a target vulnerable exactly as a
+      // stat block can. `adjustDamageParts` already cancels a same-type resistance against it.
+      vulnerabilities: [...innate.vulnerabilities, ...fromEffects.vulnerabilities, ...itemVulnerabilities],
       resistAll: petrified
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
-      const effectSource = part.adjustment === "resistance" ? fromEffects.sources.get(type) ?? null : null;
+      const effectSource = part.adjustment === "resistance" || part.adjustment === "vulnerability" ? fromEffects.sources.get(type) ?? null : null;
+      // "Fiendish Resilience" on the line, exactly as an effect or an item names itself.
+      const choiceSource = part.adjustment !== null && effectSource === null ? fromChoices.sources.get(type) ?? null : null;
       const innateHas = (list: readonly string[]) => list.map((entry) => entry.toLowerCase()).includes(type);
-      const petrifiedSource = petrified
+      const petrifiedSource = petrified && choiceSource === null
         && ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null)
           || (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
         ? "Petrified" : null;
       const underwaterSource = underwater && part.adjustment === "resistance" && type === "fire"
-        && !innateHas(innate.resistances) && effectSource === null && petrifiedSource === null
+        && !innateHas(innate.resistances) && effectSource === null && petrifiedSource === null && choiceSource === null
         ? "Underwater" : null;
       // The item's NAME on the damage line, so a halved hit explains itself ("Ring of Fire
       // Resistance") the same way an effect-sourced one does.
-      const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null
-        && !innateHas(part.adjustment === "immunity" ? innate.immunities : innate.resistances)
+      const innateList = part.adjustment === "immunity" ? innate.immunities : part.adjustment === "vulnerability" ? innate.vulnerabilities : innate.resistances;
+      const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null && choiceSource === null
+        && !innateHas(innateList)
         ? itemSourceOf(type) : null;
-      return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
+      return { ...part, adjustmentSource: effectSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
     });
-    totalRequested = input.parts.reduce((sum, part) => sum + part.amount, 0);
-    totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
+    totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
+    const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
+    // LAST, and per total: flat reduction subtracts from what the per-type maths produced.
+    flatReduction = Math.max(0, damageReductionFor(fromItems, adjusted.map((part) => normalizeDamageType(part.type))));
+    totalAdjusted = reduceDamageTotal(afterDefenses, flatReduction);
+    flatReduction = afterDefenses - totalAdjusted;
   } else {
-    totalRequested = input.amount;
-    totalAdjusted = input.amount;
+    // The untyped fast path, unchanged: a manual correction that names no type is exact by design.
+    totalRequested = input.damageOverride ?? input.amount;
+    totalAdjusted = totalRequested;
   }
 
   const hpBefore = actor.hp.current;
@@ -207,7 +321,8 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
       droppedToZero: !wasAtZero && actor.hp.current === 0 && damageToHp > 0,
       deathSaveFailuresAdded,
       instantDeath,
-      defeated
+      defeated,
+      ...(flatReduction > 0 ? { flatReduction } : {})
     },
     events
   };

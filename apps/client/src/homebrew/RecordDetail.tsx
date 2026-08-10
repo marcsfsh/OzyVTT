@@ -229,7 +229,13 @@ export function RecordDetail({
         // (This comment used to say `grants` was deliberately absent, which `ITEM_RIDERS` one
         // import away had already contradicted. See the table at the top of RiderEditor.tsx.)
         enabled={doc.type === "equipment" ? ITEM_RIDERS : doc.type === "monster" ? ["actions", "tags"] : undefined}
-        scope={doc.type === "equipment" ? "item" : "feature"}
+        // THE SAME three-way branch as the line above it. It used to collapse to two, handing a
+        // monster `"feature"` — and a feature's attack names an ability while a stat block's needs
+        // a flat `bonus`, so the form wrote a key `ActorDefinitionSchema` has no place for and the
+        // publish gate answered `actions[].attack.bonus: Required`. A monster action with an attack
+        // roll could not be published at all. Two branches for one decision is what let them drift;
+        // now `RiderScope` is three-valued and the compiler holds them together.
+        scope={doc.type === "equipment" ? "item" : doc.type === "monster" ? "statblock" : "feature"}
         ctx={ctx}
         idPrefix={`hb-${doc.type}`}
       />

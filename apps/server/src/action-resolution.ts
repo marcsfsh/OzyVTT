@@ -2,7 +2,7 @@ import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
 import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AttackKind, type DiceExpression, type RandomSource, type RiderContext, type RiderMoment, type RollModeSource } from "@vtt/rules-5e";
 import { toRollModes, type ActorDefinition } from "@vtt/schemas";
 import { criticalThreshold, effectiveActions } from "./effective-actions.js";
-import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, UNARMED_STRIKE_ACTION_ID, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
@@ -520,7 +520,11 @@ function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: 
     else if (melee) kinds.add("melee");
     if (melee && ranged) kinds.add("thrown");
   }
-  if (input.builtin && action.id === "unarmed-strike") kinds.add("unarmed");
+  // An action whose id IS the unarmed strike is an unarmed strike whether it came from the builtin
+  // catalog or from the sheet. Gating this on `input.builtin` meant a Monk's own Martial Arts strike
+  // - which SHADOWS the builtin by carrying its id - missed every `attack-kind-is: ["unarmed"]`
+  // rider (the Paladin's Divine Smite among them) that the generic strike matched.
+  if (action.id === UNARMED_STRIKE_ACTION_ID) kinds.add("unarmed");
   if (action.activation === "reaction") kinds.add("reaction");
   return [...kinds];
 }
@@ -712,7 +716,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
 
   // Builtin Unarmed Strike: the attack math is actor-derived (SRD: Str modifier + Proficiency Bonus),
   // so the concrete attack is materialized at resolve time rather than declared in the catalog.
-  if (input.builtin && action.id === "unarmed-strike") {
+  // `input.builtin` is load-bearing, not decoration: a Monk's own strike SHADOWS this id with a
+  // declared attack of its own (Martial Arts die, Dexterity or Strength), and overwriting it here
+  // with Strength would put the class's whole point back where it was found.
+  if (input.builtin && action.id === UNARMED_STRIKE_ACTION_ID) {
     action = { ...action, attack: { bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0), reachFeet: 5 } };
   }
 
@@ -787,17 +794,31 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   let attack: ActionResolution["attack"] = null;
   let rollMode: ActionResolution["rollMode"];
   let crit = false;
-  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId };
+  // WHICH SPELL this action is, when it is one. `spell-id-is` matches against it, so it belongs on
+  // BOTH branches: a spell that forces a save and rolls no attack ("when you cast Fireball") must
+  // gate its riders exactly as an attack-roll cantrip does.
+  const spellFilter = action.spellId === undefined ? {} : { spellId: action.spellId };
+  // WHAT DAMAGE THIS ACTION DEALS belongs on both branches for the same reason `spellId` does, and
+  // it used to be built only inside the attack-roll branch below. `damage-type-is` is a property of
+  // the ACTION — `action.damage` is already known, the target is not consulted — so gating it on
+  // "has an attack block AND exactly one target" was never a rule, it was where the code happened to
+  // sit. The Sorcerer's Elemental Affinity is the record that shows the cost: "when you cast a spell
+  // that deals Fire damage you can add your Charisma modifier" reaches Fire Bolt, which rolls an
+  // attack, and never reached Burning Hands, which forces a save. Same feature, same damage type,
+  // half the spells.
+  const damageTypes = action.damage.map((part) => part.type);
+  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId, damageTypes, ...spellFilter };
   if (action.attack && targets.length === 1) {
     const target = targets[0];
     const targetDerivation = deriveEquipment(target, target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, deps.catalog);
     riderFilters = {
       attackKinds: attackKindsOf(action, input, deps.distanceFeet?.(attacker.id, target.id) ?? null),
       weaponProperties: weaponPropertiesOf(riderItemId, attacker.inventory),
-      damageTypes: action.damage.map((part) => part.type),
+      damageTypes,
       targetSize: target.size ?? "medium",
       targetConditionIds: target.conditions.map((condition) => condition.id),
-      sourceItemId: riderItemId
+      sourceItemId: riderItemId,
+      ...spellFilter
     };
     const sources = attackRollSources(state, attacker, target, action, deps, { attacker: derivation, target: targetDerivation, filters: riderFilters });
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
@@ -908,6 +929,27 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       }
     }
   }
+  /**
+   * WEAPON MASTERY: GRAZE. "If your attack roll with this weapon misses a creature, you can deal
+   * damage to that creature equal to the ability modifier you used to make the attack roll. This
+   * damage is the same type dealt by the weapon."
+   *
+   * The one mastery that fires on a MISS, which is why it sits outside the damage block above - that
+   * block is gated on hit/crit/unknown by design, and Graze is the exception the SRD writes.
+   *
+   * A FUMBLE is still a miss and still grazes: the SRD gives no carve-out for a natural 1, and the
+   * feature is a floor on the swing rather than a reward for rolling well.
+   *
+   * `bonusDamage` is the right channel and not a compromise - it is flat integers with a source
+   * label, which is exactly what "damage equal to your ability modifier" is, and the roll card
+   * already renders it as its own explainable line. A non-positive modifier deals nothing rather than
+   * healing the target.
+   */
+  const mastery = derivation.masteryByActionId[action.id];
+  if (mastery?.id === "graze" && attack !== null && (attack.outcome === "miss" || attack.outcome === "fumble") && mastery.abilityModifier > 0) {
+    bonusDamage.push({ amount: mastery.abilityModifier, type: action.damage[0]?.type ?? "untyped", source: "Graze" });
+  }
+
   // TYPED RIDER DAMAGE: criterion 1's "extra 1d4 lightning" and criterion 9's "extra 1d6 fire on a
   // critical hit". Neither existing channel can carry it - `bonusDamage` is flat integers only, and
   // `attack.criticalBonusDice` is a bare COUNT applied to the first damage part, so it cannot carry a
@@ -929,19 +971,36 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const already = new Set<unknown>();
     for (const moment of passes) {
       for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
-        if (rider.modifier.type !== "extra-damage" || rider.modifier.formula === undefined || already.has(rider.modifier)) continue;
+        if (rider.modifier.type !== "extra-damage" || already.has(rider.modifier)) continue;
+        // AN ABILITY MODIFIER IS AN AMOUNT, NOT A DIE. "Add your Charisma modifier to the damage"
+        // (Agonizing Blast) resolves against the BEARER's own sheet at the roll, so no authored
+        // constant could have said it. It rolls nothing - there is no die to record - and it is
+        // never crit-doubled, because 5e doubles dice and this is a flat number.
+        const abilityAmount = rider.modifier.abilityModifier === undefined
+          ? 0 : abilityModifier(deps.definition, rider.modifier.abilityModifier);
+        if (rider.modifier.formula === undefined && rider.modifier.abilityModifier === undefined) continue;
         already.add(rider.modifier);
+        const type = rider.modifier.damageType ?? damage[0]?.type ?? "untyped";
+        if (rider.modifier.formula === undefined) {
+          if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
+          damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
+          warnings.push(`${rider.label}: +${abilityAmount} ${type} (${rider.modifier.abilityModifier!.toUpperCase()}).`);
+          continue;
+        }
         const expression = parseDiceFormula(rider.modifier.formula);
         const rolled = resolveDice(crit && rider.modifier.doubleOnCritical === true ? criticalExpression(expression) : expression, deps.random);
         recordRoll(state, rolled, { ...rollBase, id: deps.newRollId(), purpose: "damage" });
-        damage.push({ formula: rolled.expression.source, type: rider.modifier.damageType ?? damage[0]?.type ?? "untyped", total: rolled.total });
-        warnings.push(`${rider.label}: +${rolled.total} ${rider.modifier.damageType ?? "damage"}.`);
+        const total = rolled.total + abilityAmount;
+        damage.push({ formula: rolled.expression.source, type, total });
+        warnings.push(`${rider.label}: +${total} ${type}.`);
       }
     }
   }
   // Builtin Unarmed Strike damage is flat (SRD: 1 + Str modifier Bludgeoning, no dice) - it rides
-  // the explainable bonus-damage channel since the dice grammar has no zero-die formula.
-  if (input.builtin && action.id === "unarmed-strike" && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
+  // the explainable bonus-damage channel since the dice grammar has no zero-die formula. Again the
+  // `input.builtin` gate is the thing keeping a Monk's declared Martial Arts die from being paid a
+  // second, Strength-flavoured time.
+  if (input.builtin && action.id === UNARMED_STRIKE_ACTION_ID && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
     bonusDamage.push({ amount: Math.max(0, 1 + abilityModifier(deps.definition, "str")), type: "bludgeoning", source: "Unarmed Strike" });
   }
 
@@ -976,6 +1035,47 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       });
       effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
     });
+  }
+
+  /**
+   * WEAPON MASTERY: SAP. "If you hit a creature with this weapon, that creature has Disadvantage on
+   * its next attack roll before the start of your next turn."
+   *
+   * A real effect on the TARGET, carrying `attack-disadvantage` - the variant whose own comment reads
+   * "the bearer's own attack rolls have disadvantage" - and ending at the start of the attacker's next
+   * turn, which is what `until-source-next-turn` already means for Reckless Attack and Dodge.
+   *
+   * KNOWN APPROXIMATION, stated rather than hidden: the SRD ends Sap on the target's NEXT attack roll
+   * or the attacker's next turn, whichever comes first, and nothing in the effect vocabulary expires
+   * on use. So a target that attacks twice in that window rolls both at Disadvantage instead of one.
+   * This is the same shape the shipped Help builtin already has (`attack-advantage`, same duration,
+   * also "the next attack roll" in the SRD), so it follows the engine's existing convention rather
+   * than inventing a second one. A one-shot duration is the fix, and it fixes both together.
+   *
+   * NO condition is linked: Sap is not a named condition, and putting one on the row would make the
+   * token render a status it does not have.
+   */
+  if (mastery?.id === "sap" && attack !== null && (attack.outcome === "hit" || attack.outcome === "crit")) {
+    const sapped = targets[0];
+    const effect = addEffect(state, sapped.id, {
+      id: `${input.commandId}:mastery:sap:${sapped.id}`,
+      name: `Sapped by ${attacker.name}`,
+      tags: ["sap"],
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      sourceActionId: `${action.id}:sap`,
+      startedRound: state.combat.round,
+      duration: { type: "until-source-next-turn" },
+      endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: false,
+      concentration: false,
+      modifiers: [{ type: "attack-disadvantage" }],
+      linkedConditionIds: [],
+      escapeDc: null,
+      onEnd: [],
+      endsWithTag: null
+    });
+    effectsApplied.push({ targetId: sapped.id, targetName: sapped.name, name: effect.name, conditionIds: [] });
   }
 
   // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
 import { ABILITY_ROLL_FORMULA, parseDiceFormula, resolveDice, rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
+import { generateCharacterRequest } from "./character-generate.js";
 import { buildCharacterDefinition } from "./character-build.js";
 import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
@@ -14,6 +15,7 @@ import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-act
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, rebuildActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "./actor-roster.js";
 import { canInitiateForActor, canPlayerTarget } from "./authorization.js";
+import { replaceableOffers } from "./choice-overrides.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { setCurrency, setInventoryItem } from "./inventory.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "./character-edit.js";
@@ -32,7 +34,7 @@ import { CommandRejectedError, RulesBlockedError, type GameStore, type JournalEn
 import { applyMovementRules } from "./movement-rules.js";
 import { applyRest, spendHitDice } from "./rests.js";
 import { paintFog, resetFog, setFogEnabled } from "./fog.js";
-import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
+import { applyDamage, applyDamageDetailed, damageAdjustmentDetail, healActor, isSrdDamageType, setCurrentHp, setTemporaryHp, UNTYPED_DAMAGE, type ActorScope } from "./hit-points.js";
 import { settlePlayerHit, resolvePendingDamage, type AppliedDamage } from "./player-damage.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, setActorVisibility, type TokenMapGeometry } from "./token-placement.js";
@@ -44,7 +46,7 @@ import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "./r
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterGenerateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRechooseSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -343,6 +345,13 @@ export function createGameOperations(context: GameOperationsContext) {
       // it instead of a hardcoded client table.
       const catalog = catalogFor(principal);
       return { skills: catalog.skillSummaries(), attribution: catalog.attribution };
+    },
+
+    contentLanguages(principal: GamePrincipal) {
+      // The language catalog is public reference exactly like skills: the builder's species step
+      // offers "Common plus two languages" from it, and the sheet renders what a character knows.
+      const catalog = catalogFor(principal);
+      return { languages: catalog.languageSummaries(), attribution: catalog.attribution };
     },
 
     contentSpells(principal: GamePrincipal) {
@@ -839,6 +848,75 @@ export function createGameOperations(context: GameOperationsContext) {
     },
 
     /**
+     * ROLL A WHOLE CHARACTER (issue `2d`) - a complete, playable, single-class character at a named
+     * level, with every decision but the ability spread drawn at random.
+     *
+     * SERVER-SIDE IS THE WHOLE POINT. The dice are `context.random`, the same authority every other
+     * roll comes from, and they are thrown INSIDE the command against the CURRENT catalog and the
+     * CURRENT policy - so a caller cannot pre-roll a character and send it in. That is CLAUDE.md
+     * rule 2, and D14 already moved the builder's own six dice for exactly this reason.
+     *
+     * The gate is `builderPolicy.playerRandom`, which mirrors `characterCreate`'s `playerBuilder`
+     * gate line for line - the same one-character rule, the same per-session create cap, the same
+     * definitions headroom pre-check, the same auto-claim - with one deliberate difference: it is
+     * DENY BY DEFAULT. A guided builder is eight considered steps; a generator is one tap that fills
+     * a roster slot, which is a different kind of thing to hand out.
+     *
+     * The generated character lands through `character.create`'s own path: same assembler, same
+     * import, same `import-<actorId>` keying, same choice ledger. It is a hand-built character that
+     * nobody had to sit through - not a second species of sheet.
+     */
+    async characterGenerate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterGenerateSchema, raw, "The character-generate command is malformed.");
+      const isPlayer = !isGmGrade(principal);
+      if (isPlayer) {
+        const policy = store.snapshot.builderPolicy;
+        if (policy.playerRandom !== "open") throw new GameAccessDeniedError("Your GM rolls the random characters at this table.");
+        if (store.snapshot.actors.some((actor) => actor.ownerSessionId === principal.sessionId)) {
+          throw new CommandRejectedError("You already have a character - release it before rolling another.");
+        }
+        if (!withinCreateCap(principal.sessionId)) throw new CommandRejectedError("That is a lot of characters for one evening - ask your GM to add the next one.");
+      }
+      const actorId = request.commandId;
+      let summary = "";
+      let rolls: readonly number[] = [];
+      let faces = 0;
+      let rollId: string | undefined;
+      const result = await store.execute({ id: request.commandId, type: "character.generate", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        if (state.definitions.length >= MAX_STORED_DEFINITIONS) throw new CommandRejectedError("The table's sheet library is full - ask your GM to delete old characters.");
+        if (request.level > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
+        // The CALLER's catalog, exactly as `characterCreate` does: a player must not roll up a
+        // GM-only homebrew class they were never shown.
+        const generated = generateCharacterRequest(request, catalogFor(principal), state.builderPolicy, (sides) => context.random(sides));
+        ({ summary, hitPointRolls: rolls, hitDieFaces: faces } = generated);
+        const definition = buildCharacterDefinition(generated.request, catalogFor(principal), state.builderPolicy);
+        importActorDefinition(state, definition, actorId, "public", equipmentCatalog());
+        if (isPlayer) {
+          const created = state.actors.find((actor) => actor.id === actorId);
+          if (created) created.ownerSessionId = principal.sessionId;
+        }
+        // The hit-point dice land in the table feed like any other roll (D11/D14): a character
+        // rolled up at the table is a table event, not a private one. Level 1 throws none.
+        if (rolls.length > 0) {
+          rollId = context.newId();
+          recordRoll(state, {
+            id: rollId, commandId: request.commandId, initiatorSessionId: sessionIdOf(principal), initiatorRole: isGmGrade(principal) ? "gm" : "player",
+            initiatorLabel: isGmGrade(principal) ? "GM" : "A player", label: `Hit points, ${state.actors.find((actor) => actor.id === actorId)?.name ?? "a new character"}`,
+            actorId, purpose: "manual", visibility: "public",
+            formula: `${rolls.length}d${faces}`, normalizedFormula: `${rolls.length}d${faces}`,
+            dice: rolls.map((face) => ({ group: 0, sides: faces, face, kept: true, sign: 1 as const })),
+            modifiers: [], total: rolls.reduce((sum, face) => sum + face, 0), createdAt: new Date().toISOString()
+          });
+        }
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: `${actorName(actorId)} was rolled up — ${summary}.`, actorIds: [actorId] });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate, actorId };
+    },
+
+    /**
      * D13/D14 - LEVEL UP, LEVEL DOWN, RESPEC: one command, because they are one motion. The client
      * prefills the whole request from the stored choice ledger; the server re-runs the identical
      * build and re-validates every part of it (it never trusts a prefill), then updates the live
@@ -929,7 +1007,8 @@ export function createGameOperations(context: GameOperationsContext) {
           customFormula: request.customFormula === undefined ? state.builderPolicy.customFormula : request.customFormula,
           // Same tri-state spirit for the two additive fields: omitted keeps what is stored.
           maxLevel: request.maxLevel ?? state.builderPolicy.maxLevel,
-          playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder
+          playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder,
+          playerRandom: request.playerRandom ?? state.builderPolicy.playerRandom
         };
       });
       if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Character-builder ability methods set to ${allowedAbilityMethods.join(", ")}.`, gmOnly: true }); }
@@ -968,22 +1047,25 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorApplyDamage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ApplyDamageSchema, raw, "The damage command is malformed.");
       const scope = actorScopeOf(principal);
-      const { commandId, actorId, amount, parts, sourceName, critical, nonlethal, expectedRevision } = request;
+      const { commandId, actorId, amount, parts, damageType, damageOverride, sourceName, critical, nonlethal, expectedRevision } = request;
       let outcome: ReturnType<typeof applyDamageDetailed> | undefined;
       const result = await store.execute({ id: commandId, type: "actor.apply-damage", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        outcome = applyDamageDetailed(state, actorId, { amount, parts, critical, sourceName: sourceName ?? null, nonlethal }, scope, { resolveDefinition, newId: context.newId, now: () => new Date().toISOString(), catalog: equipmentCatalog() });
+        outcome = applyDamageDetailed(state, actorId, { amount, parts, damageType, damageOverride, critical, sourceName: sourceName ?? null, nonlethal }, scope, { resolveDefinition, newId: context.newId, now: () => new Date().toISOString(), catalog: equipmentCatalog() });
       });
       if (!result.duplicate && outcome) {
         await context.publishGameState(result.state);
         // Typed damage narrates its adjustments ("17 bludgeoning → 8, resistance: Rage") so the
         // table sees WHY the applied number differs - never a silent reduction (ADR-0020).
-        const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
-        const detail = adjustments.length > 0
-          ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})`
-          : "";
+        const detail = damageAdjustmentDetail(outcome.application);
         const attribution = sourceName ? `${sourceName} hit ${actorName(actorId)} for` : `${actorName(actorId)} took`;
         context.broadcastTableEvent({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
         if (detail.length > 0 || sourceName) context.appendLog({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
+        // A hand-typed type the SRD does not know is legal (homebrew is an open vocabulary) but is
+        // almost always a typo, and a typo here is silently inert - the hardest homebrew failure to
+        // diagnose. The GM hears about it once, on their own line, and the damage still lands.
+        if (damageType !== undefined && !isSrdDamageType(damageType) && damageType.trim().toLowerCase() !== UNTYPED_DAMAGE) {
+          context.appendLog({ kind: "damage", text: `"${damageType}" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.`, actorIds: [actorId], gmOnly: true });
+        }
         publishNarrations(outcome.events);
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { applied: outcome.application } : {}) };
@@ -1208,10 +1290,7 @@ export function createGameOperations(context: GameOperationsContext) {
           // breakdown). Both actors ride actorIds so gm-only-ness is re-derived correctly - the label names the
           // attacker, so a hidden attacker (unusual for a PC) must gate the line too.
           const { outcome, targetId, sourceActorId, label } = playerDamageApplied;
-          const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
-          const detail = adjustments.length > 0
-            ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})`
-            : "";
+          const detail = damageAdjustmentDetail(outcome.application);
           context.broadcastTableEvent({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
           context.appendLog({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
           publishNarrations(outcome.events);
@@ -1225,7 +1304,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(SaveAnswerSchema, raw, "The saving-throw answer is malformed.", true);
       const scope = actorScopeOf(principal);
       const sessionId = sessionIdOf(principal);
-      const { commandId, saveId, method, total, rollMode, commit, legendaryResistance, expectedRevision } = request;
+      const { commandId, saveId, method, total, rollMode, commit, legendaryResistance, damageOverride, expectedRevision } = request;
       const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
       let answered: ReturnType<typeof answerSave> | undefined;
       const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
@@ -1237,13 +1316,18 @@ export function createGameOperations(context: GameOperationsContext) {
           now: () => new Date().toISOString(),
           resolveDefinition,
           catalog: equipmentCatalog()
-        }, legendaryResistance, rollMode);
+        }, legendaryResistance, rollMode, damageOverride);
       });
       const outcome = answered?.outcome;
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         publishRolls(result.state, commandId);
-        if (outcome && outcome.committed && pending) context.broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+        if (outcome && outcome.committed && pending) {
+          // The save path narrated a bare total for as long as it existed - so a fire-resistant
+          // target's halved damage arrived unexplained. Same formatter as every other damage line.
+          const detail = damageAdjustmentDetail({ parts: outcome.parts ?? [], ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) });
+          context.broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+        }
         publishNarrations(answered?.events ?? []);
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) };
@@ -1280,23 +1364,26 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         publishRolls(result.state, commandId);
         const hidden = actorHidden(outcome.actorId);
+        // Both reaction paths kept only the total; the breakdown now rides the outcome, so all three
+        // lines below explain a number the defences changed instead of just printing it.
+        const detail = damageAdjustmentDetail({ parts: outcome.parts ?? [], ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) });
         if (outcome.kind === "leaves-reach") {
           if (outcome.used && outcome.resolution) {
             const attack = outcome.resolution.attack;
             const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : "resolved";
-            const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} - ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage` : ""}.`;
+            const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} - ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage${detail}` : ""}.`;
             context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
           }
         } else if (outcome.used) {
-          const text = `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}.`;
+          const text = `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`;
           context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
         } else {
-          const text = `${outcome.actorName} declined ${outcome.actionName} - ${outcome.sourceName} hit for ${outcome.appliedDamage} damage.`;
+          const text = `${outcome.actorName} declined ${outcome.actionName} - ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`;
           context.broadcastTableEvent({ kind: "damage", text, actorIds: [outcome.actorId], gmOnly: hidden });
         }
         publishNarrations(outcome.events);
       }
-      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: outcome.resolution } : {}) } } : {}) };
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: outcome.resolution } : {}), ...(outcome.parts ? { parts: outcome.parts } : {}), ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) } } : {}) };
     },
 
     async reactionDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1722,8 +1809,7 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         if (applied) {
           const { outcome, targetId, sourceActorId, label } = applied;
-          const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
-          const detail = adjustments.length > 0 ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})` : "";
+          const detail = damageAdjustmentDetail(outcome.application);
           const text = `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;
           context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
           context.appendLog({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
@@ -1767,6 +1853,52 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         context.appendLog({ kind: "encounter", text: underwater ? "The fight is now underwater: melee has Disadvantage unless it deals piercing damage, ranged attacks miss beyond normal range, and everyone resists fire." : "The fight is no longer underwater.", gmOnly: false });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    /**
+     * RE-MAKE A PICK the content says may be re-made on a rest - ruling A's runtime half.
+     *
+     * "Whenever you finish a Long Rest, choose one type of land." The answer is NOT written to
+     * `character.choices[]`: that ledger is the provenance level-up and respec are built on, and a
+     * re-choice between fights must not require a rebuild. It goes on the actor as `choiceOverrides`,
+     * beside `actionUses`, and the matching rest clears it (`rests.ts`).
+     *
+     * The server decides both halves of legality from the CONTENT, never from the request: which
+     * offers this character may re-choose at all (a feature declaring `replaces`), and what each may
+     * be re-chosen to (that offer's own option list). A client cannot widen either.
+     */
+    async actorRechoose(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(ActorRechooseSchema, raw, "The re-choose command is malformed.");
+      const { commandId, actorId, offer, id, expectedRevision } = request;
+      let label = "";
+      const result = await store.execute({ id: commandId, type: "actor.rechoose", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        // The same owner-or-GM seam a rest uses: this is a resource decision on a character sheet.
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+        // The GM audience deliberately: legality is a CONTENT question (which feature declares the
+        // clause, what its option list is), and a player re-choosing on their own sheet must get the
+        // same answer the GM would. Nothing GM-only is projected - only the offer they may already see.
+        const choices = replaceableOffers(definition, contentLibrary.forAudience("gm"));
+        const match = choices.find((candidate) => candidate.offer === offer);
+        if (!match) {
+          throw new CommandRejectedError(choices.length === 0
+            ? `Nothing on ${actor.name}'s sheet can be re-chosen on a rest.`
+            : `${actor.name} cannot re-choose "${offer}" - only ${choices.map((candidate) => `"${candidate.offer}"`).join(", ")}.`);
+        }
+        if (!match.options.includes(id)) {
+          throw new CommandRejectedError(`"${id}" is not one of the options ${match.label} offers (${match.options.join(", ")}).`);
+        }
+        label = match.label;
+        actor.choiceOverrides = { ...actor.choiceOverrides, [offer]: { id, per: match.per } };
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: `${actorName(actorId)} re-chose ${label}: ${id}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
@@ -2397,6 +2529,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
     ["actor.set-health-display", "Override one combatant's token health display, or clear it to follow the table default (GM).", (p, raw) => operations.actorSetHealthDisplay(p, raw)],
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
+    ["actor.rechoose", "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.", (p, raw) => operations.actorRechoose(p, raw)],
     ["actor.rest", "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.", (p, raw) => operations.actorRest(p, raw)],
     ["actor.spend-hit-dice", "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).", (p, raw) => operations.actorSpendHitDice(p, raw)],
     ["character.set-slot", "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).", (p, raw) => operations.characterSetSlot(p, raw)],
@@ -2406,6 +2539,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["character.set-identity", "Edit a character's identity (class/level/race/background/feats) on its imported sheet.", (p, raw) => operations.characterSetIdentity(p, raw)],
     ["character.set-proficiencies", "Edit a character's save and skill proficiency selections on its imported sheet.", (p, raw) => operations.characterSetProficiencies(p, raw)],
     ["character.create", "Create a character from choices (ids, scores, HP entries, the choices ledger); the server assembles and imports the sheet (GM). The actor's id equals the commandId.", (p, raw) => operations.characterCreate(p, raw)],
+    ["character.generate", "Roll a complete, playable, single-class character at a level: the standard array by the class's stat priority and every other pick drawn server-side - the GM always, a player when builderPolicy.playerRandom is open (deny by default). The actor's id equals the commandId.", (p, raw) => operations.characterGenerate(p, raw)],
     ["builder.set-policy", "Set the character-builder policy: allowed ability-score methods and the GM's custom roll formula (GM).", (p, raw) => operations.builderSetPolicy(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],

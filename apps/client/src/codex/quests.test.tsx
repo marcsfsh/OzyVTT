@@ -78,7 +78,7 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
-import { openQuests, questProgress } from "./quests";
+import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, openQuests, questProgress, questStatusTone } from "./quests";
 import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "./api";
 
 /**
@@ -111,6 +111,9 @@ const QUEST = (over: Partial<CodexQuest> = {}): CodexQuest => ({
 const OPEN = QUEST();
 const DONE = QUEST({ id: "q2", title: "The Bell of Vallaki", status: "completed", gmBody: "Already spent.", objectives: [] });
 const LOST = QUEST({ id: "q3", title: "The Missing Caravan", status: "failed", gmBody: "Eaten.", objectives: [] });
+/** 5d's two new states, as fixtures: one at each end of the lifecycle, on opposite sides of the open/finished line. */
+const FRESH = QUEST({ id: "q0", title: "A rumour in Vallaki", status: "not-started", gmBody: "Bait.", objectives: [] });
+const DROPPED = QUEST({ id: "q4", title: "The Amber Bargain", status: "canceled", gmBody: "They walked away.", objectives: [] });
 /**
  * A SECOND open quest, and it is not decoration. The log's "nothing chosen yet" fallback lands on the
  * first still-open quest, so a test that jumps to that very quest cannot fail — it would pass with the
@@ -150,14 +153,37 @@ const renderWorkspace = async () => {
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
 
 describe("What counts as OPEN (the rule, below the components)", () => {
-  it("is `active` and nothing else — a failed quest is finished too", () => {
+  it("is NOT FINISHED — `not-started` and `active`, never one of the three terminal states", () => {
     // The negative half is the point. `failed` is the one a looser predicate ("not completed") would
     // wave through, and it is exactly the quest a dashboard must stop offering.
     expect(openQuests([OPEN, DONE, LOST]).map((quest) => quest.id)).toEqual(["q1"]);
-    expect(openQuests([DONE, LOST])).toEqual([]);
+    expect(openQuests([DONE, LOST, DROPPED])).toEqual([]);
+    // 5d: `not-started` is OPEN. It is the state every quest is now created in, so the old "`active` and
+    // nothing else" reading would have meant a GM writes down a lead and it never reaches Home at all.
+    expect(openQuests([FRESH, OPEN, DONE, LOST, DROPPED]).map((quest) => quest.id)).toEqual(["q0", "q1"]);
+    // ...and `canceled` is finished, beside `completed` and `failed`. A quest the GM took off the table
+    // on purpose is not work still waiting for the party.
+    expect(openQuests([DROPPED])).toEqual([]);
     // Order is content: the filter preserves the GM's sequence, it does not re-rank by anything.
     const second = QUEST({ id: "qz", title: "Second" });
     expect(openQuests([OPEN, DONE, second]).map((quest) => quest.id)).toEqual(["q1", "qz"]);
+  });
+
+  /**
+   * 5d — the vocabulary itself. Every status has a WORD (R2), the picker order is the lifecycle rather
+   * than the alphabet, and the two quiet states share `neutral`.
+   *
+   * The tone assertions are not decoration: `canceled` wearing `danger` would be the colour silently
+   * contradicting the word beside it, telling a GM scanning the log that a quest they chose to drop was
+   * one the party lost.
+   */
+  it("names all five statuses, offers them in lifecycle order, and never colours a cancellation as a loss", () => {
+    expect(QUEST_STATUS_ORDER).toEqual(["not-started", "active", "completed", "failed", "canceled"]);
+    expect(QUEST_STATUS_ORDER.map((status) => QUEST_STATUS_LABEL[status]))
+      .toEqual(["Not started", "Active", "Completed", "Failed", "Canceled"]);
+    // Every member of the union has a label — an id leaking onto a badge as "not-started" is the failure.
+    expect(Object.keys(QUEST_STATUS_LABEL).sort()).toEqual([...QUEST_STATUS_ORDER].sort());
+    expect(QUEST_STATUS_ORDER.map(questStatusTone)).toEqual(["neutral", "info", "success", "danger", "neutral"]);
   });
 
   it("counts progress in words, so it never reads by colour or by a bare ratio", () => {
@@ -193,8 +219,8 @@ describe("The dashboard's open-quests card (M10)", () => {
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
     // Ruling 57: a quest wears the page editor's shape, so one body is on screen at a time. The GM half
     // is one switch away and still the record's own text, not a second copy of it.
-    await user.click(screen.getByRole("button", { name: "GM notes" }));
-    expect(screen.getByRole("textbox", { name: /GM notes/ })).toHaveValue("The vestiges are still bargaining.");
+    await user.click(screen.getByRole("button", { name: "GM-only notes" }));
+    expect(screen.getByRole("textbox", { name: /GM-only notes/ })).toHaveValue("The vestiges are still bargaining.");
 
     // The card is a view: one read for the whole workspace, and no write anywhere on the way here.
     expect(listQuests).toHaveBeenCalledTimes(1);
@@ -234,6 +260,41 @@ describe("The dashboard's open-quests card (M10)", () => {
 
     await jumpViaPalette();
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
+  });
+});
+
+/**
+ * 5d, the GM's end: the client's literal ask was that the STATUS PICKER offer the new options, so this
+ * drives the real `<select>` rather than asserting on `QUEST_STATUS_ORDER` a second time.
+ *
+ * Both pickers, because they are two separate controls that used to hold two hand-written lists: the
+ * rail's "Filter by status" and the editor's "Status". A widening that reached only one of them would
+ * leave a GM able to SET "Canceled" and then unable to filter for it — or the reverse.
+ */
+describe("The GM can actually pick the new statuses (5d)", () => {
+  it("offers all five in both pickers, and sends the chosen one to the server", async () => {
+    gmDefaults([OPEN]);
+    updateQuest.mockResolvedValue(QUEST());
+    const user = userEvent.setup();
+    await renderWorkspace();
+
+    // The rail's filter: "All quests" plus every status, in lifecycle order.
+    await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
+    const filter = await screen.findByLabelText("Filter by status");
+    expect(within(filter).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["All quests", "Not started", "Active", "Completed", "Failed", "Canceled"]);
+
+    await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
+    await user.click(await screen.findByRole("button", { name: "Details" }));
+    const status = await screen.findByLabelText(/Status/);
+    expect(within(status).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["Not started", "Active", "Completed", "Failed", "Canceled"]);
+
+    // Chosen through the control, and it reaches the wire as the id rather than the label.
+    await user.selectOptions(status, "Canceled");
+    await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
+    const [, , input] = updateQuest.mock.calls[0] as [string, string, { status: string }];
+    expect(input.status).toBe("canceled");
   });
 });
 
@@ -310,6 +371,9 @@ const PLAYER_DONE: PlayerCodexQuest = {
   body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: [], tags: []
 };
 const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [], tags: [] };
+/** 5d, player side: the newest thing on the plate, and one the GM took off it. `status` is player-facing on a quest, so both words travel. */
+const PLAYER_FRESH: PlayerCodexQuest = { id: "q0", title: "A rumour in Vallaki", status: "not-started", body: "Someone is buying coffins.", objectives: [], entityIds: [], tags: [] };
+const PLAYER_DROPPED: PlayerCodexQuest = { id: "q4", title: "The Amber Bargain", status: "canceled", body: "The party walked away.", objectives: [], entityIds: [], tags: [] };
 
 const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
   playerListPages.mockResolvedValue([]);
@@ -534,6 +598,51 @@ describe("The player's quest reader", () => {
     // fetched, and the GM's own quest feed is never touched from here.
     expect(playerQuests).toHaveBeenCalledWith("player");
     expect(listQuests).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 5d — the far end of the two new statuses, on the surface a PLAYER reads.
+ *
+ * `QUEST_EVENT_VERB` is player-facing copy (`questEventOf` accepts a `CodexPlayerChroniclePayload`), so a
+ * verb that reads badly is a defect the party sees, not an internal label. The two additions each
+ * complete the sentence `<Quest title> ___`:
+ *
+ *  - `not-started` → "has not started". It is the state every quest is now CREATED in, so it is by far
+ *    the most-written row of the five, and it stays true in both directions — at creation ("a lead was
+ *    written into the log") and when a GM pushes a quest back to it. The chronicle's own rule, stated at
+ *    `QUEST_EVENT_VERB`, is to say the payload and never guess the sequence.
+ *  - `canceled` → "was canceled". The passive is not optional: "The Amber Bargain canceled" reads as the
+ *    quest doing the cancelling, the way "the meeting canceled" does.
+ *
+ * Rendered rather than asserted as a string, because the sentence is assembled from three separate
+ * pieces — the verb table, the quest title resolved against the player's OWN quest feed, and the row —
+ * and only one of those three is in `questEventLabel`.
+ */
+describe("A quest-history row a player reads (5d)", () => {
+  const questRecord = (id: string, questId: string, status: string) => ({
+    id, kind: "quest" as const, title: null, text: "", tags: [], realDate: null, inWorldLabel: null,
+    inWorldDate: null, calendarInstant: null, sessionId: null, sessionNumber: null,
+    createdAt: "2026-07-31T00:00:00.000Z", payload: { questId, status }
+  });
+
+  it("says a quest HAS NOT STARTED and WAS CANCELED, naming the quest from the player's own feed", async () => {
+    playerDefaults([PLAYER_FRESH, PLAYER_DROPPED]);
+    playerChronicle.mockResolvedValue([questRecord("j1", "q0", "not-started"), questRecord("j2", "q4", "canceled")]);
+    (goTo("/codex/journal"), render)(<PlayerCodex token="player" />);
+
+    expect(await screen.findByText("A rumour in Vallaki has not started")).toBeInTheDocument();
+    expect(screen.getByText("The Amber Bargain was canceled")).toBeInTheDocument();
+  });
+
+  it("falls back to “A quest” for a status whose quest the player cannot see, rather than inventing a name", async () => {
+    // The id gate behind the whole-row gate: a payload can legitimately carry a `questId` that matches
+    // nothing in the player's feed, and the row must still read as a sentence.
+    playerDefaults([]);
+    playerChronicle.mockResolvedValue([questRecord("j1", "q-unknown", "canceled")]);
+    (goTo("/codex/journal"), render)(<PlayerCodex token="player" />);
+
+    expect(await screen.findByText("A quest was canceled")).toBeInTheDocument();
   });
 });
 

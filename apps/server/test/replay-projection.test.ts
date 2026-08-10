@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type CombatLogEntry, type GameState, type RollRecord } from "@vtt/domain";
-import { projectPlayerReplay } from "../src/replay-projection.js";
+import { playerReplayMapAssetIds, projectPlayerReplay } from "../src/replay-projection.js";
 import { startEncounter } from "../src/encounter.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
 
@@ -128,5 +128,34 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     const bare = { archiveSchemaVersion: 1, endedAt: "2026-07-01T21:00:00.000Z", turns: [], log: [] } as unknown as EncounterArchiveDocument;
     const replay = projectPlayerReplay(1, bare);
     expect(replay).toMatchObject({ id: 1, turnCount: 0, turns: [], rolls: [], startedAt: null, attribution: null });
+  });
+
+  /**
+   * The map door the ride-along opens (D26): a SHARED archive's own battlefield, and nothing else in
+   * the recording. The dangerous version of this function scans the stored document for map ids -
+   * which would also hand out `scenes[].mapAssetId`, i.e. the map of every fight the GM had PREPARED
+   * but not yet run when the recording was made. Reading them back out of the player projection
+   * cannot: a parked scene has no player shape at all.
+   */
+  it("yields only the battlefield the player's own document renders, never a prepared scene's map", () => {
+    const prepared = "20000000-0000-5000-8000-0000000000ff";
+    const source = document();
+    const staged = structuredClone(source.turns[0].state);
+    staged.combat = { ...staged.combat, scenes: [{ id: "40000000-0000-4000-8000-0000000000f1", name: "Next week", mapAssetId: prepared, combat: staged.combat.scenes[0]?.combat ?? GameStateSchema.parse({ schemaVersion: 1 }).combat }] as never };
+    const withPrepared = { ...source, turns: [{ ...source.turns[0], state: staged }, source.turns[1]] } as unknown as EncounterArchiveDocument;
+
+    const maps = playerReplayMapAssetIds(3, withPrepared);
+    expect([...maps]).toEqual([IDS.map]);
+    expect(maps.has(prepared)).toBe(false);
+    // The stored document really does carry it - so the exclusion is the projection's doing, not the fixture's.
+    expect(JSON.stringify(withPrepared)).toContain(prepared);
+  });
+
+  it("yields nothing at all for a recording whose turns were never an active fight", () => {
+    const source = document();
+    const idle = structuredClone(source.turns[0].state);
+    idle.combat = { ...idle.combat, active: false };
+    const parked = { ...source, turns: [{ ...source.turns[0], state: idle }] } as unknown as EncounterArchiveDocument;
+    expect([...playerReplayMapAssetIds(3, parked)]).toEqual([]);
   });
 });

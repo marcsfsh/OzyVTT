@@ -663,9 +663,18 @@ export type CodexDowntimeInput = Readonly<{ who: string; activity: string; days:
  */
 export type CodexMilestoneInput = Readonly<{ level: number; reason: string }>;
 
-// ----- Calendar (the world's own months / weekdays / era) -----
+// ----- Calendar (the world's own months / weekdays / eras) -----
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
-export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
+/**
+ * `5f`(iii) — a named era, running from `startYear` until the next one begins.
+ *
+ * **Derived, never stored on a date.** The server keeps this list inside the calendar blob and computes a
+ * date's era from its year (`eraForYear` there, `formatWorldYear` here); no record carries an era column, so
+ * defining one re-labels the campaign's history without rewriting a single stored date. Optional and empty
+ * by default, which is byte-for-byte today's rendering.
+ */
+export type CodexCalendarEra = Readonly<{ name: string; startYear: number }>;
+export type CodexCalendar = Readonly<{ yearName: string; eras?: readonly CodexCalendarEra[]; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
 /**
  * M11 / O-1 — the PREP CLOCK. The calendar as the **GM** reads it (`projectGmCalendar`).
  *
@@ -710,7 +719,31 @@ export function dateToInstant(calendar: CodexCalendar, date: CodexInWorldDate): 
   return Math.trunc(date.year) * (calendarDaysPerYear(calendar) || 1) + dayOfYear + (day - 1);
 }
 export function calendarYearOf(calendar: CodexCalendar, instant: number): number { const perYear = calendarDaysPerYear(calendar) || 1; return Math.floor(instant / perYear); }
-export function formatWorldYear(calendar: CodexCalendar, year: number): string { return `${year}${calendar.yearName ? ` ${calendar.yearName}` : ""}`; }
+/**
+ * The era a year falls in, or null — the last era whose start the year has reached (`5f`(iii)).
+ *
+ * The server's `eraForYear` restated, and it is here for the reason the whole client calendar duplication
+ * exists (`docs/ai-context/codex.md`): the composer must label a date for a record that does not exist yet.
+ * The list arrives already sorted ascending — `normalizeCalendar` sorts on the way in — so this is a scan,
+ * not a search, and it degrades to null for a year before the first era rather than guessing.
+ */
+export function eraForYear(calendar: CodexCalendar, year: number): CodexCalendarEra | null {
+  let found: CodexCalendarEra | null = null;
+  for (const era of calendar.eras ?? []) { if (Math.trunc(year) >= era.startYear) found = era; else break; }
+  return found;
+}
+/**
+ * A year with whatever qualifies it: the ERA LEADS where one applies, `yearName` trails where none does.
+ *
+ * `yearName` (the editor's "Era suffix") was already an era — singular, and a SUFFIX: "1492 DR". A named era
+ * is a leading component: "Third Age 1492". A calendar with no eras renders exactly as it always has, which
+ * is what makes `5f`(iii) safe to land on a live campaign. Must stay in step with the server's own
+ * `formatWorldYear`, which writes the stored `in_world_label`.
+ */
+export function formatWorldYear(calendar: CodexCalendar, year: number): string {
+  const era = eraForYear(calendar, year);
+  return `${era ? `${era.name} ` : ""}${year}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
+}
 /**
  * A raw in-world date rendered as "Month Day, Year Era". It lived inside `JournalView` until CI-7 gave
  * the Campaign dashboard the same readout — two copies of a date format is exactly how the journal's
@@ -981,7 +1014,18 @@ export const sessionApi = {
 
 // ----- Quests (M10 / CT-4: what is still open) -----
 
-export type CodexQuestStatus = "active" | "completed" | "failed";
+/**
+ * The five states, in LIFECYCLE order — the order every picker offers them in, and the order
+ * `CodexQuestStatus` in `apps/server/src/codex-store.ts` declares them.
+ *
+ * The line that matters is **open / finished**, not old / new: `not-started` and `active` are quests the
+ * party can still do (`openQuests` in `./quests` counts both), and `completed`, `failed` and `canceled`
+ * are three different ways of being done with one. `canceled` is not a synonym for `failed` — a lead the
+ * party never took up did not fail.
+ *
+ * A quest created without a status is `not-started`; the server decides that, and no client re-states it.
+ */
+export type CodexQuestStatus = "not-started" | "active" | "completed" | "failed" | "canceled";
 /**
  * One line on a quest's checklist. Deliberately exactly `{ text, done }` — the store, the route schema
  * and `@vtt/ui`'s `Checklist` all publish this same pair, and anything richer is unapproved scope.

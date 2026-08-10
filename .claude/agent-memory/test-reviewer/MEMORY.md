@@ -11,8 +11,8 @@ sibling topic files and link them here. Update after runs.
   `apps/client/test/setup.ts`). It proves logic and the accessibility tree; it cannot prove layout,
   pointer geometry or the touch floor — `getScreenCTM` is deliberately not shimmed. Browser gate:
   `scripts/browser-verify.mjs`.
-- `apps/server/test/` is not typechecked (`apps/server/tsconfig.json` `include: ["src"]`), so a type
-  error in a server test never fails `npm run check`.
+- `apps/server/test/` IS typechecked (`apps/server/tsconfig.json` `include: ["src", "test"]`, since
+  2026-08-07) — a type error in a server test fails `npm run check`.
 - Stale `*.tsbuildinfo` can mask type errors; a clean `npm run build` resolves it.
 
 ## Flaky spots / coverage gaps

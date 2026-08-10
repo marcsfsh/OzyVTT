@@ -974,6 +974,22 @@
 .codex-composer-gm-label { display: flex; align-items: center; gap: var(--space-2); }
 .codex-composer-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; }
 .codex-composer-meta > * { flex: 1 1 130px; }
+/* A FIELD KEEPS ITS OWN HEIGHT IN A ROW OF FIELDS — 5b / 5e.1 / 5e.2, all one mechanism.
+   `.nh-field` is `display: grid` with a gap and NO `align-content` (`forms.css:12`), so when its parent
+   stretches it (flex and grid both default to it), its auto rows grow and take the control with them.
+   Put one 3-row field — label + control + help sentence — beside two 2-row ones and it is the SIBLINGS
+   that move: the helped field sets the line height and stays put while everyone else's input drops and,
+   where the control is a bare `<input class="nh-input">` with no wrapper to absorb it, visibly grows.
+   Measured at 1280px before this rule: the session meta row spread 23.5px and downtime's Activity input
+   stood 67.5px tall against Who's and Days' 44px; the downtime EDIT row — which keeps its help string
+   deliberately — spread 33.25px.
+
+   Scoped to these three containers, never to bare `.nh-field`: `CodexEditor fill` and every textarea
+   field want exactly the stretch this turns off. The three parents are one flex (`.codex-composer-meta`)
+   and two grids (below), which stretch their items under the same default. */
+.codex-composer-meta > .nh-field,
+.codex-downtime-form > .nh-field,
+.codex-downtime-edit > .nh-field { align-content: start; }
 .codex-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 /* M11: the composer's kind switch. Layout only — `SegmentedControl` is the `@vtt/ui` primitive and owns
    its own 44px story (route 2, 36px paint, 4px overhang). §4's gap budget is met by the composer's own
@@ -1379,6 +1395,18 @@
 .codex-calendar-clocks { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; border: 1px solid transparent; padding: var(--space-3); }
 .codex-calendar-clock { display: flex; align-items: baseline; gap: var(--space-2); }
 .codex-calendar-clocklabel { color: var(--text-muted); font-size: var(--fs-sm); }
+/* `5f`(i) — the GM's clock is a door, so it has to look like one while still reading as the clock's value.
+   §4 ROUTE 1: `min-height` grows the paint itself. A route-2 ::after box would be a 44px rectangle centred
+   on ~20px of text, overhanging the players' clock beside it and the month bar below. */
+.codex-calendar-clockset {
+  min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: var(--space-1) var(--space-2); margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+  color: inherit; font: inherit; font-weight: 700; cursor: pointer; text-align: left;
+}
+.codex-calendar-clockset:hover { border-color: var(--line-hover); background: var(--surface-2); }
+.codex-calendar-clockset:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.codex-calendar-clockhint { margin: 0; padding: 0 var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
 .codex-calendar-monthbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .codex-calendar-monthname { margin: 0; flex: 1 1 auto; font: 700 var(--fs-h3) / 1.2 var(--font-display); }
 .codex-calendar-yearjump { max-width: 8rem; }
@@ -1412,6 +1440,10 @@
 .codex-downtime-pending, .codex-downtime-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-downtime-pendingrow, .codex-downtime-historyrow { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-height: var(--tap-min); }
 .codex-downtime-pendingrow > .codex-list-title, .codex-downtime-historyrow > .codex-campaign-recentitem { flex: 1 1 14rem; min-width: 0; }
+/* `5e.4` — a Confirm failure renders INSIDE its own row (the reason it was invisible is that it used to
+   render 450px above, at the top of the view). Full-basis so it takes the whole next line of the wrap
+   rather than squeezing in beside the button that produced it. */
+.codex-downtime-pendingrow > .nh-alert { flex: 1 0 100%; }
 .codex-downtime-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); width: 100%; }
 .codex-downtime-totals { width: 100%; }
 

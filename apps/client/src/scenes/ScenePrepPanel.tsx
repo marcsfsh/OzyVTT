@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { GmActor, MutationResult } from "@vtt/domain";
+import { rosterActors, type GmActor, type MutationResult } from "@vtt/domain";
 import { Button, IconPlus, useToast } from "@vtt/ui";
 import { MonsterBrowser } from "../encounter/MonsterBrowser";
 import { MapPicker, type PickerMap } from "../maps/MapPicker";
@@ -74,7 +74,11 @@ export function ScenePrepPanel({
   const fail = (message: string) => toast(message, { tone: "error" });
 
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
-  const live = actors.filter((actor) => !actor.archived);
+  // Two subtractions, two rules, both owned elsewhere. `rosterActors` (D3) drops a launched replay's
+  // clones: they are combatants in the fight on screen, never members of this campaign, so staging one
+  // into next week's scene would stage a creature the server deletes when the replay ends. `archived`
+  // is D16. Applied here rather than at the three call sites so every door agrees by construction.
+  const live = rosterActors(actors).filter((actor) => !actor.archived);
   const entries: readonly StagingEntry[] = staged.flatMap((actorId) => {
     const actor = byId.get(actorId);
     return actor ? [{ actorId, name: actor.name, kind: actor.kind, placed: placedIds?.has(actorId) ?? false, revealed: actor.visibility !== "gm-only" }] : [];

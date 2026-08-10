@@ -1,0 +1,135 @@
+[
+  {
+    "id": "common",
+    "name": "Common",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Common means a character can speak, read, and write it."
+  },
+  {
+    "id": "common-sign-language",
+    "name": "Common Sign Language",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Common Sign Language means a character can speak, read, and write it."
+  },
+  {
+    "id": "draconic",
+    "name": "Draconic",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Draconic means a character can speak, read, and write it."
+  },
+  {
+    "id": "dwarvish",
+    "name": "Dwarvish",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Dwarvish means a character can speak, read, and write it."
+  },
+  {
+    "id": "elvish",
+    "name": "Elvish",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Elvish means a character can speak, read, and write it."
+  },
+  {
+    "id": "giant",
+    "name": "Giant",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Giant means a character can speak, read, and write it."
+  },
+  {
+    "id": "gnomish",
+    "name": "Gnomish",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Gnomish means a character can speak, read, and write it."
+  },
+  {
+    "id": "goblin",
+    "name": "Goblin",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Goblin means a character can speak, read, and write it."
+  },
+  {
+    "id": "halfling",
+    "name": "Halfling",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Halfling means a character can speak, read, and write it."
+  },
+  {
+    "id": "orc",
+    "name": "Orc",
+    "source": "srd",
+    "table": "standard",
+    "description": "A standard language, widespread in the setting. Knowing Orc means a character can speak, read, and write it."
+  },
+  {
+    "id": "abyssal",
+    "name": "Abyssal",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Abyssal means a character can speak, read, and write it."
+  },
+  {
+    "id": "celestial",
+    "name": "Celestial",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Celestial means a character can speak, read, and write it."
+  },
+  {
+    "id": "deep-speech",
+    "name": "Deep Speech",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Deep Speech means a character can speak, read, and write it."
+  },
+  {
+    "id": "druidic",
+    "name": "Druidic",
+    "source": "srd",
+    "table": "rare",
+    "description": "The secret language of Druids, which a Druid can use to leave hidden messages. Only those who know it can speak it or read it."
+  },
+  {
+    "id": "infernal",
+    "name": "Infernal",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Infernal means a character can speak, read, and write it."
+  },
+  {
+    "id": "primordial",
+    "name": "Primordial",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language of the Elemental Planes, including the Aquan, Auran, Ignan, and Terran dialects; creatures that know one dialect can communicate with those that know another."
+  },
+  {
+    "id": "sylvan",
+    "name": "Sylvan",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Sylvan means a character can speak, read, and write it."
+  },
+  {
+    "id": "thieves-cant",
+    "name": "Thieves’ Cant",
+    "source": "srd",
+    "table": "rare",
+    "description": "A secret mix of dialect, jargon, and code known to Rogues, used to hide messages in seemingly normal conversation."
+  },
+  {
+    "id": "undercommon",
+    "name": "Undercommon",
+    "source": "srd",
+    "table": "rare",
+    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Undercommon means a character can speak, read, and write it."
+  }
+]

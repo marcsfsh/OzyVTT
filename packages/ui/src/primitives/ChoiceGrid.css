@@ -42,6 +42,44 @@
   gap: var(--space-3);
 }
 
+/* PROXIMITY, once the cards come in PAIRS. `onInspect` gives every card a reference control beside
+   it (`.nh-choice-wrap`, ChoiceCard.css), and the client could not tell which icon belonged to which
+   spell: the gap WITHIN a pair was 8px and the gap BETWEEN pairs was 10px, so in a four-column grid
+   an icon standing between two cards was ambiguous by construction and reading order was the only
+   tie-break. The frame fixed ownership; this fixes the rhythm — within a pair the two halves now sit
+   1px apart inside one border, between pairs the gap steps up to --space-4.
+
+   Scoped with `:has()` rather than raised for every grid, because the grids WITHOUT an inspect
+   control have no pairs to separate: species, classes, backgrounds and feats keep the 10px they
+   shipped with. (Their CARDS did get tighter — `.nh-choice`'s own rhythm changed for everyone, and
+   `known-bugs.md`'s step-height table moved with it.) */
+.nh-choicegrid-items:has(.nh-choice-wrap) { gap: var(--space-4); }
+
+/* A BOUNDED REGION, and the reason it replaced a fold.
+   `ChoiceGrid bounded` (ChoiceGrid.tsx) caps the card list and scrolls it in place. The thing it
+   replaced unmounted the whole grid once the offer was full, which bought the same page height by
+   deleting the one thing a player needs to see — the options they did NOT take. The cap costs
+   nothing but a scroll: every option stays mounted, greys at capacity, and stays one tap away.
+
+   THE CAP RIDES THE GRID, NOT A WRAPPER, and that is the narrow exception the scene-gallery lesson
+   allows (scene-gallery.css:31-38, restated at map-picker.css:12-17): that lesson is about a grid
+   given a DEFINITE block size, which stops it sizing its auto rows from its cards. A `max-height`
+   is not one. Measured on this grid at 320/375/561/1280 — card boxes byte-identical capped and
+   uncapped.
+
+   21rem matches `.map-picker-grid`'s cap rather than inventing a second number, and it is about
+   four cards on a phone: enough that the list reads as a list, short enough that a dozen answered
+   offers still fit a step. `overscroll-behavior: contain` stops a flick inside the region from
+   chaining into the wizard body behind it. `--space-1` of padding is the focus ring's room: the
+   ring is a box-shadow, so it never scrolls, but `overflow` still CLIPS it at the region's edge. */
+.nh-choicegrid-items--bounded {
+  max-height: 21rem;
+  padding: var(--space-1);
+  overscroll-behavior: contain;
+  /* A card walked to with the arrow keys lands clear of the edge rather than flush against it. */
+  scroll-padding: var(--space-3);
+}
+
 /* No detail pane here — WizardShell owns the one master-detail layout (see
    ChoiceGrid.tsx). This file only lays out search, facets, and the card grid. */
 

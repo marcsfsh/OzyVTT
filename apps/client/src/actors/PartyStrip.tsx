@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
+import { rosterActors, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Avatar, Button } from "@vtt/ui";
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
@@ -45,9 +45,11 @@ export function PartyStrip(props: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   /** `null` for the GM — there is no tier over the GM's own view of their own table. */
   const tier = props.role === "player" ? partyVisibilityOf(props.state) : null;
-  const actors = props.state.actors.filter(
+  // `rosterActors` (D3) keeps a launched replay's clones out of the party: they carry the party's own
+  // names, so without it a replay of a fight the party was in doubled every face in this row.
+  const actors = rosterActors(props.state.actors as ReadonlyArray<GmActor | PlayerActor>).filter(
     (actor) => actor.kind === "player-character" && !("archived" in actor && actor.archived)
-  ) as ReadonlyArray<GmActor | PlayerActor>;
+  );
   const openActor = openId ? actors.find((actor) => actor.id === openId) ?? null : null;
 
   // The second lock on `off`. The mount in `main.tsx` is the first; this one means a future call site

@@ -79,7 +79,26 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
   // D5 glossary §4: the timeline feature is the **Journal**, never "chronicle" and never "timeline", in
   // any copy a GM reads. `chronicle.ts` and `CodexChronicleRecord` are identifiers and stay.
   { pattern: /\bchronicles?\b/i, use: "Journal" },
-  { pattern: /\btimelines?\b/i, use: "Journal" }
+  { pattern: /\btimelines?\b/i, use: "Journal" },
+  /**
+   * The two-layer notes control, named seven different ways on seven surfaces until `TwoLayerBodyTabs`
+   * existed. The rules below are the seven old names, and they are **anchored**, which is the whole
+   * design of them.
+   *
+   * **Why anchored and not `\b…\b`.** The obvious rule — retire the phrase "GM only" — is wrong, and
+   * expensively so. "GM only" is the CONTENT-axis pill: `GmOnlyTag` renders it (`Reveal.tsx`, pinned
+   * below and in `packages/ui/src/primitives/reveal.test.tsx`), the atlas descend-lock says it, the
+   * connections panel labels a switch with it, four test files assert it, and `:78` of this very array
+   * RECOMMENDS it as the replacement for "secret". A blanket rule would have contradicted a rule in its
+   * own list. The same goes for "Player-facing": `PagesView`'s empty state says "Every page has a
+   * player-facing side and a GM-only side", which is prose describing the split, not a name for the
+   * control. Anchoring is what separates "the label was called this" from "the words appear here".
+   *
+   * So: whole strings only. A retired LABEL fails; the same words inside a sentence do not.
+   */
+  { pattern: /^Player-facing\b/, use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" },
+  { pattern: /^What (will happen|the party knows|the party was told)$/, use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" },
+  { pattern: /^(GM notes|GM-only side|GM secret body)$/, use: "“GM-only notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" }
 ];
 
 /**
@@ -124,6 +143,14 @@ describe("The canonical glossary (D5)", () => {
   it("reads enough of the Codex to be worth trusting", () => {
     // A guard that silently matched nothing would pass forever. This is the tripwire on the tripwire:
     // if a refactor moves the Codex out from under the glob, this fails before the word rules do.
+    //
+    // Re-measured 2026-08-08 for 5a.1/5c: **930 strings over 48 files**, from 939 over 47. Nine strings
+    // net: the seven retired labels went, `JournalView`'s four `textLabel:` entries went with them (they
+    // were never in the corpus — `textLabel` is not a copy prop), and `TwoLayerBodyTabs.tsx` is the
+    // forty-eighth file, contributing the one canonical pair the seven now share. The floors are
+    // deliberately NOT moved to 930: 80 strings of headroom is the slack this tripwire has always
+    // carried, and tightening it onto today's number would turn every ordinary copy deletion into a
+    // failed build. What guards the seven labels is the anchored rules above, not this count.
     expect(codexSources().length).toBeGreaterThan(25);
     expect(strings.length).toBeGreaterThan(850);
   });

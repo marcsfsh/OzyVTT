@@ -40,7 +40,7 @@ const IDS = {
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/** The 13 variants the build-time fold does NOT own; every one must reach the table as a carrier. */
+/** The 14 variants the build-time fold does NOT own; every one must reach the table as a carrier. */
 const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "attack-bonus", amount: 1 },
   { type: "save-bonus", amount: 1 },
@@ -49,6 +49,10 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "extra-damage", formula: "1d4", damageType: "fire" },
   { type: "critical-range", threshold: 19 },
   { type: "critical-bonus-dice", count: 1 },
+  // MOVED HERE from the baked list. Baking raised `attack.count` on the actions a FEATURE
+  // declares, and the five classes that get Extra Attack declare none - so it reached nothing at
+  // all. It is a standing rider now, folded onto the DERIVED weapon swings by `effective-actions`.
+  { type: "extra-attack", count: 1 },
   { type: "damage-reduction", amount: 1 },
   { type: "spell-save-dc", amount: 1 },
   { type: "spell-attack-bonus", amount: 1 },
@@ -56,14 +60,13 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "resource-bonus", poolId: "second-wind", amount: 1 },
   { type: "sense", sense: "tremorsense", feet: 30 }
 ];
-/** The 8 the builder BAKES into the definition; none may appear as a carrier, or it applies twice. */
+/** The 7 the builder BAKES into the definition; none may appear as a carrier, or it applies twice. */
 const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "ability-score", ability: "wis", amount: 1 },
   { type: "hit-points-per-level", amount: 1 },
   { type: "speed", amount: 10 },
   { type: "armor-class", amount: 1 },
   { type: "initiative", amount: 2 },
-  { type: "extra-attack", count: 1 },
   { type: "unarmored-defense", ability: "con" },
   { type: "darkvision", feet: 60 }
 ];
@@ -111,6 +114,8 @@ const heroInput = (): CharacterCreateRequestInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
@@ -119,6 +124,7 @@ const heroInput = (): CharacterCreateRequestInput => ({
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+    { level: 4, classId: "fighter", kind: "weapon-mastery", id: "rapier" },
     { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
     { level: 4, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
@@ -186,7 +192,7 @@ describe("a feat the builder put on the sheet is a rider carrier", () => {
     expect(carrier.isWeapon).toBeUndefined();
   });
 
-  it("reaches all THIRTEEN roll-time variants, and NONE of the eight the builder already baked", () => {
+  it("reaches all FOURTEEN roll-time variants, and NONE of the seven the builder already baked", () => {
     // The before/after of this whole fix, stated as one assertion each way.
     for (const modifier of ROLL_TIME_RIDERS) {
       const carrier = featCarrier(build({ modifiers: [modifier] }));
@@ -317,8 +323,11 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     // The carrier holds it...
     expect(featCarrier(built)!.modifiers).toHaveLength(1);
-    // ...but the standing collection does not, by construction.
-    expect(collectRiders(derivation.carriers, { ...derivation.context, moment: null })).toEqual([]);
+    // ...but the standing collection does not, by construction. Narrowed to the feat under test
+    // rather than asserting an empty list: this hero is a Champion, and Stage 4 authored Improved
+    // Critical and Remarkable Athlete as genuinely STANDING riders on the subclass, so an empty
+    // standing pass would now be asserting that the SRD content does nothing.
+    expect(collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter((rider) => rider.label === "Warcaller")).toEqual([]);
   });
 
   it("grants advantage on a MELEE attack and leaves a ranged one a single die", () => {
@@ -344,13 +353,17 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
   });
 
   it("widens the critical range from a feat, the way a keen weapon does from an item", () => {
-    const built = build({ modifiers: [{ type: "critical-range", threshold: 19 }] });
+    // 18 rather than 19, and the control is 19 rather than 20, because this hero is a level-5
+    // Champion: Improved Critical is a real `critical-range` rider now, so the feat has to beat the
+    // subclass to prove anything. `criticalThreshold` takes the LOWEST any carrier names, which is
+    // what makes the two compose instead of one winning.
+    const built = build({ modifiers: [{ type: "critical-range", threshold: 18 }] });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     const sword = actionOf(built, "item-greatsword");
-    expect(criticalThreshold(derivation, built.hero, sword)).toBe(19);
+    expect(criticalThreshold(derivation, built.hero, sword)).toBe(18);
 
     const bare = build();
-    expect(criticalThreshold(deriveEquipment(bare.hero, bare.definition, bare.catalog), bare.hero, actionOf(bare, "item-greatsword"))).toBe(20);
+    expect(criticalThreshold(deriveEquipment(bare.hero, bare.definition, bare.catalog), bare.hero, actionOf(bare, "item-greatsword"))).toBe(19);
   });
 });
 

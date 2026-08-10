@@ -3,6 +3,7 @@ import type { ActorDefinition, PartyVisibility, PlayerActor, PlayerView } from "
 import { abilityModifier } from "@vtt/rules-5e";
 import { Avatar, Button, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
+import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -108,6 +109,7 @@ export function MyCharacter({ state, onOpenSheet, onCreateCharacter, onLevel, on
 }>) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
+  const [rolling, setRolling] = useState(false);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
 
@@ -118,6 +120,14 @@ export function MyCharacter({ state, onOpenSheet, onCreateCharacter, onLevel, on
   const openable = tier === "full-sheet" || tier === "sheet-and-resources";
   const openActor = openId ? others.find((actor) => actor.id === openId) ?? null : null;
   const builderOpen = state.builderPolicy.playerBuilder === "open";
+  /**
+   * The generator's door is offered only when the GM has OPENED it — the opposite of the builder
+   * door beside it (ruling 18), and deliberately so. The builder's door explains itself when the
+   * policy is closed because a player who walks it has decided to make a character; the generator
+   * is one tap, `playerRandom` is closed by default, and a permanently-greyed button on the
+   * player's first tab would advertise a thing this table has said no to.
+   */
+  const randomOpen = state.builderPolicy.playerRandom === "open";
 
   const release = async (name: string) => {
     // D28's claim verbs: you RELEASE a character, you do not "leave" one.
@@ -139,6 +149,7 @@ export function MyCharacter({ state, onOpenSheet, onCreateCharacter, onLevel, on
             with the builder or with its gate (main.tsx), and a door that explains itself beats a
             door that is not there. Levelling is the policy's own action, so it follows the policy. */}
         <Button variant="secondary" onClick={onCreateCharacter}>Create a character</Button>
+        {!mine && randomOpen && <Button variant="secondary" onClick={() => setRolling(true)}>Roll a random one</Button>}
         {mine && builderOpen && <Button variant="secondary" onClick={() => onLevel(mine.id)}>Level up or down…</Button>}
       </div>
     </div>
@@ -202,6 +213,12 @@ export function MyCharacter({ state, onOpenSheet, onCreateCharacter, onLevel, on
     </div>
 
     {openActor && <PartyMemberSheet actor={openActor} resources={tier === "sheet-and-resources"} onClose={() => setOpenId(null)} />}
+    <RandomCharacterModal
+      open={rolling}
+      maxLevel={state.builderPolicy.maxLevel}
+      onClose={() => setRolling(false)}
+      onRolled={() => toast("Rolled up and claimed — it's yours.", { tone: "success" })}
+    />
     {dialog}
   </section>;
 }

@@ -33,6 +33,9 @@
  * number this script prints, on the surface a phone actually holds. It also opens the pin inspector's
  * collapsed Appearance disclosure (about sixty icon buttons that had no rendered box), the quick-create
  * dialog, the session editor and the cross-type tag view — surfaces the plan named and the audit missed.
+ * It also OPENS the two codex character choosers ("Who played" and downtime's "Who"): their option rows
+ * are the densest cluster on either surface and do not exist until the box is tapped. That was worth 4
+ * rows apiece at the seed's party size — session-editor 46 controls to 50, downtime 30 to 34.
  *
  * A SURFACE IT CANNOT REACH IS REPORTED, NEVER SUBSTITUTED. Two openers used to be
  * `if (await x.count() > 0) { … }` with no else, so a missing pin measured the plain Atlas a second time
@@ -163,6 +166,15 @@ const MEASURE = `((rootSelector) => {
   // real defect — the safe direction for a check whose job is to fail loudly.
   const modal = document.querySelector("dialog:modal");
   const openDrawers = [...document.querySelectorAll(".nh-drawer")].filter((d) => !d.hasAttribute("inert"));
+  // THE THIRD MECHANISM, arriving exactly as the docblock said it would. \`Combobox\`'s listbox is an
+  // absolutely-positioned popover at z-index 40 (\`Combobox.css\`) that paints over whatever the field
+  // sits above - so a run that deliberately opens one (see \`play-homebrew-picker\`) reported the four
+  // fields beneath it as unreachable, which is in the EXIT GATE and would have failed the run for
+  // four controls nobody's finger is anywhere near. Same predicate as the drawer case above, and it
+  // is a statement about the same thing: reach is judged where there is a finger. Its OWN option rows
+  // are excluded by \`!list.contains(el)\`, which is the measurement that matters here - they are the
+  // 44px route-1 rows the picker surface exists to check.
+  const openPopovers = [...document.querySelectorAll(".nh-combobox-list")];
   const out = [];
   for (const el of root.querySelectorAll(SEL)) {
     const r = el.getBoundingClientRect();
@@ -215,6 +227,7 @@ const MEASURE = `((rootSelector) => {
     if (!el.checkVisibility()) layer = "closed";
     else if (modal && !modal.contains(el)) layer = "overlaid";
     else if (openDrawers.some((d) => !d.contains(el) && d.contains(document.elementFromPoint(cx, cy)))) layer = "overlaid";
+    else if (openPopovers.some((l) => !l.contains(el) && l.contains(document.elementFromPoint(cx, cy)))) layer = "overlaid";
     out.push({
       tag: el.tagName.toLowerCase(),
       cls: (el.className && el.className.baseVal !== undefined ? el.className.baseVal : String(el.className || "")).slice(0, 60),
@@ -246,6 +259,20 @@ const MEASURE = `((rootSelector) => {
  * "Select a page" state on screen and measure THAT under an editor's heading — the substitution
  * failure the docblock's third paragraph is about.
  */
+/**
+ * Tap a `Combobox` open and wait for its listbox, so the option rows are measured rather than the
+ * closed box. Throws when there is nothing to open — a picker that silently failed to open would
+ * report its surface clean on the strength of the controls around it.
+ */
+async function openCombobox(page, selector, missing) {
+  const box = page.locator(`${selector}[role=combobox]`).first();
+  if (await box.count() === 0) throw new Error(missing);
+  await box.scrollIntoViewIfNeeded();
+  await box.click({ timeout: 8_000 });
+  await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
+  await page.waitForTimeout(600);
+}
+
 async function openFirstRecord(page, { rows, expect, what }) {
   const row = page.locator(rows).first();
   if (await row.count() === 0) throw new Error(`no ${what} row in the rail to open the editor with`);
@@ -386,16 +413,47 @@ const SURFACES = [
   // Was `hasText: /^Session \d/`, which is not a fixture reference but is the same coupling one step
   // weaker: it passes only while `sessionTitle()` is falling back to its numbered default, and a
   // campaign whose sessions carry real names would have reported this surface unmeasured.
-  { name: "session-editor", path: "/codex/sessions", open: (page) => openFirstRecord(page, {
-      rows: ".codex-shell-content button.codex-session-row", expect: ".codex-session-editor", what: "session"
-    }) },
+  { name: "session-editor", path: "/codex/sessions", open: async (page) => {
+      await openFirstRecord(page, {
+        rows: ".codex-shell-content button.codex-session-row", expect: ".codex-session-editor", what: "session"
+      });
+      // …with "Who played" OPEN (`5a`). Since it became a `TagInput pick` chooser, its option rows are
+      // the densest control cluster on this surface and they do not exist until the box is tapped —
+      // a closed picker measures one 44px input and reports the party's rows as if they were not there.
+      // Same shape as `play-homebrew-picker`; the run's third overlay mechanism excludes the fields
+      // BENEATH the open list from the reach verdict while still measuring the list's own rows.
+      await openCombobox(page, "#s-attendees", 'the session editor has no "Who played" chooser to open');
+    } },
   { name: "quests", path: "/codex/quests" },
   { name: "quest-editor", path: "/codex/quests", open: (page) => openFirstRecord(page, {
       rows: ".codex-shell-content button.codex-quest-row", expect: ".codex-quest-editor", what: "quest"
     }) },
   { name: "journal", path: "/codex/journal" },
   { name: "calendar", path: "/codex/calendar" },
-  { name: "downtime", path: "/codex/downtime" },
+  // The GM's clock on its own (`5f`(i)). The date used to be the FOURTH field of the structure modal, so
+  // the only surface a run ever measured was `calendar-editor`; this dialog is new, it is the one a GM
+  // opens most, and its three date boxes plus two footer buttons exist only once it is opened.
+  { name: "calendar-date-editor", path: "/codex/calendar", open: async (page) => {
+      const door = page.locator(".codex-calendar-clockset").first();
+      if (await door.count() === 0) throw new Error("the Calendar has no clock button to open the date editor");
+      await door.click({ timeout: 8_000 });
+      await page.locator('dialog[open][aria-label="Your date"]').waitFor({ state: "visible", timeout: 8_000 });
+      await page.waitForTimeout(500);
+    } },
+  // The world's structure, which grew the era list in `5f`(iii) — one row of two inputs and a remove
+  // button per era, none of which a closed modal has.
+  { name: "calendar-editor", path: "/codex/calendar", open: async (page) => {
+      await page.getByRole("button", { name: "Edit calendar" }).first().click({ timeout: 8_000 });
+      const sheet = page.locator('dialog[open][aria-label="Calendar"]');
+      await sheet.waitFor({ state: "visible", timeout: 8_000 });
+      await sheet.getByRole("button", { name: "Add era" }).click({ timeout: 8_000 });
+      await page.waitForTimeout(500);
+    } },
+  // …with the "Who" chooser OPEN (`5e.3`): same reason as `session-editor` above. The list carries one
+  // row per character page, marked "Archived" where the table has retired one, and a closed box shows
+  // none of them.
+  { name: "downtime", path: "/codex/downtime", open: (page) =>
+      openCombobox(page, "#codex-downtime-who", 'the downtime composer has no "Who" chooser to open') },
   { name: "audit", path: "/codex/audit" },
   { name: "backup", path: "/codex/backup" },
   { name: "settings", path: "/codex/settings" },
@@ -451,6 +509,48 @@ const SURFACES = [
   // Ruling 61 — the API reference as a real GM-only address, full window width.
   { name: "play-api-reference", path: "/settings/api", root: "main", ready: ".api-reference-page" },
   { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" },
+  /**
+   * `/homebrew` — a GM-only address this audit has never loaded, on a tab whose whole job is dense
+   * forms. Two entries because the library and the editor share almost no controls: the rail is rows
+   * and filters, and every field a GM actually authors is inside `RecordDetail`. Measuring only the
+   * first would report "the homebrew tab is clean" about a screen containing no fields.
+   *
+   * The editor entry opens whatever record the rail lists first, the same way the page and quest
+   * editors do here — never a named fixture, which is what made two Codex surfaces report NOT
+   * MEASURED against a database the seed had not built. A homebrew library with nothing in it
+   * therefore reports NOT MEASURED rather than measuring the empty state twice.
+   */
+  { name: "play-homebrew", path: "/homebrew", root: "main", ready: ".hb-root" },
+  { name: "play-homebrew-record", path: "/homebrew", root: "main", ready: ".hb-root", open: (page) => openFirstRecord(page, {
+      rows: ".hb-rail button.hb-row", expect: ".hb-detail", what: "homebrew"
+    }) },
+  /**
+   * ...and one with a CHOOSER OPEN, on the same reasoning as the pin inspector's Appearance
+   * disclosure above: `Combobox`'s option rows take the 44px floor as real paint (route 1,
+   * `min-height: var(--tap-min)` on `.nh-combobox-option`), and a closed picker has no rows at all.
+   * The editor measured with every picker shut says nothing about the densest cluster on it — which
+   * is precisely the thirteen damage types and seven rarities this audit exists to check.
+   *
+   * Separate from the entry above rather than folded into it so a library whose first record has no
+   * open-slug picker (a spell list, say) reports THIS surface unmeasured and still measures the
+   * editor. Substituting one for the other is the failure this file's docblock is about.
+   */
+  { name: "play-homebrew-picker", path: "/homebrew", root: "main", ready: ".hb-root", open: async (page) => {
+      // Only if a record is not ALREADY open. `walk` navigates by pushing the same address the
+      // previous surface used, which the router correctly treats as a no-op — so the editor the
+      // entry above opened is still on screen, and at 375px the rail it would be re-opened from is
+      // the half of the master-detail that is currently hidden. This is not the "measure the previous
+      // surface" substitution the docblock forbids: the surface still ends at a homebrew editor with
+      // a chooser open, and still fails loudly below if there is no chooser to open.
+      if (await page.locator(".hb-detail").count() === 0) {
+        await openFirstRecord(page, { rows: ".hb-rail button.hb-row", expect: ".hb-detail", what: "homebrew" });
+      }
+      const chooser = page.locator(".hb-detail .nh-combobox input[role=combobox]").first();
+      if (await chooser.count() === 0) throw new Error("the first homebrew record has no open-slug chooser to open");
+      await chooser.click({ timeout: 8_000 });
+      await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
+      await page.waitForTimeout(600);
+    } },
   // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
   // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
   // inside the sheet frame now, which is exactly the row this measurement should see.
@@ -569,7 +669,7 @@ async function walk(page, surfaces, rootSelector) {
     // Counted over controls of EVERY size, unlike the three metrics above, which are >=44 questions:
     // reach goes unjudged for a 20px control in a closed menu exactly as it does for a 44px one.
     if (overlaid.length + closed.length > 0)
-      report.push(`  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay, ${closed.length} inside a closed disclosure - sizes above still count them`);
+      report.push(`  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay (a modal, a Drawer, or a Combobox listbox), ${closed.length} inside a closed disclosure - sizes above still count them`);
     for (const c of bad) report.push(`  SIZE  ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     for (const c of stolen) report.push(`  STEAL ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     // Printed per row, unlike the count this replaces: `unresolved` was a header number with no

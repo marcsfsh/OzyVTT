@@ -38,7 +38,7 @@ export const ItemSlotSchema = z.enum([
 export type ItemSlot = z.infer<typeof ItemSlotSchema>;
 
 /**
- * WHEN a rider applies. Thirty named triggers in four KINDS, and the kind is what decides the
+ * WHEN a rider applies. Thirty-one named triggers in four KINDS, and the kind is what decides the
  * evaluation layer so a GM never picks one (see `RIDER_TRIGGER_KINDS`):
  *
  *   - `static-gate`  resolvable from the sheet alone   -> a standing number ("AC 17")
@@ -90,6 +90,16 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("skill-is"), skills: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
   z.object({ type: z.literal("spell-school-is"), schools: z.array(RiderSlugSchema).min(1).max(8) }).strict(),
   z.object({ type: z.literal("spell-level-is"), levels: z.array(z.number().int().min(0).max(9)).min(1).max(10) }).strict(),
+  /**
+   * The SPECIFIC spell being cast. `spell-school-is` and `spell-level-is` narrow a category; this
+   * names one record, which is what a printed "when you cast Eldritch Blast" actually says. Without
+   * it Agonizing Blast is inexpressible: no combination of school and level picks out one cantrip.
+   *
+   * It matches `ActorAction.spellId` - the spell an action IS - so it fires on the item-cast actions
+   * the derivation synthesises and on any feature action that names its spell. An action with no
+   * `spellId` never matches, which is the fail-closed every other filter uses.
+   */
+  z.object({ type: z.literal("spell-id-is"), spellIds: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
   /** Authorable but INERT until `ActorDefinition` carries a creature type - see the vocabulary notes. */
   z.object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
   z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
@@ -112,7 +122,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "on-damage-roll": "moment", "on-saving-throw": "moment", "on-ability-check": "moment",
   "on-initiative-roll": "moment", "on-death-save": "moment", "on-taking-damage": "moment", "on-spell-cast": "moment",
   "attack-kind-is": "filter", "weapon-property-is": "filter", "damage-type-is": "filter", "ability-is": "filter",
-  "skill-is": "filter", "spell-school-is": "filter", "spell-level-is": "filter",
+  "skill-is": "filter", "spell-school-is": "filter", "spell-level-is": "filter", "spell-id-is": "filter",
   "versus-creature-type": "filter", "versus-size": "filter", "versus-condition": "filter"
 });
 
@@ -170,14 +180,28 @@ export const AttackBonusVariantSchema = z.object({
 }).strict();
 
 /**
- * Extra typed damage as DICE. Neither existing channel can serve this: the effect-side
- * `damage-bonus` is a flat integer, and `attack.criticalBonusDice` is a bare COUNT applied to the
- * first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults FALSE because 5e
+ * Extra typed damage. Neither existing channel can serve this: the effect-side `damage-bonus` is a
+ * flat integer with no type, and `attack.criticalBonusDice` is a bare COUNT applied to the first
+ * damage part, so it cannot carry a damage type either. `doubleOnCritical` defaults FALSE because 5e
  * does not double dice added after the attack.
+ *
+ * TWO WAYS TO SAY HOW MUCH, and a rider may use either or both:
+ *
+ *   - `formula` - dice ("an extra 1d6 fire"), the original and still the common case;
+ *   - `abilityModifier` - the BEARER's modifier in that ability, as a flat number resolved at the
+ *     roll ("add your Charisma modifier to the damage"). A printed feature says this constantly and
+ *     it was previously inexpressible: the amount depends on the character, so no authored constant
+ *     is correct, and re-authoring the record per character is not authoring.
+ *
+ * Agonizing Blast is exactly `abilityModifier: "cha"` plus a `spell-id-is` gate, and it is the
+ * reason both landed together (decision D5). A rider with NEITHER field adds nothing; the homebrew
+ * publish validator refuses it rather than letting it store and silently do nothing.
  */
 export const ExtraDamageVariantSchema = z.object({
   type: z.literal("extra-damage"),
-  formula: DiceFormulaSchema,
+  formula: DiceFormulaSchema.optional(),
+  /** Add the BEARER's modifier in this ability as a flat number (Agonizing Blast: + your Charisma modifier). */
+  abilityModifier: AbilitySchema.optional(),
   damageType: DamageTypeIdSchema,
   doubleOnCritical: z.boolean().default(false),
   ...riderGate
@@ -208,6 +232,14 @@ export const RollModeVariantSchema = z.object({
 export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
   z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(20) }).strict(),
+  /**
+   * THE OTHER HALF OF THE DEFENCE VOCABULARY, and until it existed a player character could not be
+   * vulnerable to anything. `damageVulnerabilities` was declared on `ActorDefinition` and written
+   * only by a monster stat block; no effect, no item and no feature could grant it - so a curse that
+   * doubled fire damage was prose. It mirrors `damage-resistance` exactly, and `adjustDamageParts`
+   * already implements the SRD's cancellation rule (resistance + vulnerability = normal damage).
+   */
+  z.object({ type: z.literal("damage-vulnerability"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(20) }).strict(),
   z.object({ type: z.literal("attack-advantage") }).strict(),
   z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
   /** The bearer's own attack rolls have disadvantage (always-on, unlike turn-scoped attack-advantage). */
@@ -463,6 +495,23 @@ export const ActorSchema = z.object({
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id (per-encounter and per-long-rest pools). Additive. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /**
+   * PICKS RE-MADE ON A REST, keyed by the offer key the build already uses.
+   *
+   * "Whenever you finish a Long Rest, choose one type of land"; "whenever you finish a Short or Long
+   * Rest, choose one damage type". These are the RUNTIME half of a feature's `replaces` clause and
+   * they belong here rather than in `character.choices[]`: a Barbarian re-choosing weapon masteries
+   * on a rest must not require a rebuild, and a GM has to be able to see it happen mid-session.
+   *
+   * `per` is the rest that CLEARS it - so an override lasts exactly until the next rest of that kind,
+   * and the character falls back to the answer their build recorded until they choose again. A long
+   * rest clears short-rest overrides too, the same nesting a short-rest use pool has. Additive:
+   * absent means "nobody has re-chosen anything", which is every existing actor.
+   */
+  choiceOverrides: z.record(z.string(), z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/).max(80),
+    per: z.enum(["short-rest", "long-rest"])
+  }).strict()).default({}),
   /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge - stripped from player projections. Additive. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown → movement rules skip, the unmeasurable pattern. Additive. */
@@ -487,6 +536,22 @@ export const ActorSchema = z.object({
   currency: CurrencySchema.default({}),
   /** GM-archived: hidden from players and excluded from the encounter builder / party. GM management flag; never projected to players or the viewer. Additive. */
   archived: z.boolean().default(false),
+  /**
+   * THIS COMBATANT BELONGS TO A LAUNCHED REPLAY (D3), and holds the id of the replay scene that minted it.
+   *
+   * `replay-launch.ts` clones an archived fight's combatants under new ids so a historical replay can
+   * never rewrite tonight's characters. That safeguard stays; what this field buys is that the clones
+   * stop being VISIBLE as campaign members. Present = "in the fight, never in the roster": every
+   * management surface (the party, the claim screen, scene staging, add-to-the-fight) skips it through
+   * the one shared rule `rosterActors` in `@vtt/domain`, while the map, the turn order and the tokens
+   * keep it - a token whose actor is missing renders as an empty square, which is why the ENTRY stays
+   * and only the roster lists subtract it (the same bargain `partyVisibility` documents).
+   *
+   * The scene is deleted when the replay ends (`scene.activate` away from it, `scene.remove`, or the
+   * next launch), and every actor carrying its id goes with it. Absent = an ordinary campaign actor,
+   * which is every actor that existed before this field. Additive.
+   */
+  replaySceneId: z.string().uuid().optional(),
   /**
    * The GM shared this ARCHIVED character's sheet back to players as a read-only keepsake (D26).
    * Default false - hidden until shared, never the other way round. Meaningless while `archived` is
@@ -584,6 +649,16 @@ export const ActionSchema = z.object({
    * "no uses remaining".
    */
   spellSlot: z.object({ level: z.number().int().min(1).max(9) }).strict().optional(),
+  /**
+   * WHICH SPELL this action is a casting of. Identity only - every number the action rolls is
+   * already on the action itself - so it changes no arithmetic and no existing reader.
+   *
+   * It exists because `spell-id-is` needs something to match against: "when you cast Eldritch Blast"
+   * cannot be said with `spell-school-is` or `spell-level-is`, which name categories. The derivation
+   * sets it on the actions it synthesises from an item's `casts` entries, and a feature action may
+   * name it directly. Absent = this action is not a spell, and every `spell-id-is` gate fails closed.
+   */
+  spellId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional(),
   /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */
@@ -632,6 +707,33 @@ export const CharacterIdentitySchema = z.object({
   race: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60), subrace: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional() }).strict().optional(),
   background: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
   feats: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(80), description: z.string().max(4000).optional() }).strict()).max(40).default([]),
+  /**
+   * WHICH FEATURE RECORDS THIS SHEET HOLDS, by id - the class, subclass, species, lineage and
+   * background features plus every chosen inline option.
+   *
+   * `feats` has always recorded feat ids, and that is the ONLY reason a feat's roll-time riders
+   * reach the table: `deriveEquipment` turns `character.feats` into `RiderCarrier`s, and the same
+   * `collectRiders` that serves a magic item serves them. A class feature was recorded nowhere, so
+   * 13 of the 21 rider variants - `roll-mode`, `extra-damage`, `critical-range`, `spell-slot`,
+   * `resource-bonus`, the trigger-gated bonuses - were authored, validated, and then simply dropped
+   * for class, subclass, species and background features. That is the whole of issue `2e`.
+   *
+   * ID AND PROVENANCE ONLY. The riders themselves are NEVER stored: they live on the catalog record
+   * and are recomputed on every read, exactly as a feat's are, so an edited homebrew feature is
+   * correct on the next read, there is no third copy to drift, and a respec that rewrites this array
+   * needs no migration. `kind` + `sourceId` say WHERE to look the id up (a class feature id is
+   * unique only within its class), and they carry no secret: every value is a public content slug
+   * the player's own sheet already names.
+   *
+   * Additive-optional and it must stay that way: PDF imports, bundled monsters and every definition
+   * written before this field existed have no array at all, and every reader treats that as `[]`.
+   */
+  features: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/).max(80),
+    kind: z.enum(["class", "subclass", "species", "lineage", "background", "option"]),
+    /** The record the feature was looked up in: a class/subclass/species/background id, or the parent feature id for an inline option. */
+    sourceId: z.string().regex(/^[a-z0-9-]+$/).max(80)
+  }).strict()).max(80).optional(),
   /**
    * The choice-provenance ledger (see CharacterChoiceSchema). ABSENT means "this sheet carries no
    * provenance" - a PDF import or a pre-wizard character - which respec must be able to tell apart

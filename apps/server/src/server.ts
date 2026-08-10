@@ -35,6 +35,8 @@ import { TokenCatalogStore } from "./token-catalog.js";
 import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
+import { playerReplayMapAssetIds } from "./replay-projection.js";
+import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { ensureEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
@@ -427,6 +429,40 @@ export function createServer(options: CreateServerOptions) {
     return res.json({ ok: true });
   });
   app.use(createViewerRouter({ access: viewerAccess, presentation: viewerPresentation, coordinator: viewerCoordinator, authorizeGm }));
+
+  /**
+   * IS THIS ASSET THE BATTLEFIELD OF A REPLAY THE GM SHARED? (D26 - the third player map door.)
+   *
+   * Without it a shared replay was readable but not watchable: the turn data arrived and every stage
+   * rendered "Map unavailable", because the only maps a player could load were the LIVE combat map and
+   * revealed atlas maps. The gate is the ARCHIVE'S SHARED FLAG, never "the asset is in some archive" -
+   * an unshared fight's map stays a 403, and un-sharing takes the image away again on the next request.
+   *
+   * `playerReplayMapAssetIds` reads the maps back out of the PLAYER projection of the document rather
+   * than scanning the stored one, so a prepared scene's map that happened to exist when the fight was
+   * recorded can never come through this door (see its own note).
+   *
+   * The per-archive set is memoised because a stored document is immutable once written - only its
+   * visibility and its existence change, and both are re-read from `listEncounterArchives()` on every
+   * call. Deleting an archive leaves a dead entry that is never consulted again.
+   */
+  const replayMapCache = new Map<number, ReadonlySet<string>>();
+  const sharedReplayMap = (assetId: string): boolean => {
+    for (const summary of store.listEncounterArchives()) {
+      if (!summary.playerVisible) continue;
+      let maps = replayMapCache.get(summary.id);
+      if (maps === undefined) {
+        const stored = store.getEncounterArchive(summary.id);
+        if (stored === null) continue;
+        try { maps = playerReplayMapAssetIds(summary.id, JSON.parse(stored) as EncounterArchiveDocument); }
+        catch { maps = new Set<string>(); } // An unreadable archive grants nothing, like a missing one.
+        replayMapCache.set(summary.id, maps);
+      }
+      if (maps.has(assetId)) return true;
+    }
+    return false;
+  };
+
   app.use(createMapRouter({
     assets: mapAssets,
     catalog: mapCatalog,
@@ -434,8 +470,9 @@ export function createServer(options: CreateServerOptions) {
     authorizePlayer: (token, assetId) => {
       if (auth.verifyPlayer(token) === null) return false;
       const combat = store.snapshot.combat;
-      // A player may load the active battle map's image, or the image of any revealed atlas map.
-      return (combat.active && combat.mapAssetId === assetId) || codexStore.isAssetRevealedToPlayers(assetId);
+      // A player may load the active battle map's image, the image of any revealed atlas map, or the
+      // battlefield of a replay the GM SHARED with them (D26) - three doors, no fourth.
+      return (combat.active && combat.mapAssetId === assetId) || codexStore.isAssetRevealedToPlayers(assetId) || sharedReplayMap(assetId);
     },
     authorizeViewer: (token, assetId) => {
       if (!token) return false;
@@ -612,6 +649,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("character:submit-import", (payload, acknowledge) => respond(acknowledge, "Join the table before submitting a sheet.", "The sheet could not be submitted.", (principal) => operations.characterSubmitImport(principal, payload)));
     socket.on("character:resolve-import", (payload, acknowledge) => respond(acknowledge, "Only the GM can approve imported sheets.", "The import could not be resolved.", (principal) => operations.characterResolveImport(principal, payload)));
     socket.on("character:create", (payload, acknowledge) => respond(acknowledge, "Only the GM can create characters directly.", "The character could not be created.", (principal) => operations.characterCreate(principal, payload)));
+    socket.on("character:generate", (payload, acknowledge) => respond(acknowledge, "Your GM rolls the random characters at this table.", "The character could not be rolled up.", (principal) => operations.characterGenerate(principal, payload)));
     socket.on("builder:set-policy", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the character-builder policy.", "The builder policy could not be changed.", (principal) => operations.builderSetPolicy(principal, payload)));
     socket.on("character:rebuild", (payload, acknowledge) => respond(acknowledge, "You can only rebuild your own character.", "That character could not be rebuilt.", (principal) => operations.characterRebuild(principal, payload)));
     socket.on("builder:roll-abilities", (payload, acknowledge) => respond(acknowledge, "Your GM builds the characters at this table.", "The ability scores could not be rolled.", (principal) => operations.builderRollAbilities(principal, payload)));
@@ -627,6 +665,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:set-temp-hp", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The temporary hit points could not be set.", (principal) => operations.actorSetTempHp(principal, payload)));
     socket.on("content:conditions", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentConditions(principal)));
     socket.on("content:skills", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSkills(principal)));
+    socket.on("content:languages", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentLanguages(principal)));
     socket.on("content:spells", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpells(principal)));
     socket.on("content:equipment", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentEquipment(principal)));
     // The character-builder catalogs: readable by any joined session (a player builds their own character),
@@ -664,6 +703,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:set-health-display", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how health is shown.", "The health display could not be changed.", (principal) => operations.actorSetHealthDisplay(principal, payload)));
     socket.on("encounter:set-environment", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the encounter environment.", "The environment could not be changed.", (principal) => operations.encounterSetEnvironment(principal, payload)));
     socket.on("actor:rest", (payload, acknowledge) => respond(acknowledge, "Join the table before resting.", "The rest could not be applied.", (principal) => operations.actorRest(principal, payload)));
+    socket.on("actor:rechoose", (payload, acknowledge) => respond(acknowledge, "Join the table before changing a character's choices.", "The choice could not be changed.", (principal) => operations.actorRechoose(principal, payload)));
     socket.on("actor:spend-hit-dice", (payload, acknowledge) => respond(acknowledge, "Join the table before spending Hit Dice.", "The Hit Dice could not be spent.", (principal) => operations.actorSpendHitDice(principal, payload)));
     socket.on("character:set-slot", (payload, acknowledge) => respond(acknowledge, "Join the table before managing spell slots.", "The spell slot could not be updated.", (principal) => operations.characterSetSlot(principal, payload)));
     socket.on("character:set-prepared", (payload, acknowledge) => respond(acknowledge, "Join the table before preparing spells.", "The prepared spell could not be updated.", (principal) => operations.characterSetPrepared(principal, payload)));

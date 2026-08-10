@@ -3,6 +3,8 @@ import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, ty
 
 /** The `fromCatalog` choice-slug resolver (shared by the wizard UI and server-side character.create validation). */
 export * from "./catalog-choice.js";
+export * from "./pick-budget.js";
+import type { PickBudgetScaling } from "./pick-budget.js";
 
 /**
  * The Codex entity field vocabulary. Shared for the same reason as the rider gates below: the GM UI
@@ -454,9 +456,41 @@ export const SceneSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(120),
   mapAssetId: z.string().uuid(),
-  combat: SceneCombatSchema.default({})
+  combat: SceneCombatSchema.default({}),
+  /**
+   * THIS SCENE IS A LAUNCHED REPLAY (D3), not a prepared encounter: which recording it came from, and
+   * the combatants `replay-launch.ts` cloned to stage it (each carries this scene's id in
+   * `Actor.replaySceneId`).
+   *
+   * Present makes the scene DISPOSABLE, and that is the point. Before it existed, every launch minted
+   * a scene and a clone set that nothing ever removed, so a GM who launched twenty replays hit
+   * `MAX_SCENES` and "Launch from here" started refusing with a demand to unpark a scene - the leak
+   * WAS the block. `scenes.ts` now drops a replay scene and its clones the moment the table leaves it:
+   * `scene.activate` away, `scene.remove`, or the next `activateNewScene`. Absent = an ordinary
+   * prepared scene, which is every scene a GM makes by hand. GM-only, like the whole `scenes` array
+   * (no player or viewer projection carries it). Additive.
+   */
+  replayOf: z.object({
+    archiveId: z.number().int().nonnegative(),
+    actorIds: z.array(z.string().uuid()).max(200)
+  }).strict().optional()
 }).strict();
 export type Scene = z.infer<typeof SceneSchema>;
+
+/**
+ * THE CAMPAIGN ROSTER: every actor a MANAGEMENT surface lists (the party, the claim screen, scene
+ * staging, add-to-the-fight, the roster tab). One rule, exported once, so the server's projections
+ * and the client's lists cannot drift into two different answers about who is on this table.
+ *
+ * The only thing it subtracts is a launched replay's clones (`Actor.replaySceneId` - D3): they are
+ * real combatants in the fight on screen and belong in `combat.initiative`, on the map and in the
+ * turn order, but they are not members of the campaign and must never be offered for claiming,
+ * staging or party display. Everything else - archived characters, gm-only monsters - is governed by
+ * its own rule in the projection that owns it, not here.
+ */
+export function rosterActors<T extends { readonly replaySceneId?: string | undefined }>(actors: readonly T[]): readonly T[] {
+  return actors.filter((actor) => actor.replaySceneId === undefined);
+}
 
 export const CombatStateSchema = z.object({
   ...sceneCombatShape,
@@ -512,7 +546,16 @@ export const BuilderPolicySchema = z.object({
    * auto-claim and per-session create caps) is the separate WI5 §2 change. Nothing reads it to make an
    * authorization decision yet - it is projected so the surface work and the auth change land together
    * against one already-persisted policy rather than migrating a second time. */
-  playerBuilder: z.enum(["open", "gm-only"]).default("open")
+  playerBuilder: z.enum(["open", "gm-only"]).default("open"),
+  /**
+   * Whether players may roll a RANDOM character for themselves ("open") or only the GM can
+   * ("gm-only"). Additive, and the default is the OPPOSITE of `playerBuilder`'s: a guided builder is
+   * eight considered steps and a person only walks it when they mean it, whereas a generator is one
+   * tap that fills a roster slot - so it is deny-by-default and the GM opens it deliberately (issue
+   * `2d`). Enforced in `character.generate` (`game-operations.ts`) and projected beside
+   * `playerBuilder` so a player's surface can grey its own door.
+   */
+  playerRandom: z.enum(["open", "gm-only"]).default("gm-only")
 }).strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;
 
@@ -608,7 +651,7 @@ export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionI
  *    `apps/server/src/projections.ts`. Monsters, NPCs and UNCLAIMED characters are outside both gates
  *    and are unchanged by either.
  */
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived" | "sheetPreview"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** "Fighter 7" / "Fighter 5 / Rogue 2" - the identity card's second line, derived server-side from the stored sheet because a player projection carries no `definitions` list to derive it from. ANOTHER player's claimed character only, at every tier from `name-and-class` up; absent on your own (you already hold the whole `definition`), on unclaimed characters, and on monsters. */ classLine?: string; /** The imported sheet. Your own claimed character always; another player's only at `partyVisibility` `full-sheet` or `sheet-and-resources`. */ definition?: ActorDefinition; /** Spent limited-use counts. Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ actionUses?: Record<string, number>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "choiceOverrides" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived" | "sheetPreview"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** "Fighter 7" / "Fighter 5 / Rogue 2" - the identity card's second line, derived server-side from the stored sheet because a player projection carries no `definitions` list to derive it from. ANOTHER player's claimed character only, at every tier from `name-and-class` up; absent on your own (you already hold the whole `definition`), on unclaimed characters, and on monsters. */ classLine?: string; /** The imported sheet. Your own claimed character always; another player's only at `partyVisibility` `full-sheet` or `sheet-and-resources`. */ definition?: ActorDefinition; /** Spent limited-use counts. Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ actionUses?: Record<string, number>; /** Picks RE-MADE on a rest, keyed by offer key (Circle of the Land's land type, Fiendish Resilience's damage type). Same gate as `actionUses` - it is a sheet resource of exactly the same privacy. */ choiceOverrides?: Record<string, { id: string; per: "short-rest" | "long-rest" }>; /** What those spent counts are OUT OF: one entry per limited-use pool on the sheet, keyed by the exact `actionUses` key (`uses.pool ?? action.id`). Derived from the definition's own actions, never stored, and sent under the same gate as `actionUses` - which is narrower than the gate that already sends the whole `definition`. */ pools?: Array<{ id: string; name: string; limit: number; per: string }>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand; /** Active condition ids + parallel display labels ("Prone", "Exhaustion 3"): public info, so players and the shared screen render the same dots from one source. */ conditionIds: readonly string[]; conditions: readonly string[] }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
@@ -690,6 +733,10 @@ export type ContentConditionSummary = Readonly<{ id: string; name: string; descr
 export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[]; /** The bundle's canonical CC BY 4.0 line (ADR-0015). The server always sends it; a surface that has to hand-write a substitute always writes a weaker one. */ attribution?: string };
 /** SRD spell reference (rules text + the header fields a card shows) for the in-app spell rules window; public information for any joined session. */
 export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null;
+  /** Whether casting it rolls an attack. One of the three closed `fromPicks` predicates ("a cantrip that requires an attack roll" - Repelling Blast). */
+  attackRoll: boolean;
+  /** Range in FEET when the printed range IS a distance, else null (Self and Touch are not ranges of zero). The `ranged` predicate reads it - "a cantrip with a range of 10+ feet" (Eldritch Spear). */
+  rangeFeet: number | null;
   /** Spell-list ids this spell belongs to ("wizard", "cleric", a homebrew list slug) - THE class->spell-list link the wizard's spell step filters on (paired with `ContentClassSummary.spellcasting.spellListId`). */
   classes: readonly string[];
   /** Base damage/healing roll ("8d6"), or null for a spell that rolls nothing. Drives the sheet's "cast at" auto-roll. */
@@ -735,13 +782,67 @@ export type ContentSourceKind = "srd" | "homebrew";
  * wire the wizard offers Divine Order, reports the step complete, and the server refuses the build.
  * Riders (actions, grants, modifiers, uses) deliberately stay server-side - the server applies them.
  */
-export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string; choice: ContentFeatureChoiceSummary | null }>;
+export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string;
+  /**
+   * The earlier answer that makes this option legal, or null when it is always offerable.
+   *
+   * "The option you chose for Blessed Strikes grows more powerful" - the later feature's options are
+   * gated on a pick already in the ledger. It crosses the wire because the wizard must filter the
+   * same way the server does: when gating leaves exactly as many legal options as the capacity, the
+   * answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it.
+   */
+  requires: Readonly<{ offer: string; id: string }> | null;
+  /** The FIRST pick this option owes, or null. Kept for callers that only ever needed one; `choices` is the whole list. */
+  choice: ContentFeatureChoiceSummary | null;
+  /** EVERY pick this option owes, in authored order. Empty when it owes none. */
+  choices: readonly ContentFeatureChoiceSummary[];
+  extraPicks: readonly ContentExtraPickSummary[] }>;
+/**
+ * ONE budget a feature (or a chosen option) RAISES: "you know one extra cantrip from the Cleric
+ * spell list" is `{offer: "class-cantrips", amount: 1}`.
+ *
+ * `offer` is the OFFER KEY the wizard and the server already share verbatim - `class-cantrips`,
+ * `class-spells`, `class-skills`, `class-tools`, `background-skills`, `background-tools`,
+ * `background-languages`, `species-languages`, or `feature:<featureId>`. It is not a new namespace
+ * and not a closed enum: the server checks each one against the offers it really built, so an
+ * authored key naming nothing rejects loudly instead of adding zero in silence.
+ *
+ * This crosses the wire although riders (actions, grants, modifiers, uses) deliberately do not,
+ * because it is an input to PICKING rather than an outcome the server applies - the same category as
+ * `choice` and `maxSpellLevel`. A wizard that cannot see it caps the player at the printed level row
+ * and the extra pick the text promised is simply unselectable.
+ */
+export type ContentExtraPickSummary = Readonly<{ offer: string;
+  /** A flat number of extra picks; null when `scaling` states it instead. Exactly one of the two is set. */
+  amount: number | null;
+  /**
+   * "As many as the printed column has grown" - the budget follows the class table instead of a
+   * constant. Eldritch Invocations runs 1 -> 10 and Weapon Mastery 3 -> 6 with no feature heading at
+   * the levels they step, so no repeat-grant can express them; the wizard resolves it against the
+   * same level table the server does (`extraPickAmount`). Null for a flat grant.
+   */
+  scaling: PickBudgetScaling | null }>;
 export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
   /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
   maxSpellLevel: number | null;
+  /** FLOOR on a spell pick's level, the sibling of `maxSpellLevel`. Mystic Arcanum reads "one level 6 Warlock spell", not "level 6 or lower"; both set to 6 makes the pick exactly that level. Null = no floor. */
+  minSpellLevel: number | null;
+  /**
+   * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS, not a catalog - "choose one of your known
+   * Warlock cantrips that deals damage". `offer` names the budget holding them and `where` is a
+   * closed predicate slug. Null for every ordinary pick. It crosses the wire for the same reason
+   * `fromCatalog` does: the wizard must offer exactly what the server will accept.
+   */
+  fromPicks: Readonly<{ offer: string; where: string | null }> | null;
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   options: readonly ContentFeatureOptionSummary[] }>;
-export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null; /**
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The FIRST pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null;
+/**
+ * EVERY pick this feature asks for, in authored order - one record may owe more than one, and with
+ * different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell; reading only
+ * `choice` is what silently dropped the spell. Empty when the feature asks for nothing.
+ */
+choices: readonly ContentFeatureChoiceSummary[]; /**
  * EVERY level at which the owning class's table grants this feature - the authoritative repeat
  * count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times, and the server's capacity
  * is `choose x grants` (`character-build.ts` grantedClassFeatures), so a client that cannot see the
@@ -753,7 +854,9 @@ export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: 
  * are not ASIs, and a homebrew class may repeat any choice at all. Empty for a feature that is not
  * granted by a class level table (species traits, feats, subclass features).
  */
-grantedAtLevels: readonly number[] }>;
+grantedAtLevels: readonly number[];
+/** Budgets this feature raises (see `ContentExtraPickSummary`); empty for the vast majority. */
+extraPicks: readonly ContentExtraPickSummary[] }>;
 /**
  * ONE row of a class's printed 20-level table - the display data the wizard renders when a player
  * previews "what do I get at level 7?": slot columns, cantrips/spells known, the prepared-spell
@@ -768,7 +871,15 @@ export type ContentClassLevelRow = Readonly<{ level: number; proficiencyBonus: n
 /** A named starting-equipment bundle with its RESOLVABLE contents - a label alone can be shown but never turned into inventory. `goldPieces` is the "or take N gp" alternative. */
 export type ContentStartingEquipmentOption = Readonly<{ id: string; label: string; items: ReadonlyArray<{ id: string; name: string; quantity: number }>; goldPieces: number }>;
 /** A "choose N from this list" proficiency grant, exactly as authored (class tool choices, background skill/tool/language choices). */
-export type ContentChoiceList = Readonly<{ choose: number; from: readonly string[] }>;
+export type ContentChoiceList = Readonly<{ choose: number; from: readonly string[];
+  /**
+   * An open catalog slug supplying the options instead of (or beside) `from` - the same slug grammar
+   * `fromCatalog` uses on a feature's choice, resolved through the same `resolveCatalogChoice`.
+   *
+   * Exists because "Common plus two languages from the Standard Languages table" cannot be spelled as
+   * a `from` list without copying nineteen ids onto all nine species. Null for the lists that name
+   * their options outright (a class's skill list, a background's tools). */
+  fromCatalog: string | null }>;
 /**
  * A class's (or third-caster subclass's) spellcasting header - what the wizard's caster step renders
  * and filters by. `spellListId` pairs with `ContentSpellSummary.classes` to restore the class->spell
@@ -818,6 +929,16 @@ export type ContentBackgroundsResult = { ok: boolean; message?: string; backgrou
 /** One skill: reference text plus the ability its check uses. `ability` is null only while the bundle row predates the ability column (the server fills the SRD mapping for the 18 known skills). */
 export type ContentSkillSummary = Readonly<{ id: string; name: string; description: string; ability: string | null }>;
 export type ContentSkillsResult = { ok: boolean; message?: string; skills?: readonly ContentSkillSummary[]; attribution?: string };
+/**
+ * ONE LANGUAGE, plus which SRD table it is printed in ("standard" / "rare" - an open slug).
+ *
+ * The languages lived only as prose in the rules text, and the cost of that was concrete: with no
+ * list to draw from, `languageChoices` could not be authored, so the "Common plus two languages"
+ * every character is owed by Character Creation was **never offered to anyone**. `table` is what the
+ * base budget narrows on - Druidic and Thieves' Cant are `rare` and come from a class feature.
+ */
+export type ContentLanguageSummary = Readonly<{ id: string; name: string; description: string; table: string }>;
+export type ContentLanguagesResult = { ok: boolean; message?: string; languages?: readonly ContentLanguageSummary[]; attribution?: string };
 /** One feat. Prerequisites are reported as data + prose for display; the SERVER decides whether one is met, never the wizard. A feat IS a feature plus catalog metadata - hence the single `feature`. */
 export type ContentFeatSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; category: string; repeatable: boolean; prerequisiteLevel: number | null; prerequisiteAbilities: ReadonlyArray<{ ability: string; minimum: number }>; prerequisiteRequires: readonly string[]; prerequisiteText: string | null; feature: ContentFeatureSummary }>;
 export type ContentFeatsResult = { ok: boolean; message?: string; feats?: readonly ContentFeatSummary[]; attribution?: string };
@@ -887,13 +1008,19 @@ export type DamageApplication = Readonly<{
   instantDeath: boolean;
   /** A non-PC hit 0 HP: effects it sustained were ended (grapples released). */
   defeated: boolean;
+  /**
+   * Flat `damage-reduction` subtracted from the post-resistance total, once, floored at 0. Absent (or
+   * 0) when nothing reduced the hit - so an unchanged number is never explained, and a changed one
+   * always is. `parts` explains the per-type half; this is the step that comes after it.
+   */
+  flatReduction?: number;
 }>;
 export type DamageApplyResult = MutationResult & { applied?: DamageApplication };
 export type DeathSaveResult = MutationResult & { deathSave?: Readonly<{ naturalRoll: number; outcome: "success" | "failure" | "critical-success" | "critical-failure"; successes: number; failures: number; stable: boolean; dead: boolean; regainedConsciousness: boolean; /** false = previewed only (pips unchanged, awaiting confirmation); true = applied. */ committed: boolean; /** The d20 mode when adv/disadv was chosen; absent for a plain roll. */ rollMode?: "advantage" | "disadvantage" | "normal" }> };
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
-export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean; /** Condition id that forced an automatic failure (Paralyzed on a Dex save); null/absent when rolled. */ autoFailed?: string | null; /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode } };
+export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean; /** Condition id that forced an automatic failure (Paralyzed on a Dex save); null/absent when rolled. */ autoFailed?: string | null; /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode; /** The typed breakdown behind `appliedDamage` - which type was halved, doubled or ignored and by what. Absent when the save applied no damage. */ parts?: DamageApplication["parts"]; /** Flat reduction taken off the post-resistance total. */ flatReduction?: number } };
 /** Outcome of answering a reaction prompt; the (halved or full) damage already applied server-side. A used opportunity attack carries its full attack `resolution`. */
-export type ReactionAnswerResult = MutationResult & { outcome?: { used: boolean; appliedDamage: number; resolution?: ActionResolution } };
+export type ReactionAnswerResult = MutationResult & { outcome?: { used: boolean; appliedDamage: number; resolution?: ActionResolution; /** The typed breakdown behind `appliedDamage`, so a halved reaction hit explains itself exactly as a direct one does. */ parts?: DamageApplication["parts"]; flatReduction?: number } };
 /** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020 explainability). */
 export type ActionAvailability = Readonly<{
   id: string;
@@ -934,9 +1061,11 @@ export interface ClientToServerEvents {
   "character:submit-import": (payload: { commandId: string; definition: unknown; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:resolve-import": (payload: { commandId: string; importId: string; approve: boolean; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   /** Create a character from CHOICES (ids + scores + per-level HP entries + the choices[] ledger); the server's feature-rider interpreter assembles the ActorDefinition and lands it through the import path (`actorId` = commandId, definition keyed `import-<actorId>`). GM-only in phase 2. */
+  /** Roll a whole character server-side (issue `2d`). The caller decides the level and (optionally) the class; every other pick is the server's. */
+  "character:generate": (payload: { commandId: string; level: number; classId?: string; name?: string; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "character:create": (payload: { commandId: string; name: string; speciesId: string; backgroundId: string; classId: string; level: number; subclassId?: string; abilityMethod: BuilderAbilityMethod; baseScores: Record<AbilityId, number>; backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>; hp: { mode: "average" | "entries"; entries?: readonly number[] }; choices: ReadonlyArray<{ level: number; classId?: string; kind: string; id: string; payload?: Record<string, unknown> }>; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   /** GM sets the character-builder table policy (decision 10): allowed ability methods + the custom roll formula. */
-  "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; maxLevel?: number; playerBuilder?: "open" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; maxLevel?: number; playerBuilder?: "open" | "gm-only"; playerRandom?: "open" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   /**
    * Rebuild one character at a new level (up or down) or respec it (D13/D14). Same input as
    * `character:create` minus the name; the GM may rebuild anyone, a player only their own claimed
@@ -982,6 +1111,7 @@ export interface ClientToServerEvents {
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
+  "content:languages": (payload: Record<string, never>, acknowledgement: (result: ContentLanguagesResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
   "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
   "content:classes": (payload: Record<string, never>, acknowledgement: (result: ContentClassesResult) => void) => void;
@@ -1003,6 +1133,8 @@ export interface ClientToServerEvents {
   "actor:set-health-display": (payload: { commandId: string; actorId: string; display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-environment": (payload: { commandId: string; underwater: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:rest": (payload: { commandId: string; actorId: string; kind: "long" | "short"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /** Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type, Fiendish Resilience's damage type). `offer` is the offer key the build already uses. */
+  "actor:rechoose": (payload: { commandId: string; actorId: string; offer: string; id: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:spend-hit-dice": (payload: { commandId: string; actorId: string; count: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-slot": (payload: { commandId: string; actorId: string; level: number; remaining: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-prepared": (payload: { commandId: string; actorId: string; spellId: string; prepared: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

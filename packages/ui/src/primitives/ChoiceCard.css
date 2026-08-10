@@ -3,11 +3,11 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-2);
+  gap: var(--space-1);
   width: 100%;
   min-height: var(--tap-min);
   /* Room on the right for the chosen check so a long title never runs under it. */
-  padding: var(--space-3) calc(var(--space-4) + 1rem) var(--space-3) var(--space-4);
+  padding: var(--space-2) calc(var(--space-4) + 1rem) var(--space-2) var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface-1);
@@ -15,6 +15,19 @@
   text-align: left;
   cursor: pointer;
 }
+/* EIGHT PIXELS OF STRAY HEIGHT ON EVERY CARD, and the same defect family as the border rules below:
+   the consuming app styles bare elements, and a `.nh-choice` IS a `<button>` whose every row is a
+   `<span>`. The client's styles.css carries `button strong, button span { display: block }` and
+   `button span { color: var(--text-dim); font-size: .9rem; margin-top: var(--space-1) }` at (0,0,2),
+   so each row arrived 4px lower than this stylesheet said and `.nh-choice-head` inherited a 14.4px
+   type size it never asked for.
+
+   Measured at 1280 before the fix, on a Cleric cantrip card: `.nh-choice-head` 22.75px tall for an
+   18.75px title, its top 15px below the card's edge against 11px of declared padding+border, and the
+   head-to-desc gap reading 12px against a declared 8px. The card was 80.25px where its own rules add
+   up to 72.25px. Restated here at (0,1,1) — one class clear of any bare-element rule a host defines,
+   the same defence `.nh-choice.is-selected:hover` and `.nh-choice-info { padding: 0 }` already use. */
+.nh-choice span { margin-top: 0; }
 /* Hover owns the SURFACE; it must not own the EDGE of a card that is already chosen.
    `:not()` takes its argument's specificity, so `.nh-choice:hover:not(:disabled)` is (0,3,0) and
    out-specified `.nh-choice.is-selected` at (0,2,0): pointing at your own answer repainted its cyan
@@ -30,6 +43,92 @@
    rgb(38,135,165) composited, against rgb(45,226,255) at rest). This restates it at (0,3,0), one
    class clear of any bare-element hover rule a host might define. */
 .nh-choice.is-selected:hover { border-color: var(--cyan); }
+
+/* ---- The reference control that rides BESIDE a card (ChoiceCard's `action`) ----
+
+   Laid out as a flex sibling rather than floated over the card, because the two must not share a
+   pixel: the card's whole box is its tap area, and a control on top of it would steal taps from
+   the answer it is only supposed to explain. 44px square is the floor (§4), stated outright rather
+   than grown with `.tap-target`, because at 320px the card beside it is already the narrowest it
+   ever gets and an ::after box would overhang it.
+
+   THE FRAME BELONGS TO THE PAIR, NOT TO EITHER HALF, and that is the fix for "which info icon is
+   this spell's?". The two used to be two bordered boxes 8px apart in a multi-column grid whose own
+   gap was 10px — so an icon standing between two cards was ambiguous BY CONSTRUCTION, and reading
+   order was the only thing that resolved it. Now one border encloses both, they are separated by a
+   1px rule instead of a gap, and `.nh-choicegrid-items:has(.nh-choice-wrap)` (ChoiceGrid.css) steps
+   the gap BETWEEN pairs up to --space-4. Ownership is structural; nothing has to be inferred.
+
+   THE RULE IS THE WRAPPER'S BACKGROUND SHOWING THROUGH A 1px GAP, not a border on either child.
+   A border there would be a border on a `<button>`, and the consuming app's
+   `button:hover:not(:disabled) { border-color: … }` at (0,2,1) out-specifies `.nh-choice-wrap >
+   .nh-choice-info` at (0,2,0) — pointing at the reference control would have repainted the divider.
+   A gap cannot be hijacked by a bare-element rule, so the hairline is the wrapper's alone.
+
+   `align-items: stretch` is what makes the two halves the SAME HEIGHT — the client's actual
+   request ("the spell window needs to match the size of the info icon button"). The card sets the
+   pair's height and the control follows it, rather than a 44px control sitting beside an 80px card. */
+.nh-choice-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--line);
+}
+/* Borderless REGIONS inside the shared frame. They keep their own opaque backgrounds — that is what
+   leaves the 1px gap reading as a rule, and it is also what lets each region own its own hover.
+
+   And inside the frame the card is a ROW, not a card: a name over its type line, --space-1 of block
+   padding, no stack gap beyond the leading the two line-heights already carry. Measured 46.25px at
+   320 / 375 / 1280 against the 80.25px the same card cost before — and the 44px floor still governs
+   it, via the `min-height` above, so "smaller" stops where the floor starts. */
+.nh-choice-wrap > .nh-choice {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  padding-block: var(--space-1);
+  row-gap: 0;
+}
+.nh-choice-wrap > .nh-choice-info { border: 0; height: auto; }
+/* The pair's states live on the pair's frame. `:not(.is-selected)` rather than a higher-weight
+   restatement, for the reason spelled out on `.nh-choice:hover` below: `:has()` takes its
+   argument's specificity, so the hover rule would otherwise land at (0,5,0) against the chosen
+   rule's (0,3,0) and repaint a chosen pair's cyan edge grey. */
+.nh-choice-wrap:has(> .nh-choice:hover:not(.is-selected):not(:disabled)) { border-color: var(--line-strong); }
+.nh-choice-wrap:has(> .nh-choice.is-selected) { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+/* One chosen treatment, one place: the edge and the glow are the wrapper's now, so the card inside
+   spends neither. `:not(:focus-visible)` keeps the keyboard ring — the same carve-out the choose-N
+   rule below needs, and for the same reason. */
+.nh-choice-wrap > .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
+.nh-choice-info {
+  flex: none;
+  display: grid;
+  place-items: center;
+  /* PADDING: 0 IS LOAD-BEARING, not tidiness. The consuming app styles bare elements — its
+     `button { padding: 1.3rem }` (client styles.css) is (0,0,1) and this rule is (0,1,0), so it
+     applied here and left a 44px box with a 2.4px content area. The glyph rendered BELOW the
+     button's midline: measured at 1280px, box centre 544.4 against glyph centre 553.4, a 9px drop
+     against a card whose own centre was 544.4. `.nh-choice` never showed it because it declares
+     its own padding. State it, and the 44px box is 44px of centred content. */
+  padding: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  /* Stated as well as `height`, because inside `.nh-choice-wrap` the height goes to `auto` so the
+     control can stretch to the pair's height. The floor is not negotiable either way. */
+  min-height: var(--tap-min);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text-dim);
+  font-size: 1.15rem;
+  /* The glyph is the only child and it is `display: block`; a leading of 1 keeps the grid area
+     the height of the box rather than of a 1.5-line strut. */
+  line-height: 1;
+  cursor: pointer;
+}
+.nh-choice-info:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--text); }
 
 .nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
@@ -112,6 +211,10 @@
    your own answer showed nothing. `:not(:focus-visible)` takes this rule out of the way instead of
    restating the ring at a higher weight; the ring below then wins on source order at equal (0,2,0). */
 .nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
+/* Same budget, said again for the framed pair — the glow moved to the wrapper, so the rule that
+   spends it has to move with it. No `:not(:focus-visible)` carve-out here: the keyboard ring is the
+   CARD's (`.nh-choice:focus-visible`), and suppressing the wrapper's bloom never touches it. */
+.nh-choicegrid-items[role="group"] .nh-choice-wrap:has(> .nh-choice.is-selected) { box-shadow: none; }
 
 /* Disabled dims PER PROPERTY, never with a group `opacity`: group alpha composites the
    whole subtree, so a child can't opt back out of it (the old `.nh-choice-locked
@@ -128,6 +231,11 @@
    locked reason. */
 .nh-choice:disabled .nh-choice-icon { color: var(--text-muted); }
 .nh-choice:disabled .nh-choice-badge { opacity: 0.75; }
+/* The dimmed frame, for a pair — the card inside no longer owns an edge to dim. Declared after the
+   chosen rule above so the tie at (0,3,0) goes to "locked", which is the state that matters more.
+   The reference control keeps its own resting surface: at capacity, reading the two you did NOT
+   take is the whole point, and it is the one live thing on a locked pair. */
+.nh-choice-wrap:has(> .nh-choice:disabled) { border-color: color-mix(in srgb, var(--line) 60%, transparent); }
 
 /* The selection glow above is a class-level box-shadow, so it would out-specify the
    zero-specificity global :focus-visible ring and leave a focused, already-selected

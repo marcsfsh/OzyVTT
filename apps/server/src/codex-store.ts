@@ -281,10 +281,24 @@ export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind
 export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageIds?: readonly string[]; subMapId?: string | null; sceneIds?: readonly string[]; actorId?: string | null; tags?: readonly string[] }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
-/** The world's calendar: ordered months (each with a length), weekday names, and an era suffix. */
+/** The world's calendar: ordered months (each with a length), weekday names, named eras, and an era suffix. */
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
+/**
+ * A named era, starting at `startYear` and running until the next one starts (`5f`(iii)).
+ *
+ * **Era is DERIVED, never stored on a date.** A date's era is the last era whose `startYear` it has reached,
+ * which is the whole of the read rule (`eraForYear`). The alternative - an `era` field on `CodexInWorldDate` -
+ * needs `in_world_era` columns on `codex_journal` and `codex_pages` plus three `published_*` siblings, and a
+ * backfill that would have to INVENT a value for every date already stored. This shape needs neither: it
+ * lives inside `calendar_json`, so an existing calendar upgrades by being read, and no stored date is
+ * touched. It also keeps `calendar_instant` unambiguous, which a per-date era would not.
+ *
+ * Empty is the default and is exactly today's behaviour: with no eras, `yearName` remains the trailing suffix
+ * it has always been and every label is byte-identical.
+ */
+export type CodexCalendarEra = Readonly<{ name: string; startYear: number }>;
 /** The world's calendar; `currentDate` is the campaign's "now" (a Today marker on the timeline), optional. */
-export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
+export type CodexCalendar = Readonly<{ yearName: string; eras?: readonly CodexCalendarEra[]; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
 /** A structured in-world date (month is a 0-based index into the calendar's months). */
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 
@@ -571,7 +585,21 @@ export type CodexSessionUpdateInput = Readonly<{
  *  - `status` is the first enum a DASHBOARD queries rather than merely displays, which is what the
  *    `codex_quests_status` index in migration v14 is for.
  */
-export type CodexQuestStatus = "active" | "completed" | "failed";
+/**
+ * The five states, in LIFECYCLE order, and the order every picker offers them in.
+ *
+ * Two of them arrived after the first three, and the split that matters is not "old / new" but
+ * **open / finished**: `not-started` and `active` are quests the party can still do, and
+ * `completed`, `failed` and `canceled` are three different ways of being done with one. That is the
+ * line `openQuests` draws on the client, and it is the reason `canceled` is not a synonym for
+ * `failed` - a quest the party never took up did not fail, and recording it as a failure both
+ * misreports the campaign and puts a red badge on something nobody lost.
+ *
+ * `not-started` is the DEFAULT for a new quest (see `questStatus`), which is what makes the pair
+ * worth the migration: a lead the GM writes down mid-session has not started, and saying so is
+ * more honest than the old default of calling every freshly noted rumour active.
+ */
+export type CodexQuestStatus = "not-started" | "active" | "completed" | "failed" | "canceled";
 /**
  * One line on the quest's checklist. Deliberately nothing richer than `{ text, done }`: the M10 spec's
  * escalation clause makes a shape beyond this unapproved scope, so assignees / due dates / sub-quests
@@ -1591,6 +1619,58 @@ export const MIGRATIONS = [{
   // Ruling R2: `sceneIds` is GM-ONLY in projections ALWAYS - stricter than "follows the session reveal",
   // because a revealed session's player half is the RECAP and tonight's planned fights are spoilers.
   sql: `ALTER TABLE codex_sessions ADD COLUMN scene_ids_json TEXT NOT NULL DEFAULT '[]';`
+}, {
+  version: 26,
+  // Two more quest statuses - `not-started` and `canceled` - and therefore the SECOND table rebuild in
+  // this file. v15's reasoning applies verbatim and is worth restating rather than cross-referencing:
+  // `codex_quests.status` has carried `CHECK (status IN ('active', 'completed', 'failed'))` since v14,
+  // SQLite has no MODIFY/DROP CONSTRAINT, and so a `not-started` row is REJECTED BY THE FILE, not merely
+  // untyped. The rebuild is the only way to widen it.
+  //
+  // DROPPING the CHECK instead would have been one line and it is the wrong line, for exactly the reason
+  // v14 wrote it down: `questStatus()` gates this PROCESS, not the FILE. A repair script or a manual
+  // sqlite3 session would then be free to write `status = 'abandoned'`, which `coerceQuestStatus` reads
+  // back as a plausible "active" instead of failing loudly. The constraint is what makes the column
+  // honest, and it stays.
+  //
+  // **NOTHING IS REWRITTEN.** The SELECT is a column-for-column copy with no CASE, no COALESCE and no
+  // default: every existing quest keeps the exact status string it had, and `active`, `completed` and
+  // `failed` all remain legal. This migration cannot change what any existing campaign's quest log says -
+  // it only widens what a FUTURE write may say. The new default (`not-started`, in `questStatus`) applies
+  // to quests created after this point and is deliberately not back-filled onto anything.
+  //
+  // `tags_json` keeps its `DEFAULT '[]'` from v20 so the rebuilt table's shape is identical to the one it
+  // replaces, and `codex_quests_status` is recreated because a rebuild drops the index with the table -
+  // the index is not decoration, it is what makes the dashboard's open-quest filter a cheap per-render
+  // read (v14's note), and losing it here would be a silent performance regression rather than an error.
+  //
+  // The column list is written out on both sides rather than using `SELECT *`: a rebuild is exactly where
+  // a positional copy silently transposes two columns of the same type, and `player_body`/`gm_body` are
+  // adjacent TEXT columns on opposite sides of the codex's viewer boundary.
+  sql: `
+    CREATE TABLE codex_quests_new (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('not-started', 'active', 'completed', 'failed', 'canceled')),
+      player_body TEXT NOT NULL,
+      gm_body TEXT NOT NULL,
+      objectives_json TEXT NOT NULL,
+      entity_ids_json TEXT NOT NULL,
+      revealed INTEGER NOT NULL,
+      rev INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      tags_json TEXT NOT NULL DEFAULT '[]'
+    ) STRICT;
+    INSERT INTO codex_quests_new
+      (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json)
+      SELECT
+       id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json
+      FROM codex_quests;
+    DROP TABLE codex_quests;
+    ALTER TABLE codex_quests_new RENAME TO codex_quests;
+    CREATE INDEX codex_quests_status ON codex_quests (status);
+  `
 }];
 
 /**
@@ -1875,7 +1955,46 @@ function normalizeCalendar(input: CodexCalendar): CodexCalendar {
   const currentDate = current && Number.isFinite(current.year) && Number.isFinite(current.month) && Number.isFinite(current.day)
     ? { year: Math.trunc(current.year), month: Math.max(0, Math.min(Math.trunc(current.month), months.length - 1)), day: Math.max(1, Math.trunc(current.day)) }
     : null;
-  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", months, weekdays, currentDate };
+  /**
+   * `5f`(iii). **Additive and defaulted, which is the entire migration**: this function returns a fresh
+   * literal over one `calendar_json` blob, so a calendar written before eras existed reads back with `[]`
+   * and formats byte-identically. No ALTER, no backfill, no stored date rewritten.
+   *
+   * SORTED here rather than trusted from input, because `eraForYear` is a "last one reached" scan and an
+   * out-of-order list would silently name the wrong era. Doing it on the way IN means every reader gets the
+   * invariant for free - including a hand-edited blob, which is the case a read-side sort would also cover
+   * but a write-side check would not. Bounded at 20 to match the weekday cap, for the same reason: this
+   * whole object arrives from client input on `PUT /codex/calendar`.
+   */
+  const eras = (input.eras ?? []).slice(0, 20)
+    .map((era) => ({ name: shortLabel(era.name, 40, "era name") ?? "Era", startYear: Number.isFinite(era.startYear) ? Math.trunc(era.startYear) : 0 }))
+    .sort((a, b) => a.startYear - b.startYear);
+  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", eras, months, weekdays, currentDate };
+}
+/**
+ * The era a year falls in, or null - `5f`(iii)'s one read rule, stated once and used by every label.
+ *
+ * "The last era whose start the year has reached." A year before the first era's start has no era, and is
+ * rendered exactly as an era-less calendar renders it, so a half-configured calendar degrades to today's
+ * behaviour rather than to a wrong name.
+ */
+function eraForYear(calendar: CodexCalendar, year: number): CodexCalendarEra | null {
+  let found: CodexCalendarEra | null = null;
+  for (const era of calendar.eras ?? []) { if (Math.trunc(year) >= era.startYear) found = era; else break; }
+  return found;
+}
+/**
+ * A year with whatever qualifies it: the ERA LEADS when one applies, and `yearName` trails when none does.
+ *
+ * That split is the fix `5f`(iii) actually asked for. `yearName` ("Era suffix" in the editor) was already an
+ * era, but singular and a SUFFIX - "1492 DR". A named era is a leading component - "Third Age 1492" - and a
+ * calendar that has never defined one keeps the suffix it has always had, byte for byte. Both at once is a
+ * GM's choice and reads "Third Age 1492 DR", which is the honest rendering of a world that has both.
+ */
+function formatWorldYear(calendar: CodexCalendar, year: number): string {
+  const era = eraForYear(calendar, year);
+  const truncated = Math.trunc(year);
+  return `${era ? `${era.name} ` : ""}${truncated}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
 }
 function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
 /** An absolute, monotonically-increasing day number for chronological sorting (negative years allowed). */
@@ -1921,7 +2040,7 @@ function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): str
   const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
   const month = calendar.months[monthIdx];
   const day = Math.max(1, Math.min(Math.trunc(date.day), month.days));
-  const base = `${month.name} ${day}, ${Math.trunc(date.year)}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
+  const base = `${month.name} ${day}, ${formatWorldYear(calendar, date.year)}`;
   if (calendar.weekdays.length > 0) {
     const instant = calendarInstantOf(calendar, date);
     const index = ((instant % calendar.weekdays.length) + calendar.weekdays.length) % calendar.weekdays.length; // non-negative for negative years
@@ -2228,9 +2347,9 @@ function parseQuestEventPayload(raw: string | null | undefined): CodexQuestEvent
     const value = parsed as { questId?: unknown; status?: unknown };
     return {
       questId: typeof value.questId === "string" ? value.questId : "",
-      // Fails CLOSED to `active`, the `toQuest` coercion rule verbatim: an unrecognised status reads as
-      // the harmless one rather than throwing and making one bad row an unopenable codex.
-      status: value.status === "completed" || value.status === "failed" ? value.status : "active"
+      // Fails CLOSED to `active`, the `toQuest` coercion rule verbatim - and now literally the same
+      // function, so a sixth status cannot be taught to one reader and not the other.
+      status: coerceQuestStatus(value.status)
     };
   } catch { return null; }
 }
@@ -2319,12 +2438,44 @@ type EntryFields = Readonly<{ playerText: string; gmText: string | null; reveale
 export function deadlineFired(entry: Pick<CodexJournalRow, "kind" | "calendarInstant">, at: number | null): boolean {
   return entry.kind === "deadline" && entry.calendarInstant !== null && at !== null && entry.calendarInstant <= at;
 }
-const QUEST_STATUSES = new Set<CodexQuestStatus>(["active", "completed", "failed"]);
-/** The TS half of the quest status gate; migration v14's CHECK is the other half (see `sessionStatus`). */
+const QUEST_STATUSES = new Set<CodexQuestStatus>(["not-started", "active", "completed", "failed", "canceled"]);
+/**
+ * The TS half of the quest status gate; migration **v26**'s CHECK is the other half (v14 wrote the
+ * first one, over the three original statuses; see `sessionStatus`).
+ *
+ * **The default is `not-started`, and that is a deliberate reversal of the original `active`.** A quest
+ * record is created the moment a lead is NAMED - `CodexQuestCreateRequest` requires nothing but a
+ * title, precisely so a rumour can be written down mid-session and filled in later - and a rumour
+ * nobody has acted on is not an active quest. With only three statuses `active` was the least wrong of
+ * them; now that "not started" exists, defaulting to `active` would mean the honest state is the one
+ * the GM has to go and select by hand, which is the wrong way round.
+ *
+ * Nothing is lost from the dashboard by this: `openQuests` counts BOTH open states, so a quest still
+ * appears under "Open quests" the instant it is created, exactly as it did before. What changes is only
+ * the word on its badge, and the word is now true.
+ */
 function questStatus(value: string | undefined): CodexQuestStatus {
-  if (value === undefined) return "active";
-  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new CodexValidationError("A quest is active, completed, or failed.");
+  if (value === undefined) return "not-started";
+  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new CodexValidationError("A quest is not started, active, completed, failed, or canceled.");
   return value as CodexQuestStatus;
+}
+/**
+ * Read a status that came out of the FILE rather than off the wire, failing closed to `active`.
+ *
+ * One function for both readers (`toQuest` and `parseQuestEventPayload`) because they used to be two
+ * hand-written ternary chains over the same three literals - survivable at three, and precisely the
+ * shape that drifts at five when only one of them learns a new state. Now a status the file should not
+ * contain degrades identically wherever it is read.
+ *
+ * `active` stays the landing state even though `not-started` is now the default for a NEW quest, and
+ * the two answer different questions: the default is what a GM most likely means, while this is what an
+ * unclassifiable row should be treated as. Both open states are safe here, and `active` is the stronger
+ * "this is still live, go and look at it" - a quest silently demoted to "not started" is one the GM
+ * could reasonably scroll past. Keeping it also makes this migration inert for existing data: no stored
+ * value changes meaning.
+ */
+function coerceQuestStatus(value: unknown): CodexQuestStatus {
+  return typeof value === "string" && QUEST_STATUSES.has(value as CodexQuestStatus) ? (value as CodexQuestStatus) : "active";
 }
 const MAX_OBJECTIVES = 24;
 /** 120 = the repo's one-line-of-display bound (a marker `label`, an `inWorldLabel`), and the number `CodexQuestObjective` publishes. */
@@ -4183,21 +4334,51 @@ export class CodexStore {
       for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
     }
     /**
-     * The FIRST campaign date a codex is ever given publishes itself.
+     * The first campaign date an EMPTY codex is given publishes itself. Nothing else does.
      *
-     * v15 backfills `published_*` from `currentDate`, so an EXISTING campaign sees no change on upgrade
-     * (K7). A campaign created after M11 has no such row to backfill, and without this the GM would set
-     * "Current date - the world's now" in the calendar editor and every player's date would stay blank,
-     * with the only explanation living on a different screen. That is a silent regression against the
-     * behaviour every pre-M11 campaign had, and nobody approved removing it.
+     * **K7, narrowed (D6, 2026-08-09).** K7 read "the FIRST campaign date a codex is ever given publishes
+     * itself", on the reasoning that v15 backfills `published_*` for pre-M11 campaigns and a post-M11
+     * campaign would otherwise set a date and leave every player blank. The reasoning was sound and the
+     * scope was too wide: a GM who has been running a campaign for months, has never published a date, and
+     * finally sets one while PREPPING had it broadcast to the table by a write that says nothing about
+     * publishing. That is the coupling the client reported as "setting a date sets both at once", and no
+     * amount of client work could undo it because it happens in the store.
+     *
+     * The seeding case K7 was actually protecting survives intact, and is now stated as itself: a codex
+     * with **no records at all** is being set up, not run, and its first date is a starting position rather
+     * than prep. `importBundle` is unaffected either way - it wipes every table before calling this and then
+     * writes the bundle's own published date over whatever this produced.
      *
      * Publishing here cannot leak anything: the prep clock exists to run AHEAD of the party, and there is
-     * no "ahead" of a date they have never been given. Only the transition from "no published date" to
-     * "a published date" is automatic - once players have a date, every later move of the GM's clock is
-     * private until published, which is the whole of O-1.
+     * no "ahead" of a date they have never been given - and in the seeding case there is no campaign yet to
+     * be ahead of. Every later move of the GM's clock is private until published, which is the whole of O-1.
+     *
+     * The visible publish act D6 pairs with this lives on the Calendar (`CalendarView.tsx`): Publish is
+     * rendered whether or not the clocks have diverged, so the GM can see the act exists before they need it.
      */
-    if (calendar.currentDate && this.getPublishedDate() === null) this.writePublishedDate(calendar.currentDate);
+    if (calendar.currentDate && this.getPublishedDate() === null && this.isUnusedCodex()) this.writePublishedDate(calendar.currentDate);
     this.bumpRevision();
+  }
+
+  /**
+   * True while the codex holds no authored record of any kind - the "being seeded" state `writeCalendar`'s
+   * auto-publish is scoped to (D6).
+   *
+   * Authored tables only. `codex_links`, `codex_search_player`, `codex_search_gm` and `codex_page_revisions`
+   * are DERIVED from pages and journal entries, so counting them would say nothing a page count does not
+   * already say - and `codex_folders` is included because registering a folder is an authoring act even
+   * before a page lands in it.
+   *
+   * `EXISTS` rather than `COUNT(*)`: this runs on every calendar write and the question is "any at all",
+   * which stops at the first row. Ordered cheapest-first is pointless here for the same reason - each arm
+   * is O(1) - but pages and journal lead because they are what a real campaign has first.
+   */
+  private isUnusedCodex(): boolean {
+    const database = this.requireDatabase();
+    const clauses = ["codex_pages", "codex_journal", "codex_maps", "codex_markers", "codex_quests", "codex_sessions", "codex_standing", "codex_relationships", "codex_folders"]
+      .map((table) => `EXISTS(SELECT 1 FROM ${table})`).join(" OR ");
+    const row = database.prepare(`SELECT (${clauses}) AS used`).get() as { used: number } | undefined;
+    return !row?.used;
   }
 
   /**
@@ -5196,7 +5377,7 @@ export class CodexStore {
       id: row.id, title: row.title,
       // Anything unrecognised reads as `active`, the same fail-safe `toSession` applies to a status and
       // `toEntry` to a journal kind. A quest that cannot be classified is one that is still open.
-      status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "active",
+      status: coerceQuestStatus(row.status),
       playerBody: row.player_body, gmBody: row.gm_body,
       objectives: parseObjectives(row.objectives_json),
       entityIds: parseIdArray(row.entity_ids_json),

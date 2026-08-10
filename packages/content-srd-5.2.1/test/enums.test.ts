@@ -14,7 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, GEAR_CATEGORY_IDS, MAGIC_SCHOOL_IDS,
-  WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS,
+  RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS,
   loadConditions, loadDamageTypes, loadEquipment, loadMonsterDefinitions, loadSpells, loadWeaponProperties
 } from "../src/index.js";
 
@@ -69,5 +69,23 @@ describe("canonical SRD vocabularies", () => {
       ...new Set(loadEquipment().filter((item) => !item.weapon && !item.armor).map((item) => item.category))
     ]);
     expect(GEAR_CATEGORY_IDS).toEqual(authored);
+  });
+
+  it("RARITY_IDS contains every rarity the bundles declare — the weaker assertion, and the honest one", () => {
+    /**
+     * **The exception to this file's own rule, stated where it can be checked.** Every other list
+     * above is asserted EQUAL to a bundle projection. Rarity has no bundle to project: measured at
+     * the time of writing, 0 of the 132 equipment records declare `rarity`, and there is no rarity
+     * bundle. The ladder is a printed-rules fact.
+     *
+     * So the direction that CAN be true is containment, and it is worth pinning even while it is
+     * vacuous: the day a magic item lands in the bundle with a rarity the constant has never heard
+     * of, the dropdown a GM authors from and the content shipped beside it disagree — which is the
+     * exact silent divergence the rest of this file exists to catch.
+     */
+    const declared = sorted([...new Set(loadEquipment().map((item) => item.rarity).filter((rarity): rarity is string => !!rarity))]);
+    for (const rarity of declared) expect(RARITY_IDS, `equipment rarity "${rarity}"`).toContain(rarity);
+    // The six printed rungs are non-negotiable; `varies` is the seventh and is what magic-item tables print.
+    expect(RARITY_IDS).toEqual(["common", "uncommon", "rare", "very-rare", "legendary", "artifact", "varies"]);
   });
 });

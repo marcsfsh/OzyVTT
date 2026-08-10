@@ -267,7 +267,7 @@ export const CONVENTION_SHAPE = {
    * Floor on the play `.ts`/`.tsx` files `play-vocabulary.test.ts` reads (the scanned set,
    * `.ts` included because copy lives in tables as well as in JSX, plus
    * `packages/ui/src/primitives`). Measured 2026-08-03: **128**. Same ~10%-under discipline as
-   * `codex/vocabulary.test.ts:155-156`.
+   * `codex/vocabulary.test.ts:154-155`.
    */
   playSourceFloor: 115,
   /**
@@ -276,7 +276,7 @@ export const CONVENTION_SHAPE = {
    * (`{actor?.name ?? "combatant"}`) and a success message trailing a callback
    * (`run(async () => {…}, "Encounter started…")`). `copy-scan.ts` now reads both shapes, so the
    * corpus grew and this floor grew with it: leaving it at 1580 would leave the tripwire slack
-   * exactly where the scan was just proven blind. (The Codex corpus, for scale, is 919 over 47.)
+   * exactly where the scan was just proven blind. (The Codex corpus, for scale, is 930 over 48.)
    * Command: the test's own scan — `playCopySources()` through `scanCopy`, minus the artifacts.
    */
   playCorpusFloor: 1640,

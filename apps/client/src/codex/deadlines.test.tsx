@@ -333,7 +333,9 @@ describe("A deadline cannot be written without a date (CT-5)", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: "Deadline" }));
-    await user.type(screen.getByLabelText("What will happen"), "The duke's ultimatum expires.");
+    // "Player-visible notes" on every kind since 5a.1 — a deadline's player layer used to be labelled
+    // "What will happen", one of the four names the one composer gave one control.
+    await user.type(screen.getByLabelText("Player-visible notes"), "The duke's ultimatum expires.");
     // Text alone is not enough: a deadline with no date could never fire, and the store rejects it.
     expect(screen.getByRole("button", { name: "Add deadline" })).toBeDisabled();
     expect(screen.getByText(/A deadline needs a date/)).toBeInTheDocument();

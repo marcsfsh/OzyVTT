@@ -52,16 +52,36 @@
  * `feature.level ?? subclassLevel`), and `setGrantedLevels` can only express one of
  * those — two selected levels omit `level` and write no rows, so tapping a second chip
  * used to silently deselect BOTH. Where there is no table, the chips are single-select.
+ *
+ * ## Why a feature's controls are `FieldDef`s and not JSX (R1)
+ *
+ * This file used to be 651 lines of hand-written JSX with **zero** `FieldDef`s, and that
+ * was not a style problem. `fieldsOf` in `authoring-harness.ts` walks the form schema;
+ * `FeatureEditor` is mounted as a `custom` field, so it had no fields to walk and every
+ * control in here was **invisible to `applyField` in both directions**. A both-paths test
+ * could not drive a feature's name, let alone its choice panel — the fourth part of the
+ * phase's own rule ("a test through BOTH paths") was structurally unavailable for the
+ * whole pick family. `featureFields()` below is what puts it on the surface: the fields
+ * are declared once, rendered through the ONE renderer, and mounted as the row shape of
+ * the `custom: "features"` field so the harness can address them.
+ *
+ * **Three controls stay bespoke, each because it writes something a `FieldDef` cannot:**
+ * the level chips (two draft keys in one edit — the invariant this file opens with),
+ * "Where the options come from" and the "Which catalog"/"Of which" pair (both driven by a
+ * UI mode held in React state, which no `read` can recover from the draft). The reasons
+ * are written out beside `featureFields()`, where the consequences are.
  */
 
 import { useId, useMemo, useState } from "react";
-import { Chip, Field, FieldGrid, Input, RowEditor, SegmentedControl, Select, Stepper, Switch, Textarea } from "@vtt/ui";
+import { featurePicks, NAMED_PICK_BUDGET_KEYS } from "@vtt/content-srd-5.2.1/schemas";
+import { Button, Chip, Field, FieldGrid, RowEditor, SegmentedControl, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
-import { RiderEditor, riderSummary, type RiderKind } from "./RiderEditor";
+import { FieldRenderer } from "./FieldRenderer";
+import { RiderEditor, riderSummary, slugValidate, type RiderKind } from "./RiderEditor";
 import { LEVELS, blankFeature } from "./defaults";
-import { setAt } from "./paths";
+import { getAt, setAt } from "./paths";
 import { namesOwnRecord } from "./schema";
-import type { Draft, SchemaContext } from "./schema";
+import type { Draft, FieldDef, SchemaContext } from "./schema";
 
 type Feature = Readonly<{
   id: string;
@@ -79,6 +99,10 @@ const CHOICE_KINDS = [
   "feat", "fighting-style", "asi-or-feat", "subclass", "lineage", "spell", "cantrip",
   "skill", "tool", "language", "skill-or-tool", "expertise", "ability-score", "weapon-mastery"
 ];
+
+/** The four ways a choice states its list — one UI mode over three stored keys plus the
+    ledger source. Held in React state, never in the draft; see the note by `featureFields`. */
+type SourceMode = "catalog" | "list" | "options" | "picks";
 
 type CatalogFamily = "" | "subclasses" | "feats" | "spells" | "lineages" | "skills" | "weapons";
 
@@ -118,6 +142,770 @@ const composeCatalog = (family: CatalogFamily, which: string): string | undefine
  */
 const DEFAULT_GRANT_LEVEL = 1;
 
+/* -------------------------------------------------------- the field schema ------ */
+
+/** The choice a feature is seeded with the moment the switch goes on — spelled once,
+    because every seeding write (the switch, a choice key landing on a bare feature, the
+    "Add another choice" button's `newRow`) has to agree or they mint different shapes. */
+const NEW_CHOICE: Readonly<Record<string, unknown>> = { kind: "feat", choose: 1, repeatable: false };
+
+/** The slug this panel has always taken: lowercase, and every run of anything else
+    becomes one hyphen. `FeatureChoiceSchema.kind` is `ContentIdSchema`, so a value that
+    skips this is unpublishable at a gate that names a regex. */
+const asChoiceSlug = (text: string): string => text.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+
+/** One choice block — one pick the feature asks for, however the record spells it. */
+type ChoiceBlock = Readonly<Record<string, unknown>>;
+
+/** EVERY pick this feature asks for, read through `featurePicks` — the server's own
+    accessor, imported rather than mirrored, so the panel and `character-build.ts` cannot
+    disagree about which spelling holds the list. */
+const choiceBlocksOf = (feature: Draft): readonly ChoiceBlock[] =>
+  featurePicks(feature as { choice?: ChoiceBlock; choices?: ChoiceBlock[] });
+
+/**
+ * **How `choice` (singular) and `choices` (plural) relate — U12's ruling, taken from the
+ * reader rather than from taste.**
+ *
+ * `featurePicks` reads the pair as ONE list with two spellings: `choices` wins when it is
+ * non-empty, `choice` otherwise, and `FeatureRecordSchema`'s `oneChoiceForm` refinement
+ * REFUSES a record carrying both ("Author `choice` (one pick) or `choices` (several) —
+ * never both."). So the two keys are not two features of the form — they are one list
+ * whose spelling is a function of its length, and the SRD authors exactly that: every
+ * one-pick record uses `choice`, all three plural records (the Magic Initiates) use
+ * `choices`, and none uses both or a one-element `choices`.
+ *
+ * The form therefore never asks the GM to pick a spelling. Every write lands here, and
+ * the canonical spelling is derived from the count — which is what makes the refused
+ * both-keys shape UNAUTHORABLE rather than merely caught at publish, the same standard
+ * the level chips and the recharge pair are held to.
+ */
+function writeChoiceBlocks(feature: Draft, blocks: readonly ChoiceBlock[]): Draft {
+  const next: Record<string, unknown> = { ...feature };
+  delete next.choice;
+  delete next.choices;
+  if (blocks.length === 1) next.choice = blocks[0];
+  else if (blocks.length > 1) next.choices = [...blocks];
+  return next;
+}
+
+/**
+ * Merge changes into ONE block, seeding the list when there is none — so
+ * `applyField(type, feature, "choice.choose", 2)` on a bare feature still produces the
+ * same `{kind, choose, repeatable}` the switch mints, and not a half-built shape no form
+ * can make.
+ */
+function writeChoiceAt(feature: Draft, index: number, changes: Readonly<Record<string, unknown>>): Draft {
+  const held = choiceBlocksOf(feature);
+  const blocks: ChoiceBlock[] = held.length === 0 ? [{ ...NEW_CHOICE }] : [...held];
+  const merged: Record<string, unknown> = { ...(blocks[index] ?? { ...NEW_CHOICE }) };
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === undefined) delete merged[key];
+    else merged[key] = value;
+  }
+  blocks[index] = merged;
+  return writeChoiceBlocks(feature, blocks);
+}
+
+/** Does this feature ask a question at all? Every control below the switch depends on it,
+    and it reads the BLOCKS, not the singular key — a plural record asks too. */
+const asksAChoice = (feature: Draft) => choiceBlocksOf(feature).length > 0;
+
+/** The offer key's own shape, caught while typing — `PickBudgetKeySchema` is
+    `/^[a-z0-9-]+(:[a-z0-9-]+)?$/`, one colon wider than a plain slug, so `slugValidate`
+    would refuse the `feature:<id>` form the key exists to allow. */
+const offerValidate = (value: unknown): string | null => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text === "" || /^[a-z0-9-]+(:[a-z0-9-]+)?$/.test(text)) return null;
+  return "Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.";
+};
+
+/**
+ * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS — `fromPicks`, and it is the FOURTH
+ * source, not a modifier of the other three.
+ *
+ * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast), "…that
+ * has a range of 10+ feet" (Eldritch Spear), "…that requires an attack roll" (Repelling
+ * Blast). The list is the LEDGER, narrowed by a closed predicate, which is why no
+ * `fromCatalog` slug can express it: `offer` names the budget holding those answers in the
+ * same key namespace `extraPicks` and `replaces` use, and `where` is a three-value enum
+ * (ADR-0008 — a closed slug list, never an expression), each member a field the spell
+ * catalog already carries.
+ *
+ * **Exclusive with the other three, and the write is what makes that true.** The reader's
+ * chain (`character-build.ts` `featurePickOffer`) tests `fromPicks` FIRST and only then
+ * `from`/`fromCatalog`/`options`, so a block carrying `fromPicks` beside any of them
+ * SILENTLY ignores the other — the schema permits the pair and the engine answers with one
+ * of them. Every write below therefore deletes the other three, the source switch clears
+ * all four ways round, and `from`/`options` clear `fromPicks` in return. The misleading
+ * shape is unauthorable rather than merely caught, which is the standard the recharge pair
+ * and the `choice`/`choices` spelling are already held to.
+ */
+const writeFromPicks = (block: Draft, leaf: "offer" | "where", next: unknown): Draft => {
+  const held = block.fromPicks && typeof block.fromPicks === "object" && !Array.isArray(block.fromPicks)
+    ? (block.fromPicks as Record<string, unknown>)
+    : {};
+  const text = typeof next === "string" ? next.trim() : "";
+  const merged: Record<string, unknown> = { ...held };
+  if (text) merged[leaf] = text;
+  else delete merged[leaf];
+  const out: Record<string, unknown> = { ...block };
+  delete out.from;
+  delete out.fromCatalog;
+  delete out.options;
+  if (Object.keys(merged).length === 0) delete out.fromPicks;
+  else out.fromPicks = merged;
+  return out;
+};
+
+/** Drop `fromPicks` when another source is written, so the exclusivity holds in both
+    directions rather than only away from the ledger. */
+const withoutPicks = (block: Draft, changes: Readonly<Record<string, unknown>>): Draft => {
+  const out: Record<string, unknown> = { ...block, ...changes };
+  delete out.fromPicks;
+  return out;
+};
+
+/** Every feature this record declares, whichever key its type stores them under. */
+const featuresOf = (draft: Draft): readonly Draft[] => [
+  ...(Array.isArray(draft.features) ? (draft.features as Draft[]) : []),
+  ...(Array.isArray(draft.traits) ? (draft.traits as Draft[]) : []),
+  ...(draft.feature && typeof draft.feature === "object" && !Array.isArray(draft.feature) ? [draft.feature as Draft] : [])
+];
+
+/** Every feature id this record declares — the targets a `feature:<id>` offer may name. */
+const featureIdsOf = (draft: Draft): readonly string[] =>
+  featuresOf(draft).map((feature) => String((feature as { id?: unknown })?.id ?? "")).filter(Boolean);
+
+/**
+ * Every ANSWER any pick on this record could hold — the id half of a `requires` clause.
+ *
+ * A gate names one option of an earlier pick, and the SRD's four gated features all name a
+ * SIBLING feature's option (`feature:blessed-strikes` → `divine-strike`), so the record
+ * being edited already declares every id the box wants. Both spellings of a pick are read
+ * through `featurePicks`, and both ways of stating its list contribute: the inline options
+ * carry their own ids and a hand-typed `from` list IS ids.
+ */
+const optionIdsOf = (draft: Draft): readonly string[] => {
+  const ids = new Set<string>();
+  for (const feature of featuresOf(draft)) {
+    for (const block of choiceBlocksOf(feature)) {
+      for (const option of Array.isArray(block.options) ? (block.options as Draft[]) : []) {
+        const id = String((option as { id?: unknown })?.id ?? "");
+        if (id) ids.add(id);
+      }
+      for (const id of Array.isArray(block.from) ? (block.from as unknown[]) : []) {
+        if (typeof id === "string" && id) ids.add(id);
+      }
+    }
+  }
+  return [...ids];
+};
+
+/**
+ * THIS OPTION IS ONLY LEGAL WHEN AN EARLIER ANSWER SAYS SO — `requires`, on an inline
+ * option, and the read-back the SRD keeps asking for.
+ *
+ * "The option you chose for Blessed Strikes grows more powerful" (Improved Blessed
+ * Strikes), Improved Elemental Fury, Nature's Ward's Resistance "associated with your
+ * current land choice". Each is one later feature whose mechanics are DECIDED by a pick
+ * already on the ledger, and before the key existed they were prose. Eight SRD options
+ * author it — four class, four subclass — and no control anywhere could say it.
+ *
+ * **AND IT IS NOT ALWAYS A PICK.** When gating leaves exactly as many legal options as the
+ * choice's capacity the answer is a consequence rather than a choice, so both consumers
+ * ADOPT the survivors and render no card at all. That is the whole point of the ruling: a
+ * pick with one option on it is worse than the prose it replaces. The help says so, because
+ * a GM who authors two gated options and then sees no pick appear has to be told it worked.
+ *
+ * A `group`, like `fromPicks`, and for the same reason: the two halves are one clause and
+ * neither half alone means anything. Both boxes are open text — `offer` because it is the
+ * SAME namespace `extraPicks` and `replaces` are checked against, and `id` because an
+ * option id is an open slug the record may not have authored yet.
+ */
+function requiresField(): FieldDef {
+  const write = (leaf: "offer" | "id") => (next: unknown, option: Draft): Draft => {
+    const held = option.requires && typeof option.requires === "object" && !Array.isArray(option.requires)
+      ? (option.requires as Record<string, unknown>)
+      : {};
+    const text = typeof next === "string" ? next.trim() : "";
+    const merged: Record<string, unknown> = { ...held };
+    if (text) merged[leaf] = text;
+    else delete merged[leaf];
+    const out: Record<string, unknown> = { ...option };
+    // An emptied pair removes the clause rather than leaving `{}` behind: `requires` is
+    // `.optional()`, and a half-cleared gate would refuse the record at publish for a
+    // question the GM had just answered "no" to.
+    if (Object.keys(merged).length === 0) delete out.requires;
+    else out.requires = merged;
+    return out;
+  };
+  return {
+    key: "requires",
+    label: "Only when an earlier pick chose",
+    kind: "group",
+    help: "Leave both empty to offer this option to everyone. When the gates leave exactly as many options as the choice takes, the player is asked nothing and the survivor is simply granted.",
+    rows: [
+      {
+        key: "requires.offer",
+        label: "Which pick",
+        placeholder: "feature:my-feature",
+        help: "A named budget, or feature:<id> for one of this record's own features.",
+        suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+        validate: offerValidate,
+        write: write("offer")
+      },
+      {
+        key: "requires.id",
+        label: "Which answer",
+        placeholder: "divine-strike",
+        help: "The option they must have chosen there.",
+        suggestions: (_ctx, draft) => optionIdsOf(draft),
+        validate: slugValidate,
+        write: write("id")
+      }
+    ]
+  };
+}
+
+/** What to CALL one of those ids in a picker. A feature the GM has not named yet still has
+    to be pickable, so the id stands in rather than an empty row. */
+const featureLabelOf = (draft: Draft, id: string): string => {
+  const named = featuresOf(draft).find((feature) => (feature as { id?: unknown }).id === id);
+  return String((named as { name?: unknown } | undefined)?.name || id);
+};
+
+/**
+ * EXTRA PICKS — the rider by which a feature (or a chosen option) RAISES a pick budget
+ * instead of granting an outcome. "You know one extra cantrip from the Cleric spell
+ * list" is `{offer: "class-cantrips", amount: 1}`; the server folds every grant into the
+ * budget by ADDITION and refuses a key naming no budget the build has, loudly.
+ *
+ * **The offer box is an open text with suggestions, never a closed select** — the same
+ * ruling as the choice kind box, and for the same reason twice over: the eight named
+ * budgets are a closed list but `feature:<id>` is an open form over the record's own
+ * features, so a closed control could not say the very case that started this area
+ * (Eldritch Invocations raises its own feature's pick). The suggestions are the eight
+ * canonical keys (`NAMED_PICK_BUDGET_KEYS`, the list the server's rejection sentence
+ * names) plus `feature:<id>` for every feature the record declares.
+ *
+ * **`amount` and `scaling` are exactly one, and the pair is held by the mode select** the
+ * way `usesField` holds `limit`/`scaling`: picking "As a class-table column grows" swaps
+ * the flat amount for `{type: "class-resource-growth", id}` and back, deleting the other
+ * half, so the schema's "exactly one" refinement cannot be reached from the form. The
+ * column id is seeded EMPTY — a guessed "rage" would silently point a homebrew grant at
+ * the Barbarian's column — and the publish checklist names it until the GM fills it.
+ *
+ * One factory, two mounts: a feature's own list, and an inline option's (Divine Order's
+ * Thaumaturge is option-level — 2 of the SRD's 8 authors are).
+ */
+function extraPicksField(): FieldDef {
+  return {
+    key: "extraPicks",
+    label: "Extra picks",
+    kind: "rows",
+    wide: true,
+    help: "Budgets this raises — an extra cantrip, one more skill. The player still makes the pick.",
+    addLabel: "Add an extra pick",
+    emptyText: "Raises no budgets.",
+    maxRows: 4,
+    maxRowsReason: "Four extra picks is as many as one feature may grant.",
+    rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+    newRow: () => ({ rowId: newId(), offer: "", amount: 1 }),
+    rowLabel: (row) => {
+      const grant = row as { offer?: unknown; amount?: unknown; scaling?: { id?: unknown } };
+      const offer = String(grant.offer || "no pick named");
+      return grant.scaling ? `${offer} — grows with ${String(grant.scaling.id || "a column")}` : `${offer} +${Number(grant.amount ?? 1)}`;
+    },
+    rows: [
+      {
+        key: "offer",
+        label: "Which pick",
+        placeholder: "class-cantrips",
+        help: "A named budget, or feature:<id> for one of this record's own features.",
+        suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+        validate: offerValidate
+      },
+      {
+        key: "mode",
+        label: "The extra is",
+        kind: "select",
+        // `mode` is NOT stored — read back out of the shape, the same derivation the
+        // "Uses are" select rides. The two literals below are this control's own; the
+        // stored discriminator is `scaling.type`, seeded by the write.
+        options: [
+          { value: "flat", label: "A flat number" },
+          { value: "column-growth", label: "As a class-table column grows" }
+        ],
+        read: (row) => ((row as { scaling?: unknown }).scaling ? "column-growth" : "flat"),
+        write: (next, row) => {
+          const out: Record<string, unknown> = { ...row };
+          if (next === "column-growth") {
+            delete out.amount;
+            out.scaling = { type: "class-resource-growth", id: "" };
+          } else {
+            delete out.scaling;
+            out.amount ??= 1;
+          }
+          return out;
+        }
+      },
+      {
+        key: "amount",
+        label: "How many more",
+        kind: "number",
+        min: 1,
+        max: 5,
+        visibleWhen: (row) => !(row as { scaling?: unknown }).scaling
+      },
+      {
+        key: "scaling.id",
+        label: "Which column",
+        placeholder: "eldritch-invocations",
+        help: "The class-table column it grows with. The grant adds how far the column has grown past its first printed value.",
+        validate: slugValidate,
+        visibleWhen: (row) => Boolean((row as { scaling?: unknown }).scaling)
+      }
+    ]
+  };
+}
+
+/**
+ * PICKS THIS FEATURE RE-OPENS — `replaces`, the only rider whose answer is re-made after
+ * the character is built.
+ *
+ * "Whenever you finish a Long Rest, choose one type of land"; "choose one damage type
+ * whenever you finish a Short or Long Rest." The clause names a pick budget the character
+ * already answered and says WHEN that answer may be taken back, and the two halves live in
+ * different places: `level-up` is a build-time permission over the choices ledger, while
+ * `short-rest`/`long-rest` become runtime state on the actor — written by `actor.rechoose`,
+ * cleared by the matching rest, read at damage time. It is wired end to end through a
+ * command, actor state, rest clearing and a gated projection, and until this field there
+ * was no control for it anywhere.
+ *
+ * **The offer box is the same open text with suggestions `extraPicks` uses**, and it has to
+ * be: the server validates a `replaces` clause against the SAME namespace an `extraPicks`
+ * grant is validated against (`character-build.ts` reuses `namesARealBudget` for both and
+ * says so), so a closed select here would be a second, narrower list beside one shared
+ * check. Both SRD authors name the feature's own pick — `feature:circle-of-the-land-spells`,
+ * `feature:fiendish-resilience` — which is exactly the open half of that namespace.
+ */
+function replacesField(): FieldDef {
+  return {
+    key: "replaces",
+    label: "Picks it re-opens",
+    kind: "rows",
+    wide: true,
+    help: "Answers the player may take back later — a land type on a long rest, a damage type on a short one.",
+    addLabel: "Add a re-openable pick",
+    emptyText: "Re-opens nothing.",
+    maxRows: 4,
+    maxRowsReason: "Four re-openable picks is as many as one feature may declare.",
+    rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+    // `when` is seeded, `offer` is not: a guessed budget would silently point the clause at
+    // someone else's pick, the same ruling `extraPicks`' column id is seeded empty under.
+    newRow: () => ({ rowId: newId(), offer: "", when: "long-rest", amount: 1 }),
+    rowLabel: (row) => {
+      const clause = row as { offer?: unknown; when?: unknown; amount?: unknown };
+      const amount = Number(clause.amount ?? 1);
+      const each = amount > 1 ? `${amount} at a time` : "one";
+      return `${String(clause.offer || "no pick named")} — ${each}, ${WHEN_LABELS[String(clause.when ?? "")] ?? "when?"}`;
+    },
+    rows: [
+      {
+        key: "offer",
+        label: "Which pick",
+        placeholder: "feature:my-feature",
+        help: "A named budget, or feature:<id> for one of this record's own features — usually this one.",
+        suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+        validate: offerValidate
+      },
+      {
+        key: "when",
+        label: "Re-made",
+        kind: "select",
+        options: [
+          { value: "level-up", label: "At level-up" },
+          { value: "short-rest", label: "On a short rest" },
+          { value: "long-rest", label: "On a long rest" }
+        ]
+      },
+      { key: "amount", label: "How many at once", kind: "number", min: 1, max: 5 }
+    ]
+  };
+}
+
+const WHEN_LABELS: Readonly<Record<string, string>> = {
+  "level-up": "at level-up",
+  "short-rest": "on a short rest",
+  "long-rest": "on a long rest"
+};
+
+/**
+ * SUPERSEDES — `replacesFeatureId`, the feature that takes an earlier one's place.
+ *
+ * Extra Attack (2) replaces Extra Attack; Indomitable 9/13/17 replaces its own predecessor.
+ * `grantedClassFeatures` drops the named feature from the granted set once the replacement
+ * is granted, so the sheet prints one line rather than two contradicting ones.
+ *
+ * **Offered on a CLASS only, and that is a measurement rather than a shortcut** — the same
+ * call U7 made about `class-resource` on an item. The reader is `grantedClassFeatures`,
+ * which walks a CLASS's own level table and nothing else: `subclassFeatures` is a plain
+ * filter with no supersession step, so a subclass feature carrying the key is inert. The
+ * SRD proves it rather than assumes it — Champion's `superior-critical` authors
+ * `replacesFeatureId: "improved-critical"` and a level-15 Champion holds both records, which
+ * `class-mechanics/fighter.ts` writes down at the record itself. Showing the control on the
+ * other four carriers would be an editor-only row on all four.
+ */
+const replacesFeatureIdField = (): FieldDef => ({
+  key: "replacesFeatureId",
+  label: "Supersedes",
+  kind: "select",
+  help: "An earlier feature this one takes the place of. The class stops granting it once this arrives.",
+  // Only a class has a level table, and only a class's own features are read for this.
+  visibleWhen: (_feature, draft) => Array.isArray(draft.levelTable),
+  options: (_ctx, draft) => [
+    { value: "", label: "Nothing — this is a feature of its own" },
+    ...featureIdsOf(draft).map((id) => ({ value: id, label: featureLabelOf(draft, id) }))
+  ],
+  // The list cannot exclude the feature being edited (`options` is handed the RECORD, never
+  // the row), and naming itself would make the class delete the very feature that arrived.
+  // So the illegal answer is named while it is made, the way every other `validate` is.
+  validate: (value, feature) => (value && value === feature.id ? "A feature cannot supersede itself — pick the earlier one it replaces." : null)
+});
+
+/** The two kinds whose options carry a spell level, plus any block already holding a
+    bound. `kind` is an OPEN slug, so this is a visibility rule and never a gate: an
+    authored window survives on any kind, it simply has nothing to compare against unless
+    the options came from a spell catalog. */
+const showsSpellWindow = (block: Draft): boolean =>
+  block.kind === "spell" || block.kind === "cantrip"
+  || block.maxSpellLevel !== undefined || block.minSpellLevel !== undefined;
+
+/**
+ * The controls of ONE choice block, keys relative to the block — the shape every block
+ * in the list shares, spelled once. `renderFeature` renders every block through these,
+ * and `fieldsWithin(type, [features…, "choices"])` addresses them at the block's own
+ * row scope.
+ */
+function choiceBlockFields(): readonly FieldDef[] {
+  return [
+    {
+      key: "kind",
+      label: "What kind of choice",
+      help: "Type your own if none of these fit.",
+      // An OPEN slug with the reserved list as suggestions, never a closed `<select>`:
+      // homebrew is allowed to invent a kind and a closed control would make it
+      // impossible. Deliberately NOT `pick` — see the note in `featureFields`' docblock.
+      suggestions: CHOICE_KINDS,
+      write: (next, block) => ({ ...block, kind: asChoiceSlug(String(next ?? "")) })
+    },
+    { key: "choose", label: "How many they pick", kind: "stepper", min: 1, max: 10 },
+    /**
+     * THE SPELL WINDOW — a ceiling, a floor, or both, on ONE block.
+     *
+     * "Choose two Cleric cantrips" is `maxSpellLevel: 0`; "choose one level 6 Warlock
+     * spell as this arcanum" is the pair set to 6, because a ceiling alone reads as "6 or
+     * lower" and let an eleventh-level Warlock spend the arcanum on Eldritch Blast. Both
+     * are read by `withinSpellWindow` in `character-build.ts` and mirrored by the wizard's
+     * own filter, and 16 + 4 SRD records author them.
+     *
+     * **The bounds are compared against the option's own SPELL level, which only a catalog
+     * carries** — `optionLevels` is built from `resolveCatalogChoice`, and a hand-typed
+     * `from` list has no levels for the engine to read (a missing level counts as 0, so a
+     * ceiling over one never bites and a floor above 0 refuses everything). Every one of
+     * the 20 SRD authors draws on a `*-spells` catalog. The help says so rather than
+     * leaving a GM to discover it from a refusal.
+     *
+     * Offered on the two kinds whose options carry a level, plus any block that already
+     * holds a bound — so a duplicated SRD record never hides its own numbers.
+     */
+    {
+      key: "maxSpellLevel",
+      label: "Highest spell level",
+      kind: "number",
+      min: 0,
+      max: 9,
+      help: "0 is cantrips only. Compared against the catalog's own spell levels — a list typed by hand has none.",
+      visibleWhen: showsSpellWindow
+    },
+    {
+      key: "minSpellLevel",
+      label: "Lowest spell level",
+      kind: "number",
+      min: 0,
+      max: 9,
+      help: "Set both to the same number for “exactly a level 6 spell”.",
+      visibleWhen: showsSpellWindow
+    },
+    /**
+     * THE ASI CEILING — the score an ability-score pick from THIS block may reach.
+     *
+     * The sibling of the `ability-score` MODIFIER's own `maximum` (`RiderEditor`'s "Raises
+     * the cap to"), and separate because the two are different mechanisms: a modifier
+     * raises a NAMED ability, while a choice lets the player pick which — and all seven
+     * epic boons do the second. `character-build.ts` clamps each chosen point at
+     * `offer.maximum ?? 20`; the clamp used to be a hard 20, which made every boon do
+     * nothing at all for the level-19 character who has one.
+     *
+     * Offered on the kind the reader filters for (`offers.filter(kind === "ability-score")`)
+     * and on any block already carrying one.
+     */
+    {
+      key: "maximum",
+      label: "Raises a score to at most",
+      kind: "number",
+      min: 1,
+      max: 30,
+      help: "Leave empty to keep the usual 20. The epic boons print 30.",
+      visibleWhen: (block) => block.kind === "ability-score" || block.maximum !== undefined
+    },
+    {
+      /* Slugs separated by commas, in one box, because a `from` list is written by hand
+         against no catalog — there is nothing to suggest. `read` joins and `write`
+         splits, so the stored value is the array the schema wants and the displayed one
+         is the sentence a GM typed. */
+      key: "from",
+      label: "Which options",
+      help: "Type slugs, separated by commas.",
+      placeholder: "athletics, perception",
+      read: (block) => {
+        const from = block.from;
+        return (Array.isArray(from) ? from : []).map(String).join(", ");
+      },
+      write: (next, block) => withoutPicks(block, {
+        from: String(next ?? "")
+          .split(",")
+          .map((entry) => asChoiceSlug(entry.trim()))
+          .filter(Boolean)
+      })
+    },
+    {
+      /**
+       * THE FOURTH SOURCE — the options are the character's own earlier answers. See
+       * `writeFromPicks` for the exclusivity ruling this pair is written under.
+       *
+       * A `group` rather than two loose keys because the two halves are ONE clause: the
+       * budget alone is a complete source ("any cantrip you know"), the predicate alone
+       * names nothing, and the fieldset is what says so on a phone without a sentence of
+       * help per box. `fieldsWithin` flattens groups, so `fromPicks`, `fromPicks.offer`
+       * and `fromPicks.where` are all addressable at the block's own scope.
+       */
+      key: "fromPicks",
+      label: "Which earlier pick",
+      kind: "group",
+      help: "The player picks from answers they already gave. Nothing eligible chosen yet defers the pick rather than showing an empty list.",
+      visibleWhen: (block) => Boolean(block.fromPicks),
+      rows: [
+        {
+          key: "fromPicks.offer",
+          label: "Answers to",
+          placeholder: "class-cantrips",
+          // The same open box `extraPicks` and `replaces` use, and for the same reason: the
+          // eight named budgets are closed but `feature:<id>` is open over this record's own
+          // features, and one shared namespace must not grow a second, narrower list.
+          help: "A named budget, or feature:<id> for one of this record's own features.",
+          suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+          validate: offerValidate,
+          write: (next, block) => writeFromPicks(block, "offer", next)
+        },
+        {
+          key: "fromPicks.where",
+          label: "Narrowed to",
+          kind: "select",
+          // CLOSED, unlike every other slug box in this panel — `where` is a three-value
+          // enum in the schema and each member is a spell fact the resolver reads by name,
+          // so a homebrew word here would match nothing rather than invent something.
+          options: [
+            { value: "deals-damage", label: "Ones that deal damage" },
+            { value: "attack-roll", label: "Ones that need an attack roll" },
+            { value: "ranged", label: "Ones with a range of 10 ft or more" }
+          ],
+          help: "Leave unset to offer every answer to that pick. All three read the spell catalog, so they narrow spell picks only.",
+          write: (next, block) => writeFromPicks(block, "where", next)
+        }
+      ]
+    },
+    {
+      /**
+       * Inline options — the third source, and the one `RowEditor` around it is written by
+       * hand while the FIELD is the source of the row's shape.
+       *
+       * The reason is worth writing down, because U16 mounts the choice panel on an option
+       * row and meets it again: an option carries `RiderEditor`, and `FieldRenderer`'s
+       * `rows` branch hands a row-scoped `custom` field the whole RECORD and the record's
+       * setter — never its row — so it structurally cannot mount one. Everything the row
+       * IS still lives here (`newRow`, `rowKey`, `rowLabel`, the controls); the component
+       * reads them rather than restating them, so the field and the form cannot drift.
+       */
+      key: "options",
+      label: "Options",
+      kind: "rows",
+      wide: true,
+      addLabel: "Add an option",
+      emptyText: "No options yet.",
+      rowKey: (row) => String((row as { id?: unknown }).id ?? ""),
+      newRow: () => ({ id: newId(), name: "", description: "" }),
+      rowLabel: (row) => String((row as { name?: unknown }).name || "Unnamed option"),
+      write: (next, block) => withoutPicks(block, { options: next }),
+      rows: [
+        { key: "name", label: "Name" },
+        { key: "description", label: "Description", kind: "textarea", wide: true },
+        // WHETHER THIS OPTION IS OFFERED AT ALL, before anything it grants — see the
+        // factory. An option's own gate, and the only key here that can make the pick
+        // stop being a pick.
+        requiresField(),
+        // An OPTION raises budgets too — Divine Order's Thaumaturge is the SRD's own
+        // case — and the reader treats a chosen option as a feature (`optionAsFeature`),
+        // so the control is the same factory at the option's own row scope.
+        extraPicksField()
+      ]
+    },
+    {
+      key: "repeatable",
+      label: "The same option can be chosen more than once",
+      kind: "switch",
+      write: (next, block) => ({ ...block, repeatable: next === true })
+    }
+  ];
+}
+
+/**
+ * A block field re-addressed at FEATURE scope, over the FIRST block — `choice.kind`,
+ * `choice.choose`, `choice.from`, `choice.options`, `choice.repeatable`, the keys this
+ * panel has carried since R1.
+ *
+ * Kept after U12 rather than retired, for two reasons: they are how a one-pick feature —
+ * the overwhelming case — is naturally addressed (`choice.kind` reads as the record
+ * spells it), and retiring them would strand every existing test on the panel. They are
+ * ALIASES, not a second surface: read and write both go through the same block helpers
+ * the rendered per-block controls use, so the two cannot drift.
+ *
+ * **A `group`'s children are re-aliased too, and that is a correctness rule rather than a
+ * convenience.** `fieldsWithin` flattens groups, so an aliased group whose rows kept their
+ * block-relative keys would surface `fromPicks.offer` at FEATURE scope — a key that looks
+ * addressable and writes `feature.fromPicks.offer`, which no form can produce and no reader
+ * reads. Re-aliasing turns it into `choice.fromPicks.offer` over block 0, the same thing the
+ * group's own controls write. A `rows` field is deliberately NOT re-aliased: a row's keys
+ * belong to the row and `fieldsWithin` does not flatten through them.
+ */
+const firstBlockField = (field: FieldDef): FieldDef => ({
+  ...field,
+  key: `choice.${field.key}`,
+  ...(field.kind === "group" && field.rows ? { rows: field.rows.map(firstBlockField) } : {}),
+  visibleWhen: asksAChoice,
+  read: (feature) => {
+    const block = (choiceBlocksOf(feature)[0] ?? {}) as Draft;
+    return field.read ? field.read(block) : getAt(block, field.key);
+  },
+  write: (next, feature) => {
+    const blocks = choiceBlocksOf(feature);
+    const first = (blocks[0] ?? { ...NEW_CHOICE }) as Draft;
+    const written = (field.write ? field.write(next, first) : setAt(first, field.key, next)) as ChoiceBlock;
+    return writeChoiceBlocks(feature, [written, ...blocks.slice(1)]);
+  }
+});
+
+/**
+ * **One feature's controls, as data — the declarative surface this file used to be off.**
+ *
+ * Keys are relative to ONE feature, which is what a row's keys always are, and that is
+ * exactly how they are mounted: `featuresField` in `schemas.ts` declares this list as the
+ * `rows` of its `custom: "features"` field, so `fieldsOf` walks it flat and
+ * `fieldsWithin(type, ["features"])` — or `["feature"]` on a feat — addresses one feature
+ * at its own scope. Nothing about the render changes; `FieldRenderer`'s `custom` branch
+ * never reads `rows`.
+ *
+ * Every write here is the write the panel makes. That is what makes the harness's
+ * guarantee true rather than decorative: a test drives the same function the GM's finger
+ * does — the `choice.*` aliases and the per-block controls share `writeChoiceBlocks`, so
+ * there is one write path however a block is addressed.
+ *
+ * **What is NOT here, and why each one is a ruling rather than an omission:**
+ *
+ *  - **the level chips** — `feature.level` AND `levelTable[].features[]` in one edit; see
+ *    the top of this file. `CustomField` exists for exactly this shape.
+ *  - **"Where the options come from"** — a `SegmentedControl` over a UI MODE held in React
+ *    state, whose change writes FOUR draft keys at once
+ *    (`options`/`from`/`fromCatalog`/`fromPicks`). There is no stored value for a `FieldDef`
+ *    to read. Per block since U12, keyed `<feature id>:<block index>`. The fourth way is
+ *    `fromPicks` (U16) and widening the control is what makes the sources mutually
+ *    exclusive from the form — see `writeFromPicks`.
+ *  - **"Which catalog" + "Of which"** — two controls over ONE key, the block's
+ *    `fromCatalog`. A slug is `<which>-<family>`, so picking the family before the which
+ *    composes to NOTHING, and the half-made pair is held in state precisely because the
+ *    draft has nowhere to put it. A `FieldDef` for either half could not round-trip,
+ *    which is the one thing a control on this surface must do. **Consequence for the
+ *    units behind this refactor: `fromCatalog` stays unreachable from `applyField` at
+ *    every block, so a test that needs a catalog-sourced choice drives `from` instead.**
+ */
+export function featureFields(): readonly FieldDef[] {
+  const blockFields = choiceBlockFields();
+  return [
+    { key: "name", label: "Name" },
+    { key: "description", label: "Description", kind: "textarea", wide: true },
+    {
+      /* The switch is the CHOICE ITSELF: on mints the seed, off removes the question —
+         BOTH spellings of it, since a plural feature asks too. Stored as a shape rather
+         than a flag, which is why it needs the `read`/`write` pair: neither key has an
+         "off" value to hold. */
+      key: "choice",
+      label: "This feature asks the player to choose",
+      kind: "switch",
+      read: asksAChoice,
+      write: (on, feature) => writeChoiceBlocks(feature, on === true ? [{ ...NEW_CHOICE }] : [])
+    },
+    ...blockFields.map(firstBlockField),
+    {
+      /**
+       * THE LIST ITSELF — U12. One feature may ask several picks (Magic Initiate's two
+       * cantrips AND its level-1 spell), and this is the `rows` field that addresses
+       * them: `read` derives the blocks from whichever spelling the record holds, and
+       * `write` re-spells canonically (see `writeChoiceBlocks`). Rendered by hand in
+       * `renderFeature` — a block mounts the bespoke source machinery, which
+       * `FieldRenderer`'s rows branch structurally cannot — while everything a block IS
+       * lives here, the same split `choice.options` already lives with.
+       */
+      key: "choices",
+      label: "Choices",
+      kind: "rows",
+      wide: true,
+      addLabel: "Add another choice",
+      emptyText: "No choices yet.",
+      maxRows: 4,
+      maxRowsReason: "Four picks is as many as one feature may ask for.",
+      visibleWhen: asksAChoice,
+      read: (feature) => choiceBlocksOf(feature),
+      write: (next, feature) => writeChoiceBlocks(feature, Array.isArray(next) ? (next as ChoiceBlock[]) : []),
+      rowKey: (_row, index) => String(index),
+      newRow: () => ({ ...NEW_CHOICE }),
+      rowLabel: (row, index) => `Choice ${index + 1} — ${String((row as { kind?: unknown }).kind ?? "")}`,
+      rows: blockFields
+    },
+    extraPicksField(),
+    replacesField(),
+    replacesFeatureIdField()
+  ];
+}
+
+/** Built once: the list is a constant of this module, and `featuresField` mounts the same
+    call, so the fields a test finds are literally the objects the component renders. */
+const FIELDS = featureFields();
+
+const fieldFor = (key: string): FieldDef => {
+  const field = FIELDS.find((entry) => entry.key === key);
+  if (!field) throw new Error(`FeatureEditor has no field "${key}".`);
+  return field;
+};
+
+/** One of a choice block's own controls, off the `choices` field's declared rows — the
+    same objects `fieldsWithin(type, [features…, "choices"])` hands a test. */
+const blockFieldFor = (key: string): FieldDef => {
+  const field = (fieldFor("choices").rows ?? []).find((entry) => entry.key === key);
+  if (!field) throw new Error(`The choice block has no field "${key}".`);
+  return field;
+};
+
 export function FeatureEditor({
   draft,
   onDraft,
@@ -153,7 +941,7 @@ export function FeatureEditor({
    * took the half-finished panel away mid-selection. This is a UI mode, not draft data;
    * there is nothing to invalidate and nothing to store.
    */
-  const [sourceMode, setSourceMode] = useState<Readonly<Record<string, "catalog" | "list" | "options">>>({});
+  const [sourceMode, setSourceMode] = useState<Readonly<Record<string, SourceMode>>>({});
   /** Same reason, one level down: a catalog slug is `<which>-<family>`, so picking the
       family before the `which` composes to nothing and the family select would snap back
       to "Not set" under the GM's finger. Held here until the pair is complete. */
@@ -281,56 +1069,291 @@ export function FeatureEditor({
       is the same editor as a class feature minus the list chrome it has no use for. */
   const renderFeature = (feature: Feature, index: number) => {
     const levels = grantedLevels(feature);
-    const choice = feature.choice as Record<string, unknown> | undefined;
-    const choose = typeof choice?.choose === "number" ? choice.choose : 1;
     const grants = levelAware ? Math.max(levels.length, 1) : 1;
-    const repeatable = choice?.repeatable === true;
-    const catalogSlug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
-    const parsed = parseCatalog(catalogSlug);
-    const family = familyMode[feature.id] ?? parsed.family;
-    const derivedSource: "catalog" | "list" | "options" = Array.isArray(choice?.options)
-      ? "options"
-      : catalogSlug
-        ? "catalog"
-        : "list";
-    const source = sourceMode[feature.id] ?? derivedSource;
+    const blocks = choiceBlocksOf(feature);
+    const choicesField = fieldFor("choices");
+    const blockCap = choicesField.maxRows ?? 4;
 
-    const setChoice = (changes: Readonly<Record<string, unknown>> | undefined) => {
-      if (changes === undefined) {
-        patch(index, { choice: undefined });
-        return;
-      }
-      const merged: Record<string, unknown> = { ...(choice ?? { kind: "feat", choose: 1, repeatable: false }) };
-      for (const [key, value] of Object.entries(changes)) {
-        if (value === undefined) delete merged[key];
-        else merged[key] = value;
-      }
-      patch(index, { choice: merged });
+    /** Replace ONE feature wholesale — every choice write below funnels through this. */
+    const putFeature = (next: Draft) =>
+      writeFeatures(features.map((entry, i) => (i === index ? (next as Feature) : entry)));
+
+    /** One declared control, rendered against THIS feature as its container. The write is
+        the field's own, so what a test drives and what a finger drives are one function. */
+    const control = (key: string) => (
+      <FieldRenderer
+        field={fieldFor(key)}
+        value={feature}
+        onValue={putFeature}
+        draft={draft}
+        onDraft={onDraft}
+        ctx={ctx}
+        idPrefix={`${idPrefix}-feature-${index}`}
+      />
+    );
+
+    /**
+     * ONE choice block's whole panel. Every block gets the same controls — the kind box,
+     * the stepper, the three-way source machinery, repeatable, the picks readout — so the
+     * second block a GM adds is as rich as the first (Magic Initiate's level-1 spell
+     * reads from a catalog exactly as its cantrips do). The declared shape lives on the
+     * `choices` field's rows; this renders them, plus the three bespoke controls whose
+     * rulings are written beside `featureFields`.
+     */
+    const renderChoiceBlock = (blockIndex: number) => {
+      const block = (blocks[blockIndex] ?? {}) as Record<string, unknown>;
+      /** UI-mode state is per block. Index-keyed: blocks carry no id, and the half-made
+          catalog pair the state exists to hold is always the block under the finger. */
+      const stateKey = `${feature.id}:${blockIndex}`;
+      const choose = typeof block.choose === "number" ? block.choose : 1;
+      const repeatable = block.repeatable === true;
+      const catalogSlug = typeof block.fromCatalog === "string" ? block.fromCatalog : "";
+      const parsed = parseCatalog(catalogSlug);
+      const family = familyMode[stateKey] ?? parsed.family;
+      // Read in the READER's own precedence: `featurePickOffer` tests `fromPicks` before the
+      // other three, so a block that somehow holds two shows the one the engine would use.
+      const derivedSource: SourceMode = block.fromPicks
+        ? "picks"
+        : Array.isArray(block.options)
+          ? "options"
+          : catalogSlug
+            ? "catalog"
+            : "list";
+      const source = sourceMode[stateKey] ?? derivedSource;
+      const optionsField = blockFieldFor("options");
+      const optionRows = Array.isArray(block.options) ? (block.options as Array<Record<string, unknown>>) : [];
+
+      const setChoice = (changes: Readonly<Record<string, unknown>>) =>
+        putFeature(writeChoiceAt(feature, blockIndex, changes));
+
+      // A slug naming THIS record. The merged catalog cannot answer it while the record is
+      // a draft; the server answers it from authorship. See `namesOwnRecord`.
+      const selfCatalog = !!catalogSlug && namesOwnRecord(catalogSlug, ctx.recordId);
+      const catalogResult = catalogSlug && !selfCatalog ? ctx.resolveCatalog(catalogSlug) : null;
+
+      /** One of the block's own declared controls, rendered against the BLOCK. */
+      const blockControl = (key: string) => (
+        <FieldRenderer
+          field={blockFieldFor(key)}
+          value={block}
+          onValue={(next) =>
+            putFeature(writeChoiceBlocks(feature, blocks.map((held, i) => (i === blockIndex ? (next as Record<string, unknown>) : held))))}
+          draft={draft}
+          onDraft={onDraft}
+          ctx={ctx}
+          idPrefix={`${idPrefix}-feature-${index}-choice-${blockIndex}`}
+        />
+      );
+
+      return (
+        <div className="hb-choice" key={blockIndex}>
+          {blocks.length > 1 && (
+            <div className="hb-choice-head">
+              <span className="nh-field-label">Choice {blockIndex + 1}</span>
+              <Button size="sm" onClick={() => putFeature(writeChoiceBlocks(feature, blocks.filter((_, i) => i !== blockIndex)))}>
+                Remove choice {blockIndex + 1}
+              </Button>
+            </div>
+          )}
+
+          <FieldGrid>
+            {blockControl("kind")}
+            {blockControl("choose")}
+          </FieldGrid>
+
+          <div className="hb-field">
+            <span className="nh-field-label">Where the options come from</span>
+            <SegmentedControl
+              ariaLabel={blocks.length > 1 ? `Where choice ${blockIndex + 1}'s options come from` : "Where the options come from"}
+              size="sm"
+              value={source}
+              options={[
+                { value: "catalog", label: "A catalog" },
+                { value: "list", label: "A list I choose" },
+                { value: "options", label: "Options I write" },
+                { value: "picks", label: "Their earlier picks" }
+              ]}
+              /* FOUR ways now, and each clears the other three in the same edit. The reader
+                 reads `fromPicks` first and the rest in order, so a block holding two answers
+                 with one and silently drops the other — that shape has to be unreachable from
+                 the form, not merely refused at publish (the schema permits the pair). The
+                 offer is seeded EMPTY, the ruling `extraPicks`' column id already lives under:
+                 a guessed "class-cantrips" would silently point the pick at the wrong budget. */
+              onChange={(next) => {
+                setSourceMode((prev) => ({ ...prev, [stateKey]: next as SourceMode }));
+                if (next === "catalog") setChoice({ options: undefined, from: undefined, fromPicks: undefined, fromCatalog: "skills" });
+                else if (next === "list") setChoice({ options: undefined, fromCatalog: undefined, fromPicks: undefined, from: [] });
+                else if (next === "picks") setChoice({ options: undefined, from: undefined, fromCatalog: undefined, fromPicks: { offer: "" } });
+                else setChoice({ fromCatalog: undefined, from: undefined, fromPicks: undefined, options: [] });
+              }}
+            />
+          </div>
+
+          {source === "catalog" && (
+            <>
+              <FieldGrid>
+                <Field label="Which catalog">
+                  <Select
+                    value={family}
+                    onChange={(event) => {
+                      const next = event.target.value as CatalogFamily;
+                      setFamilyMode((prev) => ({ ...prev, [stateKey]: next }));
+                      setChoice({ fromCatalog: composeCatalog(next, parsed.which) });
+                    }}
+                  >
+                    {FAMILY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                {(family === "subclasses" || family === "feats" || family === "spells" || family === "lineages") && (
+                  <Field label="Of which">
+                    <Select
+                      value={parsed.which}
+                      onChange={(event) => setChoice({ fromCatalog: composeCatalog(family, event.target.value) })}
+                    >
+                      <option value="">Not set</option>
+                      {(family === "subclasses"
+                        ? ctx.classes
+                        : family === "feats"
+                          ? ctx.featCategories
+                          : family === "spells"
+                            ? ctx.spellLists
+                            : ctx.species
+                      ).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+              </FieldGrid>
+              {/* Live, and resolved through the SAME function the server validates
+                  with, so the count the GM reads is the count the game offers — EXCEPT
+                  for a slug naming this very record (`<own id>-subclasses`,
+                  `<own id>-lineages`). Those resolve against the merged catalog, which
+                  by construction cannot hold the draft being edited, so the shared
+                  resolver throws and the readout said "matches no catalog" on a class
+                  the GM had just duplicated and not touched. The server answers that
+                  pair from authorship instead, so the honest thing to say here is what
+                  the rule is, in the neutral register — not a caution about a break
+                  that is not one. */}
+              <p className={(!catalogSlug || (catalogResult && "error" in catalogResult)) && !selfCatalog ? "hb-blocked" : "nh-field-help"}>
+                {selfCatalog
+                  ? "Players pick from the records that name this one. They only have to exist in your library — they don't have to be published."
+                  : !catalogSlug
+                    ? family
+                      ? "Pick which one, and this will say how many options players get."
+                      : "This matches no catalog — the choice would be skipped."
+                    : catalogResult && "error" in catalogResult
+                      ? `This matches no catalog — the choice would be skipped. (${catalogResult.error})`
+                      : `Players will pick from ${catalogResult?.count ?? 0} ${catalogResult?.count === 1 ? "option" : "options"}.`}
+              </p>
+            </>
+          )}
+
+          {source === "list" && blockControl("from")}
+
+          {source === "picks" && blockControl("fromPicks")}
+
+          {/* The FIELD says what an option row is; this says how it is drawn, because a
+              row that mounts `RiderEditor` cannot go through `FieldRenderer`'s rows
+              branch — see the field's own note. Every value below comes from the field. */}
+          {source === "options" && (
+            <RowEditor
+              rows={optionRows}
+              onChange={(next) => setChoice({ options: next })}
+              rowKey={(option) => optionsField.rowKey!(option, 0)}
+              onAdd={() => optionsField.newRow!() as Record<string, unknown>}
+              addLabel={optionsField.addLabel!}
+              emptyText={optionsField.emptyText}
+              collapsible
+              ariaLabel={optionsField.label}
+              rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex)}
+              renderRow={(option, optionIndex) => {
+                /**
+                 * REPLACE the row, never merge into it — the same thing `FieldRenderer`'s own
+                 * `rows` branch does (`copy[index] = nextRow`), and both callers below hand over
+                 * a WHOLE option: a `FieldDef.write` returns its container and `RiderEditor`
+                 * writes whole-body.
+                 *
+                 * Merging looked harmless and was not: `{...entry, ...next}` restores every key
+                 * the write DELETED, so on an option row a control could add and change but
+                 * never REMOVE. Measured, at HEAD: the writes that reshape by assigning
+                 * `undefined` survive a merge (a spread copies the key), and the ones that
+                 * `delete` do not — which until U16 was nothing, because `requires` is the first
+                 * control on this row whose own ruling is a removal ("clearing both boxes drops
+                 * the clause, so a half-cleared gate never refuses the record"). The rendered
+                 * form disagreed with `applyField` about that, which is exactly the drift the
+                 * field-declares-the-row split exists to prevent.
+                 */
+                const setOption = (next: Readonly<Record<string, unknown>>) =>
+                  setChoice({ options: optionRows.map((entry, i) => (i === optionIndex ? next : entry)) });
+                return (
+                  <>
+                    <FieldGrid>
+                      {(optionsField.rows ?? []).map((rowField, rowFieldIndex) => (
+                        <FieldRenderer
+                          key={`${rowField.key}-${rowFieldIndex}`}
+                          field={rowField}
+                          value={option}
+                          onValue={(next) => setOption(next as Record<string, unknown>)}
+                          draft={draft}
+                          onDraft={onDraft}
+                          ctx={ctx}
+                          idPrefix={`${idPrefix}-feature-${index}-choice-${blockIndex}-option-${optionIndex}`}
+                        />
+                      ))}
+                    </FieldGrid>
+                    {/* Depth capped at 1: an option carries riders but never its
+                        own "Options I write", which is what the schema allows. */}
+                    <RiderEditor
+                      value={option}
+                      onChange={(next) => setOption(next)}
+                      scope="feature"
+                      ctx={ctx}
+                      idPrefix={`${idPrefix}-choice-${blockIndex}-option-${optionIndex}`}
+                    />
+                  </>
+                );
+              }}
+            />
+          )}
+
+          {/* The three numbers that NARROW what an answer may be — after the source,
+              because each of them is read against the list it produced. Each declares its
+              own `visibleWhen`, so at most two of the three ever draw. */}
+          <FieldGrid>
+            {blockControl("maxSpellLevel")}
+            {blockControl("minSpellLevel")}
+            {blockControl("maximum")}
+          </FieldGrid>
+
+          {blockControl("repeatable")}
+
+          {/* The readout that makes `choose × grants` legible. Derived, stated
+              once, in words, updating live. Never a stored duplicate. */}
+          <p className="hb-picks">
+            {levelAware && grants > 1
+              ? `Granted at ${grants} levels × choose ${choose} = `
+              : `Choose ${choose} = `}
+            <strong>
+              {grants * choose} {grants * choose === 1 ? "pick" : "picks"}
+            </strong>
+            {repeatable ? ". The same option may be taken again." : grants * choose > 1 ? ", each a different option." : "."}
+          </p>
+        </div>
+      );
     };
-
-    // A slug naming THIS record. The merged catalog cannot answer it while the record is
-    // a draft; the server answers it from authorship. See `namesOwnRecord`.
-    const selfCatalog = !!catalogSlug && namesOwnRecord(catalogSlug, ctx.recordId);
-    const catalogResult = catalogSlug && !selfCatalog ? ctx.resolveCatalog(catalogSlug) : null;
 
     return (
       <div className="hb-feature">
         <FieldGrid>
-          <Field label="Name" htmlFor={`${autoId}-name-${feature.id}`}>
-            <Input
-              id={`${autoId}-name-${feature.id}`}
-              value={feature.name ?? ""}
-              onChange={(event) => patch(index, { name: event.target.value })}
-            />
-          </Field>
-          <Field label="Description" htmlFor={`${autoId}-desc-${feature.id}`} className="nh-fieldgrid-wide">
-            <Textarea
-              id={`${autoId}-desc-${feature.id}`}
-              rows={4}
-              value={feature.description ?? ""}
-              onChange={(event) => patch(index, { description: event.target.value })}
-            />
-          </Field>
+          {control("name")}
+          {control("description")}
         </FieldGrid>
 
         {levelAware && (
@@ -385,209 +1408,37 @@ export function FeatureEditor({
           </div>
         )}
 
-        <div className="hb-field">
-          <Switch
-            checked={!!choice}
-            label="This feature asks the player to choose"
-            onChange={(on) => setChoice(on ? { kind: "feat", choose: 1, repeatable: false } : undefined)}
-          />
-        </div>
+        {/* Beside the levels, because it is the other half of the same question: WHEN does
+            the class grant this, and what does granting it take off the sheet. Renders on a
+            class only — see the field's own note. */}
+        {control("replacesFeatureId")}
 
-        {choice && (
-          <div className="hb-choice">
-            <FieldGrid>
-              <Field label="What kind of choice" htmlFor={`${autoId}-kind-${feature.id}`} help="Type your own if none of these fit.">
-                <Input
-                  id={`${autoId}-kind-${feature.id}`}
-                  list={`${autoId}-kinds`}
-                  value={String(choice.kind ?? "")}
-                  onChange={(event) => setChoice({ kind: event.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-") })}
-                />
-                <datalist id={`${autoId}-kinds`}>
-                  {CHOICE_KINDS.map((kind) => (
-                    <option key={kind} value={kind} />
-                  ))}
-                </datalist>
-              </Field>
+        {control("choice")}
 
-              <div className="hb-field">
-                <Stepper
-                  value={choose}
-                  min={1}
-                  max={10}
-                  label="How many they pick"
-                  onChange={(next) => setChoice({ choose: next })}
-                />
-              </div>
-            </FieldGrid>
-
-            <div className="hb-field">
-              <span className="nh-field-label">Where the options come from</span>
-              <SegmentedControl
-                ariaLabel="Where the options come from"
+        {blocks.length > 0 && (
+          <>
+            {blocks.map((_, blockIndex) => renderChoiceBlock(blockIndex))}
+            {/* Annotate at capacity, never hide the Add button — the same readiness rule
+                `RowEditor` follows. The cap is the field's own (`FeatureRecordSchema`'s
+                `choices` takes at most four), spelled once on the `choices` field. */}
+            <div className="hb-choice-add">
+              <Button
                 size="sm"
-                value={source}
-                options={[
-                  { value: "catalog", label: "A catalog" },
-                  { value: "list", label: "A list I choose" },
-                  { value: "options", label: "Options I write" }
-                ]}
-                onChange={(next) => {
-                  setSourceMode((prev) => ({ ...prev, [feature.id]: next as "catalog" | "list" | "options" }));
-                  if (next === "catalog") setChoice({ options: undefined, from: undefined, fromCatalog: "skills" });
-                  else if (next === "list") setChoice({ options: undefined, fromCatalog: undefined, from: [] });
-                  else setChoice({ fromCatalog: undefined, from: undefined, options: [] });
-                }}
-              />
+                disabled={blocks.length >= blockCap}
+                aria-describedby={blocks.length >= blockCap ? `${autoId}-choicecap-${feature.id}` : undefined}
+                onClick={() => putFeature(writeChoiceBlocks(feature, [...blocks, choicesField.newRow!() as ChoiceBlock]))}
+              >
+                {choicesField.addLabel}
+              </Button>
+              {blocks.length >= blockCap && (
+                <p className="nh-field-help" id={`${autoId}-choicecap-${feature.id}`}>{choicesField.maxRowsReason}</p>
+              )}
             </div>
-
-            {source === "catalog" && (
-              <>
-                <FieldGrid>
-                  <Field label="Which catalog">
-                    <Select
-                      value={family}
-                      onChange={(event) => {
-                        const next = event.target.value as CatalogFamily;
-                        setFamilyMode((prev) => ({ ...prev, [feature.id]: next }));
-                        setChoice({ fromCatalog: composeCatalog(next, parsed.which) });
-                      }}
-                    >
-                      {FAMILY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  {(family === "subclasses" || family === "feats" || family === "spells" || family === "lineages") && (
-                    <Field label="Of which">
-                      <Select
-                        value={parsed.which}
-                        onChange={(event) => setChoice({ fromCatalog: composeCatalog(family, event.target.value) })}
-                      >
-                        <option value="">Not set</option>
-                        {(family === "subclasses"
-                          ? ctx.classes
-                          : family === "feats"
-                            ? ctx.featCategories
-                            : family === "spells"
-                              ? ctx.spellLists
-                              : ctx.species
-                        ).map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  )}
-                </FieldGrid>
-                {/* Live, and resolved through the SAME function the server validates
-                    with, so the count the GM reads is the count the game offers — EXCEPT
-                    for a slug naming this very record (`<own id>-subclasses`,
-                    `<own id>-lineages`). Those resolve against the merged catalog, which
-                    by construction cannot hold the draft being edited, so the shared
-                    resolver throws and the readout said "matches no catalog" on a class
-                    the GM had just duplicated and not touched. The server answers that
-                    pair from authorship instead, so the honest thing to say here is what
-                    the rule is, in the neutral register — not a caution about a break
-                    that is not one. */}
-                <p className={(!catalogSlug || (catalogResult && "error" in catalogResult)) && !selfCatalog ? "hb-blocked" : "nh-field-help"}>
-                  {selfCatalog
-                    ? "Players pick from the records that name this one. They only have to exist in your library — they don't have to be published."
-                    : !catalogSlug
-                      ? family
-                        ? "Pick which one, and this will say how many options players get."
-                        : "This matches no catalog — the choice would be skipped."
-                      : catalogResult && "error" in catalogResult
-                        ? `This matches no catalog — the choice would be skipped. (${catalogResult.error})`
-                        : `Players will pick from ${catalogResult?.count ?? 0} ${catalogResult?.count === 1 ? "option" : "options"}.`}
-                </p>
-              </>
-            )}
-
-            {source === "list" && (
-              <Field label="Which options" help="Type slugs, separated by commas.">
-                <Input
-                  value={(Array.isArray(choice.from) ? (choice.from as string[]) : []).join(", ")}
-                  placeholder="athletics, perception"
-                  onChange={(event) =>
-                    setChoice({
-                      from: event.target.value
-                        .split(",")
-                        .map((entry) => entry.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-"))
-                        .filter(Boolean)
-                    })
-                  }
-                />
-              </Field>
-            )}
-
-            {source === "options" && (
-              <RowEditor
-                rows={Array.isArray(choice.options) ? (choice.options as Array<Record<string, unknown>>) : []}
-                onChange={(next) => setChoice({ options: next })}
-                rowKey={(option) => String(option.id)}
-                onAdd={() => ({ id: newId(), name: "", description: "" })}
-                addLabel="Add an option"
-                emptyText="No options yet."
-                collapsible
-                ariaLabel="Options"
-                rowLabel={(option) => String(option.name || "Unnamed option")}
-                renderRow={(option, optionIndex) => {
-                  const setOption = (changes: Readonly<Record<string, unknown>>) =>
-                    setChoice({
-                      options: (choice.options as Array<Record<string, unknown>>).map((entry, i) =>
-                        i === optionIndex ? { ...entry, ...changes } : entry
-                      )
-                    });
-                  return (
-                    <>
-                      <FieldGrid>
-                        <Field label="Name">
-                          <Input value={String(option.name ?? "")} onChange={(event) => setOption({ name: event.target.value })} />
-                        </Field>
-                        <Field label="Description" className="nh-fieldgrid-wide">
-                          <Textarea rows={3} value={String(option.description ?? "")} onChange={(event) => setOption({ description: event.target.value })} />
-                        </Field>
-                      </FieldGrid>
-                      {/* Depth capped at 1: an option carries riders but never its
-                          own "Options I write", which is what the schema allows. */}
-                      <RiderEditor
-                        value={option}
-                        onChange={(next) => setOption(next)}
-                        scope="feature"
-                        ctx={ctx}
-                        idPrefix={`${idPrefix}-option-${optionIndex}`}
-                      />
-                    </>
-                  );
-                }}
-              />
-            )}
-
-            <div className="hb-field">
-              <Switch
-                checked={repeatable}
-                label="The same option can be chosen more than once"
-                onChange={(on) => setChoice({ repeatable: on })}
-              />
-            </div>
-
-            {/* The readout that makes `choose × grants` legible. Derived, stated
-                once, in words, updating live. Never a stored duplicate. */}
-            <p className="hb-picks">
-              {levelAware && grants > 1
-                ? `Granted at ${grants} levels × choose ${choose} = `
-                : `Choose ${choose} = `}
-              <strong>
-                {grants * choose} {grants * choose === 1 ? "pick" : "picks"}
-              </strong>
-              {repeatable ? ". The same option may be taken again." : grants * choose > 1 ? ", each a different option." : "."}
-            </p>
-          </div>
+          </>
         )}
+
+        {control("extraPicks")}
+        {control("replaces")}
 
         <RiderEditor
           value={feature}
@@ -639,7 +1490,9 @@ export function FeatureEditor({
           const bits = [feature.name || `Unnamed ${singular}`];
           if (levelAware && levels.length === 1) bits.push(`level ${levels[0]}`);
           else if (levelAware && levels.length > 1) bits.push(`${levels.length} levels`);
-          if (feature.choice) bits.push("asks a choice");
+          const asked = choiceBlocksOf(feature).length;
+          if (asked === 1) bits.push("asks a choice");
+          else if (asked > 1) bits.push(`asks ${asked} choices`);
           const summary = riderSummary(feature);
           if (summary) bits.push(summary);
           return bits.join(" · ");

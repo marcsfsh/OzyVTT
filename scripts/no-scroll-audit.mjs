@@ -21,6 +21,12 @@
  *  - It had no landscape and no short pane. A phone in landscape (or portrait with the
  *    soft keyboard up) is where the frame's floors stop fitting, and it is the state the
  *    whole table went unusable in.
+ *  - It stopped one level short. The pane probe measures the FRAME and is blind by
+ *    construction to the regions inside it, which is where issue `4e` lived: with one legal
+ *    roll in the dice panel's list (a twenty-term formula — the cap in `rules-5e/src/dice.ts`)
+ *    `.roll-list` could be dragged 279px sideways at 1280x900 and 363px at 320x568, and
+ *    nothing here said so. Every `.scroll-y` region is now probed on the axis it did NOT
+ *    declare — see the INNER docblock for why that is one rule and not a list of surfaces.
  *
  * Same terms as `tap-audit.mjs`: it needs a browser and a running dev server, so it is a
  * scripted manual audit, deliberately NOT wired into `npm test`. `playwright-core` is
@@ -63,10 +69,12 @@
  * design-conventions.test.ts, not this table.
  *
  * WHAT A GREEN RUN IS STILL NOT WORTH. It proves the document does not scroll, that the
- * table's own frame stays inside its budget, and that two named controls hit-test — at the
- * viewports and in the states a route list opens. It remains blind to occlusion in general,
- * to every control behind a collapsed tab or a closed disclosure, and to any state this
- * script cannot reach (a claimed player, a populated replays shelf). Read it as a floor.
+ * table's own frame stays inside its budget, that two named controls hit-test, and that no
+ * MOUNTED, LAID-OUT `.scroll-y` region scrolls on its undeclared axis — at the viewports and
+ * in the states a route list opens. It remains blind to occlusion in general, to every
+ * control behind a collapsed tab or a closed disclosure (whose regions the inner probe skips
+ * along with them), and to any state this script cannot reach (a claimed player, a populated
+ * replays shelf). Read it as a floor.
  *
  * THE RUN IS RED ON ITS FIRST EXTENDED PASS (2026-08-05), and the red is the point rather
  * than a broken script: adding landscape and short-pane cells found 14 of them, on five
@@ -76,6 +84,19 @@
  * looked for. **Do not delete a viewport to go green** — the widths and heights here are a
  * claim about what the app supports (ADR-0014), and narrowing the claim to fit the code is
  * the one move this file exists to prevent.
+ *
+ * AND RED AGAIN ON THE SECOND ONE (2026-08-08), for the same reason and with the same standing
+ * instruction: the inner-scroller probe added 15 failing cells on three surfaces, measured on a
+ * dev server with an empty-ish table (`21` failing cells total, against `6` document-Y cells from
+ * the pass above). None of them is the `4e` list — that one is fixed — and none is new code:
+ *   · `/table` gm, all nine cells, `div.dock-section-body+10` / `div.dock-tabs-body+10`. The
+ *     culprit measured inside is `span.nh-tooltip-bubble`, overflowing its region by 10.16px.
+ *   · `/settings/api`, three cells, `div.api-reference-page-body.frame-fill+163…+233`.
+ *   · `/viewer-controls`, three cells, `div.viewer-col.viewer-col-access+2…+3`.
+ *   · `div.table-layout.anim-view+1` rides the `/table` gm phone cells.
+ * Confirmed pre-existing by re-running the whole table against `apps/client/src/styles.css` at
+ * `35b17bf`: byte-identical, 21 failing cells either way. **Do not silence the probe** — the
+ * fixes are the two the INNER docblock names, per region.
  */
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE ?? "playwright-core");
@@ -169,6 +190,61 @@ const PANE = `(() => {
   };
 })()`;
 
+/**
+ * THE INNER-SCROLLER PROBE — the blind spot the pane probe left, found by measuring rather than
+ * by reading. Issue `4e` ("Recent rolls scrolls the wrong axis") is the case that named it: a
+ * PASS says the DOCUMENT does not scroll and that the table's own frame keeps its overflow
+ * reachable, and `.roll-list` overflowed INSIDE a frame that was doing both. Same failure class
+ * as the docblock's first bullet, one level further in. Measured against the pre-fix CSS with one
+ * legal roll in the list, this probe reports `div.roll-list+279` at 1280x900, `+293` at 390x844
+ * and `+363` at 320x568 — where nothing else here had anything to say.
+ *
+ * WHAT IT ASSERTS, and only this: **a declared scroll region scrolls on ONE axis, the one it
+ * declared.** `.scroll-y` is §7's blessed treatment and it means what it says — `overflow-y: auto`
+ * and nothing about x (design-tokens.css). CSS then computes the undeclared axis to `auto`, so any
+ * region whose content is one pixel too wide grows a horizontal bar nobody asked for. A region that
+ * genuinely needs the other axis declares it in CSS, which §7's wide-content rule requires and
+ * check (h) in design-conventions.test.ts explicitly permits; then this probe sees `clip`/`hidden`
+ * and stays quiet. So a red cell here is always the same defect and always has the same two fixes:
+ * let the content shrink, or declare the axis.
+ *
+ * X BY ATTEMPTED SCROLL, not by `scrollWidth`, for the reason the document probe already gives:
+ * a `scrollWidth` comparison reports inert stretch (a translated-off drawer) that no user can
+ * reach. A `scrollLeft` readback reports only scroll a thumb could actually perform. RTL is not a
+ * concern here — the app is LTR-only — but the readback is taken from wherever the region already
+ * sits and put back, so a region mid-scroll is not disturbed.
+ *
+ * AND THE AXIS MUST ACTUALLY BE SCROLLABLE, which the readback alone does not establish: an
+ * `overflow-x: hidden` box answers a `scrollLeft` write exactly like an `auto` one, while showing
+ * no bar and refusing every thumb, wheel and swipe. Measured on this tree, that distinction is
+ * most of the signal — without the `auto|scroll` gate the probe flags a 1px `.table-layout` whose
+ * x axis is clipped, which is not a defect and not §7's business. So the rule the cell reports is
+ * exactly: **this region will grow a horizontal scrollbar.** (`overflow-x: clip` beside a
+ * scrolling y computes to `hidden`, CSS Overflow 3 §3.1, so a region that declares the axis reads
+ * as clipped here either way.)
+ *
+ * ZERO-BOX AND UNMOUNTED REGIONS ARE SKIPPED, deliberately: a `.scroll-y` behind a collapsed tab
+ * has no layout to be wrong about, and this script's own docblock already disclaims every control
+ * behind a closed disclosure. That is a floor, not a hole.
+ */
+const INNER = `(() => {
+  const bad = [];
+  for (const el of document.querySelectorAll(".scroll-y")) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    const ox = getComputedStyle(el).overflowX;
+    if (ox !== "auto" && ox !== "scroll") continue;
+    const x0 = el.scrollLeft;
+    el.scrollLeft = 1e6;
+    const xMax = Math.round(el.scrollLeft);
+    el.scrollLeft = x0;
+    if (xMax <= 0) continue;
+    const name = el.tagName.toLowerCase() + [...el.classList].filter((c) => c !== "scroll-y").slice(0, 2).map((c) => "." + c).join("");
+    bad.push(name + "+" + xMax);
+  }
+  return bad;
+})()`;
+
 /** Reads a PANE result into a cell fragment plus a pass/fail verdict. */
 function paneVerdict(p) {
   if (!p) return { text: "", bad: [] };
@@ -256,6 +332,22 @@ const GM_ROUTES = [
   { path: "/scenes/maps", ready: ".scenes-maps-view" },
   { path: "/roster", ready: ".party-heading-actions" },
   { path: "/codex", ready: ".codex-root" },
+  // The Codex's two COMPOSERS, which `/codex` alone never renders: `/codex` is the campaign dashboard,
+  // so the field rows where `5b`/`5e.1`/`5e.2` lived were outside this audit entirely. Downtime's is at
+  // its own address; a session's is behind a record, so the address is resolved from the rail below.
+  { path: "/codex/downtime", ready: ".codex-downtime-form" },
+  {
+    path: "/codex/sessions/:id", ready: ".codex-session-editor",
+    /** D3: which session is open IS the address, so opening the first row yields a real route to probe. */
+    resolve: async (page) => {
+      await go(page, "/codex/sessions", ".codex-shell-content");
+      const row = page.locator(".codex-shell-content button.codex-session-row").first();
+      if ((await row.count()) === 0) return null;
+      await row.click({ timeout: 8_000 });
+      await page.waitForTimeout(900);
+      return await page.evaluate(() => location.pathname);
+    }
+  },
   { path: "/homebrew", ready: ".hb-root" },
   { path: "/viewer-controls", ready: ".viewer-controls" },
   { path: "/replays", ready: ".replay-panel" },
@@ -345,10 +437,13 @@ async function auditRoutes(page, role, routes) {
       const m = await page.evaluate(MEASURE);
       // The pane probe rides the same cell, and only `/table` has a `.table-layout` to probe.
       const verdict = paneVerdict(await page.evaluate(PANE));
+      // The inner probe rides it too, and unlike the pane one it applies to EVERY route: a declared
+      // region that scrolls sideways is the same defect wherever it lives.
+      const inner = await page.evaluate(INNER);
       const doc = cellOf(m);
-      const cell = doc === "PASS" && verdict.bad.length === 0
+      const cell = doc === "PASS" && verdict.bad.length === 0 && inner.length === 0
         ? `PASS${verdict.text}`
-        : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad].filter(Boolean).join(" ")}`;
+        : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad, ...inner].filter(Boolean).join(" ")}`;
       if (cell.startsWith("FAIL")) failures += 1;
       cells.push(cell);
     }
@@ -375,11 +470,12 @@ async function auditDocked() {
         const m = await page.evaluate(MEASURE);
         const docked = await page.evaluate(() => document.querySelector(".table-layout.docked") !== null);
         const verdict = paneVerdict(await page.evaluate(PANE));
+        const inner = await page.evaluate(INNER);
         const doc = cellOf(m);
         // A cell that never reached the docked composition proves nothing — say so rather than pass.
         // (It needs a live map: `showDocked` is gated on `combat.mapAssetId`, which is what the
         // in-combat seed above provides.)
-        const cell = !docked ? "NOT MEASURED" : (doc === "PASS" && verdict.bad.length === 0 ? `PASS${verdict.text}` : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad].filter(Boolean).join(" ")}`);
+        const cell = !docked ? "NOT MEASURED" : (doc === "PASS" && verdict.bad.length === 0 && inner.length === 0 ? `PASS${verdict.text}` : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad, ...inner].filter(Boolean).join(" ")}`);
         if (cell === "NOT MEASURED") unmeasured += 1; else if (cell.startsWith("FAIL")) failures += 1;
         out.push(cell);
       }
@@ -454,8 +550,10 @@ const line = (cols) => cols.map((c, i) => c.padEnd(widths[i])).join("  ");
 console.log(`\n===== no-scroll audit (the page never scrolls - design-language.md §7) =====`);
 console.log(line(headers));
 for (const r of rows) console.log(line([r.route, r.role, ...r.cells]));
-console.log(`\nA cell reads PASS when the DOCUMENT does not scroll on either axis AND the table's own`);
-console.log(`frame keeps every overflow reachable, its dock body non-zero and its named controls`);
-console.log(`hit-testable. "pane+N" on a PASS is a frame that overflows by N and can be scrolled to.`);
+console.log(`\nA cell reads PASS when the DOCUMENT does not scroll on either axis, the table's own frame`);
+console.log(`keeps every overflow reachable, its dock body is non-zero, its named controls hit-test, and`);
+console.log(`no .scroll-y region scrolls sideways. "pane+N" on a PASS is a frame that overflows by N and`);
+console.log(`can be scrolled to. A fragment like "div.roll-list+279" names a region and how far it scrolls`);
+console.log(`on the axis it never declared: let its content shrink, or declare that axis in CSS.`);
 console.log(`\n${rows.length} route rows; ${failures} failing viewport cells; ${unmeasured} NOT MEASURED.`);
 process.exit(failures === 0 && unmeasured === 0 ? 0 : 1);

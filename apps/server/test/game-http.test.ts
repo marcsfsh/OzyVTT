@@ -443,7 +443,7 @@ describe("public game API over /api/v1", () => {
     expect(elf).toHaveProperty("abilityBonusChoice");
     const backgrounds = await (await fetch(base + CONTENT_PATHS.backgrounds, { headers: bearer(playerToken) })).json();
     const soldier = backgrounds.data.backgrounds.find((entry: { id: string }) => entry.id === "soldier");
-    expect(soldier.toolChoices).toEqual({ choose: 1, from: ["gaming-set-dice", "gaming-set-playing-cards"] });
+    expect(soldier.toolChoices).toEqual({ choose: 1, from: ["gaming-set-dice", "gaming-set-playing-cards"], fromCatalog: null });
     expect(soldier).toHaveProperty("skillChoices");
     expect(soldier).toHaveProperty("languageChoices");
   });
@@ -454,7 +454,8 @@ describe("public game API over /api/v1", () => {
 
     // Players see the default policy (all four methods) before the GM touches anything.
     const before = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
-    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null, maxLevel: 20, playerBuilder: "open" });
+    // `playerRandom` defaults CLOSED, unlike `playerBuilder` - a generator is a roster-filling vector (issue `2d`).
+    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null, maxLevel: 20, playerBuilder: "open", playerRandom: "gm-only" });
 
     // Player write refused; the policy is the GM's (decision 10).
     const denied = await post(base, GAME_PATHS.builderPolicy, playerToken, { allowedAbilityMethods: ["standard-array"] });
@@ -472,7 +473,7 @@ describe("public game API over /api/v1", () => {
     // Player-READABLE: the stored policy reaches the player projection verbatim.
     const after = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
     // The two additive fields are omitted by this request, so they must survive it untouched.
-    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6", maxLevel: 20, playerBuilder: "open" });
+    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6", maxLevel: 20, playerBuilder: "open", playerRandom: "gm-only" });
   });
 
   it("creates a character from choices over HTTP (GM only); the actor id equals the commandId and the sheet is import-keyed", async () => {
@@ -488,6 +489,8 @@ describe("public game API over /api/v1", () => {
       backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
       hp: { mode: "average" },
       choices: [
+        { level: 1, kind: "language", id: "dwarvish" },
+        { level: 1, kind: "language", id: "giant" },
         { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
         { level: 1, classId: "fighter", kind: "skill", id: "perception" },
         { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
@@ -836,6 +839,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.healthDisplay, "post", "encounter.set-health-display"],
       [GAME_PATHS.environment, "post", "encounter.set-environment"],
       [GAME_PATHS.actorRest, "post", "actor.rest"],
+      [GAME_PATHS.actorRechoose, "post", "actor.rechoose"],
       [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],
       [GAME_PATHS.characterSetSlot, "post", "character.set-slot"],
       [GAME_PATHS.characterSetPrepared, "post", "character.set-prepared"],
@@ -844,6 +848,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.characterSetIdentity, "post", "character.set-identity"],
       [GAME_PATHS.characterSetProficiencies, "post", "character.set-proficiencies"],
       [GAME_PATHS.characters, "post", "character.create"],
+      [GAME_PATHS.charactersRandom, "post", "character.generate"],
       [GAME_PATHS.builderPolicy, "post", "builder.set-policy"],
       [GAME_PATHS.rulesPolicy, "post", "rules.set-policy"],
       [GAME_PATHS.actionUse, "post", "action.use"],
@@ -938,6 +943,7 @@ describe("public game API over /api/v1", () => {
       "content:monster-actions": [CONTENT_PATHS.monsterActions, "get"],
       "content:conditions": [CONTENT_PATHS.conditions, "get"],
       "content:skills": [CONTENT_PATHS.skills, "get"],
+      "content:languages": [CONTENT_PATHS.languages, "get"],
       "content:spells": [CONTENT_PATHS.spells, "get"],
       "content:equipment": [CONTENT_PATHS.equipment, "get"],
       "content:classes": [CONTENT_PATHS.classes, "get"],

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CombatLogEntry, GameState, PlayerCombatView, PlayerHp } from "@vtt/domain";
-import { Button, GmOnlyTag, IconChevronLeft, IconChevronRight, IconDownload, IconPlay, Menu, MenuItem, RevealSwitch, SegmentedControl, useToast } from "@vtt/ui";
+import { Alert, Button, GmOnlyTag, IconChevronLeft, IconChevronRight, IconDownload, IconPlay, Menu, MenuItem, RevealSwitch, SegmentedControl, useToast } from "@vtt/ui";
+import { navigate } from "../router";
+import { launchRefusalOf, type LaunchRefusal } from "./launch-refusal";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph } from "../scene/annotationGlyph";
 import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
@@ -192,6 +194,8 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [launching, setLaunching] = useState(false);
+  /** A refusal STAYS on screen (an Alert, not a Toast) - it is a state with a next step, not a result. */
+  const [refused, setRefused] = useState<{ kind: LaunchRefusal; message: string } | null>(null);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
 
@@ -230,9 +234,18 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
     });
     if (!ok) return;
     setLaunching(true);
+    setRefused(null);
     socket.emit("replay:launch", { commandId: newId(), archiveId, turnIndex: index }, (result: { ok: boolean; message?: string }) => {
       setLaunching(false);
-      if (!result.ok) { toast(result.message ?? "That moment could not be launched.", { tone: "error" }); return; }
+      if (!result.ok) {
+        const message = result.message ?? "That moment could not be launched.";
+        const kind = launchRefusalOf(result.message);
+        // A refusal with somewhere to go stays on screen with the door attached; anything else is an
+        // ordinary failure and keeps the transient toast it always had.
+        if (kind === "other") { toast(message, { tone: "error" }); return; }
+        setRefused({ kind, message });
+        return;
+      }
       toast("The table is live on that moment. Your previous scene is parked in Scenes.", { tone: "success" });
       onLaunched();
     });
@@ -250,6 +263,18 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
         <Button variant="secondary" onClick={() => exportDocument(archiveId, document.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks."><IconDownload /> Download JSON</Button>
       </div>
     </div>
+    {/* The refusal and its way out, in the row under the action that raised it. `scene-room` sends the
+        GM to the scene gallery, which is the only place a prepared scene can be removed; `history-review`
+        has no route worth offering (the rewind is unwound on the table, from the banner that shows it),
+        so it says where to go rather than pretending to take them there. */}
+    {refused && <Alert tone="warning" className="replay-refusal" title="That moment could not be launched">
+      <p>{refused.message}</p>
+      <div className="replay-refusal-actions">
+        {refused.kind === "scene-room" && <Button variant="primary" size="sm" onClick={() => void navigate("/scenes")}>Manage scenes</Button>}
+        {refused.kind === "history-review" && <span>Step back to the live turn on the table first - the fight&rsquo;s history banner has the way out.</span>}
+        <Button variant="ghost" size="sm" onClick={() => setRefused(null)}>Dismiss</Button>
+      </div>
+    </Alert>}
     <Transport index={index} count={steps.length} playing={playing} onMove={move} onPlay={() => (playing ? setPlaying(false) : (index >= steps.length - 1 && setIndex(0), setPlaying(true)))} onSeek={(next) => { setPlaying(false); setIndex(next); }} />
     <p className="replay-step-label"><strong>{step.label}</strong> · {when(step.at)}</p>
     <div className="replay-layout frame-fill">

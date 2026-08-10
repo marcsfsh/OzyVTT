@@ -1,16 +1,20 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { BuilderAbilityMethod, ContentFeatureSummary, GmView, PlayerView } from "@vtt/domain";
+import type { BuilderAbilityMethod, ContentFeatureSummary, ContentSpellSummary, GmView, PlayerView } from "@vtt/domain";
 import {
   ABILITIES, ABILITY_ROLL_FORMULA, ABILITY_SCORE_MAXIMUM, ABILITY_SCORE_MINIMUM, abilityModifier,
   hitDieAverage, hitDieFaces, POINT_BUY_BUDGET, POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY,
   validateAbilityFormula, type Ability, type HitDie
 } from "@vtt/rules-5e";
 import {
-  AbilityScoreAllocator, Alert, Badge, Button, Chip, ChoiceGrid, DiceInputRow, FeatureList, NameField,
+  AbilityScoreAllocator, Alert, Badge, Button, ChoiceGrid, DiceInputRow, FeatureList, NameField,
   ReviewSummary, SegmentedControl, Select, Stepper, useToast, WizardShell, type ChoiceOption, type DiceEntryMode,
   type FeatureItem, type ReviewSection, type StepItem
 } from "@vtt/ui";
 import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
+/* The SAME spell card the fight uses (`encounter/spells.tsx`) — header, the four reference lines,
+   the full description and the upcast note, in a `Modal`. Reused rather than re-specified: a spell's
+   rules must not read one way while choosing it and another way while casting it. */
+import { SpellCard } from "../encounter/spells";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import {
@@ -63,6 +67,26 @@ export type CharacterBuilderProps = Readonly<{
 /** How long Create waits for the table's answer before offering the (idempotent) retry. */
 const CREATE_ACK_TIMEOUT_MS = 10_000;
 
+/**
+ * How many options an offer has to carry before its grid earns a search box.
+ *
+ * This number used to do a second job — it also decided which answered offers folded away to chips
+ * — and that second job was the reported defect, twice. Filed as `1` ("exhausted option lists hide
+ * their unselected options"), it was first fixed only BELOW this line, so an Elf's three Keen Senses
+ * skills stayed while a Wizard's 203 prepared spells still vanished the moment the 25th was picked.
+ * The rule the client actually asked for has no threshold in it: whenever a player is choosing
+ * several options, reaching the maximum greys the unchosen ones — it never hides them.
+ *
+ * So the fold is gone and the page height it was buying is bought by `ChoiceGrid bounded` instead:
+ * the grid caps its own height and scrolls internally, which costs a scroll rather than the one
+ * thing a player needs to see. Searching survives as the only job this constant has left, and it is
+ * what makes the capped region navigable at 203 cards.
+ */
+const SEARCH_THRESHOLD = 8;
+
+/** The offer kinds whose options are spells, and therefore have rules worth reading while choosing. */
+const SPELL_KINDS: ReadonlySet<string> = new Set(["spell", "cantrip"]);
+
 const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
   "standard-array": "Standard array", "point-buy": "Point buy", roll: "Roll 4d6", custom: "GM formula"
 };
@@ -101,6 +125,10 @@ const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.sli
 const featSummary = (catalogs: BuilderCatalogs, id: string) =>
   catalogs.choice.feats.find((entry) => entry.id === id)?.summary ?? undefined;
 
+/** What an option's `level` says on the card. Only the spell catalogs carry one; 0 is a cantrip. */
+const spellLevelLine = (level: number | null | undefined) =>
+  level == null ? undefined : level === 0 ? "Cantrip" : `Level ${level}`;
+
 /**
  * Provenance for an OFFER option, by id.
  *
@@ -125,39 +153,29 @@ const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined 
   ?? catalogs.choice.feats.find((entry) => entry.id === id)?.source;
 
 /**
- * One pick offered by the content: heading, count, and the grid that answers it — until it IS
- * answered, at which point the grid folds down to the answer.
+ * One pick offered by the content: heading, count, and the grid that answers it.
  *
- * A level-5 Wizard's fourth step asks seven questions and, once every one of them has been answered,
- * was still showing all 183 cards it asked them with: nine thousand pixels of scroll whose entire
- * content was options already declined. An answered question is a line, not a grid. Reopening it is
- * one press of Change, in the place the answer is.
+ * THE GRID NEVER LEAVES. An answered offer used to fold down to chips, which is how the wizard kept
+ * a level-20 Wizard's fourth step from being twenty-four thousand pixels of declined options — and
+ * it is also exactly the defect filed as `1`: at capacity the player could no longer see what they
+ * had not chosen. The height is bought by the grid capping ITSELF now (`ChoiceGrid bounded`), so
+ * every option stays mounted at every list length, greys when the offer is full, and a chosen card
+ * stays tappable so the pick can be swapped. One rule, no threshold, every offer kind.
  */
 function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
   onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
 }>) {
   const picks = draft.picks[offer.key] ?? [];
-  const complete = picks.length === offer.capacity;
-  const [expanded, setExpanded] = useState(false);
+  /** Long enough to earn a search box. See `SEARCH_THRESHOLD`. */
+  const long = offer.options.length > SEARCH_THRESHOLD;
   /**
-   * DERIVED, never stored. An offer whose picks are pruned away by a change upstream (a new class,
-   * a granted origin feat) becomes incomplete, and therefore open again, with no stale "collapsed"
-   * flag anywhere to invalidate. It is also why an offer whose capacity exceeds its option count —
-   * a choose-5-of-4 content gap — can never fold: it can never be complete.
+   * The spell whose rules are open, or null. Client-side and free: `catalogs.choice.spells` is the
+   * same catalog the offer's options were resolved from, already loaded, so reading one costs no
+   * round trip and the server learns nothing about what is being read.
    */
-  const collapsed = complete && !expanded;
-  const changeRef = useRef<HTMLButtonElement | null>(null);
-  const wasCollapsed = useRef(collapsed);
-  useEffect(() => {
-    const justCollapsed = collapsed && !wasCollapsed.current;
-    wasCollapsed.current = collapsed;
-    // The last pick unmounts the grid the finger (or the Space bar) was in, and focus falls to
-    // <body> — a keyboard walk would then restart from the top of the page. Hand it to the control
-    // that stands where the grid was. Only when it really was lost: a mouse user who never had
-    // focus in the grid keeps whatever they had.
-    if (justCollapsed && document.activeElement === document.body) changeRef.current?.focus();
-  }, [collapsed]);
+  const [reading, setReading] = useState<ContentSpellSummary | null>(null);
+  const spells = SPELL_KINDS.has(offer.kind) ? catalogs.choice.spells : null;
 
   if (offer.unresolvable) {
     return <section className="cb-offer">
@@ -178,9 +196,16 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
     title: option.name,
     // Every feat in the catalog carries a summary; showing it turns a grid of bare names
     // ("Alert", "Savage Attacker") into a choice that can actually be made from the card.
-    description: isFeat ? featSummary(catalogs, option.id) : undefined,
+    //
+    // A spell's TYPE LINE — "Cantrip", "Level 3" — rides the same slot rather than `meta`, and that
+    // is the typography fix, not a rename. `meta` is the card's mono micro-label (`.tabular`,
+    // --fs-xs, Space Mono): right for the numbers it was built for — a hit die, "+2 STR" — and
+    // wrong for a word, which came out as 11px Space Mono under a 15px Manrope name, two sizes and
+    // two faces apart on a card carrying two labels. `description` is --fs-sm in the body face, one
+    // rung under the title: the same "name over a smaller grey line" the client asked for, in
+    // tokens the scale already has. Nothing else on an offer card ever set `meta`.
+    description: isFeat ? featSummary(catalogs, option.id) : spellLevelLine(option.level),
     badge: sourceBadge(offerSource(catalogs, option.id)),
-    meta: option.level != null && option.level > 0 ? `Level ${option.level}` : option.level === 0 ? "Cantrip" : undefined,
     // A proficiency this build already holds stays IN the list and greys out, saying where it
     // came from. Picked from a different source it would be merged away server-side, costing the
     // player the pick and leaving them one proficiency short with nothing said.
@@ -190,9 +215,6 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
     keywords: option.id
   }));
   const many = offer.capacity > 1;
-  const nameOf = (id: string) => offer.options.find((option) => option.id === id)?.name ?? titleize(id);
-  /* The heading is byte-identical in both states: the question and its count do not change just
-     because it has been answered, and a heading that moved would cost the collapse its whole point. */
   return <section className="cb-offer">
     <div className="cb-offer-head">
       <h3 className="cb-offer-title">{offer.label}</h3>
@@ -203,31 +225,32 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
           names this very offer. The slot is a readout, not a seventh vocabulary. */}
       {many && <span className="cb-offer-count tabular" role="status">{picks.length} of {offer.capacity} chosen</span>}
     </div>
-    {collapsed
-      /* DISPLAY chips, never `.nh-chip--pressable`: a readout is not a second place the pick can be
-         made (the rule the count beside it already obeys). Change is the one way back in. */
-      ? <div className="cb-offer-picks">
-          {picks.map((pick) => <Chip key={pick}>{nameOf(pick)}</Chip>)}
-          <Button ref={changeRef} variant="ghost" size="sm" onClick={() => setExpanded(true)}>Change</Button>
-        </div>
-      : <>
-          {offer.help && <p className="cb-offer-help">{offer.help}</p>}
-          <ChoiceGrid
-            ariaLabel={offer.label}
-            options={options}
-            searchable={offer.options.length > 8}
-            searchPlaceholder="Search options…"
-            selection={many ? "multiple" : "single"}
-            value={many ? null : picks[0] ?? null}
-            onChange={(value) => onSet(offer, [value])}
-            values={many ? picks : undefined}
-            max={many ? offer.capacity : undefined}
-            onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
-          />
-          {/* Only ever offered once the question is answered, so exactly one of Change / Done is on
-              screen at a time. Reopening a finished offer needs a way back out that is not a pick. */}
-          {complete && <div className="cb-offer-picks"><Button variant="ghost" size="sm" onClick={() => setExpanded(false)}>Done</Button></div>}
-        </>}
+    {offer.help && <p className="cb-offer-help">{offer.help}</p>}
+    <ChoiceGrid
+      ariaLabel={offer.label}
+      options={options}
+      /* THE HEIGHT FIX, and the reason nothing here unmounts. A capped, internally scrolling grid
+         keeps a twelve-offer step readable without taking a single option off the screen. */
+      bounded
+      searchable={long}
+      searchPlaceholder="Search options…"
+      selection={many ? "multiple" : "single"}
+      value={many ? null : picks[0] ?? null}
+      onChange={(value) => onSet(offer, [value])}
+      values={many ? picks : undefined}
+      /* `max` is what greys the unchosen cards at capacity, in `ChoiceGrid` — every kind, every
+         length, no threshold. It is set for every choose-N offer there is: skills, spells,
+         cantrips, feats, equipment, languages, tools, expertise. A choose-ONE offer is a
+         radiogroup and passes none: greying the alternatives there would leave a keyboard player
+         locked into their first answer with nowhere to arrow to. */
+      max={many ? offer.capacity : undefined}
+      onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
+      /* Choosing six spells out of 203 names is not a choice; it is a lottery. The rules open
+         beside the list, in a modal, and answer nothing — `onInspect` never touches `picks`. */
+      onInspect={spells ? (id) => setReading(spells.find((spell) => spell.id === id) ?? null) : undefined}
+      inspectLabel={(option) => `Read the ${option.title} rules`}
+    />
+    {reading && <SpellCard spell={reading} onClose={() => setReading(null)} />}
   </section>;
 }
 
@@ -335,7 +358,10 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
     {route !== "asi" && <ChoiceGrid
       ariaLabel={`Level ${offer.level} feat`}
       options={featOptions}
-      searchable={featOptions.length > 8}
+      /* Bounded for the same reason every other offer's grid is: five ASI levels on a level-20
+         build is five feat lists, and a step is not five lists long. */
+      bounded
+      searchable={featOptions.length > SEARCH_THRESHOLD}
       searchPlaceholder="Search feats…"
       value={route === "feat" ? picks[0] ?? null : null}
       onChange={(value) => onSet(offer, [value])}
@@ -589,6 +615,19 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      /**
+       * ...unless something is layered OVER the page, and now something is: the spell-rules card a
+       * player reads while choosing spells is a `Modal`, i.e. a `<dialog>` in the top layer.
+       *
+       * The two mechanisms do not see each other. `showModal()` makes the rest of the document
+       * inert, but Escape reaches this window listener as a plain `keydown` and the dialog answers
+       * it separately, as a `cancel` event — so `defaultPrevented` above is false and one press
+       * dismissed the card AND left the wizard underneath it. Measured, not reasoned: the builder
+       * was gone from the DOM after the first Escape in the 2c browser check.
+       *
+       * The keydown fires before the dialog closes, so the open dialog is still here to be found.
+       */
+      if (document.querySelector("dialog[open]")) return;
       saveAndCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
@@ -700,6 +739,24 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       {grid}
     </section>;
 
+  /**
+   * The class features step's missing question, named.
+   *
+   * Every SRD class carries `subclassLevel: 3` and the draft starts at level 1, so below that level
+   * there is no subclass offer on the step AT ALL — and the detail pane still said "Pick a cleric
+   * subclass to read about it here", inviting a pick that nothing on screen could answer. (It is
+   * only ever an invitation that fails, never the pick itself: verified in a browser at level 3,
+   * where tapping Life Domain fills the pane with the subclass's description and its features.)
+   *
+   * So the fact goes in the step BODY rather than the pane. The pane is hidden below 761px
+   * (`WizardShell.css`'s master-detail rung) and its only door there is gated on real content, so a
+   * sentence left in it is a sentence a phone cannot read — and a one-line fact is not worth leaving
+   * the step to go and find.
+   */
+  const subclassPending = context.classRecord && draft.level < context.classRecord.subclassLevel
+    ? { label: context.classRecord.subclassLabel?.toLowerCase() ?? "subclass", level: context.classRecord.subclassLevel }
+    : null;
+
   const stepOffers = (owner: BuilderOffer["step"]) => offers.filter((offer) => offer.step === owner);
   const renderOffer = (offer: BuilderOffer) => offer.kind === "asi-or-feat"
     ? <AsiOffer key={offer.key} offer={offer} draft={draft} catalogs={catalogs} capBefore={abilityCap.before.get(offer.key) ?? null} onSet={setPicks} onIncreases={setIncreases} />
@@ -785,9 +842,12 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
           {stepOffers("class").map(renderOffer)}
         </>;
       case "features":
-        return stepOffers("features").length === 0
-          ? <div className="nh-empty"><span className="nh-empty-title">Nothing to choose yet</span><span className="nh-empty-text">This class asks for no decisions at level {draft.level}. Carry on.</span></div>
-          : <>{stepOffers("features").map(renderOffer)}</>;
+        return <>
+          {subclassPending && <p className="cb-note">You choose a {subclassPending.label} at level {subclassPending.level}.</p>}
+          {stepOffers("features").length === 0
+            ? <div className="nh-empty"><span className="nh-empty-title">Nothing to choose yet</span><span className="nh-empty-text">This class asks for no decisions at level {draft.level}. Carry on.</span></div>
+            : stepOffers("features").map(renderOffer)}
+        </>;
       case "abilities": {
         const spent = pointBuySpent(draft);
         const options = context.background?.abilityOptions ?? null;
@@ -1033,9 +1093,15 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     species: "Pick a species to read its traits here.",
     background: "Pick a background to read about it here.",
     class: "Pick a class to read about it here.",
-    features: context.classRecord?.subclassLabel
-      ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
-      : "Pick a subclass to read about it here."
+    /* The features pane holds a place for a subclass, so it only holds it when there IS one to pick.
+       Below the class's subclass level the step body says so instead (`subclassPending`), and the
+       step keeps the whole width — there is nothing on it that can ever fill the column, so
+       reserving one would cost every spell grid two of its five tracks to hold a sentence. */
+    ...(subclassPending ? {} : {
+      features: context.classRecord?.subclassLabel
+        ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
+        : "Pick a subclass to read about it here."
+    })
   };
 
   /**

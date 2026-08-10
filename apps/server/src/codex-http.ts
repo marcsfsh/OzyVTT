@@ -272,7 +272,8 @@ const SessionUpdateSchema = z.object({
  * in its own description, so the contract is not advertising a rule nobody enforces. See
  * `questObjectives` for the full reasoning; the store is the enforcer, this is the early rejection.
  */
-const QuestStatusSchema = z.enum(["active", "completed", "failed"]);
+/** The five states of `CodexQuestStatus`, in the store's lifecycle order. `.enum` is exact, so a retired or misspelt status is a 400 here rather than a `coerceQuestStatus` fallback three layers down. */
+const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
 const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
 const QuestEntityIdsSchema = z.array(z.string().uuid()).max(24);
@@ -380,6 +381,12 @@ const CodexImportSchema = z.object({
 }).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
+  // `5f`(iii). OPTIONAL rather than required, unlike `weekdays` beside it, so a caller written before eras
+  // existed - the integration API is a real one (ADR-0016), and so are the browser audit scripts - is not
+  // met with a 400. It carries the same warning every field on this route carries: the PUT REPLACES the
+  // whole calendar (D11-G), so omitting `eras` clears them exactly as omitting `weekdays` would clear those.
+  // Both codex editors send the list they rendered, whether or not the GM touched it.
+  eras: z.array(z.object({ name: z.string().trim().min(1).max(40), startYear: z.number().int().min(-100_000).max(100_000) })).max(20).optional(),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
   weekdays: z.array(z.string().trim().min(1).max(40)).max(20),
   currentDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional(),

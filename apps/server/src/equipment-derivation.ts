@@ -68,7 +68,27 @@ export type RiderBlockLike = Readonly<{
   actions?: readonly RiderActionLike[];
   /** Standing effects the item carries while active (see `itemEffectCarrier`). */
   effects?: readonly ItemEffectLike[];
-  uses?: Readonly<{ limit: number; per: string; pool?: string; recharge?: number }>;
+  uses?: RiderUsesLike;
+}>;
+/**
+ * Limited uses as the AUTHORING vocabulary actually prints them. `FeatureUsesSchema.limit` is
+ * OPTIONAL - a `scaling` rule is the second way to express a count - and an item spreads the very
+ * same `featureRiders` object a class feature does, so an item's `uses` carries `scaling` too.
+ *
+ * This view used to claim `limit: number`. It was wrong, and because `apps/server/test/` was outside
+ * the TypeScript program (hazard H1) the compile-time claim in `item-riders.test.ts` could not say
+ * so: `EquipmentReferenceSchema`'s own output type has never been assignable to `EquipmentRecordLike`.
+ * `usesOf` resolves the printed forms against the bearer, the same way `character-build.ts`'s
+ * `resolvedUseLimit` does for a feature.
+ */
+export type RiderUsesLike = Readonly<{
+  limit?: number; per: string; pool?: string; recharge?: number;
+  scaling?:
+    | Readonly<{ type: "proficiency-bonus" }>
+    | Readonly<{ type: "ability-modifier"; ability: RiderAbility; minimum?: number }>
+    | Readonly<{ type: "by-level"; table: readonly Readonly<{ level: number; limit: number }>[] }>
+    /** Reads the class table's printed column by `classResources.id`. An ITEM has no class table, so it resolves to nothing here - see `scaledLimit`. */
+    | Readonly<{ type: "class-resource"; id: string }>;
 }>;
 /**
  * A `FeatureAction` as synthesised here.
@@ -89,7 +109,7 @@ export type RiderActionLike = Readonly<{
   }>;
   save?: Readonly<{ ability: RiderAbility; dc: FeatureSaveDcLike }>;
   damage?: readonly Readonly<{ formula: string; type: string }>[];
-  uses?: Readonly<{ limit: number; per: string; pool?: string; recharge?: number }>;
+  uses?: RiderUsesLike;
 }>;
 /** `FeatureSaveDcSchema`'s three printed forms: the character's own spell DC, a flat number, or `base + ability (+ PB)`. */
 export type FeatureSaveDcLike = "spellcasting" | number | Readonly<{ base?: number; ability: RiderAbility; proficiencyBonus?: boolean }>;
@@ -109,6 +129,14 @@ export type ItemEffectModifierLike = RiderModifier & Readonly<{ damageTypes?: re
 export type EquipmentRecordLike = RiderBlockLike & Readonly<{
   id: string; name: string; category?: string;
   slot?: string;
+  /**
+   * The weapon block, read for its MASTERY only - the damage/range half already reaches the engine
+   * through the inventory row. Resolved from the catalog by item id rather than stored on the row,
+   * which is the same rule an item's riders follow ("Mechanics resolve by `item.id` against the
+   * content catalog, which never leaves the server"). No schema change on the wire, no migration, and
+   * a GM who re-authors a homebrew weapon's mastery sees it on the next read.
+   */
+  weapon?: Readonly<{ mastery?: string }> | null;
   isMagic?: boolean;
   attunement?: Readonly<{ required?: boolean; restrictedTo?: readonly string[] }> | null;
   cursed?: boolean;
@@ -126,7 +154,7 @@ export type ItemSpellCastLike = Readonly<{
   saveDc?: number;
   /** Whether casting it also spends one of the bearer's own spell slots. */
   consumesSpellSlot?: boolean;
-  uses?: Readonly<{ limit: number; per: string; pool?: string }>;
+  uses?: RiderUsesLike;
 }>;
 /** The catalog's spell record, as the cast synthesis reads it (`SpellReference`). */
 export type SpellRecordLike = Readonly<{
@@ -138,6 +166,20 @@ export type SpellRecordLike = Readonly<{
   castingOptions?: readonly Readonly<{ type: string; damageRoll: string | null; targetCount: number | null }>[];
 }>;
 export type FeatRecordLike = Readonly<{ id: string; name: string; feature: RiderBlockLike }>;
+/**
+ * A class / subclass / species / lineage / background FEATURE, or a chosen inline option, as this
+ * module reads it. Structurally a `FeatureRecord` (or a `FeatureOption`, which carries the identical
+ * `featureRiders` vocabulary): the record IS the rider block, where a feat's is one level down.
+ */
+export type FeatureRecordLike = RiderBlockLike & Readonly<{ id: string; name: string }>;
+/**
+ * How `definition.character.features` names one record.
+ *
+ * A bare id would be AMBIGUOUS and silently wrong: `unarmored-defense` is a Barbarian feature and a
+ * Monk feature with different mechanics, `weapon-mastery` belongs to five classes, `spellcasting` to
+ * seven, and every class has an `epic-boon`. `kind` + `sourceId` make the lookup exact.
+ */
+export type CharacterFeatureRef = Readonly<{ id: string; kind: "class" | "subclass" | "species" | "lineage" | "background" | "option"; sourceId: string }>;
 
 /**
  * The rider families `buildCharacterDefinition`'s `interpretFeature` FOLDS INTO the ActorDefinition
@@ -146,13 +188,13 @@ export type FeatRecordLike = Readonly<{ id: string; name: string; feature: Rider
  * This list and `character-build.ts`'s `CARRIER_RIDER_DISPOSITION` are the two halves of ONE
  * partition of the 21-variant vocabulary, and the partition is what rules out double-counting:
  *
- *   - THESE EIGHT describe a permanent change to the SHAPE OF THE SHEET, and baking is the correct
+ *   - THESE SEVEN describe a permanent change to the SHAPE OF THE SHEET, and baking is the correct
  *     reading for a feat specifically (`ITEM_REFUSED_MODIFIER_TYPES`' own note: "Both stay fully
  *     available on a FEATURE or FEAT carrier, where baking is correct: a feat is granted once and
  *     never un-granted"). `ability-score` is already inside `definition.abilityScores`,
  *     `hit-points-per-level` inside `hitPoints.maximum`, `speed` inside `speedFeet`, `armor-class`
  *     inside `armorClass` + the `armorClassBonus` extension, `initiative` inside `initiativeBonus`,
- *     `extra-attack` inside each action's `attack.count`, `unarmored-defense` inside `armorClass`.
+ *     `unarmored-defense` inside `armorClass`.
  *     Collecting any of them here would apply the feat's bonus a SECOND time on every read.
  *     `darkvision` is in the list because the builder's switch claims it as an explicit display-only
  *     no-op; leaving it out would split ownership of one variant across both files.
@@ -161,24 +203,74 @@ export type FeatRecordLike = Readonly<{ id: string; name: string; feature: Rider
  *     fold structurally cannot express. Those become carriers, read by the SAME `collectRiders` an
  *     item's riders go through.
  *
+ * `extra-attack` USED TO BE THE EIGHTH, and moving it out is the whole of that fix. Baking it was
+ * not merely a worse reading, it was a fold onto nothing: the builder raised `attack.count` on the
+ * actions a FEATURE declares, and no martial class declares one - a Fighter's, Barbarian's, Monk's,
+ * Ranger's and Paladin's swings are all derived from equipped inventory, which this very list then
+ * excluded from the collector. Measured before the fix: at every level, for every one of those five
+ * classes, `definition.actions.filter(a => a.attack)` is EMPTY, so Extra Attack changed no number a
+ * player could ever act on. It is now a standing rider like any other, consumed by
+ * `effective-actions.ts`'s `withStandingRiders` against `weaponActionIds` below.
+ *
  * It lives HERE, next to the filter that reads it, rather than in `character-build.ts` where the
  * baking happens: this module imports no other server module, so `character-build.ts` can import it
  * without a cycle, while the reverse would drag the whole content library into a leaf.
  */
 export const BUILDER_BAKED_MODIFIER_TYPES = [
   "ability-score", "hit-points-per-level", "speed", "armor-class",
-  "initiative", "extra-attack", "unarmored-defense", "darkvision"
+  "initiative", "unarmored-defense", "darkvision"
 ] as const;
 const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES);
+
+/**
+ * WHICH OF THE EIGHT MASTERIES THE ENGINE ACTUALLY IMPLEMENTS - the one place that answers it.
+ *
+ * The SRD defines exactly eight mastery properties, and all 38 weapons now name one. That data is
+ * worth nothing on its own: a slug on 38 records that no engine path reads is the "built but unwired"
+ * failure this repo has already shipped three times, and it looks identical to a feature that works.
+ * So the derivation refuses to advertise a mastery it cannot honour, and this set is the gate.
+ *
+ * Implemented, and proved at the far end (a rolled number, a die that changes):
+ *   graze - `action-resolution.ts` rolls the ability modifier as damage on a MISS.
+ *   sap   - `action-resolution.ts` puts a real effect on the target; its next attack rolls 2d20kl1.
+ *
+ * NOT implemented, and therefore deliberately inert rather than half-wired. Each needs engine surface
+ * that does not exist yet, sized in the Stage 5 report:
+ *   push   - moves a token 10 feet directly away; needs the attack path to write a position.
+ *   slow   - -10 Speed until the attacker's next turn; the effect vocabulary has no speed modifier.
+ *   topple - a Constitution save the WEAPON triggers, then Prone; the save path is action-declared.
+ *   cleave - a second attack roll against a different creature inside one resolution.
+ *   nick   - moves the Light property's extra attack out of the bonus action; a turn-economy change.
+ *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target
+ *            scoping, so there is nowhere to hang "against this one foe" today.
+ */
+const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(["graze", "sap"]);
+/**
+ * One weapon swing's mastery, as the resolver needs it. The ability modifier travels with the slug
+ * because Graze deals "damage equal to the ability modifier you used to make the attack roll", and
+ * that choice (finesse takes the better of Str/Dex, a ranged weapon takes Dex) is `weaponAction`'s
+ * to make - recomputing it at the resolver would be a second copy of the rule, free to drift.
+ */
+export type MasteryInForce = Readonly<{ id: string; abilityModifier: number }>;
+
+/** Does this mastery slug reach a real behaviour today? The derivation omits it entirely when not. */
+export const masteryReaches = (mastery: string): boolean => IMPLEMENTED_MASTERIES.has(mastery);
 
 export type EquipmentCatalog = Readonly<{
   equipmentRecord: (id: string) => EquipmentRecordLike | undefined;
   featRecord?: (id: string) => FeatRecordLike | undefined;
+  /** The class/subclass/species/lineage/background feature (or inline option) a sheet's `character.features` entry names. */
+  featureRecord?: (ref: CharacterFeatureRef) => FeatureRecordLike | undefined;
   /** The spell an item's `casts` entry names, so the synthesised cast can resolve real damage/attack/save. */
   spellRecord?: (id: string) => SpellRecordLike | undefined;
 }>;
 
-type CatalogSource = Readonly<{ equipmentRecord: (id: string) => unknown; featRecord: (id: string) => unknown; spellRecord?: (id: string) => unknown }>;
+type CatalogSource = Readonly<{
+  equipmentRecord: (id: string) => unknown;
+  featRecord: (id: string) => unknown;
+  featureRecord?: (ref: CharacterFeatureRef) => unknown;
+  spellRecord?: (id: string) => unknown;
+}>;
 const ADAPTED = new WeakMap<CatalogSource, EquipmentCatalog>();
 
 /**
@@ -197,6 +289,7 @@ export function equipmentCatalogOf(view: CatalogSource): EquipmentCatalog {
   const adapted: EquipmentCatalog = {
     equipmentRecord: (id) => view.equipmentRecord(id) as EquipmentRecordLike | undefined,
     featRecord: (id) => view.featRecord(id) as FeatRecordLike | undefined,
+    ...(view.featureRecord ? { featureRecord: (ref: CharacterFeatureRef) => view.featureRecord!(ref) as FeatureRecordLike | undefined } : {}),
     ...(view.spellRecord ? { spellRecord: (id: string) => view.spellRecord!(id) as SpellRecordLike | undefined } : {})
   };
   ADAPTED.set(view, adapted);
@@ -217,6 +310,8 @@ export type EquipmentDerivation = Readonly<{
   tools: readonly Sourced[];
   languages: readonly Sourced[];
   damageResistances: readonly Sourced[];
+  /** Damage the bearer takes DOUBLE of while the item's effect is active - the mirror of the line above, and the item half of the vulnerability channel a PC never had. */
+  damageVulnerabilities: readonly Sourced[];
   /** Damage the bearer ignores entirely while the item is active; read by the damage pipeline beside the definition's own. */
   damageImmunities: readonly Sourced[];
   /** Conditions the item refuses; `setCondition` narrates the skip exactly as it does for an innate immunity. */
@@ -244,16 +339,41 @@ export type EquipmentDerivation = Readonly<{
   context: Omit<RiderContext, "moment">;
   /** Item-granted actions and synthesised weapon attacks, keyed `item-<itemId>`. */
   actions: readonly ActorAction[];
+  /**
+   * WHICH of `actions` are real WEAPON SWINGS - the subset `weaponAction` synthesised from an
+   * equipped weapon, as opposed to an item's declared action or a wand's synthesised spell cast.
+   *
+   * Extra Attack is the reason this exists and the reason it has to be a list rather than a guess.
+   * "You can attack twice whenever you take the ATTACK ACTION" - so the rider must raise the count on
+   * a swing and on nothing else. Inferring it from `action.attack !== undefined` would hand the same
+   * multiplier to a Wand of Magic Missiles' cast and to any item action that happens to roll to hit,
+   * which is a rules bug that would look exactly like the feature working.
+   */
+  weaponActionIds: readonly string[];
+  /**
+   * THE MASTERY IN FORCE for each weapon swing, keyed by action id - and ONLY where the bearer has
+   * actually unlocked it.
+   *
+   * Two things have to be true for a mastery to do anything, and this map is where they meet:
+   * the weapon has one (the SRD table's Mastery column, all 38 rows), and the character has spent one
+   * of their Weapon Mastery picks ON THAT WEAPON. A Fighter 1 knows three weapons' masteries, not
+   * every weapon's - so a greatsword in the hands of someone who picked longbow, flail and rapier
+   * grazes for nothing, and that is the SRD's own rule, not a limitation.
+   *
+   * A weapon whose mastery is unlocked but not yet IMPLEMENTED is simply absent from this map, so
+   * `masteryReaches` below is the single honest answer to "does this slug do anything today".
+   */
+  masteryByActionId: Readonly<Record<string, MasteryInForce>>;
   /** Provenance for the sheet ("Stealth (Circlet of Shadows)"). */
   sources: readonly Readonly<{ itemId: string; itemName: string; summary: string }>[];
 }>;
 
 export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
-  skills: [], saves: [], tools: [], languages: [], damageResistances: [], damageImmunities: [],
+  skills: [], saves: [], tools: [], languages: [], damageResistances: [], damageVulnerabilities: [], damageImmunities: [],
   conditionImmunities: [], armorProficiencies: [], weaponProficiencies: [], featIds: [],
   armorClass: 0, initiative: 0, speed: 0, saveBonus: 0, checkBonus: 0,
   spellSaveDc: [], spellAttackBonus: [], spellSlots: [], resourceBonus: [],
-  carriers: [], context: {}, actions: [], sources: []
+  carriers: [], context: {}, actions: [], weaponActionIds: [], masteryByActionId: {}, sources: []
 });
 
 /**
@@ -340,6 +460,42 @@ function characterFeatCarriers(definition: ActorDefinition | undefined, catalog:
   return carriers;
 }
 
+/**
+ * THE CHARACTER'S OWN CLASS, SUBCLASS, SPECIES, LINEAGE AND BACKGROUND FEATURES - and every chosen
+ * inline option - as rider carriers. Issue `2e`.
+ *
+ * The near-twin of `characterFeatCarriers` above, and deliberately so: the two solve the identical
+ * problem for two halves of the same sheet. `interpretFeature` in `character-build.ts` folds 8 of
+ * the 21 rider variants into the definition at BUILD time; the other 13 are inherently roll-time (a
+ * `roll-mode` is advantage at a moment, `extra-damage` is dice rolled on a hit, `spell-slot` and
+ * `resource-bonus` are live maxima) and can only reach the table as carriers. A feat got there
+ * because `character.feats` records its id. A class feature was recorded NOWHERE, so its 13
+ * roll-time riders were authored, validated, and dropped - the Cleric with one usable action.
+ *
+ * Every argument in `characterFeatCarriers`'s header applies verbatim and is not repeated: recompute
+ * rather than persist (the riders live on the catalog record, so an edited homebrew feature is
+ * correct on the next read and a respec needs no migration), and no `sourceItemId`, because a class
+ * feature is worn by the BEARER - `collectRiders` must scope its riders to every action.
+ *
+ * FAILS OPEN on an absent array. Definitions written before this field existed - PDF imports, the
+ * example party, every bundled monster - have no `features` at all, and must keep working exactly as
+ * they do today: no array means no carriers, never an error.
+ */
+function characterFeatureCarriers(definition: ActorDefinition | undefined, catalog: EquipmentCatalog): readonly RiderCarrier[] {
+  const features = definition?.character?.features ?? [];
+  if (features.length === 0 || !catalog.featureRecord) return [];
+  const carriers: RiderCarrier[] = [];
+  for (const held of features) {
+    // Same fail-open as a feat with no catalog record: a homebrew class the GM has since deleted, or
+    // a feature renamed out from under a stored sheet, contributes prose only rather than throwing.
+    const record = catalog.featureRecord(held);
+    if (!record) continue;
+    const modifiers = (record.modifiers ?? []).filter(ridesOnTheBearer);
+    if (modifiers.length > 0) carriers.push({ label: record.name, modifiers });
+  }
+  return carriers;
+}
+
 /** Which of a feat's authored riders this carrier may hand to the collector. */
 function ridesOnTheBearer(modifier: RiderModifier): boolean {
   // Already inside the definition's own numbers - see BUILDER_BAKED_MODIFIER_TYPES.
@@ -386,14 +542,15 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     equipped.push(entry);
     if (itemIsActive(item, record)) active.push(entry);
   }
-  // A character's own feats carry riders whether or not they are holding anything, so the
-  // nothing-equipped shortcut has to clear BOTH sources before it can return the empty block.
+  // A character's own feats AND features carry riders whether or not they are holding anything, so
+  // the nothing-equipped shortcut has to clear all three sources before it returns the empty block.
   const featCarriers = characterFeatCarriers(definition, catalog);
-  if (equipped.length === 0 && featCarriers.length === 0) return EMPTY_DERIVATION;
+  const featureCarriers = characterFeatureCarriers(definition, catalog);
+  if (equipped.length === 0 && featCarriers.length === 0 && featureCarriers.length === 0) return EMPTY_DERIVATION;
   /** Feats the character already HOLDS - so an item that grants one they have adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
 
-  const carriers: RiderCarrier[] = [...featCarriers];
+  const carriers: RiderCarrier[] = [...featCarriers, ...featureCarriers];
   const featIds: Array<{ id: string; name: string; sourceItemId: string }> = [];
   const actions: ActorAction[] = [];
   const sources: Array<{ itemId: string; itemName: string; summary: string }> = [];
@@ -402,6 +559,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   const tools: Sourced[] = [];
   const languages: Sourced[] = [];
   const damageResistances: Sourced[] = [];
+  const damageVulnerabilities: Sourced[] = [];
   const damageImmunities: Sourced[] = [];
   const conditionImmunities: Sourced[] = [];
   const armorProficiencies: Sourced[] = [];
@@ -431,10 +589,13 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       for (const tag of effect.tags ?? []) itemEffectTags.push(tag);
       const modifiers: RiderModifier[] = [];
       for (const modifier of effect.modifiers ?? []) {
-        // `damage-resistance` is the effect vocabulary's own shape (a LIST of types, no amount); it
-        // is a defense, not a rider, so it joins the resistance grants rather than the collector.
-        if (modifier.type === "damage-resistance") {
-          for (const id of modifier.damageTypes ?? []) damageResistances.push({ id, sourceItemId: itemId });
+        // `damage-resistance`/`damage-vulnerability` are the effect vocabulary's own shape (a LIST of
+        // types, no amount); they are defenses, not riders, so they join the grants rather than the
+        // collector. Without the second branch a `damage-vulnerability` on an item's effect would
+        // fall through to `asRiderModifiers` and become a rider that nothing reads.
+        if (modifier.type === "damage-resistance" || modifier.type === "damage-vulnerability") {
+          const into = modifier.type === "damage-resistance" ? damageResistances : damageVulnerabilities;
+          for (const id of modifier.damageTypes ?? []) into.push({ id, sourceItemId: itemId });
           continue;
         }
         modifiers.push(...asRiderModifiers(modifier));
@@ -474,9 +635,32 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   // training is collected above, so a gauntlet that grants martial weapons pays the proficiency
   // bonus on the axe in the same recomputation.
   const grantedWeaponIds = weaponProficiencies.map((entry) => entry.id);
+  const weaponActionIds: string[] = [];
+  // Which weapons this character has spent a Weapon Mastery pick on. The builder already stores the
+  // ledger verbatim on the definition, so no new state is needed - the picks are read back from the
+  // same rows level-up and respec prefill from. `id` is the WEAPON id; the mastery is the weapon's.
+  const unlocked = new Set((definition?.character?.choices ?? [])
+    .filter((row) => row.kind === "weapon-mastery").map((row) => row.id));
+  const masteryByActionId: Record<string, MasteryInForce> = {};
   for (const entry of equipped) {
     const weaponAttack = weaponAction(entry.item, definition, grantedWeaponIds);
-    if (weaponAttack) actions.push(weaponAttack);
+    if (!weaponAttack) continue;
+    actions.push(weaponAttack);
+    weaponActionIds.push(weaponAttack.id);
+    const mastery = catalog.equipmentRecord(entry.item.id)?.weapon?.mastery;
+    // BOTH gates: the weapon has a mastery AND the bearer unlocked THIS weapon - plus the third,
+    // that the engine can actually honour it (see `masteryReaches`).
+    if (mastery && unlocked.has(entry.item.id) && masteryReaches(mastery)) {
+      masteryByActionId[weaponAttack.id] = { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition) };
+    }
+  }
+  // THE BEARER'S OWN UNARMED STRIKE IS A WEAPON SWING. A Monk's is minted by the builder (the
+  // printed Martial Arts die, Dexterity or Strength - see `martialArtsStrike`), so it lives on the
+  // DEFINITION rather than being derived from an inventory row here. `extraAttacksFor` tests
+  // membership of this list BY ID, so without this line a Monk 5's Extra Attack multiplied the
+  // quarterstaff and not the strike the whole class is built around.
+  if (definition?.actions.some((action) => action.id === UNARMED_STRIKE_ACTION_ID && action.attack !== undefined)) {
+    weaponActionIds.push(UNARMED_STRIKE_ACTION_ID);
   }
 
   // The STANDING + CONDITIONAL pass: riders naming no moment whose static and dynamic gates pass.
@@ -487,7 +671,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   const standing = collectRiders(carriers, { ...context, moment: null });
   return {
     context,
-    skills, saves, tools, languages, damageResistances, damageImmunities, conditionImmunities,
+    skills, saves, tools, languages, damageResistances, damageVulnerabilities, damageImmunities, conditionImmunities,
     armorProficiencies, weaponProficiencies, featIds,
     armorClass: sumRiders(standing, "armor-class"),
     initiative: sumRiders(standing, "initiative"),
@@ -500,7 +684,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       ? [{ level: rider.modifier.level, amount: rider.modifier.amount ?? 0 }] : []),
     resourceBonus: standing.flatMap((rider) => rider.modifier.type === "resource-bonus" && rider.modifier.poolId !== undefined
       ? [{ poolId: rider.modifier.poolId, amount: rider.modifier.amount ?? 0 }] : []),
-    carriers, actions, sources
+    carriers, actions, weaponActionIds, masteryByActionId, sources
   };
 }
 
@@ -610,10 +794,56 @@ const ACTION_ID_PREFIX = "item-";
 export const itemActionId = (itemId: string, suffix?: string) => `${ACTION_ID_PREFIX}${itemId}${suffix ? `-${suffix}` : ""}`;
 export const isItemActionId = (id: string) => id.startsWith(ACTION_ID_PREFIX);
 
-function usesOf(uses: RiderBlockLike["uses"]): ActorAction["uses"] | undefined {
+/**
+ * THE ID A CHARACTER'S OWN UNARMED STRIKE MUST CARRY, and it is deliberately the BUILTIN's id.
+ *
+ * Every combatant can take the generic SRD Unarmed Strike (`builtin-actions.ts`), whose numbers are
+ * materialised at resolve time as Strength + Proficiency Bonus for 1 + Strength - correct for
+ * everyone except the one class built around the strike. A declared id SHADOWS its builtin
+ * everywhere the two meet (`actionAvailability`'s builtin filter, `action.resolve`'s
+ * `statBlockAction ?? builtinAction`), so a Monk whose builder minted this id gets exactly one
+ * Unarmed Strike on the sheet - theirs, with the Martial Arts die - rather than two that disagree.
+ *
+ * Named here rather than in the builder because THIS module owns `weaponActionIds`, the list that
+ * decides what Extra Attack may multiply.
+ */
+export const UNARMED_STRIKE_ACTION_ID = "unarmed-strike";
+
+/** The bearer's total character level, for a `by-level` use table. Absent (a bare token) reads as 1. */
+function bearerLevel(definition: ActorDefinition | undefined): number {
+  const classes = definition?.character?.classes ?? [];
+  const total = classes.reduce((sum, entry) => sum + entry.level, 0);
+  return total >= 1 ? total : 1;
+}
+
+/**
+ * `uses` -> `ActionUsesSchema`, resolving the scaling forms against the bearer.
+ *
+ * `ActionUsesSchema.limit` is a REQUIRED 1-20 integer, while the authored `FeatureUsesSchema.limit`
+ * is optional whenever a `scaling` rule supplies the count. Emitting `{ limit: undefined }` produced
+ * an action the actor schema rejects, so a homebrew item printing "proficiency bonus per long rest"
+ * (schema-valid, publishable) broke its own bearer. Mirror `character-build.ts`'s `resolvedUseLimit`
+ * and its `limit >= 1` / `Math.min(20, ...)` clamps: below 1 the item simply has no charges yet.
+ */
+function usesOf(uses: RiderUsesLike | undefined, definition: ActorDefinition | undefined): ActorAction["uses"] | undefined {
   if (!uses) return undefined;
   const per = uses.per as NonNullable<ActorAction["uses"]>["per"];
-  return { limit: uses.limit, per, ...(uses.pool ? { pool: uses.pool } : {}), ...(uses.recharge !== undefined ? { recharge: uses.recharge } : {}) };
+  const limit = uses.limit ?? scaledLimit(uses.scaling, definition);
+  if (limit === undefined || limit < 1) return undefined;
+  return { limit: Math.min(20, limit), per, ...(uses.pool ? { pool: uses.pool } : {}), ...(uses.recharge !== undefined ? { recharge: uses.recharge } : {}) };
+}
+
+function scaledLimit(scaling: RiderUsesLike["scaling"], definition: ActorDefinition | undefined): number | undefined {
+  if (!scaling) return undefined;
+  if (scaling.type === "proficiency-bonus") return definition?.proficiencyBonus ?? 0;
+  if (scaling.type === "ability-modifier") return Math.max(scaling.minimum ?? 1, scoreModifierOf(definition, scaling.ability));
+  // `class-resource` reads a CLASS TABLE's printed column, which a built definition no longer
+  // carries - the builder resolved it to a flat number at build time, which is the only place the
+  // row exists. An ITEM authored with it therefore grants no uses rather than guessing a count.
+  if (scaling.type === "class-resource") return undefined;
+  const level = bearerLevel(definition);
+  const rows = [...scaling.table].filter((row) => row.level <= level).sort((left, right) => left.level - right.level);
+  return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
 /**
@@ -665,7 +895,7 @@ function itemAction(itemId: string, declared: RiderActionLike, itemName: string,
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
     damage: (declared.damage ?? []).map((part) => ({ ...part })),
-    ...(usesOf(declared.uses) ? { uses: usesOf(declared.uses)! } : {})
+    ...(usesOf(declared.uses, definition) ? { uses: usesOf(declared.uses, definition)! } : {})
   };
 }
 
@@ -699,7 +929,10 @@ function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, d
     activation: "action",
     description: spell?.description ?? `Cast ${spellName} from ${itemName}.`,
     damage: [],
-    ...(usesOf(cast.uses) ? { uses: usesOf(cast.uses)! } : {}),
+    // WHICH spell this is, so a `spell-id-is` rider can gate on it. Set even when the catalog cannot
+    // resolve the record: the id is what the item authored, and it is what the gate names.
+    spellId: cast.spellId,
+    ...(usesOf(cast.uses, definition) ? { uses: usesOf(cast.uses, definition)! } : {}),
     // The bearer's OWN slot, on top of the item's charges, when the item says so.
     ...(cast.consumesSpellSlot === true && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {})
   };
@@ -739,14 +972,30 @@ function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, d
  * Absent `proficiencies.weapons` means "not recorded", NOT "untrained", so proficiency is assumed -
  * which keeps every existing sheet's number exactly where it is.
  */
-export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined, grantedWeapons: readonly string[] = []): ActorAction | null {
+/**
+ * WHICH ABILITY MODIFIER THIS WEAPON SWINGS WITH - Finesse takes the better of Strength and Dexterity,
+ * a genuinely ranged weapon takes Dexterity, everything else takes Strength.
+ *
+ * Extracted from `weaponAction` rather than copied because Graze needs the SAME number ("damage equal
+ * to the ability modifier you used to make the attack roll"). Two copies of a rule with a Finesse
+ * branch in it is two copies that can disagree, and the disagreement would be a wrong damage number
+ * on a miss - visible to a player and hard to trace back here.
+ */
+export function weaponAbilityModifier(item: InventoryItem, definition: ActorDefinition | undefined): number {
   const weapon = item.weapon;
-  if (!weapon || !definition) return null;
+  if (!weapon || !definition) return 0;
   const properties = weapon.properties ?? [];
   const str = abilityModifier(definition.abilityScores.str);
   const dex = abilityModifier(definition.abilityScores.dex);
   const ranged = weapon.rangeFeet !== null && !properties.includes("thrown");
-  const modifier = properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+  return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+}
+
+export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined, grantedWeapons: readonly string[] = []): ActorAction | null {
+  const weapon = item.weapon;
+  if (!weapon || !definition) return null;
+  const properties = weapon.properties ?? [];
+  const modifier = weaponAbilityModifier(item, definition);
   const trained = definition.proficiencies?.weapons;
   const granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id);
   const proficient = granted || trained === undefined || trained.includes(weapon.category) || trained.includes(item.id);

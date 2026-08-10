@@ -1801,7 +1801,7 @@ describe("CodexStore quests (M10)", () => {
   });
 
   it("rejects an unknown status, lists oldest-first, and deletes idempotently", () => {
-    expect(() => quests.createQuest({ title: "Bad", status: "abandoned" as never })).toThrow(/active, completed, or failed/);
+    expect(() => quests.createQuest({ title: "Bad", status: "abandoned" as never })).toThrow(/not started, active, completed, failed, or canceled/);
     expect(() => quests.createQuest({ title: "" })).toThrow(/1 to 160 printable characters/);
 
     const first = quests.createQuest({ title: "First" });
@@ -1819,6 +1819,31 @@ describe("CodexStore quests (M10)", () => {
     // The index row goes with the record: an orphan would keep matching forever with no live row for
     // `PLAYER_VISIBLE_SQL` to gate it on.
     expect(quests.searchAll("gm", "First").hits).toEqual([]);
+  });
+
+  /**
+   * 5d — all FIVE statuses survive a write and a re-read as themselves, and the default is `not-started`.
+   *
+   * `coerceQuestStatus` fails closed to `active`, which is the right fail-safe and also the thing that
+   * would make a half-done widening invisible: teach the TS union and the CHECK about `canceled` but
+   * forget the read path, and a canceled quest simply reads back as active with nothing thrown anywhere.
+   * The re-read through `getQuest` is what catches that, which is why it is not asserted on the create
+   * call's return value.
+   */
+  it("stores all five statuses as THEMSELVES, and defaults a new quest to not-started", () => {
+    for (const status of ["not-started", "active", "completed", "failed", "canceled"] as const) {
+      const created = quests.createQuest({ title: `Quest ${status}`, status });
+      expect(created.status, status).toBe(status);
+      expect(quests.getQuest(created.id)!.status, `${status} re-read`).toBe(status);
+    }
+    // The default reversal: a quest created with no status is NOT started. A lead written down mid-session
+    // is not one the party has taken up, and `openQuests` counts it as open either way.
+    expect(quests.createQuest({ title: "A rumour in Vallaki" }).status).toBe("not-started");
+    // ...and a status is still changeable to and from the two new states through the ordinary update path.
+    const quest = quests.createQuest({ title: "The Bell of Vallaki" });
+    expect(quests.updateQuest(quest.id, { status: "active" }, undefined).status).toBe("active");
+    expect(quests.updateQuest(quest.id, { status: "canceled" }, undefined).status).toBe("canceled");
+    expect(quests.getQuest(quest.id)!.status).toBe("canceled");
   });
 
   /**
@@ -1965,14 +1990,14 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
     const quest = seed();
     // Called directly, with no SQL in front of it. `PLAYER_VISIBLE_SQL` would already have dropped this
     // row over HTTP, which is exactly why breaking this arm is invisible from there.
-    expect(projectPlayerSearchHit({ kind: "quest", quest })).toBeNull();
+    expect(projectPlayerSearchHit({ kind: "quest", quest }, playerSessionNumbers())).toBeNull();
     // The GM's hit exists for the same record, so the null is the reveal gate and not a missing arm.
     expect(projectGmSearchHit({ kind: "quest", quest })).toMatchObject({ kind: "quest", id: quest.id, title: "The Wyrmwood Contract" });
   });
 
   it("emits a REVEALED quest as a uniform hit row: no body, no reveal flag, and `tags: []`", () => {
     const revealed = store.setQuestRevealed(seed().id, true);
-    const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed })!;
+    const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed }, playerSessionNumbers())!;
     // The same key set every other kind emits — a row renderer must never branch on which kind it got.
     expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
     // Quests carry no tags at all (not in the spec's column list), so this is `[]` rather than a missing
@@ -2203,7 +2228,7 @@ describe("CodexStore migration v14 — quests arrive with nothing to back-fill (
 
       // ...and the upgraded database really accepts a quest, so the empty list above is "nothing to
       // back-fill" and not a table that failed to arrive.
-      expect(upgraded.createQuest({ title: "The Wyrmwood Contract" }).status).toBe("active");
+      expect(upgraded.createQuest({ title: "The Wyrmwood Contract" }).status).toBe("not-started");
     } finally {
       upgraded?.close();
       await rm(legacyDirectory, { recursive: true, force: true });
@@ -2225,12 +2250,278 @@ describe("CodexStore migration v14 — quests arrive with nothing to back-fill (
       .run(`id-${status}`, status);
 
     expect(() => insert("abandoned")).toThrow();
-    // All three legal values still insert, so the throw above is the CHECK discriminating rather than the
-    // statement being broken for every input.
-    expect(() => insert("active")).not.toThrow();
-    expect(() => insert("completed")).not.toThrow();
-    expect(() => insert("failed")).not.toThrow();
+    // All FIVE legal values still insert, so the throw above is the CHECK discriminating rather than the
+    // statement being broken for every input. `not-started` and `canceled` are v26's whole point: before
+    // the rebuild they were rejected by the FILE, and this loop is what proves the rebuilt CHECK ran.
+    for (const status of ["not-started", "active", "completed", "failed", "canceled"]) expect(() => insert(status), status).not.toThrow();
+    // ...and `canceled` is not silently accepted as a near-miss spelling of itself.
+    expect(() => insert("cancelled")).toThrow();
     database.close();
+  });
+});
+
+/**
+ * Migration **v26** — two more quest statuses, and therefore the SECOND table rebuild in this file.
+ *
+ * `codex_quests.status` has carried `CHECK (status IN ('active', 'completed', 'failed'))` since v14 and
+ * SQLite cannot widen a CHECK in place, so `not-started` and `canceled` were rejected by the FILE. The
+ * table is recreated, copied, dropped, renamed and re-indexed — v15's shape, and its risk: **a rebuild
+ * that loses or mangles an existing campaign's quests is the worst outcome this change can produce, and a
+ * fresh-database test can never catch one, because every table is empty.**
+ *
+ * So this builds a genuine v1..v25 database out of the shipped migration SQL, seeds it with quests in all
+ * three statuses that could exist before today, upgrades it exactly as a GM's `vtt.sqlite` will, and
+ * compares every column of every row.
+ */
+describe("CodexStore migration v26 — two more quest statuses, no quest touched (5d)", () => {
+  /** A genuine v1..v25 database on disk, ready for a CodexStore to upgrade. `legacyDatabase`'s shape, eleven versions later. */
+  const v25Database = (path: string): DatabaseSync => {
+    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+    database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 25)) {
+      database.exec(migration.sql);
+      database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+    }
+    return database;
+  };
+
+  it("v26 is the next version, and the file really is at 25 before it", () => {
+    // The count this migration was written against, asserted rather than remembered: a sibling landing a
+    // v26 of their own turns this into a duplicate-version collision, and it should fail here first.
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual(Array.from({ length: 26 }, (_, index) => index + 1));
+  });
+
+  it("preserves every column of every pre-existing quest — status, id and both bodies byte-identical", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v25-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = v25Database(path);
+      database.prepare("INSERT INTO codex_meta (id, codex_revision, links_backfilled) VALUES (1, 7, 1)").run();
+      // One quest per status that could exist before v26, plus the shapes with something to lose: a GM
+      // body, an ordered objective list, linked page ids, tags, and a revealed row.
+      const insert = database.prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      const live = crypto.randomUUID(), done = crypto.randomUUID(), lost = crypto.randomUUID();
+      const linked = crypto.randomUUID();
+      insert.run(live, "The Wyrmwood Contract", "active", "Deliver the ledger to Vallaki.", "The ledger is a forgery.",
+        JSON.stringify([{ text: "Find the ledger", done: true }, { text: "Reach Vallaki", done: false }]), JSON.stringify([linked]), 1, 4, "2026-01-04T00:00:00.000Z", "2026-01-09T00:00:00.000Z", '["travel","barovia"]');
+      insert.run(done, "Free Ireena", "completed", "She is safe.", "Strahd is not finished.", JSON.stringify([{ text: "Escort her", done: true }]), "[]", 0, 2, "2026-01-05T00:00:00.000Z", "2026-01-06T00:00:00.000Z", "[]");
+      insert.run(lost, "The Missing Caravan", "failed", "", "Nobody survived the pass.", "[]", "[]", 0, 1, "2026-01-06T00:00:00.000Z", "2026-01-06T00:00:00.000Z", '["caravan"]');
+
+      // Raw SQL, not `toQuest`: a projection that drops a column reads as null on BOTH sides and the
+      // comparison would pass. `SELECT *` is right here for the same reason it is wrong in the migration —
+      // the test wants whatever columns actually exist, not the ones it remembers.
+      const before = database.prepare("SELECT * FROM codex_quests ORDER BY id").all();
+      const beforeColumns = (database.prepare("PRAGMA table_info(codex_quests)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      expect(before).toHaveLength(3);
+      // The v25 file genuinely REFUSES the new statuses, so the widening below is a real change and not a
+      // constraint that was never there.
+      expect(() => database.prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Probe', 'not-started', '', '', '[]', '[]', 0, 1, '', '')").run(crypto.randomUUID())).toThrow();
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();                                  // <- v26 runs here
+
+      const reopened = new DatabaseSync(path);
+      const after = reopened.prepare("SELECT * FROM codex_quests ORDER BY id").all() as Array<Record<string, unknown>>;
+      const afterColumns = (reopened.prepare("PRAGMA table_info(codex_quests)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      const indexes = (reopened.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_quests'").all() as Array<{ name: string }>).map((row) => row.name);
+      reopened.close();
+
+      expect(after).toHaveLength(before.length);                    // nothing dropped, nothing duplicated
+      // EVERY column of EVERY row, value for value. v26 adds no column, so this is a whole-row equality
+      // with nothing excused — including the status strings, which is the single thing the rebuild's
+      // copying SELECT could most plausibly have mangled.
+      expect(after).toEqual(before);
+      expect([...after.map((row) => row.status)].sort()).toEqual(["active", "completed", "failed"]);
+      // The rebuilt table IS the old table: same columns, order, types, NOT-NULLs and defaults — including
+      // `tags_json`'s DEFAULT '[]', which v20 added and a reconstructed-from-memory DDL would silently drop.
+      expect(afterColumns).toEqual(beforeColumns);
+      // A rebuild drops the table's indexes with it. `codex_quests_status` is what makes the dashboard's
+      // open-quest filter a cheap per-render read, so losing it here would be a silent regression.
+      expect(indexes).toContain("codex_quests_status");
+
+      // The rows are not merely present, they still READ correctly through the store's own path.
+      const carried = upgraded.getQuest(live)!;
+      expect(carried.status).toBe("active");
+      expect(carried.title).toBe("The Wyrmwood Contract");
+      expect(carried.playerBody).toBe("Deliver the ledger to Vallaki.");
+      expect(carried.gmBody).toBe("The ledger is a forgery.");
+      expect(carried.objectives).toEqual([{ text: "Find the ledger", done: true }, { text: "Reach Vallaki", done: false }]);
+      expect(carried.entityIds).toEqual([linked]);
+      expect(carried.tags).toEqual(["travel", "barovia"]);
+      expect(carried.revealedToPlayers).toBe(true);
+      expect(carried.rev).toBe(4);
+      expect(upgraded.getQuest(done)!.status).toBe("completed");
+      expect(upgraded.getQuest(lost)!.status).toBe("failed");
+      expect(upgraded.listQuests().map((quest) => quest.id)).toEqual([live, done, lost]);   // oldest-first, unchanged
+
+      // ...and the upgraded file now ACCEPTS both new statuses, through the store and back out again.
+      expect(upgraded.updateQuest(lost, { status: "canceled" }, undefined).status).toBe("canceled");
+      expect(upgraded.getQuest(lost)!.status).toBe("canceled");
+      expect(upgraded.createQuest({ title: "A rumour in Vallaki" }).status).toBe("not-started");
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * `5f`(iii) — **eras arrive with no migration, and this describe is the proof rather than the claim.**
+ *
+ * The design that made that possible: an era is a CALENDAR-LEVEL list and a date's era is DERIVED from its
+ * year. Nothing is stored on a date, so there is no `in_world_era` column, no `published_era` sibling, and
+ * no backfill that would have had to invent a value for every date a campaign has already written down. The
+ * whole of the upgrade is `normalizeCalendar` reading `input.eras ?? []` out of one `calendar_json` blob.
+ *
+ * The worst outcome available here is a change that loses or mangles a live campaign's dates, so the four
+ * tests below are stated as byte-identity rather than as behaviour. The fixture is built through the
+ * store's own write path and then DOWNGRADED — the `eras` key is deleted straight out of the stored blob,
+ * which is exactly what is on disk in every campaign written before today.
+ */
+describe("CodexStore eras — additive inside calendar_json, no stored date touched (5f)", () => {
+  /** Every dated row's derived and raw columns, read as raw SQL so a projection cannot paper over a loss. */
+  const datedRows = (path: string) => {
+    const database = new DatabaseSync(path);
+    const read = (table: string) => database.prepare(`SELECT id, in_world_year, in_world_month, in_world_day, calendar_instant, in_world_label FROM ${table} WHERE in_world_year IS NOT NULL ORDER BY id`).all();
+    const out = { journal: read("codex_journal"), pages: read("codex_pages"), meta: database.prepare("SELECT published_year, published_month, published_day, calendar_json FROM codex_meta WHERE id = 1").get() };
+    database.close();
+    return out;
+  };
+  /** A campaign of the shape a real one has: a custom calendar, a published clock, dated entries and events. */
+  const seedCampaign = (target: CodexStore) => {
+    target.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 28 }], weekdays: ["Sul", "Mol"], currentDate: { year: 1491, month: 0, day: 4 } });
+    target.publishCampaignDate();
+    target.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 28 }], weekdays: ["Sul", "Mol"], currentDate: { year: 1492, month: 1, day: 9 } });
+    return {
+      entry: target.createEntry({ playerText: "The party met in Daggerford.", inWorldDate: { year: 1491, month: 0, day: 4 } }),
+      deadline: target.createDeadline({ playerText: "The tax falls due.", inWorldDate: { year: 1492, month: 1, day: 20 } }),
+      event: target.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1200, month: 1, day: 3 } })
+    };
+  };
+  /** Strip `eras` from the stored blob — the pre-`5f` shape, byte for byte. */
+  const downgradeCalendarJson = (path: string) => {
+    const database = new DatabaseSync(path);
+    const row = database.prepare("SELECT calendar_json FROM codex_meta WHERE id = 1").get() as { calendar_json: string };
+    const parsed = JSON.parse(row.calendar_json) as Record<string, unknown>;
+    expect(parsed).toHaveProperty("eras");                                   // the fixture is a real downgrade
+    delete parsed.eras;
+    database.prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(parsed));
+    database.close();
+  };
+
+  /**
+   * SAFETY TEST 1 + 2. A file written before eras existed, reopened by a store that knows about them:
+   * every dated row's raw date, sort instant and display label byte-identical, and both clocks unmoved.
+   *
+   * `migrate()` runs on `initialize()`, so simply reopening the file is the migration. It is a no-op by
+   * construction and this is what proves it rather than asserting it.
+   */
+  it("upgrades a pre-eras file by reading it: every dated row and both clocks byte-identical", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-eras-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let first: CodexStore | undefined;
+    let reopened: CodexStore | undefined;
+    try {
+      first = new CodexStore(path);
+      await first.initialize();
+      const seeded = seedCampaign(first);
+      const clocksBefore = { published: first.getPublishedDate(), current: first.getCalendar().currentDate };
+      first.close(); first = undefined;
+
+      downgradeCalendarJson(path);
+      const before = datedRows(path);
+      expect(before.journal).toHaveLength(2);
+      expect(before.pages).toHaveLength(1);
+      expect(JSON.parse(String(before.meta!.calendar_json))).not.toHaveProperty("eras");
+
+      reopened = new CodexStore(path);
+      await reopened.initialize();                                            // <- migrate() runs here
+      const after = datedRows(path);
+
+      // 1. Raw dates, sort instants and display labels: whole-row equality, nothing excused.
+      expect(after.journal).toEqual(before.journal);
+      expect(after.pages).toEqual(before.pages);
+      // 2. Both clocks, through the store's own reads and through the raw columns beneath them.
+      expect(reopened.getPublishedDate()).toEqual(clocksBefore.published);
+      expect(reopened.getCalendar().currentDate).toEqual(clocksBefore.current);
+      expect([after.meta!.published_year, after.meta!.published_month, after.meta!.published_day]).toEqual([1491, 0, 4]);
+      // ...and the blob on disk is STILL the pre-eras one: reading it does not rewrite it, so a file opened
+      // by this version and then by an older one is unchanged.
+      expect(after.meta!.calendar_json).toBe(before.meta!.calendar_json);
+      // The calendar reads back with the default, and every label still formats exactly as it was written.
+      expect(reopened.getCalendar().eras).toEqual([]);
+      expect(reopened.getEntry(seeded.entry.id)!.inWorldLabel).toBe(String(before.journal.find((row) => (row as { id: string }).id === seeded.entry.id)!["in_world_label"]));
+      expect(reopened.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, 1491 DR");
+      expect(reopened.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, 1200 DR");
+    } finally {
+      first?.close(); reopened?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * SAFETY TEST 3. `exportBundle`/`importBundle` round-trips with and WITHOUT `eras`, and an old bundle -
+   * one made before the key existed - imports to `[]` rather than to undefined or to a crash. A GM's backup
+   * is the only copy of their campaign; a restore that half-understands it is worse than one that refuses.
+   */
+  it("round-trips eras through export/import, and imports a pre-eras bundle to an empty list", () => {
+    const eras = [{ name: "Third Age", startYear: 1400 }, { name: "Age of Ruin", startYear: 1000 }];
+    seedCampaign(store);
+    store.setCalendar({ ...store.getCalendar(), eras });
+    const withEras = store.exportBundle();
+    // Sorted on the way in, so the bundle carries the invariant rather than the order it was typed in.
+    expect(withEras.calendar.eras).toEqual([{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }]);
+
+    store.importBundle(JSON.parse(JSON.stringify(withEras)));
+    expect(store.getCalendar().eras).toEqual([{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }]);
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 9 });
+    expect(store.getPublishedDate()).toEqual({ year: 1491, month: 0, day: 4 });
+    expect(store.listTimeline().map((entry) => entry.inWorldLabel)).toEqual(["Mol, Hammer 4, Third Age 1491 DR", "Mol, Alturiak 20, Third Age 1492 DR"]);
+
+    // A bundle made before `5f`: the key is not merely empty, it is ABSENT.
+    const legacy = JSON.parse(JSON.stringify(withEras)) as { calendar: Record<string, unknown> };
+    delete legacy.calendar.eras;
+    expect(legacy.calendar).not.toHaveProperty("eras");
+    store.importBundle(legacy);
+    expect(store.getCalendar().eras).toEqual([]);
+    // ...and with no eras, every label is back to exactly what a pre-`5f` campaign renders.
+    expect(store.listTimeline().map((entry) => entry.inWorldLabel)).toEqual(["Mol, Hammer 4, 1491 DR", "Mol, Alturiak 20, 1492 DR"]);
+  });
+
+  /**
+   * SAFETY TEST 4. Changing the eras is a calendar write, so `writeCalendar`'s reflow must run over every
+   * dated row in `codex_journal` AND `codex_pages` - K3's rule, which existed for month lengths and now has
+   * a second reason to hold. A reflow that skipped either table would leave half the chronicle labelled by
+   * an era it no longer belongs to.
+   *
+   * The two properties that matter are opposite ones: LABELS change, RAW DATES and INSTANTS do not. An era
+   * is a naming layer over the year, so it cannot move a record by a single day.
+   */
+  it("re-labels every dated row when eras change, and moves not one of them", () => {
+    const seeded = seedCampaign(store);
+    const instantsBefore = { entry: store.getEntry(seeded.entry.id)!.calendarInstant, deadline: store.getEntry(seeded.deadline.id)!.calendarInstant, event: store.getPage(seeded.event.id)!.calendarInstant };
+    expect(store.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, 1491 DR");
+
+    store.setCalendar({ ...store.getCalendar(), eras: [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }] });
+
+    // Journal AND pages, both re-labelled, each by the era its own year falls in - the event is at 1200 and
+    // must NOT pick up the era that starts at 1400.
+    expect(store.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, Third Age 1491 DR");
+    expect(store.getEntry(seeded.deadline.id)!.inWorldLabel).toBe("Mol, Alturiak 20, Third Age 1492 DR");
+    expect(store.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, Age of Ruin 1200 DR");
+    // Nothing moved: raw dates verbatim, instants identical, chronicle order unchanged.
+    expect(store.getEntry(seeded.entry.id)!.inWorldDate).toEqual({ year: 1491, month: 0, day: 4 });
+    expect(store.getPage(seeded.event.id)!.inWorldDate).toEqual({ year: 1200, month: 1, day: 3 });
+    expect({ entry: store.getEntry(seeded.entry.id)!.calendarInstant, deadline: store.getEntry(seeded.deadline.id)!.calendarInstant, event: store.getPage(seeded.event.id)!.calendarInstant }).toEqual(instantsBefore);
+    // ...and a year BEFORE the first era keeps the bare rendering rather than guessing at one.
+    store.setCalendar({ ...store.getCalendar(), eras: [{ name: "Third Age", startYear: 1400 }] });
+    expect(store.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, 1200 DR");
+    // Removing every era returns every label to the exact string it started with.
+    store.setCalendar({ ...store.getCalendar(), eras: [] });
+    expect(store.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, 1491 DR");
+    expect(store.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, 1200 DR");
   });
 });
 
@@ -4548,9 +4839,11 @@ describe("CodexStore quest history (D11, R5)", () => {
     store.setActiveSession(session.id);
 
     const quest = store.createQuest({ title: "Find the Sunsword" });
-    expect(questRecords(), "R5: a quest STARTING is an event, and quests start at creation").toHaveLength(1);
+    expect(questRecords(), "R5: a quest ENTERING THE LOG is an event, and every quest enters at creation").toHaveLength(1);
     const start = questRecords()[0]!;
-    expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "active" });
+    // The status REACHED, which since v26 is the new default `not-started` rather than `active`: writing a
+    // lead down is not the party taking it up, and the chronicle now says so instead of overstating it.
+    expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "not-started" });
     // Hidden, with EMPTY player text - which is why the projection hides the whole row rather than a field.
     expect(start.revealedToPlayers).toBe(false);
     expect(start.playerText).toBe("");
@@ -4596,7 +4889,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     database.close();
 
     expect(() => store.updateQuest(quest.id, { status: "failed" }, undefined)).toThrow();
-    expect(store.getQuest(quest.id)!.status, "the quest UPDATE rolled back with the entry INSERT").toBe("active");
+    expect(store.getQuest(quest.id)!.status, "the quest UPDATE rolled back with the entry INSERT").toBe("not-started");
     expect(questRecords(), "...and no second history record was left behind either").toHaveLength(1);
     // ...and a quest CREATE rolls back the same way: no quest row survives its own failed start record.
     const questCount = store.listQuests().length;
@@ -4614,7 +4907,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     expect(projectPlayerJournalEntry(store.getEntry(record.id)!, context([]))).toBeNull();
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([]))).toBeNull();
     // The GM's own row carries it throughout, so the nulls are the gate and not a missing record.
-    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }).payload).toEqual({ questId: quest.id, status: "active" });
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }).payload).toEqual({ questId: quest.id, status: "not-started" });
 
     // Absent context fails CLOSED - a caller that forgets to resolve the set hides history, never leaks it.
     expect(projectPlayerJournalEntry(store.getEntry(record.id)!, { unrevealedSessionIds: new Set<string>() })).toBeNull();
@@ -4623,7 +4916,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     store.setQuestRevealed(quest.id, true);
     const shown = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))!;
     expect(shown.kind).toBe("quest");
-    expect(shown.payload).toEqual({ questId: quest.id, status: "active" });
+    expect(shown.payload).toEqual({ questId: quest.id, status: "not-started" });
     // ...and the ENTRY's own reveal flag still gates it, so both must hold.
     store.setEntryRevealed(record.id, false);
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))).toBeNull();
@@ -5060,7 +5353,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     setEntryRevealed: (s) => { s.setEntryRevealed(s.createEntry({ playerText: "A" }).id, true); },
     deleteEntry: (s) => { s.deleteEntry(s.createEntry({ playerText: "A" }).id); },
     createSession: (s) => { s.createSession({ sessionNumber: 1 }); },
-    updateSession: (s) => { s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined); },
+    updateSession: (s) => { s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined, "gm"); },
     setSessionRevealed: (s) => { s.setSessionRevealed(s.createSession({ sessionNumber: 1 }).id, true); },
     deleteSession: (s) => { s.deleteSession(s.createSession({ sessionNumber: 1 }).id); },
     setActiveSession: (s) => { s.setActiveSession(s.createSession({ sessionNumber: 1 }).id); },

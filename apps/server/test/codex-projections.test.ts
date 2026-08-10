@@ -48,11 +48,31 @@ describe("M11 calendar projection - the GM's prep clock never reaches a player (
     expect(player.currentDate).not.toEqual(CALENDAR.currentDate);
     // ...and the GM's clock is nowhere in the serialized payload, under any key, at any depth. `month: 1`
     // and `day: 20` are the GM clock's own parts, and neither appears.
-    expect(JSON.stringify(player)).toBe(JSON.stringify({ yearName: "DR", months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: published }));
-    expect(Object.keys(player).sort()).toEqual(["currentDate", "months", "weekdays", "yearName"]);
-    // The world's own months/weekdays/era are not secrets and still travel unchanged.
+    expect(JSON.stringify(player)).toBe(JSON.stringify({ yearName: "DR", eras: [], months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: published }));
+    expect(Object.keys(player).sort()).toEqual(["currentDate", "eras", "months", "weekdays", "yearName"]);
+    // The world's own months/weekdays/eras are not secrets and still travel unchanged.
     expect(player.months).toEqual(CALENDAR.months);
     expect(player.weekdays).toEqual(CALENDAR.weekdays);
+  });
+
+  /**
+   * `5f`(iii) — `eras` is a KEY-BY-KEY addition to both halves, and the exact-key assertion above is what
+   * makes that a decision rather than an accident: a field added to the GM projection alone would have left
+   * the player unable to read the date they were given, and one added by a spread would carry the next
+   * GM-only field out with it (K1). Eras are structure, on the footing of `months` - a period of the
+   * world's own history, named. They carry no dates, and `currentDate` is still the only clock here.
+   */
+  it("gives BOTH audiences the world's eras, and gives the player no extra key with them", () => {
+    const eras = [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }];
+    const withEras = { ...CALENDAR, eras };
+    const published: CodexInWorldDate = { year: 1492, month: 0, day: 10 };
+
+    expect(projectGmCalendar(withEras, published).eras).toEqual(eras);
+    const player = projectPlayerCalendar(withEras, published);
+    expect(player.eras).toEqual(eras);
+    expect(Object.keys(player).sort()).toEqual(["currentDate", "eras", "months", "weekdays", "yearName"]);
+    // ...and the GM's own clock is still nowhere in it, which the new key must not have changed.
+    expect(JSON.stringify(player)).not.toContain('"day":20');
   });
 
   it("gives the GM both clocks, so they can see that the table is behind them", () => {

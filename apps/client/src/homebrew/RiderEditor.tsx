@@ -39,10 +39,30 @@
 import { useMemo } from "react";
 import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
+import { CatalogPicker } from "./CatalogPicker";
 import { FieldRenderer } from "./FieldRenderer";
-import { damagePartsField, diceValidate, grouped, opt, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
+import { damagePartsField, diceValidate, grouped, opt, suggestionLabel, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
 
 export type RiderKind = "modifiers" | "grants" | "uses" | "tags" | "actions" | "effects";
+
+/**
+ * WHICH CARRIER is mounting this form — and the third value is a bug fix, not a nicety.
+ *
+ * `RecordDetail.tsx` has always branched THREE ways for `enabled` (equipment / monster / feature)
+ * and then collapsed to TWO for `scope` (`doc.type === "equipment" ? "item" : "feature"`), so a
+ * monster was handed `"feature"`. That mismatch is not cosmetic: a feature's attack is
+ * `FeatureAttackSchema` (`ability`, and the builder derives the number from the character's scores),
+ * a stat block's is `ActionSchema.attack` (`bonus`, a flat printed to-hit, and it is REQUIRED). One
+ * `actionsField` served both and wrote `ability`, so **a monster action with an attack roll could
+ * not be published at all** — the GM filled in "Uses: Strength" and the publish gate answered
+ * `actions[].attack.bonus: Required`. 423 SRD monster actions author `attack.bonus`.
+ *
+ * Three-valued, so the next divergence is a compile error rather than a silent wrong body. An
+ * ITEM's actions are `featureRiders.actions` — the same `FeatureActionSchema` a feature carries — so
+ * `"item"` is feature-shaped wherever the ACTION vocabulary is concerned, and diverges only where
+ * the CARRIER is what differs (which riders an item may hold, what a rest gives back).
+ */
+export type RiderScope = "feature" | "item" | "statblock";
 
 const ABILITIES = [
   opt("str", "Strength"), opt("dex", "Dexterity"), opt("con", "Constitution"),
@@ -105,6 +125,7 @@ const TRIGGER_TYPES: readonly SelectOption[] = [
   FOR("skill-is", "One skill"),
   FOR("spell-school-is", "A school of magic"),
   FOR("spell-level-is", "A spell level"),
+  FOR("spell-id-is", "One specific spell"),
   FOR("versus-size", "A target's size"),
   FOR("versus-condition", "A target's condition"),
   FOR("versus-creature-type", "A target's kind")
@@ -137,6 +158,7 @@ function blankTrigger(type: string): Draft {
     case "skill-is": return { type, skills: [] };
     case "spell-school-is": return { type, schools: [] };
     case "spell-level-is": return { type, levels: [] };
+    case "spell-id-is": return { type, spellIds: [] };
     case "versus-size": return { type, sizes: [] };
     case "versus-condition": return { type, conditionIds: [] };
     case "versus-creature-type": return { type, creatureTypes: [] };
@@ -148,8 +170,9 @@ const hasType = (...types: readonly string[]) => (row: Draft) => types.includes(
 
 /** These fields are ids, not prose — `ContentIdSchema` is `/^[a-z0-9-]+$/`. Caught while
     typing rather than as a publish refusal, because "Lay on Hands" being wrong is the
-    field being wrong NOW, and the corrected form is one the GM can read off the message. */
-const slugValidate = (value: unknown): string | null => {
+    field being wrong NOW, and the corrected form is one the GM can read off the message.
+    Exported for `FeatureEditor`'s `extraPicks` column id — the same rule, one definition. */
+export const slugValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "" || /^[a-z0-9-]+$/.test(text)) return null;
   return `Write it as ${text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "lowercase-with-dashes"} — lowercase, no spaces.`;
@@ -158,7 +181,7 @@ const slugValidate = (value: unknown): string | null => {
 /** A collapsed row's own sentence — "Only for: A damage type — fire, cold". */
 function triggerRowLabel(row: Draft): string {
   const name = triggerLabelOf(row.type);
-  const values = [row.weights, row.classIds, row.speciesIds, row.ids, row.tags, row.conditionIds, row.kinds, row.properties, row.damageTypes, row.abilities, row.skills, row.schools, row.levels, row.sizes, row.creatureTypes]
+  const values = [row.weights, row.classIds, row.speciesIds, row.ids, row.tags, row.conditionIds, row.kinds, row.properties, row.damageTypes, row.abilities, row.skills, row.schools, row.levels, row.spellIds, row.sizes, row.creatureTypes]
     .filter(Array.isArray)
     .flat()
     .map(String);
@@ -224,11 +247,14 @@ const whenField = (): FieldDef => ({
     { key: "present", label: "It has the condition", kind: "switch", visibleWhen: hasType("while-condition"), help: "Turn off for “only while you don't have it”." },
     { key: "kinds", label: "Kinds of attack", kind: "multiselect", options: [opt("melee", "Melee"), opt("ranged", "Ranged"), opt("spell", "Spell"), opt("unarmed", "Unarmed"), opt("thrown", "Thrown"), opt("reaction", "Reaction"), opt("opportunity", "Opportunity")], visibleWhen: hasType("attack-kind-is") },
     { key: "properties", label: "Weapon properties", kind: "tags", visibleWhen: hasType("weapon-property-is"), suggestions: (ctx) => ctx.weaponProperties },
-    { key: "damageTypes", label: "Damage types", kind: "tags", visibleWhen: hasType("damage-type-is"), suggestions: (ctx) => ctx.damageTypes },
+    // `3d`, site 6 of 9 — the `damage-type-is` gate. A slug typed one character wrong here does not
+    // fail: the rider simply never fires, which is the hardest homebrew failure there is to diagnose.
+    { key: "damageTypes", label: "Damage types", kind: "tags", pick: true, visibleWhen: hasType("damage-type-is"), suggestions: (ctx) => ctx.damageTypes },
     { key: "abilities", label: "Abilities", kind: "multiselect", options: ABILITIES, visibleWhen: hasType("ability-is") },
     { key: "skills", label: "Skills", kind: "multiselect", options: (ctx) => ctx.skills, visibleWhen: hasType("skill-is") },
     { key: "schools", label: "Schools", kind: "tags", visibleWhen: hasType("spell-school-is"), suggestions: (ctx) => ctx.schools },
     { key: "levels", label: "Spell levels", kind: "multiselect", options: Array.from({ length: 10 }, (_, level) => opt(String(level), level === 0 ? "Cantrip" : `Level ${level}`)), visibleWhen: hasType("spell-level-is"), read: (row) => (Array.isArray(row.levels) ? row.levels.map(String) : []), write: (next, row) => ({ ...row, levels: (next as string[]).map(Number) }) },
+    { key: "spellIds", label: "Spells", kind: "tags", visibleWhen: hasType("spell-id-is"), suggestions: (ctx) => ctx.spells.map((entry) => entry.id), help: "Only when this exact spell is cast — “when you cast Eldritch Blast”. A school or a level names a category; this names one." },
     { key: "sizes", label: "Sizes", kind: "multiselect", options: SIZES, visibleWhen: hasType("versus-size") },
     { key: "creatureTypes", label: "Kinds of creature", kind: "tags", visibleWhen: hasType("versus-creature-type"), suggestions: (ctx) => ctx.creatureTypes, note: "Not checked yet — a creature doesn't record its kind." }
   ]
@@ -327,9 +353,17 @@ const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critic
  */
 const ITEM_REFUSED = ["ability-score", "hit-points-per-level"];
 
+/** The seven rolls and the two ways, spelled once: `RollModeVariantSchema` is carried by BOTH rider
+    vocabularies (the record's own modifiers and an effect's), so both controls read this list. */
+const ROLL_MODE_ROLLS: readonly SelectOption[] = [
+  opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"),
+  opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")
+];
+const ROLL_MODE_WAYS: readonly SelectOption[] = [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")];
+
 const signed = (amount: number) => `${amount >= 0 ? "+" : ""}${amount}`;
 
-const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => ({
+const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
   key: "modifiers",
   label,
   kind: "rows",
@@ -353,6 +387,10 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
       key: "type",
       label: "What it changes",
       kind: "select",
+      // `"statblock"` behaves like `"feature"` here, deliberately: the refusal belongs to the ITEM
+      // carrier — `EquipmentReferenceSchema` is the schema that rejects these two — and a stat block
+      // is not an item. Written as `=== "item"` rather than `!== "feature"` so the reason and the
+      // test are the same sentence.
       options: scope === "item" ? MODIFIER_TYPES.filter((entry) => !ITEM_REFUSED.includes(entry.value)) : MODIFIER_TYPES,
       // The whole row is replaced, so no key from the previous variant survives.
       write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankModifier(String(next)) })
@@ -379,11 +417,18 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
     { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("darkvision"), note: "Display only." },
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"), note: "Not read yet." },
-    { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage") },
-    { key: "damageType", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
+    { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage"), help: "Dice. Leave it empty to add only an ability modifier." },
+    { key: "abilityModifier", label: "Plus an ability modifier", kind: "select", options: ABILITIES, emptyValue: "omit", visibleWhen: hasType("extra-damage"), help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”." },
+    /* `3d`, site 7 of 9 — the mace's "+1d6 lightning". Left EMPTY on purpose is a real authored
+       answer here and not a blank: `action-resolution.ts` reads `damageType ?? damage[0].type`, so an
+       absent type means "the same type this weapon already deals". That is why `"untyped"` — the
+       fourteenth string the engine mints when there is nothing to inherit either — is NOT offered:
+       picking it would silently override the inheritance a GM meant to keep. U23 gives that case its
+       own words. The box stays open, so a GM who really wants the word can still type it. */
+    { key: "damageType", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
     { key: "doubleOnCritical", label: "Doubled on a critical hit", kind: "switch", visibleWhen: hasType("extra-damage"), help: "Off is the 5e rule — dice added after the attack aren't doubled." },
-    { key: "roll", label: "On which roll", kind: "select", options: [opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"), opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")], visibleWhen: hasType("roll-mode") },
-    { key: "mode", label: "Which way", kind: "select", options: [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")], visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
+    { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
+    { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
     { key: "classId", label: "For one class only", kind: "select", options: (ctx) => ctx.classes, visibleWhen: hasType("spell-save-dc", "spell-attack-bonus"), help: "Leave empty for every class on the sheet." },
     { key: "level", label: "Slot level", kind: "stepper", min: 1, max: 9, visibleWhen: hasType("spell-slot") },
     { key: "poolId", label: "Which pool", placeholder: "lay-on-hands", validate: slugValidate, visibleWhen: hasType("resource-bonus"), help: "The shared-pool name a feature already uses. One more of whatever that pool counts." },
@@ -406,10 +451,18 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
   ]
 });
 
-const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
+const usesField = (label: string, scope: RiderScope): FieldDef => ({
   key: "uses",
   label,
   kind: "group",
+  // Only an ITEM has charges; a feature carrier gets the plainer sentence.
+  //
+  // **No stat block mounts this field, and U8 measured that it never should.** The comment here used
+  // to say U8 would change it and "will find the copy already correct". It found the opposite:
+  // `ActorDefinitionSchema` has no record-level `uses` at all, so a monster mounting this would be
+  // writing a key Zod strips in silence. A creature's uses are its ACTIONS' uses
+  // (`ActionSchema.uses`, 86 recharge authors among them) and that is where the control went — see
+  // `actionUsesField`. `riderFieldsForTest` no longer claims this field at `"statblock"`.
   help:
     scope === "item"
       ? "Charges the item spends and gets back on a rest."
@@ -424,9 +477,44 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
       key: "mode",
       label: "Uses are",
       kind: "select",
-      options: [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
+      /**
+       * **The fifth option is a FEATURE's, and the omission elsewhere is a refusal.**
+       *
+       * `class-resource` reads the count off the class table's own printed column at this
+       * character's level, which is why Rage 2 → 3 → 4 needs no `by-level` table beside the table
+       * it would be copying. 19 SRD features stand on it (16 class, 3 subclass).
+       *
+       * An ITEM is not offered it because it can never resolve: `scaledLimit` in
+       * `equipment-derivation.ts` answers `undefined` for `class-resource` **in writing** — a built
+       * definition no longer carries a class table, the builder having already flattened it — so an
+       * item authored this way would grant no charges no matter what a GM typed. Offering it there
+       * would be a box that stores a value the fight can never read, which is the one thing this
+       * form exists not to do.
+       */
+      options: scope === "feature"
+        ? [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level"), opt("class-resource", "A column on the class table")]
+        : [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
       // `mode` is NOT stored — it is read back out of the shape, so there is no second
       // place the answer lives and nothing to keep in sync.
+      //
+      // **This `read` is the whole of the client's `3b`(a) report.** The comment above has
+      // been true about the WRITE since the field was written and false about the read:
+      // there was no `read`, so `FieldRenderer` fell through to `getAt(value, "mode")` — a
+      // key the write path deliberately never persists — and the control rendered `""` on
+      // every pass, selecting `<option value="">Not set</option>`. The GM's choice was
+      // saving correctly the whole time; only the readback was missing. Not a controlled
+      // input, not `defaults.ts`, not `useAutosave.ts`.
+      //
+      // The four literals below are the schema's own (`FeatureUsesSchema.scaling`'s
+      // discriminator) and are byte-identical to the option values above, so there is no
+      // mapping table to drift. All four now have an option at feature scope; an item sees the
+      // first three plus `flat`, and a body imported with a `class-resource` scaling reads back as
+      // "Not set" there — which is the truth about a shape that carrier cannot resolve.
+      read: (scope_) => {
+        const uses = scope_.uses as { limit?: unknown; scaling?: { type?: string } } | undefined;
+        if (!uses) return undefined;
+        return uses.scaling?.type ?? "flat";
+      },
       write: (next, scope_) => {
         const uses = { ...(scope_.uses as Record<string, unknown> | undefined) };
         if (next === "flat") {
@@ -438,6 +526,12 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
         } else if (next === "by-level") {
           delete uses.limit;
           uses.scaling = { type: "by-level", table: [{ level: 1, limit: 1 }] };
+        } else if (next === "class-resource") {
+          delete uses.limit;
+          // Seeded EMPTY rather than with a guess: "rage" would silently point a homebrew feature
+          // at the Barbarian's column, and `ContentIdSchema` refuses `""`, so the publish checklist
+          // names the field until the GM fills it. Same discipline as `resource-bonus`'s `poolId`.
+          uses.scaling = { type: "class-resource", id: "" };
         } else {
           delete uses.limit;
           uses.scaling = { type: "proficiency-bonus" };
@@ -467,6 +561,23 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
     },
     { key: "uses.scaling.ability", label: "Which ability", kind: "select", options: ABILITIES, visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier" },
     { key: "uses.scaling.minimum", label: "At least", kind: "number", min: 0, max: 5, visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier" },
+    // The `classResources` id off the level table — "rage", "channel-divinity", "sorcery-points".
+    // A slug typed one character wrong resolves to 0 uses and the feature silently carries none,
+    // which is why the id is checked while typing rather than at publish.
+    //
+    // ABSENT at the other scopes rather than merely hidden: the mode select offers no
+    // `class-resource` option there, so the row could never become visible — and a field the census
+    // can see is a claim that a GM can reach the key, which at item scope would be false.
+    ...(scope === "feature"
+      ? [{
+        key: "uses.scaling.id",
+        label: "Which column",
+        placeholder: "rage",
+        validate: slugValidate,
+        help: "The column's id on the class's level table — the count is read from it at the character's own level.",
+        visibleWhen: (scope_: Draft) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "class-resource"
+      }]
+      : []),
     {
       key: "uses.scaling.table",
       label: "By level",
@@ -489,14 +600,129 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
       options: [opt("turn", "Every turn"), opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"), opt("long-rest", "On a long rest")],
       // "Once per day" is the phrase every printed item uses and there is no "day" here
       // on purpose: a long rest already IS this app's day (`legendary.resistancesPerDay`
-      // says so in the schema). Said once, where a GM looking for "day" will read it.
+      // says so in the schema). Said once, where a GM looking for "day" will read it —
+      // which is on an ITEM, so a stat block gets no extra sentence.
       ...(scope === "item" ? { help: "A long rest is this table's day, so “once per day” is “on a long rest”." } : {})
     },
+    // A pool is shared by whatever names it. The item wording names both carriers because an item's
+    // charges can share a feature's pool; a stat block's actions share pools with each other, which
+    // is what the feature sentence already says.
     { key: "uses.pool", label: "Shared pool", help: scope === "item" ? "Items and features sharing a pool share one counter." : "Features sharing a pool share one counter.", placeholder: "channel-divinity" }
   ]
 });
 
-const actionsField = (): FieldDef => ({
+/**
+ * The to-hit half of an attack, which is the ONE place the three carriers genuinely disagree.
+ *
+ * A feature and an item both author `FeatureAttackSchema` — they name the ABILITY and the builder
+ * resolves the number from the character's own scores, because a class feature cannot know them. A
+ * stat block authors `ActionSchema.attack`, whose `bonus` is a flat printed integer and is
+ * **required**; there is no `ability` key for it to fall back on, and Zod would strip one silently.
+ * So this is `instead of`, not `alongside`: offering both would let a GM fill in a box whose value
+ * is dropped on the way to the store, which is the exact failure this form exists to avoid.
+ */
+const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
+  scope === "statblock"
+    ? [{ key: "attack.bonus", label: "To hit", kind: "number", allowNegative: true, min: -5, max: 20, help: "The flat bonus the stat block prints — the +9 in “+9 to hit”." }]
+    : [{ key: "attack.ability", label: "Uses", kind: "select", options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")] }];
+
+/**
+ * **An ACTION's own limited uses — and it is a different schema from the record's, which is why it
+ * is a different control.**
+ *
+ * `usesField` above writes `FeatureUsesSchema`: `limit` OPTIONAL, four `scaling` rules, four `per`
+ * values, no `recharge` key at all. An action's `uses` is `ActionUsesSchema` (`@vtt/schemas`), which
+ * `ActionSchema` declares and `FeatureActionSchema` inherits: `limit` REQUIRED, **no `scaling` at
+ * all** (the union is `.strict()`, so a scaling rule here is a parse error), a FIFTH `per` value
+ * `"recharge"`, and a `recharge` threshold. Mounting `usesField` here would have offered four
+ * scalings an action cannot hold and hidden the one thing 86 SRD monster actions say — the same
+ * mistake `effectModifiersField` exists to avoid one level up.
+ *
+ * **`recharge` is the row this control exists for, and its reader is the best-proved in the wave.**
+ * `encounter.ts` rolls a d6 at the start of the owner's turn, clears the pool on `>= threshold`, and
+ * narrates BOTH outcomes by name; `rests.ts` clears recharge pools on a short rest and a fresh fight
+ * re-arms them. 86 bundled monster actions author it (67 at 5, 14 at 6, 5 at 4) and **no carrier had
+ * a control**: `actionsField` had no `uses` block at any scope, and `RecordDetail` mounts nothing
+ * else on a stat block. Offered at all three scopes because all three really read it — a monster's
+ * through `ActionSchema` directly, an item's through `usesOf` in `equipment-derivation.ts`, a
+ * feature's through `interpretAction`, and all three arrive at the same `ActorAction.uses`.
+ *
+ * **`FeatureUsesSchema` is deliberately NOT widened to match**, and the reason is a measurement:
+ * `character-build.ts` folds a feature's record-level uses into an action at TWO sites, and neither
+ * forwards a threshold. A feature authoring `per: "recharge"` would therefore build an
+ * `ActorAction.uses` with no `recharge`, which `ActionUsesSchema`'s own refinement rejects with
+ * *"Recharge uses need the d6 threshold"* — turning a schema-valid authored record into an
+ * unbuildable character. An item's record-level `uses` has no reader at all yet (U24), so widening
+ * it there would be a value the fight cannot see. The recharge vocabulary belongs where the engine
+ * already reads it, which is the action.
+ */
+const ACTION_USES_PER: readonly SelectOption[] = [
+  opt("turn", "Every turn"), opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"),
+  opt("long-rest", "On a long rest"), opt("recharge", "On a die roll")
+];
+
+const actionUses = (scope_: Draft) => ({ ...(scope_.uses as Record<string, unknown> | undefined) });
+
+const actionUsesField = (): FieldDef => ({
+  key: "uses",
+  label: "Limited uses",
+  kind: "group",
+  help: "How many times this action can be used before something gives it back.",
+  rows: [
+    {
+      key: "uses.limit",
+      label: "How many",
+      kind: "number",
+      min: 1,
+      max: 20,
+      // `ActionUsesSchema.limit` is REQUIRED and there is no `scaling` to supply it, so clearing the
+      // count is how a GM removes the whole block — and `per` is seeded here so a count typed first
+      // never publishes as uses with no recovery.
+      write: (next, scope_) => {
+        const uses = actionUses(scope_);
+        if (next === null || next === undefined) return { ...scope_, uses: undefined };
+        uses.limit = next;
+        uses.per ??= "long-rest";
+        return { ...scope_, uses };
+      }
+    },
+    {
+      key: "uses.per",
+      label: "Comes back",
+      kind: "select",
+      options: ACTION_USES_PER,
+      // The threshold and the mode are ONE authored fact and the schema refuses them apart, in both
+      // directions: `per: "recharge"` with no threshold, and a threshold with any other `per`, are
+      // each their own named refusal. So switching to recharge seeds the SRD's commonest 5 and
+      // switching away deletes it — the same replace-the-row discipline `blankModifier` follows.
+      write: (next, scope_) => {
+        const uses = actionUses(scope_);
+        if (next === null || next === undefined || next === "") {
+          delete uses.per;
+          delete uses.recharge;
+          return uses.limit === undefined ? { ...scope_, uses: undefined } : { ...scope_, uses };
+        }
+        uses.per = next;
+        uses.limit ??= 1;
+        if (next === "recharge") uses.recharge ??= 5;
+        else delete uses.recharge;
+        return { ...scope_, uses };
+      }
+    },
+    {
+      key: "uses.recharge",
+      label: "Recharges on",
+      kind: "number",
+      min: 2,
+      max: 6,
+      help: "A d6 at the start of its turn: 5 is a printed “Recharge 5–6”. The table sees the die either way.",
+      visibleWhen: (scope_) => (scope_.uses as { per?: string } | undefined)?.per === "recharge"
+    },
+    { key: "uses.pool", label: "Shared pool", placeholder: "breath-weapon", validate: slugValidate, help: "Actions sharing a pool share one counter — and one recharge roll." }
+  ]
+});
+
+const actionsField = (scope: RiderScope): FieldDef => ({
   key: "actions",
   label: "Actions",
   kind: "rows",
@@ -518,9 +744,16 @@ const actionsField = (): FieldDef => ({
       label: "Attack roll",
       kind: "group",
       rows: [
-        { key: "attack.ability", label: "Uses", kind: "select", options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")] },
+        ...toHitFields(scope),
         { key: "attack.reachFeet", label: "Reach", kind: "number", min: 1, max: 120, unit: "ft" },
-        { key: "attack.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft" }
+        { key: "attack.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", help: "The farthest this can reach at all." },
+        /* The second half of a printed "range 80/320" — and it is the ONE number in this group the
+           engine turns into a die rather than a refusal. `Range` alone says where the shot becomes
+           impossible; this says where it becomes hard, and past it the attack rolls 2d20 keeping the
+           lower (`action-resolution.ts`, the `Long range (beyond N ft)` source). 45 SRD records author
+           it — every two-band weapon a monster carries. Offered at every scope because both schemas
+           have the key: `ActionSchema.attack.rangeNormalFeet` and `FeatureAttackSchema`'s twin. */
+        { key: "attack.rangeNormalFeet", label: "Normal range", kind: "number", min: 1, max: 1000, unit: "ft", help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage." }
       ]
     },
     {
@@ -531,21 +764,141 @@ const actionsField = (): FieldDef => ({
         { key: "save.ability", label: "Target rolls", kind: "select", options: ABILITIES },
         { key: "save.dc", label: "DC", kind: "number", min: 1, max: 40, help: "Leave empty to use the character's own spell save DC." }
       ]
-    }
+    },
+    actionUsesField()
   ]
 });
 
-const effectsField = (): FieldDef => ({
+/** Grouping only, and it is a `FieldDef` like everything else — built here rather than inline in the
+    component so `riderFieldsForTest` can state the rider surface COMPLETELY. A key the census cannot
+    see is a key the both-paths harness waves through. */
+const tagsField = (label: string): FieldDef => ({ key: "tags", label, kind: "tags", help: "Grouping only — no mechanical effect." });
+
+/* ------------------------------------------------------- effect modifiers ------ */
+
+/**
+ * **What an effect DOES — the row that made every GM-authored effect decorative.**
+ *
+ * `EffectGrant.modifiers` is `EffectModifierSchema`, and that is **not** the union
+ * `modifiersField` above authors. `FeatureModifierSchema` is 21 variants; `EffectModifierSchema` is
+ * 12, and they overlap by exactly three (`attack-bonus`, `extra-damage`, `roll-mode`, declared once
+ * in `@vtt/schemas` and spread into both). Mounting `modifiersField` here would have offered
+ * eighteen variants an effect cannot hold and hidden nine it can — Reckless Attack's own pair among
+ * them — so this is its own list.
+ *
+ * **Four of the twelve are offered, and each omission is a ruling:**
+ *
+ *  - **`roll-mode` is the general form**, so `attack-disadvantage`, `incoming-attack-disadvantage`,
+ *    `save-advantage` and `save-disadvantage` are not offered beside it: the actor side normalises
+ *    every one of them through `toRollModes` and the item side through `asRiderModifiers`, into
+ *    exactly this. Two spellings of one sentence is how a vocabulary drifts.
+ *  - **`attack-advantage` stays** even though `roll-mode` looks like it covers it, because it does
+ *    not: `action-resolution.ts` applies `attack-advantage` **only on the bearer's own turn**
+ *    (Reckless Attack semantics) and applies `roll-mode` always. That gate is the whole difference
+ *    and it is in the label. `incoming-attack-advantage` stays beside it because the two are one
+ *    authored sentence — Reckless Attack's benefit and its cost — and the SRD writes them together.
+ *  - **`damage-bonus` is refused rather than forgotten.** `asRiderModifiers` returns nothing for it,
+ *    in writing: a flat +N with no type has no rider equivalent, so on an ITEM it is inert by
+ *    construction. A control for it would be a box that does nothing, which is the failure this form
+ *    exists to avoid. Say it as `extra-damage` on the record's own modifier list instead.
+ *  - `damage-vulnerability`, and `attack-bonus`/`extra-damage` **inside** an effect, have zero SRD
+ *    authors and the last two already have a control one level up. Each ships the day a record
+ *    authors it, not by default.
+ *
+ * **No `when` list here, deliberately.** The two carriers disagree about it: `attackRollSources`
+ * reads a live effect's modifiers straight through `toRollModes` and never evaluates a gate, while
+ * an item's effect goes through `collectRiders` and would. A gate that fires on one carrier and not
+ * the other is worse than no gate — the effect's own duration and tags are what bound it.
+ */
+const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = [
+  ROLLS("roll-mode", "Advantage or disadvantage"),
+  ROLLS("attack-advantage", "Advantage on your attacks, on your turn"),
+  ROLLS("incoming-attack-advantage", "Attacks against you have advantage"),
+  HARM("damage-resistance", "Resistance to damage")
+];
+
+/** Same rule as `blankModifier`: the union is `.strict()`, so switching variant REPLACES the row. */
+function blankEffectModifier(type: string): Draft {
+  switch (type) {
+    case "roll-mode": return { type, roll: "attack", mode: "advantage" };
+    case "damage-resistance": return { type, damageTypes: [] };
+    default: return { type };
+  }
+}
+
+const effectModifiersField = (): FieldDef => ({
+  key: "modifiers",
+  label: "What it does",
+  kind: "rows",
+  wide: true,
+  help: "An effect with nothing here is a label the fight cannot feel.",
+  addLabel: "Add a modifier",
+  emptyText: "Nothing yet — this effect changes no numbers.",
+  maxRows: 8,
+  maxRowsReason: "Eight modifiers is as many as one effect carries.",
+  rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+  newRow: () => ({ rowId: newId(), ...blankEffectModifier("roll-mode") }),
+  rowLabel: (row) => {
+    const modifier = row as Record<string, unknown>;
+    const name = EFFECT_MODIFIER_TYPES.find((entry) => entry.value === modifier.type)?.label ?? "Modifier";
+    if (modifier.type === "roll-mode") return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
+    const types = Array.isArray(modifier.damageTypes) ? modifier.damageTypes.map(String) : [];
+    return types.length > 0 ? `${name} — ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
+  },
+  rows: [
+    {
+      key: "type",
+      label: "What it does",
+      kind: "select",
+      options: EFFECT_MODIFIER_TYPES,
+      write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankEffectModifier(String(next)) })
+    },
+    { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
+    { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a curse bites." },
+    // `3d`, site 10 of 9 — the count in `vocabularies.test.ts` moves with this list rather than
+    // being restated. Half damage of every type named here, and the SRD's own carrier (Superior
+    // Defense) names twelve of the thirteen at once.
+    { key: "damageTypes", label: "Damage types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("damage-resistance") }
+  ]
+});
+
+/**
+ * The effects a record grants — and **how many of them the engine really reads is the carrier's
+ * business, not one number for all three.**
+ *
+ * The cap used to be 1 everywhere, with the reason "only the first effect is applied by the rules
+ * engine today". That sentence is true of a FEATURE (`character-build.ts` synthesises an activation
+ * carrying `feature.effects[0]` and nothing after it) and **false of an ITEM**: `takeEffects` in
+ * `equipment-derivation.ts` iterates `block.effects` entire, so an item's second effect was refused
+ * by the form for a limit the engine does not have. Four is `featureRiders.effects`'s own maximum.
+ *
+ * A STAT BLOCK gets one, and for a third reason again: `ActorDefinitionSchema` has no record-level
+ * `effects` array at all — a creature's effects hang off `ActionSchema.grants`, which is a SINGLE
+ * `EffectGrant`, not a list. So "one" is the schema's number rather than the engine's. (No monster
+ * mounts this field today: `RecordDetail` enables only `["actions", "tags"]` on a stat block. The
+ * cap is written for the day one does, the same way `usesField`'s copy is.)
+ */
+const effectsField = (scope: RiderScope): FieldDef => ({
   key: "effects",
   label: "Effects",
   kind: "rows",
-  // Stated ONCE, and it is why the cap exists — authoring mechanics that silently vanish
-  // is worse than not offering the field.
-  help: "Only the first effect is applied by the rules engine today.",
+  // Stated ONCE, per carrier, and it is why the cap is what it is — authoring mechanics that
+  // silently vanish is worse than not offering the field.
+  help:
+    scope === "item"
+      ? "Each of these applies while the item is equipped."
+      : scope === "statblock"
+        ? "A stat block's action carries one effect, not a list."
+        : "Only the first effect is applied by the rules engine today.",
   addLabel: "Add an effect",
   emptyText: "No effects yet.",
-  maxRows: 1,
-  maxRowsReason: "Only the first effect is applied by the rules engine today.",
+  maxRows: scope === "item" ? 4 : 1,
+  maxRowsReason:
+    scope === "item"
+      ? "Four effects is as many as one item carries."
+      : scope === "statblock"
+        ? "A stat block's action carries one effect, not a list."
+        : "Only the first effect is applied by the rules engine today.",
   rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
   newRow: () => ({ rowId: newId(), name: "", tags: [], duration: { type: "encounter" }, modifiers: [], onEnd: [] }),
   rowLabel: (row) => (row as { name?: string }).name || "Unnamed effect",
@@ -554,7 +907,11 @@ const effectsField = (): FieldDef => ({
     { key: "tags", label: "Tags", kind: "tags", help: "The sheet groups effects by these.", suggestions: ["raging", "blessed", "concentrating", "inspired"] },
     { key: "duration.type", label: "Lasts", kind: "select", options: [opt("rounds", "A number of rounds"), opt("until-source-next-turn", "Until your next turn"), opt("encounter", "The whole encounter"), opt("manual", "Until removed by hand")] },
     { key: "duration.rounds", label: "Rounds", kind: "number", min: 1, max: 100, visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "rounds" },
-    { key: "concentration", label: "Needs concentration", kind: "switch" }
+    { key: "concentration", label: "Needs concentration", kind: "switch" },
+    // A `rows` field inside a `rows` field, which is the depth `whenField` inside `modifiersField`
+    // has always rendered at — `RowEditor` is nesting-safe by construction and `FieldRenderer`'s
+    // `rows` case recurses through itself, so this needs no new primitive.
+    effectModifiersField()
   ]
 });
 
@@ -579,10 +936,57 @@ const GRANT_KINDS: ReadonlyArray<{ key: string; label: string; help?: string }> 
   { key: "saves", label: "Saving throws" },
   { key: "damageResistances", label: "Damage resistances" },
   { key: "damageImmunities", label: "Damage immunities" },
-  { key: "conditionImmunities", label: "Condition immunities" }
+  { key: "conditionImmunities", label: "Condition immunities" },
+  // The eleventh, and the last of the eleven arrays to become editable. 41 SRD records author it —
+  // domain spells, racial spells, every "you always have X prepared" — and until this landed the
+  // editor merely PRESERVED whatever was already in the body on its way past.
+  { key: "spells", label: "Spells", help: "Always ready, and they don't count against what the character can prepare." }
 ];
 
-type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly string[] }>;
+export type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly string[] }>;
+
+/**
+ * **The two ends of the grants boundary, exported — and this is the honest half of `RIDER_EXEMPT`.**
+ *
+ * `GrantsEditor` is the one rider surface with no `FieldDef` anywhere: eleven parallel arrays behind
+ * one `[What ▾][Which…]` row, written whole-body. So `authoring-harness.ts` cannot look a grant key
+ * up and waves `grants` through — which means a test that called `applyField(…, "grants.spells", …)`
+ * would be writing the body itself and proving nothing about a control.
+ *
+ * These two functions are the component's OWN read and write, so a test that drives them is driving
+ * the control's real path rather than a parallel one. (The rendered affordance is driven in
+ * `pick-fields.test.tsx`, the same split the damage-type grant kinds already use.) The exemption
+ * stays until every one of the eleven has a `FieldDef`; it must never grow.
+ *
+ * **`spells` is the one kind whose values are not slugs**, and the mapping is here rather than in
+ * the renderer so both directions are one sentence: the GM picks spell ids, the body carries
+ * `{id, alwaysPrepared}`. `level` and `ability` are deliberately NOT written — `character-build.ts`
+ * resolves the level from the spell record itself (`grantedSpell.level ?? record?.level`), which is
+ * righter than a number the editor would have to guess (the client's catalog entry carries only
+ * prose), and `ability` is authored by exactly one SRD record and falls back to the caster's own.
+ */
+export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[] {
+  return GRANT_KINDS
+    .filter((kind) => Array.isArray(grants[kind.key]))
+    .map((kind) => ({
+      rowId: kind.key,
+      kind: kind.key,
+      values: kind.key === "spells"
+        ? (grants.spells as ReadonlyArray<{ id?: string }>).map((spell) => String(spell?.id ?? ""))
+        : ((grants[kind.key] as string[]) ?? [])
+    }));
+}
+
+export function grantsFromRows(rows: readonly GrantRow[]): Record<string, unknown> | undefined {
+  const bag: Record<string, unknown> = {};
+  for (const row of rows) {
+    if (!row.kind) continue;
+    bag[row.kind] = row.kind === "spells"
+      ? row.values.map((id) => ({ id, alwaysPrepared: true }))
+      : row.values;
+  }
+  return Object.keys(bag).length > 0 ? bag : undefined;
+}
 
 /**
  * The canonical vocabulary each open-slug grant kind draws on, so "Which" is a complete list plus
@@ -616,26 +1020,25 @@ function GrantsEditor({
   onChange,
   ctx,
   scope
-}: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: "feature" | "item" }>) {
+}: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: RiderScope }>) {
   const grants = (value.grants ?? {}) as Record<string, unknown>;
 
-  const rows = useMemo<readonly GrantRow[]>(
-    () =>
-      GRANT_KINDS.filter((kind) => Array.isArray(grants[kind.key]) && (grants[kind.key] as unknown[]).length >= 0)
-        .filter((kind) => Array.isArray(grants[kind.key]))
-        .map((kind) => ({ rowId: kind.key, kind: kind.key, values: (grants[kind.key] as string[]) ?? [] })),
-    [grants]
-  );
+  const rows = useMemo<readonly GrantRow[]>(() => grantRowsOf(grants), [grants]);
 
-  const write = (next: readonly GrantRow[]) => {
-    const bag: Record<string, unknown> = {};
-    for (const row of next) if (row.kind) bag[row.kind] = row.values;
-    const spells = grants.spells;
-    if (Array.isArray(spells) && spells.length > 0) bag.spells = spells;
-    onChange({ ...value, grants: Object.keys(bag).length > 0 ? bag : undefined });
-  };
+  // `spells` used to be re-attached HERE, verbatim, after the bag was rebuilt — the editor preserved
+  // what it could not edit. It is a kind like the other ten now, so the boundary is one function.
+  const write = (next: readonly GrantRow[]) => onChange({ ...value, grants: grantsFromRows(next) });
 
-  const unused = GRANT_KINDS.filter((kind) => !rows.some((row) => row.kind === kind.key));
+  /**
+   * **Ten kinds on an item, eleven everywhere else — and the missing one is a refusal, not an
+   * oversight.** `EquipmentReferenceSchema` spreads `featureRiders`, so an item's body PARSES a
+   * `grants.spells`; nothing reads it. `takeGrants` in `equipment-derivation.ts` folds nine grant
+   * arrays for an equipped item and `spells` is not among them, while `character-build.ts` reads it
+   * only off a FEATURE. Offering it here would be a box that stores a value the fight never sees,
+   * which is the one thing this form exists not to do.
+   */
+  const kinds = GRANT_KINDS.filter((kind) => kind.key !== "spells" || scope !== "item");
+  const unused = kinds.filter((kind) => !rows.some((row) => row.kind === kind.key));
 
   return (
     <div className="hb-field">
@@ -644,6 +1047,9 @@ function GrantsEditor({
           authored shape, two lifecycles, because the two carriers have two lifecycles. */}
       <p className="nh-field-help">
         Proficiencies and languages this hands out for free.
+        {/* The extra sentence is the ITEM's lifecycle — layered on while equipped, removed when it
+            comes off. A stat block's grants are simply part of the creature, like a feature's, so
+            there is nothing extra to say and nothing is said. */}
         {scope === "item" ? " They come back off the sheet when the item comes off." : ""}
       </p>
       <RowEditor
@@ -653,18 +1059,23 @@ function GrantsEditor({
         onAdd={() => ({ rowId: newId(), kind: unused[0]?.key ?? "", values: [] })}
         addLabel="Grant something"
         emptyText="Nothing granted yet."
-        max={GRANT_KINDS.length}
+        max={kinds.length}
         maxReachedReason="Every kind of grant is already on the list."
         reorderable={false}
         ariaLabel="Grants"
         rowLabel={(row) => {
           const label = GRANT_KINDS.find((kind) => kind.key === row.kind)?.label ?? "Grant";
-          return row.values.length > 0 ? `${label}: ${row.values.join(", ")}` : label;
+          // A collapsed spells row reads the NAMES the GM picked, not the slugs it stores.
+          const shown = row.kind === "spells" ? row.values.map((id) => ctx.spells.find((entry) => entry.id === id)?.name ?? id) : row.values;
+          return shown.length > 0 ? `${label}: ${shown.join(", ")}` : label;
         }}
         renderRow={(row, index) => {
           const meta = GRANT_KINDS.find((kind) => kind.key === row.kind);
           const options = row.kind === "saves" ? ABILITIES : row.kind === "skills" || row.kind === "expertise" ? ctx.skills : null;
           const replace = (patch: Partial<GrantRow>) => write(rows.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)));
+          // A body that already carries a kind this scope does not offer (an imported item with a
+          // spell grant) still shows its own row rather than a blank select the GM cannot read.
+          const kindOptions = kinds.some((kind) => kind.key === row.kind) ? kinds : [...kinds, ...GRANT_KINDS.filter((kind) => kind.key === row.kind)];
           return (
             <FieldGrid>
               <Field label="What">
@@ -672,7 +1083,7 @@ function GrantsEditor({
                   value={row.kind}
                   onChange={(event) => replace({ kind: event.target.value, values: [] })}
                 >
-                  {GRANT_KINDS.map((kind) => (
+                  {kindOptions.map((kind) => (
                     <option key={kind.key} value={kind.key} disabled={kind.key !== row.kind && rows.some((entry) => entry.kind === kind.key)}>
                       {kind.label}
                     </option>
@@ -680,7 +1091,38 @@ function GrantsEditor({
                 </Select>
               </Field>
               <Field label="Which" help={meta?.help} className="nh-fieldgrid-wide">
-                {options ? (
+                {row.kind === "spells" ? (
+                  /* THE ELEVENTH KIND, and the one that could not be a `TagInput`. The other ten are
+                     slug sets a GM can reasonably type; a spell id is one of 339 and a character
+                     wrong is a grant that silently hands out nothing. So "Which" here is the same
+                     `CatalogPicker` the item's cast row already uses — a searchable modal over the
+                     merged catalog, homebrew included — with the chosen spells shown as removable
+                     chips beside it. Multi-pick, so the picker itself holds no value: it appends and
+                     resets, and the chips ARE the value. */
+                  <div className="hb-chips" role="group" aria-label="Which spells">
+                    {row.values.map((id) => {
+                      const name = ctx.spells.find((entry) => entry.id === id)?.name ?? id;
+                      return (
+                        <Chip
+                          key={id}
+                          onRemove={() => replace({ values: row.values.filter((entry) => entry !== id) })}
+                          removeLabel={`Remove ${name}`}
+                        >
+                          {name}
+                        </Chip>
+                      );
+                    })}
+                    <CatalogPicker
+                      entries={ctx.spells.filter((entry) => !row.values.includes(entry.id))}
+                      value={null}
+                      onChange={(next) => { if (next) replace({ values: [...row.values, next] }); }}
+                      emptyLabel="Add a spell"
+                      title="Spells this grants"
+                      searchPlaceholder="Search spells…"
+                      ariaLabel="Which spells"
+                    />
+                  </div>
+                ) : options ? (
                   <div className="hb-chips" role="group" aria-label={`Which ${meta?.label.toLowerCase() ?? "grants"}`}>
                     {options.map((option) => {
                       const on = row.values.includes(option.value);
@@ -707,6 +1149,15 @@ function GrantsEditor({
                     values={row.values}
                     onChange={(values) => replace({ values })}
                     suggestions={grantSuggestions(row.kind, ctx)}
+                    /* `3d`, site 9 of 9 — `damageResistances` and `damageImmunities` are two of the
+                       kinds this one control serves. It is set for the CONTROL rather than for those
+                       two kinds, because the alternative is an affordance that appears and vanishes
+                       as the "What" select changes beside it — the same box teaching two different
+                       things about itself. `TagInput` falls back to the plain input for the kinds
+                       with no list (tools, languages), so this reads as "show the list when there is
+                       one", which is the sentence a GM can actually hold. */
+                    pick
+                    optionLabel={suggestionLabel}
                     placeholder={GRANT_PLACEHOLDERS[row.kind] ?? "light-armor"}
                   />
                 )}
@@ -724,16 +1175,57 @@ function GrantsEditor({
 export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", "tags", "actions", "effects"];
 
 /**
- * The rider field definitions, flattened, for `vocabularies.test.ts`.
+ * The rider field definitions, flattened, for `vocabularies.test.ts` and for
+ * `authoring-harness.ts`.
  *
  * Exported for one reason and it is worth naming: the rider vocabulary is ONE vocabulary mounted by
  * items, class features, species traits and feats alike, so a damage-type box that quietly went back
  * to a hand-typed list here would regress on all four carriers at once. The census in that test
  * needs to see these fields, and they are otherwise built inside the component.
+ *
+ * **Scoped, because the harness asks a second question of it.** `vocabularies.test.ts` asks "does
+ * this control offer the whole vocabulary", which one scope answers. `authoring-harness.ts` asks
+ * "does a control for this key exist AT ALL", and it asks it of a feature carrier as often as an
+ * item one — so the builder takes the scope the carrier is mounted at (`RecordDetail.tsx` is the one
+ * place that decision is made).
+ *
+ * **A STAT BLOCK MOUNTS TWO OF THE SIX, and this list used to claim all six.** `RecordDetail` enables
+ * exactly `["actions", "tags"]` on a monster, and that is not a UI choice — `ActorDefinitionSchema`
+ * has **no record-level `modifiers`, `uses` or `effects`** to hold the other three, and being a plain
+ * `z.object` it would drop them in silence. So while this returned the whole list for `"statblock"`,
+ * `hasControl("monster", "uses")` answered `true` for a key no stat block can carry and no monster
+ * form renders: a false PASS on the exact question the harness exists to ask. `usesField`'s own
+ * comment said U8 was the unit that would change that, and U8 measured the opposite — a stat block's
+ * uses live on its ACTIONS, where `ActionSchema.uses` really is and where all 86 SRD recharge
+ * authors are. Narrowed rather than made true, and `vocabulary-parity.mirror.test.ts` asserts the
+ * narrow shape per carrier.
+ *
+ * **`grants` is deliberately absent**, and it is the one honest gap: it is authored by
+ * `GrantsEditor` above, a bespoke component that writes eleven parallel arrays whole-body and has no
+ * `FieldDef` to export. It stays on the harness's exemption list WITH that reason. **U9 did not
+ * retire it, and the reason is worth keeping straight:** U9 made the eleventh array — `spells` —
+ * editable rather than merely preserved, so all eleven kinds now have a control. But a control is
+ * not a `FieldDef`, and the exemption is about the LOOKUP: all eleven are bespoke JSX behind one
+ * `[What ▾][Which…]` row, so there is still nothing for `fieldsOf` to find. Retiring it means
+ * converting `GrantsEditor` itself, which has no vocabulary of its own and is therefore a refactor,
+ * not a unit. `grantRowsOf`/`grantsFromRows` are what a test drives in the meantime.
  */
-export const RIDER_FIELDS_FOR_TEST: readonly FieldDef[] = [
-  whenField(), modifiersField("What it does", "item"), usesField("Charges", "item"), actionsField(), effectsField()
-];
+export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
+  // The two `RecordDetail` really enables on a monster, in the order it renders them. `whenField` is
+  // absent with `modifiersField`, which is the only place it nests.
+  if (scope === "statblock") return [tagsField("Tags"), actionsField(scope)];
+  return [
+    whenField(),
+    modifiersField("What it does", scope),
+    // "Charges" is an item's word for it; a feature carrier's is plainer.
+    usesField(scope === "item" ? "Charges" : "Limited uses", scope),
+    tagsField("Tags"),
+    actionsField(scope),
+    effectsField(scope)
+  ];
+}
+
+export const RIDER_FIELDS_FOR_TEST: readonly FieldDef[] = riderFieldsForTest("item");
 
 /** Items get everything except `choice` — an item never asks a question at character
     creation, and there is no code path from an item to the wizard. `grants` IS here now:
@@ -753,7 +1245,7 @@ export function RiderEditor({
   value: Draft;
   onChange: (next: Draft) => void;
   enabled?: readonly RiderKind[];
-  scope: "feature" | "item";
+  scope: RiderScope;
   labels?: Partial<Record<RiderKind, string>>;
   ctx: SchemaContext;
   idPrefix: string;
@@ -764,24 +1256,27 @@ export function RiderEditor({
     const list: FieldDef[] = [];
     if (enabled.includes("modifiers")) list.push(modifiersField(label("modifiers", "Modifiers"), scope));
     if (enabled.includes("uses")) list.push(usesField(label("uses", scope === "item" ? "Charges" : "Limited uses"), scope));
-    if (enabled.includes("tags")) {
-      list.push({ key: "tags", label: label("tags", "Tags"), kind: "tags", help: "Grouping only — no mechanical effect." });
-    }
-    if (enabled.includes("actions")) list.push(actionsField());
-    if (enabled.includes("effects")) list.push(effectsField());
+    if (enabled.includes("tags")) list.push(tagsField(label("tags", "Tags")));
+    if (enabled.includes("actions")) list.push(actionsField(scope));
+    if (enabled.includes("effects")) list.push(effectsField(scope));
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, scope, labels]);
 
   return (
     <div className="hb-riders">
-      {/* The one sentence that carries the mental model, derived and stated ONCE. */}
+      {/* The one sentence that carries the mental model, derived and stated ONCE — and it needed
+          the third carrier as much as the attack control did. A monster editing its own Bite was
+          being told "These apply as soon as the feature is granted", which names a thing a stat
+          block does not have. */}
       <p className="hb-riders-when">
         {scope === "item"
           ? (value.attunement as { required?: boolean } | undefined)?.required === true
             ? "These apply while the item is equipped and attuned."
             : "These apply while the item is equipped."
-          : "These apply as soon as the feature is granted."}
+          : scope === "statblock"
+            ? "These are the creature's own — always available to it."
+            : "These apply as soon as the feature is granted."}
       </p>
 
       {/* What the SHEET will show, derived live from the four inputs above it. A GM
@@ -862,7 +1357,9 @@ export function riderSummary(value: Draft): string {
   if (modifiers) parts.push(`${modifiers} ${modifiers === 1 ? "modifier" : "modifiers"}`);
   if (grants) parts.push(`${grants} ${grants === 1 ? "grant" : "grants"}`);
   if (actions) parts.push(`${actions} ${actions === 1 ? "action" : "actions"}`);
-  if (effects) parts.push("an effect");
+  // An item may carry four (see `effectsField`), so this stopped being "an effect" the day the cap
+  // became the carrier's rather than one number for all three.
+  if (effects) parts.push(effects === 1 ? "an effect" : `${effects} effects`);
   if (value.uses) parts.push("limited uses");
   return parts.join(" · ");
 }

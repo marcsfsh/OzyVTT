@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { Alert, Badge, Button, GmOnlyTag, IconChevron, Input, Skeleton } from "@vtt/ui";
 import {
   calendarApi, calendarDaysPerYear, dateToInstant, formatWorldDate, formatWorldYear,
-  type CodexChronicleRecord, type CodexInWorldDate, type GmCodexCalendar
+  type CodexCalendarEra, type CodexChronicleRecord, type CodexInWorldDate, type GmCodexCalendar
 } from "./api";
 import { CHRONICLE_KIND_META, chronicleRowSummary, sameInWorldDate } from "./chronicle";
-import { CalendarEditor } from "./CalendarEditor";
+import { CalendarEditor, CampaignDateEditor } from "./CalendarEditor";
 import { CodexIcon } from "./icons";
 
 /**
@@ -20,8 +20,20 @@ import { CodexIcon } from "./icons";
  * arrive as raw dates and carry no instant.
  *
  * The two clocks are the header, in the glossary's words: **Your date** (the GM's prep clock, violet
- * because it is GM-only information) and **Players' date** (what the table has been shown). Publishing
- * is offered only while they differ — there is nothing to publish when they agree.
+ * because it is GM-only information) and **Players' date** (what the table has been shown).
+ *
+ * **D6 (`5f`) — the two clocks are independent, and the UI has to say so.** Publishing used to be offered
+ * only while they differed, which meant that from the unset state there was no visible publish act at all:
+ * the GM set a date, the server auto-published it (K7), the clocks agreed, and no control ever appeared. The
+ * table read as one welded clock with two readouts. Publish is now always rendered — disabled, with the
+ * reason on screen, when there is nothing to publish — so the act exists before it is needed. Its server
+ * half is `writeCalendar`'s narrowed auto-publish (`codex-store.ts`).
+ *
+ * **Your date's value is a button; the players' is not, and that asymmetry is the invariant.** The GM's
+ * clock is theirs to set, so it opens a dedicated date editor (`5f`(i) — it used to be the fourth field of
+ * the structure modal). The players' clock is not settable by anyone: it is a COPY of the GM's, made by
+ * `publishCampaignDate()` and by nothing else (D11-H). Giving it a "set" affordance would be offering a
+ * control that cannot exist; its one door is Publish, beside it.
  */
 export type CalendarViewProps = Readonly<{
   gmToken: string;
@@ -40,6 +52,8 @@ export type CalendarViewProps = Readonly<{
 
 export function CalendarView({ gmToken, calendar, records, loading, error, onChanged, year, month, onMonthChange, onOpenEntry, onOpenPage }: CalendarViewProps) {
   const [editorOpen, setEditorOpen] = useState(false);
+  /** `5f`(i): the GM's clock on its own, not the fourth field of the world's structure. */
+  const [dateOpen, setDateOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [selectedInstant, setSelectedInstant] = useState<number | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -120,7 +134,12 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
       <header className="codex-calendar-clocks">
         <div className="codex-calendar-clock">
           <span className="codex-calendar-clocklabel">Your date</span>
-          <strong>{now ? formatWorldDate(calendar, now) : "Not set"}</strong>
+          {/* §4 route 1: `.codex-calendar-clockset` grows its own paint to the 44px floor rather than
+              hanging an ::after box over the clock beside it. */}
+          <button type="button" className="codex-calendar-clockset" onClick={() => setDateOpen(true)}
+            aria-label={now ? `Your date is ${formatWorldDate(calendar, now)}. Change it.` : "Set your date"}>
+            {now ? formatWorldDate(calendar, now) : "Set your date"}
+          </button>
           <GmOnlyTag />
         </div>
         <div className="codex-calendar-clock">
@@ -128,10 +147,20 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
           <strong>{published ? formatWorldDate(calendar, published) : "Not shared yet"}</strong>
         </div>
         {/* One primary action per view, and on THIS view publishing is it — the Journal's copy of this
-            row is secondary there for exactly that reason (D25 / §5). */}
-        {diverged && <Button variant="primary" disabled={publishing} onClick={() => void publish()}>Publish the date</Button>}
+            row is secondary there for exactly that reason (D25 / §5). ALWAYS RENDERED (D6): a control that
+            appears only once the GM has already caused the thing it fixes teaches nobody that it exists. */}
+        <Button variant="primary" disabled={publishing || !diverged} onClick={() => void publish()}>Publish the date</Button>
         <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>Edit calendar</Button>
       </header>
+      {/* The relationship, stated rather than inferred — the client's own words for what `5f` was missing.
+          Three states, because "nothing to publish" and "the party has never been given a date" are
+          different facts and the second one is the one a GM needs told. */}
+      <p className="codex-calendar-clockhint">
+        {!now ? "Your date is the campaign's now — every new record is dated by it. The party sees it only when you publish."
+          : !published ? "The party has no date yet. Publishing shares the date above with them; until then it is yours alone."
+          : diverged ? "You are running ahead of the party. Publishing moves their date to yours."
+          : "The party is on your date. Move yours and this becomes a date only you can see, until you publish again."}
+      </p>
       {publishError && <Alert tone="danger">{publishError}</Alert>}
 
       <div className="codex-calendar-monthbar">
@@ -203,13 +232,14 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
       )}
 
       {editorOpen && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={() => { setEditorOpen(false); onChanged(); }} onClose={() => setEditorOpen(false)} />}
+      {dateOpen && <CampaignDateEditor gmToken={gmToken} calendar={calendar} onSaved={() => { setDateOpen(false); onChanged(); }} onClose={() => setDateOpen(false)} />}
     </div>
   );
 }
 
 /** The player's Calendar — one clock, revealed records only, and no structure editing. */
 export function PlayerCalendarView({ calendar, records, year, month, onMonthChange, onOpenEntry }: Readonly<{
-  calendar: Readonly<{ yearName: string; months: readonly Readonly<{ name: string; days: number }>[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }> | null;
+  calendar: Readonly<{ yearName: string; eras?: readonly CodexCalendarEra[]; months: readonly Readonly<{ name: string; days: number }>[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }> | null;
   records: ReadonlyArray<Readonly<{ id: string; kind: CodexChronicleRecord["kind"]; title: string | null; text: string; calendarInstant: number | null }>>;
   year: string | null;
   month: string | null;
