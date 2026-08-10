@@ -82,8 +82,17 @@ type SrdExtension = Partial<{
   traits: ReadonlyArray<{ name: string; description: string }>;
 }>;
 
-/** Compact HP tracker inside the sheet; the server enforces scope (GM anyone, player self). */
-function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: string; allowSet: boolean; onFeedback: (text: string) => void }>) {
+/**
+ * Compact HP tracker inside the sheet; the server enforces scope (GM anyone, player self).
+ *
+ * **Exported for `damage-type.test.tsx`, and that export is the fix to a real hole.** D7 gave three
+ * doors one payload builder and only the token menu was joined to it by a test: a hostile review on
+ * 2026-08-10 replaced this component's `manualDamageType(...)` with `undefined` and the whole client
+ * suite stayed green at 65 files / 917 tests. Rendering the sheet WHOLE to reach these five controls
+ * would need a definition fetch, a skill catalog and a targeting context, none of which are the thing
+ * under test — so the door is exported at the same grain `SavePrompt` is.
+ */
+export function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: string; allowSet: boolean; onFeedback: (text: string) => void }>) {
   const [amount, setAmount] = useState("");
   /**
    * D7's type, on the one damage door a PLAYER can also reach.

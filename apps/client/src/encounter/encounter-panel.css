@@ -740,6 +740,26 @@
 .sheet-hp-controls > input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
 /* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
 .sheet-hp-controls > input:disabled { opacity: .5; cursor: default; }
+/* GIVING THE CHOOSER A LINE WAS ONLY HALF OF IT: its open list has to escape the chip too, and
+   `7541dbf` shipped without that half.
+   `.sheet-vital` carries `isolation: isolate` (ruling 45's flat plate, far below) so its `::before`
+   backing layer at `z-index: -1` stays inside it. That isolate is a stacking context, and it TRAPS
+   `.nh-combobox-list`'s `z-index: 40` inside ONE vital — so everything positioned that paints after
+   it covers the list, and positioned is nearly everything (`.nh-btn` and `.nh-chip` both take
+   `position: relative; isolation: isolate` for backing layers of their own). The other two D7 doors
+   never had this: in `.row-tools-popover` the list sits DIRECTLY inside the isolate, so its 40 wins.
+   Measured at 375px on 2026-08-10, GM, on each of the three seeded sheets: all 13 rows rendered at
+   222.2x44 and only 10 answered `elementFromPoint` at their own centre. `Acid` resolved to the AC
+   chip's `<strong>` (Playwright: `<div class="sheet-vital">` intercepts pointer events), `Thunder`
+   to `Long rest` in `.sheet-rest-block`, `Cold` to a condition chip on the sheet that had three; a
+   real `.tap()` on any of them timed out at 6 s and left the chooser empty. Which rows are
+   unreachable varies with what is rendered below the chip, which makes it harder to notice.
+   The isolate is NOT removed — without it the plate escapes upward, the failure `Button.css`
+   documents at length. The chip is LIFTED instead, and only while a list is open, exactly as
+   `.scene-gallery-hub .nh-card:has(details[open])` lifts a card whose ⋯ menu is open. `3` and not
+   `1` because `.sheet-float-resize` is the one explicit z-index inside a sheet and it is `2`.
+   After: 13 of 13 own their centre on all three sheets, and Acid/Thunder/Cold each tap through. */
+.sheet-vital:has(.nh-combobox-list) { z-index: 3; }
 /* Dmg/Heal/Temp/Set now render as <Button size="sm"> (Dmg destructive). */
 /* Conditions section (v3 #2.5): a labelled section instead of a bare "+ Add". */
 .sheet-conditions { margin-top: .85rem; }
