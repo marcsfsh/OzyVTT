@@ -152,7 +152,12 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
               <span className="sheet-picker-name">{item.name}{owned > 0 && <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>×{owned}</span>}</span>
               <span className="sheet-picker-meta">{metaLine(item)}</span>
             </div>
-            <button type="button" className="sheet-picker-add" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => onAdd(item)}>Add</button>
+            {/* Route 2 (`.tap-target`): the button paints 45x27 and reaches the 44px floor through a
+                centred `::after`, so the row's rhythm does not change. `::before` is the material's
+                here, `::after` was free. It matters more than it looks: this control did nothing at
+                all until the browse-and-add payload was fixed, so its touch ergonomics had never
+                once been exercised - a 27px-tall target on the phone the sheet is mostly read on. */}
+            <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => onAdd(item)}>Add</button>
           </li>;
         })}
       </ul>}
