@@ -28,7 +28,7 @@ exact command in `combat.pendingRuleAsks` (`rule-asks.ts`) and `rules.answer` re
 a player sees only their own ask, without its payload. B1's client half (Ask row, waiting rows, GM
 Allow/Deny) is driven both ways; the parked command commits (`apps/client/src/encounter/rule-ask.test.tsx`).
 **Typed damage is typed everywhere** (`4a`/`4b`/D7, 2026-08-08). `applyDamageDetailed` (`hit-points.ts`) stays the one entry point and all six call sites now narrate the adjustment. Six defence sources: definition RVI, effects, items, Petrified/Underwater, flat `damage-reduction` riders (last, per total, floored at 0) and rest-time re-choices (`choice-overrides.ts` — Fiendish Resilience really works). Vulnerability has three channels, not one (`damage-vulnerability` on `EffectModifierSchema`).
-Entering a number no longer discards its type: `actor.apply-damage` takes an optional `damageType` (absent/`"untyped"` = the old exact fast path) and a `damageOverride` that re-weights the rolled types to it; `save.answer` takes the same override before the success halving, and a player may amend only their own character's save.
+Entering a number no longer discards its type: `actor.apply-damage` takes an optional `damageType` (absent/`"untyped"` = the old exact fast path) and a `damageOverride` that re-weights the rolled types to it; `save.answer` takes the same override before the success halving, and a player may amend only their own character's save. **Both overrides are server-half only** — no client control sends either yet (decision log 2026-08-10; owed before any new unit).
 
 **One table feed** (D11). The combat-log store IS the feed (`apps/server/src/combat-log.ts`): every
 roll lands there as a `kind: "roll"` row carrying the whole `RollRecord`, attributed to its character,
@@ -54,39 +54,38 @@ the wizard's dice server-side into the feed. A player also dresses their own cha
 per-entry `hidden` flag — one picker for both roles (`tokens/TokenLibrary.tsx`). Archived characters
 are out of play server-side — refused by claim, scene staging and fight start/add.
 
-**Homebrew keeps its promises** (D21). Every field the item editor offers reaches the fight
-(`equipment-derivation.ts`, one test per formerly-inert field in `homebrew-inert-fields.test.ts`).
+**Homebrew keeps its promises** (D21), and since 2026-08-09 the editor's vocabulary is under a guard
+(`apps/client/src/homebrew/authoring-harness.ts` + `vocabulary-parity.mirror.test.ts` — every control
+driven from both ends, a census of still-owed keys). Parity Waves 0–2 landed 17 units — monster
+attacks publish, effects change numbers, granted spells / recharge / class-resource uses /
+multi-block choices / extraPicks / replaces / spell windows are authorable — and **all twelve
+classes build and level 1–20** (Extra Attack swings, capstones reach their DCs).
 
-**Replays** (D25/D26/D3). `replay.launch` parks the live table exactly as a scene switch does and makes
-one recorded moment live, cloning everyone under new ids so tonight's characters are never rewritten
-(`replay-launch.ts`). **The clone is kept and hidden** (D3, 2026-08-08): scoped to its scene (`Actor.replaySceneId`, `Scene.replayOf`), undecorated, off every roster (`rosterActors` in `@vtt/domain`), unclaimable, still in initiative and on the map, and deleted with the scene the table leaves — so a launch no longer spends a scene slot forever and 25 in a row never refuse. Both refusals now name their way out (`replay/launch-refusal.ts`, pinned by a mirror test). An archive stays hidden until the GM shares it; a player then reads a COMPUTED
-replay (`replay-projection.ts`) that hides each character until the turn it was revealed and carries no
-session ids, journal, raw states or stat blocks, and may load **that fight's map and no other archived one** (`playerReplayMapAssetIds`, gated on the shared flag). Unshared reads 404, never 403. One component serves
-both roles (`replay/ReplayPanel.tsx`): the GM list carries the per-replay reveal control (hidden by
-default), *Launch from here* whose confirm says the live scene is **parked**, and a triad Delete.
+**Replays** (D25/D26/D3). `replay.launch` parks the live table as a scene switch does and makes one
+recorded moment live, cloning everyone under new ids (`replay-launch.ts`). The clone is **kept and
+hidden** (D3): scene-scoped, off every roster, unclaimable, deleted with the scene — a launch no
+longer spends a scene slot forever, and both refusals name their way out. An archive stays hidden
+until shared; a player then reads a COMPUTED replay (`replay-projection.ts`) — no session ids,
+journal, raw states or stat blocks, that fight's map and no other. Unshared reads 404, never 403.
+One component serves both roles (`replay/ReplayPanel.tsx`).
 
 **Content.** SRD 5.2.1 bundles (`packages/content-srd-5.2.1`, ADR-0015); GM homebrew authoring with its
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
 (`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters.
 
 **The screen is the page** (D15/D30, refresh A1). `body` is locked and `<main>` is a 100dvh grid —
-[connection row][tab bar][content pane] (`apps/client/src/styles.css`); layers render in the pane,
-every surface owns a real frame (staging retired in Phase C), post-auth notices ride the toast.
-`/` is the title screen (per-theme `--landing-*` skies); the party is the table's, not the shell's.
-**And the app wears a sky** (§9 reversal, decision log 2026-08-04): `.pane-scene` + a `.pane-sky` child
-paint a literal scene — starfield, a sun cresting a lit horizon, a receding grid floor — off one
-`--sky-*` set, so the toggle changes the *hour*. Settings, roster, scenes, replays, the builder gate and
-not-found stand on it; **the table never does** (a horizon competes with the map), though its chrome takes
-the linework. AA is STRUCTURAL: `.pane-scene > .scroll-y` reserves the bright band (176px/144px against a
-measured 157/130), so no row rests in it. `.rim-*`, `.sign` and `.neon-beam` are the last three lessons.
+[connection row][tab bar][content pane] (`apps/client/src/styles.css`); every surface owns a real
+frame; `/` is the title screen. **And the app wears a sky** (§9 reversal, decision log 2026-08-04):
+`.pane-scene` + `.pane-sky` paint a literal scene off one `--sky-*` set, so the theme toggle changes
+the *hour*. Settings, roster, scenes, replays, the builder gate and not-found stand on it; **the
+table never does** (a horizon competes with the map), though its chrome takes the linework. AA is
+structural: `.pane-scene > .scroll-y` reserves the bright band, so no row rests in it.
 
 **Settings — one tab, three groups, one page** (A7/D24, `apps/client/src/settings/SettingsPage.tsx`).
-*Mine* (theme, "How you roll") reaches every role; *The table* and *Players* are never rendered without
-a GM token, so a player's page holds one group rather than three with two hidden. The rules dial lives
-here rather than in a mid-fight menu and reads **Enforce / Advise / Off** (D6 — copy only; the wire
-stays `strict|assisted|freeform`), one toggle per server rule family. `builderPolicy`
-gets its first client control, beside health display, staging defaults, players' hits and players'
-initiative; `/setup` folded into *Access & integrations*. `SETTINGS_GROUPS` is data, pinned by
+*Mine* reaches every role; *The table* and *Players* are never rendered without a GM token. The rules
+dial lives here and reads **Enforce / Advise / Off** (D6 — copy only; the wire stays
+`strict|assisted|freeform`), one toggle per server rule family; `builderPolicy` gets its first client
+control; `/setup` folded into *Access & integrations*. `SETTINGS_GROUPS` is data, pinned by
 `settings-groups.test.ts`.
 
 **Everything has an address** (D29, `apps/client/src/router.ts`): `/table` (both roles), `/settings`,
@@ -98,13 +97,10 @@ not-found when the thing behind one is not theirs. Levelling is the same wizard 
 that exists (`builder/LevelFlow.tsx`), previewing what a level-down drops (`level-ledger.ts`).
 
 **Coherence is enforced, not documented** (D28). One copy scanner (`apps/client/src/copy-scan.ts`)
-serves both vocabulary locks — `codex/vocabulary.test.ts` and the play-wide `play-vocabulary.test.ts`,
-which reads **everything under `apps/client/src` minus a pinned exclusion list** plus
-`packages/ui/src/primitives`, so a new directory is born locked. A retired word ("actor", "combatant",
-"Encounter" the place, the five dice phrasings) fails `npm run test` with the replacement named;
-exemptions are (file, string) pairs and die when they rescue nothing; the words D28 KEEPS are asserted
-present. `design-conventions.test.ts` does the same for glyphs, raw inputs, colours, feedback, breakpoints,
-viewport units and undeclared scroll regions — shrink-only, sized in `design-conventions-shape.ts`.
+serves both vocabulary locks (`codex/vocabulary.test.ts`, the play-wide `play-vocabulary.test.ts` —
+everything under `apps/client/src` minus a pinned exclusion list, so a new directory is born locked);
+a retired word fails `npm run test` with the replacement named. `design-conventions.test.ts` does the
+same for glyphs, raw inputs, colours, breakpoints and undeclared scroll regions — shrink-only.
 
 **Table viewer / second screen.** Pairing codes exchanged for a hashed cookie session, an SSE feed, and
 a player-safe projection that never carries `GameState` (`apps/server/src/viewer-http.ts`,
@@ -125,20 +121,24 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **"The screen is the page" refresh (this branch, 2026-08-05). A, B and C are in, and QA has run.**
-  C1: the phone table is a frame that yields **sheet-first** — free space to the sheet, a deficit out of the sheet down to an 8.25rem floor (44px tab bar + 88px body), and below that `.table-layout` **declares a scroll** rather than clipping. Clipping was the bug QA found: a 0px dock body and a `null` tab bar on every landscape phone mid-fight, a 0px claim picker at 320×568 (an unclaimed player could not join at all), "Leave table" off the bottom. Portrait is unchanged — GM 390×844 = section 336 / band 224 / sheet 456 / body 412, `.table-layout` 800 in every tab. Landscape is usable, not good (it scrolls 36–200px); it wants a map-beside-sheet composition, which needs a height axis the ladder does not have. A floored map half was measured and **rejected**: it spills 91.6px where the top line wraps.
-  **Docked at ≥980 the sidebar scrolls its own column** (`DicePanel` alone is 787–850px in an ~856px column, so no flex arrangement fits); dropping that had cost 114–429px of PAGE scroll, stuck to the device by `localStorage`.
-  C2: calibration is four steps, canvas always mounted (0px on screen at a 1280×720 landing, now 374 in every step).
-  Ratchets — ladder 0, viewport-legacy 0, **undeclared scrollers 0** (the last row drained by moving `.scroll-y` into the picker's markup, keeping its cap). Tap floor **124 → 9** of 1223, 0 unreachable: 8 are §4 exceptions, 1 a 1×1 hidden input C2 itself introduced. "9" means nine *on the surfaces the route list opens, in the state it opens them* — §4 names the ones behind a collapsed tab or closed disclosure. The route audit now measures 9 viewports (was 3) incl. landscape and a soft-keyboard pane, a docked pass, and whether overflow is *reachable*; `/table` passes all 9. It is **red on 10 cells across 4 other surfaces** (`/scenes/maps`, `/roster`, `/homebrew`, `/replays/:id`, plus `/replays` player at 844×390 by 1px) — all always broken and never measured until the audit grew. **Was 18** — the "14" recorded here through 2026-08-05 was an undercount, measured against a shorter route list; round 2 wave 1 cleared 8, taking `/scenes` fully green. Do not delete a viewport to go green.
-- **Refresh round 2 — waves 1–5 landed 2026-08-06; QA run, fixes in flight (2026-08-07).** 21 client feedback items, scoped in `docs/product/refresh-round-2-plan.md` and settled in `docs/product/refresh-round-2-decisions.md` (**66 rulings**, discovery closed). **Read the decisions document before touching any round-2 work.** Its acceptance bar is at the top and is all three of: a session runs on a phone with nothing in the way · all 21 items closed and verified · the landing and the app read as one product. Nothing is deferred to buy time. Three adversarial QA passes produced 20 findings, every one **re-measured** before it was scheduled (18 confirmed, 1 scope-corrected, 1 partly wrong) — the plan and its evidence are `docs/product/refresh-round-2-fixes.md`. Three P0s are open there: on a landscape phone a GM cannot end a fight, cannot reach "Next turn", and cannot tap-to-place a staged token on any pointer device.
-  Ruling 22's **partial reversal is now dated in `decision-log.md`** (2026-08-06) and the old no-sky sub-bullet carries a superseded marker: the table takes the horizon behind its chrome, never behind the map. Ruling 21 (chrome metal on hero surfaces) needs **no** reversal — measured, `.sign` has one call site in the repo and was never applied to a hero surface.
-- **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`); rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
+- **The feature-implementations program (PR #55) — Waves 0–2 DONE, the rest planned, the branch
+  splitting.** The 30 client-reported issues are closed; a 19-agent discovery pass (2026-08-10)
+  re-measured the remaining 22 units (only two are "add a control" work) and found ~80
+  API-authorable capabilities the editor cannot reach. **Read
+  `docs/product/remaining-program-plan.md` FIRST** — it carries the twenty client rulings (decision
+  log 2026-08-10); the four `plan-*-program.md` beside it carry every remaining unit with measured
+  sizes, carriers and workflow scripts. Waves 0–2 merge to `main`; each next batch is its own PR.
+- **"The screen is the page" refresh + round 2 — landed through wave 5, QA run.** Rulings:
+  `docs/product/refresh-round-2-decisions.md` (66 — read before touching round-2 work); evidence and
+  residue: `refresh-round-2-fixes.md`. The three P0s this page carried through 2026-08-08 were
+  re-measured 2026-08-10 and are closed; the tap-floor audit runs 9 viewports, `/table` passes all 9.
+- **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
+  rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 - **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
 
 ## Known broken
 
-Individual defects are in `known-bugs.md` — every entry there is broken at HEAD or it is deleted.
-The structural gaps worth knowing before you plan:
+Individual defects: `known-bugs.md` (every entry broken at HEAD, or deleted). The structural gaps:
 
 - **No browser baseline and no physical-device pass.** No `browserslist`, no Vite `build.target`, no
   degraded-browser fallback, no iOS/Android acceptance run (BUILD_PLAN GAP-001).

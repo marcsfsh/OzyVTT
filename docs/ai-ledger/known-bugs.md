@@ -14,6 +14,54 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
+- **[combat/weapons] A Rapier rolls off Strength, and every reach weapon threatens at five feet.**
+  `weaponAbilityModifier` and `weaponAction` already read `finesse`, `thrown` and `reach` off
+  `weapon.properties` — and no SRD weapon carries a `properties` array, so the readers run against an
+  empty column. Finesse weapons never use Dexterity; Glaive, Halberd, Lance, Pike and Whip all have
+  5-foot reach. Found 2026-08-10 by PLANNER-CONTENT; the vendored SRD Weapons table already carries
+  the data (70 property assignments, joined 38/38). Owner: content program **C3**
+  (`docs/product/plan-content-program.md`).
+
+- **[content/etl] Regenerating the bundles silently deletes every weapon's mastery.** The `mastery`
+  column in `weapons.v1.json` has no ETL home — measured in a scratch copy, `npm run build-bundle`
+  drops it from all 38 rows, nothing pins it (`bundle.test.ts` checks category and damage only), and
+  the build stays green. That column is the whole data basis of the mastery program. **Do not
+  regenerate bundles** until content program **C1** lands the parser for the already-vendored SRD
+  Weapons table.
+
+- **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
+  `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces
+  the Constitution/Wisdom AC path instead of adding +2 to it. Found 2026-08-10 by PLANNER-ENGINE.
+  Owner: engine program **U28** (`docs/product/plan-engine-program.md`), together with
+  `unarmored-defense.allowShield` (2 SRD authors: Barbarian `true`, Monk `false`).
+
+- **[homebrew/editor] The "inherit the damage type" empty box mints unpublishable records.**
+  `RiderEditor`'s extra-damage row documents an empty `damageType` as "same as the weapon's", and
+  `blankModifier` seeds exactly that — but the schema refuses both `""` ("String must contain at
+  least 1 character") and absence ("Required"), and the reader fallback that would honour the inherit
+  is unreachable. Every extra-damage row the editor mints fails publish with no client message.
+  Owner: engine program **U23+U30** (merged).
+
+- **[homebrew/editor] Tapping "Add a spread" makes a background unpublishable.** The
+  `abilityOptions.spreads` control mints `{amounts:[2,1]}` plus a `label` key against a schema of
+  bare number arrays — the shape is refused at publish and the editor offers no way to author the
+  legal one. Found 2026-08-10 by PLANNER-API. Owner: API program **D3**
+  (`docs/product/plan-api-program.md`).
+
+- **[homebrew/sheet] A homebrew monster's typed resistances bite mechanically and render blank.**
+  The engine applies `damageResistances`/`damageImmunities` from the typed columns, but the sheet
+  renders the `open5e.srd-2024` extension prose — which a homebrew record does not carry — so the
+  defenses work in the fight and are invisible on the card. Found 2026-08-10 by PLANNER-API; logged
+  here rather than folded into a unit. Unowned.
+
+- **[api/homebrew] Three API contract defects, planned as API program F1–F4.** (1) The server never
+  stamps `source: "homebrew"`, so an API-authored record publishes badged as bundled SRD content —
+  and eight false doc descriptions say the opposite while the summary shape says something different
+  again inside the same response. (2) Publishing a monster hard-requires two
+  `extensions["open5e.srd-2024"]` keys that appear zero times in the published contract. (3) The
+  closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
+  slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
+
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and
   migration v17 bounded revision growth with a global switch plus a coalescing window, with

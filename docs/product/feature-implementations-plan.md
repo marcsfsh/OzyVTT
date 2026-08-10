@@ -583,6 +583,12 @@ the client. Adding an era is a **stored-data change** — expect a migration and
 
 ## Decisions taken  (2026-08-07)
 
+> **Numbering note (2026-08-10).** The D-numbers below are **file-local** — read them as
+> "register D1"…"register D8". The single home for decisions is `docs/ai-ledger/decision-log.md`,
+> whose 2026-08-10 entry migrates the five of these that never reached it and records that
+> register D7's client half (and issue `4b`'s) is still owed. Two other documents quote different
+> D-schemes; where a bare "D7" appears anywhere, the decision log wins.
+
 ### D1 — Class content: **all 12 classes, all levels**
 
 Both halves are in scope:

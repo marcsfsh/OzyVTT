@@ -180,3 +180,36 @@ the server workspace, and `npm run test` then collects those compiled tests too 
 spurious failures) — build only the client workspace and it never appears; never run two full suites
 concurrently, because the server suite binds a live port; and read `docs/ai-ledger/known-bugs.md`
 before calling a red test a regression.
+
+---
+
+## 7. Opening prompt for the next session
+
+Copy-paste this to start the successor session. It assumes nothing from any prior conversation —
+the repo is the memory.
+
+> Read, in this order: `CLAUDE.md`, `docs/ai-ledger/current-state.md`,
+> `docs/product/remaining-program-plan.md` (the governing plan — twenty client rulings, batch
+> order, serialization points, the done bar), and the decision-log entry dated 2026-08-10.
+>
+> Context: PR #55 (Waves 0–2 of the feature-implementations program, 17 units) is merged to
+> `main`. You are executing the remaining program on a fresh branch off `main`, one PR per
+> measured batch. Four program plans are committed with runnable workflow scripts beside them:
+> `docs/product/plan-content-program.md`, `plan-api-program.md`, `plan-engine-program.md`,
+> `plan-mastery-program.md`, each with its workflow in `docs/product/workflows/`. The scripts
+> were written by planners and never executed — re-verify each plan's premises against HEAD
+> before running anything; every prior plan in this repo accumulated stale citations, and the
+> plans themselves tell you what to re-measure.
+>
+> Execution order (client-ruled): batch 0 prerequisites first and serial (the weapons ETL home —
+> **do not regenerate bundles before it lands** — `properties`, the CI flake + dedupe, the
+> `packages/schemas` test typecheck, the overlay `clears` ruling), then the honesty batch
+> (issue `4b` and register D7's client halves, the Wave-2 mobile back-fill), then the parity
+> guard, then the content program (longest pole), then the unit batches at up to 4 concurrent
+> agents in worktrees (hard-link `node_modules`, never symlink), then the closers. Every batch
+> ends with a hostile adversarial review hunting built-but-unwired mechanisms and vacuous tests,
+> a QA-fix pass, and a polish pass. The done bar per unit: an engine-outcome far-end proof,
+> non-vacuity probes at both control and value level, a 375px touch pass for UI. Commit after
+> each unit; push with `git push -u origin <branch>`; never `git add -A`.
+>
+> Trust the committed plans over your instincts, and the code over the plans.

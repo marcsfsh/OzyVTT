@@ -13,6 +13,66 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-10 — the remaining program: twenty client rulings, and one home for decisions
+
+**Context.** The feature-implementations branch (PR #55) closed 17 vocabulary-parity units across
+Waves 0–2, then a five-round discovery pass (19 agents) re-measured the remaining 22 units and found
+the plan's premise inverted — only two are "add a control" work — plus ~80 API-authorable
+capabilities the editor cannot reach. The client answered nine rounds of structured questions on
+2026-08-10. The full rulings, the measured findings and the four program plans live in
+`docs/product/remaining-program-plan.md` and `docs/product/plan-{content,api,engine,mastery}-program.md`;
+this entry records what is *durable* so it cannot be relitigated from memory.
+
+**The rulings that bind future work:**
+
+- **The branch splits.** Waves 0–2 merge to `main` as PR #55; the remaining programs run on a fresh
+  branch with **one PR per measured batch**. No more 34k-line unreviewed landings.
+- **The done bar is fixed:** an engine-outcome far-end proof, non-vacuity probes at **both** control
+  and value level, and a 375px touch pass for anything with UI. Every late bug this program caught
+  was caught by one of the three.
+- **Review is interleaved**, not terminal: every batch closes with a hostile adversarial review
+  hunting **built-but-unwired mechanisms and vacuous tests** specifically, plus a QA-fix and polish
+  pass; Areas 2–4's missing reviews are back-filled.
+- **A control with no SRD author is a defect, not a deliverable** (reaffirmed). The content program
+  authors the **full SRD magic-item list** (258 items, generated bundle + four overlay lanes), which
+  supplies real carriers to every zero-author unit — the harness's "not a lone record" rule stands
+  unchanged rather than gaining exemptions.
+- **The API parity guard is an HTTP round-trip** — the real router, the real store, the real publish
+  gate, and a deep-equal between the API-stored body and the editor-reproduced one. It lands
+  **before** the capability units so they land under it. `docs/product/vocabulary-parity-audit.md`
+  stops being hand-edited and is regenerated from the guard.
+- **`vex` and `slow` are real mastery units** with the same four-part contract as U34–U37; U38 stays
+  gated on all eight slugs reaching. "Unblocked by another unit" is not "implemented".
+- **U33 keeps its relabels and drops both destructive halves** — deleting an enum member that stored
+  records still carry (silent parse loss from every catalog), and removing a wire field with 44
+  authors. Breaking removals need migrations and their own decision, never a sweep.
+- **Baked characters get a versioned rebuild**: `schemaVersion` bumps, a per-sheet stale notice, and
+  a bulk GM action. Nothing rebuilds silently mid-campaign.
+- **Risky units run alone**: U22 (an `EffectInstanceSchema` field reaches every player by default),
+  U36 (cleave's second target must route through `canPlayerTarget` — client-supplied, never
+  server-chosen), U37 (push writes token position through `moveEncounterToken` only, with no client
+  input), and U19/U25's projection changes — each a dedicated agent plus a viewer-safety audit
+  before merge.
+- **The hand-authored overlay collision is ruled once**: adopt the content planner's `clears` verb
+  on `FeatureMechanics` (idempotent; a build error unless the same feature re-authors the key)
+  rather than hand-editing bundles or special-casing `choice`.
+- **U17's freeze is lifted**: the Stage-4 CONFIG freeze was documentation-only and Stage 4 is done.
+  Delete the stale `magical-secrets` row from `CONFIG.bard.choices` and author `widensPicks` through
+  the overlay — the engine plan costs the alternatives and cites why each loses.
+- **CI gets one verdict per commit**: seed the dice in `typed-damage-feed.test.ts`, then dedupe the
+  workflow's two concurrency groups. Six of thirty sampled commits disagreed with themselves.
+
+**The numbering migration.** This log is the **single home for decisions**; a D-number that does not
+resolve here does not exist. `docs/product/feature-implementations-plan.md` carries a file-local
+D1–D8 (2026-08-07) that collides with two older schemes quoted elsewhere; those numbers are now read
+as **"register D1"…"register D8"**, the register carries a pointer to this entry, and the five of
+them that never reached this log are hereby logged by reference: register D1 (all twelve classes
+ship), D2 (pinch-to-zoom), D4 (H1 — packages typecheck their own tests; **the packages/schemas half
+was never delivered** and is batch-0 work), D5 (schema gaps close by addition, not exemption), D7
+(the GM's damage entry gains an optional type — **server half only; the client half is owed** and
+runs before any new unit, with issue `4b`'s client half beside it). Future decisions: dated entries
+here, no parallel numbering anywhere.
+
 ## 2026-08-09 — the calendar's two clocks are independent, and an era is derived from the year
 
 Client report (`5f`): *"Your date and Players' date give no indication of how to set them, setting a date
