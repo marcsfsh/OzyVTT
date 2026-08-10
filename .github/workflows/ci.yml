@@ -6,8 +6,40 @@ on:
   # Any base branch, not just main: a PR from claude/b into claude/a currently runs nothing.
   pull_request:
 
+# ONE VERDICT PER COMMIT. A commit on `claude/**` with an open PR fires BOTH triggers above, and
+# `github.ref` differs between them - `refs/heads/claude/x` for the push, `refs/pull/N/merge` for the
+# pull_request - so a group keyed on `github.ref` filed them separately and neither cancelled the
+# other. That produced two runs over two DIFFERENT trees (the branch tip and the merge commit), and a
+# sampled thirty commits had six whose two runs disagreed with each other.
+#
+# The key below resolves to the HEAD BRANCH NAME in every case, so the two runs share one group and
+# `cancel-in-progress` collapses them:
+#
+#   push to main                -> no pull_request payload -> github.ref_name = "main"
+#   push to claude/x, no PR yet -> no pull_request payload -> github.ref_name = "claude/x"
+#   pull_request from claude/x  -> payload present         -> head.ref        = "claude/x"
+#
+# It is the HEAD branch and never the BASE, so a PR into `main` does not share a group with `main`'s
+# own push run - only the two events for one commit are ever collapsed together.
+#
+# `github.ref_name` alone will NOT do: on a pull_request event it evaluates to "N/merge", not the
+# branch, which is the same mismatch in a shorter spelling. `head.ref` alone will not do either -
+# it is empty on a push. The fallback is the whole mechanism.
+#
+# The push trigger on `claude/**` stays exactly as it is, for the reason given above it: an agent
+# branch with no PR open yet would otherwise be verified by nothing at all.
+#
+# RESIDUAL TRADEOFF, stated plainly: cancelling means the surviving verdict belongs to whichever of
+# the two runs STARTED LATER - branch tip or merge commit, and we do not get to choose which. The two
+# trees are identical while the PR's base has not moved and differ once it has; in that case the
+# merge-commit verdict is the more informative one, and it is not guaranteed to be the one kept. One
+# consistent verdict beats two contradictory ones, which is the trade being made.
+#
+# Not covered: a pull request from a FORK, where `head.ref` names a branch in the fork and could
+# collide with a branch of the same name here. This repo takes no outside contributions; if that ever
+# changes, qualify the key with `github.event.pull_request.head.repo.full_name || github.repository`.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:

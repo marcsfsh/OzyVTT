@@ -164,10 +164,28 @@ describe("save.answer narrates the adjustment it used to swallow", () => {
 });
 
 describe("both reaction paths narrate the adjustment they used to swallow", () => {
-  /** Bite Borin so his Uncanny Dodge parks the hit's damage on a prompt. */
+  /**
+   * Bite Borin so his Uncanny Dodge parks the hit's damage on a prompt.
+   *
+   * SEEDED ATTACK DIE, and it is load-bearing. +20 vs AC 12 hits on every face except a natural 1,
+   * which the resolver calls a FUMBLE - a miss, so no damage rolls, so no reaction prompt is minted
+   * and `pendingReactions[0]` is `undefined`. That is the whole of the flake this file carried: one
+   * bite in twenty erased the far end these two tests exist to assert, and with two bites per run the
+   * file failed roughly one run in ten (captured: `TypeError: Cannot read properties of undefined
+   * (reading 'proposedDamage')` at the DECLINED test).
+   *
+   * `attackNatural` is the public contract's own door for exactly this ("apply this exact d20 face
+   * for the attack instead of rolling"), so nothing about the server moves to make the test stable -
+   * the opportunity-attack test below already pins its d20 the same way. 18 hits and is below the
+   * critical threshold (20, and no rider here widens it), so the swing lands as an ordinary hit.
+   *
+   * Only the ATTACK die is pinned. The `4d6 + 6` damage still rolls for real and every assertion
+   * downstream derives its expectation from the number that came back, so the far-end proof stays a
+   * real rolled number rather than a hard-coded one.
+   */
   async function biteBorin(base: string, gmToken: string, mapAssetId: string): Promise<void> {
     expect((await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: DRAGON }, { actorId: BORIN }] })).status).toBe(200);
-    expect((await post(base, GAME_PATHS.actionResolve, gmToken, { commandId: randomUUID(), actorId: DRAGON, actionId: "bite", targetIds: [BORIN] })).status).toBe(200);
+    expect((await post(base, GAME_PATHS.actionResolve, gmToken, { commandId: randomUUID(), actorId: DRAGON, actionId: "bite", targetIds: [BORIN], attackNatural: 18 })).status).toBe(200);
   }
 
   it("explains the halved reaction damage when the reaction is USED", async () => {
@@ -195,6 +213,9 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
     const { base, server, gmToken, mapAssetId } = await boot();
     await biteBorin(base, gmToken, mapAssetId);
     const prompt = server.store.snapshot.combat.pendingReactions[0];
+    // Same guard as the USED test above: this line is where an unseeded fumble surfaced, and a named
+    // failure beats `TypeError: Cannot read properties of undefined`.
+    expect(prompt, "the bite parked no reaction prompt").toBeDefined();
     const parked = prompt.proposedDamage;
     const before = hpOf(server, BORIN);
 
