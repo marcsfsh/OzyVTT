@@ -1111,7 +1111,18 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (D26). Default hidden. */
   "actor:set-sheet-preview": (payload: { commandId: string; actorId: string; enabled: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-speed": (payload: { commandId: string; actorId: string; speedFeet: number | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; nonlethal?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
+  /**
+   * `damageType` and `damageOverride` are the two halves of "entering a number no longer discards its
+   * type" (`4a`/`4b`, register D7). Both were on `ApplyDamageSchema` and on NEITHER side of this
+   * contract, which is how `ActionRunner`'s `damageOverride` reached the server uncontracted: a NAMED
+   * excess property fails typecheck, a conditional spread does not.
+   *
+   * `damageType` names the type of a bare manual `amount` (absent or `"untyped"` = the old exact fast
+   * path; open text, so a homebrew type still matches a homebrew defence). `damageOverride` replaces a
+   * rolled total while KEEPING its types. Both are ignored where the other's shape wins - `damageType`
+   * when `parts` is present, since `parts` carries its own.
+   */
+  "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; damageType?: string; damageOverride?: number; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; nonlethal?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-temp-hp": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

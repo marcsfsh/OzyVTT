@@ -378,7 +378,17 @@
 .initiative-row-tools .secondary { padding: .3rem .7rem; font-size: var(--fs-xs); }
 /* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
-.row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
+/* `minmax(0, 1fr)`, not the default `auto` column, which grows to its widest item's MAX-CONTENT and
+   overflows a grid container that has a perfectly definite width. Measured at 375px: the popover was
+   313px wide and its `.hp-editor` row 419.8px, so `Temp` was clipped by the screen edge and `Set` sat
+   entirely beyond it (x 405.7-470.6) with nothing able to scroll to it. Pre-existing — it is what
+   `.hp-editor`'s five `flex: 1` buttons have always summed to — and fixed here because D7's chooser
+   sits in that row and inherits the same overflow. `1fr` is `minmax(auto, 1fr)`, whose auto MINIMUM
+   is the same trap; the `0` is the whole point. Measured after: the row is 291.9px and the five
+   buttons settle at 35.4-45.8px wide, which is what five buttons and a number field cost when they
+   are all required to be ON the screen. Their 38.9px HEIGHT is unchanged, and height is the dimension
+   that was already under the 44px floor, so `scripts/tap-audit.mjs` does not move. */
+.row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .45rem; padding: .6rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
 /* The active row carries the acting console inline, so open its HP/tools popover in-flow ABOVE the
    console (not floating below the whole row), so editing HP shows those controls above the actions. */
 .initiative-list.gm > li.active .row-tools-popover { position: relative; z-index: 41; top: auto; margin-top: .4rem; }
@@ -473,10 +483,22 @@
    the Foundry-style row) and nothing has emitted the bare class since. Verified 2026-08-05 by
    searching the whole tree outside node_modules/dist - the only hits were this stylesheet's own six
    declarations plus two compound selectors it shared with the live `.initiative-score-value`. */
-.hp-editor { display: flex; gap: .35rem; }
-.hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
-.hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
-.hp-editor button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* `flex-wrap` so D7's damage-type chooser can take a whole line of its own under the five buttons
+   (`flex-basis: 100%`, below). The buttons never wrap and are not meant to: `flex: 1` is
+   `flex-basis: 0`, so all five have a hypothetical size of 0 and always share one line.
+   `> input` / `> button` RATHER THAN DESCENDANTS, here and at `.sheet-hp-controls`,
+   `.token-context-hp` and every entry these four have in the material blocks below. The chooser is a
+   shared `Combobox`, and its own box is an `<input>` while each of its thirteen listbox rows is a
+   `<button>` — so the loose selectors were restyling a primitive's internals from outside it.
+   Measured: `.hp-editor input` sized the chooser to the number field's 4.2rem, and
+   `.token-context-hp button`'s `min-height: 2.6rem` shrank every option row to 41.6px, one tap floor
+   short, while the plate `::before` drew a bordered box around each one. Child combinators cost no
+   specificity, so nothing else in these files reorders. */
+.hp-editor { display: flex; flex-wrap: wrap; gap: .35rem; }
+.hp-editor > input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
+.hp-editor .damage-type-field { flex: 1 0 100%; }
+.hp-editor > button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
+.hp-editor > button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* `.health-chip` AND ITS TWO TONES WERE HERE — another `--radius-pill` rule for markup that does
    not exist. Same search as `.initiative-tag` above, same result: `health-chip`, `health-bloodied`
    and `health-down` appear in no `.tsx` anywhere in the repo, and the live DOM renders zero. The
@@ -712,9 +734,12 @@
 /* At-a-glance health band (design language §6) under the HP readout; number stays the primary display. */
 .sheet-hp-meter { margin: .3rem 0 .1rem; }
 .sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
-.sheet-hp-controls input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
+/* Same rule as `.hp-editor`'s: D7's chooser takes a whole line so the number and its four buttons keep
+   the row they were measured on. This one already wrapped, so only the basis is new. */
+.sheet-hp-controls .damage-type-field { flex: 1 0 100%; }
+.sheet-hp-controls > input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
 /* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
-.sheet-hp-controls input:disabled { opacity: .5; cursor: default; }
+.sheet-hp-controls > input:disabled { opacity: .5; cursor: default; }
 /* Dmg/Heal/Temp/Set now render as <Button size="sm"> (Dmg destructive). */
 /* Conditions section (v3 #2.5): a labelled section instead of a bare "+ Add". */
 .sheet-conditions { margin-top: .85rem; }
@@ -1631,13 +1656,13 @@
 .initiative-score-edit,
 .initiative-reaction,
 .menu-add-row button,
-.hp-editor button,
+.hp-editor > button,
 .action-again,
 .action-save-buttons button,
 .save-prompt-actions button, .save-prompt-confirm button,
 .action-preview .save-prompt-manual button,
 .save-die-mode,
-.sheet-hp-controls input,
+.sheet-hp-controls > input,
 .sheet-roll-chip,
 .sheet-prepare,
 .sheet-toggle-btn,
@@ -1675,13 +1700,13 @@
 .initiative-score-edit::before,
 .initiative-reaction::before,
 .menu-add-row button::before,
-.hp-editor button::before,
+.hp-editor > button::before,
 .action-again::before,
 .action-save-buttons button::before,
 .save-prompt-actions button::before, .save-prompt-confirm button::before,
 .action-preview .save-prompt-manual button::before,
 .save-die-mode::before,
-.sheet-hp-controls input::before,
+.sheet-hp-controls > input::before,
 .sheet-roll-chip::before,
 .sheet-prepare::before,
 .sheet-toggle-btn::before,
@@ -1721,7 +1746,7 @@
 .turn-controls button:hover:not(:disabled)::before, .turn-controls button:focus-visible::before, .turn-controls button:active:not(:disabled)::before,
 .encounter-menu-toggle:hover:not(:disabled)::before, .encounter-menu-toggle:focus-visible::before, .encounter-menu-toggle:active:not(:disabled)::before,
 .menu-add-row button:hover:not(:disabled)::before, .menu-add-row button:focus-visible::before,
-.hp-editor button:hover:not(:disabled)::before, .hp-editor button:focus-visible::before,
+.hp-editor > button:hover:not(:disabled)::before, .hp-editor > button:focus-visible::before,
 .action-again:hover:not(:disabled)::before, .action-again:focus-visible::before,
 .action-save-buttons button:hover:not(:disabled)::before, .action-save-buttons button:focus-visible::before,
 .save-prompt-actions button:hover:not(:disabled)::before, .save-prompt-confirm button:hover:not(:disabled)::before,
@@ -1752,7 +1777,7 @@
 .legendary-offer { border-radius: 0; }
 /* Inert reads as a material state, not only as reduced opacity (ruling 40). */
 .dock-log-door:disabled::before, .encounter-primary:disabled::before, .turn-controls button:disabled::before,
-.hp-editor button:disabled::before, .sheet-prepare:disabled::before, .builtin-chip:disabled::before,
+.hp-editor > button:disabled::before, .sheet-prepare:disabled::before, .builtin-chip:disabled::before,
 .legendary-offer:disabled::before, .monster-browser-add:disabled::before {
   border-color: transparent;
   background: var(--surface-2);

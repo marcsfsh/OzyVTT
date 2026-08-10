@@ -4,6 +4,8 @@ import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } fr
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc, weaponAbilityModifierFrom } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
+import { DamageTypeField } from "./DamageTypeField";
+import { manualDamagePayload, manualDamageType } from "./manual-damage";
 import { EquipmentPicker, inventoryWeaponFrom } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
@@ -83,16 +85,32 @@ type SrdExtension = Partial<{
 /** Compact HP tracker inside the sheet; the server enforces scope (GM anyone, player self). */
 function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: string; allowSet: boolean; onFeedback: (text: string) => void }>) {
   const [amount, setAmount] = useState("");
+  /**
+   * D7's type, on the one damage door a PLAYER can also reach.
+   *
+   * The decision says "the GM's damage entry", and this component renders for both roles - only the
+   * extra `Set` button is GM-gated. It gets the field anyway, because the server already accepts
+   * `damageType` from a player scope (`actorApplyDamage` has no GM grade; `adjustableActor` restricts
+   * WHICH character, not what may be said about the damage), and because the alternative is a `Dmg`
+   * button that quietly means something different depending on who taps it. A player typing "12 fire"
+   * on their own sheet gets their own resistance applied, which is the correct answer and the one they
+   * would otherwise have to ask the GM for.
+   */
+  const [damageType, setDamageType] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const send = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", label: string) => {
     const value = Number(amount.trim());
     const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { onFeedback(`Enter a whole number (${minimum}-1000).`); return; }
     setBusy(true);
-    const payload = event === "actor:set-hp" ? { commandId: newId(), actorId, current: value } : { commandId: newId(), actorId, amount: value };
+    // Only Dmg carries the type; Heal, Temp and Set share the row and none of them has one.
+    const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
+    const payload = event === "actor:set-hp" ? { commandId: newId(), actorId, current: value }
+      : event === "actor:apply-damage" ? manualDamagePayload({ commandId: newId(), actorId, amount: value, damageType: typed })
+      : { commandId: newId(), actorId, amount: value };
     socket.emit(event, payload as never, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
-      onFeedback(result.ok ? `${label} ${value}.` : result.message ?? "The hit point change was rejected.");
+      onFeedback(result.ok ? `${label} ${typed ? `${value} ${typed}` : value}.` : result.message ?? "The hit point change was rejected.");
       if (result.ok) setAmount("");
     });
   };
@@ -102,6 +120,7 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
     <Button size="sm" disabled={busy} onClick={() => send("actor:heal", "Healed")}>Heal</Button>
     <Button size="sm" disabled={busy} onClick={() => send("actor:set-temp-hp", "Temp set to")}>Temp</Button>
     {allowSet && <Button size="sm" disabled={busy} onClick={() => send("actor:set-hp", "HP set to")}>Set</Button>}
+    <DamageTypeField value={damageType} disabled={busy} onChange={setDamageType} />
   </div>;
 }
 

@@ -746,12 +746,20 @@
    header: no fill, no border, and it keeps the primitive's 44px `.tap-target` area. */
 .token-context-head .nh-iconbtn { flex: none; background: transparent; border-color: transparent; }
 .token-context-head .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.token-context-hp { display: flex; gap: .3rem; }
-.token-context-hp input { width: 3.4rem; margin: 0; padding: var(--space-2); text-align: center; }
-.token-context-hp button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer; }
-.token-context-hp button { flex: 1; text-align: center; }
+/* Wraps for D7's damage-type chooser, which takes a whole line under Dmg/Heal rather than a third
+   column: the menu is 12.5-16rem wide and the 3.4rem number field plus two `flex: 1` buttons already
+   fill it. A full-width basis is also what the chooser's `inset-inline: 0` listbox needs — in a
+   third-of-a-menu column it would open a ~4rem list of thirteen ellipsised words.
+   `> input` / `> button` for the reason spelled out at `.hp-editor` (encounter-panel.css): the
+   chooser's listbox rows are `<button>`s, and this rule's `min-height: 2.6rem` was shrinking all
+   thirteen of them to 41.6px — measured, one tap floor short. */
+.token-context-hp { display: flex; flex-wrap: wrap; gap: .3rem; }
+.token-context-hp > input { width: 3.4rem; margin: 0; padding: var(--space-2); text-align: center; }
+.token-context-hp .damage-type-field { flex: 1 0 100%; }
+.token-context-hp > button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.token-context-hp > button { flex: 1; text-align: center; }
 .token-context-item { text-align: left; }
-.token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.token-context-hp > button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* Fixed label column so the Size / Health / Show-to selects all share one width and left edge. */
 .token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
 .token-context-size select { width: 100%; margin: 0; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }

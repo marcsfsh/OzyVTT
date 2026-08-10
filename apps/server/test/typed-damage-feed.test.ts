@@ -324,3 +324,51 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect(hpOf(server, BORIN)).toBe(37);
   });
 });
+
+describe("actor.apply-damage narrates the type the GM named", () => {
+  /**
+   * D7's CLIENT HALF MADE THIS PATH REACHABLE. `damageType` had been on `ApplyDamageSchema` since
+   * `4a` and no client control sent one, so the whole branch - including the GM-only typo warning
+   * below - was HTTP-callers-only and had no test anywhere in the repo. The chooser that now sits in
+   * the three hand-entry doors is what a GM types into; these are the rows it produces.
+   */
+  const damageBorin = (base: string, token: string, body: Record<string, unknown>) =>
+    post(base, GAME_PATHS.actorDamage.replace("{actorId}", BORIN), token, { commandId: randomUUID(), actorId: BORIN, ...body });
+
+  it("halves a named type against resistance and puts the reason in the row the TABLE reads", async () => {
+    const { base, server, gmToken } = await boot();
+    const before = hpOf(server, BORIN);
+    expect((await damageBorin(base, gmToken, { amount: 10, damageType: "fire" })).status).toBe(200);
+    expect(before - hpOf(server, BORIN)).toBe(5);
+
+    const row = (await feed(base, gmToken)).find((entry) => entry.kind === "damage" && entry.text.includes("Borin"))!;
+    expect(row.text).toBe("Borin took 5 damage (10 fire → 5, resistance).");
+    // Not GM-only: a halved number the table cannot explain is the defect ADR-0020 exists to prevent.
+    const playerToken = server.auth.issuePlayerSession();
+    expect((await feed(base, playerToken)).some((entry) => entry.text.includes("10 fire → 5, resistance"))).toBe(true);
+  });
+
+  it("warns the GM about a type the SRD does not know, and tells the table nothing about it", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    const before = hpOf(server, BORIN);
+    // The vocabulary is open, so this lands in full rather than being refused - which is exactly why
+    // a typo here is silently inert and worth one line to the person who can fix it.
+    expect((await damageBorin(base, gmToken, { amount: 10, damageType: "fier" })).status).toBe(200);
+    expect(before - hpOf(server, BORIN)).toBe(10);
+
+    const warning = (await feed(base, gmToken)).find((entry) => entry.text.includes("is not one of the SRD damage types"));
+    expect(warning, "the GM was never told the type matched nothing").toBeDefined();
+    expect(warning!.text).toBe("\"fier\" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.");
+    // The GM's typo is the GM's business: the table sees the damage row and not the warning.
+    expect((await feed(base, playerToken)).some((entry) => entry.text.includes("SRD damage types"))).toBe(false);
+  });
+
+  it("stays silent for the untyped path and for a type the SRD does know", async () => {
+    const { base, gmToken } = await boot();
+    expect((await damageBorin(base, gmToken, { amount: 10 })).status).toBe(200);
+    expect((await damageBorin(base, gmToken, { amount: 3, damageType: "untyped" })).status).toBe(200);
+    expect((await damageBorin(base, gmToken, { amount: 3, damageType: "fire" })).status).toBe(200);
+    expect((await feed(base, gmToken)).some((entry) => entry.text.includes("SRD damage types"))).toBe(false);
+  });
+});

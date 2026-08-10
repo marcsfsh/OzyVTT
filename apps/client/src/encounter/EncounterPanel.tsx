@@ -10,6 +10,8 @@ import { beginTargeting, clearTargeting, resolveActionDirect, resolveTargeting, 
 import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
+import { manualDamagePayload, manualDamageType } from "./manual-damage";
+import { DamageTypeField } from "./DamageTypeField";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
 import { InitiativeRow } from "./InitiativeList";
@@ -778,6 +780,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   // editors, sheet) are open at a time.
   const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
+  /** D7's chosen type for the number beside it. Unlike `hpAmount` it is NOT cleared — see `adjustHp`. */
+  const [hpDamageType, setHpDamageType] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   // Close the ⋯ options popover on Escape, matching the token menu and the Menu primitive (it already
   // closes on outside-click via the backdrop). Rich content keeps it a bespoke popover, not a Menu.
@@ -941,11 +945,17 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     const value = Number(hpAmount.trim());
     const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { setMessage(`Enter a whole number (${minimum}-1000).`); return; }
-    const verbs = { "actor:apply-damage": options?.nonlethal ? `${name} took ${value} nonlethal damage.` : `${name} took ${value} damage.`, "actor:heal": `${name} healed ${value}.`, "actor:set-temp-hp": `${name} has ${value} temporary HP.`, "actor:set-hp": `${name} set to ${value} HP.` } as const;
+    // D7: the type rides ONLY on damage. Heal, Temp and Set share this row and none of them has a
+    // type, so a chosen "fire" left over from the hit before must not travel with them.
+    const damageType = event === "actor:apply-damage" ? manualDamageType(hpDamageType) : undefined;
+    const typed = damageType ? ` ${damageType}` : "";
+    const verbs = { "actor:apply-damage": options?.nonlethal ? `${name} took ${value} nonlethal${typed} damage.` : `${name} took ${value}${typed} damage.`, "actor:heal": `${name} healed ${value}.`, "actor:set-temp-hp": `${name} has ${value} temporary HP.`, "actor:set-hp": `${name} set to ${value} HP.` } as const;
     setHpAmount("");
     void run(() => event === "actor:set-hp"
       ? emitCommand(event, { commandId: newId(), actorId, current: value, expectedRevision: state.revision })
-      : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
+      : event === "actor:apply-damage"
+        ? emitCommand(event, manualDamagePayload({ commandId: newId(), actorId, amount: value, damageType, nonlethal: options?.nonlethal, expectedRevision: state.revision }))
+        : emitCommand(event, { commandId: newId(), actorId, amount: value, expectedRevision: state.revision }), verbs[event]);
   };
 
   // The quick-start door (D1/B2.5). Everyone active is pre-listed in the staging tray without being
@@ -1268,6 +1278,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
+                {/* D7. Below the buttons, not among them: this row already carries a number field and
+                    FIVE buttons, and a sixth control inline is what breaks it at 375px. It is panel
+                    state like `hpAmount`, so it deliberately SURVIVES an application and the next row
+                    opened — a fireball is one type across four tokens, and it is never hidden state:
+                    the chosen type renders as a chip and the confirmation says "took 10 fire damage." */}
+                <DamageTypeField value={hpDamageType} disabled={busy} onChange={setHpDamageType} />
               </div>
               <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />
               <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />
