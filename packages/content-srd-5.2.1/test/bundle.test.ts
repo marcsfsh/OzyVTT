@@ -21,11 +21,25 @@ import {
  * `EquipmentWeaponStatsSchema` is a NAMED schema (`schemas.ts`), and adding a key to it - as
  * `properties` did - is exactly the move that broke it.
  *
- * `Has` fails to compile when the key is missing or its type has collapsed, so the failure lands
- * here at `npm run check` (this package typechecks `test`) rather than as a mystery two packages
- * away. Runtime `toMatchObject` cannot catch it: the VALUE is always there; it is the TYPE that goes.
+ * `Has` fails to compile when the key is missing, when its type has collapsed to `any` or `never`,
+ * or when it no longer satisfies the expected shape - so the failure lands here at `npm run check`
+ * (this package typechecks `test`) rather than as a mystery two packages away. Runtime
+ * `toMatchObject` cannot catch it: the VALUE is always there; it is the TYPE that goes.
+ *
+ * Both collapse arms are load-bearing and neither is reachable through plain `extends`. A bare
+ * `T[K] extends Expected` answers TRUE for `any` (a conditional on `any` returns both branches
+ * unioned, and `true | never` is `true`) and TRUE for `never` (which extends everything), so the
+ * two shapes a truncated inference actually takes were the two this guard used to wave through.
+ *
+ * SCOPE, because this guard is easy to over-read: it proves these types are intact IN THIS
+ * PACKAGE'S program. Instantiation budgets are per-program, so it cannot reproduce exhaustion in a
+ * larger one - and the historic truncation surfaced in `packages/domain`. The matching assertion
+ * for that program lives beside the code that suffered it, in `packages/domain/test/catalog-choice.test.ts`.
  */
-type Has<T, K extends keyof T, Expected> = T[K] extends Expected ? true : never;
+type Has<T, K extends keyof T, Expected> =
+  0 extends (1 & T[K]) ? never
+  : [T[K]] extends [never] ? never
+  : T[K] extends Expected ? true : never;
 const _inferenceBudget: [
   Has<SpellReference, "attackRoll", boolean>,
   Has<SpellReference, "range", { distance: number | null; unit: string | null; text: string | null }>,

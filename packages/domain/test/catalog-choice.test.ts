@@ -3,6 +3,39 @@ import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } 
 import type { ContentClassSummary, ContentEquipmentSummary, ContentFeatSummary, ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary } from "../src/index.js";
 
 /**
+ * THE INFERENCE-BUDGET GUARD FOR THIS PROGRAM, and it is a TYPE assertion on purpose.
+ *
+ * Inlining one more property in `EquipmentReferenceSchema` (`packages/content-srd-5.2.1`) once
+ * pushed a `z.infer` past TypeScript's expansion budget, and the compiler answered by silently
+ * truncating a DIFFERENT inferred type - the spell summary THIS file's resolver reads - dropping
+ * its attack-roll and range fields with no error at the edit site. `resolvePickChoice` reads
+ * `attackRoll`, `rangeFeet`, `damageRoll` and `damageTypes` to answer the three closed `fromPicks`
+ * predicates; lose any of them to a collapse and those predicates silently stop matching.
+ *
+ * The content package carries the same assertion over its own types, but instantiation budgets are
+ * PER-PROGRAM: a guard in that package's small program cannot detect exhaustion in this larger one,
+ * which is the program the historic truncation actually surfaced in. Hence a copy here, next to the
+ * code that suffered it. Runtime assertions cannot see this: the VALUES arrive fine over the wire;
+ * it is the compile-time type that goes missing.
+ *
+ * The `any` and `never` arms are the point. A bare `T[K] extends Expected` answers TRUE for both -
+ * a conditional on `any` returns both branches unioned, and `never` extends everything - so the two
+ * shapes a truncated inference actually takes are exactly the two a naive check waves through.
+ */
+type Intact<T, K extends keyof T, Expected> =
+  0 extends (1 & T[K]) ? never
+  : [T[K]] extends [never] ? never
+  : T[K] extends Expected ? true : never;
+const _inferenceBudget: [
+  Intact<ContentSpellSummary, "attackRoll", boolean>,
+  Intact<ContentSpellSummary, "rangeFeet", number | null>,
+  Intact<ContentSpellSummary, "damageRoll", string | null>,
+  Intact<ContentSpellSummary, "damageTypes", readonly string[]>,
+  Intact<ContentEquipmentSummary, "weapon", { properties?: readonly string[] } | null | undefined>
+] = [true, true, true, true, true];
+void _inferenceBudget;
+
+/**
  * Fixture catalogs, minimal but real-shaped: every field the resolver reads is present, everything
  * else is the smallest legal value. Built as partials cast at the edges so a summary-shape change
  * that the resolver depends on still fails loudly here.
