@@ -14,6 +14,90 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
+- **[encounter/damage] Editing the pre-filled number on a parked player hit drops its damage types, so
+  Apply bypasses every defence.** `resolvePendingDamage`'s `amount !== undefined` arm
+  (`apps/server/src/player-damage.ts:83-85`) builds `{ amount, critical, sourceName }` and never
+  forwards `proposal.proposedDamageParts`, so `damagePartsOf` returns null in `applyDamageDetailed`
+  (`apps/server/src/hit-points.ts:170`) and the whole typed pipeline — resistance, immunity,
+  vulnerability, Petrified/Underwater, flat `damage-reduction` — is skipped. Measured 2026-08-10
+  against a fire-resistant target holding a 10-fire proposal: an untouched Apply lands **5** with
+  `parts` naming the halving; typing **12** lands **12**, not 6, with `parts` empty. The GM's route
+  to it is the editable field in `PendingDamagePrompt`
+  (`apps/client/src/encounter/EncounterPanel.tsx:694`), whose own docblock at `:673-678` says Apply
+  goes "through the typed-defense pipeline" — the server's docblock is honest about the override
+  ("no defense math"), the client's is not. **`ActionRunner`'s Apply already carries the fix for this
+  exact shape** and its comment says so (`apps/client/src/encounter/ActionRunner.tsx:150-154` — "a GM
+  correcting 17 to 12 handed a fire-resistant target all 12"): send the parts and let the server
+  re-weight them. The same shape is owed here, and `DamageResolveSchema`
+  (`apps/server/src/game-commands.ts:239`) carries no `damageOverride` for the amend to ride on.
+
+- **[encounter/damage] The save and reaction acks carry a typed breakdown nothing reads.**
+  `SaveAnswerResult.outcome.parts` / `.flatReduction` (`packages/domain/src/index.ts:1028`) and
+  `ReactionAnswerResult`'s pair (`:1030`) are computed and put on the ack by `game-operations.ts`;
+  `SavePrompt` and `ReactionPrompt` (`apps/client/src/encounter/EncounterPanel.tsx`) take
+  `success`/`total`/`dc`/`appliedDamage`/`conditionApplied`/`rollMode` and stop. Measured 2026-08-10:
+  `outcome.parts` has two client readers and both are mirror tests
+  (`apps/client/src/encounter/save-damage.mirror.test.ts`); **`flatReduction` has no reader anywhere
+  outside the server that writes it** — it appears only in `hit-points.ts`, `saving-throws.ts`,
+  `reactions.ts`, `game-operations.ts` and one server test. So a hit halved by resistance and then cut
+  by a `damage-reduction` rider explains itself on `actor.apply-damage`'s path
+  (`apps/client/src/encounter/ActionRunner.tsx:166`) and stays a bare number on the save's and the
+  reaction's.
+
+- **[ui/touch] The sheet's browse-and-add picker has ten controls under the floor.**
+  `node scripts/tap-audit.mjs 375` at HEAD (2026-08-10): `play-sheet-picker` measures 328 controls,
+  10 below 44px — `input.sheet-picker-search` at **34.3px tall** × 303 wide, and nine
+  `button.sheet-picker-chip` (All, Weapons, Armor, Gear, Tools, Focuses, Consumables, Packs, Ammo) at
+  **19px tall**, 38.9–90.2 wide. That is 10 of the run's 30; the other 20 are the two graph passes
+  (16), three encounter tokens and the 1×1 `input.map-upload-input`. Pre-existing at `8c8d6b2` by
+  construction, not by re-measurement: nothing in `8c8d6b2..HEAD` touches
+  `apps/client/src/encounter/equipment.tsx` or the `.sheet-picker-*` rules in
+  `apps/client/src/encounter/encounter-panel.css`.
+
+- **[ui/touch] The row-tools popover and the token context menu ship sub-floor controls, and the tap
+  audit opens neither surface.** Measured 2026-08-10 in Chromium 1194 at 375×667 (dsf 2, isMobile,
+  hasTouch) by design-language §4's own rule. The initiative row's popover (`.hp-editor`,
+  `apps/client/src/encounter/EncounterPanel.tsx:1342`) is **six** controls all **38.9px tall** —
+  Amount 67.2 wide, Dmg 40.4, KO 35.4, Heal 39.8, Temp 45.8, Set 35.4. The token menu
+  (`apps/client/src/scene/TokenContextMenu.tsx`) is **eleven**: Amount 54.4×41.6, Dmg and Heal
+  63×41.6, two `select` at 190×38, `summary.token-context-conditions-summary` 190×35.3, and five
+  `button.token-context-item` 190×41.6 — the 41.6 is `.token-context-hp > button`'s
+  `min-height: 2.6rem` (`apps/client/src/scene/encounter-map.css:759`) exactly. **None of the
+  seventeen is in the audit's 30**: neither surface is in `scripts/tap-audit.mjs`'s route list, which
+  touches `[data-token-id]` only to read an actor id for the sheet address. Same blind spot the
+  `[codex/verify]` entry below records for `.dice-custom > summary`, on the surface a GM adjusts hit
+  points from.
+
+- **[repo/verify] `scripts/tap-audit.mjs`'s `play-homebrew-picker` surface cannot open, so the audit's
+  non-zero exit is not always a floor failure.** Its opener takes the `.first()` combobox inside
+  `.hb-detail` and clicks it. Measured 2026-08-10 with one real record in the rail: that first match
+  is the `Answers to` box, **0×0 inside a `div.nh-roweditor-body` carrying `hidden`** — the collapsed
+  `RowEditor` row the script's own docblock already knows about — so the click waits out its 8s and
+  the surface reports NOT MEASURED, while `play-homebrew-record` measures 203 controls (78 inside a
+  closed disclosure) and `play-homebrew-feature` 288, both clean, for a run of 2622 controls and
+  **one** unmeasured surface. On an **empty** library — which is what the dev database holds, the two
+  earlier fixtures having been soft-deleted — all three homebrew surfaces go unmeasured instead ("no
+  homebrew row in the rail"): 2131 measured, 30 below the floor, 1 unreachable, **3** surfaces NOT
+  MEASURED. Either way the exit code is 1 for the unmeasured surfaces, not for the 30. Its sibling
+  `play-homebrew-feature` finds its target by walking the rail; this one does not.
+
+- **[codex/touch] The pin inspector's "Show the pin" is the audit's one unreachable control.**
+  `node scripts/tap-audit.mjs 375` at HEAD (2026-08-10): on `pin-inspector` (`/codex/atlas`),
+  `button.nh-btn nh-btn--ghost interactive "Show the pin"` measures **44 tall × 158.1 wide with
+  reach 0** — the size is fine and `elementFromPoint` at its own centre answers with something else.
+  It is the only `UNREACH` row in a 2131-control run and it is in the **active** layer, so it is not
+  the overlay/disclosure exemption the `[codex/verify]` entry below describes. Unowned; what is
+  painted over it has not been identified.
+
+- **[repo/tooling] `npx vitest run --root apps/client` from the repo root reds
+  `design-conventions.test.ts` for a reason that is not the code.** `CLIENT_SRC` and `UI_SRC` are
+  built from `process.cwd()` (`apps/client/src/design-conventions-shape.ts:38-39`), and `--root`
+  moves vitest's root without moving the process's cwd — so `assertRoots` looks for `main.tsx` under
+  the repo root, and the suite fails to COLLECT with `ENOENT`, printing "1 failed / no tests".
+  Measured both ways 2026-08-10: from the repo root the file does not collect; `cd apps/client` then
+  `npx vitest run src/design-conventions.test.ts` is **34 passed**. Three separate lanes reported it
+  on 2026-08-10, so it is not a one-off. Run a workspace suite from inside the workspace.
+
 - **[homebrew/editor] A homebrew weapon cannot be given properties or a mastery.** The API accepts
   both on `equipment.weapon` and the engine reads both, but the editor's weapon block has five rows
   (kind, damage, damage type, range, long range) and neither. So an SRD Rapier is Finesse and a GM's
@@ -438,26 +522,28 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   opener stop presenting itself as a toggle it cannot untoggle?
 
 - **[codex/verify] `scripts/tap-audit.mjs` withholds its reach verdict for every control outside the
-  active layer — and never opens some layers at all.** At HEAD (2026-08-05) the footer at 375px reads
-  **1223 controls measured, 9 below the 44px floor, 0 unreachable in the active layer**. Reach is
+  active layer — and never opens some layers at all.** At HEAD (2026-08-10) the footer at 375px reads
+  **2131 controls measured, 30 below the 44px floor, 1 unreachable in the active layer, 3 surfaces
+  NOT MEASURED** — it read 1223 / 9 / 0 on 2026-08-05, before the play shell's surfaces were walked.
+  Reach is
   *not judged* for the controls that sit behind an open overlay (a modal `<dialog>`, which the
   platform makes inert by spec, or an open non-modal `Drawer` — the entry above) or inside a closed
   `<details>`. They are still sized and still counted in the below-floor total; only the reach verdict
   is withheld, so nothing measures whether they are reachable once their own layer becomes the active
   one. That is the gap.
   **The split is quoted with its provenance, because this entry once carried a stale one as if it were
-  current.** The last measured breakdown is `765e232`'s: **184 unjudged — 130 behind an open overlay,
-  54 inside a closed disclosure**. It has not been re-measured since; the phase that followed cleared
-  115 sub-floor controls and deleted a `<details>` whose contents were surfaced, so the population
-  moved and only the totals above were re-read. `node scripts/tap-audit.mjs 375` settles it. (The
-  numbers this entry used to quote — 187 unjudged of 1259 measured, 124 below the floor — were a
-  phase-opening snapshot, and 187 was `765e232`'s 184 mis-added as 130+57.)
-  **A second, larger blind spot is the state the audit opens a surface IN.** "9" means nine on the
+  current.** Re-measured 2026-08-10 at HEAD: **541 unjudged — 508 behind an open overlay, 33 inside a
+  closed disclosure**, against `765e232`'s 184 (130 / 54). The population moved with the play shell,
+  so quote the pair from one run and never across two. (The numbers this entry used to quote — 187
+  unjudged of 1259 measured, 124 below the floor — were a phase-opening snapshot, and 187 was
+  `765e232`'s 184 mis-added as 130+57.)
+  **A second, larger blind spot is the state the audit opens a surface IN.** "30" means thirty on the
   surfaces its route list opens, as it finds them. Controls behind a collapsed tab or a closed
   disclosure are never measured at all: `.dice-custom > summary` x2 at 19.5x375 (the phone sheet
   mounts one tab's body at a time and the audit only ever measures the default tab) and
   `button.api-copy` at 27.3x48.9 inside a closed `details.api-reference` on `/settings`. Both are
-  pre-existing and both are real sub-floor controls that would raise the 9 if the audit drove them.
+  pre-existing and both are real sub-floor controls that would raise the 30 if the audit drove them,
+  as would the seventeen in the `[ui/touch]` row-tools/token-menu entry above.
   This entry used to blame the old "unresolved" column on SVG children and on controls that could not
   be scrolled to the viewport centre. **Both causes measure zero.** SVG controls resolve —
   `g.encounter-token` walks out to reach 21 against its own 15.8px box, `g.codex-graph-node` to 29-31 —
