@@ -48,8 +48,12 @@ const sheet = (damageResistances: readonly string[]) => ({
   extensions: {}
 }) as unknown as ActorDefinition;
 
-/** A live fight with a 17-fire breath owed by Borin, exactly as `action.resolve` would have parked it. */
-function tableWith(options: Readonly<{ resistant: boolean; halfOnSuccess: boolean }>) {
+/**
+ * A live fight with a 17-damage breath owed by Borin, exactly as `action.resolve` would have parked
+ * it. `parts` defaults to one fire component; hand it two and the halving stops agreeing with
+ * `floor(total / 2)`, which is what makes the two-type case worth having.
+ */
+function tableWith(options: Readonly<{ resistant: boolean; halfOnSuccess: boolean; parts?: ReadonlyArray<{ amount: number; type: string }> }>) {
   const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
     { id: IDS.dragon, name: "Dragon", kind: "monster", visibility: "public", hp: { current: 100, maximum: 100 } },
     { id: IDS.borin, name: "Borin", kind: "player-character", visibility: "public", hp: { current: 40, maximum: 40 }, ownerSessionId: IDS.borinSession, definitionId: "borin-def" }
@@ -57,7 +61,7 @@ function tableWith(options: Readonly<{ resistant: boolean; halfOnSuccess: boolea
   startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.dragon, score: 20 }, { actorId: IDS.borin, score: 12 }] }, () => 1, GEOMETRY);
   createPendingSaves(state, {
     sourceActorId: IDS.dragon, sourceName: "Dragon", actionName: "Fire Breath", ability: "dex", dc: 15,
-    targetIds: [IDS.borin], proposedDamage: 17, proposedDamageParts: [{ amount: 17, type: "fire" }],
+    targetIds: [IDS.borin], proposedDamage: 17, proposedDamageParts: [...(options.parts ?? [{ amount: 17, type: "fire" }])],
     halfOnSuccess: options.halfOnSuccess, conditionId: null, newSaveId: () => IDS.save, createdAt: 0
   });
   const definition = sheet(options.resistant ? ["fire"] : []);
@@ -81,10 +85,11 @@ function answerFromThePrompt(
   table: ReturnType<typeof tableWith>,
   typedDamage: string | null,
   rolledTotal: number,
-  who: Readonly<{ role: "gm" | "player"; sessionId: string }> = { role: "gm", sessionId: IDS.gm }
+  who: Readonly<{ role: "gm" | "player"; sessionId: string }> = { role: "gm", sessionId: IDS.gm },
+  commit = true
 ) {
   const payload = saveAnswerPayload({
-    commandId: command, saveId: IDS.save, method: "manual", commit: true, total: rolledTotal,
+    commandId: command, saveId: IDS.save, method: "manual", commit, total: rolledTotal,
     ...(saveDamageAmend(17, typedDamage) !== undefined ? { damageOverride: saveDamageAmend(17, typedDamage) } : {})
   });
   const request = SaveAnswerSchema.parse(payload);
@@ -125,6 +130,54 @@ describe("the save prompt's damage field", () => {
     expect(before - table.hp()).toBe(6);
   });
 
+  /**
+   * THE NUMBER `SavePrompt` PRINTS AFTER AN AMEND, sourced.
+   *
+   * The prompt's summary line used to print the PRE-halving proposal in the same "N dmg" grammar
+   * that had meant applied damage a keystroke earlier - 12 shown, 6 landing. It now re-asks the
+   * server with Confirm's own payload and `commit: false`, and prints whatever comes back. These
+   * two cases are what comes back, from the server's own code: the 6 and the 0 that
+   * `save-damage.test.tsx` acknowledges are these, not numbers a test author chose.
+   */
+  it("answers an uncommitted recheck with the number the commit will apply, and applies nothing", () => {
+    const table = tableWith({ resistant: false, halfOnSuccess: true });
+    const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
+    expect(outcome.committed).toBe(false);
+    expect(outcome.appliedDamage).toBe(6);
+    // A recheck is a question, not an answer: no hit points moved and the save is still owed.
+    expect(table.hp()).toBe(40);
+    expect(table.state.combat.pendingSaves).toHaveLength(1);
+    // And the commit that follows lands exactly the number the recheck projected.
+    expect(40 - answerFromThePrompt(table, "12", 18).outcome.appliedDamage).toBe(34);
+    expect(table.hp()).toBe(34);
+  });
+
+  it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {
+    // 9 fire + 8 cold. `rescaleDamageParts` re-weights 12 across them as 7 + 5, and the success
+    // halving floors EACH part: 3 + 2 = 5. `floor(12 / 2)` is 6. That gap is the point of this case -
+    // it is the fixture `save-damage.test.tsx` renders, so the string it asserts cannot be reached
+    // by any arithmetic the client could have done on the number in its own field.
+    const table = tableWith({ resistant: false, halfOnSuccess: true, parts: [{ amount: 9, type: "fire" }, { amount: 8, type: "cold" }] });
+    const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
+    expect(outcome.appliedDamage).toBe(5);
+    expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's halving").not.toBe(5);
+    // And the commit lands the same 5, per type.
+    const committed = answerFromThePrompt(table, "12", 18);
+    expect(committed.outcome.parts).toEqual([
+      { amount: 3, type: "fire", adjusted: 3, adjustment: null, adjustmentSource: null },
+      { amount: 2, type: "cold", adjusted: 2, adjustment: null, adjustmentSource: null }
+    ]);
+    expect(40 - table.hp()).toBe(5);
+  });
+
+  it("answers the recheck with ZERO on a success that does not halve - the case the old line got most wrong", () => {
+    const table = tableWith({ resistant: false, halfOnSuccess: false });
+    const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
+    expect(outcome.success).toBe(true);
+    expect(outcome.appliedDamage).toBe(0);
+    expect(table.hp()).toBe(40);
+  });
+
   it("sends nothing at all when the field is untouched, cleared, or retyped to the same number", () => {
     for (const typed of [null, "", "   ", "17"]) {
       const table = tableWith({ resistant: false, halfOnSuccess: false });
@@ -151,22 +204,40 @@ describe("the save prompt's damage field", () => {
 
     const theirs = tableWith({ resistant: false, halfOnSuccess: false });
     expect(() => answerFromThePrompt(theirs, "3", 5, { role: "player", sessionId: IDS.strangerSession }))
-      // NOTE: this is `adjustableActor`'s refusal, not `saving-throws.ts:304`'s
-      // "You can only amend your own character's save damage." A player who does not own the target
-      // is turned away before the amend is looked at, so that later line cannot fire - see the
-      // finding reported with this change. The boundary holds; the second guard is belt-and-braces.
+      // THIS is the ownership boundary, and it is the only one: `adjustableActor` turns a player
+      // away from somebody else's target before the amend is looked at. `answerSave` used to carry
+      // a second guard saying "You can only amend your own character's save damage." that could
+      // never fire, which made the sheet's boundary look like it was in two places; it was deleted
+      // 2026-08-10 and this message is what a player really gets.
       .toThrow(/only track your own character/);
     expect(theirs.hp(), "a refused amend still moved hit points").toBe(40);
   });
 
-  it("is refused by the server's own bound rather than silently applying the rolled number", () => {
+  it("is refused IN WORDS by the server's own bound rather than silently applying the rolled number", () => {
     // The client does NOT range-check: a fat-fingered 9999 must come back as a refusal the prompt
     // can show, never as a quiet fallback to the 17 nobody asked for. The refusal lands one step
-    // earlier than `answerSave`'s own message - `SaveAnswerSchema`'s 0..1000 bound turns it away
-    // before the command runs, which is the same door the HTTP and socket paths post through.
+    // earlier than `answerSave` - `SaveAnswerSchema`'s 0..1000 bound turns it away before the
+    // command runs, which is the same door the HTTP and socket paths post through.
     const table = tableWith({ resistant: false, halfOnSuccess: false });
     expect(saveDamageAmend(17, "9999")).toBe(9999);
-    expect(() => answerFromThePrompt(table, "9999", 5)).toThrow(/damageOverride/);
+
+    // THE MESSAGE, not the path. This assertion used to read `.toThrow(/damageOverride/)`, which
+    // matches the ZodError's serialized JSON - the issue's `path` - and so passed just as happily
+    // while the sentence a GM read was zod's "Number must be less than or equal to 1000". Every
+    // arm of the bound answers with the same sentence, because `save.answer` surfaces
+    // `issues[0].message` verbatim (`game-operations.ts`, `preferIssueMessage`).
+    for (const typed of ["9999", "1001"]) {
+      const refusal = SaveAnswerSchema.safeParse(saveAnswerPayload({
+        commandId: command, saveId: IDS.save, method: "manual", commit: true, total: 5,
+        damageOverride: saveDamageAmend(17, typed)
+      }));
+      expect(refusal.success, `${typed} was accepted`).toBe(false);
+      expect(refusal.error!.issues[0].message).toBe("Enter the damage as a whole number from 0 to 1000.");
+    }
+    // 1000 is inside the bound, so the sentence is a refusal and not a wall.
+    expect(SaveAnswerSchema.safeParse(saveAnswerPayload({ commandId: command, saveId: IDS.save, method: "manual", commit: true, total: 5, damageOverride: 1000 })).success).toBe(true);
+
+    expect(() => answerFromThePrompt(table, "9999", 5)).toThrow();
     expect(table.hp()).toBe(40);
   });
 });

@@ -295,14 +295,13 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   // The proposal's TYPES survive it (`rescaleDamageParts`), which is the whole point: an amended 12
   // is still 12 fire against a fire-resistant target, not 12 untyped that ignores the resistance.
   //
-  // ROLE BOUNDARY, stated rather than inherited: a player may amend only their own claimed
-  // character's save. `adjustableActor` above already refuses any other target for a player scope,
-  // so the rule is the same one that governs answering the save at all - named here so it cannot be
-  // widened by accident.
-  if (damageOverride !== undefined) {
-    if (!Number.isInteger(damageOverride) || damageOverride < 0 || damageOverride > 1000) throw new CommandRejectedError("Enter the damage as a whole number from 0 to 1000.");
-    if (scope.role === "player" && target.ownerSessionId !== scope.sessionId) throw new CommandRejectedError("You can only amend your own character's save damage.");
-  }
+  // THE TWO BOUNDARIES ON IT ARE BOTH UPSTREAM, and this used to re-state them as a pair of guards
+  // that could never fire. The RANGE is `SaveAnswerSchema`'s (`game-commands.ts`), which refuses
+  // 0..1000 before the command runs and now carries the sentence the answerer reads; the OWNERSHIP
+  // is `adjustableActor`'s, called at the top of this function, which turns a player away from
+  // somebody else's target with "You can only track your own character." A guard that cannot fire is
+  // a lie about where the boundary is, so both were deleted (2026-08-10) rather than left as
+  // reassurance - the tests that prove each boundary name the message it really produces.
   const proposedTotal = damageOverride ?? pending.proposedDamage;
   // Typed parts (ADR-0020) halve per part on success and run the defense pipeline on application;
   // saves persisted before the field fall back to the untyped total.

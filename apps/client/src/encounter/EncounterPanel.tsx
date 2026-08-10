@@ -37,6 +37,15 @@ const validInitiativeScore = (value: string | undefined) => value !== undefined 
     for the same reason (D3) — `ScenePrepPanel.tsx:28`, whose list this one is deliberately a copy of. */
 const RECENT_COUNT = 10;
 
+/**
+ * How long the save prompt waits after the last keystroke before re-asking the server what an
+ * amended damage would actually apply (`SavePrompt`). Short enough that the answer is there before a
+ * thumb reaches Confirm, long enough that typing "12" is one question and not two — a half-typed "1"
+ * is not worth a command. Much shorter than the homebrew editor's 800ms autosave, because nothing is
+ * being written: the recheck records no die and applies nothing.
+ */
+const RECHECK_AMEND_MS = 350;
+
 /* ── THE ⋯ FIGHT MENU'S GEOMETRY ────────────────────────────────────────────────────────────────
    Breathing room from every viewport edge, the gap between the trigger and the box, and the box's
    own width — the same three numbers the old inline `place()` used, named so the placement rule
@@ -142,10 +151,22 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  * WHAT THE FIELD HOLDS IS THE PROPOSAL, NOT WHAT LANDS. `damageOverride` is applied BEFORE the
  * success halving (`saving-throws.ts`), so on a successful half-on-success save a typed 12 lands as
  * 6 - and against a fire-resistant target, as 3. Binding the field to the post-halving number the
- * preview reports would halve it twice. Hence the label ("Damage on a failure"), and hence the
- * summary below stops asserting the previewed number once the field moves off the basis that
- * preview was computed with: the same "(manual - rolled N)" honesty `ActionRunner` uses, rather
- * than a post-halving number this client is in no position to compute.
+ * preview reports would halve it twice. Hence the label ("Damage on a failure").
+ *
+ * AND HENCE THE SUMMARY RE-ASKS. An amend typed AFTER the roll invalidates the projection the
+ * server returned with it, and the first cut of this prompt printed the pre-halving proposal in its
+ * place - "12 dmg (amended - rolled 17)" over a save the server would apply as **6**, in the same
+ * "N dmg" grammar that meant applied damage one keystroke earlier. Two ways out; this is the second:
+ *
+ *   - Compute the post-halving number here. Rejected. It is not one rule but three (fail: all;
+ *     success + half: halved PER TYPED PART and floored, so two parts do not sum to `floor(total/2)`;
+ *     success without half: **nothing at all** - the case that printed 12 where 0 landed), and every
+ *     one of them is a game decision the server owns.
+ *   - Ask the server again. Taken. A short pause after the typing stops, the prompt re-sends
+ *     **Confirm's own payload with `commit: false`** - same rolled total, same amend - which records
+ *     nothing, applies nothing, and answers with the projection for the number now in the field. So
+ *     the line reads the server's arithmetic by construction rather than a mirror of it, and the
+ *     amend's provenance stays on the row ("6 dmg (amended - rolled 17)").
  */
 export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
   const [busy, setBusy] = useState(false);
@@ -157,8 +178,25 @@ export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode,
   // null = untouched. Rendering falls back to the proposal (auto) or to nothing (manual), so the
   // field and the "did the answerer mean to change this" question stay one piece of state.
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
+  // The background recheck of an amend typed AFTER the roll (see the header): `pending` while one is
+  // out, `failed` after a refusal - which stops the loop and drops "checking" from the line, so a
+  // recheck the server turned away settles on a claim that is incomplete rather than one that is
+  // wrong. Any further typing puts it back to `idle` and asks again.
+  const [recheck, setRecheck] = useState<"idle" | "pending" | "failed">("idle");
   const damageOverride = saveDamageAmend(save.proposedDamage, damageEdit);
   const proposal = damageOverride ?? save.proposedDamage;
+  // A committed answer unmounts this prompt, so a recheck still in flight must not report into a
+  // component that is gone - it would toast "already answered" on top of the applied outcome.
+  // The flag is RE-ARMED in the effect body, not just cleared in the cleanup: `main.tsx` renders
+  // under `<StrictMode>`, whose mount → cleanup → mount would otherwise leave it false for the life
+  // of the prompt and swallow every recheck. Measured in Chromium at 375px, where the line sat on
+  // "Amended to 12 - checking" forever; jsdom has no StrictMode and could not see it.
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  // Read through a ref so a parent that hands down a fresh closure each render cannot restart the
+  // recheck's timer forever.
+  const feedbackRef = useRef(onFeedback);
+  feedbackRef.current = onFeedback;
   // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
   // unmounts before it could show its own result. `dieMode` is the answerer's explicit adv/disadv.
   const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false, dieMode?: DieMode) => {
@@ -182,12 +220,39 @@ export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode,
       onFeedback(result.ok ? "Saving throw dismissed." : result.message ?? "The saving throw could not be dismissed.");
     });
   };
-  const amended = rolled !== null && proposal !== rolled.basis;
+  // The shown projection was computed from `basis`; move the field off it and the number on screen
+  // is no longer the server's answer to the question now being asked.
+  const stale = rolled !== null && proposal !== rolled.basis;
+  useEffect(() => {
+    if (rolled === null || !stale || busy || recheck !== "idle") return;
+    // Confirm's payload with the commit taken off: same rolled total, same amend. `commit: false`
+    // records no die and applies nothing (`answerSave` returns before the outcome is written), so
+    // what comes back is a projection of exactly what Confirm would do next.
+    const { total } = rolled;
+    const basis = proposal;
+    const timer = setTimeout(() => {
+      setRecheck("pending");
+      socket.emit("save:answer", saveAnswerPayload({ commandId: newId(), saveId: save.id, method: "manual", commit: false, total, ...(damageOverride !== undefined ? { damageOverride } : {}) }), (result: SaveAnswerResult) => {
+        if (!mounted.current) return;
+        if (!result.ok || !result.outcome) {
+          setRecheck("failed");
+          if (!result.ok) feedbackRef.current(result.message ?? "The amended damage could not be checked.");
+          return;
+        }
+        const outcome = result.outcome;
+        setRecheck("idle");
+        // `basis` is the proposal this answer was ASKED about, not the current one: type again while
+        // it was out and the line is stale again, and this effect re-runs and asks again.
+        setRolled((current) => (current === null ? null : { ...current, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied, basis }));
+      });
+    }, RECHECK_AMEND_MS);
+    return () => clearTimeout(timer);
+  }, [rolled, stale, busy, recheck, proposal, damageOverride, save.id]);
   return <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
     <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName})</span>
     {save.proposedDamage > 0 && <label className="save-damage-amend">
       <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>
-      <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={4} className="action-damage-edit" placeholder={String(save.proposedDamage)} value={damageEdit ?? (rollMode === "manual" ? "" : String(save.proposedDamage))} disabled={busy} onChange={(event) => setDamageEdit(event.target.value.replace(/[^0-9]/g, ""))} />
+      <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={4} className="action-damage-edit" placeholder={String(save.proposedDamage)} value={damageEdit ?? (rollMode === "manual" ? "" : String(save.proposedDamage))} disabled={busy} onChange={(event) => { setDamageEdit(event.target.value.replace(/[^0-9]/g, "")); setRecheck("idle"); }} />
     </label>}
     <RollControls
       rollMode={rollMode} busy={busy} rolled={rolled !== null} currentMode={rolled?.mode}
@@ -200,7 +265,12 @@ export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode,
       summary={rolled ? <>
         {/* Reveal the rolled total and what it will do; an explicit Confirm applies it. */}
         <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.success ? "Success" : "Failure"}</strong>
-        <span className="save-prompt-effect">{amended ? `${proposal} dmg (amended - rolled ${rolled.basis})` : rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
+        {/* `rolled.damage` is always the SERVER's projection for the number the field holds - never
+            this component's arithmetic on it. While a recheck is out there is no such projection, so
+            the line says what was typed and stops short of claiming an outcome. */}
+        <span className="save-prompt-effect">{stale
+          ? `Amended to ${proposal}${recheck === "failed" ? "" : " - checking"}`
+          : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended - rolled ${save.proposedDamage})` : ""}`}</span>
       </> : undefined}
       extraActions={rolled && !rolled.success && (legendaryResistanceLeft ?? 0) > 0
         ? <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when it fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>

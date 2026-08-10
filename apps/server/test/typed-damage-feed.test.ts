@@ -306,6 +306,34 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect(row.text).toContain("12 fire → 6, resistance");
   });
 
+  it("refuses a fat-fingered 9999 in words a GM can act on, and moves nothing", async () => {
+    // THE REFUSAL A GM READS, through the door the prompt posts through. The field is four
+    // characters wide, so 1001-9999 is typeable and `saveDamageAmend` lets it travel on purpose -
+    // swallowing it client-side would quietly apply the auto-rolled number instead. What came back
+    // until 2026-08-10 was zod's own "Number must be less than or equal to 1000": the 0..1000 bound
+    // was bare, and the sentence below lived only on an `answerSave` guard the schema had already
+    // made unreachable. The bound carries it now, which is the only place that can produce it.
+    const { base, server, gmToken, mapAssetId } = await boot([]);
+    await breatheOnBorin(base, gmToken, mapAssetId);
+    const save = server.store.snapshot.combat.pendingSaves[0];
+    const before = hpOf(server, BORIN);
+    const answer = (damageOverride: unknown) => post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride });
+
+    for (const typo of [9999, 1001, -1, 12.5, "12"]) {
+      const refused = await answer(typo);
+      expect(refused.status, `${JSON.stringify(typo)} was not refused`).toBe(400);
+      expect((await refused.json()).error.message, `${JSON.stringify(typo)} was refused in the wrong words`).toBe("Enter the damage as a whole number from 0 to 1000.");
+    }
+    // Nothing moved and the save is still owed, so the GM can simply retype the number.
+    expect(hpOf(server, BORIN)).toBe(before);
+    expect(server.store.snapshot.combat.pendingSaves.some((entry) => entry.id === save.id)).toBe(true);
+
+    // The far edge of the bound is INSIDE it - the sentence is a refusal, not a wall at 999.
+    const accepted = await answer(1000);
+    expect(accepted.status).toBe(200);
+    expect(before - hpOf(server, BORIN)).toBeGreaterThan(0);
+  });
+
   it("refuses a player amending somebody else's save", async () => {
     const { base, server, gmToken, mapAssetId } = await boot([]);
     await breatheOnBorin(base, gmToken, mapAssetId);

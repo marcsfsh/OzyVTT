@@ -52,10 +52,15 @@ export function saveAnswerPayload(input: Readonly<{
  *  - a number equal to the proposal is not an amend, so the untouched path stays byte-identical on
  *    the wire (the guard `PendingDamagePrompt` and `ActionRunner` already use).
  *
- * OUT-OF-RANGE NUMBERS TRAVEL ON PURPOSE. The server owns the 0-1000 bound and refuses by name
- * ("Enter the damage as a whole number from 0 to 1000."), which the prompt shows. Swallowing a
- * typed 99999 here would silently apply the ROLLED number instead - a wrong number with no
- * complaint, which is worse than a refusal.
+ * OUT-OF-RANGE NUMBERS TRAVEL ON PURPOSE. The server owns the 0-1000 bound: `SaveAnswerSchema`
+ * (`apps/server/src/game-commands.ts`) refuses before the command runs, and `save.answer` is one of
+ * the two commands that surface the failing issue's own message, so the prompt shows **"Enter the
+ * damage as a whole number from 0 to 1000."** Swallowing a typed 99999 here would silently apply the
+ * ROLLED number instead - a wrong number with no complaint, which is worse than a refusal.
+ *
+ * This paragraph was false until 2026-08-10 and is the reason the claim is now sourced. The bound
+ * was a bare `.max(1000)`, so what a GM actually read was zod's own "Number must be less than or
+ * equal to 1000" - a sentence about a schema, in a prompt about a dragon.
  */
 export function saveDamageAmend(proposedDamage: number, typed: string | null): number | undefined {
   if (proposedDamage <= 0) return undefined;
