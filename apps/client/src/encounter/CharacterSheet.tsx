@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { resolveSpellcasting, type ActorDefinition, type ActorDerivedSheet, type ContentActionSummary, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
-import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
+import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc, weaponAbilityModifierFrom } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker, inventoryWeaponFrom } from "./equipment";
@@ -514,13 +514,20 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
   // Equipped weapons become rollable attack actions on the sheet (v6 #5): to-hit = ability mod + PB,
-  // damage = the weapon die + ability mod. Ranged weapons use Dex, melee uses Str (finesse isn't vendored
-  // in the SRD weapon table, so this is the common case). Client-derived + tap-to-roll like the other
-  // sheet actions; the server-authoritative attack flow is unchanged.
+  // damage = the weapon die + ability mod. Client-derived + tap-to-roll like the other sheet actions;
+  // the server-authoritative attack flow is unchanged.
+  //
+  // The ability comes from `weaponAbilityModifierFrom`, the same function the server derives its
+  // authoritative attack with, because a preview that computes its own number is a preview that can
+  // disagree with the roll it is previewing. This read `rangeFeet != null ? dex : str` under a note
+  // that finesse "isn't vendored in the SRD weapon table" - accurate when written, and falsified the
+  // moment the `properties` column reached the inventory row. It was then wrong twice over: it
+  // missed finesse (a Rapier previewed off Strength) and it called every thrown weapon ranged (a
+  // Javelin previewed off Dexterity, when throwing one is a Strength attack).
   const equippedWeaponActions = (actor.kind === "player-character" && definition)
     ? inventory.filter((item) => item.equipped && item.weapon && item.quantity > 0).map((item) => {
         const weapon = item.weapon!;
-        const abilityMod = modifierOf(definition.abilityScores[weapon.rangeFeet != null ? "dex" : "str"]);
+        const abilityMod = weaponAbilityModifierFrom(weapon.properties ?? [], weapon.rangeFeet, modifierOf(definition.abilityScores.str), modifierOf(definition.abilityScores.dex));
         const toHit = abilityMod + definition.proficiencyBonus;
         const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
         // ACTIVE, not merely magical: riders apply while equipped, and while ATTUNED as well when the

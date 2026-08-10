@@ -1,7 +1,7 @@
 import type { Actor } from "@vtt/domain";
 import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 import {
-  abilityModifier, armorWeightOf, collectRiders, effectiveSlot, sumRiders,
+  abilityModifier, armorWeightOf, collectRiders, effectiveSlot, sumRiders, weaponAbilityModifierFrom,
   type ArmorWeight, type RiderAbility, type RiderCarrier, type RiderContext, type RiderModifier, type ResolvedRider
 } from "@vtt/rules-5e";
 
@@ -984,11 +984,14 @@ function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, d
 export function weaponAbilityModifier(item: InventoryItem, definition: ActorDefinition | undefined): number {
   const weapon = item.weapon;
   if (!weapon || !definition) return 0;
-  const properties = weapon.properties ?? [];
-  const str = abilityModifier(definition.abilityScores.str);
-  const dex = abilityModifier(definition.abilityScores.dex);
-  const ranged = weapon.rangeFeet !== null && !properties.includes("thrown");
-  return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+  // The rule itself lives in `@vtt/rules-5e` because the character sheet's tap-to-roll preview has
+  // to derive the SAME number; see `weaponAbilityModifierFrom`.
+  return weaponAbilityModifierFrom(
+    weapon.properties ?? [],
+    weapon.rangeFeet,
+    abilityModifier(definition.abilityScores.str),
+    abilityModifier(definition.abilityScores.dex)
+  );
 }
 
 export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined, grantedWeapons: readonly string[] = []): ActorAction | null {

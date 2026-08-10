@@ -17,6 +17,29 @@ export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+/**
+ * WHICH ABILITY A WEAPON ATTACK ROLLS OFF, from the SRD weapon properties (2024 rules).
+ *
+ * Finesse takes the better of Strength and Dexterity - it is the player's choice, and no sheet has
+ * ever wanted the worse one. Otherwise a ranged weapon rolls Dexterity and a melee weapon Strength,
+ * and `thrown` is what makes those two not the same question as "does it have a range": a Javelin
+ * has a range and is still a Strength weapon, because throwing one is a melee weapon used at range.
+ *
+ * It lives HERE, in the dependency-free rules package, because it has two callers that must not
+ * disagree: the server derives the authoritative attack from it, and the character sheet derives
+ * the tap-to-roll preview beside it. The sheet's copy of this rule was `rangeFeet != null ? dex :
+ * str` under a comment claiming finesse "isn't vendored in the SRD weapon table" - true when it was
+ * written, false the moment the `properties` column shipped, and wrong on both axes afterwards. A
+ * preview mirrors the server result; it does not get its own arithmetic.
+ *
+ * Takes primitives rather than an item so it can sit below both the domain types and the wire
+ * schema, which is what lets both sides call it.
+ */
+export function weaponAbilityModifierFrom(properties: readonly string[], rangeFeet: number | null | undefined, str: number, dex: number): number {
+  const ranged = rangeFeet !== null && rangeFeet !== undefined && !properties.includes("thrown");
+  return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+}
+
 /** Total character level for multiclass sheets = the sum of class levels; never below 1. */
 export function characterLevel(classLevels: readonly number[]): number {
   const total = classLevels.reduce((sum, level) => sum + level, 0);

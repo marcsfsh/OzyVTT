@@ -7,8 +7,39 @@ import {
   saveBonus,
   skillBonus,
   spellAttackBonus,
-  spellSaveDc
+  spellSaveDc,
+  weaponAbilityModifierFrom
 } from "../src/character.js";
+
+describe("weaponAbilityModifierFrom - the ONE rule the server and the sheet both roll off", () => {
+  // A duellist who makes the two axes visible: Dexterity is the better score, so a Finesse weapon
+  // must take it and a Strength weapon must not.
+  const str = abilityModifier(12); // +1
+  const dex = abilityModifier(18); // +4
+
+  it("takes the better score for Finesse, and Strength for a plain melee weapon", () => {
+    expect(weaponAbilityModifierFrom(["finesse"], null, str, dex)).toBe(4);        // Rapier
+    expect(weaponAbilityModifierFrom(["finesse", "light"], null, str, dex)).toBe(4); // Shortsword
+    expect(weaponAbilityModifierFrom(["heavy", "two-handed"], null, str, dex)).toBe(1); // Greatsword
+    // Finesse is the better of the two, not "Dexterity" - a STR 18 / DEX 12 brute keeps Strength.
+    expect(weaponAbilityModifierFrom(["finesse"], null, 4, 1)).toBe(4);
+  });
+
+  it("rolls a THROWN weapon off Strength even though it has a range", () => {
+    // The half the sheet used to get wrong in the other direction: `rangeFeet != null` is not the
+    // same question as "is this a ranged weapon". Throwing a Javelin is a Strength attack.
+    expect(weaponAbilityModifierFrom(["thrown"], 30, str, dex)).toBe(1);            // Javelin
+    expect(weaponAbilityModifierFrom(["light", "thrown"], 20, str, dex)).toBe(1);   // Handaxe
+    expect(weaponAbilityModifierFrom([], 80, str, dex)).toBe(4);                    // Shortbow
+    // Both properties at once resolves through Finesse, which is why a Dagger agrees either way.
+    expect(weaponAbilityModifierFrom(["finesse", "light", "thrown"], 20, str, dex)).toBe(4);
+  });
+
+  it("treats a missing range and a missing property list as melee with no properties", () => {
+    expect(weaponAbilityModifierFrom([], undefined, str, dex)).toBe(1);
+    expect(weaponAbilityModifierFrom([], null, str, dex)).toBe(1);
+  });
+});
 
 describe("abilityModifier", () => {
   it("applies floor((score - 10) / 2) across the range", () => {
