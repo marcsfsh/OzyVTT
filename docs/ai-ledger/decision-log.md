@@ -73,6 +73,64 @@ was never delivered** and is batch-0 work), D5 (schema gaps close by addition, n
 runs before any new unit, with issue `4b`'s client half beside it). Future decisions: dated entries
 here, no parallel numbering anywhere.
 
+## 2026-08-10 — the overlay gets a `clears` verb, and the delete it authorises is one-way
+
+**Context.** Ruled by the client on 2026-08-10 as ruling 14 of the entry above, and **implemented in
+that same form** as batch 0's last prerequisite. It is recorded in full here because the summary line
+above cannot carry the hazard, and the hazard is the reason the mitigations are not optional.
+
+For `cleric`, `fighter` and `wizard` the class record in `packages/content-srd-5.2.1/bundles/classes.v1.json`
+is both the ETL's **input and its output** — those three are hand-authored and carried through
+verbatim, so the mechanics overlay may only **add**. `applyMechanics` refuses to overwrite a key the
+record already carries and fails the build naming both homes. A *second* edit to a shipped rider was
+therefore unauthorable from the class module, and the only home left was a hand edit to a
+10,418-line bundle. Measured across the whole remaining program, that bites in **exactly one case**:
+Wizard's Spell Mastery, printed as "choose a level 1 **and** a level 2 spell" and shipped as one pick
+of two capped at level 2. (Re-verified at implementation: `evoker.empowered-evocation` and
+`fighter.studied-attacks` carry no riders at all, so the units that land on them are clean adds.)
+
+**The ruling: a `clears?: readonly RiderKey[]` on `FeatureMechanics`.** The named keys are deleted
+from the record before the merge, so a module can say *"this feature's `choice` is superseded — the
+list beside it replaces it."* It is the general form of the problem, it keeps one home per rider for
+all twelve classes, and it makes the collision message's own advice ("remove it from one of the two
+homes") expressible in the module. The decisive argument was not code cost — at N = 1 a hand edit is
+cheaper — it is that this program's shape is four concurrent agents in four worktrees, and a hand
+edit is paid in the one currency the program is short of: a shared 10,418-line file.
+
+**The hazard, stated because it does not go away.** On a hand-authored record the ETL writes the
+merged record back over its own input, so a `clears` is a **one-way, irreversible** edit to committed
+JSON. Deleting the `clears` line later does not bring the old value back. Three mitigations, all
+part of the ruling:
+
+1. **`clears` is idempotent.** Clearing an absent key is a no-op, never an error — so the second and
+   later builds are clean and the module stays truthful instead of becoming a build error the moment
+   it works.
+2. **A `clears` entry is a build error unless the same feature also authors a rider.** The verb can
+   never be a silent delete-only tool. An invalid entry deletes *nothing*: it contributes none of
+   itself rather than the irreversible half.
+3. **The review bar is the `git diff` of `classes.v1.json` in the same commit.** Stated here because
+   the collision guard's whole argument was that an unannounced overwrite would be *"unreviewable and
+   un-revertable"*. `clears` makes the overwrite authorable, so the review is what has to make it
+   reviewable again.
+
+**Rejected, with why.** *Hand-edit the three bundles* — cheapest at N = 1, but it reinstates the
+shared-file workflow the overlay was extended to end, and splits the authoring surface so an author
+reading `wizard.ts` sees nothing of what Wizard actually authors. *Teach the guard that `choices`
+supersedes `choice`* — five lines, but a special case for whichever pair happens to be first; the
+next case (a `uses` that must change) needs a second one. *Move the three onto the generated path* —
+freezes 242 records' worth of prose into a hand-maintained copy the cross-check deliberately does not
+compare, to gain somewhere to hang three lines of riders. The full costing is
+`docs/product/plan-content-program.md` §4.
+
+**Consequences.** The verb and both code-enforced mitigations live in
+`packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts`; `HAND_AUTHORED` moved there from
+`packages/content-srd-5.2.1/scripts/build-class-bundle.ts` because it is a property of the merge, not
+of the parse, and one home is what lets a test hold the merge to the same three classes. The proof is
+in `packages/content-srd-5.2.1/test/mechanics-overlay.test.ts`: a build over a copy of the real
+bundle, run **twice**, ending at the picks the twice-built record offers. Because the hand-edit option
+was *not* taken, `classes.v1.json` does **not** become a serialization point for concurrent agents —
+a `clears` is a module edit, and modules are one file per class by design.
+
 ## 2026-08-09 — the calendar's two clocks are independent, and an era is derived from the year
 
 Client report (`5f`): *"Your date and Players' date give no indication of how to set them, setting a date

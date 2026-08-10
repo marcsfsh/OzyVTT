@@ -15,7 +15,7 @@
  * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
+import { CLASS_MECHANICS, HAND_AUTHORED, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -29,8 +29,10 @@ const root = join(here, "..");
 const bundles = join(root, "bundles");
 const source = readFileSync(join(root, "sources/dnd-5e-srd-markdown/classes.md"), "utf8");
 
-/** Classes already authored by hand, with riders the prose cannot express. Never regenerated. */
-const HAND_AUTHORED = new Set(["fighter", "wizard", "cleric"]);
+// `HAND_AUTHORED` - the classes already authored by hand, with riders the prose cannot express, and
+// never regenerated - is imported from `class-mechanics/overlay.ts` rather than declared here. It is
+// a property of the OVERLAY's merge (these are the records it may only add to, and the ones a
+// `clears` edits one-way), and one home is what lets a test hold the merge to the same three.
 
 // ---------------------------------------------------------------------------------------------
 // Markdown/HTML parsing helpers

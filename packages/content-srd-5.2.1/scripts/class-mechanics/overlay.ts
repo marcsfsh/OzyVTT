@@ -37,6 +37,31 @@
  * area has been fixing is authored mechanics that vanish without a trace; an overlay that quietly
  * dropped a renamed feature's riders would be a new instance of exactly that.
  *
+ * `clears` - THE REPLACEMENT VERB, ruled 2026-08-10. For the three HAND_AUTHORED classes the bundle
+ * is this script's input AND its output, so the merge is additive-only and a SECOND edit to a rider
+ * that already shipped was unauthorable from the class module - the only home left was a hand edit
+ * to a 10,000-line JSON file, which is the shared-file workflow the overlay exists to end. `clears`
+ * names the keys a feature supersedes; they are deleted from the record before the merge, so the
+ * module can say "this feature's `choice` is superseded - the list below replaces it."
+ *
+ * ITS HAZARD IS REAL AND IS THE REASON FOR THE THREE MITIGATIONS BELOW: on a hand-authored record
+ * the ETL writes the merged record back over its own input, so a `clears` is a ONE-WAY edit to
+ * committed JSON. Deleting the `clears` line later does not bring the old value back.
+ *
+ *   1. IDEMPOTENT. Clearing an absent key is a no-op, never an error - so the second and later builds
+ *      are clean and the module stays truthful instead of becoming a build error the moment it works.
+ *   2. NEVER DELETE-ONLY. A `clears` entry is a build error unless the same feature also authors a
+ *      rider, so the verb can never be used to quietly remove content.
+ *   3. THE REVIEW BAR IS THE `git diff` OF `bundles/classes.v1.json` IN THE SAME COMMIT. That is
+ *      stated here because the collision guard's whole argument was that an overwrite would be
+ *      "unreviewable and un-revertable" (see `applyMechanics` below); `clears` makes the overwrite
+ *      authorable, so the review has to be the thing that makes it reviewable again.
+ *
+ * The rejected alternatives are costed in `docs/product/plan-content-program.md` §4 and the ruling is
+ * `docs/ai-ledger/decision-log.md` (2026-08-10). `clears` is deliberately NOT on `OptionMechanics`:
+ * no measured case needs it, and an option-level delete inside a `choice` this same entry may be
+ * replacing wholesale is a shape nobody has had to author yet.
+ *
  * ONE FILE PER CLASS (`./barbarian.ts`, `./monk.ts`, ...), composed by `./index.ts`. A single
  * object literal holding twelve classes is one file that every content author has to edit, and
  * Stage 4 authors twelve classes in four parallel lanes. The split is the difference between four
@@ -49,6 +74,25 @@ type FeatureInput = z.input<typeof FeatureRecordSchema>;
 type OptionInput = z.input<typeof FeatureOptionSchema>;
 
 /**
+ * Classes whose records are hand-authored and carried through the ETL verbatim, so `classes.v1.json`
+ * is simultaneously that script's input and its output.
+ *
+ * It lives HERE rather than in `build-class-bundle.ts` because it is a property of the overlay's
+ * merge, not of the parse: these three are the records the merge may only ADD to, and the three for
+ * which a `clears` is a one-way edit to committed JSON. One home, read by the script and by the test
+ * that holds the merge to it - a second hand-maintained copy of this list is exactly the defect the
+ * content/engine agreement test exists to catch.
+ */
+export const HAND_AUTHORED: ReadonlySet<string> = new Set(["fighter", "wizard", "cleric"]);
+
+/**
+ * The rider keys an overlay may author - the one list, so the feature form, the option form and
+ * `clears` can never drift apart. Prose (`id`, `name`, `level`, `description`) is the ETL's and is
+ * not in it, which is what stops `clears` from being able to name a description.
+ */
+type RiderKey = "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices";
+
+/**
  * The rider fields an overlay may add to ONE pickable option inside a feature's choice.
  *
  * This exists because Divine Order's Thaumaturge - the record that produced the bug report this
@@ -56,8 +100,7 @@ type OptionInput = z.input<typeof FeatureOptionSchema>;
  * feature does. Without it the only way to author an option's mechanics was to hand-edit the
  * bundle, which is the thing the overlay exists to stop.
  */
-export type OptionMechanics = Partial<Pick<OptionInput,
-  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices">>;
+export type OptionMechanics = Partial<Pick<OptionInput, RiderKey>>;
 
 /**
  * The rider fields an overlay may add to a feature. Prose (`id`, `name`, `level`, `description`) is
@@ -74,14 +117,23 @@ export type OptionMechanics = Partial<Pick<OptionInput,
  * were previously authorable only in `build-class-bundle.ts`'s own `CONFIG.choices` map, which is a
  * shared file, or not at all.
  */
-export type FeatureMechanics = Partial<Pick<FeatureInput,
-  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices">> & {
+export type FeatureMechanics = Partial<Pick<FeatureInput, RiderKey>> & {
   /**
    * Riders merged into the feature's inline `choice.options`, by option id. The option must already
    * exist (the ETL parses the SRD's `#### Agonizing Blast` entries into them, or the overlay's own
    * `choice.options` created it); an id matching nothing FAILS the build like any other key.
    */
   options?: Readonly<Record<string, OptionMechanics>>;
+  /**
+   * Keys this feature SUPERSEDES: deleted from the record before the merge, so the riders authored
+   * beside them land where the collision guard would otherwise stop the build. See the header for
+   * the ruling and its three mitigations; the two that are code are enforced in `applyMechanics`.
+   *
+   * Only ever needed on a HAND_AUTHORED record, whose old value is in `classes.v1.json` rather than
+   * regenerated each run - and there it is a ONE-WAY edit to that file. Review the bundle's `git
+   * diff` in the same commit.
+   */
+  clears?: readonly RiderKey[];
 };
 
 /** Riders by record id (a class id or a subclass id), then feature id. */
@@ -114,12 +166,20 @@ const isAbsent = (value: unknown) => value === undefined || (Array.isArray(value
  * the build: a rider authored against a feature id the ETL no longer emits is precisely the silent
  * drop this file exists to avoid.
  *
- * THE OVERLAY NEVER OVERWRITES A VALUE THAT IS ALREADY THERE. For the nine generated classes that
- * can only happen for `choice`, whose other home is `CONFIG.choices` in the ETL. For the three
- * HAND_AUTHORED classes it can happen for any rider, because their features come from
- * `classes.v1.json` itself - and there the collision matters, since the ETL writes the merged record
- * back over its own input, so an overwrite would be unreviewable and un-revertable. Both cases stop
- * the build naming the two homes, rather than picking a winner silently.
+ * THE OVERLAY NEVER OVERWRITES A VALUE THAT IS ALREADY THERE - UNLESS THE FEATURE SAYS `clears`. For
+ * the nine generated classes a collision can only happen for `choice`, whose other home is
+ * `CONFIG.choices` in the ETL. For the three HAND_AUTHORED classes it can happen for any rider,
+ * because their features come from `classes.v1.json` itself - and there the collision matters, since
+ * the ETL writes the merged record back over its own input, so an unannounced overwrite would be
+ * unreviewable and un-revertable. Both cases stop the build naming the two homes, rather than picking
+ * a winner silently.
+ *
+ * `clears` is how a module ANNOUNCES one: the named keys are deleted first, so the merge that follows
+ * is an add like any other and the collision message's own advice ("remove it from one of the two
+ * homes") becomes expressible in the module instead of requiring a hand edit to the bundle. Two of
+ * its three mitigations are enforced right here - clearing an absent key is a NO-OP so the second
+ * build is clean, and a `clears` with no rider beside it is a build error so the verb can never
+ * delete alone. The third is the review bar: read the bundle's `git diff` in the same commit.
  */
 export function applyMechanics(
   recordId: string,
@@ -133,7 +193,21 @@ export function applyMechanics(
   for (const [featureId, mechanics] of Object.entries(entries)) {
     const feature = byId.get(featureId) as (Record<string, unknown> & { id: string }) | undefined;
     if (!feature) { unmatched.push(`${recordId}.${featureId}`); continue; }
-    const { options, ...riders } = mechanics;
+    const { options, clears, ...riders } = mechanics;
+    if (clears?.length) {
+      // MITIGATION 2 - never a delete-only tool. A rider authored as `[]` is "not authored at all"
+      // (see `isAbsent`), so it does not license a delete either. Nothing is deleted on this path:
+      // the build exits on any miss, but an invalid entry contributes NOTHING rather than half of
+      // itself, because the thing it half-does is irreversible.
+      if (Object.entries(riders).every(([, value]) => isAbsent(value))) {
+        unmatched.push(`${recordId}.${featureId}.clears [${clears.join(", ")}] (deletes without replacing - author the rider that supersedes the key in the same entry)`);
+        continue;
+      }
+      // MITIGATION 1 - idempotent. `delete` on an absent key is a no-op, which is what makes the
+      // SECOND build of a hand-authored record clean: run 1 removes the superseded key from
+      // `classes.v1.json`, run 2 reads the file run 1 wrote and finds nothing left to remove.
+      for (const key of clears) delete feature[key];
+    }
     for (const [key, value] of Object.entries(riders)) {
       const existing = feature[key];
       if (!isAbsent(existing) && JSON.stringify(existing) !== JSON.stringify(value)) {
