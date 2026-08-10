@@ -4,7 +4,7 @@ import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } fr
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
-import { EquipmentPicker } from "./equipment";
+import { EquipmentPicker, inventoryWeaponFrom } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
@@ -554,7 +554,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
       ...(item.description ? { description: item.description } : {}),
       // Carry the mechanical stats so equipping has effect (v6 #5): weapon → a rollable attack; armor → AC.
-      ...(item.weapon ? { weapon: item.weapon } : {}),
+      // The weapon block is NARROWED, not spread: the browse summary carries a browse-only `mastery`
+      // the strict wire schema refuses. See `inventoryWeaponFrom`.
+      ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
       ...(item.armor ? { armor: item.armor } : {})
     } }, ack);
   };

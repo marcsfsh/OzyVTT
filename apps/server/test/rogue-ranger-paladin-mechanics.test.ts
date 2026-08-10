@@ -633,19 +633,29 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
     expect(plain.damage.some((part) => part.type === "radiant")).toBe(false);
   });
 
-  it("adds nothing to the javelin the SAME Paladin throws - the attack-kind filter is real", () => {
-    // The two weapons the starting loadout hands a Paladin land on opposite sides of the filter: the
-    // longsword's derived action carries `reachFeet` (Melee), the javelin's carries `rangeFeet`
-    // (Ranged). Same character, same turn's worth of dice, one rider - and it fires exactly once.
-    // Without the filter this would roll 1d8 Radiant on every attack a Paladin makes.
+  it("adds nothing to the javelin the SAME Paladin THROWS, and does add it when they stab with it", () => {
+    // The attack-kind filter, proved on the one weapon that is on BOTH sides of it. A Javelin is a
+    // Thrown weapon, so its derived action carries a reach AND a range, and `attackKindsOf`
+    // (`action-resolution.ts`) settles which it is from the MEASURED distance to the target: past
+    // the reach it is Ranged and Radiant Strikes must not fire; inside it the Paladin is stabbing
+    // and it must. Without the filter this would roll 1d8 Radiant on every attack a Paladin makes.
+    //
+    // That thrown branch had no data to run on until the SRD `properties` column reached the
+    // inventory row: with an empty column a Javelin derived range-only and read as purely Ranged,
+    // which is why this test used to assert its reach was ABSENT.
     const built = table(paladinInput(11));
     expect(actionOf(built, "item-longsword")?.attack?.reachFeet).toBe(5);
-    expect(actionOf(built, "item-javelin")?.attack?.rangeFeet).toBeGreaterThan(0);
-    expect(actionOf(built, "item-javelin")?.attack?.reachFeet).toBeUndefined();
+    expect(actionOf(built, "item-javelin")?.attack).toMatchObject({ reachFeet: 5, rangeNormalFeet: 30 });
 
-    const shot = resolve(built, "item-javelin", [19, 4]);
-    expect(shot.attack?.outcome).toBe("hit");
-    expect(shot.damage.some((part) => part.type === "radiant")).toBe(false);
+    const atDistance = (feet: number, faces: number[]): ResolveDependencies => ({ ...deps(built, faces), distanceFeet: () => feet });
+    const action = actionOf(built, "item-javelin")!;
+    const throwIt = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() }, atDistance(30, [19, 4]));
+    expect(throwIt.attack?.outcome).toBe("hit");
+    expect(throwIt.damage.some((part) => part.type === "radiant")).toBe(false);
+
+    const stabIt = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() }, atDistance(5, [19, 4, 7]));
+    expect(stabIt.attack?.outcome).toBe("hit");
+    expect(stabIt.damage.find((part) => part.type === "radiant")).toMatchObject({ formula: "1d8", total: 7 });
   });
 });
 

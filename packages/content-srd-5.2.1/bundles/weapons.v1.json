@@ -5,6 +5,9 @@
   "category": "martial",
   "improvised": false,
   "mastery": "topple",
+  "properties": [
+   "versatile"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "slashing"
@@ -18,6 +21,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "ammunition",
+   "loading"
+  ],
   "damage": {
    "dice": "1",
    "type": "piercing"
@@ -31,6 +38,9 @@
   "category": "simple",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "light"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "bludgeoning"
@@ -44,6 +54,11 @@
   "category": "simple",
   "improvised": false,
   "mastery": "nick",
+  "properties": [
+   "finesse",
+   "light",
+   "thrown"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "piercing"
@@ -57,6 +72,10 @@
   "category": "simple",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "finesse",
+   "thrown"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "piercing"
@@ -70,6 +89,7 @@
   "category": "martial",
   "improvised": false,
   "mastery": "sap",
+  "properties": [],
   "damage": {
    "dice": "1d8",
    "type": "bludgeoning"
@@ -83,6 +103,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "graze",
+  "properties": [
+   "heavy",
+   "reach",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d10",
    "type": "slashing"
@@ -96,6 +121,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "cleave",
+  "properties": [
+   "heavy",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d12",
    "type": "slashing"
@@ -109,6 +138,9 @@
   "category": "simple",
   "improvised": false,
   "mastery": "push",
+  "properties": [
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "bludgeoning"
@@ -122,6 +154,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "graze",
+  "properties": [
+   "heavy",
+   "two-handed"
+  ],
   "damage": {
    "dice": "2d6",
    "type": "slashing"
@@ -135,6 +171,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "cleave",
+  "properties": [
+   "heavy",
+   "reach",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d10",
    "type": "slashing"
@@ -148,6 +189,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "ammunition",
+   "light",
+   "loading"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -161,6 +207,10 @@
   "category": "simple",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "light",
+   "thrown"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "slashing"
@@ -174,6 +224,12 @@
   "category": "martial",
   "improvised": false,
   "mastery": "push",
+  "properties": [
+   "ammunition",
+   "heavy",
+   "loading",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -187,6 +243,9 @@
   "category": "simple",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "thrown"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -200,6 +259,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "topple",
+  "properties": [
+   "heavy",
+   "reach",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -213,6 +277,11 @@
   "category": "simple",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "ammunition",
+   "loading",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -226,6 +295,10 @@
   "category": "simple",
   "improvised": false,
   "mastery": "nick",
+  "properties": [
+   "light",
+   "thrown"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "bludgeoning"
@@ -239,6 +312,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "ammunition",
+   "heavy",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -252,6 +330,9 @@
   "category": "martial",
   "improvised": false,
   "mastery": "sap",
+  "properties": [
+   "versatile"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "slashing"
@@ -265,6 +346,7 @@
   "category": "simple",
   "improvised": false,
   "mastery": "sap",
+  "properties": [],
   "damage": {
    "dice": "1d6",
    "type": "bludgeoning"
@@ -278,6 +360,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "topple",
+  "properties": [
+   "heavy",
+   "two-handed"
+  ],
   "damage": {
    "dice": "2d6",
    "type": "bludgeoning"
@@ -291,6 +377,7 @@
   "category": "martial",
   "improvised": false,
   "mastery": "sap",
+  "properties": [],
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -304,6 +391,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "ammunition",
+   "loading",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d12",
    "type": "piercing"
@@ -317,6 +409,11 @@
   "category": "martial",
   "improvised": false,
   "mastery": "push",
+  "properties": [
+   "heavy",
+   "reach",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -330,6 +427,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "ammunition",
+   "loading"
+  ],
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -343,6 +444,9 @@
   "category": "simple",
   "improvised": false,
   "mastery": "topple",
+  "properties": [
+   "versatile"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "bludgeoning"
@@ -356,6 +460,9 @@
   "category": "martial",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "finesse"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -369,6 +476,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "nick",
+  "properties": [
+   "finesse",
+   "light"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "slashing"
@@ -382,6 +493,10 @@
   "category": "simple",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "ammunition",
+   "two-handed"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -395,6 +510,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "vex",
+  "properties": [
+   "finesse",
+   "light"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -408,6 +527,9 @@
   "category": "simple",
   "improvised": false,
   "mastery": "nick",
+  "properties": [
+   "light"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "slashing"
@@ -421,6 +543,9 @@
   "category": "simple",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "ammunition"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "bludgeoning"
@@ -434,6 +559,10 @@
   "category": "simple",
   "improvised": false,
   "mastery": "sap",
+  "properties": [
+   "thrown",
+   "versatile"
+  ],
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -447,6 +576,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "topple",
+  "properties": [
+   "thrown",
+   "versatile"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -460,6 +593,9 @@
   "category": "martial",
   "improvised": false,
   "mastery": "sap",
+  "properties": [
+   "versatile"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -473,6 +609,9 @@
   "category": "martial",
   "improvised": false,
   "mastery": "push",
+  "properties": [
+   "versatile"
+  ],
   "damage": {
    "dice": "1d8",
    "type": "bludgeoning"
@@ -486,6 +625,10 @@
   "category": "martial",
   "improvised": false,
   "mastery": "slow",
+  "properties": [
+   "finesse",
+   "reach"
+  ],
   "damage": {
    "dice": "1d4",
    "type": "slashing"

@@ -1163,7 +1163,7 @@ Adds, updates, or removes (quantity 0) one of a character's inventory items and 
 | `item.weightEach` | number (≥ 0) | no |  |
 | `item.description` | string | no |  |
 | `item.category` | string (pattern) | no |  |
-| `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet |
+| `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet. NOT `mastery`: that is browse-only and is rejected here. |
 | `item.armor` | object | no | Armor/shield stats (from the SRD catalog); equipping derives Armor Class |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
@@ -5348,6 +5348,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `rangeFeet` | integer \| null | yes |  |
 | `longRangeFeet` | integer \| null | yes | Attacks past `rangeFeet` up to this roll at disadvantage |
 | `mastery` | `cleave` \| `graze` \| `nick` \| `push` \| `sap` \| `slow` \| `topple` \| `vex` | no | The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery. |
+| `properties` | string (pattern)[] | no | The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` keeps a ranged weapon on a melee reach, and `reach` makes it 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none. |
 
 ### `HomebrewExtraPick`
 

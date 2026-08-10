@@ -46,6 +46,31 @@ export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEqu
   return { catalog, attribution: attributionCache };
 }
 
+/**
+ * THE CATALOG'S WEAPON BLOCK, NARROWED TO WHAT AN INVENTORY ROW MAY CARRY.
+ *
+ * These are two different shapes and the difference is load-bearing. The browse summary is the
+ * catalog record's own block, so it carries `mastery`; `ItemWeaponSchema` (`@vtt/schemas`) is
+ * `.strict()` and has no such key, because a mastery is gated on the bearer having UNLOCKED that
+ * weapon and resolves against the catalog by item id rather than travelling on the row. Spreading
+ * the summary's block wholesale therefore made `character.set-inventory` refuse every SRD weapon
+ * with *"Unrecognized key(s) in object: 'mastery'"* - the browse-and-add picker could not add a
+ * sword.
+ *
+ * `properties` goes the other way and must be carried: `weaponPropertiesOf` reads it off the
+ * INVENTORY row, and it is what makes a Rapier swing off Dexterity and a Glaive threaten at 10 feet.
+ *
+ * Exported so `catalog-add.mirror.test.ts` can drive the real SRD catalog through it and the
+ * server's own schema, which is the seam where those two shapes have to agree.
+ */
+export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary["weapon"]>) {
+  return {
+    category: weapon.category, damageDice: weapon.damageDice, damageType: weapon.damageType,
+    rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet,
+    ...(weapon.properties ? { properties: [...weapon.properties] } : {})
+  };
+}
+
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const categoryLabel = (category: string) => category.split("-").map(titleCase).join(" ");
 

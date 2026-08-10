@@ -14,20 +14,12 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
-- **[combat/weapons] A Rapier rolls off Strength, and every reach weapon threatens at five feet.**
-  `weaponAbilityModifier` and `weaponAction` already read `finesse`, `thrown` and `reach` off
-  `weapon.properties` — and no SRD weapon carries a `properties` array, so the readers run against an
-  empty column. Finesse weapons never use Dexterity; Glaive, Halberd, Lance, Pike and Whip all have
-  5-foot reach. Found 2026-08-10 by PLANNER-CONTENT; the vendored SRD Weapons table already carries
-  the data (70 property assignments, joined 38/38). Owner: content program **C3**
-  (`docs/product/plan-content-program.md`).
-
-- **[content/etl] Regenerating the bundles silently deletes every weapon's mastery.** The `mastery`
-  column in `weapons.v1.json` has no ETL home — measured in a scratch copy, `npm run build-bundle`
-  drops it from all 38 rows, nothing pins it (`bundle.test.ts` checks category and damage only), and
-  the build stays green. That column is the whole data basis of the mastery program. **Do not
-  regenerate bundles** until content program **C1** lands the parser for the already-vendored SRD
-  Weapons table.
+- **[homebrew/editor] A homebrew weapon cannot be given properties or a mastery.** The API accepts
+  both on `equipment.weapon` and the engine reads both, but the editor's weapon block has five rows
+  (kind, damage, damage type, range, long range) and neither. So an SRD Rapier is Finesse and a GM's
+  homebrew rapier can never be. Owners: content program **C3** (`properties`) and mastery program
+  **U38** (`mastery`, gated on all eight slugs reaching) — both are the CONTROL half only; the four
+  data shapes and the readers landed 2026-08-10 in batch 0.
 
 - **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
   `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces

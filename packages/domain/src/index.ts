@@ -756,8 +756,15 @@ export type ContentSpellsResult = { ok: boolean; message?: string; spells?: read
  * category must derive its groups from the data, because there is no closed list to switch on. Four
  * values still carry mechanical meaning - "weapon", "armor" and "shield" drive AC and attack
  * derivation, everything else is inert - so a new slug displays and stacks but derives nothing.
+ *
+ * The `weapon` block is the catalog record's own, passed through whole
+ * (`content-library.ts` `equipmentSummaries`), so it is WIDER than `ItemWeaponSchema`: it carries
+ * `mastery`, which is browse-only and must NOT be copied onto an inventory row (a mastery is gated
+ * on the bearer having unlocked that weapon, and `ItemWeaponSchema` is `.strict()`, so sending it
+ * is a refusal). Declaring both optional keys here is what lets a caller SEE the difference -
+ * `inventoryWeaponFrom` in `encounter/equipment.tsx` is the one projection that takes it.
  */
-export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; mastery?: string; properties?: readonly string[] }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 
 // ---------- Character-builder catalogs ----------

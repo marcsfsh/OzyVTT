@@ -122,7 +122,21 @@ export const WeaponReferenceSchema = z.object({
    * pick a behaviour at random. Usable only by a character who has unlocked it for that weapon
    * (Weapon Mastery); the gate lives with the reader, not here.
    */
-  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional()
+  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
+  /**
+   * The weapon table's PROPERTIES column ("finesse", "light", "thrown", ...). OPEN slugs, unlike
+   * `mastery` above, and the asymmetry is the point: a mastery is a named behaviour the engine
+   * implements, so an unknown one would be inert; a property is read by whoever cares about it
+   * (`weaponAction` consults `thrown` and `reach`) and a homebrew weapon that declares "serrated"
+   * is expressible without a schema change. This matches `ItemWeaponSchema.properties`
+   * (`packages/schemas`), which the catalog copies onto an inventory row.
+   *
+   * ABSENT means not recorded; an EMPTY ARRAY means "this weapon has no properties" - a Mace really
+   * has none. All 38 SRD rows carry the column and `bundle.test.ts` pins that, because the ETL
+   * transcribes it (open5e links no properties to weapons) and a silent drop is exactly how
+   * `mastery` spent a release doing nothing.
+   */
+  properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
 });
 export type WeaponReference = z.infer<typeof WeaponReferenceSchema>;
 /** The eight SRD mastery properties, for a consumer that needs to enumerate or validate them. */
@@ -219,9 +233,14 @@ export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
  * The weapon stats a unified equipment row carries, NAMED rather than inlined - and the name is
  * load-bearing, not style. `EquipmentReferenceSchema` is the largest object in this package, and
  * inlining one more property here pushed `z.infer` past TypeScript's expansion budget: the compiler
- * silently truncated a DIFFERENT inferred type two packages away, and `packages/domain`'s
- * `catalog-choice.ts` stopped seeing `SpellReference.attackRoll` and `.rangeFeet` at all. A named
- * schema gives the inference one alias to reuse instead of re-expanding the shape at every use.
+ * silently truncated a DIFFERENT inferred type two packages away, and the spell shape
+ * `packages/domain`'s `catalog-choice.ts` reads lost its attack-roll and range fields. (`SpellReference`
+ * itself carries `attackRoll` and a nested `range` object; `rangeFeet` is the domain summary's own
+ * flattening of it - the earlier wording here named the wrong one of the two.) A named schema gives
+ * the inference one alias to reuse instead of re-expanding the shape at every use.
+ *
+ * `test/bundle.test.ts` now holds a compile-time guard for this, because the failure mode is a type
+ * that quietly narrows and no runtime assertion can see it.
  */
 const EquipmentWeaponStatsSchema = z.object({
   category: z.enum(["simple", "martial"]),
@@ -230,7 +249,15 @@ const EquipmentWeaponStatsSchema = z.object({
   rangeFeet: z.number().int().positive().nullable(),
   longRangeFeet: z.number().int().positive().nullable(),
   /** OPTIONAL here, unlike the weapon table: gear and homebrew rows map through this same shape and have no mastery. */
-  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional()
+  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
+  /**
+   * The weapon's property slugs, carried through from `WeaponReferenceSchema.properties` so the
+   * catalog->inventory copy in `character-build.ts` can put them on the row `weaponPropertiesOf`
+   * reads. Unlike `mastery` - which is browse-only and resolves against the catalog by item id -
+   * properties are read off the INVENTORY row, so stopping this shape here would leave
+   * `weaponPropertiesOf` returning `[]` for every weapon a builder ever handed out.
+   */
+  properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
 });
 
 export const EquipmentReferenceSchema = z.object({
