@@ -133,8 +133,11 @@ dedicated agent each and a viewer-safety audit before merge.
 Distinct from the ~80 capability gaps, and each is a correctness or documentation defect:
 
 - **(a) API-authored content publishes as `source: "srd"`** — badged as official in the character
-  builder. Only the client stamps `"homebrew"`; the server never does. The OpenAPI describes `source`
-  **ten times** as *"Always \"homebrew\" once stored"*, so a caller who trusts the docs produces the bug.
+  builder. Only the client stamps `"homebrew"`; the server never does. The API reference carries
+  **eight** false *"Always \"homebrew\" once stored"* descriptions plus one different-and-true sentence
+  on the summary shape — so the summary and the record body disagree inside a single response, and a
+  caller who trusts either produces the bug. *(Count corrected 2026-08-10 by PLANNER-API; an earlier
+  draft said ten.)*
 - **(b) A monster cannot be published from the published contract.** The publish gate hard-requires
   `extensions["open5e.srd-2024"].challengeRating` and `.type`; the contract documents that field as
   free-form and says *"the engine reads nothing from it"*. The string `open5e` appears **zero times**
