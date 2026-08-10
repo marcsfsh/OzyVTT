@@ -564,6 +564,35 @@ const SURFACES = [
       }, `/characters/${id}`);
       await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
       await page.waitForTimeout(700);
+    } },
+  // The sheet's browse-and-add picker, a MODAL over that layer and reachable from no address, so
+  // the entry above stopped one tap short of it and nothing had ever measured its rows. Its Add
+  // button paints 45x27 and reaches the floor only through `.tap-target`'s centred `::after`; it
+  // sat under the floor unnoticed because until the catalog->inventory payload was fixed, tapping
+  // it did nothing at all, and a control that does nothing is a control nobody reports. The
+  // `<dialog>` renders inline inside the sheet, so `root: "main"` sees it.
+  { name: "play-sheet-picker", path: "/table", root: "main", ready: ".table-layout", open: async (page) => {
+      // Same not-already-open guard as `play-homebrew-picker`, and for the same reason: `walk`
+      // re-pushes the previous address, which the router treats as a no-op, so the sheet the entry
+      // above opened is still on screen.
+      if (await page.locator(".sheet-standalone").count() === 0) {
+        const id = await page.evaluate(() => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null);
+        if (!id) throw new Error("no character token on the table to open a sheet from");
+        await page.evaluate((target) => {
+          history.pushState(null, "", target);
+          dispatchEvent(new PopStateEvent("popstate", { state: null }));
+          dispatchEvent(new PopStateEvent("popstate", { state: null }));
+        }, `/characters/${id}`);
+        await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
+      }
+      const browse = page.getByRole("button", { name: /Browse SRD gear/i }).first();
+      if (await browse.count() === 0) throw new Error("the sheet has no browse-and-add picker to open");
+      await browse.scrollIntoViewIfNeeded();
+      await browse.click({ timeout: 8_000 });
+      // The list, not the dialog: an empty catalog renders `.sheet-picker-empty` and would measure
+      // the search and the filter chips while silently contributing no item rows at all.
+      await page.waitForSelector(".sheet-picker-list", { timeout: 8_000 });
+      await page.waitForTimeout(600);
     } }
 ];
 
