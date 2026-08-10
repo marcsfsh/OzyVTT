@@ -657,6 +657,22 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
     expect(stabIt.attack?.outcome).toBe("hit");
     expect(stabIt.damage.find((part) => part.type === "radiant")).toMatchObject({ formula: "1d8", total: 7 });
   });
+
+  it("adds nothing to the javelin when the distance is UNMEASURABLE - no map, no placement, no grid", () => {
+    // The case both branches above buy off with an injected distance, and the one that actually
+    // ships: `resolve` runs the DEFAULT dependencies, whose `distanceFeet` returns null exactly as
+    // it does at a table with no map loaded, a combatant not yet placed, or an uncalibrated grid.
+    //
+    // A Javelin carries a reach and a range, so with nothing to measure `attackKindsOf` has to pick,
+    // and it picks Ranged. Picking melee instead - which is what it did for as long as the reach
+    // existed and this assertion did not - hands a thrown javelin 1d8 Radiant on every mapless
+    // table. This is the assertion the pre-`properties` version of this test made through the shape
+    // of its dependencies rather than on purpose; it is on purpose now.
+    const built = table(paladinInput(11));
+    const unmeasured = resolve(built, "item-javelin", [19, 4]);
+    expect(unmeasured.attack?.outcome).toBe("hit");
+    expect(unmeasured.damage.some((part) => part.type === "radiant")).toBe(false);
+  });
 });
 
 describe("Paladin - Oath of Devotion, audit row 28 (first tier only)", () => {

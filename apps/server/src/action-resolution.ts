@@ -504,10 +504,33 @@ type RiderMomentContext = Readonly<{
 }>;
 
 /**
+ * Whether THIS swing is being made at range. A weapon carrying only one of the two is settled by
+ * that alone; a Thrown weapon carries BOTH and needs the measured distance, so one used inside its
+ * reach stays melee.
+ *
+ * When the distance is unmeasurable - no map loaded, a combatant not yet placed, an uncalibrated
+ * grid, all ordinary at this table - a both-ways weapon resolves to RANGED. That is the reading
+ * that keeps a mapless table safe: defaulting to melee hands a thrown javelin every melee-gated
+ * rider on the sheet, a Paladin's Radiant Strikes among them. It is also the classification every
+ * such weapon had before the SRD `properties` column reached the inventory row and gave these
+ * derived actions a reach at all.
+ *
+ * Three rules ask this question - the kind filter below, the underwater disadvantage, and the
+ * ranged-attack penalties - and they answered it three slightly different ways, which is how the
+ * underwater rule came to disagree with the kind filter about an unmeasured javelin. One helper so
+ * they cannot drift again.
+ */
+function attackUsedAsRanged(attack: { reachFeet?: number; rangeFeet?: number }, distance: number | null): boolean {
+  if (attack.rangeFeet === undefined) return false;
+  if (attack.reachFeet === undefined) return true;
+  return distance === null || distance > attack.reachFeet + 1e-6;
+}
+
+/**
  * How this attack is being made. `melee` / `ranged` / `thrown` are derivable from the action's own
- * reach and range (and the measured distance, so a thrown weapon used inside its reach stays melee);
- * `reaction` and `opportunity` are NOT derivable and must be announced by the caller through
- * `input.attackKinds` - which is exactly what `reactions.ts` does for an opportunity attack.
+ * reach and range (see `attackUsedAsRanged` for the distance rule); `reaction` and `opportunity`
+ * are NOT derivable and must be announced by the caller through `input.attackKinds` - which is
+ * exactly what `reactions.ts` does for an opportunity attack.
  */
 function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: number | null): AttackKind[] {
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
@@ -515,8 +538,7 @@ function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: 
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
-    const usedAsRanged = ranged && (!melee || (distance !== null && distance > attack.reachFeet! + 1e-6));
-    if (usedAsRanged) kinds.add("ranged");
+    if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
     else if (melee) kinds.add("melee");
     if (melee && ranged) kinds.add("thrown");
   }
@@ -621,7 +643,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   // (the SRD's dagger/javelin/shortsword/spear/trident list, generalized to its shared damage type).
   if (state.combat.underwater && action.attack?.reachFeet !== undefined) {
     const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
-    const usedAsRanged = action.attack.rangeFeet !== undefined && distance !== null && distance > action.attack.reachFeet + 1e-6;
+    const usedAsRanged = attackUsedAsRanged(action.attack, distance);
     const piercing = action.damage.some((part) => part.type === "piercing");
     if (!usedAsRanged && !piercing) disadvantage.push({ source: "underwater-melee", label: "Underwater (non-piercing melee)" });
   }
@@ -630,7 +652,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   // actually ranged (a thrown weapon used within its reach stays melee) and distance is measurable.
   if (action.attack?.rangeFeet !== undefined && deps.distanceFeet) {
     const distance = deps.distanceFeet(attacker.id, target.id);
-    const usingMelee = action.attack.reachFeet !== undefined && distance !== null && distance <= action.attack.reachFeet + 1e-6;
+    const usingMelee = !attackUsedAsRanged(action.attack, distance);
     if (!usingMelee) {
       const normal = action.attack.rangeNormalFeet;
       if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
