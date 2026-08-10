@@ -1,13 +1,17 @@
 # The API parity program
 
-**Written 2026-08-10 against HEAD `6278e5a` on `claude/feature-implementations-intake-c5eyu1`.**
-Governed by [`remaining-program-plan.md`](remaining-program-plan.md) — that document's twenty client
-rulings, batch order, serialization points and verification bar bind everything here. This plan owns
+**Written 2026-08-10 against HEAD `6278e5a`; re-verified 2026-08-10 against HEAD `36b5a1f` on
+`claude/feature-impl-program-exec-ekmevw`.** Governed by
+[`remaining-program-plan.md`](remaining-program-plan.md) — that document's twenty client rulings,
+batch order, serialization points and verification bar bind everything here. This plan owns
 **batch 2 (the parity guard)** and **ruling 9 (close every API bucket; fix all three API defects)**.
 
-**Every count and every `file:line` below was measured against this HEAD**, not carried forward.
-Where a measurement contradicts the governing plan it is called out under
-[§8](#8-what-i-measured-that-contradicts-the-governing-plan) rather than quietly corrected.
+**Every count and every `file:line` below was re-measured at `36b5a1f`**, not carried forward. Batch 0
+moved two whole families of citation and they are corrected in place rather than annotated:
+`docs/api-reference.md` gained one line at `:5348`, so every reference citation past it shifted by
+one, and `apps/client/src/encounter/CharacterSheet.tsx` gained two lines at `:554`, so every sheet
+citation past it shifted by two. Where a measurement contradicts the governing plan it is called out
+under [§8](#8-what-i-measured-that-contradicts-the-governing-plan) rather than quietly corrected.
 
 ---
 
@@ -46,7 +50,7 @@ Three reasons, all verified:
   vite refuses to bundle for a browser-shaped environment."* `HomebrewStore` imports exactly
   `node:sqlite` (`apps/server/src/homebrew-store.ts:3`), a Node builtin — no dependency needed.
 - `apps/client/src/builder/server-offers.mirror.test.ts` is the precedent for importing server
-  modules by relative path; `vocabulary-parity.mirror.test.ts:65-71` already imports eight of them.
+  modules by relative path; `vocabulary-parity.mirror.test.ts:65-72` already imports eight of them.
 - **It must NOT go inside `vocabulary-parity.mirror.test.ts`.** That file's `unauthorable` census
   array is a named serialization point for ten units (governing plan §5). A guard living there would
   collide with every one of them. This program therefore **never touches that file** — see §6.
@@ -54,7 +58,7 @@ Three reasons, all verified:
 ### 2.2 The three tests
 
 **T1 — the census (structural, exhaustive).** Walk the nine `HOMEBREW_BODY_SCHEMAS`
-(`packages/content-srd-5.2.1/src/schemas.ts:399-409`) recursively into an address set, canonicalise
+(`packages/content-srd-5.2.1/src/schemas.ts:426-436`) recursively into an address set, canonicalise
 each address into an editor address, ask `hasControl(type, key, within)`, and assert the uncovered
 set equals the exemption table **exactly, in both directions** — the discipline the existing census
 already uses (`vocabulary-parity.mirror.test.ts:3402-3422`). Each exemption row carries a `reason`
@@ -64,7 +68,7 @@ and an `owner` (a unit id, or `permanent:` plus why).
 
 1. **Boot the real router.** `express()` → `createHomebrewRouter({ store: new HomebrewStore(<tmpdir>),
    authorizeGm, authorizePlayer, notifyChanged, validate: createHomebrewValidator(…), catalogRecord })`
-   → `server.listen(0, "127.0.0.1")`. This is `apps/server/test/homebrew-http.test.ts:34-67` lifted
+   → `server.listen(0, "127.0.0.1")`. This is `apps/server/test/homebrew-http.test.ts:35-68` lifted
    verbatim into `api-parity-harness.ts`. **One fixture per file, in `beforeAll`** — `ContentLibrary`
    loads the whole SRD bundle (`monsters.v1.json` 951 KB + `spells.v1.json` 565 KB) and per-test boot
    would dominate the run.
@@ -95,10 +99,12 @@ path. Asserted in the file, so the guard cannot rot into a green no-op.
 ### 2.3 The hard part: address canonicalisation
 
 **Measured, and this is where the unit's weight is.** A naive walk of the nine schemas yields
-**162 distinct object schemas carrying 708 declared keys**; expanded per type into
-`(type, container-chain, key)` addresses it yields **3,806 asked addresses, of which a naive lookup
-calls 3,341 missing**. Almost all of that is noise, because **the editor's scope model is not
-isomorphic to the Zod path**. Three measured causes:
+**162 distinct object schemas carrying 709 declared keys** — 708 until batch 0 gave
+`EquipmentWeaponStatsSchema` its `properties` key, which is the whole of the drift in that number.
+Expanded per type into `(type, container-chain, key)` addresses the same walk asks **thousands**
+(re-measured at `36b5a1f`: the obvious expansion asks 5,471), of which a naive lookup calls almost
+all missing. Almost all of that is noise, because **the editor's scope model is not isomorphic to
+the Zod path**. Three measured causes:
 
 | cause | example | rule |
 | --- | --- | --- |
@@ -107,9 +113,18 @@ isomorphic to the Zod path**. Three measured causes:
 | **System-forced keys are never authored by hand.** | `id`, `source`, `schemaId`, `schemaVersion`, `source.*`, the wire-only `type` | A standing, reasoned exemption block. |
 
 With those three rules applied by *probing an ordered candidate list* rather than by a hardcoded
-table, the same walk gives **1,108 uncovered addresses over 223 distinct key names**. That is still
-not a defect list — it is the guard's raw output before exemptions — but it is the honest starting
-point, and every remaining false positive must be named in the exemption table with a reason.
+table, the raw uncovered set drops by roughly three quarters and spans a couple of hundred distinct
+key names. That is still not a defect list — it is the guard's raw output before exemptions — but it
+is the honest starting point, and every remaining false positive must be named in the exemption table
+with a reason.
+
+**Do not implement against a pinned figure here.** The first draft of this plan reported 3,806 asked
+/ 3,341 missing / 1,108 uncovered / 223 key names; re-measured at `36b5a1f`, none of the four is
+reproducible from this document's own description of the walk, because each is a property of the
+expansion and probe rules the guard itself defines rather than of the schemas. Only the two that are
+schema-intrinsic — 162 object schemas, 709 declared keys — survive re-measurement. Pin whatever your
+own canonicaliser produces, in the file, on the day you write it, so the next agent measures the same
+thing you did.
 
 **The canonicaliser is the fragile part and must fail loudly.** Every rewrite rule is *validated*:
 if a rewrite produces a container that `fieldsWithin` cannot resolve, the guard throws rather than
@@ -138,7 +153,7 @@ test. That declaration is unit **B0**, and it is a prerequisite of B1–B4 rathe
   already `listen(0, …)` (verified: no fixed-port listen exists in `apps/server/test` or
   `server.ts`), so there is no collision — but the governing plan's *"at most 2 concurrent full
   suites"* rule now applies to the **client** suite too, not only the server's. Record that.
-- **Fold in one live known bug, and only one.** `docs/ai-ledger/known-bugs.md:127-131` records that
+- **Fold in one live known bug, and only one.** `docs/ai-ledger/known-bugs.md:167-171` records that
   `apps/server/test/homebrew-http.test.ts`'s per-path mount probe is vacuous — it asserts headers
   that come back for *any* path. A1 is the unit about tests that prove nothing, it mounts the real
   router, and the Codex equivalent already reads Express's route table. One targeted fix, cited in
@@ -175,7 +190,7 @@ Eighteen units. **4 S · 10 M · 3 L · 1 XL.** Every one names its four parts.
 
 #### B0 · declare the statblock extension contract · **S**
 
-Today `statblockFacts` (`apps/server/src/content-library.ts:314-325`) declares exactly two bag keys,
+Today `statblockFacts` (`apps/server/src/content-library.ts:314-324`) declares exactly two bag keys,
 `challengeRating` and `type`. Seventeen are shipped. B0 declares the full vocabulary once, beside
 `STATBLOCK_EXTENSION` (`content-library.ts:305`), and a test re-derives it from
 `packages/content-srd-5.2.1/bundles/monsters.v1.json` — the discipline
@@ -186,15 +201,15 @@ Measured, all 330 rows, key present on every row:
 | key | rows with a non-empty value | reader |
 | --- | --- | --- |
 | `savingThrows` | **330** (≥1 numeric entry) | `apps/server/src/saving-throws.ts:127` |
-| `speeds` | **330** (197 with a non-walk mode) | `apps/client/src/encounter/CharacterSheet.tsx:443-445, 628` |
-| `alignment` | **330** | `CharacterSheet.tsx:844` |
-| `passivePerception` | **330** | `CharacterSheet.tsx:659-660` |
-| `type`, `challengeRating` | **330** | `content-library.ts:314-325` (already controlled) |
-| `senses` | **252** | `CharacterSheet.tsx:659` |
-| `traits` | **204** | `CharacterSheet.tsx:754-755` |
-| `languages` | **200** | `CharacterSheet.tsx:661` |
-| `armorDetail` | **329** | `CharacterSheet.tsx:626` (the AC tooltip) |
-| `damageResistances` / `damageImmunities` / `conditionImmunities` (prose mirrors) | 53 / 124 / 75 | `CharacterSheet.tsx:661-664` — **excluded, see §4** |
+| `speeds` | **330** (197 with a non-walk mode) | `apps/client/src/encounter/CharacterSheet.tsx:443-445, 630` |
+| `alignment` | **330** | `CharacterSheet.tsx:846` |
+| `passivePerception` | **330** | `CharacterSheet.tsx:661-662` |
+| `type`, `challengeRating` | **330** | `content-library.ts:314-324` (already controlled) |
+| `senses` | **252** | `CharacterSheet.tsx:661` |
+| `traits` | **204** | `CharacterSheet.tsx:756-757` |
+| `languages` | **200** | `CharacterSheet.tsx:663` |
+| `armorDetail` | **329** | `CharacterSheet.tsx:628` (the AC tooltip) |
+| `damageResistances` / `damageImmunities` / `conditionImmunities` (prose mirrors) | 53 / 124 / 75 | `CharacterSheet.tsx:664-667` — **excluded, see §4** |
 | `damageVulnerabilities` | **0** | — **excluded** |
 | `nonmagicalAttackImmunity` / `nonmagicalAttackResistance` | **0 true** | *no reader anywhere* — **excluded** |
 | `experiencePoints` | **1** | *no reader anywhere* — **excluded** |
@@ -237,7 +252,7 @@ authors** and is excluded (§4).
 
 | part | what |
 | --- | --- |
-| engine reader | `CharacterSheet.tsx:659-661` (senses + passive Perception, languages) and `:844` (alignment, in the identity line) |
+| engine reader | `CharacterSheet.tsx:661-663` (senses + passive Perception, languages) and `:846` (alignment, in the identity line) |
 | SRD content | senses **252**, passivePerception **330**, languages **200**, alignment **330** |
 | editor control | four extension-bag fields in the Identity section |
 | both-paths test | new: `monster-header.mirror.test.ts` in `apps/client/src/homebrew/` |
@@ -261,7 +276,7 @@ package; it is not an extra abstraction invented for a test.
 
 | part | what |
 | --- | --- |
-| engine reader | `CharacterSheet.tsx:443-445` → the Speed vital at `:628` |
+| engine reader | `CharacterSheet.tsx:443-445` → the Speed vital at `:630` |
 | SRD content | **330** rows carry `speeds`; **197** carry a non-walk mode (fly 107, swim 63, climb 51, burrow 21, hover 16) |
 | editor control | a five-number + one-checkbox group in the Identity section |
 | both-paths test | new: `monster-speeds.mirror.test.ts` in `apps/client/src/homebrew/` |
@@ -282,7 +297,7 @@ The control must seed the whole container the first time any member is touched, 
 
 | part | what |
 | --- | --- |
-| engine reader | `CharacterSheet.tsx:754-755` — a Traits section, rendered through `RichText` |
+| engine reader | `CharacterSheet.tsx:756-757` — a Traits section, rendered through `RichText` |
 | SRD content | **204 of 330** rows carry a non-empty `traits` array |
 | editor control | a `rows` field (name + description) in a new Traits section |
 | both-paths test | new: `monster-traits.mirror.test.ts` in `apps/client/src/homebrew/` |
@@ -298,7 +313,7 @@ The control must seed the whole container the first time any member is touched, 
   `CharacterSheet.tsx:433` (`if (role !== "gm" …) return`). Confirm that line still holds; no
   projection changes.
 
-### C — an action's advanced fields (`apps/client/src/homebrew/RiderEditor.tsx`, `actionsField` at :723)
+### C — an action's advanced fields (`apps/client/src/homebrew/RiderEditor.tsx`, `actionsField` at :725)
 
 Today `actionsField` offers exactly `name · activation · description · damage · attack · save · uses`
 (verified by probe: a monster action row's fields are
@@ -326,7 +341,7 @@ attack.rangeNormalFeet, save, save.ability, save.dc, uses, uses.limit, uses.per,
 | part | what |
 | --- | --- |
 | engine reader | `action-resolution.ts:311-313` (spends from the per-round pool), `tap-routing.ts:51` (exempt from the turn gate), client `encounter/ActionRunner.tsx:41, 52-55` |
-| SRD content | **82** monster actions across **32** rows author `legendary.cost` |
+| SRD content | **82** monster actions across **30** rows author `legendary.cost` |
 | editor control | one number on the action row, paired with the existing `legendary.actionsPerRound` on the record |
 | both-paths test | new: `action-legendary.mirror.test.ts` in `apps/client/src/homebrew/` |
 
@@ -340,7 +355,7 @@ attack.rangeNormalFeet, save, save.ability, save.dc, uses, uses.limit, uses.per,
 
 | part | what |
 | --- | --- |
-| engine reader | `apps/server/src/character-build.ts:339, 362-367` |
+| engine reader | `apps/server/src/character-build.ts:339, 362-365` |
 | SRD content | **15** actions: cleric `divine-spark` + `divine-strike`, druid `primal-strike`, rogue `sneak-attack`, subclass `circle-of-the-land/lands-aid`, and the dragonborn breath weapon on all **10** lineages |
 | editor control | a rows field (level, formula, type) on a **feature-carrier** action row only — the same `scope !== "statblock"` split `toHitFields` already makes (`RiderEditor.tsx:624-627`), because `ActionSchema` on a stat block has no `damageByLevel` |
 | both-paths test | new: `action-damage-by-level.mirror.test.ts` in `apps/client/src/homebrew/` |
@@ -367,7 +382,7 @@ attack.rangeNormalFeet, save, save.ability, save.dc, uses, uses.limit, uses.per,
 - **Non-vacuity (value):** change the granted effect's tag → the gated action refuses again.
 - **375px:** yes.
 
-### D — species and background choice fields (`schemas.ts`, `SPECIES_SCHEMA` :302-368 and `BACKGROUND_SCHEMA` :371-408)
+### D — species and background choice fields (`schemas.ts`, `SPECIES_SCHEMA` :302-370 and `BACKGROUND_SCHEMA` :374-415)
 
 #### D1 · a species' language choices · **M**
 
@@ -475,9 +490,10 @@ badged as official SRD in the character builder.
 The documentation makes it worse in a specific, countable way: `homebrewRecordBase.source`
 (`packages/api-contract/src/index.ts:1119`) describes the field as *"Always \"homebrew\" once
 stored"*, and that string renders **8 times** in `docs/api-reference.md` — at lines 5034, 5093, 5320,
-5379, 6071, 6104, 6122, 6244, once for each of the eight record components that spread
-`homebrewRecordBase` (class, subclass, species, background, feat, spell, equipment, spell-list; a
-monster's `source` is the provenance object and is excluded). A ninth occurrence, at line 5979, reads
+5380, 6072, 6105, 6123, 6245, once for each of the eight record components that carry
+`homebrewRecordBase.source` (class, subclass, species, background, feat and spell-list spread the
+whole base; `spell` and `equipment` pull the keys one at a time, `:2116` and `:2142`; a monster's
+`source` is the provenance object and is excluded). A ninth occurrence, at line 5980, reads
 *"Always \"homebrew\" on this surface"* on `HomebrewRecordSummary` — and that one is **true**, because
 `homebrew-http.ts:220` hardcodes it. **The API therefore contradicts itself inside one response:**
 the summary says homebrew, the record body says srd.
@@ -508,7 +524,7 @@ satisfies every documented requirement and still get a 409 they cannot act on.
 
 | part | what |
 | --- | --- |
-| engine reader | `statblockFacts`, `content-library.ts:314-325` |
+| engine reader | `statblockFacts`, `content-library.ts:314-324` |
 | SRD content | **330 of 330** monsters carry both keys |
 | editor control | already exists (`extensionField("type"…)`, `extensionField("challengeRating"…)`, `schemas.ts:823-824`) |
 | both-paths test | new: `api-monster-publish.mirror.test.ts` in `apps/client/src/homebrew/` |
@@ -592,7 +608,7 @@ advisories for the closed vocabularies.
 ## 4. What I am excluding, and why
 
 **The phase's own rule, applied honestly:** a control with no SRD author creates an editor-only row,
-which is its own defect. Everything below was measured at this HEAD.
+which is its own defect. Every count below was re-measured against the bundles at `36b5a1f`.
 
 ### Excluded for **zero SRD authors**
 
@@ -606,7 +622,7 @@ which is its own defect. Everything below was measured at this HEAD.
 | extension `experiencePoints` | 1 row, **no reader** | |
 | action `requiresEffectTag` | **0** authored (it is *read* at `action-resolution.ts:230`; C4 supplies its authored counterpart) | |
 | action `spellSlot` | **0** authored — synthesised from an item's `consumesSpellSlot` (`equipment-derivation.ts:918`) | |
-| action `spellId` | **0** authored — synthesised at `character-build.ts:441` | |
+| action `spellId` | **0** authored — synthesised at `character-build.ts:443` | |
 | background `skillChoices` | **0** of 4 | |
 | background `languages`, `languageChoices` | **0** of 4 | |
 | species `abilityBonusChoice` | **0** of 9 | |
@@ -629,7 +645,7 @@ which is its own defect. Everything below was measured at this HEAD.
 | action `multiattack` (126 authors) | **U21** | It is a live row of the census in `vocabulary-parity.mirror.test.ts:3416` — *"U21 — 126 SRD records author it"* — and governing plan ruling 13 re-scopes U21 explicitly. My guard **covers** it with an exemption pointing at U21; U21 ships the control. **If the parent wants this program to own it instead, the census row must move — a one-line change I am flagging rather than making.** |
 | `equipment.weapon.mastery` | **U38** | census row at `:3415` |
 | `class.widensPicks` | **U17** | census row at `:3417` |
-| `equipment.weapon.properties` | prerequisites batch | governing plan §3 batch 0 |
+| `equipment.weapon.properties` | content program **C3** | Batch 0 landed the plumbing at `36b5a1f` — the ETL join, the schema on all four shapes, the catalog→inventory copy. What is left is the editor control alone, and it belongs to C3. |
 | the full SRD magic-item list | content program | governing plan ruling 4 |
 
 ### Excluded as a **second spelling of a fact that already has a control**
@@ -641,10 +657,11 @@ mechanically live ones (`apps/server/src/hit-points.ts:149-150`). Authoring the 
 spellings of one sentence — the drift this vocabulary work exists to prevent.
 
 **But it surfaces a real bug, recorded not fixed:** the sheet renders `extension.damageResistances`
-(`CharacterSheet.tsx:661-663`), so **a homebrew monster whose typed resistances are authored through
+(`CharacterSheet.tsx:665-667`), so **a homebrew monster whose typed resistances are authored through
 the existing control shows nothing in the sheet's Resistances row** — the mechanic bites, the display
 is blank. It belongs to whoever owns `CharacterSheet`'s statblock rendering; B2's shared formatter is
-the natural home. Log it in `known-bugs.md`; do not smuggle it into a unit.
+the natural home. Already logged in `known-bugs.md:43-47` (added by the handoff commit `1263e34`, and
+still unowned); do not smuggle it into a unit.
 
 ### 4.1 Equipment-side gaps, and the content program's effect on them
 
@@ -656,7 +673,7 @@ item-level `uses` rider has real SRD authors for the first time.
 **Nothing in §4 above is re-classified by that**, and it is worth saying why rather than leaving it
 implied: I excluded no equipment-side capability on author grounds. The only two equipment gaps this
 program names — `weapon.mastery` and `weapon.properties` — are excluded for **ownership** (U38 and
-the prerequisites batch), not for want of an author, and that does not change.
+the content program's C3), not for want of an author, and that does not change.
 
 **But it changes one thing, and it is inside the guard.** `grants` is the single surviving entry on
 `RIDER_EXEMPT` (`apps/client/src/homebrew/authoring-harness.ts:69`), waved through because
@@ -698,13 +715,13 @@ program's contention is concentrated in three client files**, which the governin
 | --- | --- | --- | --- |
 | **α** | `schemas.ts` **`MONSTER_SCHEMA` region (813-884)**, `content-library.ts` | B0 → B1 → B2 → B3 → B4 | |
 | **β** | `RiderEditor.tsx` | C1 → C2 → C3 → C4 | |
-| **γ** | `schemas.ts` **`SPECIES_SCHEMA` (302-368) + `BACKGROUND_SCHEMA` (371-408)**, `LevelTableEditor.tsx` | D1 → D2 → D3 → E1 | |
+| **γ** | `schemas.ts` **`SPECIES_SCHEMA` (302-370) + `BACKGROUND_SCHEMA` (374-415)**, `LevelTableEditor.tsx` | D1 → D2 → D3 → E1 | |
 | **δ** | `packages/api-contract/src/index.ts`, `homebrew-store.ts`, `homebrew-validate.ts`, `game-http.ts` | F1 → F2 → F3 → F4 | |
 
 **Two serialization points this program does NOT touch, checked because another planner found them.**
 `EQUIPMENT_SCHEMA`'s weapon block (`schemas.ts:764-769`) is contended by the content program and the
 mastery program's U38 — two programs, one block. My `schemas.ts` lanes are the `MONSTER_SCHEMA`
-region (813-884) and the `SPECIES_SCHEMA` / `BACKGROUND_SCHEMA` regions (302-408); neither overlaps
+region (813-884) and the `SPECIES_SCHEMA` / `BACKGROUND_SCHEMA` regions (302-415); neither overlaps
 it. And `loadEquipment()` is contended by the content program's C3 and C6 — **F3 does not touch it,
 by design**: it serves the frozen constants in `packages/content-srd-5.2.1/src/enums.ts`, which are
 browser-safe and already re-derived from the bundles by
@@ -713,7 +730,7 @@ loader-backed pattern. That choice is what keeps F3 off the contended loader; do
 into a loader call.
 
 **α and γ share `schemas.ts`, deliberately, and the deviation is stated rather than discovered.**
-Their edit regions are **405 lines apart** and share no symbol, so a three-way merge is trivial. The
+Their edit regions are **398 lines apart** and share no symbol, so a three-way merge is trivial. The
 condition on the deviation: whichever lane merges second **rebases and re-runs its own verification**
 in its own worktree before the parent merges it — never a blind merge. If the parent prefers the
 governing plan's stricter *"no two share a file"*, collapse α+γ into one nine-unit lane and give
@@ -773,12 +790,12 @@ parent's merge. The rule:
 
 ### 6.2 The 375px pass — concrete, because this program adds a lot of UI
 
-Fourteen of the eighteen units add controls to `/homebrew`. The repo already has the two audits and
-they already cover this surface:
+Thirteen of the eighteen units add controls to `/homebrew` — every unit marked ✔ in §9's 375px
+column. The repo already has the two audits and they already cover this surface:
 
 - **`node scripts/tap-audit.mjs 375`** — the 44px floor. It carries three `/homebrew` entries:
   `play-homebrew`, `play-homebrew-record` and `play-homebrew-picker`
-  (`scripts/tap-audit.mjs:523-556`). Its own docblock warns that it was once *"MEASURED against a
+  (`scripts/tap-audit.mjs:523-553`). Its own docblock warns that it was once *"MEASURED against a
   database the seed had not built"* — an empty library reports a clean tab about a screen with no
   fields.
 - **`node scripts/no-scroll-audit.mjs`** — the page-never-scrolls law at eight viewports, portrait
@@ -821,8 +838,9 @@ Parent-only, after the merge:
 - `docs/ai-ledger/decision-log.md` — the `schemas.ts` shared-file deviation (§5.1); the ruling that
   a monster's saves are authored in the **bag** and not in `proficiencies` (B1); the `warnings`
   contract addition (F4).
-- `docs/ai-ledger/known-bugs.md` — **add** the sheet's typed-vs-prose resistance split (§4);
-  **remove** the vacuous mount probe entry at `:127-131` once A1 fixes it.
+- `docs/ai-ledger/known-bugs.md` — **remove** the vacuous mount probe entry at `:167-171` once A1
+  fixes it. The sheet's typed-vs-prose resistance split (§4) is already there, at `:43-47`; leave it,
+  and give it an owner only if a unit takes it.
 - `docs/ai-ledger/current-state.md` — one edit in place, at the ceiling, describing the guard.
 - `npm run docs`, once, as the merge resolution.
 
@@ -830,14 +848,16 @@ Parent-only, after the merge:
 
 ## 8. What I measured that contradicts the governing plan
 
-Five items. Each was measured at HEAD `6278e5a`; none is corrected silently.
+Five items. Each was measured at HEAD `6278e5a` and re-measured at `36b5a1f`; none is corrected
+silently.
 
 1. **"the OpenAPI describes `source` ten times as *Always \"homebrew\" once stored*"** (§4a). The
    measured count is **eight** false occurrences in `docs/api-reference.md` (lines 5034, 5093, 5320,
-   5379, 6071, 6104, 6122, 6244) plus **one** occurrence of a *different and true* sentence on
-   `HomebrewRecordSummary` (line 5979). Nine total, eight of them wrong. The under-reported half is
-   more interesting than the count: **the summary and the record body disagree inside a single
-   response.**
+   5380, 6072, 6105, 6123, 6245) plus **one** occurrence of a *different and true* sentence on
+   `HomebrewRecordSummary` (line 5980). Nine total, eight of them wrong — the count held at both
+   HEADs; only the line numbers moved, by one, when batch 0 regenerated the reference. The
+   under-reported half is more interesting than the count: **the summary and the record body disagree
+   inside a single response.**
 
 2. **"17 weapon properties" is the bundle row count, not a vocabulary** (§4c).
    `weapon-properties.v1.json` has 17 rows because the two families share one id space —
@@ -858,8 +878,11 @@ Five items. Each was measured at HEAD `6278e5a`; none is corrected silently.
    **0 each**, action `requiresEffectTag`/`spellSlot`/`spellId` **0 each**, `targetRules` **1**,
    `reaction` **1**, background `skillChoices`/`languages`/`languageChoices` **0**, class
    `levelTable[].spellsKnown` **0**, `skillChoices.fromCatalog` **0**. Applying the phase's own rule
-   honestly removes fourteen candidates. The ones that survive are the ones that matter — 330, 204,
-   197, 126, 82, 47, 36, 18, 15 authors — and the program is stronger for the pruning, not weaker.
+   honestly removes those **sixteen** candidates (§4's two tables carry eighteen rows, because they
+   also exclude monster `damageVulnerabilities`, the two `nonmagicalAttack*` flags,
+   `experiencePoints`, species `abilityBonusChoice`, class `toolChoices` and background
+   `toolChoices`). The ones that survive are the ones that matter — 330, 204, 197, 126, 82, 47, 36,
+   18, 15 authors — and the program is stronger for the pruning, not weaker.
 
 5. **`multiattack` is already assigned.** It is a live census row in
    `vocabulary-parity.mirror.test.ts:3416` naming **U21**, and governing plan ruling 13 re-scopes U21

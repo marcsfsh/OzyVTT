@@ -10,7 +10,7 @@ export const meta = {
   ],
 }
 
-const REPO = `OzyVTT at /home/user/OzyVTT, branch claude/feature-implementations-intake-c5eyu1.
+const REPO = `OzyVTT at /home/user/OzyVTT, branch claude/feature-impl-program-exec-ekmevw.
 
 READ FIRST, in this order:
   1. CLAUDE.md (constitutional; rules 2, 4, 5 and 6 all bite here)
@@ -24,8 +24,9 @@ READ FIRST, in this order:
 
 STANDING RULES FOR THIS PROGRAM:
   - NEVER run \`npm run build-bundle\`, and never regenerate
-    packages/content-srd-5.2.1/bundles/weapons.v1.json. It is batch 0's, and a rebuild silently
-    drops the mastery column from all 38 rows.
+    packages/content-srd-5.2.1/bundles/weapons.v1.json. Batch 0 gave the mastery and properties
+    columns an ETL home and regenerated that file once, deliberately (commit 36b5a1f). It is done,
+    it is batch 0's, and a second regeneration from this program can only lose.
   - Generated and parent-only, never yours: docs/api-reference.md, docs/app-map.md,
     docs/ai-ledger/current-state.md (it sits exactly at its 150-line ceiling).
   - Build only the client workspace. \`npm run build\` emits compiled output under the server
@@ -55,7 +56,10 @@ const DONE_BAR = `THE DONE BAR — all three, and none is optional:
 THE HONESTY GATE. A slug joins the implemented set in the SAME commit that adds its behaviour and
 its test — never before, never after. apps/server/test/weapon-mastery.test.ts:279-280 carries
 \`built\` and \`notYet\` as two hand-written arrays; move exactly one slug from one to the other,
-in alphabetical position. Re-check those two lines after any rebase, before your final run.
+in alphabetical position. The three assertions over them are at :281-284, and the third (:284)
+compares the union against the bundle's own eight — so dropping a slug from one array without
+adding it to the other fails loudly rather than silently. Re-check those two lines after any
+rebase, before your final run.
 
 Say what you ran and what you saw. "Should work now" is not a result.`
 
@@ -151,8 +155,9 @@ repository has actually shipped:
       NAMED failure and the value probe failed at the FAR END rather than at the same place.
 
 Also check, specifically:
-  - apps/server/test/weapon-mastery.test.ts:279-282 — exactly one slug moved from \`notYet\` to
-    \`built\`, and the third assertion (the union equals the bundle's eight) still holds.
+  - apps/server/test/weapon-mastery.test.ts:279-284 — exactly one slug moved from \`notYet\` (:280)
+    to \`built\` (:279), and the third assertion at :284 (the union equals the bundle's own eight)
+    still holds.
   - The unit's test is driven from a WEAPON RECORD, not from a hand-built effect or a synthetic
     action. If the test would pass with no weapon in the inventory, it is not this unit's test.
   - CLAUDE.md rule 2 (the server owns every game decision) and rule 4 (a player acts only on their
@@ -186,9 +191,10 @@ registry (slug keys) must stay a leaf; the handlers (which import effects.ts and
 must not be reachable from it. If a clean split proves awkward, LEAVE IMPLEMENTED_MASTERIES where it
 is as a hand-written literal, say so, and stop — do NOT invent a cycle.`,
     invariants: `THE PROOF THAT THIS WAS A REFACTOR: apps/server/test/weapon-mastery.test.ts passes
-UNCHANGED — all 12 tests, with ZERO edits to that file in this commit. Baseline measured at HEAD
-6278e5a: \`npx vitest run test/weapon-mastery.test.ts --root apps/server\` -> 1 file, 12 passed,
-1.82s. If one assertion has to move, this was not a refactor and you must stop and report.
+UNCHANGED — all 12 tests, with ZERO edits to that file in this commit. Baseline re-measured at HEAD
+36b5a1f: \`npx vitest run test/weapon-mastery.test.ts --root apps/server\` -> 1 file, 12 passed
+(0.95s). The COUNT is the baseline; the wall time moves with the box. If one assertion has to move,
+this was not a refactor and you must stop and report.
 
 You add no slug to the implemented set. The set stays {graze, sap}.`,
     ui: false,
@@ -231,11 +237,19 @@ THE RULING YOU ARE IMPLEMENTING — do not redesign it:
   dedicated cleaveTargetId field, creates a second target path that loop does not iterate: that is
   the ungated hole, not the fix. REUSE THE GATE; DO NOT ADD ONE BESIDE IT.
 
-THE ONE GUARD THAT MUST CHANGE: apps/server/src/action-resolution.ts:678 currently throws "An
-attack roll resolves against exactly one target." Relax it to permit EXACTLY TWO, and ONLY when the
-action's in-force mastery is cleave. Everything downstream keeps reading targets[0] — the on-hit
-riders (:1011), Sap (:1059), the grant recipient (:1086), the reaction prompt (:1122) and the
-builtin saves (:1165) all take index 0 and stay correct. Keep the relaxation as narrow as the rule.
+THE TWO GUARDS THAT MUST CHANGE — and relaxing only the first is WORSE than relaxing neither:
+  1. apps/server/src/action-resolution.ts:678 throws "An attack roll resolves against exactly one
+     target." This is the loud one.
+  2. apps/server/src/action-resolution.ts:811 — \`if (action.attack && targets.length === 1) {\` —
+     opens the ENTIRE attack-roll block (:811-905). This one is silent. Relax :678 alone and a
+     two-target cleave sails past the throw, skips the whole block, leaves \`attack\` null, rolls no
+     damage and fires NO mastery branch (Graze :949 and Sap :1058 both require attack !== null).
+     The swing resolves, reports nothing, and reviews as working — the exact built-but-unwired
+     shape this program exists to close.
+Relax BOTH to permit EXACTLY TWO, and ONLY when the action's in-force mastery is cleave. Everything
+downstream keeps reading targets[0] — the block's own \`const target = targets[0]\` (:812), the
+on-hit riders (:1011), Sap (:1059), the grant recipient (:1086), the reaction prompt (:1122) and the
+builtin saves (:1165) all take index 0 and stay correct. Keep each relaxation as narrow as the rule.
 
 STILL A SERVER DECISION (CLAUDE.md rule 2): whether the second target is LEGAL — within 5 feet of
 the first, within reach — computed from deps.distanceFeet, never trusted from the client. An
@@ -270,26 +284,29 @@ THE RULING YOU ARE IMPLEMENTING — do not redesign it:
   rather than re-checked.
 
 THE SEAM: action-resolution.ts has no geometry and must NOT grow an import of token-placement.ts.
-\`geometry\` is already fetched inside actionResolve at apps/server/src/game-operations.ts:1194, so
+\`geometry\` is already fetched inside actionResolve at apps/server/src/game-operations.ts:1195, so
 add an OPTIONAL DEPENDENCY to ResolveDependencies (action-resolution.ts:54-76) — a callback the
-operation constructs, which calls moveEncounterToken (apps/server/src/token-placement.ts:155-166)
-internally. That reuses the same snapping the GM's own drag uses (:77-97 via :161), which is what
+operation constructs, which calls moveEncounterToken (apps/server/src/token-placement.ts:155-165)
+internally. That reuses the same snapping the GM's own drag uses (:77-97 via :160), which is what
 docs/ai-context/map-grid.md requires: the server owns all snapping and there is exactly ONE
-implementation of it.
+implementation of it. Note that geometry is \`TokenMapGeometry | null\` — null when the encounter has
+no map asset — and moveEncounterToken requires a non-null one, so a null geometry is the
+unmeasurable case in ruling 2, not a crash.
 
 THREE RULINGS, so you do not have to invent them:
   1. FORCED MOVEMENT DOES NOT ROUTE THROUGH applyMovementRules. Calling moveEncounterToken directly
      skips it and that is CORRECT: SRD forced movement provokes no opportunity attacks and spends
      none of the target's movement. applyMovementRules is called only from tokenMove
-     (game-operations.ts:713), never from moveEncounterToken. SAY SO IN A COMMENT or the next
+     (game-operations.ts:717), never from moveEncounterToken. SAY SO IN A COMMENT or the next
      reader will "fix" it.
-  2. UNMEASURABLE DEGRADES TO A WARNING, NEVER A REJECTION. On a gridless or uncalibrated map
-     mapDistance returns null (apps/server/src/movement-narration.ts:33-40), and a token with no
-     position cannot be pushed. The precedent is one file away and exactly right: the builtin shove
-     at action-resolution.ts:1183 pushes a warning. Copy that sentence shape. moveEncounterToken
-     THROWS when the token is absent — guard before calling.
+  2. UNMEASURABLE DEGRADES TO A WARNING, NEVER A REJECTION. On a map with neither calibration nor
+     scale mapDistance returns null (apps/server/src/movement-narration.ts:33-44), and a token with
+     no position cannot be pushed. The precedent is one file away and exactly right: the builtin
+     shove at action-resolution.ts:1183 pushes a warning. Copy that sentence shape.
+     moveEncounterToken THROWS when the token is absent — guard before calling.
   3. THE FOG REQUIREMENT IN docs/product/area-2-plan.md IS STALE. Measured: apps/server/src/fog.ts
-     contains ZERO token references and its only production importer is game-operations.ts:36
+     reads no token anywhere — the word appears once, in a docblock at :13 naming the token-move
+     PATTERN, and in no code path — and its only production importer is game-operations.ts:36
      (paintFog, resetFog, setFogEnabled — all GM paint commands). NOTHING recomputes fog from token
      positions. There is nothing to route through. DO NOT BUILD ONE.
 
@@ -319,10 +336,12 @@ measured through mapDistance equal to 10 feet, in the direction away from the at
     brief: `READ THIS FIRST: this unit exists because the plan measured that nick has nothing to
 move. Nick reads "when you make the extra attack of the Light property, you can make it as part of
 the Attack action instead of as a Bonus Action" — and there is NO Light-property extra attack
-anywhere in this codebase. Grepping two-weapon / offhand / off-hand / a light weapon branch across
-apps/server/src, apps/client/src and packages/rules-5e/src returns nothing but armour weight
+anywhere in this codebase. Re-measured at 36b5a1f, AFTER batch 0 landed the properties column:
+grepping two-weapon / twoWeapon / offhand / off-hand across apps/server/src, apps/client/src and
+packages/rules-5e/src returns ZERO hits, and a light-weapon branch returns nothing but armour weight
 (packages/rules-5e/src/riders.ts:18,280). weaponAction hard-codes activation "action" at
-apps/server/src/equipment-derivation.ts:1007.
+apps/server/src/equipment-derivation.ts:1007. Eight weapons now carry the "light" property and
+nothing reads it for an extra attack — the column arrived, the mechanism did not.
 
 CORROBORATION that this is work someone owes anyway: the SRD fighting style two-weapon-fighting
 ships at packages/content-srd-5.2.1/bundles/feats.v1.json:302, a Fighter can pick it, its
@@ -333,11 +352,13 @@ BUILD: a bonus-action swing offered when the attacker made the Attack action wit
 and holds a second Light weapon; damage WITHOUT the ability modifier. The bonus-action economy
 already exists at apps/server/src/action-resolution.ts:255-257 and is committed at :1211-1215.
 
-The \`light\` property itself is BATCH 0's work, not yours (see the plan §2.2). If
-weaponPropertiesOf("dagger", ...) does not return a list containing "light", STOP and report it as
-a blocker — you are unblocked by batch 0, not by writing the column yourself.`,
-    invariants: `THIS IS A SCOPE EXPANSION and the plan flags it as needing the parent's ruling. If
-you were started without that ruling, say so in your report.
+The \`light\` property itself was BATCH 0's work, not yours (see the plan §2.2), and it LANDED in
+36b5a1f — confirmed by apps/server/test/character-build.test.ts:362. Confirm it once yourself
+before building on it; if weaponPropertiesOf("dagger", ...) does not return a list containing
+"light", STOP and report it as a blocker rather than writing the column yourself.`,
+    invariants: `THIS IS A SCOPE EXPANSION and the plan flags it as needing the parent's ruling,
+which as of 36b5a1f is STILL OWED — nothing in docs/ai-ledger/decision-log.md rules on it. If you
+were started without that ruling, say so in your report and treat it as a blocker.
 
 FAR END: a Fighter holding two Light weapons gets a bonus-action swing that ROLLS DAMAGE; a Fighter
 holding one does not. Not "the action appears in a list".
@@ -357,8 +378,8 @@ Add a \`nick\` handler: when the attacker's Light weapon has nick in force, U35a
 swing folds into the Attack action — it resolves WITHOUT setting bonusActionUsed
 (apps/server/src/action-resolution.ts:256, committed at :1212), once per turn.
 
-Authors: dagger, light-hammer, scimitar, sickle — all four must also carry "light" after batch 0.
-Nothing to author. No control.`,
+Authors: dagger, light-hammer, scimitar, sickle — all four carry "light" at 36b5a1f, verified
+against the bundle. Nothing to author. No control.`,
     invariants: `FAR END: THE REFUSAL THAT DOES NOT HAPPEN. state.combat.turn.bonusActionUsed is
 still FALSE after the extra swing, and then a bonus-action Dash SUCCEEDS. The same Fighter without
 nick picked has bonusActionUsed true and the Dash is REFUSED with economy.bonus-action-used.
@@ -402,9 +423,9 @@ field you write is the one projections.ts:138-139 strips. That is a check, not a
     title: 'slow — the target loses 10 feet of Speed until your next turn (7 weapons)',
     brief: `HARD-BLOCKED ON U18 (the runtime speed effect modifier). Before writing anything,
 confirm in the merged trunk BOTH halves: (a) EffectModifierSchema
-(packages/schemas/src/index.ts:232-255, 12 members at HEAD) has a speed member, AND (b)
-effectiveSpeedFeet (apps/server/src/condition-rules.ts:44-51) actually READS effect modifiers. At
-HEAD it reads actor.speedFeet, exhaustion, SPEED_ZERO_CONDITIONS and the dashing tag, and never
+(packages/schemas/src/index.ts:232-255, 12 members at 36b5a1f) has a speed member, AND (b)
+effectiveSpeedFeet (apps/server/src/condition-rules.ts:44-50) actually READS effect modifiers. At
+36b5a1f it reads actor.speedFeet, exhaustion, SPEED_ZERO_CONDITIONS and the dashing tag, and never
 looks at actor.effects[].modifiers at all. If (b) is missing you have a field nothing consumes —
 STOP and report.
 
@@ -439,32 +460,35 @@ Only the CONTROL is missing. The reader already ships (masteryByActionId,
 apps/server/src/equipment-derivation.ts:644-656, which already requires mastery AND unlocked AND
 implemented), and all 38 SRD weapons already author it.
 
-ADD ONE ROW to the weapon section of apps/client/src/homebrew/schemas.ts. Measured at HEAD the
+ADD ONE ROW to the weapon section of apps/client/src/homebrew/schemas.ts. Measured at 36b5a1f the
 section is :756-771 and its fields are :764-769 — five rows (weapon kind, damage, damage type,
 range, long range) and no mastery.
 
 TWO THINGS TO GET RIGHT:
   1. IT IS A \`select\`, NOT A \`pick\`. weapon.mastery is a CLOSED 8-slug enum
-     (packages/content-srd-5.2.1/src/schemas.ts:233), so free entry would let a GM type a slug that
-     publishes clean and is silently inert — the hardest homebrew failure to diagnose. Join the
-     closed list at apps/client/src/homebrew/vocabularies.test.ts:169-171 beside equipment.slot,
-     equipment.weapon.category and class.hitDie, with emptyValue "omit" (a homebrew weapon may
-     legitimately have no mastery — the schema says so at
+     (packages/content-srd-5.2.1/src/schemas.ts:252, mirroring :125), so free entry would let a GM
+     type a slug that publishes clean and is silently inert — the hardest homebrew failure to
+     diagnose. Join the closed list at apps/client/src/homebrew/vocabularies.test.ts:169-171 beside
+     equipment.slot, equipment.weapon.category and class.hitDie, with emptyValue "omit" (a homebrew
+     weapon may legitimately have no mastery — the schema says so at
      packages/content-srd-5.2.1/src/schemas.ts:120-123).
   2. DO NOT USE ctx.weaponProperties. That list is properties AND masteries merged
      (apps/client/src/homebrew/schema.ts:136 — measured 9 + 8 = 17 slugs), assembled for the
      weapon-property-is trigger. Offering it here would let a GM set a weapon's mastery to
-     "finesse". WEAPON_MASTERY_IDS (packages/content-srd-5.2.1/src/schemas.ts:129) is the right
-     list and is ALREADY imported at apps/client/src/homebrew/useSchemaContext.ts:17.
+     "finesse". WEAPON_MASTERY_IDS (packages/content-srd-5.2.1/src/schemas.ts:143) is the right
+     list and is ALREADY imported at apps/client/src/homebrew/useSchemaContext.ts:17. Import it
+     from @vtt/content-srd-5.2.1/schemas the way that file does — schemas.ts also re-exports
+     enums.js (:45), which publishes a SECOND WEAPON_MASTERY_IDS (enums.ts:72) that the local
+     export at :143 shadows. Same eight slugs; do not reach past the subpath for the other one.
 
 DELETE THE CENSUS LINE IN THE SAME COMMIT.
 apps/client/src/homebrew/vocabulary-parity.mirror.test.ts:3415 carries
 ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"] in
 the \`owed\` array, and the assertion at :3419-3421 requires every owed key to still be
 unreachable. Adding the control without deleting that line FAILS the test. That is the guard
-working, not a regression. Baseline measured at HEAD:
+working, not a regression. Baseline re-measured at HEAD 36b5a1f:
 \`npx vitest run src/homebrew/vocabulary-parity.mirror.test.ts --root apps/client --project node\`
--> 1 file, 51 passed, 3.62s.`,
+-> 1 file, 51 passed (2.33s). The COUNT is the baseline; the wall time moves with the box.`,
     invariants: `FAR END: a GM authors a homebrew weapon with mastery "topple", a character unlocks
 it, and a swing produces the Constitution save — through the editor's own applyField / storedBody
 path, the way vocabulary-parity.mirror.test.ts proves every other control. NOT "the key
@@ -498,26 +522,31 @@ const gate = await agent(
 You are the BATCH-0 GATE for the weapon-mastery program. Read and measure only; change nothing.
 
 This program's entire data basis is the \`mastery\` column on the 38 weapon rows, and its
-second-largest unit needs a \`properties\` column that does not exist. Both belong to batch 0. Your
-job is to answer, with evidence, whether batch 0 actually landed them — not whether someone said it
-did.
+second-largest unit needs a \`properties\` column. Both belonged to batch 0, and batch 0 reports
+both as landed in commit 36b5a1f. Your job is to CONFIRM that against the code, with evidence —
+not to trust the report, and not to re-do the work.
 
 MEASURE, DO NOT TRUST:
 
-1. THE MASTERY ETL. At HEAD 6278e5a, packages/content-srd-5.2.1/scripts/build-bundle.ts:549-559
-   builds weaponRecords and never emits \`mastery\`. Because WeaponReferenceSchema.mastery is
-   .optional() (packages/content-srd-5.2.1/src/schemas.ts:125), validateBundle passes with the
-   column gone — the loss is SILENT. Read the current build-bundle.ts and state whether the emit
-   now carries mastery. Do NOT run \`npm run build-bundle\` to find out; read the code.
+1. THE MASTERY ETL. The historic defect: build-bundle.ts built weaponRecords without ever emitting
+   \`mastery\`, and because WeaponReferenceSchema.mastery is .optional()
+   (packages/content-srd-5.2.1/src/schemas.ts:125) validateBundle passed with the column gone — the
+   loss was SILENT. At 36b5a1f the emit joins both columns in from the vendored markdown SRD's
+   printed Weapons table: the parse and slug cross-check at build-bundle.ts:585-618, the emit at
+   :620-641 (mastery :632, properties :635), and fail-closed checks in BOTH directions at :626 and
+   :642-645. Read the current build-bundle.ts and confirm the emit carries mastery on every row.
+   Do NOT run \`npm run build-bundle\` to find out; read the code.
 
-2. THE PROPERTIES COLUMN. At HEAD, 0 of 38 rows carry \`properties\`, and the column is absent from
-   WeaponReferenceSchema (:105-126) and EquipmentWeaponStatsSchema (:226-234). It must land on FOUR
-   shapes or it never reaches the reader: those two schemas, the ETL emit (:549-559), and the
-   catalog-to-inventory copy at apps/server/src/character-build.ts:1586 which today copies five
-   weapon fields.
+2. THE PROPERTIES COLUMN. It had to land on FOUR shapes or it never reaches the reader. At 36b5a1f
+   all four are present: WeaponReferenceSchema.properties (schemas.ts:139),
+   EquipmentWeaponStatsSchema.properties (:260), the ETL emit (build-bundle.ts:635), and the
+   catalog-to-inventory copy at apps/server/src/character-build.ts:1591. Confirm all four.
    THE ACCEPTANCE TEST: does weaponPropertiesOf (apps/server/src/equipment-derivation.ts:1044-1047)
-   return a list containing "light" for a built character carrying a dagger? Establish this by
-   reading the chain, or by a throwaway read-only script — never by regenerating a bundle.
+   return a list containing "light" for a BUILT character carrying a dagger? It is already asserted
+   at apps/server/test/character-build.test.ts:362 on the inventory a real buildCharacterDefinition
+   produced. Re-run it and quote the count:
+     npx vitest run test/character-build.test.ts --root apps/server -t "copies the catalog's weapon properties"
+   Establish it that way or by a throwaway read-only script — never by regenerating a bundle.
 
 Report each as a boolean with file:line evidence, and set safeToStart only if BOTH are true.
 A false here stops the whole program; say plainly which one is missing and what is still owed.`,

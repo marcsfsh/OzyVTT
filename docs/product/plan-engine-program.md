@@ -1,7 +1,9 @@
 # The engine-and-vocabulary program — U17 through U33
 
-**Written 2026-08-10 by PLANNER-ENGINE, against HEAD `6278e5a` on
-`claude/feature-implementations-intake-c5eyu1`, tree clean.**
+**Written 2026-08-10 by PLANNER-ENGINE against HEAD `6278e5a`; re-verified 2026-08-10 against HEAD
+`36b5a1f` on `claude/feature-impl-program-exec-ekmevw`** (PR #55 merged; batch 0 landed the weapons
+ETL home, `properties` on all four shapes, and the catalog-picker fix). Every `file:line` below was
+re-opened at `36b5a1f`; the ones that had moved are corrected in place.
 
 This plan governs **U17–U33 only**. It obeys
 [`remaining-program-plan.md`](remaining-program-plan.md), which is the governing document for the
@@ -20,8 +22,9 @@ earlier document the contradiction is stated rather than quietly corrected. Size
 > Cite them; do not author your own and do not re-derive them. **Author the carrier in the unit's own
 > commit, never earlier** — a rider authored before its reader ships is an inert rider, which is the
 > failure this whole program exists to close. Item-side carriers come from the content program's
-> **C7** lanes, which give `equipment.v1.json`'s rider blocks their **first SRD authors ever**
-> (measured: zero today). Verified at HEAD for this plan: `fighter.studied-attacks`,
+> **C7** lanes, which give `equipment.v1.json`'s rider blocks their **first SRD authors ever** —
+> re-counted at HEAD across all 132 records: `modifiers` 0, `effects` 0, `actions` 0, `casts` 0,
+> `grants` 0, `grantsFeatIds` 0, `uses` 0. Re-verified at HEAD: `fighter.studied-attacks`,
 > `ranger.precise-hunter` and `evoker.empowered-evocation` carry **no** rider keys, so U22's, U23's
 > and U30's overlay adds are clean; `bard.magical-secrets` and `evoker.evocation-savant` each carry a
 > `choice`, and both are overlay collisions.
@@ -40,15 +43,15 @@ Seventeen rows came in. Nineteen go out, in a different shape.
 | **U31 re-scoped** | L → **S** | its reader shipped; the governing plan's premise is false at HEAD |
 | **U33 re-scoped** | copy sweep → a mechanism | there is no way to label an OPTION today; `SelectOption` has no `note` |
 | **U18 grows** | schema + control → **schema + control + the READ** | `effectiveSpeedFeet` never touches `actor.effects[].modifiers`; without the sweep the row is inert and mastery `slow` cannot ship |
-| **U17 gated** | not schedulable | blocked on decision **D-ENGINE-1** (§7) |
-| **new prep `R2`** | split `RiderEditor.tsx` | 8 of 15 units need a control in one 1365-line file (decision **D-ENGINE-2**, §7) |
+| **U17 unblocked** | schedulable | **D-ENGINE-1 was ruled** on 2026-08-10 (`decision-log.md:59`–`:61`), option 1 — see §7 |
+| **new prep `R2`** | split `RiderEditor.tsx` | 8 of 19 units need a control in one 1365-line file (decision **D-ENGINE-2**, §7, still open) |
 | **U23 grows** | S → M | the reader's `?? damage[0].type` fallback is unreachable; the schema refuses what the form seeds |
 | **U27 grows** | M → L | there is no advantage machinery on the check path at all, and its one author is effect-side |
 | **U29 grows** | S → M | it depends on `E0`, and `attackKinds` is built on one branch only |
 | **U30 grows** | content → reader + content | nothing in the repo sets `RiderContext.spellSchool` or `.spellLevel` |
 
-Totals after the re-baseline: **19 shippable units** (17 named U-rows, `E0`, `R2`) —
-**5 S · 5 M · 7 L · 1 XL · 1 gated**.
+Totals after the re-baseline: **19 shippable units** (17 named U-rows, `E0`, `R2`) — **3 S · 7 M ·
+6 L · 1 XL**, plus `R2` (S–M) and `U17` (L, and the last thing gating it lifted on 2026-08-10).
 
 ---
 
@@ -72,6 +75,17 @@ so U29's far-end assertion would pass for the wrong reason and its value-level n
 would not move. Same for U22 (an effect narrowed to one foe) and U27 (Rage's Strength-check
 advantage, measured below as the *only* `roll-mode: check` author in the SRD).
 
+**The SRD author already wrote this bug down, and that is the strongest evidence E0 is real.**
+`packages/content-srd-5.2.1/scripts/class-mechanics/sorcerer.ts:61`–`:73` declines to author Innate
+Sorcery's advantage and names both blockers verbatim: *"An effect's modifiers are normalised through
+`toRollModes`, which returns `{roll, mode}` and DROPS the `when` list, so a `roll-mode` gated on
+`attack-kind-is: ["spell"]` inside an effect would be read as advantage on every attack roll the
+Sorcerer makes — a dagger swing included"*, and *"`attackKindsOf` derives
+melee/ranged/thrown/unarmed/reaction and nothing in the codebase ever announces `"spell"`, so the
+filter fails closed."* Those are E0 and U29 exactly, written by the content lane that hit them.
+**The comment moves with the fix** — leaving it in place after E0 and U29 land is a false honesty
+note.
+
 **Also measured, and it bounds the fix:** `attackRollSources` is the **only** consumer of effect-side
 `roll-mode` anywhere. `apps/server/src/saving-throws.ts:52`–`:58` handles only the legacy
 `save-advantage`/`save-disadvantage` variants and never calls `toRollModes`;
@@ -81,7 +95,7 @@ So an effect's `roll-mode` for `save`, `check`, `initiative`, `death-save` or `c
 
 ---
 
-### U17 — `widensPicks` · **L** · **BLOCKED on D-ENGINE-1 — do not schedule**
+### U17 — `widensPicks` · **L** · *D-ENGINE-1 ruled 2026-08-10; schedulable*
 
 | part | at HEAD |
 | --- | --- |
@@ -91,9 +105,9 @@ So an effect's `roll-mode` for `save`, `check`, `initiative`, `death-save` or `c
 | **test** | none. |
 
 **Extra, measured, and not in any earlier document:** the overlay's `FeatureMechanics` type
-(`packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts:78`–`:88`) is a
-`Partial<Pick<FeatureInput, …>>` over ten named keys. `widensPicks` is not among them, so **whichever
-option D-ENGINE-1 takes, that Pick union widens too.** And
+(`packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts:77`–`:85`) is a
+`Partial<Pick<FeatureInput, …>>` over ten named keys (`:78`). `widensPicks` is not among them, so
+**the ruled option widens that Pick union too.** And
 `apps/server/test/cleric-druid-bard-mechanics.test.ts:153`–`:154` pins the current mis-wiring (a
 level-10 Bard recording two `kind: "spell"` picks under `payload.featureId: "magical-secrets"`); it
 moves with the fix.
@@ -116,9 +130,9 @@ identical to the level-9 list and the far-end assertion fails on the **list**, n
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **the build-time form ships**: `type: "speed"` is variant 3 of `FeatureModifierSchema` (`packages/content-srd-5.2.1/src/character-content.ts:191`), summed at `apps/server/src/character-build.ts:563` into `speedBonus` and baked into `speedFeet` at `:1607`. **The runtime form does not exist, and it is two things missing, not one.** `EffectModifierSchema` is **12 variants** (probed: `.options.length === 12`) and has no `speed`; **and** `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts:44`–`:49`) reads base − 5×exhaustion, the Speed-0 conditions and the `dashing` **tag**, and **never touches `actor.effects[].modifiers`** at all. |
-| **content** | **3 SRD authors, measured** — `classes.v1.json` ×2, `species.v1.json` ×1. All three are the build-time form. The runtime form needs its own carrier from the content program. |
-| **control** | goes in `EFFECT_MODIFIER_TYPES` / `effectModifiersField` (`RiderEditor.tsx:813`, `:829`) — **not** in `modifiersField`, which already carries `speed` at `:289` with its own ±30/60 amount row at `:410`. |
+| **reader** | **the build-time form ships**: `type: "speed"` is variant 3 of `FeatureModifierSchema` (`packages/content-srd-5.2.1/src/character-content.ts:191`), summed at `apps/server/src/character-build.ts:563` into `speedBonus` and baked into `speedFeet` at `:1612`. **The runtime form does not exist, and it is two things missing, not one.** `EffectModifierSchema` is **12 variants** (probed at HEAD: `.options.length === 12`) and has no `speed`; **and** `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts:44`–`:49`) reads `actor.speedFeet`, exhaustion, `SPEED_ZERO_CONDITIONS` and the `dashing` **tag**, and **never touches `actor.effects[].modifiers`** at all. |
+| **content** | **3 SRD authors, measured** — `classes.v1.json` ×2 (`amount: 10`), `species.v1.json` ×1 (`amount: 5`). All three are the build-time form. The runtime form needs its own carrier from the content program. |
+| **control** | goes in `EFFECT_MODIFIER_TYPES` / `effectModifiersField` (`RiderEditor.tsx:813`, `:829`) — **not** in `modifiersField`, which already carries `speed` at `:293` with its own ±30/60 amount row at `:408`. |
 | **test** | both paths end at a movement budget that **changes when the effect is applied and reverts when it ends**. |
 
 **The correction the governing plan already ruled, confirmed:** U6 (`381567d`) built
@@ -157,8 +171,10 @@ dependency-free so any engine module can import it without cycles."* It may read
 **Order of operations inside `effectiveSpeedFeet`, so `slow` and Dash compose the way the SRD reads:**
 base − 5×exhaustion → **+ the summed effect modifiers** → floor at 0 → Speed-0 conditions → ×2 while
 Dashing. Pin that order in the test; a Dashing, slowed creature is the case that distinguishes it.
+**Note the shape you are editing:** at HEAD the Speed-0 conditions are an *early return* at `:46`,
+ahead of the exhaustion maths at `:47` — the sweep has to restructure that, not just insert a line.
 
-**Far-end proof.** `apps/server/src/movement-rules.ts:68` refuses with *"…has N ft of movement left
+**Far-end proof.** `apps/server/src/movement-rules.ts:76` refuses with *"…has N ft of movement left
 (this move needs M ft)"*. Assert the **number in that message** moves with the effect and returns
 when it ends. *"The value survived derivation" is not a test.*
 
@@ -186,7 +202,7 @@ on the **feet**, not the field.
 
 **The projection change is real, and here is why — measured.** `SchemaContext`
 (`apps/client/src/homebrew/useSchemaContext.ts`) has no `pools` entry, and `ContentFeatureSummary`
-(`packages/domain/src/index.ts:839`) carries `tags`, `choice`, `choices` and `grantedAtLevels` but
+(`packages/domain/src/index.ts:846`) carries `tags`, `choice`, `choices` and `grantedAtLevels` but
 **no `uses` and no pool id**. So pool ids do not cross the wire in the content catalog at all. The
 shipped `pools` field is the *actor's* live pools in a running game; the editor holds no actor.
 
@@ -228,7 +244,7 @@ factory — measure before writing the number).
 | **control** | a new variant in `modifiersField`, scoped by `weapon-property-is` / category, carrying `die?` and `ability?`. |
 | **test** | both paths end at **a quarterstaff swing that rolls the Monk die off Dexterity**. |
 
-**The bug is already written down**, measured, at `docs/ai-ledger/known-bugs.md:206`–`:214`:
+**The bug is already written down**, measured, at `docs/ai-ledger/known-bugs.md:247`–`:254`:
 *"Measured on a real generated Monk 5 (DEX 15 / STR 12): `Quarterstaff +4 (1d6+1)` — Strength, and the
 printed 1d8 nowhere."* U20 retires that clause.
 
@@ -252,16 +268,18 @@ formula is unchanged and the far-end assertion fails on the **dice**, not the fi
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **ships.** `evaluateActionEconomy` (`apps/server/src/action-resolution.ts:258`–`:300`) opens a component instance from `action.multiattack` via `componentMap` / `multiattackParents`, decrements it per component resolve, and names the leftovers in its refusal. |
+| **reader** | **ships.** `evaluateActionEconomy` (`apps/server/src/action-resolution.ts:211`) opens a component instance from `action.multiattack` via `componentMap` / `multiattackParents`, decrements it per component resolve, and names the leftovers in its refusal — all of it in the `activation === "action"` branch at `:257`–`:301`. |
 | **content** | **126 SRD authors, measured** (`monsters.v1.json`). |
 | **control** | **none, deliberately** — `apps/client/src/homebrew/schemas.ts:866`–`:868` says the monster-only keys are withheld because *"a form that produced them without a composer constrained to sibling action ids would author references that resolve to nothing."* U21a builds that composer. |
 | **test** | both paths end at **a second component swing refused after the plan is spent**, naming the leftovers. |
 
-This is the census row at `vocabulary-parity.mirror.test.ts:3418`, and it is a control-only unit
+This is the census row at `vocabulary-parity.mirror.test.ts:3416`, and it is a control-only unit
 with 126 SRD authors and a live reader — the shape the old plan claimed the whole of U21 had.
 
 **Far-end proof.** Resolve two of the three declared claws, then the fourth → the refusal reads
-*"…has no Claw left in this action — remaining: 1× Bite."*
+*"…has no Claw left in this action - remaining: 1× Bite."* **That dash is a plain hyphen in the
+template** (`action-resolution.ts:295`); an assertion written with an em dash fails for the wrong
+reason.
 
 **Non-vacuity.** *Control:* filter the composer out of the actions field → the mirror file fails at
 `hasControl("monster", "multiattack", ["actions"])`. *Value:* keep the composer and point one
@@ -276,7 +294,7 @@ text is wrong; assert on the **message**.
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing.** `apps/server/src/action-resolution.ts:255`–`:257` — the bonus-action branch sets `markBonus = true` and nothing else. Every component-pool line lives in the `action` branch below it. |
+| **reader** | **missing.** `apps/server/src/action-resolution.ts:254`–`:257` — the bonus-action branch checks `turn.bonusActionUsed`, sets `markBonus = true`, and does nothing else. Every component-pool line lives in the `action` branch below it (`:257`–`:301`). |
 | **content** | **zero authors today, and one record whose prose demands it.** Measured: **all 126** `multiattack` authors carry `activation: "action"`; **no** SRD record anywhere authors a bonus action with a `multiattack` or an `attack.count > 1` (76 bonus actions in `monsters.v1.json`, 11 in `classes.v1.json`, 5 each in `species`/`subclasses` — none with components). Flurry of Blows (`classes.v1.json`, `id: "flurry-of-blows"`) says *"make two Unarmed Strikes as a Bonus Action"* **in prose only**. It must be **authored** by the content program. |
 | **control** | inherited from U21a. |
 | **test** | both paths end at **two swings handed out on a bonus action**, and a third refused. |
@@ -288,7 +306,7 @@ author**. The 126 belong to U21a.
 **Role-boundary invariant.** The economy is what refuses a player's off-turn action. Widening it must
 not widen *who* may act: the `onOwnTurn` guard stays.
 
-**Its known-bugs entry, verbatim** (`docs/ai-ledger/known-bugs.md:215`–`:221`): *"Declaring
+**Its known-bugs entry, verbatim** (`docs/ai-ledger/known-bugs.md:255`–`:260`): *"Declaring
 `multiattack` on a bonus action would look wired and hand out nothing, which is worse than the
 prose."* U21b retires it.
 
@@ -309,7 +327,7 @@ the component count to 1 → the second swing is refused; assert on the **swing 
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **nothing.** The advantage collector is `attackRollSources` (`apps/server/src/action-resolution.ts:531`); it narrows by nothing target-specific. |
+| **reader** | **nothing.** The advantage collector is `attackRollSources` (`apps/server/src/action-resolution.ts:533`); it narrows by nothing target-specific. |
 | **content** | **nothing exists to author it.** `EffectInstanceSchema` (`packages/schemas/src/index.ts:288`–`:317`) carries `sourceActorId` and no "against actor X" field; the `versus-*` triggers narrow by **size**, **condition** and **creature type** only (`packages/rules-5e/src/riders.ts:208`–`:213`). There is nowhere to hang "against this one foe." **The carrier is NOT an item** — PLANNER-CONTENT measured **0 of 258** SRD magic items authoring the shape. Use fighter `studied-attacks`, whose printed text is the shape exactly: *"If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature."* Seconds: ranger `precise-hunter`, barbarian Staggering Blow. |
 | **control** | one row in `effectModifiersField`. |
 | **test** | both paths end at **an advantage that applies against one named foe and not another**. |
@@ -335,10 +353,14 @@ and the far end moves for the wrong reason.
 is one of the three `HAND_AUTHORED` classes (`packages/content-srd-5.2.1/scripts/build-class-bundle.ts:33`
 = fighter, wizard, cleric), so for `studied-attacks` the ETL writes the merged record **back over its
 own input** — an overwrite there is un-revertable and unreviewable, which is why `applyMechanics`
-fails the build rather than picking a winner. Verified at HEAD: `fighter.studied-attacks` carries
-**no** rider keys at all, so this add is a clean insert and no ruling is needed. Confirm that is still
-true before writing; if it has grown a key by then, move to `ranger.precise-hunter` (also verified
-rider-free, and Ranger is generated) rather than weakening the rule.
+fails the build rather than picking a winner. Re-verified at HEAD: `fighter.studied-attacks` carries
+**no** rider key at all (none of `tags`/`actions`/`effects`/`modifiers`/`grants`/`uses`/`extraPicks`/
+`replaces`/`choice`/`choices`), so this add is a clean insert. Confirm that is still true before
+writing; if it has grown a key by then, move to `ranger.precise-hunter` (also re-verified rider-free,
+and Ranger is generated). The client ruled the general collision on 2026-08-10 — a `clears` verb on
+`FeatureMechanics`, idempotent, a build error unless the same feature re-authors the key
+(`decision-log.md:56`–`:58`) — but that verb is **not in `overlay.ts` yet** (grep: zero hits), and it
+belongs to the content program. Do not build it here; pick a rider-free carrier instead.
 
 **Far-end proof.** Two foes, one effect: the attack against the named foe rolls `2d20kh1`; the attack
 against the other rolls `1d20`. Both in the same test, one after the other.
@@ -368,21 +390,24 @@ put them two waves apart.
 | --- | --- |
 | **reader** | `apps/server/src/action-resolution.ts:983` already reads `rider.modifier.damageType ?? damage[0]?.type ?? "untyped"`. **That `??` is unreachable.** |
 | **content** | **7 `extra-damage` authors, measured** (`classes.v1.json` 2, `subclasses.v1.json` 5). None can say "same type". Carriers: **Vicious Weapon** (item, from C7) and **Empowered Evocation**. |
-| **control** | ships as a `pick` combobox at `RiderEditor.tsx:427`. |
+| **control** | ships as a `pick` combobox at `RiderEditor.tsx:428`. |
 | **test** | both paths end at **a rider whose damage type matches the weapon's**, and a second weapon of a different type proving it followed. |
 
-> **Measured contradiction — this is a live defect, not a design note.**
-> `ExtraDamageVariantSchema.damageType` is `z.string().min(1)`, **required**
+> **Measured contradiction — this is a live defect, not a design note, and it is now logged**
+> (`docs/ai-ledger/known-bugs.md:30`–`:35`, owner "engine program U23+U30 (merged)").
+> `ExtraDamageVariantSchema.damageType` is `DamageTypeIdSchema` — `z.string().min(1).max(40)`,
+> declared at `packages/schemas/src/index.ts:7` — and it is **required**
 > (`packages/schemas/src/index.ts:205`). Probed at HEAD through the real schema:
 > `{type:"extra-damage", formula:"1d6", damageType:""}` → `String must contain at least 1
 > character(s)`; with the key absent → `Required`.
-> Meanwhile `RiderEditor.tsx:421`–`:427` documents the empty box as *"a real authored answer here and
+> Meanwhile `RiderEditor.tsx:422`–`:427` documents the empty box as *"a real authored answer here and
 > not a blank … an absent type means 'the same type this weapon already deals'"*, and
-> `blankModifier("extra-damage")` (`:319`) seeds exactly `damageType: ""`.
+> `blankModifier("extra-damage")` (`:320`) seeds exactly `damageType: ""`.
 > **Consequence:** every extra-damage row the editor mints is unpublishable until the GM types a
-> type, `apps/client/src/homebrew/validate.ts` has **no** message for it (grep: only the spell and
-> weapon damage-type messages exist), and what the GM meets is a raw server Zod refusal — the exact
-> *"a form that produces a record the store rejects"* failure the editor exists to avoid.
+> type, `apps/client/src/homebrew/validate.ts` has **no** message for it (grep at HEAD: only the
+> spell message at `:421` and the weapon one at `:449`–`:450` exist), and what the GM meets is a raw
+> server Zod refusal — the exact *"a form that produces a record the store rejects"* failure the
+> editor exists to avoid.
 > So U23 is a **schema** change (optional `damageType`, or an explicit sentinel) plus the control,
 > plus the validate message, plus the content. **M, not S.**
 
@@ -390,19 +415,21 @@ put them two waves apart.
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing.** `RiderContext.spellSchool` and `.spellLevel` (`packages/rules-5e/src/riders.ts:142`–`:143`) are evaluated by `passes` (`:202`–`:205`) and **set by nothing**. Grep across `apps/server/src` and `packages/rules-5e/src` finds only the two declarations and the two reads. `riderFilters` (`apps/server/src/action-resolution.ts:809`) sets `sourceItemId`, `damageTypes` and `spellId` — never school or level. **Both filters fail closed 100% of the time.** |
+| **reader** | **missing.** `RiderContext.spellSchool` and `.spellLevel` (`packages/rules-5e/src/riders.ts:142`–`:143`) are evaluated by `passes` (`:203`, `:205`) and **set by nothing**. Grep across `apps/server/src`, `packages/rules-5e/src` and `packages/domain/src` at HEAD finds only the two declarations and the two reads. `riderFilters` (`apps/server/src/action-resolution.ts:810`) sets `sourceItemId`, `damageTypes` and `spellId` — never school or level. **Both filters fail closed 100% of the time.** |
 | **content** | **0 authors, measured** (`spell-school-is` and `spell-level-is` appear zero times in every bundle). Carrier: **Empowered Evocation — the same record U23 uses.** That is the shared record, confirmed by PLANNER-CONTENT, and it is why these two are merged. |
 | **control** | ships (`RiderEditor.tsx:255` schools; `:256` levels, with its own number `read`/`write`). |
 | **test** | both paths end at **a school-gated rider that fires on an Evocation and not on an Abjuration**. |
 
-`action-resolution.ts:800` already sets `spellId` from the action on both branches; the school and
-level are one catalog lookup from there.
+`action-resolution.ts:800` already builds `spellFilter` from `action.spellId` and both branches of
+`riderFilters` (`:810`, `:821`) spread it; the school and level are one catalog lookup from there.
 
-**Do NOT scope U30 onto `evoker.evocation-savant`.** Verified at HEAD: it already carries a `choice`,
-so it is a **second overlay collision** of the same shape as U17's, and PLANNER-CONTENT has an open
-recommendation (a `clears` verb on `FeatureMechanics`) that has not been ruled. `empowered-evocation`
-carries no rider keys at all, so scoping both halves onto it is clean and needs no ruling. If a second
-carrier is genuinely wanted, take it from C7's item lanes instead.
+**Do NOT scope U30 onto `evoker.evocation-savant`.** Re-verified at HEAD: it already carries a
+`choice`, so it is a **second overlay collision** of the same shape as U17's. The client ruled that
+collision on 2026-08-10 — adopt a `clears` verb on `FeatureMechanics` (`decision-log.md:56`–`:58`) —
+but the verb is **not implemented** (grep in `overlay.ts` at HEAD: zero hits) and building it is the
+content program's, not this unit's. `empowered-evocation` carries no rider key at all, so scoping
+both halves onto it is clean and waits for nothing. If a second carrier is genuinely wanted, take it
+from C7's item lanes instead.
 
 **Far-end proof (both halves, one body).** Empowered Evocation adds the Wizard's Intelligence modifier
 to an Evocation's damage, **typed as whatever that spell deals** — Fire for Fireball, Lightning for
@@ -424,14 +451,15 @@ the rider fires on the Abjuration too; assert on the **damage total** of the Abj
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing, and precisely.** `usesOf` (`apps/server/src/equipment-derivation.ts:828`) has exactly two call sites — an action's own uses (`:898`) and a cast's own uses (`:935`). The equipped loop (`:607`–`:632`) reads `modifiers`, `grants`, `effects`, `actions`, `casts` and `grantsFeatIds` and **never `record.uses`**. `weaponAction` (`:994`–`:1016`) builds its `ActorAction` with **no `uses` key at all**. |
+| **reader** | **missing, and precisely.** `usesOf` (`apps/server/src/equipment-derivation.ts:828`) has exactly two call sites — an action's own uses (`:898`) and a cast's own uses (`:935`). The carrier loop over `active` (`:607`–`:632`) reads `modifiers`, `grants`, `effects`, `actions`, `casts` and `grantsFeatIds` and **never `record.uses`**. `weaponAction` (`:994`–`:1016`) builds its `ActorAction` with **no `uses` key at all**. |
 | **content** | 0 — the client's mace, 1/short rest. |
 | **control** | ships. |
 | **test** | four far ends — a rolled number, a spent counter, a refusal naming `1/short rest`, and a re-arm on a short rest. |
 
-**Cheaper than the old plan sized it, and the reason is still true at HEAD:** the equipped loop
-already calls `catalog.equipmentRecord(entry.item.id)` at `:643` for the weapon's mastery, so the
-record the fix needs is in hand at the call site.
+**Cheaper than the old plan sized it, and the reason is still true at HEAD:** the carrier loop
+destructures the catalog record at `:608` (`const { item, record } = entry;`) and the separate weapon
+loop over `equipped` re-fetches it at `:650` (`catalog.equipmentRecord(entry.item.id)`, for the
+weapon's mastery). Either way the record the fix needs is already in hand at the call site.
 
 **Watch:** `rests.ts` and `encounter.ts` iterate `effectiveActions`, so a new `uses` re-arms for free
 — but a `per: "recharge"` value now newly reaches the recharge roll.
@@ -448,7 +476,7 @@ authored mace → no refusal, and the counter never appears. *Value:* keep the b
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | three hops, all re-confirmed. (1) `withStandingRiders` (`apps/server/src/effective-actions.ts:44`–`:76`) folds `attack-bonus`, `critical-bonus-dice`, `spell-save-dc`, the uses bonus and extra attacks — and correctly **not** `extra-damage`, which `CARRIER_RIDER_DISPOSITION` (`apps/server/src/character-build.ts:300`) calls `"at-its-moment"`. So `srv.damage` is base-only. (2) `apps/client/src/encounter/CharacterSheet.tsx:803` rolls `rollFlat(part.formula)` with no riders, and `structuredAttacks` (`:228`) is false unless a fight is live **and** it is that player's turn. (3) `addFromCatalog` (`:548`). |
+| **reader** | three hops, all re-confirmed. (1) `withStandingRiders` (`apps/server/src/effective-actions.ts:44`–`:73`) folds `attack-bonus`, `critical-bonus-dice`, `spell-save-dc`, the uses bonus and extra attacks — and correctly **not** `extra-damage`, which `CARRIER_RIDER_DISPOSITION` (`apps/server/src/character-build.ts:300`) calls `"at-its-moment"`. So `srv.damage` is base-only. (2) `apps/client/src/encounter/CharacterSheet.tsx:805` rolls `rollFlat(part.formula)` with no riders, and `structuredAttacks` (`:228`) is false unless a fight is live **and** it is that player's turn. (3) `addFromCatalog` (`:548`). |
 | **content** | 0 — the client's mace, +1d6 lightning. |
 | **control** | ships. |
 | **test** | the sheet shows both damage lines **before** the roll, and one resolution produces both bludgeoning and `{1d6, lightning, total}`. |
@@ -479,9 +507,11 @@ entry's **total** is wrong; assert on the number.
 inventory holds a rider-bearing homebrew item and assert the payload contains **no** rider text and
 **no** `extraDamage` key on any inventory row.
 
-**Also in the same commit:** `docs/ai-ledger/current-state.md:54` overstates *"Every field the item
-editor offers reaches the fight."* That file is parent-only and at its 150-line ceiling — hand the
-corrected sentence to the parent rather than editing it.
+**No ledger correction is owed any more.** An earlier draft asked U25 to hand the parent a fix for
+*"Every field the item editor offers reaches the fight"* in `current-state.md`. That sentence was
+deleted by `1263e34` and **does not exist at HEAD** (grep: zero hits in the file). The surviving D21
+paragraph (`docs/ai-ledger/current-state.md:57`) claims only that the vocabulary is under a guard,
+which is true. Leave it alone.
 
 **375px:** yes — a second damage line on the sheet's weapon row.
 
@@ -491,9 +521,9 @@ corrected sentence to the parent rather than editing it.
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing, and the repo says so in writing.** Collected into `derivation.spellAttackBonus` at `apps/server/src/equipment-derivation.ts:682`; grep finds **no consumer**. `CARRIER_RIDER_DISPOSITION` (`apps/server/src/character-build.ts:302`) reads `"unread"` with the comment *"reaches derivation.spellAttackBonus; no spell-attack path reads it yet."* Its sibling `spell-save-dc` **is** folded, at `apps/server/src/effective-actions.ts:73`. |
+| **reader** | **missing, and the repo says so in writing.** Collected into `derivation.spellAttackBonus` at `apps/server/src/equipment-derivation.ts:682`; grep at HEAD finds **no consumer** (the only other `spellAttackBonus` hits are the unrelated pure function in `packages/rules-5e/src/character.ts:55`). `CARRIER_RIDER_DISPOSITION` (`apps/server/src/character-build.ts:302`) reads `"unread"` with the comment *"reaches derivation.spellAttackBonus; no spell-attack path reads it yet."* Its sibling `spell-save-dc` **is** folded — summed at `apps/server/src/effective-actions.ts:51` and applied to `action.save.dc` at `:70`. |
 | **content** | **0 authors, measured.** Carriers: **5 items from C7** (a Wand of the War Mage is literally this rider and nothing else). |
-| **control** | ships (`RiderEditor.tsx:288` type, `:409` amount, `:432` `classId`). |
+| **control** | ships (`RiderEditor.tsx:290` type, `:407` amount, `:432` `classId`). |
 | **test** | both paths end at **a spell attack roll that moved**. |
 
 **Coupling that decides its schedule:** folding this needs *"is this action a spell attack"*, which is
@@ -511,9 +541,9 @@ bonus is not applied and the far-end assertion fails on the **to-hit**.
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing, and there is no advantage machinery on the check path at all.** The only rolled ability checks are `BUILTIN_CHECKS` (Hide / Influence / Search / Study) and `escape-grapple`, both at `apps/server/src/action-resolution.ts:735`–`:790`, and both roll `resolveDice(parseDiceFormula("1d20 ± N"))` — a bare d20, no `aggregateRollMode`, no sources list. `checkRiderBonus` (`apps/server/src/equipment-derivation.ts:778`) collects at `on-ability-check` and sums **only** `check-bonus`; it feeds the sheet's display rows (`apps/server/src/actor-derived.ts:65`, `:91`, `:94`), not a roll. |
-| **content** | **exactly 1 author, measured — and it is effect-side.** Barbarian's Rage, at bundle path `features(barbarian) → actions(rage) → grants(rage) → modifiers[1]`: `{type:"roll-mode", roll:"check", mode:"advantage", when:[{on-ability-check},{ability-is:["str"]}]}`. |
-| **control** | ships (`ROLL_MODE_ROLLS` at `RiderEditor.tsx:346` offers `check`). |
+| **reader** | **missing, and there is no advantage machinery on the check path at all.** The only rolled ability checks are `BUILTIN_CHECKS` (declared at `apps/server/src/action-resolution.ts:138`, run at `:736`) and `escape-grapple` (`:776`–`:791`), and both roll `resolveDice(parseDiceFormula("1d20 ± N"))` — a bare d20, no `aggregateRollMode`, no sources list. `checkRiderBonus` (`apps/server/src/equipment-derivation.ts:778`) collects at `on-ability-check` and sums **only** `check-bonus`; it feeds the sheet's display rows (`apps/server/src/actor-derived.ts:65`, `:91`, `:94`), not a roll. |
+| **content** | **exactly 1 author, measured — and it is effect-side.** Barbarian's Rage, at bundle path `features(barbarian) → actions(rage) → grants(rage) → modifiers[1]`: `{type:"roll-mode", roll:"check", mode:"advantage", when:[{on-ability-check},{ability-is:["str"]}]}`. Re-read out of `classes.v1.json` at HEAD, index and all. |
+| **control** | ships (`ROLL_MODE_ROLLS` at `RiderEditor.tsx:358` offers `check`, at `:360`). |
 | **test** | both paths end at **an ability check rolled with advantage**. |
 
 **Depends on E0** — the one SRD author carries a `when` on an **effect**, and the effect-side
@@ -535,19 +565,23 @@ option list. *Value:* keep it and change the authored `ability-is` to `dex` → 
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing.** `apps/server/src/character-build.ts:1612` reads `interpreted.unarmoredDefense.ability` and nothing else; `allowShield` is stored and dropped. |
+| **reader** | **missing.** `allowShield` is stored at `apps/server/src/character-build.ts:572` and dropped: `:1617` reads `interpreted.unarmoredDefense.ability` and nothing else. |
 | **content** | **2 authors, measured, and they are the contrast the test needs** — Barbarian `{ability:"con", allowShield:true}` and Monk `{ability:"wis", allowShield:false}`, both in `classes.v1.json`. A third, Draconic Sorcery's `draconic-resilience` `{ability:"cha"}` in `subclasses.v1.json`, takes the default. |
 | **control** | ships, **with its own honesty note** — `RiderEditor.tsx:419` carries `note: "Not read yet."`. **U28 deletes that note in the same commit.** |
 | **test** | both paths end at **an AC that differs with a shield**, and differs the right way for each class. |
 
-> **The unowned live bug this unit absorbs, measured.**
+> **The live bug this unit absorbs — measured, reproduced, and now logged**
+> (`docs/ai-ledger/known-bugs.md:24`–`:28`, owner "engine program **U28**", so it is no longer
+> unowned).
 > `armorClassFromEquipment` (`packages/rules-5e/src/character.ts:76`–`:84`) returns `null` only when
-> there is neither body armour nor a shield: `if (!equippedArmor && shieldBonus === 0) return null;`.
-> With a **shield alone** it returns `10 + dex + shield`.
-> `apps/server/src/character-build.ts:1619` is `(equipmentAc ?? unarmoredAc ?? 10 + dexModifier)`, so
+> there is neither body armour nor a shield: `if (!equippedArmor && shieldBonus === 0) return null;`
+> (`:80`). With a **shield alone** it returns `10 + dex + shield` (`:82`–`:83`).
+> `apps/server/src/character-build.ts:1624` is `(equipmentAc ?? unarmoredAc ?? 10 + dexModifier)`, so
 > equipment AC **short-circuits unarmoured defence entirely**.
-> A Barbarian who picks up a shield therefore *loses their Constitution bonus* — strictly worse than
-> going without it. The Monk case happens to come out right, which is why nobody noticed.
+> Reproduced at HEAD against the real function, Barbarian CON 16 / DEX 14: `armorClassFromEquipment`
+> returns `null` bare-handed (so AC = the unarmoured 15) and `14` holding one shield — **AC 15 → 14.
+> Picking up a shield makes the character strictly worse.** The Monk case happens to come out right,
+> which is why nobody noticed.
 
 **Far-end proof.** Four numbers in one test: Barbarian without shield, Barbarian with shield
 (+2 **on top of** CON), Monk without shield, Monk with shield (unarmoured defence correctly lost).
@@ -566,8 +600,8 @@ assertion fails on the **AC**.
 | part | at HEAD |
 | --- | --- |
 | **reader** | **missing.** `attackKindsOf` (`apps/server/src/action-resolution.ts:512`–`:528`) emits `melee`, `ranged`, `thrown`, `unarmed`, `reaction`. `AttackKind` (`packages/rules-5e/src/riders.ts:20`) already declares `"spell"`. An action with a `spellId` is a spell attack. |
-| **content** | **1 author of `attack-kind-is`, measured, and it is `["melee","unarmed"]`** (`classes.v1.json`). **Zero** `"spell"` authors. Carriers: **7 items from C7.** |
-| **control** | ships (`RiderEditor.tsx:257`, the `kinds` multiselect, offers `Spell`). |
+| **content** | **1 author of `attack-kind-is`, measured, and it is `["melee","unarmed"]`** (`classes.v1.json`). **Zero** `"spell"` authors. Carriers: **7 items from C7** — plus Innate Sorcery, which is already an authored effect and only needs the rider (see below). |
+| **control** | ships (`RiderEditor.tsx:248`, the `kinds` multiselect, offers `Spell`). |
 | **test** | both paths end at **a rider gated on `["spell"]` that fires on a cantrip attack and not on a weapon swing**. |
 
 **The E0 dependency, stated precisely.** With PLANNER-CONTENT's **item** carriers it is soft, not
@@ -578,9 +612,17 @@ Sorcerer spells you cast"*) is the obvious one, and under the E0 bug its rider w
 weapon swing too, so the *"and not on a weapon swing"* half would pass for the wrong reason.
 E0 is scheduled ahead of U29 in the same lane regardless: it is the same file, the same agent, and S.
 
+**The Innate Sorcery carrier is CHEAPER than "the content program supplies it" — measured.** The
+record is already authored: `class-mechanics/sorcerer.ts:75`–`:88` ships `"innate-sorcery"` with a
+bonus-action, a 2/long-rest `uses` block and a ten-round `grants` effect tagged `innate-sorcery` —
+and **no `modifiers` array**, because `:61`–`:73` declines to author one and names E0 and U29 as the
+two reasons. So U29's content half is *one array added to a shipped overlay entry that Ranger-style
+generation already merges cleanly*, plus deleting the two bullets that are no longer true. It is not
+a new record and it does not wait on C7.
+
 **A second thing to decide inside the unit, measured.** `attackKinds` is built **only** inside
-`if (action.attack && targets.length === 1)` (`action-resolution.ts:811`–`:819`); the outer
-`riderFilters` (`:809`) carries `sourceItemId`, `damageTypes` and `spellId` only. So
+`if (action.attack && targets.length === 1)` (`action-resolution.ts:811`–`:822`); the outer
+`riderFilters` (`:810`) carries `sourceItemId`, `damageTypes` and `spellId` only. So
 `attack-kind-is` fails closed on the standing pass and on every save-only action. U4 widened
 `damageTypes` out of that branch for exactly this reason and the same argument may apply here —
 **decide it in the unit, in writing, and pin whichever way you go.**
@@ -608,15 +650,15 @@ and the far-end assertion fails on the **die**.
 | --- | --- |
 | **reader** | **ships** (above). |
 | **content** | **0 authors, measured** — `damage-reduction` and `on-taking-damage` appear zero times in every bundle. Carriers: **Gloves of Missile Snaring** and **Ring of Warmth** (items, from C7). |
-| **control** | ships — `damage-reduction` in `MODIFIER_TYPES` (`RiderEditor.tsx:284`), its amount row (`:415`), `on-taking-damage` in `TRIGGER_TYPES` (`:117`). |
+| **control** | ships — `damage-reduction` in `MODIFIER_TYPES` (`RiderEditor.tsx:285`), its amount row (`:413`), `on-taking-damage` in `TRIGGER_TYPES` (`:118`). |
 | **test** | both paths end at **a hit that lands for less**, with the flat step named separately in the narration. |
 
 So U31 is **content + a both-paths test + a stale-claim sweep**, and the sweep is the second half:
 the audit rows above, and `RiderEditor.tsx`'s implicit promise. **S.**
 
 **Far-end proof.** The damage narration
-(`hit-points.ts:110`–`:115`) appends `then -N, reduction` **after** the resistance step, per total,
-floored at 0. Assert on that string and on the resulting HP.
+(`damageAdjustmentDetail`, `hit-points.ts:109`–`:116`) appends `then -N, reduction` at `:114`,
+**after** the resistance step, per total, floored at 0. Assert on that string and on the resulting HP.
 
 **Non-vacuity.** *Control:* remove `damage-reduction` from `MODIFIER_TYPES` → the mirror file fails at
 `hasControl`. *Value:* keep it and gate the rider on a damage type the hit does not deal → the
@@ -630,9 +672,9 @@ reduction does not apply and the far-end assertion fails on the **HP**.
 
 | part | at HEAD |
 | --- | --- |
-| **reader** | **missing.** `rollDeathSave` (`apps/server/src/death-saves.ts:36`–`:61`) reads only `options.rollMode`, the caller's chosen mode; the module imports no `collectRiders` and reads no effect modifiers. |
+| **reader** | **missing.** `rollDeathSave` (`apps/server/src/death-saves.ts:37`–`:64`) reads only `options.rollMode`, the caller's chosen mode; the module imports no `collectRiders` and reads no effect modifiers. |
 | **content** | **0 authors, measured.** Carriers: **Periapt of Wound Closure** and the **Mysterious Deck** (items, from C7). |
-| **control** | ships — `on-death-save` (`RiderEditor.tsx:115`) and `death-save` in `ROLL_MODE_ROLLS` (`:346`). |
+| **control** | ships — `on-death-save` (`RiderEditor.tsx:117`) and `death-save` in `ROLL_MODE_ROLLS` (`:358`, the entry at `:360`). |
 | **test** | both paths end at **a death save rolled `2d20kh1`**. |
 
 One new call site closes both, and death saves are exactly where a magic item wants to help. **Shares
@@ -656,7 +698,7 @@ the **formula**.
   loudly. Silent data loss.
 - **removing `featureRiders.tags` from the wire** — **44 authors, measured** (`classes.v1.json` 23,
   `feats.v1.json` 16, `subclasses.v1.json` 5), and it crosses as `ContentFeatureSummary.tags`
-  (`packages/domain/src/index.ts:839`). A player-readable contract.
+  (`packages/domain/src/index.ts:846`). A player-readable contract.
 
 > **The mechanism U33 needs does not exist, and this is why it is M rather than S.**
 > `SelectOption` (`apps/client/src/homebrew/schema.ts:47`) is
@@ -676,13 +718,14 @@ the **formula**.
 | `versus-creature-type` — *"Not checked yet…"* (`:259`) | **Keep.** Closing it means promoting creature type to a first-class `ActorDefinition` field; it lives only in the `open5e.srd-2024` extension bag. |
 
 **Two new option-level notes:** `roll-mode: concentration` (the concentration save is minted as a
-plain CON save at `apps/server/src/hit-points.ts:175`) and the `on-spell-cast` moment (no spell-cast
+plain CON save inside `applyDamage` at `apps/server/src/hit-points.ts:282`–`:298`, `ability: "con"` at
+`:297`, and no rider is collected anywhere on that path) and the `on-spell-cast` moment (no spell-cast
 pipeline collects riders; `spell-id-is` fires from the action path instead).
 
 **One FALSE claim to fix, and fixing it makes the form more useful, not less.**
-`effectsField`'s tag row says *"The sheet groups effects by these"* (`RiderEditor.tsx:900`). Measured,
+`effectsField`'s tag row says *"The sheet groups effects by these"* (`RiderEditor.tsx:907`). Measured,
 effect tags are a **real mechanical gate**: the `while-effect-tag` trigger
-(`packages/rules-5e/src/riders.ts:181`), `requiresEffectTag` on an action
+(`packages/rules-5e/src/riders.ts:182`), `requiresEffectTag` on an action
 (`apps/server/src/action-resolution.ts:230`, `apps/client/src/encounter/ActionRunner.tsx:51`),
 `endsWithTag` cascades (`apps/server/src/effects.ts:123`), plus `dashing`
 (`apps/server/src/condition-rules.ts:48`), `disengaged` (`apps/server/src/movement-rules.ts:89`),
@@ -751,21 +794,23 @@ Measured at HEAD. Each is a merge conflict or silent data loss waiting to happen
 | `vocabulary-parity.mirror.test.ts` census array | **2** — U17, U21a | see below. |
 
 **The census array is narrower than the brief assumed — measured.** At HEAD it holds **three**
-rows (`vocabulary-parity.mirror.test.ts:3415`–`:3418`): `weapon.mastery` (U38, the mastery program's),
-`multiattack` (U21a) and `widensPicks` (U17). U21a's and U17's rows are **adjacent lines**, so those
-two units must not run in the same batch. Nothing else in this program touches it.
+rows (`vocabulary-parity.mirror.test.ts:3415`–`:3417`, inside the `owed` literal opened at `:3413`):
+`weapon.mastery` (U38, the mastery program's), `multiattack` (U21a, `:3416`) and `widensPicks`
+(U17, `:3417`). U21a's and U17's rows are **adjacent lines**, so those two units must not run in the
+same batch. Nothing else in this program touches it.
 
 > **The finding that makes concurrency possible at all.**
-> `apps/client/vitest.config.ts`'s node project declares `include: ["src/**/*.mirror.test.ts"]` —
-> a **glob**, not a file list. Three mirror files already exist in three different directories
-> (`server-offers.mirror.test.ts`, `vocabulary-parity.mirror.test.ts`,
-> `launch-refusal.mirror.test.ts`). **So every unit writes its both-paths test in its OWN
-> `*.mirror.test.ts` file**, beside `authoring-harness.ts` in `apps/client/src/homebrew/`, importing
-> the harness and the server modules the way the precedent does. The 3423-line
-> `vocabulary-parity.mirror.test.ts` stops being a serialization point for anything except its census
-> array and its final guard block.
-> **Measured at HEAD:** the whole node project is **3 files / 199 tests, green, in 2.7 s** — which is
-> also the fastest inner loop in this program.
+> `apps/client/vitest.config.ts:37`'s node project declares `include: ["src/**/*.mirror.test.ts"]` —
+> a **glob**, not a file list. **Four** mirror files already exist in **four** different directories
+> (`builder/server-offers.mirror.test.ts`, `homebrew/vocabulary-parity.mirror.test.ts`,
+> `replay/launch-refusal.mirror.test.ts`, and `encounter/catalog-add.mirror.test.ts`, which batch 0
+> added). **So every unit writes its both-paths test in its OWN `*.mirror.test.ts` file**, beside
+> `authoring-harness.ts` in `apps/client/src/homebrew/`, importing the harness and the server modules
+> the way the precedent does. The 3423-line `vocabulary-parity.mirror.test.ts` stops being a
+> serialization point for anything except its census array and its final guard block.
+> **Re-measured at HEAD** (`npx vitest run --project node`, from `apps/client`): the whole node
+> project is **4 files / 202 tests, green, in 2.6 s** — which is also the fastest inner loop in this
+> program.
 
 **Parent-only, never touched by a unit agent:** `docs/api-reference.md`, `docs/app-map.md`,
 `docs/ai-ledger/current-state.md` (at its 150-line ceiling), `docs/product/vocabulary-parity-audit.md`
@@ -792,13 +837,14 @@ gives the schedule both ways.
 
 | lane | units | files it holds |
 | --- | --- | --- |
-| **A** | **E0 → U29 → U26** | `apps/server/src/action-resolution.ts`, `apps/server/src/effective-actions.ts` |
+| **A** | **E0 → U29 → U26** | `apps/server/src/action-resolution.ts`, `apps/server/src/effective-actions.ts`, `packages/content-srd-5.2.1/scripts/class-mechanics/sorcerer.ts` (U29's carrier edit + the comment that names E0 and U29) |
 | **B** | **U24** | `apps/server/src/equipment-derivation.ts` |
 | **C** | **U28** | `packages/rules-5e/src/character.ts`, `apps/server/src/character-build.ts`, the `modifiers` region of `RiderEditor.tsx` |
 | **D** | **U32** | `apps/server/src/death-saves.ts` |
 
 Disjoint. A owns both `action-resolution.ts` and `effective-actions.ts`, which is why U25 cannot be
-here. Each lane also creates its own new `*.mirror.test.ts`.
+here; its `sorcerer.ts` edit collides with no other lane in this batch (U31's class-mechanics carrier
+is E2, a batch later). Each lane also creates its own new `*.mirror.test.ts`.
 
 ### Batch E2
 
@@ -829,7 +875,7 @@ to one control lane. That is the whole of D-ENGINE-2.
 | lane | units | files it holds |
 | --- | --- | --- |
 | **A** | **U21b → U18** | `apps/server/src/action-resolution.ts`, `packages/content-srd-5.2.1/scripts/class-mechanics/monk.ts`, `apps/server/src/condition-rules.ts`, `packages/schemas/src/index.ts`, the `effects` region of `RiderEditor.tsx` |
-| **B** | **U17** — *only if D-ENGINE-1 has been ruled* | `apps/server/src/character-build.ts`, `apps/client/src/homebrew/FeatureEditor.tsx`, `packages/content-srd-5.2.1/scripts/build-class-bundle.ts`, `packages/content-srd-5.2.1/scripts/class-mechanics/bard.ts`, `packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts`, `packages/content-srd-5.2.1/src/character-content.ts`, the census array in `vocabulary-parity.mirror.test.ts`, `apps/server/test/cleric-druid-bard-mechanics.test.ts` |
+| **B** | **U17** — *D-ENGINE-1 ruled 2026-08-10; no longer conditional* | `apps/server/src/character-build.ts`, `apps/client/src/homebrew/FeatureEditor.tsx`, `packages/content-srd-5.2.1/scripts/build-class-bundle.ts`, `packages/content-srd-5.2.1/scripts/class-mechanics/bard.ts`, `packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts`, `packages/content-srd-5.2.1/src/character-content.ts`, the census array in `vocabulary-parity.mirror.test.ts`, `apps/server/test/cleric-druid-bard-mechanics.test.ts` |
 | **C** | mobile + QA back-fill over E3 | as above |
 | **D** | spare — content support, or U17's content half if B is blocked | |
 
@@ -863,21 +909,28 @@ five plus a closer. No code risk either way; the cost is calendar.
 
 ## 7. Decisions this program needs
 
-### D-ENGINE-1 — how Bard's Magical Secrets gets `widensPicks` · **blocks U17**
+### D-ENGINE-1 — how Bard's Magical Secrets gets `widensPicks` · **RULED 2026-08-10 · option 1**
 
-**The collision, measured.** `build-class-bundle.ts:344` authors the mis-wired choice in
-`CONFIG.bard.choices`. `class-mechanics/bard.ts:75`–`:93` declines and names both blockers.
-`applyMechanics` (`class-mechanics/overlay.ts:127`–`:160`) refuses to overwrite a non-absent value and
-pushes an *"already authored on the record"* message that **fails the build**
-(`build-class-bundle.ts:846`–`:851`). Bard is **not** in `HAND_AUTHORED` (`build-class-bundle.ts:33` =
-fighter, wizard, cleric), so for Bard the collision is CONFIG-versus-overlay, not
-bundle-versus-overlay. The "frozen" claim is **documentation only** —
-`docs/product/stage-4-authoring-assignments.md:24` and `:100` — and **no test enforces it**. Stage 4 is
-finished.
+**Settled.** `docs/ai-ledger/decision-log.md:59`–`:61`: *"U17's freeze is lifted: the Stage-4 CONFIG
+freeze was documentation-only and Stage 4 is done. Delete the stale `magical-secrets` row from
+`CONFIG.bard.choices` and author `widensPicks` through the overlay — the engine plan costs the
+alternatives and cites why each loses."* The table below is the costing that ruling points at; it
+stays so the reasoning is auditable, and **U17 is schedulable**.
+
+**The collision, re-measured at HEAD.** `build-class-bundle.ts:344` still authors the mis-wired
+choice `{kind: "spell", choose: 2, fromCatalog: "bard-spells"}` in `CONFIG.bard.choices` — the row to
+delete is still there. `class-mechanics/bard.ts:75`–`:93` declines and names both blockers.
+`applyMechanics` (`class-mechanics/overlay.ts:124`–`:162`) refuses to overwrite a non-absent value and
+pushes an *"already authored on the record - remove it from one of the two homes"* message (`:140`)
+that **fails the build** (`build-class-bundle.ts:855`–`:859`, `process.exit(1)`). Bard is **not** in
+`HAND_AUTHORED` (`build-class-bundle.ts:33` = fighter, wizard, cleric), so for Bard the collision is
+CONFIG-versus-overlay, not bundle-versus-overlay. The "frozen" claim was **documentation only** —
+`docs/product/stage-4-authoring-assignments.md:24` and `:100` — with **no test enforcing it**, which
+is what the ruling turned on.
 
 | option | cost | verdict |
 | --- | --- | --- |
-| **1. Delete the row from `CONFIG.choices`; author `widensPicks` in `bard.ts`.** | one deleted line in `build-class-bundle.ts`; one key added to `FeatureMechanics`' `Pick` union in `overlay.ts`; ~15 lines in `bard.ts`; update `cleric-druid-bard-mechanics.test.ts:153`–`:154`. Schedule so one agent holds `build-class-bundle.ts`. | **RECOMMENDED.** The freeze's only reason was Stage-4 lane contention, which is over. The no-overwrite rule stays intact and un-weakened, and the record ends with **one** home for its mechanics — the overlay's whole thesis. |
+| **1. Delete the row from `CONFIG.choices`; author `widensPicks` in `bard.ts`.** | one deleted line in `build-class-bundle.ts` (`:344`); one key added to `FeatureMechanics`' `Pick` union in `overlay.ts` (`:78`); ~15 lines in `bard.ts`; update `cleric-druid-bard-mechanics.test.ts:153`–`:154`. Schedule so one agent holds `build-class-bundle.ts`. | **RULED — this is the one taken.** The freeze's only reason was Stage-4 lane contention, which is over. The no-overwrite rule stays intact and un-weakened, and the record ends with **one** home for its mechanics — the overlay's whole thesis. |
 | 2. Give the overlay an explicit "replaces" marker so it may overwrite. | changes a build-safety invariant; adds an authoring concept every future author must decide about. | **Reject.** For the three `HAND_AUTHORED` classes the ETL writes the merged record back over its own input, so an overwrite is un-revertable and unreviewable — `overlay.ts` says so in writing. Weakening the rule for Bard weakens it for Cleric, Fighter and Wizard. |
 | 3. Move Bard to `HAND_AUTHORED`. | freezes Bard's **prose**; 242 records stop being derived from the source. | **Reject.** `overlay.ts`'s header argues against exactly this: *"trades a generated artifact for a manual one to gain a place to hang three lines of riders."* |
 | 4. Author `widensPicks` on a homebrew-only carrier; leave Bard mis-wired. | zero build risk. | **Reject.** Violates the harness's test 2 (*"not a lone record"*) and leaves the client's own audit row 55 open. |
@@ -888,25 +941,29 @@ already use (`packages/content-srd-5.2.1/src/character-content.ts`, imported at
 `apps/server/src/character-build.ts:16`). Do not mint a second namespace; `83420fd` already ruled
 against a narrower second list for exactly this reason.
 
-**Record it in `docs/ai-ledger/decision-log.md` before U17 is scheduled.**
+**Already recorded** in `docs/ai-ledger/decision-log.md` (2026-08-10 entry). Nothing further is owed
+before U17 is scheduled.
 
-### D-ENGINE-2 — split `RiderEditor.tsx`? · **shapes every batch**
+### D-ENGINE-2 — split `RiderEditor.tsx`? · **shapes every batch · STILL OPEN**
 
-**Measured:** 1365 lines, 8 of 19 units need a control in it, and it already has clean factory
+**Not in the 2026-08-10 rulings** — grep of `decision-log.md` for `RiderEditor` at HEAD: zero hits.
+It is this program's to take, and it must be taken before batch E3.
+
+**Measured:** 1365 lines at HEAD, 8 of 19 units need a control in it, and it already has clean factory
 boundaries (`whenField`, `modifiersField` + `MODIFIER_TYPES` + `blankModifier`, `usesField` +
 `actionUsesField`, `tagsField`, `actionsField`, `effectsField` + `effectModifiersField` +
 `EFFECT_MODIFIER_TYPES` + `blankEffectModifier`, `GrantsEditor`).
 
 | option | cost | verdict |
 | --- | --- | --- |
-| **A. R2 — split by rider family behind an unchanged barrel.** | S–M, zero behaviour change. `riderFieldsForTest`, `RIDER_FIELDS_FOR_TEST`, `ITEM_RIDERS`, `ALL_RIDERS`, `modifierLabel`, `triggerKindOf`, `slugValidate`, `grantRowsOf`, `grantsFromRows`, `attackReadout` and `riderSummary` all re-export unchanged, so `RecordDetail.tsx`, `validate.ts`, `authoring-harness.ts`, `vocabularies.test.ts`, `uses-mode.test.tsx` and the mirror file need **no** edit. | **RECOMMENDED.** Turns one 8-way bottleneck into a 4-way one (`modifiers`: U19, U20, U23+U30, U28) plus three 1–2-way ones. Precedent: R1 (`4f4815d`) is the same category — a refactor with no vocabulary of its own, taken because *"the five units behind this refactor would each have shipped with the fourth part of the rule structurally unavailable."* |
+| **A. R2 — split by rider family behind an unchanged barrel.** | S–M, zero behaviour change. `riderFieldsForTest`, `RIDER_FIELDS_FOR_TEST`, `ITEM_RIDERS`, `ALL_RIDERS`, `modifierLabel`, `triggerKindOf`, `slugValidate`, `grantRowsOf`, `grantsFromRows`, `attackReadout` and `riderSummary` all re-export unchanged, so `RecordDetail.tsx`, `validate.ts`, `authoring-harness.ts`, `vocabularies.test.ts`, `uses-mode.test.tsx` and the mirror file need **no** edit. | **RECOMMENDED.** Turns one 8-way bottleneck into a 4-way one (`modifiers`: U19, U20, U23+U30, U28) plus three 1–2-way ones. Precedent: R1 (`4f4815d`) is the same category — a refactor with no vocabulary of its own, taken because *"the five units behind this refactor would each have shipped with the fourth part of the rule — a test through BOTH paths — structurally unavailable."* |
 | B. Leave it; one control unit per batch. | eight batches instead of five (§6). | acceptable, slower. |
 | C. Allow same-file, different-region concurrency. | the client ruled against it. | out. |
 
-**The one tax R2 must pay, measured:** `apps/client/src/play-vocabulary.test.ts:102`–`:108` holds a
-`(file, string)` exemption pinned to `apps/client/src/homebrew/RiderEditor.tsx` for *"Kinds of
-creature"*, and that file has a dead-exemption check. Moving `whenField` makes the exemption dead.
-**Update it in the same commit.**
+**The one tax R2 must pay, measured:** `apps/client/src/play-vocabulary.test.ts:103`–`:109` (the
+first entry of the `ALLOWED` array opened at `:102`) holds a `(file, string)` exemption pinned to
+`apps/client/src/homebrew/RiderEditor.tsx` for *"Kinds of creature"*, and that file has a
+dead-exemption check. Moving `whenField` makes the exemption dead. **Update it in the same commit.**
 
 ---
 
@@ -922,9 +979,10 @@ Unchanged, non-negotiable, and applied per unit in §2.
 3. **A 375px touch pass** for anything with UI. Chromium is pre-installed at `/opt/pw-browsers`;
    **never run `playwright install`**.
 
-**Measured baselines to diff against.** The node (mirror) project: **3 files / 199 tests / 2.7 s**,
-green at HEAD. `vocabularies.test.ts` + `publish-paths.test.ts` under the dom project: **2 files /
-26 tests / 3.5 s**, green at HEAD.
+**Measured baselines to diff against, re-run at HEAD `36b5a1f`.** The node (mirror) project
+(`npx vitest run --project node`): **4 files / 202 tests / 2.6 s**, green.
+`vocabularies.test.ts` + `publish-paths.test.ts` under the dom project: **2 files / 26 tests /
+2.2 s**, green. Both from `apps/client`.
 
 **Operational traps that have each cost an agent real time.** `npm run build` emits compiled output
 under the server workspace and `npm run test` then collects those compiled tests too (185 → 204 files,
@@ -944,14 +1002,16 @@ Every row was re-checked at HEAD; these are the ones where the answer differs.
 | U30 is a **content** unit | the brief's table · `vocabulary-parity-audit.md:480` | **Reader missing too.** `RiderContext.spellSchool` / `.spellLevel` (`packages/rules-5e/src/riders.ts:142`–`:143`) are set by **nothing**; both filters fail closed 100%. |
 | U21's reader has *"1"* author that can exercise it | `remaining-program-plan.md` §2.13 | **Zero.** All 126 `multiattack` authors are `activation: "action"`; no SRD record anywhere authors a bonus action with a component pool. Flurry of Blows is prose. The unit splits. |
 | `unarmored-defense.allowShield` has **1** SRD author | `vocabulary-parity-audit.md:200` | **2**, and the pair is what makes the test non-vacuous: Barbarian `allowShield: true`, Monk `allowShield: false`. |
-| an empty damage type means *"the same type this weapon already deals"* | `apps/client/src/homebrew/RiderEditor.tsx:421`–`:427` | **False.** `damageType` is `z.string().min(1)`, **required** (`packages/schemas/src/index.ts:205`). Probed: `""` → *"String must contain at least 1 character(s)"*; absent → *"Required"*. So `action-resolution.ts:983`'s `?? damage[0]?.type` fallback is **unreachable**, and `blankModifier` seeds an unpublishable row with no client-side message. |
+| an empty damage type means *"the same type this weapon already deals"* | `apps/client/src/homebrew/RiderEditor.tsx:422`–`:427` | **False.** `damageType` is `DamageTypeIdSchema` — `z.string().min(1).max(40)` at `packages/schemas/src/index.ts:7` — and **required** (`:205`). Re-probed at HEAD: `""` → *"String must contain at least 1 character(s)"*; absent → *"Required"*. So `action-resolution.ts:983`'s `?? damage[0]?.type` fallback is **unreachable**, and `blankModifier` (`:320`) seeds an unpublishable row with no client-side message. |
 | U18's control is *"one row in U6's `modifiersField` nest"* | `area-2-plan.md` §U18 | Wrong nest — U6 built a **separate** `effectModifiersField` over a 4-entry list, because `FeatureModifierSchema` is **21** variants and `EffectModifierSchema` is **12** (both probed). Confirmed the governing plan's correction. |
-| U27 is a *"one-line fix"* | `area-2-plan.md` Wave 5 table | There is **no advantage machinery on the check path at all** (`action-resolution.ts:735`–`:790` rolls a bare `1d20`), and the one SRD author is **effect-side** (Rage), so it also depends on E0. **L.** |
-| the census array is a multi-unit conflict zone | the brief | **Three rows** at HEAD (`vocabulary-parity.mirror.test.ts:3415`–`:3418`), two of them mine (U17, U21a) and adjacent. Narrow, and handled by putting them in different batches. |
-| the mirror test file is an unavoidable serialization point | implied by the brief | **It is not.** `apps/client/vitest.config.ts`'s node project includes `src/**/*.mirror.test.ts` as a **glob**; three such files already exist in three directories. Every unit gets its own. |
+| U27 is a *"one-line fix"* | `area-2-plan.md` Wave 5 table | There is **no advantage machinery on the check path at all** (`action-resolution.ts:736`–`:791` rolls a bare `1d20`), and the one SRD author is **effect-side** (Rage), so it also depends on E0. **L.** |
+| the census array is a multi-unit conflict zone | the brief | **Three rows** at HEAD (`vocabulary-parity.mirror.test.ts:3415`–`:3417`), two of them mine (U17, U21a) and adjacent. Narrow, and handled by putting them in different batches. |
+| the mirror test file is an unavoidable serialization point | implied by the brief | **It is not.** `apps/client/vitest.config.ts:37`'s node project includes `src/**/*.mirror.test.ts` as a **glob**; **four** such files already exist in four directories. Every unit gets its own. |
 | `EquipmentDerivation.speed` is a live item channel | nowhere — this is new | Computed at `apps/server/src/equipment-derivation.ts:678` and consumed by **nothing in production**; the only two references are tests asserting it is `0`. The item speed path is as dead as the effect path. |
-| effect-side `roll-mode` is read where it is authored | `apps/server/src/action-resolution.ts:542`'s own comment | **Only** `attackRollSources` reads it, and it ignores the rider's `when`. For `save`, `check`, `initiative`, `death-save` and `concentration` an effect's `roll-mode` is inert everywhere. Hence **E0**. |
-| U33 is a copy sweep | `area-2-plan.md` §U33 | It needs a **mechanism** first: `SelectOption` (`apps/client/src/homebrew/schema.ts:47`) has no `note`, so an OPTION cannot be labelled at all today. And `effectsField`'s *"The sheet groups effects by these"* (`RiderEditor.tsx:900`) **understates** a live gate rather than overstating a dead one. |
+| effect-side `roll-mode` is read where it is authored | `apps/server/src/action-resolution.ts:542`'s own comment | **Only** `attackRollSources` (`:533`) reads it, and it ignores the rider's `when`. `toRollModes` has exactly two call sites in `apps/server/src`, both inside it (`:547`, `:555`). For `save`, `check`, `initiative`, `death-save` and `concentration` an effect's `roll-mode` is inert everywhere. Hence **E0**. |
+| U33 is a copy sweep | `area-2-plan.md` §U33 | It needs a **mechanism** first: `SelectOption` (`apps/client/src/homebrew/schema.ts:47`) has no `note`, so an OPTION cannot be labelled at all today. And `effectsField`'s *"The sheet groups effects by these"* (`RiderEditor.tsx:907`) **understates** a live gate rather than overstating a dead one. |
+| U25 must hand the parent a fix for `current-state.md:54` | this plan's own earlier draft · `area-2-plan.md:520`–`:521`, `:763` | **Gone.** *"Every field the item editor offers reaches the fight"* was deleted from `current-state.md` by `1263e34`; grep at HEAD finds it nowhere in that file. U25 owes the ledger nothing. |
+| U29's and E0's blockers are undocumented in the content lane | nowhere — this is new | `class-mechanics/sorcerer.ts:61`–`:73` names **both** in writing (`toRollModes` "DROPS the `when` list"; `attackKindsOf` "never announces `"spell"`, so the filter fails closed") and declines to author Innate Sorcery's advantage because of them. The record itself is already shipped at `:75`–`:88` with no `modifiers`, so U29's content half is an edit, not a new carrier. |
 
 ---
 
@@ -969,12 +1029,13 @@ this program's hottest file (6 units). Measured at HEAD, here is exactly who tou
 
 | M0 region at HEAD | what is there | my units at that site |
 | --- | --- | --- |
-| `:678` — `if (action.attack && targets.length !== 1) throw …` | the one-target guard | **U29, indirectly.** U29 must decide whether `attackKinds` moves out of the `if (action.attack && targets.length === 1)` block at `:811`–`:819` (the way U4 moved `damageTypes`). Relaxing `:678` changes how many targets reach that block, so the two rulings interact. |
+| `:678` — `if (action.attack && targets.length !== 1) throw …` | the one-target guard | **U29, indirectly.** U29 must decide whether `attackKinds` moves out of the `if (action.attack && targets.length === 1)` block at `:811`–`:822` (the way U4 moved `damageTypes`). Relaxing `:678` changes how many targets reach that block, so the two rulings interact. |
 | `:1058`–`:1079` — the mastery on-hit effect application (Sap) | `addEffect` on `targets[0]` after a hit | **U22, directly.** Its natural content — *"advantage on your next attack against a creature you hit"* — applies an effect **on hit**, in this exact region, and `vex` is the mastery that consumes it. |
 
-**Everything else in this program uses a different site**, verified: E0 and U22's collector at
-`:531`–`:559`; U21b at `:255`–`:257`; U27 at `:735`–`:790`; U23+U30 at `:809` and `:965`–`:997`
-(adjacent to the mastery region, not inside it); U29's `attackKindsOf` at `:512`–`:528`.
+**Everything else in this program uses a different site**, re-verified at HEAD: E0 and U22's
+collector `attackRollSources` at `:533`–`:559`; U21b's bonus-action branch at `:254`–`:257`; U27 at
+`:736`–`:791`; U23+U30 at `:810` and the extra-damage rider block at `:963`–`:997` (adjacent to the
+mastery region, not inside it); U29's `attackKindsOf` at `:512`–`:530`.
 **U25 does not touch `action-resolution.ts` at all** — its three hops are `effective-actions.ts`,
 `CharacterSheet.tsx` and `equipment-derivation.ts`.
 
@@ -989,7 +1050,8 @@ this program's hottest file (6 units). Measured at HEAD, here is exactly who tou
   invariant and then let `cleave` inherit the answer than to answer it while the invariant is moving.
   U29 is in **batch E1**, which is already ahead of M0.
 - **Neither program regenerates `IMPLEMENTED_MASTERIES`.** That Set literal
-  (`apps/server/src/equipment-derivation.ts`) belongs to the mastery program alone; U18, U21b and U22
+  (`apps/server/src/equipment-derivation.ts:247`, `new Set(["graze", "sap"])`) belongs to the mastery
+  program alone; U18, U21b and U22
   each remove the *reason* a slug is excluded and say so in their commit message, and the mastery
   program moves the slug.
 
@@ -1042,9 +1104,13 @@ off `loadEquipment()`, so nothing in this program contends with it.
 
 Owned elsewhere; depend on them, do not build them.
 
-- **Prerequisites and content** — the weapons ETL and `mastery`'s ETL home, `properties`, the full SRD
-  magic-item list, Wizard's Spell Mastery, the hand-authored overlay ruling, **and every SRD carrier
-  the zero-author units above need**.
+- **Prerequisites** — **already landed** in batch 0 (`36b5a1f`): the weapons ETL home for `mastery`,
+  `properties` on all four shapes, and the catalog-picker fix. Do **not** regenerate
+  `packages/content-srd-5.2.1/bundles/weapons.v1.json`; that column is settled.
+- **Content** — the full SRD magic-item list, Wizard's Spell Mastery, the `clears` verb the
+  2026-08-10 overlay ruling adopted (`decision-log.md:56`–`:58`; not in `overlay.ts` yet), **and every
+  SRD carrier the zero-author units above need**. U29's Innate Sorcery half is the exception: the
+  record already ships and this program edits it.
 - **The API parity program** — the round-trip parity guard, the ~80 capability gaps, the three API
   defects, and the regeneration of `docs/product/vocabulary-parity-audit.md`.
 - **The mastery program** — U34–U38 plus `vex` and `slow`. This program *unblocks* `slow` (U18),

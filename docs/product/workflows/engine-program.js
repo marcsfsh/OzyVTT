@@ -1,8 +1,12 @@
 /**
  * The engine-and-vocabulary program — U17 through U33, executable form.
  *
+ * Written against HEAD `6278e5a`; re-verified against HEAD `36b5a1f` on
+ * `claude/feature-impl-program-exec-ekmevw` (PR #55 merged, batch 0 landed). The old
+ * `claude/feature-implementations-intake-c5eyu1` branch is gone — do not look for it.
+ *
  * Companion to `docs/product/plan-engine-program.md`, which carries the measurements, the four
- * parts of every unit, the far-end proofs, the two non-vacuity probes and the two open decisions.
+ * parts of every unit, the far-end proofs, the two non-vacuity probes and the decisions.
  * This file carries only the ORDER and the CONCURRENCY, and it is the plan's claim that no two
  * agents in one phase open the same file — every `agent()` below lists the file set it holds.
  *
@@ -23,19 +27,26 @@
  *      it and this program puts eight. THE TWO MUST NEVER BE IN FLIGHT TOGETHER. That covers every
  *      phase below except `e1` lanes A/B/D. R2 is what dissolves the lock, which is why D-ENGINE-2
  *      is a cross-program prerequisite rather than this program's convenience.
- *   2. `apps/client/src/homebrew/schemas.ts` - U21a sits at :863-869, inside the API program's lane
- *      alpha (:813-884, the whole MONSTER_SCHEMA). U33's three notes sit at :312/:326/:393, inside
- *      lane gamma (:302-408). Both of mine SEQUENCE after their lane; neither is worth splitting.
+ *      Re-measured at HEAD: still 1365 lines, still one file, factory boundaries unchanged.
+ *   2. `apps/client/src/homebrew/schemas.ts` - U21a sits at :863-869 (the `actions` section runs
+ *      :862-870 and its withheld-keys comment :865-868), inside the API program's lane alpha
+ *      (:813-884, the whole MONSTER_SCHEMA - re-verified: MONSTER_SCHEMA opens at :813 and closes
+ *      at :884). U33's three notes sit at :312/:326/:393, inside lane gamma (:302-408; SPECIES_SCHEMA
+ *      opens at :302, BACKGROUND_SCHEMA at :374); its fourth, :237, is in CLASS_SCHEMA and outside
+ *      both. All six line numbers re-opened at HEAD and still exact. Both of mine SEQUENCE after
+ *      their lane; neither is worth splitting.
  *   3. `apps/server/src/action-resolution.ts` - the mastery program's M0 seam refactor lands before
- *      U22 (phase e3), and U29 (phase e1) lands before M0 relaxes the one-target guard at :678.
+ *      U22 (phase e3), and U29 (phase e1) lands before M0 relaxes the one-target guard at :678
+ *      (re-verified: `if (action.attack && targets.length !== 1) throw ...` is still exactly there).
  */
 
 export const meta = {
   name: "engine-program",
   description:
     "U17-U33: the engine readers, the SRD vocabulary they read, and the homebrew controls that " +
-    "author it. 19 units in six phases, four agents wide, ordered by three real dependencies and " +
-    "grouped so no two concurrent agents share a file.",
+    "author it. 19 units across six unit phases (plus a rulings phase and R2's solo prep), four " +
+    "agents wide, ordered by three real dependencies and grouped so no two concurrent agents " +
+    "share a file.",
   phases: [
     "decisions",
     "prep-r2",
@@ -51,26 +62,36 @@ export const meta = {
 /* ------------------------------------------------------------------ the two rulings ------ */
 
 phase("decisions", () => {
-  log("Two rulings gate this program. Neither is an implementation unit; both are cheap to take.");
+  log("D-ENGINE-1 is already RULED (decision-log.md:59-61). Only D-ENGINE-2 is still open.");
 
   pipeline(
     agent("decision-d-engine-1", {
-      title: "Rule on Bard's Magical Secrets before U17 is scheduled",
+      title: "D-ENGINE-1 is already ruled - confirm and move on, do not re-litigate",
+      alreadyRuled:
+        "docs/ai-ledger/decision-log.md:59-61, 2026-08-10: 'U17's freeze is lifted: the Stage-4 " +
+        "CONFIG freeze was documentation-only and Stage 4 is done. Delete the stale " +
+        "magical-secrets row from CONFIG.bard.choices and author widensPicks through the overlay.' " +
+        "That is option 1 of the plan's four. This agent is now a VERIFICATION step, not a ruling.",
       reads: [
+        "docs/ai-ledger/decision-log.md",
         "docs/product/plan-engine-program.md#7",
         "packages/content-srd-5.2.1/scripts/build-class-bundle.ts",
         "packages/content-srd-5.2.1/scripts/class-mechanics/bard.ts",
         "packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts"
       ],
-      recommendation:
-        "Option 1 - delete the row from CONFIG.choices and author widensPicks in bard.ts. The " +
-        "Stage-4 freeze on CONFIG is documentation only and no test enforces it; the overlay's " +
-        "no-overwrite rule stays intact; the record ends with one home for its mechanics.",
-      writes: ["docs/ai-ledger/decision-log.md"],
-      blocks: ["U17"]
+      verify:
+        "The row to delete is still at build-class-bundle.ts:344 ({kind:'spell', choose:2, " +
+        "fromCatalog:'bard-spells'} in CONFIG.bard.choices) and bard.magical-secrets still carries " +
+        "a `choice` in classes.v1.json. Both re-confirmed at HEAD 36b5a1f. If either has moved, " +
+        "say so before U17 opens the file.",
+      writes: [],
+      blocks: []
     }),
     agent("decision-d-engine-2", {
-      title: "Rule on splitting RiderEditor.tsx",
+      title: "Rule on splitting RiderEditor.tsx - STILL OPEN, and it is the only one left",
+      stillOpen:
+        "Grep of decision-log.md for 'RiderEditor' at HEAD: zero hits. The 2026-08-10 rulings did " +
+        "not cover it, so it is this program's to take, before phase e3.",
       reads: ["docs/product/plan-engine-program.md#7", "apps/client/src/homebrew/RiderEditor.tsx"],
       recommendation:
         "Option A - R2. Eight of nineteen units need a control in one 1365-line file, and the API " +
@@ -101,9 +122,10 @@ phase("prep-r2", () => {
         "apps/client/src/play-vocabulary.test.ts"
       ],
       note:
-        "play-vocabulary.test.ts:102-108 pins a (file, string) exemption for 'Kinds of creature' " +
-        "to RiderEditor.tsx and that file has a dead-exemption check. Move the exemption with " +
-        "whenField in the same commit or the suite goes red for a reason that reads like drift.",
+        "play-vocabulary.test.ts:103-109 (first entry of the ALLOWED array opened at :102) pins a " +
+        "(file, string) exemption for 'Kinds of creature' to RiderEditor.tsx and that file has a " +
+        "dead-exemption check. Move the exemption with whenField in the same commit or the suite " +
+        "goes red for a reason that reads like drift.",
       unchanged: [
         "riderFieldsForTest", "RIDER_FIELDS_FOR_TEST", "ITEM_RIDERS", "ALL_RIDERS",
         "modifierLabel", "triggerKindOf", "slugValidate", "grantRowsOf", "grantsFromRows",
@@ -128,6 +150,14 @@ phase("e1-cheap-readers", () => {
         size: "S",
         title: "The effect-side roll-mode collector must evaluate the rider's own `when`",
         holds: ["apps/server/src/action-resolution.ts"],
+        theSite:
+          "attackRollSources at :533; the two effect walks at :545-:559 run toRollModes and never " +
+          "look at modifier.when, three lines under a comment (:542) claiming the general roll-mode " +
+          "variant carries its own when. toRollModes has exactly two call sites in apps/server/src " +
+          "(:547, :555), both here - so this is the whole blast radius.",
+        alreadyDocumented:
+          "class-mechanics/sorcerer.ts:61-73 names this bug in writing and declines to author " +
+          "Innate Sorcery's advantage because of it. That comment moves with the fix.",
         farEnd: "A gated effect rider fires on the attack it names and not on the one it does not.",
         probes: {
           control: "n/a - a bug fix. Substitute: remove the authored `when` and both attacks gain it.",
@@ -138,11 +168,20 @@ phase("e1-cheap-readers", () => {
         unit: "U29",
         size: "M",
         title: "`attack-kind-is: \"spell\"` - an action with a spellId is a spell attack",
-        holds: ["apps/server/src/action-resolution.ts"],
-        needsContent: "Innate Sorcery, authored as an effect - the content program supplies it",
+        holds: [
+          "apps/server/src/action-resolution.ts",
+          "packages/content-srd-5.2.1/scripts/class-mechanics/sorcerer.ts"
+        ],
+        needsContent:
+          "NOT a new record. Innate Sorcery already ships at sorcerer.ts:75-88 - a bonus action, " +
+          "2/long-rest uses, a ten-round `grants` effect tagged innate-sorcery - with NO modifiers " +
+          "array, because :61-73 declines to author one and names E0 and U29 as the two reasons. " +
+          "U29 adds the rider to that shipped entry and deletes the two bullets that stop being " +
+          "true. Sorcerer is generated, so the overlay add is clean. It does not wait on C7.",
         decideInUnit:
-          "Whether attackKinds moves out of the single-target branch the way U4 moved damageTypes. " +
-          "Answer it in writing and pin it; the mastery program's cleave will inherit the answer.",
+          "Whether attackKinds moves out of the single-target branch (:811-:822; the outer " +
+          "riderFilters at :810 carries sourceItemId, damageTypes and spellId only) the way U4 " +
+          "moved damageTypes. Answer it in writing and pin it; cleave will inherit the answer.",
         farEnd: "A rider gated on ['spell'] fires on a cantrip attack and not on a weapon swing.",
         probes: {
           control: "Remove Spell from the kinds options; the mirror file fails at the option list.",
@@ -177,8 +216,8 @@ phase("e1-cheap-readers", () => {
           value: "Set limit 99; the refusal never fires. Assert on the message."
         },
         watch:
-          "rests.ts and encounter.ts iterate effectiveActions, so the new uses re-arms for free - " +
-          "but a `per: \"recharge\"` value now newly reaches the recharge roll."
+          "rests.ts:76 and encounter.ts:30/:288 iterate effectiveActions, so the new uses re-arms " +
+          "for free - but a `per: \"recharge\"` value now newly reaches the recharge roll."
       })
     ),
 
@@ -193,10 +232,14 @@ phase("e1-cheap-readers", () => {
           "the modifiers region of apps/client/src/homebrew/RiderEditor.tsx"
         ],
         absorbs:
-          "The unowned live bug: armorClassFromEquipment returns non-null for a shield alone, so " +
-          "equipment AC short-circuits unarmoured defence and a Barbarian who picks up a shield " +
-          "loses their Constitution entirely.",
-        alsoDeletes: "the `note: \"Not read yet.\"` on the allowShield row, in the same commit",
+          "The live bug now logged at known-bugs.md:24-28 with U28 as its owner: " +
+          "armorClassFromEquipment (packages/rules-5e/src/character.ts:76-84) returns non-null for " +
+          "a shield alone (:80, :82-83), so character-build.ts:1624's " +
+          "`equipmentAc ?? unarmoredAc ?? 10 + dex` short-circuits unarmoured defence. Reproduced " +
+          "at HEAD, Barbarian CON 16 / DEX 14: AC 15 bare-handed, AC 14 holding a shield. Picking " +
+          "up a shield makes the character WORSE.",
+        alsoDeletes:
+          "the `note: \"Not read yet.\"` on the allowShield row (RiderEditor.tsx:419), same commit",
         farEnd:
           "Four numbers in one test: Barbarian without shield, Barbarian with shield (+2 on top " +
           "of CON), Monk without shield, Monk with shield (unarmoured defence correctly lost).",
@@ -279,8 +322,9 @@ phase("e2-projection-and-sheet", () => {
           "Serialize a player projection for a character carrying a rider-bearing homebrew item; " +
           "assert the payload contains no rider text and no extraDamage key on any inventory row.",
         handToParent:
-          "docs/ai-ledger/current-state.md:54 overstates 'Every field the item editor offers " +
-          "reaches the fight.' That file is parent-only and at its 150-line ceiling."
+          "NOTHING. An earlier draft owed the parent a fix for current-state.md:54 ('Every field " +
+          "the item editor offers reaches the fight'). That sentence was deleted by 1263e34 and " +
+          "grep finds it nowhere in the file at HEAD. Do not re-add it to hand it back."
       })
     ),
 
@@ -428,12 +472,15 @@ phase("e3-invariant-units", () => {
           "This unit builds that composer.",
         farEnd:
           "Resolve two of three declared claws, then a fourth: the refusal reads 'has no Claw " +
-          "left in this action - remaining: 1x Bite.'",
+          "left in this action - remaining: 1x Bite.' The template is at action-resolution.ts:295 " +
+          "and that dash is a PLAIN HYPHEN; an assertion written with an em dash fails wrongly.",
         probes: {
           control: "Filter the composer out; hasControl('monster','multiattack',['actions']) fails.",
           value: "Point a component at a sibling id that does not exist; the refusal text is wrong."
         },
-        census: "deletes its own row; U17 deletes the adjacent one a phase later, never together",
+        census:
+          "deletes its own row (vocabulary-parity.mirror.test.ts:3416); U17 deletes the adjacent " +
+          "one at :3417 a phase later, never together",
         crossProgram:
           "schemas.ts:863-869 is inside the API program's lane alpha (:813-884, the whole " +
           "MONSTER_SCHEMA). Sequence after alpha; a single insert is cheaper to wait than to merge."
@@ -500,16 +547,20 @@ phase("e4-effects-and-picks", () => {
           "authored-and-inert row this program exists to close.",
         order:
           "base - 5x exhaustion, then + the summed effect modifiers, then floor at 0, then the " +
-          "Speed-0 conditions, then x2 while Dashing. A Dashing slowed creature distinguishes it.",
+          "Speed-0 conditions, then x2 while Dashing. A Dashing slowed creature distinguishes it. " +
+          "At HEAD effectiveSpeedFeet (condition-rules.ts:44-49) EARLY-RETURNS 0 on the Speed-0 " +
+          "conditions at :46, ahead of the exhaustion maths at :47 - so this is a restructure, not " +
+          "an inserted line.",
         constraint:
-          "condition-rules.ts is a dependency-free leaf by its own header. It may read " +
+          "condition-rules.ts is a dependency-free leaf by its own header (:5-6). It may read " +
           "actor.effects; it must NOT import deriveEquipment.",
         alsoMeasured:
-          "EquipmentDerivation.speed is computed and consumed by NOTHING in production - the only " +
-          "two references assert it is 0. Close the item path too, or label it.",
+          "EquipmentDerivation.speed (equipment-derivation.ts:678) is computed and consumed by " +
+          "NOTHING in production - the only two references are feat-riders.test.ts:408 and " +
+          "feature-riders.test.ts:547, each asserting it is 0. Close the item path too, or label it.",
         farEnd:
-          "movement-rules.ts refuses with 'has N ft of movement left'. The number in that message " +
-          "moves when the effect is applied and RETURNS when it ends.",
+          "movement-rules.ts:76 refuses with 'has N ft of movement left'. The number in that " +
+          "message moves when the effect is applied and RETURNS when it ends.",
         probes: {
           control: "Filter speed out of EFFECT_MODIFIER_TYPES; hasControl on the effects nest fails.",
           value: "Author amount 0; the refusal quotes the unchanged budget."
@@ -522,7 +573,7 @@ phase("e4-effects-and-picks", () => {
       agent("u17-widens-picks", {
         unit: "U17",
         size: "L",
-        gatedOn: "decision-d-engine-1",
+        gatedOn: "decision-d-engine-1 - SATISFIED, ruled 2026-08-10 (decision-log.md:59-61)",
         title: "`widensPicks` - a budget whose SOURCE LIST grew, not whose capacity did",
         holds: [
           "apps/server/src/character-build.ts",
@@ -538,7 +589,13 @@ phase("e4-effects-and-picks", () => {
           "widensPicks targets NAMED_PICK_BUDGET_KEYS - the SAME offer-key namespace extraPicks " +
           "and replaces use. Do not mint a second one; 83420fd already ruled against a narrower " +
           "second list for exactly this reason.",
-        alsoWidens: "FeatureMechanics' Pick union in overlay.ts, whichever option D-ENGINE-1 took",
+        alsoWidens:
+          "FeatureMechanics' Pick union in overlay.ts:78 - it is a Partial<Pick<FeatureInput, ...>> " +
+          "over ten named keys and widensPicks is not one of them",
+        theRuledShape:
+          "Delete the row at build-class-bundle.ts:344 from CONFIG.bard.choices and author " +
+          "widensPicks in bard.ts. Also move the pin at cleric-druid-bard-mechanics.test.ts:153-154, " +
+          "which currently records two kind:'spell' picks under featureId:'magical-secrets'.",
         farEnd:
           "A prepared-spell budget whose SOURCE LIST grew - the same count of prepared spells, " +
           "drawn from Bard + Cleric + Druid + Wizard from level 10.",
@@ -582,15 +639,21 @@ phase("e5-spell-filters", () => {
           "apps/client/src/homebrew/vocabularies.test.ts"
         ],
         u23IsBiggerThanItLooks:
-          "The reader's `?? damage[0].type` fallback is UNREACHABLE: ExtraDamageVariantSchema's " +
-          "damageType is z.string().min(1), required. Probed: '' is refused, absent is refused. " +
-          "Meanwhile RiderEditor documents the empty box as meaning 'inherit' and blankModifier " +
-          "seeds exactly that - so every extra-damage row the editor mints is unpublishable, and " +
-          "validate.ts has no message for it. Schema change, control, message, content.",
+          "Logged at known-bugs.md:30-35 with this unit as owner. The reader's `?? damage[0].type` " +
+          "fallback at action-resolution.ts:983 is UNREACHABLE: ExtraDamageVariantSchema.damageType " +
+          "(packages/schemas/src/index.ts:205) is DamageTypeIdSchema - z.string().min(1).max(40) at " +
+          ":7 - and required. Re-probed at HEAD: '' -> 'String must contain at least 1 " +
+          "character(s)', absent -> 'Required'. Meanwhile RiderEditor.tsx:422-427 documents the " +
+          "empty box as meaning 'inherit' and blankModifier (:320) seeds exactly that - so every " +
+          "extra-damage row the editor mints is unpublishable, and validate.ts has no message for " +
+          "it (only the spell one at :421 and the weapon one at :449-450 exist). Schema change, " +
+          "control, message, content.",
         u30NeedsAReader:
-          "RiderContext.spellSchool and .spellLevel are evaluated by `passes` and set by NOTHING. " +
-          "Both filters fail closed 100% of the time. action-resolution already sets spellId on " +
-          "both branches; school and level are one catalog lookup from there.",
+          "RiderContext.spellSchool and .spellLevel (packages/rules-5e/src/riders.ts:142-143) are " +
+          "evaluated by `passes` (:203, :205) and set by NOTHING. Both filters fail closed 100% of " +
+          "the time. action-resolution.ts:800 already builds spellFilter from action.spellId and " +
+          "both riderFilters branches (:810, :821) spread it; school and level are one catalog " +
+          "lookup from there.",
         farEnd:
           "Empowered Evocation adds the Wizard's Intelligence modifier to an Evocation's damage, " +
           "typed as whatever that spell deals - Fire for Fireball, Lightning for Lightning Bolt - " +

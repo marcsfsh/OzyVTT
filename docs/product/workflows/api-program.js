@@ -107,7 +107,7 @@ THE THREE TESTS:
      address, ask hasControl(), assert the uncovered set equals the exemption table EXACTLY in both
      directions. Every exemption row carries a reason and an owner.
   T2 the round trip — boot the REAL router (express + createHomebrewRouter + a real HomebrewStore on
-     a temp dir, listen(0,"127.0.0.1"); lift apps/server/test/homebrew-http.test.ts:34-67 into the
+     a temp dir, listen(0,"127.0.0.1"); lift apps/server/test/homebrew-http.test.ts:35-68 into the
      harness, ONE fixture per file in beforeAll). POST the record -> 201. POST publish -> 200 (this
      runs the real four-tier gate, which is what makes the round trip stronger than a Zod parse).
      GET it back. Rebuild the same record through authored()/authoredRow() and storedBody(). Assert
@@ -115,12 +115,15 @@ THE THREE TESTS:
      and a monster's source.externalId — see normalizeBody, apps/server/src/homebrew-store.ts:791).
   T3 the guard's own non-vacuity — two constructed failures proving T1 and T2 can fail.
 
-THE HARD PART is address canonicalisation, and it is measured: a naive walk yields 162 distinct
-object schemas / 708 declared keys, expanding to 3,806 asked addresses of which a naive lookup calls
-3,341 missing. Almost all noise, from three causes with three rules — see §2.3. Canonicalise by
-PROBING an ordered candidate list, not by a hardcoded table, and make every rewrite VALIDATE: if a
-rewrite produces a container fieldsWithin cannot resolve, THROW. A stale rule must be a red build,
-never a quiet pass.
+THE HARD PART is address canonicalisation. Two numbers are schema-intrinsic and re-measured at HEAD:
+a naive walk yields 162 distinct object schemas carrying 709 declared keys. The expansion into
+addresses runs to thousands and almost all of it is noise, from three causes with three rules — see
+§2.3. DO NOT chase the 3,806 / 3,341 / 1,108 / 223 figures an earlier draft pinned: they are
+properties of the expansion and probe rules the guard itself defines, they were not reproducible on
+re-measurement, and §2.3 now says so. Pin whatever YOUR canonicaliser produces, in the file, the day
+you write it. Canonicalise by PROBING an ordered candidate list, not by a hardcoded table, and make
+every rewrite VALIDATE: if a rewrite produces a container fieldsWithin cannot resolve, THROW. A stale
+rule must be a red build, never a quiet pass.
 
 KNOWN BLIND SPOT, state it in the file rather than leaving it to be found:
 ActorDefinitionSchema.extensions is z.record(z.string(), z.unknown()), so the walker finds NO
@@ -141,7 +144,7 @@ open that follow-on now — its second part does not exist yet. See plan §4.1.
 ALSO: declare express and @types/express in apps/client's devDependencies. Both are hoisted at the
 root today so runtime already resolves, but tsc -b on apps/client needs @types/express visible.
 
-FOLD IN ONE known bug and only one: docs/ai-ledger/known-bugs.md:127-131 records that
+FOLD IN ONE known bug and only one: docs/ai-ledger/known-bugs.md:167-171 records that
 apps/server/test/homebrew-http.test.ts's per-path mount probe is vacuous — it asserts headers that
 come back for ANY path. You are the unit about tests that prove nothing and you mount the real
 router. Fix that probe, cite the ledger line in the commit, and touch nothing else in that file.
@@ -161,7 +164,7 @@ const LANE_MONSTER = pipeline(
     title: "Declare the statblock extension contract",
     size: "S",
     prompt: unit("B0", "Declare the statblock extension contract", `
-statblockFacts (apps/server/src/content-library.ts:314-325) declares exactly two extension-bag keys,
+statblockFacts (apps/server/src/content-library.ts:314-324) declares exactly two extension-bag keys,
 challengeRating and type. Seventeen ship. Declare the full vocabulary once, beside
 STATBLOCK_EXTENSION (content-library.ts:305), and hold it to the bundle with a test that RE-DERIVES
 it from packages/content-srd-5.2.1/bundles/monsters.v1.json — the discipline
@@ -213,8 +216,8 @@ form'; (value) 8 -> 0 and the far-end total moves 15 -> 7.
     title: "A monster's printed header",
     size: "M",
     prompt: unit("B2", "A monster's printed header: senses, passive Perception, languages, alignment", `
-Readers: apps/client/src/encounter/CharacterSheet.tsx:659-661 (senses + passive Perception,
-languages) and :844 (alignment, in the identity line). Authors: senses 252/330, passivePerception
+Readers: apps/client/src/encounter/CharacterSheet.tsx:661-663 (senses + passive Perception,
+languages) and :846 (alignment, in the identity line). Authors: senses 252/330, passivePerception
 330/330, languages 200/330, alignment 330/330. No controls.
 
 RULING ON THE FAR END. The bar allows a rendered string. To reach it from the node mirror project,
@@ -241,7 +244,7 @@ pinned identity line fails.
     prompt: unit("B3", "A monster's movement modes", `
 330 rows carry extensions["open5e.srd-2024"].speeds; 197 carry a non-walk mode (fly 107, swim 63,
 climb 51, burrow 21, hover 16). The reader is CharacterSheet.tsx:443-445 feeding the Speed vital at
-:628. No control.
+:630. No control.
 
 THE TRAP: the reader is \`extension.speeds ? <derive from the bag> : <definition.speedFeet>\`. A
 monster that authors speeds.fly and leaves speeds.walk empty renders ONLY the fly line — the walking
@@ -264,7 +267,7 @@ its first clause.
     size: "M",
     prompt: unit("B4", "A monster's traits", `
 204 of 330 SRD monsters carry a non-empty traits array in the extension bag. The reader is
-CharacterSheet.tsx:754-755 — a Traits section rendered through RichText. No control.
+CharacterSheet.tsx:756-757 — a Traits section rendered through RichText. No control.
 
 CONTROL: a rows field (name + description) in a new Traits section on MONSTER_SCHEMA.
 
@@ -293,7 +296,7 @@ const LANE_ACTIONS = pipeline(
     size: "M",
     prompt: unit("C1", "A hit that lands a condition (onHit)", `
 47 SRD monster actions author onHit. The reader is apps/server/src/action-resolution.ts:1010-1013.
-actionsField (RiderEditor.tsx:723) offers exactly name / activation / description / damage / attack /
+actionsField (RiderEditor.tsx:725) offers exactly name / activation / description / damage / attack /
 save / uses — verified by probe — so there is no control.
 
 CONTROL: a rows field on the action row: conditions (a pick-list over the 15 SRD condition ids),
@@ -313,7 +316,7 @@ escapeDc 14 -> 20 and the far-end assertion on the applied condition fails.
     title: "A legendary action's cost",
     size: "S",
     prompt: unit("C2", "A legendary action's cost", `
-82 SRD monster actions across 32 rows author legendary.cost. Readers: action-resolution.ts:311-313
+82 SRD monster actions across 30 rows author legendary.cost. Readers: action-resolution.ts:311-313
 (spends from the per-round pool), tap-routing.ts:51 (exempt from the turn gate), and the client's
 encounter/ActionRunner.tsx:41 and :52-55. The record already has a legendary.actionsPerRound control
 (schemas.ts:879); the ACTION has none.
@@ -336,7 +339,7 @@ instead of the fourth.
     prompt: unit("C3", "Damage that grows with level (damageByLevel)", `
 15 SRD actions author damageByLevel: cleric divine-spark and divine-strike, druid primal-strike,
 rogue sneak-attack, the circle-of-the-land subclass's lands-aid, and the dragonborn breath weapon on
-all ten lineages. The reader is apps/server/src/character-build.ts:339 and :362-367. No control.
+all ten lineages. The reader is apps/server/src/character-build.ts:339 and :362-365. No control.
 
 CONTROL: a rows field (level, formula, type) on a FEATURE-CARRIER action row only — the same
 \`scope !== "statblock"\` split toHitFields already makes at RiderEditor.tsx:624-627, because
@@ -376,8 +379,8 @@ gated action refuses again.
   })
 );
 
-/* Lane γ — schemas.ts SPECIES_SCHEMA (:302-368) and BACKGROUND_SCHEMA (:371-408), plus
-   LevelTableEditor.tsx. Shares schemas.ts with lane α by design: the edit regions are 405 lines
+/* Lane γ — schemas.ts SPECIES_SCHEMA (:302-370) and BACKGROUND_SCHEMA (:374-415), plus
+   LevelTableEditor.tsx. Shares schemas.ts with lane α by design: the edit regions are 398 lines
    apart and share no symbol. Whichever lane merges SECOND rebases and re-runs its own verification
    in its own worktree first. Never a blind merge. */
 
@@ -514,10 +517,11 @@ created over HTTP with no source key is badged as OFFICIAL SRD in the character 
 
 The documentation makes it worse, countably. homebrewRecordBase.source
 (packages/api-contract/src/index.ts:1119) describes the field as 'Always "homebrew" once stored', and
-that string renders EIGHT times in docs/api-reference.md — lines 5034, 5093, 5320, 5379, 6071, 6104,
-6122, 6244, once per record component that spreads homebrewRecordBase (class, subclass, species,
-background, feat, spell, equipment, spell-list; a monster's source is the provenance object and is
-excluded). A NINTH occurrence at line 5979 reads 'Always "homebrew" on this surface' on
+that string renders EIGHT times in docs/api-reference.md — lines 5034, 5093, 5320, 5380, 6072, 6105,
+6123, 6245, once per record component that carries homebrewRecordBase.source (class, subclass,
+species, background, feat and spell-list spread the whole base; spell and equipment pull the keys one
+at a time, :2116 and :2142; a monster's source is the provenance object and is excluded). A NINTH
+occurrence at line 5980 reads 'Always "homebrew" on this surface' on
 HomebrewRecordSummary — and that one is TRUE, because homebrew-http.ts:220 hardcodes it. THE API
 CONTRADICTS ITSELF INSIDE ONE RESPONSE: the summary says homebrew, the record body says srd.
 
@@ -683,8 +687,8 @@ const MOBILE = agent({
   id: "R2",
   title: "The 375px pass over everything this program added",
   prompt: `
-Fourteen of the eighteen units add controls to /homebrew. Run the repo's two audits, at 375px, over
-the surface as merged.
+Thirteen of the eighteen units add controls to /homebrew — every unit marked with a 375px tick in §9
+of the plan. Run the repo's two audits, at 375px, over the surface as merged.
 
   node scripts/tap-audit.mjs 375        # the 44px floor
   node scripts/no-scroll-audit.mjs      # the page-never-scrolls law, 8 viewports
@@ -728,9 +732,10 @@ Then the ledger, in place, parent-only:
   - docs/ai-ledger/decision-log.md — the schemas.ts shared-file deviation; the ruling that a monster's
     saves are authored in the extension BAG and not in proficiencies; the \`warnings\` contract
     addition.
-  - docs/ai-ledger/known-bugs.md — ADD the sheet's typed-vs-prose resistance split (a homebrew
-    monster's typed resistances bite mechanically and render blank, because CharacterSheet.tsx:661-663
-    reads the extension prose); REMOVE the vacuous mount probe entry at :127-131, which A1 fixed.
+  - docs/ai-ledger/known-bugs.md — REMOVE the vacuous mount probe entry at :167-171, which A1 fixed.
+    The sheet's typed-vs-prose resistance split is ALREADY logged at :43-47 (a homebrew monster's
+    typed resistances bite mechanically and render blank, because CharacterSheet.tsx:665-667 reads the
+    extension prose) — leave it there and give it an owner only if a unit took it.
   - docs/ai-ledger/current-state.md — ONE edit in place. It sits at its enforced 150-line ceiling with
     zero headroom, so something must come out for anything to go in.
 `
