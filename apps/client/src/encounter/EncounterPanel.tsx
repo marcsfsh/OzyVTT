@@ -9,6 +9,7 @@ import { AskTheGmPrompt, MyPendingAsks, PendingAsksForGm } from "./RuleAsk";
 import { beginTargeting, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
+import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
 import { InitiativeRow } from "./InitiativeList";
@@ -127,22 +128,48 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  * A saving throw a combatant still owes, rendered inside its initiative row. Roll = the server rolls
  * d20 + its best-known modifier; the typed total covers proficient/situational saves. The outcome
  * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
+ *
+ * ISSUE `4b` - THE DAMAGE IS ENTERABLE, and this one field serves both halves of the report. The
+ * number was rolled the instant the action resolved and frozen into `proposedDamage`, so the prompt
+ * only ever narrated it: no amend as GM, and a table rolling physical dice was TOLD its damage
+ * instead of asked for it. The field is pre-filled in auto mode (amend the rolled number) and starts
+ * empty in manual mode with the rolled number as its placeholder (type yours, or accept it). One
+ * control, one component, so the GM's call site and the player's `OwnSavePrompts` both get it - and
+ * the server already enforces that a player may amend only their own character's save.
+ *
+ * WHAT THE FIELD HOLDS IS THE PROPOSAL, NOT WHAT LANDS. `damageOverride` is applied BEFORE the
+ * success halving (`saving-throws.ts`), so on a successful half-on-success save a typed 12 lands as
+ * 6 - and against a fire-resistant target, as 3. Binding the field to the post-halving number the
+ * preview reports would halve it twice. Hence the label ("Damage on a failure"), and hence the
+ * summary below stops asserting the previewed number once the field moves off the basis that
+ * preview was computed with: the same "(manual - rolled N)" honesty `ActionRunner` uses, rather
+ * than a post-halving number this client is in no position to compute.
  */
-function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
+export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
   const [busy, setBusy] = useState(false);
   // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
   // so we can show it and let the answerer confirm rather than auto-resolving on the Roll click.
-  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean; mode?: DieMode } | null>(null);
+  // `basis` is the pre-halving damage THAT preview was computed with, so an amend typed afterwards
+  // is detectable and the projected number can stop claiming to be current.
+  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean; mode?: DieMode; basis: number } | null>(null);
+  // null = untouched. Rendering falls back to the proposal (auto) or to nothing (manual), so the
+  // field and the "did the answerer mean to change this" question stay one piece of state.
+  const [damageEdit, setDamageEdit] = useState<string | null>(null);
+  const damageOverride = saveDamageAmend(save.proposedDamage, damageEdit);
+  const proposal = damageOverride ?? save.proposedDamage;
   // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
   // unmounts before it could show its own result. `dieMode` is the answerer's explicit adv/disadv.
   const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false, dieMode?: DieMode) => {
     setBusy(true);
-    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(legendaryResistance ? { legendaryResistance } : {}), ...(total !== undefined ? { total } : {}), ...(dieMode ? { rollMode: dieMode } : {}) }, (result: SaveAnswerResult) => {
+    // The amend rides EVERY send - preview, manual apply, Confirm and Legendary Resistance - so a
+    // number typed before the roll is the number the preview projects, and one typed after is still
+    // the number the commit applies.
+    socket.emit("save:answer", saveAnswerPayload({ commandId: newId(), saveId: save.id, method, commit, legendaryResistance, ...(total !== undefined ? { total } : {}), ...(dieMode ? { dieMode } : {}), ...(damageOverride !== undefined ? { damageOverride } : {}) }), (result: SaveAnswerResult) => {
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The saving throw could not be answered."); return; }
       const outcome = result.outcome;
       if (!outcome) return;
-      if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied, mode: outcome.rollMode?.mode }); return; }
+      if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied, mode: outcome.rollMode?.mode, basis: proposal }); return; }
       onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`);
     });
   };
@@ -153,8 +180,13 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
       onFeedback(result.ok ? "Saving throw dismissed." : result.message ?? "The saving throw could not be dismissed.");
     });
   };
+  const amended = rolled !== null && proposal !== rolled.basis;
   return <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
-    <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName}){save.proposedDamage > 0 ? ` · ${save.proposedDamage} dmg` : ""}</span>
+    <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName})</span>
+    {save.proposedDamage > 0 && <label className="save-damage-amend">
+      <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>
+      <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={4} className="action-damage-edit" placeholder={String(save.proposedDamage)} value={damageEdit ?? (rollMode === "manual" ? "" : String(save.proposedDamage))} disabled={busy} onChange={(event) => setDamageEdit(event.target.value.replace(/[^0-9]/g, ""))} />
+    </label>}
     <RollControls
       rollMode={rollMode} busy={busy} rolled={rolled !== null} currentMode={rolled?.mode}
       manualLabel="Rolled save total" onInvalidManual={onFeedback}
@@ -166,7 +198,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
       summary={rolled ? <>
         {/* Reveal the rolled total and what it will do; an explicit Confirm applies it. */}
         <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.success ? "Success" : "Failure"}</strong>
-        <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
+        <span className="save-prompt-effect">{amended ? `${proposal} dmg (amended - rolled ${rolled.basis})` : rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
       </> : undefined}
       extraActions={rolled && !rolled.success && (legendaryResistanceLeft ?? 0) > 0
         ? <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when it fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>

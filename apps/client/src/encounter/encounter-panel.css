@@ -637,6 +637,15 @@
 .save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem var(--space-2); border: 1px solid transparent; }
 .save-prompt-label { font-size: var(--fs-sm); color: var(--text-dim); }
 .save-prompt-label strong { color: var(--text); }
+/* Issue `4b`'s amend field: its OWN row inside the prompt's column, deliberately not inside
+   .save-prompt-actions. That row already wraps two controls plus a dismiss at 375px, and a third
+   flex item in it put the damage field and the d20 field side by side reading as one pair. A label
+   is the hit area, so the 44px floor is real paint (the .manual-nat20 route above), and the field
+   keeps .action-damage-edit's danger tint - the same control the attack path and the pending-damage
+   proposal already use for "the number about to come off somebody's hit points". */
+.save-damage-amend { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: var(--tap-min); font-size: var(--fs-xs); font-weight: 700; color: var(--text-dim); cursor: pointer; }
+.save-damage-amend > span { flex: 1 1 auto; min-width: 0; }
+.save-damage-amend .action-damage-edit { flex: 0 0 4rem; min-height: var(--tap-min); box-sizing: border-box; }
 .save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .save-prompt-roll { flex: 0 0 auto; }
 .save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; flex: 1 1 12rem; }
