@@ -14,6 +14,21 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
+- **[codex/rail] Three of the folder menu's five items cannot be tapped at 375px.** Measured
+  2026-08-11 on `/codex/pages`, GM, 375×667 with touch: the rail's `Menu` popover renders 5 items at
+  **44×184** — every one clears the tap floor — and `elementFromPoint` at the centre of three of them
+  answers with something else: *New subfolder* ← `div.codex-rail-tools`, *New page here* ←
+  `aside.codex-rail` itself, *Rename folder* ← `input.nh-input`. Only *Delete folder* taps through.
+  **It is NOT the `isolation: isolate` trap** that this same rail's tag combobox had (fixed in
+  `codex.css`, `.codex-rail:has(.nh-combobox-list)`): every thief here is INSIDE the rail, so lifting
+  the rail changes nothing — extending that selector to `details.nh-menu[open]` was tried and
+  re-measured at still 3 stolen. Suspected cause: the primitives in `.codex-rail-tools` and the
+  `.nh-input` beside them carry `isolation: isolate` of their own, so each is a stacking context that
+  the popover's `z-index: 40` is competing with rather than clearing. Wants its own diagnosis; the
+  popover may need to leave the rail's subtree entirely (the `Modal`/`Drawer` route) rather than win
+  a z-index argument inside it. **The 44px audit cannot see this** — `scripts/tap-audit.mjs` measures
+  size, not reach, and never opens this popover.
+
 - **[encounter/saves] A save preview projects the PRE-defence number, so the prompt prints more than
   the commit lands against any resistant target.** `answerSave`'s preview arm returns `outcomeDamage`
   — the halved, re-typed total — and it `return`s from ABOVE the call to `applyDamageDetailed`

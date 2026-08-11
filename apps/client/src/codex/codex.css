@@ -27,6 +27,30 @@
   border: 1px solid transparent;
   padding: var(--space-3);
 }
+/* THE ISOLATE SWALLOWS AN OPEN OVERLAY, AND THIS IS THE FOURTH SURFACE IT HAS DONE IT ON.
+   `isolation: isolate` above is load-bearing (it keeps this panel's `z-index: -1` backing layer
+   inside it, the escape `Button.css` documents) but it is also a stacking context, so an overlay's
+   z-index is resolved INSIDE the rail and never above it. The rail does not CLIP - `overflow` is
+   `visible` - so the overlay is painted; it simply loses to anything that comes after the rail.
+   Measured at 375x667 with touch on 2026-08-11, on `/codex/pages`, with the rail spanning y 114-558:
+     - "Filter by tag" (`.nh-combobox-list`, z-index 40) opens 352-624, so its tail hangs 66px past
+       the rail. 8 rows, all 44x311, and the last one (`#rules`) answered `elementFromPoint` with an
+       `<h3>` from the pane beside it; a real `.tap()` on it timed out at 6,000 ms.
+   Same fix as `.sheet-vital` (`encounter-panel.css`) and `.hb-fieldset` (`homebrew.css`): the isolate
+   STAYS and the rail is LIFTED, only while a list is open. `1` because nothing beside the rail
+   declares a positive z-index - the thieves win on source order alone, so the smallest lift that
+   beats `auto` is the whole of the fix. After: 8 of 8 rows own their centre and `#rules` taps
+   through.
+
+   THE RAIL'S `Menu` POPOVER IS A DIFFERENT BUG AND THIS RULE DOES NOT FIX IT. Measured in the same
+   pass: 5 items at 44x184 with THREE stolen - "New subfolder" by `.codex-rail-tools`, "New page
+   here" by the rail itself, "Rename folder" by an `.nh-input`. Every one of those thieves is INSIDE
+   the rail, so lifting the rail cannot help; the competition is within its own stacking context, and
+   the cause is something else (the primitives in `.codex-rail-tools` carry `isolation: isolate` of
+   their own). Extending this selector to `details.nh-menu[open]` was tried and measured: still 3
+   stolen. It is in `known-bugs.md` with the numbers rather than covered by a rule that would look
+   like a fix and not be one. */
+.codex-rail:has(.nh-combobox-list) { z-index: 1; }
 /* D7's "top-left label area beside the search bar", measured rather than eyeballed. At 1280x900 this
    corner stood at three heights and one clipped label:
      search field   151.6 x 44     the field primitive's own height
