@@ -19,3 +19,7 @@ verify-shots/
 # checkout's tree — or a link that ends up pointing at its own path, which is how this one
 # arrived — is a file, and `node_modules/` does not match a file. It reached the index once.
 node_modules
+
+# Subagent worktrees live under the checkout so their branches share this clone's objects;
+# their CONTENTS are those branches' business, never this one's index.
+.claude/worktrees/
