@@ -774,7 +774,14 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
               <span>Qty</span><span>Equip</span><span>Attune</span><span></span>
             </div>
             {inventory.map((item) => <div key={item.id} className="sheet-inv-row">
-              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}</span>
+              {/* The description was already being COPIED onto every added row and then never shown.
+                  That was invisible while the catalog was mundane gear; with the SRD's 268 magic
+                  items in it, the row's own text is the only place a rarity or an attunement
+                  requirement appears on this sheet - `ItemMagicMarkerSchema` carries neither and
+                  the browse summary has no `rarity` key at all. Clamped to two lines so a
+                  reference-length entry cannot push the Equip/Attune controls off a phone. */}
+              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}
+                {item.description ? <span className="sheet-item-desc">{item.description}</span> : null}</span>
               <Stepper className="sheet-inv-qty" value={item.quantity} min={0} disabled={busy} aria-label={`Quantity of ${item.name}`} onChange={(quantity) => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity } }, ack); }} />
               <button type="button" className={`sheet-toggle-btn${item.equipped ? " on" : ""}`} disabled={busy} aria-pressed={item.equipped} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "Equipped" : "Equip"}</button>
               <button type="button" className={`sheet-toggle-btn${item.attuned ? " on" : ""}`} disabled={busy} aria-pressed={item.attuned} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } }, ack); }}>{item.attuned ? "Attuned" : "Attune"}</button>

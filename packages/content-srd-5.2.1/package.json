@@ -12,7 +12,8 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "build-bundle": "node --import tsx scripts/build-bundle.ts",
-    "build-class-bundle": "node --import tsx scripts/build-class-bundle.ts"
+    "build-class-bundle": "node --import tsx scripts/build-class-bundle.ts",
+    "build-magic-item-bundle": "node --import tsx scripts/build-magic-items.ts"
   },
   "dependencies": {
     "@vtt/rules-5e": "*",

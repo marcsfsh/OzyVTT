@@ -4,7 +4,8 @@ import { ActorDefinitionSchema } from "@vtt/schemas";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import {
   applySpellListOverlay, ArmorReferenceSchema, ConditionReferenceSchema, EquipmentReferenceSchema,
-  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadEquipment, loadMonsterDefinitions,
+  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadEquipment, loadMagicItems,
+  loadMonsterDefinitions,
   loadRules, loadSkills, loadSpells, loadWeaponProperties, loadWeapons, resolveSpellLists,
   RuleReferenceSchema, SkillReferenceSchema, spellListMemberIds, SpellListReferenceSchema,
   SpellReferenceSchema, WeaponPropertyReferenceSchema, WeaponReferenceSchema,
@@ -285,12 +286,15 @@ describe("SRD 5.2.1 reference bundles", () => {
     expect(weapons.find((weapon) => weapon.id === "mace")!.properties).toEqual([]);
   });
 
-  it("folds the vendored gear bundle together with weapons and armor into one addable catalog", () => {
+  it("folds the vendored gear bundle together with weapons, armor and the magic items into one addable catalog", () => {
     const equipment = loadEquipment();
-    // The gear bundle (ammunition/gear/tools/packs/focuses/consumables) plus every non-improvised
-    // weapon and every armor piece, mapped into the unified shape.
+    // THE CATALOG CENSUS - four sources, each counted from its own bundle rather than from a
+    // remembered total, so dropping any one fold names the count it dropped by. The gear bundle
+    // (ammunition/gear/tools/packs/focuses/consumables) plus every non-improvised weapon, every
+    // armor piece, and the 268 generated magic-item rows.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
-    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length);
+    expect(loadMagicItems().length).toBe(268);
+    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length + 268);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).

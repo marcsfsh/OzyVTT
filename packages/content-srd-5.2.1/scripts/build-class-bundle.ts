@@ -16,6 +16,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { CLASS_MECHANICS, HAND_AUTHORED, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
+import { slug, strip, tableAsText, withTables } from "./markdown.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -36,57 +37,11 @@ const source = readFileSync(join(root, "sources/dnd-5e-srd-markdown/classes.md")
 
 // ---------------------------------------------------------------------------------------------
 // Markdown/HTML parsing helpers
+//
+// `strip`, `tableAsText`, `withTables` and `slug` moved to `./markdown.ts` when the magic-item ETL
+// needed the same table rendering. They are unchanged; the move is what keeps ONE rendering of an
+// SRD table across the two bundles rather than two that drift.
 // ---------------------------------------------------------------------------------------------
-
-const strip = (value: string) =>
-  value.replace(/<[^>]+>/g, " ")
-    .replace(/&mdash;|&#8212;/g, "—").replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, "'")
-    .replace(/\s+/g, " ").trim();
-
-/**
- * ONE HTML table, as a sentence.
- *
- * Every cell is prefixed with its own column heading, so the rendering is self-describing rather
- * than positional: a player reading "Druid Level 2: Known Forms 4, Max CR 1/4, Fly Speed No" needs
- * no column order in their head. Rows join with "; " because descriptions are collapsed to a single
- * line downstream and a table cannot be laid out there.
- *
- * A TWO-COLUMN table labels only its first cell. "Sorcerer Level 3: Alter Self, Chromatic Orb" is
- * unambiguous, and the alternative ("Sorcerer Level 3: Spells Alter Self, ...") reads like a typo -
- * every spell-by-level table in the SRD's subclasses is this shape, so it is worth the special case.
- */
-function tableAsText(html: string): string {
-  const cells = (row: string, tag: "th" | "td") =>
-    [...row.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "g"))].map((cell) => strip(cell[1]));
-  const head = html.match(/<thead>([\s\S]*?)<\/thead>/)?.[1] ?? "";
-  const columns = cells(head, "th");
-  const bodyRows = [...(html.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? html).matchAll(/<tr>([\s\S]*?)<\/tr>/g)];
-  const lines: string[] = [];
-  for (const [, row] of bodyRows) {
-    const values = cells(row, "td");
-    if (values.length === 0) continue;
-    const labelled = values.map((value, index) =>
-      (columns[index] && (index === 0 || values.length > 2) ? `${columns[index]} ${value}` : value));
-    lines.push(labelled.length === 1 ? labelled[0] : `${labelled[0]}: ${labelled.slice(1).join(", ")}`);
-  }
-  const text = lines.join("; ");
-  return text === "" ? "" : `${text}.`;
-}
-
-/**
- * THE TABLES ARE CONTENT, NOT DECORATION - and dropping them truncated five features mid-sentence.
- *
- * Every parser below used to `.replace(/<table>[\s\S]*?<\/table>/g, " ")`, which is why Draconic
- * Spells, Fiend Spells, Oath of Devotion Spells and Circle of the Land Spells each ended at the word
- * "table" with the spells they promise nowhere in the record, and why Nature's Ward, Wild Shape and
- * Font of Magic lost theirs too. The table IS the promise in all seven; a description that stops
- * before it is not shorter prose, it is a feature that does not say what it does.
- */
-const withTables = (value: string) => value.replace(/<table>[\s\S]*?<\/table>/g, (html) => ` ${tableAsText(html)} `);
-
-const slug = (value: string) =>
-  strip(value).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** `#### Level 7: Remarkable Athlete` -> [, level, name]. Read by BOTH the class and subclass parsers. */
 const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;

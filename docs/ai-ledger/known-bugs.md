@@ -82,15 +82,19 @@ Format: `[area] — description — suspected cause / status`.
   (`apps/client/src/encounter/ActionRunner.tsx:166`) and stays a bare number on the save's and the
   reaction's.
 
-- **[ui/touch] The sheet's browse-and-add picker has ten controls under the floor.**
-  `node scripts/tap-audit.mjs 375` at HEAD (2026-08-10): `play-sheet-picker` measures 328 controls,
-  10 below 44px — `input.sheet-picker-search` at **34.3px tall** × 303 wide, and nine
-  `button.sheet-picker-chip` (All, Weapons, Armor, Gear, Tools, Focuses, Consumables, Packs, Ammo) at
-  **19px tall**, 38.9–90.2 wide. That is 10 of the run's 30; the other 20 are the two graph passes
-  (16), three encounter tokens and the 1×1 `input.map-upload-input`. Pre-existing at `8c8d6b2` by
-  construction, not by re-measurement: nothing in `8c8d6b2..HEAD` touches
-  `apps/client/src/encounter/equipment.tsx` or the `.sheet-picker-*` rules in
-  `apps/client/src/encounter/encounter-panel.css`.
+- **[repo/verify] The sheet and its browse-and-add picker are measured BY HAND, because the tap audit
+  cannot reach either.** Both `play-sheet` and `play-sheet-picker` resolve their address from
+  `[data-token-id]` on `/table`, which exists only for a combatant in a running fight — on a dev
+  database with a PC merely on the roster both report NOT MEASURED, and every control on the two
+  surfaces contributes nothing to the number the audit prints. That is not a small blind spot: it is
+  the 451-row catalog and the inventory row, on the surface a phone is mostly holding.
+  Their previous entry here — the picker's *ten* sub-floor controls, `input.sheet-picker-search` at
+  34.3px and nine 19px `button.sheet-picker-chip` — was **fixed 2026-08-11** in the magic-item ETL
+  commit (`min-height: var(--tap-min)` on both, route 1 rather than `.tap-target`, because the chips
+  wrap and an `::after` overhang would steal from the chip above). Re-measured there directly in
+  Chromium 1194 at 375×667 with touch: all **12** chips 44px tall, search 303×44. The remaining
+  sub-floor control on those surfaces is `.sheet-remove` at **29.6×29.6** (`IconButton size="sm"`),
+  which nothing has fixed and the audit still cannot see.
 
 - **[ui/touch] The row-tools popover and the token context menu ship sub-floor controls, and the tap
   audit opens neither surface.** Measured 2026-08-10 in Chromium 1194 at 375×667 (dsf 2, isMobile,
