@@ -1008,6 +1008,22 @@ describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two pi
     expect(message).toBe('The "spell" pick "blur" exceeds what this build may choose (Spell Mastery: 1, Spell Mastery: 1).');
   });
 
+  it("REFUSES a cantrip in the level-1 row — a level-0 spell is not \"a level 1 spell\"", () => {
+    // The window's FLOOR, and it is the half C4 shipped without. `wizard-spells` resolves to all 218
+    // Wizard spells, 15 of them cantrips, and `withinSpellWindow` is a plain min/max check - so a
+    // block reading `maxSpellLevel: 1` with no floor accepted a level-0 cantrip as the printed
+    // "level 1 spell". Measured before the fix: `fire-bolt` + `acid-arrow` built CLEAN.
+    //
+    // The client's picker filters cantrips out of a `kind: "spell"` block (build-payload.ts:459), so
+    // this was never reachable by tapping - which is exactly why it needed a server-side test. The
+    // server is the authority and it was not enforcing what the text says.
+    // The refusal is the floor's OWN, not the generic capacity one the other two rows produce —
+    // the builder names the level it got, the minimum it wanted, and the feature that wanted it.
+    const message = thrown(() => buildCharacterDefinition(
+      level18([mastery("fire-bolt"), mastery("acid-arrow")]), library, POLICY));
+    expect(message).toBe('"fire-bolt" is level 0, below the minimum spell level (1) for "Spell Mastery".');
+  });
+
   it("ACCEPTS the printed pair, and puts both spells on the sheet", () => {
     // The other side of the refusal: the feature still works, and it works for the pair the SRD prints.
     const built = buildCharacterDefinition(level18([mastery("magic-missile"), mastery("acid-arrow")]), library, POLICY);
@@ -1024,7 +1040,9 @@ describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two pi
       .features.find((feature) => feature.id === "spell-mastery")!;
     const picks = featurePicks(spellMastery);
     expect(picks).toHaveLength(2);
-    expect(picks.map((pick) => [pick.minSpellLevel ?? null, pick.maxSpellLevel ?? null])).toEqual([[null, 1], [2, 2]]);
+    // BOTH windows are floored as well as capped. The first block's floor of 1 is what keeps a
+    // cantrip out of the level-1 row; before it, this read [null, 1] and level 0 satisfied it.
+    expect(picks.map((pick) => [pick.minSpellLevel ?? null, pick.maxSpellLevel ?? null])).toEqual([[1, 1], [2, 2]]);
     expect(picks.map((pick) => pick.choose)).toEqual([1, 1]);
   });
 });

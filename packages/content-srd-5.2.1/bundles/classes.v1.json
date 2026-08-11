@@ -10381,6 +10381,7 @@
       "kind": "spell",
       "choose": 1,
       "fromCatalog": "wizard-spells",
+      "minSpellLevel": 1,
       "maxSpellLevel": 1
      },
      {

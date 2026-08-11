@@ -79,9 +79,25 @@ export const wizard: ClassMechanicsModule = {
      * the restrictions and a GM reading the sheet sees them.
      */
     "spell-mastery": {
-      clears: ["choice"],
+      // `choices` clears ITSELF, and that is not a typo. For a hand-authored class the bundle is the
+      // ETL's own input, so once this overlay has run once the record carries `choices` — and
+      // `applyMechanics` refuses to overwrite a key already on the record when the value DIFFERS
+      // (JSON.stringify compare). So the first author needed `clears: ["choice"]` and every later
+      // CHANGE to the authored value needs `choices` in the list too, or the build fails with
+      // `wizard.spell-mastery.choices (already authored on the record - remove it from one of the
+      // two homes)`. Clearing then re-authoring an identical value is still a byte-identical no-op,
+      // so idempotency is unaffected. `choice` stays in the list: it is a no-op now, but it is what
+      // supersedes the original hand-authored form if this record is ever rebuilt from one.
+      clears: ["choice", "choices"],
       choices: [
-        { kind: "spell", choose: 1, fromCatalog: "wizard-spells", maxSpellLevel: 1 },
+        // BOTH blocks are FLOORED as well as capped, and the floor on the first one is not
+        // decoration. `wizard-spells` resolves to all 218 wizard spells, 15 of them CANTRIPS, and
+        // `withinSpellWindow` is a plain min/max check - so a block reading `maxSpellLevel: 1` with
+        // no floor accepts a level-0 cantrip as "a level 1 spell". Measured: fire-bolt + acid-arrow
+        // built clean before this floor existed. The client's picker filters cantrips out of a
+        // `kind: "spell"` block (build-payload.ts:459), which is exactly why the floor has to live
+        // HERE - the server is the authority and it was not enforcing what the printed text says.
+        { kind: "spell", choose: 1, fromCatalog: "wizard-spells", minSpellLevel: 1, maxSpellLevel: 1 },
         { kind: "spell", choose: 1, fromCatalog: "wizard-spells", minSpellLevel: 2, maxSpellLevel: 2 }
       ]
     }
