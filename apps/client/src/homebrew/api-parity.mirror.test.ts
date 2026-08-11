@@ -57,7 +57,12 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    }).toEqual({ asked: 4660, covered: 2817, forced: 106, open: 1737 });
+    // **2817 → 2818 / 1737 → 1736, 2026-08-11 (`C3`).** The weapon block's `properties` row landed,
+    // so `equipment.weapon.properties` moved from open to covered and its exemption row was deleted
+    // in the same commit — which is precisely the "re-pin the counts above" the row's own direction-2
+    // failure demands. One address, because the key is a leaf: the array's members have no schema of
+    // their own for the walk to descend into.
+    }).toEqual({ asked: 4660, covered: 2818, forced: 106, open: 1736 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {

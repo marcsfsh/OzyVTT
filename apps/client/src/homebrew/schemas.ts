@@ -11,7 +11,7 @@
  * fires has no other way to find out.
  */
 
-import { RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
+import { RARITY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../lib/ids";
 import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
 import { featureFields } from "./FeatureEditor";
@@ -766,7 +766,33 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
         // `3d`, site 2 of 9 — and the one the client's own mace goes through.
         { key: "weapon.damageType", label: "Damage type", pick: true, placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
         { key: "weapon.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", emptyValue: "null", help: "Leave both empty for a melee weapon." },
-        { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft", emptyValue: "null" }
+        { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft", emptyValue: "null" },
+        /**
+         * THE SIXTH ROW, and the one that made the other five a half-truth (`C3`).
+         *
+         * `properties` is not a label: `weaponAbilityModifier` reads `finesse` off the INVENTORY row
+         * to take the better of Strength and Dexterity, `weaponAction` reads `reach` for the 10-foot
+         * threat and `thrown` for the range/reach pair, and `weapon-property-is` riders match on it.
+         * All four have shipped for releases and all four fired on SRD weapons only, because this row
+         * did not exist — so an SRD Rapier was Finesse and a GM's rapier could never be.
+         *
+         * `WEAPON_PROPERTY_IDS`, deliberately, and NOT `ctx.weaponProperties`: that context key is the
+         * UNION of properties and masteries (`useSchemaContext.ts`, `schema.ts`), which is right for the
+         * `weapon-property-is` trigger — it matches either family — and wrong here, where offering
+         * `topple` would suggest a value this column cannot mean. Open like every other SRD vocabulary
+         * control: the schema's column is `z.array(z.string()...)`, so a homebrew property stays typable.
+         */
+        {
+          key: "weapon.properties",
+          label: "Properties",
+          kind: "tags",
+          pick: true,
+          max: 12,
+          maxRowsReason: "Twelve properties is as many as the column stores.",
+          suggestions: WEAPON_PROPERTY_IDS,
+          placeholder: "finesse",
+          help: "Finesse lets it swing off Dexterity; reach threatens at 10 feet."
+        }
       ])
     },
     {

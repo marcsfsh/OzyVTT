@@ -29,7 +29,7 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DAMAGE_TYPE_IDS, RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
+import { DAMAGE_TYPE_IDS, RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { blankDraft, forStorage } from "./defaults";
 import { RiderEditor } from "./RiderEditor";
 import { SchemaForm } from "./SchemaForm";
@@ -485,5 +485,65 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
     await user.click(screen.getByRole("button", { name: "Add a spell" }));
     expect(screen.queryByRole("radio", { name: /^Bless/ })).toBeNull();
     expect(screen.getByRole("radio", { name: /^Cure Wounds/ })).toBeTruthy();
+  });
+});
+
+/**
+ * **C3 — the weapon block's sixth row, on screen.**
+ *
+ * `weapon-properties.mirror.test.ts` proves the row reaches the ENGINE: a GM-authored Finesse weapon
+ * swings off Dexterity. It drives the form MODEL, though, and the model is not the screen — the whole
+ * point of `pick` is that a complete vocabulary shipped invisible is a vocabulary a GM does not have,
+ * which is exactly what `<datalist>` did to rarity and to damage types before `3a`/`3d`. So the
+ * assertions here are what a GM SEES and TAPS.
+ *
+ * The one that is specific to this unit is the SECOND: the chooser must offer the nine weapon
+ * PROPERTIES and must not offer the eight masteries. `ctx.weaponProperties` is the union of both
+ * families — right for the `weapon-property-is` trigger, which matches either — and offering `topple`
+ * here would suggest a value the weapon column cannot mean, silently inert at play time. That is the
+ * hardest homebrew failure to diagnose, and it is a one-word mistake to make.
+ */
+describe("C3 — a homebrew weapon's Properties row is a visible chooser over the properties alone", () => {
+  const PROPERTY_NAMES = WEAPON_PROPERTY_IDS.map(suggestionLabel);
+
+  it("offers all nine properties unprompted, and none of the eight masteries", async () => {
+    const user = userEvent.setup();
+    const form = mount();
+
+    await user.click(form.chooser("Properties"));
+
+    expect(form.options("Properties")).toEqual(PROPERTY_NAMES);
+    expect(form.options("Properties")).toContain("Two Handed");
+    // The union guard, named per slug so a regression says WHICH family leaked.
+    for (const mastery of WEAPON_MASTERY_IDS) {
+      expect(form.options("Properties"), `${mastery} is a mastery, not a property`)
+        .not.toContain(suggestionLabel(mastery));
+    }
+  });
+
+  it("tapping Finesse writes the slug into the weapon block, container and all", async () => {
+    const user = userEvent.setup();
+    const form = mount();
+
+    await user.click(form.chooser("Properties"));
+    await user.click(screen.getByRole("option", { name: "Finesse" }));
+
+    // THE FAR END for this file: the body that gets published. `inContainer` seeds the rest of the
+    // weapon block around it, so a first touch here cannot produce `weapon: { properties: [...] }`
+    // alone and the three `Required` refusals that used to follow.
+    expect(form.body().weapon).toMatchObject({ properties: ["finesse"], rangeFeet: null, longRangeFeet: null });
+    // A chosen property leaves the menu — offering it again would be offering a tap that does nothing.
+    await user.click(form.chooser("Properties"));
+    expect(form.options("Properties")).not.toContain("Finesse");
+  });
+
+  it("a homebrew “duelling” property survives — the column stays open", async () => {
+    const user = userEvent.setup();
+    const form = mount();
+
+    // The half a closed enum would have broken. `WEAPON_PROPERTY_IDS` is what the chooser SHOWS; the
+    // column is `z.array(z.string().regex(/^[a-z0-9-]+$/))`, so a GM's own word is a legal value.
+    await user.type(form.chooser("Properties"), "Duelling{Enter}");
+    expect((form.body().weapon as { properties?: string[] }).properties).toEqual(["duelling"]);
   });
 });

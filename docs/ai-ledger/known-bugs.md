@@ -136,12 +136,14 @@ Format: `[area] — description — suspected cause / status`.
   `npx vitest run src/design-conventions.test.ts` is **34 passed**. Three separate lanes reported it
   on 2026-08-10, so it is not a one-off. Run a workspace suite from inside the workspace.
 
-- **[homebrew/editor] A homebrew weapon cannot be given properties or a mastery.** The API accepts
-  both on `equipment.weapon` and the engine reads both, but the editor's weapon block has five rows
-  (kind, damage, damage type, range, long range) and neither. So an SRD Rapier is Finesse and a GM's
-  homebrew rapier can never be. Owners: content program **C3** (`properties`) and mastery program
-  **U38** (`mastery`, gated on all eight slugs reaching) — both are the CONTROL half only; the four
-  data shapes and the readers landed 2026-08-10 in batch 0.
+- **[homebrew/editor] A homebrew weapon cannot be given a mastery.** The API accepts `mastery` on
+  `equipment.weapon` and the engine reads it, but the editor's weapon block has no row for it, so a
+  GM's greatsword can never Graze. Owner: mastery program **U38**, gated on all eight slugs reaching;
+  it is the CONTROL half only — the data shapes and the readers landed 2026-08-10 in batch 0.
+  **`properties` was the other half of this bug and is FIXED** (2026-08-11, content program **C3**):
+  the weapon block's sixth row is a `tags` chooser over `WEAPON_PROPERTY_IDS`, open like every other
+  SRD vocabulary control, and `weapon-properties.mirror.test.ts` swings a GM-authored Finesse weapon
+  off Dexterity through the real controls, the real wire and the real catalog.
 
 - **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
   `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces

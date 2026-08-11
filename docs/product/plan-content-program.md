@@ -16,8 +16,8 @@ says so.
 
 **What has already landed, so nobody re-plans it.** Commit `36b5a1f` shipped **C1 in full** and
 **C3's plumbing half**: both weapon columns now have an ETL home, `properties` reaches the inventory
-row, and three readers that had shipped for releases stopped running against an empty column. C3
-retains its **editor control only**. Every section below is written to that state — the measurements
+row, and three readers that had shipped for releases stopped running against an empty column. **C3's
+editor half then landed 2026-08-11, so C3 is complete.** Every section below is written to that state — the measurements
 that describe the defect are kept in the past tense where the defect is closed, because the argument
 for the guard is the reason the guard has to stay.
 
@@ -143,11 +143,13 @@ build with all three defects intact. **All four landed in `36b5a1f`:**
 | 2 | the ETL emit | `packages/content-srd-5.2.1/scripts/build-bundle.ts:620-641` (`weaponRecords`) | **done, C1** |
 | 3 | `EquipmentWeaponStatsSchema` and the `loadEquipment()` weapon fold | `schemas.ts:245-261` (`properties` at `:253-260`), `src/index.ts:113-117` | **done, C3** |
 | 4 | the catalog→inventory copy | `apps/server/src/character-build.ts:1586-1591` | **done, C3** |
-| 5 | **the editor control** | `apps/client/src/homebrew/schemas.ts:764-770` — still five rows | **open — all that is left of C3** |
+| 5 | **the editor control** | `apps/client/src/homebrew/schemas.ts:763-795` — the weapon block is six rows | **done, C3** |
 
-Shipping the four without the fifth manufactures a fresh SRD-only row, which is the exact mirror
-defect the phase exists to end. `docs/ai-ledger/known-bugs.md` carries it as a live bug and names C3
-as its owner.
+Shipping the four without the fifth would have manufactured a fresh SRD-only row, which is the exact
+mirror defect the phase exists to end. All five are in: the sixth row is a `tags` chooser over
+`WEAPON_PROPERTY_IDS` (not `ctx.weaponProperties`, which is the properties∪masteries union), open so
+a homebrew property stays typable. `docs/ai-ledger/known-bugs.md`'s entry is narrowed to `mastery`
+alone, whose control is U38's.
 
 Two hazards to carry into the remaining half, both documented in the code:
 
@@ -230,7 +232,7 @@ Sizes are estimated from reading the code; the *counts* inside them are measured
 | --- | --- | --- | --- | --- |
 | ~~**C1**~~ | ~~the weapons ETL home — `mastery` and `properties`, derived and fail-closed~~ | M | **LANDED `36b5a1f`** | — |
 | **C2** | the hand-authored overlay ruling | S | 0, serial | C4, and any later unit authoring onto cleric/fighter/wizard |
-| **C3** | `properties` reaches the **editor** — the control half only; the four data shapes landed in `36b5a1f` | S | 0b | U20, U35 |
+| ~~**C3**~~ | ~~`properties` reaches the **editor** — the control half only; the four data shapes landed in `36b5a1f`~~ | S | **LANDED 2026-08-11** | U20, U35 |
 | **C4** | Wizard's Spell Mastery becomes two picks | S | 0b | — |
 | **C5** | vendor the magic-item source; repair the provenance and the attribution | S | 3, serial | C6 |
 | **C6** | the magic-item ETL — 268 rows, typed, folded into the catalog | L | 3, serial | C7a–d |
@@ -240,7 +242,7 @@ Sizes are estimated from reading the code; the *counts* inside them are measured
 | **C7d** | item mechanics — potions and carried wondrous (94) | M | 3, concurrent | U32 |
 | **C8** | the program's close: adversarial review, mobile back-fill, ledger | M | 3, last | — |
 
-**Total ~9–11 agent-days** left, estimated — C1 is spent and C3 is down to one control. Nine units
+**Total ~9–11 agent-days** left, estimated — C1 and C3 are both spent. Eight units
 remain, of which four run concurrently.
 
 The carrier dossier the governing plan's ruling 5 asks for is **§5 of this document**, delivered now
@@ -322,15 +324,16 @@ numbered ruling with the reason, not a note).
 
 ### C3 — `properties` reaches the **editor**
 
-*Shapes 1–4 of §1.3's five landed in `36b5a1f`. What is left is shape 5, and only shape 5: the GM
-still cannot give a homebrew weapon a property. An SRD Rapier is Finesse; a GM's rapier can never be.*
+***LANDED 2026-08-11.** Shapes 1–4 of §1.3's five landed in `36b5a1f`; shape 5, the editor control,
+landed here. The GM could not give a homebrew weapon a property — an SRD Rapier was Finesse and a
+GM's rapier could never be. The weapon block is six rows now and both halves of the sentence are true.*
 
 | part | what |
 | --- | --- |
-| **reader** | ships, three of them — `weaponAbilityModifier` (`equipment-derivation.ts:984-991`), `weaponAction`'s reach branch (`:1011`), and `weaponPropertiesOf` (`:1044`) → `riders.ts:194`. All three now fire on SRD weapons; this unit is what lets a GM's weapon reach them. |
+| **reader** | ships, three of them — `weaponAbilityModifier` (`equipment-derivation.ts:984`, which delegates the Finesse rule to `weaponAbilityModifierFrom` in `@vtt/rules-5e` so the sheet's tap-to-roll preview derives the same number), `weaponAction`'s reach branch (`:1014`), and `weaponPropertiesOf` (`:1047`) → `packages/rules-5e/src/riders.ts:194`. *Line numbers re-measured 2026-08-11; the earlier `:1011`/`:1044` had drifted by three.* All three fired on SRD weapons only; this unit is what lets a GM's weapon reach them. |
 | **content** | ships — the 70 assignments C1 emitted, carried through `loadEquipment()`'s weapon fold (`packages/content-srd-5.2.1/src/index.ts:113-117`) into the catalog record and through `apps/server/src/character-build.ts:1591` onto the inventory row. This unit authors none of it. |
-| **control** | a **sixth** row in the client's weapon block (`apps/client/src/homebrew/schemas.ts:764-770`) — a tag/multiselect over `WEAPON_PROPERTY_IDS`. Open, like every other SRD vocabulary control: a homebrew property must stay typable. |
-| **test** | the editor path, end to end: a GM-authored Finesse weapon built through the real controls, published, equipped, and swung. |
+| **control** | **done** — a **sixth** row in the client's weapon block (`apps/client/src/homebrew/schemas.ts:763-795`): `kind: "tags"` + `pick: true` over `WEAPON_PROPERTY_IDS`, capped at 12 to mirror the column's own `.max(12)`. Open, like every other SRD vocabulary control: a homebrew property stays typable, and a test proves one publishes and reaches `weaponPropertiesOf`. |
+| **test** | `apps/client/src/homebrew/weapon-properties.mirror.test.ts` — the editor path end to end: authored through the real controls, POSTed and published over the real wire, read back out of the real merged `ContentLibrary`, added through the browse-and-add picker's own projection under the server's `InventoryItemSchema`, and swung. |
 
 > **Do not reach for `ctx.weaponProperties` for the suggestions.** *Measured:*
 > `apps/client/src/homebrew/useSchemaContext.ts:33` builds `WEAPON_SLUGS` as
@@ -339,18 +342,22 @@ still cannot give a homebrew weapon a property. An SRD Rapier is Finesse; a GM's
 > **trigger**, which matches either family. It is wrong for the weapon block, where offering `topple`
 > as a property would suggest a value the weapon column cannot mean. Suggest `WEAPON_PROPERTY_IDS`.
 
-**Far end.** A GM-authored weapon with `finesse`, on a DEX 15 / STR 12 character, **swings off
-Dexterity** — a changed attack bonus and a changed damage string on the sheet, out of a record that
-went through the editor's own controls. The mirrored SRD assertion (a catalog Rapier) is the control
-group and is already green at HEAD; the editor row is the new claim. Not "the array survived the form".
+**Far end — MET.** A GM-authored weapon with `finesse`, on a DEX 15 / STR 12 character, **swings off
+Dexterity**: **+4 to hit and `1d8 + 2`**, out of a record that went through the editor's own controls,
+the real POST/publish pair and the real merged catalog. The Maul beside it reads **+3 / `2d6 + 1`** off
+Strength, and the SRD Rapier — the control group, green at HEAD — lands on the same +4 / `1d8 + 2`, so
+a number that moves for both is a broken fixture rather than a broken editor row. The scores are one
+point apart on purpose: `Math.max(str, dex)` would swallow a wide gap. Not "the array survived the form".
 
-**Non-vacuity, both probes.** *Control:* delete the `weapon.properties` row from the weapon block →
-the editor path throws from the authoring harness. **The message shape is
+**Non-vacuity, both probes — BOTH MET, both restored.** *Control:* deleting the `weapon.properties`
+row threw from the authoring harness, verbatim and byte-for-byte as predicted —
 `No field "weapon.properties" in the equipment form — the test is addressing a field that does not
-exist.`** (`apps/client/src/homebrew/authoring-harness.ts:180-187`; the weapon block flattens to
-top-level keys, so this is *not* the container-shaped `Field "a → b"` message). Report the exact
-string you observe. *Value:* author `heavy` instead of `finesse` through the same control → the attack
-bonus falls back to Strength and the far end fails; restore.
+exist.` (`authoring-harness.ts:186`; the weapon block flattens to top-level keys, so it is *not* the
+container-shaped `Field "a → b"` message). It took all 3 tests in the far-end file with it, plus the
+`vocabularies.test.ts` pick census and 5 of the parity guard's 15 — 9 failed / 18 passed over 3 files.
+*Value:* authoring `heavy` instead of `finesse` through the same control dropped the attack bonus to
+**3** — Strength — and the failure landed **at the far-end assertion** (`expected 3 to be 4`), not at
+an intermediate one, which is the difference between a probe and a data check.
 
 **375px: yes.** `node scripts/tap-audit.mjs 375` on `/homebrew`; the count must not rise, and the new
 control is checked with touch at a narrow viewport.
@@ -665,8 +672,8 @@ Three things, in order:
 3. **The ledger.** `docs/ai-ledger/current-state.md` is **exactly at its 150-line ceiling**
    (*re-measured: `wc -l` = 150*), so it is parent-only and edited by replacement, never by addition.
    `known-bugs.md` and `decision-log.md` take this program's entries — and `known-bugs.md`'s entry for
-   the weapon block (*"A homebrew weapon cannot be given properties or a mastery"*) is C3's to narrow,
-   not to delete: U38 still owns the `mastery` half. `npm run docs` is re-run if anything touched
+   the weapon block was C3's to narrow, not to delete — **narrowed 2026-08-11** to *"A homebrew weapon
+   cannot be given a mastery"*, because U38 still owns the `mastery` half. `npm run docs` is re-run if anything touched
    state/command/HTTP/OpenAPI — nothing in this program should, and if something did, that is a finding.
 
 **375px:** this unit *is* the 375px pass.
@@ -952,8 +959,8 @@ only the client workspace; never run two full suites concurrently, because the s
 live port; read `docs/ai-ledger/known-bugs.md` before calling a red test a regression.
 
 **What this unblocks, and when.** C1 is landed, so the mastery program can regenerate bundles again and
-U20/U35 have the `properties` data they needed. C3 closes the last half of the editor's weapon block
-below `mastery`. C6 unblocks C7a–d. C7a unblocks U20, U23 and U29's shield; C7b unblocks U26, U29 and
+U20/U35 have the `properties` data they needed. C3 closed the last half of the editor's weapon block
+below `mastery` on 2026-08-11. C6 unblocks C7a–d. C7a unblocks U20, U23 and U29's shield; C7b unblocks U26, U29 and
 U31's ring; C7c unblocks U26, U29, U31 and U32; C7d unblocks U32's second carrier. The
 engine/vocabulary planner and the mastery planner should sequence their units behind those four
 merges, not behind the whole program.
@@ -973,7 +980,7 @@ loss waiting to happen.
 | `apps/client/src/homebrew/vocabularies.test.ts` | one unit at a time | exact counts and an ordered list (211 lines) |
 | `apps/client/src/homebrew/vocabulary-parity.mirror.test.ts` census | one unit at a time | an exact ordered set — *re-measured at HEAD, still exactly **3 rows***: `equipment.weapon.mastery` (U38), `monster.actions[].multiattack` (U21), `class.widensPicks` (U17). This program deletes **none** of them; C3's `weapon.properties` is not on the list and does not go on it |
 | `apps/server/src/equipment-derivation.ts` `IMPLEMENTED_MASTERIES` | the mastery program | one `Set` literal at `:247`, `{graze, sap}` today, seven units. **This program never edits it** — C1 supplied the data, not the gate |
-| **`apps/client/src/homebrew/schemas.ts`, the weapon block** | C3, then U38 | **still five rows at `:764-770`** (*re-verified at HEAD*). C3 adds `properties` (sixth), U38 adds `mastery` (seventh). The two programs must not both hold the file |
+| **`apps/client/src/homebrew/schemas.ts`, the weapon block** | ~~C3~~, now U38 alone | **six rows at `:763-795`** — C3 added `properties` (sixth) 2026-08-11; U38 adds `mastery` (seventh). C3 is out of the file, so the lock is U38's alone |
 | **`packages/content-srd-5.2.1/src/index.ts` `loadEquipment()`** | C6 alone now | C1/C3 already threaded `properties` through the weapon fold at `:113-117`; C6 adds a fourth source. No third party may edit it in between |
 | `packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts` | **C2 alone** | C2 adds `clears` to `FeatureMechanics` and `applyMechanics`. C4 consumes it from `wizard.ts` and does not touch this file |
 | full-suite verification | ≤ 2 concurrent | the server suite binds a live port |
@@ -990,7 +997,7 @@ Chromium is pre-installed at `/opt/pw-browsers`; **never run `playwright install
 | --- | --- | --- | --- | --- |
 | ~~**C1**~~ | **met at `36b5a1f`**: the regenerated bundle was 143 insertions / **zero** deletions — the mastery column byte-identical on all 38 rows | — | — | no |
 | **C2** | the build accepts a declared replacement and rejects an undeclared one | remove `clears` handling → the case fails | clear a key the feature does not author → build error | no |
-| **C3** | a **GM-authored** Finesse weapon, built through the real controls, swings off Dexterity on a DEX 15 / STR 12 sheet | delete the `weapon.properties` row → `No field "weapon.properties" in the equipment form — …` | author `heavy` instead of `finesse` → the bonus falls back to Strength | **yes** |
+| ~~**C3**~~ | **met 2026-08-11** (`weapon-properties.mirror.test.ts`): a GM-authored Finesse weapon, published over the real wire, swings at **+4 / `1d8 + 2`** on a DEX 15 / STR 12 sheet where a Maul reads +3 / `2d6 + 1` | met — the exact predicted string, verbatim | met — `heavy` drops the bonus to **3**, at the far-end assertion | **yes** |
 | **C4** | a level-18 Wizard is **refused** for answering both rows with level-1 spells | collapse two blocks to one → the refusal stops | set the second block's floor to 1 → the refusal stops | **yes** |
 | **C5** | the pinned entry count matches the vendored file | — (a sourcing unit; its probe is the pin) | change the pinned count → the guard fails | no |
 | **C6** | a browsed-and-added `Wand of the War Mage, +1` renders on a sheet with its rarity and attunement | remove the fourth fold → the census drops by 268 | change one item's parsed slot → the slot assertion names it | **yes** |
@@ -1015,7 +1022,7 @@ Named so nobody re-solves it, and so the handoff is precise.
 | U34–U38, `vex`, `slow` | the mastery planner | **C1's mastery column, landed at `36b5a1f` and pinned by `bundle.test.ts:224`** at the exact measured distribution (`vex 8 · slow 7 · sap 6 · topple 5 · nick 4 · push 4 · graze 2 · cleave 2`, 38 of 38). Without that pin the entire mastery program's data basis was one rebuild from gone. C1 also authored `light` on 8 weapons, which `nick` (U35) needs and which **no engine mechanism reads yet** (see C7a's box) |
 | the parity guard, the ~80 capability gaps, the three API defects | the API-parity planner | C6's 268 rows, which is the first SRD content that exercises `rarity`, `slot`, `attunement`, `cursed`, `casts` and item riders at all, and therefore the first real closer for the API's rarity bucket (defect (c) names 7 rarities) |
 | `IMPLEMENTED_MASTERIES` | the mastery planner | untouched by this program, by rule |
-| the `weapon.mastery` control (U38) | the mastery planner | C3 leaves the weapon block one row wider and says so in §7. Both halves are named as one live bug in `docs/ai-ledger/known-bugs.md`, with C3 and U38 as its two owners |
+| the `weapon.mastery` control (U38) | the mastery planner | C3 left the weapon block one row wider (2026-08-11) and says so in §7. The live bug in `docs/ai-ledger/known-bugs.md` is now narrowed to the `mastery` half, U38's alone |
 | a second die for Versatile | nobody, yet | recorded as a named absence in C1's parser at `build-bundle.ts:574-579`; it needs a vocabulary decision, not a content edit |
 | the seven ability-score and hit-point items | nobody, yet | recorded as named absences in C7a (`Thunderous Greatclub`, `Berserker Axe`), C7c (`Amulet of Health`, `Belt of Giant Strength`, `Gauntlets of Ogre Power`, `Headband of Intellect`) and C7d (`Potion of Giant Strength`), with `ITEM_REFUSED_MODIFIER_TYPES`' own message quoted |
 
@@ -1046,4 +1053,4 @@ Named so nobody re-solves it, and so the handoff is precise.
    implementation, and C4 is the only unit in this program waiting on it.
 6. **~~The inference budget.~~** Spent at `36b5a1f` and now guarded at compile time
    (`bundle.test.ts:19-31`). It returns only if a later unit adds another key to
-   `EquipmentWeaponStatsSchema`; C3's remaining half adds none.
+   `EquipmentWeaponStatsSchema`; C3's editor half added none — it is a control over an existing column.

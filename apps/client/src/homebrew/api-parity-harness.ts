@@ -575,8 +575,6 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason: "the class-resource id at ITEM scope — the dedicated field exists on feature mounts only; the item's uses rows omit it", owner: "unowned: recorded by this census, owned by no plan" },
   { at: "weapon.mastery", types: ["equipment"],
     reason: "owned outside this program (census row at vocabulary-parity.mirror.test.ts:3415)", owner: "U38 (mastery program)" },
-  { at: "weapon.properties", types: ["equipment"],
-    reason: "batch 0 landed the plumbing; the editor control belongs to the content program (§4)", owner: "content-program C3" },
   { at: "prerequisite.**", types: ["feat"],
     reason: "feat prerequisites have no controls — the ability-score rows, the requires slug and the printed text alike", owner: "unowned: recorded by this census, owned by no plan" },
   { at: "castingOptions[].**", types: ["spell"],

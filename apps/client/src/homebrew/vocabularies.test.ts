@@ -206,7 +206,13 @@ describe("an open slug always keeps its “other”", () => {
     //   · 2 the feature itself carries — `extraPicks` `offer` and `replaces` `offer`.
     // 11 + 5 × 12 = 71. Still EXACT, for the reason it always was: a seventh box cannot land here
     // unmeasured, and a reader who disagrees with the total has the derivation to check it against.
-    expect(picks.length).toBe(71);
+    //
+    // **71 → 72: the weapon block's `properties` row, 2026-08-11 (`C3`).** One declaration, one mount,
+    // one entry — the equipment form is not one of the five types `featuresField` multiplies. It is a
+    // `tags` pick over `WEAPON_PROPERTY_IDS` rather than over `ctx.weaponProperties`, because that
+    // context key is the properties∪masteries union the `weapon-property-is` trigger wants and this
+    // column cannot mean `topple`. Re-derived, not relaxed: 11 + 5 × 12 + 1 = 72.
+    expect(picks.length).toBe(72);
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
       // A FLAG ON TWO KINDS, never a kind of its own. `text` renders `Combobox` directly; `tags`

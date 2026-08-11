@@ -12,15 +12,15 @@ the nine homebrew body schemas accept.
 ## Headline counts
 
 - **162 distinct object schemas** carrying **709 declared keys**, expanded to **4660 editor-addressable questions**.
-- **2817 covered** — the editor has a control (or a composite ancestor control) for the key.
+- **2818 covered** — the editor has a control (or a composite ancestor control) for the key.
 - **106 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
-- **1737 open**, every one carried by a reasoned exemption row below.
+- **1736 open**, every one carried by a reasoned exemption row below.
 
 | type | covered | open |
 | --- | ---: | ---: |
 | background | 447 | 242 |
 | class | 465 | 253 |
-| equipment | 166 | 62 |
+| equipment | 167 | 61 |
 | feat | 404 | 270 |
 | monster | 39 | 133 |
 | species | 819 | 526 |
@@ -73,7 +73,6 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 | `feat.^feature.grants.**` | 10 | bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone |
 | `*.^grants.**` | 10 | bespoke GrantsEditor JSX at record scope — same probe-blind mount |
 | `equipment.casts[].uses.scaling.**` | 3 | an item cast's scaling — zero SRD authors until the magic-item bundle lands |
-| `equipment.weapon.properties` | 1 | batch 0 landed the plumbing; the editor control belongs to the content program (§4) |
 
 ### Owner: D1
 
