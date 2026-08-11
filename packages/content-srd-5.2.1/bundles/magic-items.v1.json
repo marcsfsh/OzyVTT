@@ -72,7 +72,23 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "ammunition-2",
@@ -97,7 +113,23 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2,
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "ammunition-3",
@@ -122,7 +154,23 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3,
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "amulet-of-health",
@@ -272,6 +320,23 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "bludgeoning",
+    "piercing",
+    "slashing"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -297,6 +362,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "lightning"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -347,7 +427,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "armor-2",
@@ -372,7 +459,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 2,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "armor-3",
@@ -397,7 +491,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 3,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "arrow-catching-shield",
@@ -1541,13 +1642,20 @@
    "required": true,
    "restrictedTo": []
   },
-  "cursed": false,
+  "cursed": true,
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "dimensional-shackles",
@@ -1622,7 +1730,29 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "fire"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "dragon-slayer",
@@ -1747,7 +1877,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 2,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "dwarven-thrower",
@@ -1900,7 +2037,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "energy-bow",
@@ -2150,6 +2294,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "fire"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -2275,7 +2434,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "gloves-of-missile-snaring",
@@ -2929,7 +3095,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "save-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "mace-of-disruption",
@@ -3655,7 +3827,16 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "etherealness",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5164,7 +5345,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "initiative",
+    "mode": "advantage",
+    "when": []
+   }
+  ]
  },
  {
   "id": "shield-of-missile-attraction",
@@ -5183,7 +5371,7 @@
    "required": true,
    "restrictedTo": []
   },
-  "cursed": false,
+  "cursed": true,
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
@@ -5214,7 +5402,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 2,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "shield-1",
@@ -5239,7 +5434,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "shield-2",
@@ -5264,7 +5466,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 2,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "shield-3",
@@ -5289,7 +5498,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 3,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "slippers-of-spider-climbing",
@@ -6100,7 +6316,17 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "dominate-beast",
+    "saveDc": 15,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -6596,7 +6822,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "initiative",
+    "mode": "advantage",
+    "when": []
+   }
+  ]
  },
  {
   "id": "weapon-1",

@@ -359,7 +359,11 @@ describe("the ETL's overlay hook", () => {
 
   const scratch = mkdtempSync(join(tmpdir(), "item-mechanics-"));
 
-  it("re-emits the committed bundle byte for byte on a real run - the seam is inert end to end", { timeout: 120_000 }, () => {
+  // The "- the seam is inert end to end" this title used to carry was true only while
+  // `ITEM_MECHANICS_LANES` was empty; C7a landed 2026-08-11 and the run now reports 24 changed rows.
+  // What the assertion always actually proved is REPRODUCIBILITY: the generator plus whatever lanes
+  // are composed re-emits exactly the committed bytes.
+  it("re-emits the committed bundle byte for byte on a real run", { timeout: 120_000 }, () => {
     const out = join(scratch, "inert.json");
     const stdout = run(`--out=${out}`);
     expect(stdout).toContain("wrote 268 magic items");

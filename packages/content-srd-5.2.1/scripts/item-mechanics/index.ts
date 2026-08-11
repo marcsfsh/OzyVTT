@@ -17,17 +17,19 @@
  * lane's rider nowhere in the bundle. Kept as a LIST, both survive to the merge, which refuses them
  * by name. Every other guard a lane inherits is in `./overlay.ts`'s header.
  *
- * IT SHIPS EMPTY, ON PURPOSE. `docs/product/plan-content-program.md` C7a-C7d author the four lanes;
- * this seam is C7's infrastructure and lands before any of them, so today it composes nothing and
- * `bundles/magic-items.v1.json` comes out byte-identical to what C6 committed
- * (`test/item-mechanics.test.ts` holds that, both in process and through the real ETL). Authoring an
- * item here would pre-empt a lane.
+ * IT SHIPPED EMPTY AND NO LONGER IS. `docs/product/plan-content-program.md` C7a-C7d author the four
+ * lanes; the seam landed at `6a0766f` composing nothing, and **C7a (weapons and armour) is the first
+ * lane in.** C7b, C7c and C7d are still absent - authoring one of their items here would pre-empt a
+ * lane. `test/item-mechanics.test.ts` still holds the seam's own guarantees: the EMPTY overlay is a
+ * byte-for-byte no-op, and the committed bundle is exactly what the real ETL re-emits with whatever
+ * lanes are composed here.
  */
 import type { ItemMechanicsLane } from "./overlay.js";
 // one import line per lane module, alphabetical:
-// import { WEAPONS_ARMOUR } from "./weapons-armour.js";
+import { WEAPONS_ARMOUR } from "./weapons-armour.js";
 
 export const ITEM_MECHANICS_LANES: readonly ItemMechanicsLane[] = [
+  { lane: "C7a", categories: ["weapon", "armor", "shield", "ammunition"], entries: WEAPONS_ARMOUR },
   // One block per lane, alphabetical by `lane`. Copy this shape exactly - the categories are the
   // `category` column the ETL emits, and an entry on a row outside them fails the build:
   //
