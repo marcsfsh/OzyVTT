@@ -634,7 +634,7 @@ const attribution = {
     vendoredFrom: "https://github.com/downfallx/dnd-5e-srd-markdown",
     commit: "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4",
     retrieved: "2026-07-27",
-    covers: "classes, subclasses, class spell lists, species, backgrounds, feats"
+    covers: "classes, subclasses, class spell lists, species, backgrounds, feats, magic items"
   }]
 };
 
