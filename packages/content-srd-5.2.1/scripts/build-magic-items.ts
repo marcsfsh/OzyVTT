@@ -182,8 +182,9 @@ function rarityId(printed: string): string {
  * location at all, while missing items whose worn-ness is only implied; over these same 127 it
  * yields 53, a third number for the same question. A phrase about wearing is not a body location.
  *
- * PRODUCED, over the 127 wondrous items: 57 worn / 70 carried -
- * neck 15 · shoulders 15 · head 12 · feet 7 · hands 6 · belt 2.
+ * PRODUCED, over the 127 wondrous items: 56 worn / 71 carried -
+ * neck 15 · shoulders 15 · head 11 · feet 7 · hands 6 · belt 2.
+ * (56 name-matched, minus the 1 pass 3 demotes, plus the 1 pass 2 promotes.)
  *
  * TWO NAMED READINGS INSIDE IT, because a rule with no judgement in it would get them wrong:
  *
@@ -203,11 +204,38 @@ const WORN_BY_NOUN: ReadonlyArray<readonly [string, string]> = [
   ["belt", "belts?|girdles?"]
 ];
 
+/**
+ * Pass 3's test: the item's own prose never says the bearer WEARS it, and does say they HOLD it.
+ * Deliberately requires the hold-word as well as the missing wear-word — an item that says neither
+ * (`Necklace of Fireballs`, `Scarab of Protection`) has no positive evidence either way, and its
+ * name is then the best evidence available, which is where pass 1 already put it.
+ */
+const HELD_NOT_WORN = (body: string): boolean =>
+  !/\bwear(s|ing)?\b|\bworn\b/i.test(body) && /\bhold(s|ing)?\b/i.test(body);
+
 function wondrousSlot(entry: Entry): string {
   // Pass 1: the name names the body location. `Eyes of ...` is the one SRD family whose noun is the
   // body part itself rather than a garment worn on it.
-  if (/^eyes of\b/i.test(entry.name)) return "head";
-  for (const [slotId, nouns] of WORN_BY_NOUN) if (new RegExp(`\\b(${nouns})\\b`, "i").test(entry.name)) return slotId;
+  const byName = /^eyes of\b/i.test(entry.name)
+    ? "head"
+    : WORN_BY_NOUN.find(([, nouns]) => new RegExp(`\\b(${nouns})\\b`, "i").test(entry.name))?.[0];
+  if (byName) {
+    // Pass 3: DEMOTE. A garment name is strong evidence, but it is not conclusive, and the rule was
+    // one-directional until this pass — prose could promote a carried item to worn, and nothing
+    // could do the reverse. `Hat of Many Spells` is the miss that produced it: BOTH its properties
+    // read "While holding the hat", it is never once described as worn, and the only sentence about
+    // it as an object is "This pointed hat has the following properties."
+    //
+    // This is not a labelling nicety. `slot` is SERVER-ENFORCED — `apps/server/src/inventory.ts`
+    // rejects an equip against `SLOT_CAPACITY`, where `head` is 1 — so a `head` hat means a player
+    // wearing a Helm of Telepathy is refused the hat with "Helm of Telepathy already occupies the
+    // head slot - take it off first." The SRD imposes no such conflict: you hold this one.
+    //
+    // MEASURED over the same 127: this pass moves EXACTLY ONE item, and the bundle guard asserts
+    // that by name, so a re-vendor that makes it move a second is a red test rather than a silent
+    // reslotting.
+    return HELD_NOT_WORN(entry.body) ? "wondrous" : byName;
+  }
   // Pass 2: the prose names the garment the name left out ("While wearing this cloak, ...").
   for (const [slotId, nouns] of WORN_BY_NOUN) {
     if (new RegExp(`\\b(this|these|the)\\s+(magic\\s+)?(${nouns})\\b`, "i").test(entry.body)) return slotId;
@@ -279,16 +307,30 @@ const LADDER_RARITIES = /^(.+?)\s*\(\+1\),\s*(.+?)\s*\(\+2\),\s*or\s*(.+?)\s*\(\
 // ---------------------------------------------------------------------------------------------
 
 /**
- * `EquipmentReferenceSchema.description` is `z.string().max(2000)`, and 12 of the 258 entries render
- * longer than that. The cap is not this ETL's to move: the same string is copied onto the INVENTORY
- * row by the sheet's add-from-catalog, and widening a catalog column to fit a reference-book entry
- * would push a 7,000-character paragraph onto a phone's sheet to no one's benefit.
+ * `EquipmentReferenceSchema.description` is `z.string().max(4000)` — RAISED from 2000 on 2026-08-11,
+ * after the review pass showed the original argument for cutting was wrong.
  *
- * So the overflow is cut at the last sentence boundary that fits and marked. It is NOT silent: the
- * bundle guard asserts the exact count and the exact names of the rows that were cut, so the day a
- * thirteenth appears it is a named test failure rather than a paragraph that quietly stops.
+ * The claim was that the cap "is not this ETL's to move" because the same string is copied onto the
+ * INVENTORY row by add-from-catalog. The copy is real (`CharacterSheet.tsx`'s `addFromCatalog`), but
+ * `InventoryItemSchema.description` is `z.string().max(4000)` — DOUBLE the catalog's. The downstream
+ * never constrained the catalog to 2000; the catalog was simply the tighter of the two for no reason.
+ *
+ * And the cut was not cheap. At 2000 it cost, among 12 rows: `Ring of Elemental Command`'s entire
+ * spell-by-plane table AND its "save DC of 18" (the kept text ended "...as shown in the following
+ * table. […]", a dangling promise); `Rod of Lordly Might`'s Drain Life, Paralyze and Terrify, all
+ * three with DC 17; `Staff of the Magi`'s retributive strike; `Apparatus of the Crab`'s levers 6-10.
+ * Those are save DCs and damage dice a C7 lane authors mechanics FROM. `withTables`' own rule below
+ * says it: a description that stops "is not shorter prose, it is a feature that does not say what
+ * it does."
+ *
+ * At 4000 only 2 of 268 are cut — Mysterious Deck (7,687) and Wand of Wonder (4,899) — and both are
+ * long-tail d100 tables rather than a mechanic with a number in it.
+ *
+ * The overflow is still cut at the last sentence boundary that fits and marked. It is NOT silent:
+ * the bundle guard asserts the exact count and the exact names of the rows cut, so a third appearing
+ * is a named test failure rather than a paragraph that quietly stops.
  */
-const DESCRIPTION_LIMIT = 2000;
+const DESCRIPTION_LIMIT = 4000;
 const TRUNCATION_MARK = " […]";
 
 function renderDescription(entry: Entry, printedTypeLine: string): { text: string; truncated: boolean } {

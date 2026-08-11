@@ -5321,7 +5321,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `category` | string (pattern) | yes | Open slug, never a closed enum - "relic", "vehicle", "trinket" need no schema change. Display and grouping; `slot` is what the engine switches on |
 | `costGp` | number \| null | yes |  |
 | `weightLb` | number \| null | yes |  |
-| `description` | string \| null | yes |  |
+| `description` | string \| null | yes | Raised from 2000 to 4000 on 2026-08-11 to match both `EquipmentReferenceSchema` and `InventoryItemSchema.description`, the row this string is copied onto by add-from-catalog. Widening a maxLength accepts everything the old bound did, so no caller that validated before stops validating |
 | `weapon` | HomebrewEquipmentWeapon \| null | no | Populated for weapons only |
 | `armor` | HomebrewEquipmentArmor \| null | no | Populated for armor and shields only |
 | `slot` | `weapon` \| `shield` \| `armor` \| `head` \| `neck` \| `shoulders` \| `hands` \| `ring` \| `belt` \| `feet` \| `held` \| `wondrous` \| `consumable` \| `ammunition` \| `none` | no | WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield) |

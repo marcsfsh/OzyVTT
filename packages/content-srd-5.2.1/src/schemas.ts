@@ -278,7 +278,16 @@ export const EquipmentReferenceSchema = z.object({
   category: z.string().regex(/^[a-z0-9-]+$/).max(40),
   costGp: z.number().nonnegative().max(1_000_000).nullable(),
   weightLb: z.number().nonnegative().max(1000).nullable(),
-  description: z.string().max(2000).nullable(),
+  /**
+   * 4000, RAISED FROM 2000 on 2026-08-11, and the number is not arbitrary — it is the cap on
+   * `InventoryItemSchema.description` (`packages/schemas/src/index.ts`), which is where
+   * add-from-catalog COPIES this string. A catalog cap below its own downstream's was the tighter
+   * of the two for no stated reason, and it cost real content: 12 of the SRD's 268 magic items ran
+   * past 2000 and had to be cut mid-entry, taking `Ring of Elemental Command`'s spell table and its
+   * save DC, `Rod of Lordly Might`'s three DC-17 effects, and `Staff of the Magi`'s retributive
+   * strike with them. Matching the two caps leaves only the 2 genuine outliers cut.
+   */
+  description: z.string().max(4000).nullable(),
   weapon: EquipmentWeaponStatsSchema.nullable().optional(),
   armor: z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).nullable().optional(),
 

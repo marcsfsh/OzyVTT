@@ -67,27 +67,50 @@ describe("the generated magic-item bundle", () => {
       .map((row) => `${row.name} -> ${String(row.slot)}`);
     expect(bad, "rows whose slot is not a member of ItemSlotSchema").toEqual([]);
     expect(histogram(rows.map((row) => row.slot!))).toEqual({
-      wondrous: 70, held: 34, weapon: 33, consumable: 25, ring: 22, neck: 15, shoulders: 15,
-      armor: 14, head: 12, shield: 9, feet: 7, hands: 6, ammunition: 4, belt: 2
+      wondrous: 71, held: 34, weapon: 33, consumable: 25, ring: 22, neck: 15, shoulders: 15,
+      armor: 14, head: 11, shield: 9, feet: 7, hands: 6, ammunition: 4, belt: 2
     });
   });
 
-  it("splits the 127 wondrous items 57 worn / 70 carried, and that split is the rule's OUTPUT", () => {
+  it("emits only category values the browse-and-add chips can filter on", () => {
+    /**
+     * ADDED 2026-08-11 by the review pass, and it closes a hole that hole-shaped tests missed.
+     *
+     * `enums.test.ts`'s hand-authored-gear assertion used to catch an unknown `category` on any row,
+     * because it filtered on "no weapon and no armor sub-object". The magic rows all carry
+     * `weapon: null, armor: null` — the SRD prints no damage dice for `Weapon, +1` — so that filter
+     * could not survive the fourth fold and became `&& !item.isMagic`. Necessary, but it left the
+     * category values of 60 magic rows asserted by NOTHING: the reviewer renamed all 14 magic-armour
+     * rows from `armor` to `armour` and the entire 2,970-test suite still passed.
+     *
+     * It is not cosmetic. The picker's chips filter on `category`, so a miscategorised row vanishes
+     * from its chip and is reachable only under "All" — a GM looking for magic armour would not find
+     * any. Asserted as an exact histogram rather than a membership check, so a row moving BETWEEN
+     * two legal categories fails too.
+     */
+    expect(histogram(rows.map((row) => row.category))).toEqual({
+      "wondrous-item": 127, weapon: 33, consumable: 25, ring: 22, wand: 15, armor: 14,
+      staff: 12, shield: 9, rod: 7, ammunition: 4
+    });
+  });
+
+  it("splits the 127 wondrous items 56 worn / 71 carried, and that split is the rule's OUTPUT", () => {
     /**
      * THE NUMBER IS DERIVED, NOT TARGETED. The rule is written down in full in
      * `scripts/build-magic-items.ts`: a wondrous item is worn when its NAME names the garment
-     * (56 of 127), or failing that when its own prose does in a "this/these <garment>"
-     * construction (1 - `Wings of Flying`, whose first sentence is "While wearing this cloak").
+     * (56 of 127), MINUS the one pass 3 demotes back out again (`Hat of Many Spells`, held not
+     * worn), plus the one its own prose promotes in a "this/these <garment>" construction
+     * (`Wings of Flying`, whose first sentence is "While wearing this cloak"). 56 - 1 + 1 = 56.
      * Everything else is carried.
      *
-     * Two other methods over the same 127 give 62/65 and 52; this file pins what THIS rule
+     * Two other methods over the same 127 give 62/65 and 53; this file pins what THIS rule
      * produces, and C7c ("wondrous, worn") and C7d ("carried wondrous") are scoped off it.
      */
     const wondrous = rows.filter((row) => row.category === "wondrous-item");
     expect(wondrous).toHaveLength(127);
     const worn = wondrous.filter((row) => row.slot !== "wondrous");
-    expect(worn).toHaveLength(57);
-    expect(wondrous.filter((row) => row.slot === "wondrous")).toHaveLength(70);
+    expect(worn).toHaveLength(56);
+    expect(wondrous.filter((row) => row.slot === "wondrous")).toHaveLength(71);
     /**
      * THE ROSTER, NOT JUST THE COUNT, AND IT IS ASSERTED FIRST - because a histogram cannot name the
      * item that moved, and whichever assertion runs first is the one a reader sees. C7c ("wondrous,
@@ -114,7 +137,7 @@ describe("the generated magic-item bundle", () => {
       ],
       head: [
         "Circlet of Blasting", "Eyes of Charming", "Eyes of Minute Seeing", "Eyes of the Eagle",
-        "Goggles of Night", "Hat of Disguise", "Hat of Many Spells", "Headband of Intellect",
+        "Goggles of Night", "Hat of Disguise", "Headband of Intellect",
         "Helm of Brilliance", "Helm of Comprehending Languages", "Helm of Telepathy",
         "Helm of Teleportation"
       ],
@@ -131,10 +154,17 @@ describe("the generated magic-item bundle", () => {
     });
     // The counts, derived from the roster above so the two can never disagree.
     expect(histogram(worn.map((row) => row.slot!)))
-      .toEqual({ neck: 15, shoulders: 15, head: 12, feet: 7, hands: 6, belt: 2 });
+      .toEqual({ neck: 15, shoulders: 15, head: 11, feet: 7, hands: 6, belt: 2 });
     // The two readings inside the rule, named where they can be checked. `Ioun Stone` orbits your
     // head rather than occupying it - three may orbit at once and none competes with a helm - and
     // horseshoes are worn by a horse, not by the bearer this column describes.
+    // PASS 3, the demotion, asserted by name because it is the one pass that can take a slot AWAY.
+    // A garment name is strong evidence and pass 1 trusts it; `Hat of Many Spells` is where that
+    // trust was wrong — both its properties read "While holding the hat" and it is never described
+    // as worn. It matters beyond a label: `slot` is server-enforced (`SLOT_CAPACITY.head` is 1), so
+    // at `head` this hat refused a player already wearing a helm. It is the ONLY item the pass moves,
+    // and pinning that is what stops a re-vendor from quietly reslotting a second.
+    expect(rows.find((row) => row.name === "Hat of Many Spells")!.slot).toBe("wondrous");
     expect(rows.find((row) => row.name === "Ioun Stone")!.slot).toBe("wondrous");
     for (const name of ["Horseshoes of Speed", "Horseshoes of a Zephyr"]) {
       expect(rows.find((row) => row.name === name)!.slot, name).toBe("wondrous");
@@ -223,13 +253,22 @@ describe("the generated magic-item bundle", () => {
      * twelve is what keeps that from being silent: a thirteenth is a test failure, not a paragraph
      * that quietly stops.
      */
+    // TWO, not the twelve this started at. The cap was raised from 2000 to 4000 on 2026-08-11 to
+    // match `InventoryItemSchema.description`, the field add-from-catalog copies this string ONTO —
+    // so the ten that came back include `Ring of Elemental Command`'s spell table and its save DC,
+    // `Rod of Lordly Might`'s three DC-17 effects and `Staff of the Magi`'s retributive strike, all
+    // of which are numbers a C7 lane authors mechanics from. What is still cut is two long-tail
+    // d100 tables, which carry no mechanic a rider needs.
     const cut = rows.filter((row) => row.description!.endsWith(" […]")).map((row) => row.name).sort();
-    expect(cut).toEqual([
-      "Apparatus of the Crab", "Bag of Beans", "Deck of Illusions", "Feather Token",
-      "Hat of Many Spells", "Ioun Stone", "Mirror of Life Trapping", "Mysterious Deck",
-      "Ring of Elemental Command", "Rod of Lordly Might", "Staff of the Magi", "Wand of Wonder"
-    ]);
-    expect(rows.every((row) => row.description!.length <= 2000)).toBe(true);
+    expect(cut).toEqual(["Mysterious Deck", "Wand of Wonder"]);
+    expect(rows.every((row) => row.description!.length <= 4000)).toBe(true);
+    // The ten that came back are asserted by name AND by the mechanic each one lost, so a cap that
+    // silently drops back to 2000 fails here naming what it costs rather than moving a count.
+    const textOf = (name: string) => rows.find((row) => row.name === name)!.description!;
+    expect(textOf("Ring of Elemental Command")).toContain("save DC of 18");
+    expect(textOf("Rod of Lordly Might")).toContain("Drain Life");
+    expect(textOf("Staff of the Magi")).toContain("Retributive Strike");
+    expect(textOf("Apparatus of the Crab")).toContain("escape DC 15");
   });
 
   it("mints no id that any other bundle already ships, and none twice", () => {

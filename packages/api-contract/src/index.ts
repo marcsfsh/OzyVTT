@@ -2143,7 +2143,7 @@ export const openApiDocument = {
           category: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40, description: "Open slug, never a closed enum - \"relic\", \"vehicle\", \"trinket\" need no schema change. Display and grouping; `slot` is what the engine switches on" },
           costGp: { type: ["number", "null"], minimum: 0, maximum: 1000000 },
           weightLb: { type: ["number", "null"], minimum: 0, maximum: 1000 },
-          description: { type: ["string", "null"], maxLength: 2000 },
+          description: { type: ["string", "null"], maxLength: 4000, description: "Raised from 2000 to 4000 on 2026-08-11 to match both `EquipmentReferenceSchema` and `InventoryItemSchema.description`, the row this string is copied onto by add-from-catalog. Widening a maxLength accepts everything the old bound did, so no caller that validated before stops validating" },
           weapon: { description: "Populated for weapons only", oneOf: [{ $ref: "#/components/schemas/HomebrewEquipmentWeapon" }, { type: "null" }] },
           armor: { description: "Populated for armor and shields only", oneOf: [{ $ref: "#/components/schemas/HomebrewEquipmentArmor" }, { type: "null" }] },
           slot: { ...homebrewItemSlot, description: "WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)" },

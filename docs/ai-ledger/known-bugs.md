@@ -92,9 +92,20 @@ Format: `[area] — description — suspected cause / status`.
   34.3px and nine 19px `button.sheet-picker-chip` — was **fixed 2026-08-11** in the magic-item ETL
   commit (`min-height: var(--tap-min)` on both, route 1 rather than `.tap-target`, because the chips
   wrap and an `::after` overhang would steal from the chip above). Re-measured there directly in
-  Chromium 1194 at 375×667 with touch: all **12** chips 44px tall, search 303×44. The remaining
-  sub-floor control on those surfaces is `.sheet-remove` at **29.6×29.6** (`IconButton size="sm"`),
-  which nothing has fixed and the audit still cannot see.
+  Chromium 1194 at 375×667 with touch: all **12** chips 44px tall, search 303×44.
+  An earlier version of this entry then named `.sheet-remove` at **29.6×29.6** as a remaining
+  sub-floor control; **that was a false violation and is retracted** (2026-08-11, the C6 review pass).
+  `.sheet-remove` is an `IconButton`, `IconButton` adds `tap-target` unconditionally
+  (`packages/ui/src/primitives/Button.tsx:83`), `.tap-target::after` is a centred
+  `max(100%, var(--tap-min))` = 44px (`design-tokens.css`), and the audit's own size is
+  `max(rect, ::after)` (`scripts/tap-audit.mjs`). 29.6 is its **paint**, and
+  `packages/ui/src/primitives/Button.css` names `.nh-iconbtn` exempt from the paint floor for exactly
+  this reason — "they reach the floor by route 2". The control measures 44×44 and always did. Logged
+  here because the audit's own docblock calls this failure out by name: *"a false violation is worse
+  than none: it sends the next session to 'fix' working code."*
+  **Still true and still owed:** the audit reaches neither surface, so nothing on them is in the
+  printed number. That is a fixture gap rather than a structural one — with a fight seeded, the
+  2026-08-10 run *did* measure `play-sheet-picker` at 328 controls.
 
 - **[ui/touch] The row-tools popover and the token context menu ship sub-floor controls, and the tap
   audit opens neither surface.** Measured 2026-08-10 in Chromium 1194 at 375×667 (dsf 2, isMobile,
@@ -120,7 +131,10 @@ Format: `[area] — description — suspected cause / status`.
   **one** unmeasured surface. On an **empty** library — which is what the dev database holds, the two
   earlier fixtures having been soft-deleted — all three homebrew surfaces go unmeasured instead ("no
   homebrew row in the rail"): 2131 measured, 30 below the floor, 1 unreachable, **3** surfaces NOT
-  MEASURED. Either way the exit code is 1 for the unmeasured surfaces, not for the 30. Its sibling
+  MEASURED. (That 30 is the 2026-08-10 total and **ten of it is now fixed** — the picker's search and
+  nine chips, in the C6 commit — so a re-run on the same database would print 20. The figure is left
+  as measured rather than adjusted on paper; what it dates is the run, not today.)
+  Either way the exit code is 1 for the unmeasured surfaces, not for the 30. Its sibling
   `play-homebrew-feature` finds its target by walking the rail; this one does not.
 
 - **[codex/touch] The pin inspector's "Show the pin" is the audit's one unreachable control.**
