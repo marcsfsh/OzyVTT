@@ -178,6 +178,18 @@ Format: `[area] — description — suspected cause / status`.
   closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
   slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
 
+- **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
+  carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
+  now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as
+  well — set to the FIRST block, not to null. A consumer reading only `choice` therefore sees "pick
+  one level-1 spell" and silently drops the level-2 pick entirely. The client is not affected:
+  `featurePicksOf` (`apps/client/src/builder/build-payload.ts:130`) prefers `choices` whenever it is
+  non-empty, which is why the builder renders two rows. It is the PUBLIC API surface that misleads,
+  and the trap grows with every feature converted to the two-block shape (Magic Initiate and the
+  four Mystic Arcana are already there). Not a projection leak — both spellings are player-facing
+  content. Suspected fix: serve `choice` as null when `choices` holds more than one block, or drop
+  the compatibility spelling from the published contract and say so in the API reference.
+
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and
   migration v17 bounded revision growth with a global switch plus a coalescing window, with
