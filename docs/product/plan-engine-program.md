@@ -44,7 +44,7 @@ Seventeen rows came in. Nineteen go out, in a different shape.
 | **U33 re-scoped** | copy sweep → a mechanism | there is no way to label an OPTION today; `SelectOption` has no `note` |
 | **U18 grows** | schema + control → **schema + control + the READ** | `effectiveSpeedFeet` never touches `actor.effects[].modifiers`; without the sweep the row is inert and mastery `slow` cannot ship |
 | **U17 unblocked** | schedulable | **D-ENGINE-1 was ruled** on 2026-08-10 (`decision-log.md:59`–`:61`), option 1 — see §7 |
-| **new prep `R2`** | split `RiderEditor.tsx` | 8 of 19 units need a control in one 1365-line file (decision **D-ENGINE-2**, §7, still open) |
+| **new prep `R2`** | ~~split `RiderEditor.tsx`~~ **NOT DOING** | **D-ENGINE-2 declined 2026-08-11** (decision log). The file stays whole, so §6 is the live plan: one `RiderEditor` unit per batch across the twelve that need one. |
 | **U23 grows** | S → M | the reader's `?? damage[0].type` fallback is unreachable; the schema refuses what the form seeds |
 | **U27 grows** | M → L | there is no advantage machinery on the check path at all, and its one author is effect-side |
 | **U29 grows** | S → M | it depends on `E0`, and `attackKinds` is built on one branch only |
@@ -898,7 +898,7 @@ rider-field region. Runs alone, after all seven of its predecessors.
 
 ---
 
-## 6. If D-ENGINE-2 is declined
+## 6. If D-ENGINE-2 is declined — **it was, 2026-08-11. This section is the live plan.**
 
 Without R2, `RiderEditor.tsx` is one file and the rule *"no two agents share a file"* admits **one**
 control unit per batch. Measured: **8 of the 19 units need a control there.** The program then runs
@@ -944,7 +944,14 @@ against a narrower second list for exactly this reason.
 **Already recorded** in `docs/ai-ledger/decision-log.md` (2026-08-10 entry). Nothing further is owed
 before U17 is scheduled.
 
-### D-ENGINE-2 — split `RiderEditor.tsx`? · **shapes every batch · STILL OPEN**
+### D-ENGINE-2 — split `RiderEditor.tsx`? · **shapes every batch · RULED 2026-08-11: DECLINED**
+
+> **The client answered NO: the file is not split.** `decision-log.md`, 2026-08-11. **§6 below is
+> therefore the live plan, not a contingency** — read it instead of the R2 path in §5. The costed
+> consequence is calendar, not risk: eight batches with three lanes idle in most of them rather than
+> five plus a closer, and **at most one `RiderEditor` unit per batch** across the twelve that need
+> one. The analysis below is kept because it is the case for re-opening if that queue becomes the
+> critical path — but re-open it with the measured cost of the serialisation, not with this argument.
 
 **Not in the 2026-08-10 rulings** — grep of `decision-log.md` for `RiderEditor` at HEAD: zero hits.
 It is this program's to take, and it must be taken before batch E3.

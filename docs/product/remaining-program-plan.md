@@ -129,9 +129,17 @@ an implementing agent does:
 **Batch 3 — the content program.** The full SRD magic-item list, plus the carriers the zero-author
 units need, plus Wizard's Spell Mastery. Longest pole; starts as early as batch 0 allows.
 
-**Batches 4–7 — the units**, four concurrent agents in separate worktrees, grouped so no two share a
-file, ordered by the three real dependencies. The three invariant-touching units (U22, U36, U37) get a
-dedicated agent each and a viewer-safety audit before merge.
+**Batches 4–7 — the units**, up to four concurrent agents in separate worktrees, grouped so no two
+share a file, ordered by the three real dependencies. The three invariant-touching units (U22, U36,
+U37) get a dedicated agent each and a viewer-safety audit before merge.
+
+> **Four is a CEILING these batches will rarely reach, ruled 2026-08-11.** D-ENGINE-2 was answered
+> *do not split `RiderEditor.tsx`* — see the decision log. Twelve units need a control in that one
+> 1365-line file (eight engine: U18, U19, U20, U21a, U22, U23+U30, U28, U33; four more from the API
+> program's lane β), and "no two share a file" then permits **at most one of them per batch**. Plan
+> the unit batches as one `RiderEditor` unit plus up to three that avoid it entirely, not as four of
+> anything. A schedule drawn from the old "four concurrent agents" reading will deadlock on its
+> second lane.
 
 **Closers.** U38 (after all eight mastery slugs), U33 (after its seven).
 
@@ -169,6 +177,13 @@ Measured. Each is a merge conflict or a silent data loss waiting to happen:
 - **`apps/client/src/homebrew/vocabularies.test.ts`** — carries exact counts and an ordered list.
 - **`apps/client/src/homebrew/vocabulary-parity.mirror.test.ts`**'s census array — an exact ordered set.
 - **`apps/server/src/equipment-derivation.ts`'s `IMPLEMENTED_MASTERIES`** — one Set literal, seven units.
+- **`apps/client/src/homebrew/RiderEditor.tsx`** — **the widest one, and it is here because of a
+  ruling rather than a measurement.** 1365 lines, twelve units need a control in it, and D-ENGINE-2
+  (2026-08-11) ruled it stays whole. Those twelve therefore run **one per batch**, and this is the
+  constraint most likely to be missed, because the file is not obviously shared the way a census
+  array is — each unit touches a different *region* of it and reads as independent right up until
+  the merge. Re-open the split (prep unit `R2`, §7 of the engine plan) if the queue becomes the
+  critical path; until then, treat it as a lock.
 - **Full-suite verification** — at most 2 concurrent on this box.
 
 ---
