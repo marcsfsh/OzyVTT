@@ -212,6 +212,35 @@ Format: `[area] — description — suspected cause / status`.
   needs a real field, not a heuristic. Wants its own unit: a `healing` block on the spell reference,
   the ETL to populate it, and a reader — until then every healing carrier stays a named absence.
 
+- **[content/spells] A spell's `damage` and `attackRoll` columns describe its TEXT, not what one cast
+  rolls, and `castAction` reads them as if they did.** The sibling of the entry above and the wider
+  half of it: healing is one shape of "the printed dice are not damage at a target", and there are
+  others. `castAction` (`apps/server/src/equipment-derivation.ts:922-961`) takes `spell.damage.roll`
+  as a cast's damage formula, **`spell.damage.types[0] ?? "force"`** as its damage type, and emits an
+  `attack` block whenever `spell.attackRoll` is true. Measured 2026-08-11 against the committed
+  `packages/content-srd-5.2.1/bundles/spells.v1.json` (339 records), four spells whose records are
+  faithful to the SRD text become four wrong item actions: **`web`** is `{roll: "2d4",
+  types: ["fire"]}` — which the SRD deals only *"to any creature that starts its turn in the fire"*
+  after somebody ignites the webs — so a cast rolls it every time; **`magic-missile`** is
+  `{roll: "1d4 + 1"}`, which is what ONE of the spell's **three** darts deals, so a cast averages
+  ~3.5 where the spell averages ~10.5; and `cure-wounds`/`heal` are the entry above.
+  **`attackRoll` is separately over-broad**: 42 of the 339 carry it, and three were read against
+  their own text here and make no attack roll at all — `faerie-fire` (*"Each creature in the Cube is
+  also outlined if it fails a Dexterity saving throw"*), `protection-from-evil-and-good` (*"Creatures
+  of those types have Disadvantage on attack rolls against the target"*) and `ray-of-enfeeblement`
+  (*"The target must make a Constitution saving throw"*). Each merely *mentions* an attack roll
+  somebody else makes. The population is larger than three and unaudited: **13 of the 42 carry no
+  damage roll at all** and **11 also force a saving throw** — `bane`, `bless`, `blur`, `invisibility`,
+  `magic-weapon`, `mirror-image` among them — shapes a spell attack does not have.
+  `ray-of-enfeeblement` is both defects at once: `attackRoll: true` plus `{roll: "1d8", types: []}`
+  makes a **1d8 Force spell attack** out of a spell whose 1d8 is what the TARGET subtracts from its
+  own damage rolls. Found by the C7b salvage, which removed seven authored casts over it and records
+  each as a named absence in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/wands-rods-rings.ts` (limit **L6**). Not a
+  projection or a wire problem — the records are honest and the CONSUMER's reading of them is not.
+  Wants the same unit as the entry above: a cast-time damage/attack model the item carrier can trust,
+  rather than a heuristic over prose columns.
+
 - **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
   carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
   now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as

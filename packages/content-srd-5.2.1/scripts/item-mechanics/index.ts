@@ -18,18 +18,20 @@
  * by name. Every other guard a lane inherits is in `./overlay.ts`'s header.
  *
  * IT SHIPPED EMPTY AND NO LONGER IS. `docs/product/plan-content-program.md` C7a-C7d author the four
- * lanes; the seam landed at `6a0766f` composing nothing, and **C7a (weapons and armour) is the first
- * lane in.** C7b, C7c and C7d are still absent - authoring one of their items here would pre-empt a
- * lane. `test/item-mechanics.test.ts` still holds the seam's own guarantees: the EMPTY overlay is a
- * byte-for-byte no-op, and the committed bundle is exactly what the real ETL re-emits with whatever
- * lanes are composed here.
+ * lanes; the seam landed at `6a0766f` composing nothing, then **C7a (weapons and armour)** and
+ * **C7b (wands, staffs, rods, rings and the scroll)**. C7c and C7d are still absent - authoring one
+ * of their items here would pre-empt a lane. `test/item-mechanics.test.ts` still holds the seam's own
+ * guarantees: the EMPTY overlay is a byte-for-byte no-op, and the committed bundle is exactly what
+ * the real ETL re-emits with whatever lanes are composed here.
  */
 import type { ItemMechanicsLane } from "./overlay.js";
 // one import line per lane module, alphabetical:
+import { WANDS_RODS_RINGS } from "./wands-rods-rings.js";
 import { WEAPONS_ARMOUR } from "./weapons-armour.js";
 
 export const ITEM_MECHANICS_LANES: readonly ItemMechanicsLane[] = [
   { lane: "C7a", categories: ["weapon", "armor", "shield", "ammunition"], entries: WEAPONS_ARMOUR },
+  { lane: "C7b", categories: ["wand", "staff", "rod", "ring", "consumable"], entries: WANDS_RODS_RINGS },
   // One block per lane, alphabetical by `lane`. Copy this shape exactly - the categories are the
   // `category` column the ETL emits, and an entry on a row outside them fails the build:
   //
