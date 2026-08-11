@@ -10,7 +10,7 @@
  * Three tests, exactly as planned:
  *
  *   - **T1, the census.** Walk the nine `HOMEBREW_BODY_SCHEMAS` into 4,660 editor-addressable
- *     questions, probe each against the real form model, and hold the 1,611 open answers to the
+ *     questions, probe each against the real form model, and hold the 1,737 open answers to the
  *     exemption table in both directions — a gap with no reasoned row fails, a row whose gap closed
  *     fails, and the counts are pinned so a control landing on even one type moves a number.
  *   - **T2, the round trip.** For each type: author a record through the REAL controls, POST it
@@ -57,7 +57,7 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    }).toEqual({ asked: 4660, covered: 2944, forced: 105, open: 1611 });
+    }).toEqual({ asked: 4660, covered: 2817, forced: 106, open: 1737 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {
@@ -204,18 +204,31 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
   }
 
   it("background: CANNOT round-trip today — D3's measured defect, pinned until its unit lands", () => {
-    // `abilityOptions.spreads` is schema-required non-empty, and the only control mints
-    // `{ amounts, label }` — a shape the schema refuses (plan §D3: "Tapping 'Add a spread' makes a
-    // background unpublishable"). So there is no editor path to a publishable background AT ALL.
-    // This pin is the honest T2 for the type: when D3 lands, it fails, and the unit replaces it
-    // with the real round trip in the same commit.
+    // There is no editor path to a publishable background AT ALL, for two stacked reasons this pin
+    // holds apart. This is the honest T2 for the type: when D3 lands, both halves fail, and the
+    // unit replaces them with the real round trip in the same commit.
     const bare = authored("background", "Lamplighter", [
       ["summary", "You kept the streets lit."],
       ["description", "Every alley knows your ladder and your flame."]
     ]);
-    const verdict = publishVerdict("background", bare, "hb-a1-probe");
+
+    // Half 1 — the requirement: `abilityOptions.spreads` is schema-required non-empty, so leaving
+    // it alone is already unpublishable.
+    const untouched = publishVerdict("background", bare, "hb-a1-probe");
+    expect(untouched.publishable).toBe(false);
+    expect(untouched.why).toContain("Fix spreads — array must contain at least 1");
+
+    // Half 2 — D3's own mechanism ("Tapping 'Add a spread' makes a background unpublishable"):
+    // the ONLY control for the required key mints `{ amounts, label }`, a shape the schema
+    // refuses. So satisfying half 1 through the real control swaps the refusal for the minted
+    // shape's own — the regression target D3's implementer needs. `authoredRow` goes through the
+    // row field's real `newRow`/writes.
+    const spread = authoredRow("background", ["abilityOptions.spreads"], [["label", "Standard"]]);
+    const tapped = applyField("background", bare, "abilityOptions.spreads", [spread]);
+    const verdict = publishVerdict("background", tapped, "hb-a1-probe");
     expect(verdict.publishable).toBe(false);
-    expect(verdict.why).toContain("spreads");
+    expect(verdict.why, "the tapped refusal is the minted SHAPE's, not the empty array's")
+      .toContain("Fix spreads — expected array, received object");
   });
 });
 
@@ -225,9 +238,10 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
   it("(control) removing an exemption row whose addresses still have no control fails the census, naming them", () => {
     const withoutGrants = EXEMPTIONS.filter((row) => row.at !== "actions[].grants.**");
     const verdict = censusVerdict(open, withoutGrants);
-    // The exact failure a later agent would see. Not all 292 of C4's addresses orphan — the
-    // modifiers/spells rows legitimately float under `actions[].grants.` and keep their slices —
-    // but the group's own keys have nowhere to go, and the census names them.
+    // The exact failure a later agent would see. Not all of C4's addresses orphan — the
+    // `modifiers[].**` row legitimately floats under `actions[].grants.modifiers[].` and keeps
+    // that slice (`EffectGrantSchema` has no `spells`, so nothing else intersects) — but the
+    // grant's own keys have nowhere to go, and the census names them.
     expect(verdict.unmatched.length).toBe(111);
     expect(verdict.unmatched.some((line) => line.includes("monster.actions[].grants.name"))).toBe(true);
   });

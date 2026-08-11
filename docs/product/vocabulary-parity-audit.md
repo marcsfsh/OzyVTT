@@ -12,21 +12,21 @@ the nine homebrew body schemas accept.
 ## Headline counts
 
 - **162 distinct object schemas** carrying **709 declared keys**, expanded to **4660 editor-addressable questions**.
-- **2944 covered** — the editor has a control (or a composite ancestor control) for the key.
-- **105 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
-- **1611 open**, every one carried by a reasoned exemption row below.
+- **2817 covered** — the editor has a control (or a composite ancestor control) for the key.
+- **106 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
+- **1737 open**, every one carried by a reasoned exemption row below.
 
 | type | covered | open |
 | --- | ---: | ---: |
-| background | 463 | 226 |
-| class | 487 | 231 |
-| equipment | 172 | 56 |
-| feat | 435 | 240 |
-| monster | 41 | 131 |
-| species | 853 | 492 |
+| background | 447 | 242 |
+| class | 465 | 253 |
+| equipment | 166 | 62 |
+| feat | 404 | 270 |
+| monster | 39 | 133 |
+| species | 819 | 526 |
 | spell | 29 | 4 |
 | spell-list | 5 | 2 |
-| subclass | 459 | 229 |
+| subclass | 443 | 245 |
 
 ## The exemption table — every open address, its reason, and who closes it
 
@@ -70,8 +70,9 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 | `*.grants.spells[].**` | 21 | GrantsEditor writes the spells array whole (grantsFromRows, U9); the per-row keys have no FieldDef the probe can see |
 | `*.features[].grants.**` | 30 | bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe |
 | `*.traits[].grants.**` | 20 | bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe |
+| `feat.^feature.grants.**` | 10 | bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone |
 | `*.^grants.**` | 10 | bespoke GrantsEditor JSX at record scope — same probe-blind mount |
-| `equipment.casts[].uses.scaling.**` | 4 | an item cast's scaling — zero SRD authors until the magic-item bundle lands |
+| `equipment.casts[].uses.scaling.**` | 3 | an item cast's scaling — zero SRD authors until the magic-item bundle lands |
 | `equipment.weapon.properties` | 1 | batch 0 landed the plumbing; the editor control belongs to the content program (§4) |
 
 ### Owner: D1
@@ -107,6 +108,8 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 | `background.skillChoices.**` | 3 | zero SRD backgrounds author it (§4) |
 | `background.toolChoices.**` | 3 | one SRD background authors it (§4, lone record) |
 | `species.abilityBonusChoice.**` | 3 | zero SRD species author it (§4) |
+| `class.skillChoices.fromCatalog` | 1 | zero of 12 SRD classes author it — every class uses the from list, which has a control (§4); the group's rows never offered it |
+| `class.toolChoices.fromCatalog` | 1 | zero of 12 SRD classes author it (§4); the group's rows never offered it |
 | `spell-list.^add` | 1 | written whole by the bespoke SpellListContents editor — no FieldDef the probe can see |
 | `spell-list.^remove` | 1 | written whole by the bespoke SpellListContents editor — no FieldDef the probe can see |
 | `monster.proficiencies.**` | 8 | 0 of 330 SRD monsters author it, and a control would change which rung saves resolve on (§4, B1's trap) |
@@ -131,20 +134,26 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 
 | group | open | reason |
 | --- | ---: | --- |
+| `background\|class\|equipment\|feat\|monster\|species\|subclass.actions[].attack.count` | 20 | attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review) |
+| `background\|class\|equipment\|feat\|monster\|species\|subclass.actions[].attack.criticalBonusDice` | 20 | attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review) |
+| `background\|class\|equipment\|feat\|species\|subclass.actions[].attack.proficient` | 19 | the feature attack shape's proficiency flag — no row enumerates it (the statblock shape does not carry it) |
+| `background\|class\|equipment\|feat\|species\|subclass.actions[].save.dc.**` | 57 | the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only |
 | `background\|class\|equipment\|feat\|species\|subclass.effects[].onEnd[].**` | 57 | what happens when an effect ends — no program unit authors it |
 | `background\|class\|equipment\|feat\|species\|subclass.effects[].endsWithTag` | 19 | effect linkage vocabulary with no control — no program unit authors it |
 | `background\|class\|equipment\|feat\|species\|subclass.effects[].target` | 19 | effect linkage vocabulary with no control — no program unit authors it |
 | `background\|class\|equipment\|feat\|species\|subclass.effects[].voidWhileIncapacitated` | 19 | effect linkage vocabulary with no control — no program unit authors it |
-| `background\|class\|equipment\|feat\|species\|subclass.modifiers[].**` | 33 | the modifier rows beyond U6's type control — appliesTo/damageTypes and the when[] filter have no fields |
-| `*.choice.options[].**` | 296 | an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper |
-| `*.choices[].**` | 324 | the plural choices list — the panel writes the singular choice; the list shape has no control at all |
+| `background\|class\|equipment\|feat\|species\|subclass.modifiers[].**` | 33 | the modifier rows beyond U6's type control — neither union's per-key internals (appliesTo/damageTypes on effects; the feature union's filters) have fields |
+| `*.choice.options[].**` | 292 | an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper |
+| `*.choices[].**` | 320 | the plural choices list — the panel writes the singular choice; the list shape has no control at all |
 | `*.choice.**` | 10 | the parts of a feature's choice beyond the panel's fields |
-| `*.uses.scaling.table[].**` | 6 | the hand-written scaling table rows — features scale by class-resource or level today (U7's surface); the literal table has no rows control |
+| `*.uses.scaling.table[].**` | 6 | the by-level table at the three mounts the canonicaliser cannot reach — lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered |
 | `*.extraPicks[].**` | 12 | extra-pick rows beyond the resolver U15 wired — no rows control at feature scope |
 | `*.replaces[].**` | 6 | the replacement clause's rows — written whole by the U14 control, per-key fields invisible to the probe |
 | `species.replacesFeatureId` | 1 | supersession at species-trait scope — the control exists on class features (U14), not here |
-| `class.multiclassPrerequisites.**` | 2 | the builder does not multiclass — the schema key has no reader on the build path and no control |
-| `feat.prerequisite.abilityScores[].**` | 2 | feat prerequisites have no rows control |
+| `class.multiclassProficiencies.**` | 3 | the builder does not multiclass — no reader on the build path and no control |
+| `class.multiclassPrerequisites.**` | 3 | the builder does not multiclass — the schema key has no reader on the build path and no control |
+| `equipment.^uses.scaling.id` | 1 | the class-resource id at ITEM scope — the dedicated field exists on feature mounts only; the item's uses rows omit it |
+| `feat.prerequisite.**` | 4 | feat prerequisites have no controls — the ability-score rows, the requires slug and the printed text alike |
 | `spell.castingOptions[].**` | 4 | a spell's casting options — the spell form has no rows control for them |
 
 ## What this census cannot see, stated so nobody over-reads a green run

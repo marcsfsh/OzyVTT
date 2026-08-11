@@ -72,8 +72,8 @@ Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `
   restated code. Use `vtt-context-router` to pick the 2-4 that apply; don't read the tree.
 - **`docs/ai-ledger/`** — `known-bugs.md`, `decision-log.md` on demand; history in `docs/archive/`.
 - **`docs/adr/`**, **`docs/product/`**, **`BUILD_PLAN.md`** — durable decisions and roadmap.
-- **`docs/app-map.md`** and **`docs/api-reference.md`** are generated and freshness-tested.
-  Never hand-edit either; regenerate with the commands above.
+- **`docs/app-map.md`**, **`docs/api-reference.md`** and **`docs/product/vocabulary-parity-audit.md`** are generated and freshness-tested.
+  Never hand-edit any of them; regenerate with the commands above.
 
 ## How to work
 
