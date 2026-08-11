@@ -13,6 +13,35 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-11 — two of the parent decisions the unit programs were waiting on
+
+**Context.** `docs/product/plan-engine-program.md` §7 (D-ENGINE-2) and the U35a scope question were
+both left open by the 2026-08-10 re-verification pass, and both gate work that cannot start without
+them. Put to the client 2026-08-11; both answered.
+
+**D-ENGINE-2 — `RiderEditor.tsx` is NOT split. Ruled: leave it, and serialise the work instead.**
+Eight engine units (U18, U19, U20, U21a, U22, U23+U30, U28, U33) plus four from the API program's
+lane β all need a control in that one 1365-line file. The plan offered a prep unit `R2` to split it
+first and recommended taking it; the client declined. **The consequence is a scheduling one and it is
+now binding: no two units that touch `RiderEditor.tsx` may run in the same batch.** Twelve units
+therefore queue through it one at a time rather than fanning out, and any plan text that assumes
+four concurrent agents across those units is wrong until this is re-opened. The upside the client
+bought: no refactor of a file that eight shipped units already depend on, and no window where a
+half-split file is the merge base for concurrent work.
+
+> The split remains available. If the queue becomes the critical path, re-open this with the
+> measurement — how much wall-clock the serialisation actually cost — rather than the argument.
+
+**U35a — the Light-property extra attack is its OWN unit, not a mastery.** Size L. It is a core 2024
+rule available to every character who wields a light weapon, so it does not belong inside the
+weapon-mastery system, which exists for the per-weapon special cases. This unblocks U35b, which in
+turn is one of the eight slugs U38 is gated on.
+
+**Still open**, and named so the next session does not think this closed them: the engine U18/U22 →
+mastery-program sequencing (the vex/slow agents stop-and-report if it is got wrong), the C6 wondrous
+split, Horn of Valhalla's rarity, the multiattack census row, and who owns
+`equipment.weapon.properties`.
+
 ## 2026-08-10 — the remaining program: twenty client rulings, and one home for decisions
 
 **Context.** The feature-implementations branch (PR #55) closed 17 vocabulary-parity units across
