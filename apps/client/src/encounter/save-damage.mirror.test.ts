@@ -152,6 +152,40 @@ describe("the save prompt's damage field", () => {
     expect(table.hp()).toBe(34);
   });
 
+  /**
+   * THE SAME RECHECK AGAINST A DEFENCE, WHERE THE PROJECTION IS WRONG - asserted as it BEHAVES,
+   * not as the prompt claims, because this is a live bug and a test that encoded the aspiration
+   * would go green the day the bug got worse.
+   *
+   * `answerSave`'s preview arm returns `outcomeDamage`, which is the halved, re-typed total BEFORE
+   * `applyDamageDetailed` runs (`saving-throws.ts` - the `if (!commit) return` sits above the call).
+   * Only the commit arm reports `application.totalApplied`. So every defence - resistance,
+   * vulnerability, immunity, flat `damage-reduction` - is invisible to the preview, and the prompt
+   * prints a number the commit will not land.
+   *
+   * The case above passes only because its fixture is `resistant: false`, where the two arms agree
+   * by construction. That is why the gap survived a review: the one test named for the property
+   * exercised it on the only fixture where it cannot fail.
+   *
+   * The gap is NOT new to the amend - the un-amended Roll preview has the identical shape - so the
+   * fix belongs to the preview path rather than to `4b`. Recorded in `known-bugs.md`; when it is
+   * fixed, this test's numbers converge and its title stops being true.
+   */
+  it("projects the PRE-defence number on a recheck, which is not what the commit applies", () => {
+    const table = tableWith({ resistant: true, halfOnSuccess: true });
+    // 18 vs DC 15 succeeds, so 12 halves to 6; the target is fire-resistant, so 6 lands as 3.
+    const preview = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
+    expect(preview.outcome.committed).toBe(false);
+    expect(preview.outcome.appliedDamage).toBe(6);
+    expect(table.hp()).toBe(40);
+
+    const committed = answerFromThePrompt(table, "12", 18);
+    expect(committed.outcome.appliedDamage).toBe(3);
+    expect(40 - table.hp()).toBe(3);
+    // The whole finding in one line: the prompt showed 6, the target lost 3.
+    expect(preview.outcome.appliedDamage).not.toBe(committed.outcome.appliedDamage);
+  });
+
   it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {
     // 9 fire + 8 cold. `rescaleDamageParts` re-weights 12 across them as 7 + 5, and the success
     // halving floors EACH part: 3 + 2 = 5. `floor(12 / 2)` is 6. That gap is the point of this case -

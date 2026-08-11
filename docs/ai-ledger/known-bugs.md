@@ -14,6 +14,24 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
+- **[encounter/saves] A save preview projects the PRE-defence number, so the prompt prints more than
+  the commit lands against any resistant target.** `answerSave`'s preview arm returns `outcomeDamage`
+  — the halved, re-typed total — and it `return`s from ABOVE the call to `applyDamageDetailed`
+  (`apps/server/src/saving-throws.ts`, the `if (!commit) return` immediately preceding it). Only the
+  commit arm reports `application.totalApplied`. Every defence is therefore invisible to the preview:
+  resistance, vulnerability, immunity, Petrified/Underwater and flat `damage-reduction` riders.
+  Measured 2026-08-10 through the client's own payload builder, the server's `.strict()` schema and
+  `answerSave`, on a fire-resistant target with `halfOnSuccess` and a save that succeeded 18 vs DC 15:
+  an amend of **12** projects **6** and the commit applies **3**. Pinned as it behaves — not as the
+  prompt claims — by *"projects the PRE-defence number on a recheck"* in
+  `apps/client/src/encounter/save-damage.mirror.test.ts`; when this is fixed those numbers converge
+  and that test changes on purpose. **Not specific to the amend:** the un-amended Roll preview has the
+  identical shape (17 projected, 8 applied), so the fix belongs to the preview path, not to `4b`. The
+  honest fix is a dry-run projection through the same pipeline that applies nothing — no hit points
+  moved and no receipt a commit would double-count — which is a change to the authoritative damage
+  path and wants its own review pass. `SavePrompt`'s docblock and `current-state.md:31` both used to
+  assert the opposite; corrected 2026-08-11.
+
 - **[encounter/damage] Editing the pre-filled number on a parked player hit drops its damage types, so
   Apply bypasses every defence.** `resolvePendingDamage`'s `amount !== undefined` arm
   (`apps/server/src/player-damage.ts:83-85`) builds `{ amount, critical, sourceName }` and never

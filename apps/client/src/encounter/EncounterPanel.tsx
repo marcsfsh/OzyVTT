@@ -167,6 +167,16 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  *     nothing, applies nothing, and answers with the projection for the number now in the field. So
  *     the line reads the server's arithmetic by construction rather than a mirror of it, and the
  *     amend's provenance stays on the row ("6 dmg (amended - rolled 17)").
+ *
+ * WHAT THAT PROJECTION STILL DOES NOT COVER, because the sentence above is easy to over-read: the
+ * server's PREVIEW arm returns the halved, re-typed total from ABOVE its call to
+ * `applyDamageDetailed` (`saving-throws.ts`), so the number this line prints has been through the
+ * halving rules and NOT through the defence pipeline. Against resistance, vulnerability, immunity or
+ * a flat `damage-reduction` rider the commit lands something else - measured, 12 amended onto a
+ * fire-resistant target on a successful half-on-success save prints 6 and applies 3. The gap is the
+ * preview path's, not the amend's: the un-amended Roll preview has the identical shape. It is in
+ * `known-bugs.md`, and `save-damage.mirror.test.ts` pins the behaviour as it IS so the day it is
+ * fixed is a day a test changes on purpose.
  */
 export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
   const [busy, setBusy] = useState(false);
@@ -267,7 +277,9 @@ export function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode,
         <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.success ? "Success" : "Failure"}</strong>
         {/* `rolled.damage` is always the SERVER's projection for the number the field holds - never
             this component's arithmetic on it. While a recheck is out there is no such projection, so
-            the line says what was typed and stops short of claiming an outcome. */}
+            the line says what was typed and stops short of claiming an outcome.
+            The projection is PRE-defence (see the docblock): against a resistant target the commit
+            lands less than this prints. `known-bugs.md`. */}
         <span className="save-prompt-effect">{stale
           ? `Amended to ${proposal}${recheck === "failed" ? "" : " - checking"}`
           : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended - rolled ${save.proposedDamage})` : ""}`}</span>
