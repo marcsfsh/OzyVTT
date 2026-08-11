@@ -2458,7 +2458,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
   });
 
-  it("2. SRD content authors the same shapes — 16 ceilings, 4 floors, 7 epic boons", () => {
+  it("2. SRD content authors the same shapes — 17 ceilings, 6 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{ id: string; kind: string; max?: number; min?: number; maximum?: number; fromCatalog?: string }> = [];
     // A choice block carries no id of its own, so the nearest enclosing one travels with the walk —
@@ -2482,16 +2482,29 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     carriers(library.subclassSummaries(), (id) => library.subclassRecord(id));
     carriers(library.featSummaries(), (id) => library.featRecord(id));
 
-    // Measured at the time of writing: 16 ceilings (9 class, 6 feat, 1 subclass), 4 floors — all
-    // four Mystic Arcana, each with its ceiling set to the SAME number, which is what makes the pick
-    // exact — and 7 ceilings on the epic boons.
+    // Measured 2026-08-11, and the numbers MOVED — this is the census catching content that changed
+    // shape, which is the whole reason it counts rather than samples.
+    //
+    // Was: 16 ceilings (9 class, 6 feat, 1 subclass) and 4 floors, all four Mystic Arcana. Now 17
+    // and 6, both from ONE record. C4 split the Wizard's Spell Mastery from a single
+    // `{choose: 2, maxSpellLevel: 2}` — one pick of two under one ceiling, which let a Wizard take
+    // two level-1 spells — into the printed "a level 1 AND a level 2 spell": two blocks, each
+    // `choose: 1`, each floored and capped at its own level. So one ceiling became two, and two
+    // floors arrived where there were none.
+    //
+    // The Mystic Arcanum invariant SURVIVES the arrival, and that is the load-bearing part: every
+    // floor in this list still has `min === max`. A floor exists to make a pick EXACT — "a level 6
+    // Warlock spell" is 6, not "6 or lower" — and both Spell Mastery blocks are exact in the same
+    // sense. The first block's floor is what makes that true: without it the block read
+    // `{maxSpellLevel: 1}` and a level-0 CANTRIP satisfied the printed "a level 1 spell".
     const ceilings = found.filter((entry) => entry.max !== undefined);
     const floors = found.filter((entry) => entry.min !== undefined);
     const maxima = found.filter((entry) => entry.maximum !== undefined);
-    expect(ceilings).toHaveLength(16);
+    expect(ceilings).toHaveLength(17);
     expect(floors.map((entry) => entry.id).sort()).toEqual([
       "mystic-arcanum-level-6-spell", "mystic-arcanum-level-7-spell",
-      "mystic-arcanum-level-8-spell", "mystic-arcanum-level-9-spell"
+      "mystic-arcanum-level-8-spell", "mystic-arcanum-level-9-spell",
+      "spell-mastery", "spell-mastery"
     ]);
     expect(floors.every((entry) => entry.min === entry.max)).toBe(true);
     expect(maxima).toHaveLength(7);
