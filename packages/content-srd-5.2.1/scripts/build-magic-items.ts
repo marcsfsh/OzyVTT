@@ -23,20 +23,42 @@
  * output is unchanged by it byte for byte; each lane fills one module.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ItemSlotSchema } from "@vtt/schemas";
 import { EquipmentReferenceSchema, type EquipmentReference } from "../src/schemas.js";
 import { RARITY_IDS } from "../src/enums.js";
 import { slug, withTables } from "./markdown.js";
-import { ITEM_MECHANICS } from "./item-mechanics/index.js";
-import { applyItemMechanics } from "./item-mechanics/overlay.js";
+import { ITEM_MECHANICS_LANES } from "./item-mechanics/index.js";
+import { applyItemMechanics, type ItemMechanicsLane } from "./item-mechanics/overlay.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 const bundles = join(root, "bundles");
 const source = readFileSync(join(root, "sources/dnd-5e-srd-markdown/magic-items.md"), "utf8");
+
+/**
+ * TWO FLAGS, AND THEY EXIST SO THE OVERLAY HOOK CAN BE TESTED AT ALL. `npm run
+ * build-magic-item-bundle` passes neither and behaves exactly as it always has.
+ *
+ *   --out=<path>       write the bundle somewhere else than `bundles/magic-items.v1.json`.
+ *   --overlay=<path>   read `ITEM_MECHANICS_LANES` from that module instead of `./item-mechanics/`.
+ *
+ * Without them nothing could hold this script to APPLYING the overlay. Measured before they existed:
+ * replacing step 7's merge with `const merged = rows;` left the whole content suite green and
+ * `npm run check` at exit 0, because all six tests called `applyItemMechanics` directly and the
+ * empty overlay makes the hook unobservable by construction. `test/item-mechanics.test.ts` now
+ * spawns this script with a probe overlay and a scratch `--out`, so deleting the merge turns a test
+ * red instead of quietly shipping a bundle with no riders in it.
+ */
+const flag = (name: string): string | undefined =>
+  process.argv.slice(2).find((argument) => argument.startsWith(`--${name}=`))?.slice(name.length + 3);
+const outPath = flag("out") ?? join(bundles, "magic-items.v1.json");
+const overlayPath = flag("overlay");
+const lanes: readonly ItemMechanicsLane[] = overlayPath
+  ? ((await import(pathToFileURL(resolve(overlayPath)).href)) as { ITEM_MECHANICS_LANES: readonly ItemMechanicsLane[] }).ITEM_MECHANICS_LANES
+  : ITEM_MECHANICS_LANES;
 
 const die = (message: string): never => { console.error(`\n${message}\n`); process.exit(1); };
 
@@ -472,14 +494,26 @@ if (collisions.length > 0 || duplicates.length > 0) {
 // Caught and re-reported through `die` so an overlay mistake reads like every other guard in this
 // file - one sentence naming the entry - rather than as a stack trace out of a merge helper.
 const merged: EquipmentReference[] = ((): EquipmentReference[] => {
-  try { return applyItemMechanics(rows, ITEM_MECHANICS); }
+  try { return applyItemMechanics(rows, lanes); }
   catch (error) { return die(error instanceof Error ? error.message : String(error)); }
 })();
+
+/**
+ * ROWS ACTUALLY CHANGED, compared by serialized bytes against the pre-overlay rows and keyed by id
+ * so the sort below cannot disturb it.
+ *
+ * The console used to print `Object.keys(ITEM_MECHANICS).length` - the count REQUESTED, read off the
+ * module, never the count of rows that moved. Measured: with the merge neutered to `const merged =
+ * rows;` it still printed 1 while writing a bundle with zero riders in it, which is the one thing
+ * that number exists to make impossible.
+ */
+const before = new Map(rows.map((row) => [row.id, JSON.stringify(row)]));
+const changed = merged.filter((row) => before.get(row.id) !== JSON.stringify(row)).length;
 
 // The fold sorts by name anyway; sorting here keeps the generated diff stable between runs.
 merged.sort((left, right) => left.name.localeCompare(right.name));
 z.array(EquipmentReferenceSchema).parse(merged);
-writeFileSync(join(bundles, "magic-items.v1.json"), `${JSON.stringify(merged, null, 1)}\n`);
+writeFileSync(outPath, `${JSON.stringify(merged, null, 1)}\n`);
 
 const histogram = (values: readonly string[]) => [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map<string, number>())]
   .sort((left, right) => right[1] - left[1]).map(([key, count]) => `${key} ${count}`).join(" · ");
@@ -490,5 +524,6 @@ console.log(`  rarity:   ${histogram(merged.map((row) => row.rarity!))}`);
 console.log(`  attunement required: ${merged.filter((row) => row.attunement?.required).length}`);
 console.log(`  descriptions cut at the ${DESCRIPTION_LIMIT}-char schema cap: ${merged.filter((row) => row.description!.endsWith(TRUNCATION_MARK)).length}`);
 // Reported every run so "the lanes authored nothing" is a number on the console rather than an
-// assumption - it is 0 until C7a-C7d fill `scripts/item-mechanics/`.
-console.log(`  rows carrying overlay mechanics: ${Object.keys(ITEM_MECHANICS).length}`);
+// assumption - it is 0 until C7a-C7d fill `scripts/item-mechanics/`. It counts rows whose BYTES
+// moved, so it cannot report work the merge did not do.
+console.log(`  rows changed by the overlay: ${changed} (${lanes.length} lane(s): ${lanes.map((lane) => lane.lane).join(", ") || "none"})`);

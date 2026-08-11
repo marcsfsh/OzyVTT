@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ItemSlotSchema } from "@vtt/schemas";
+import { ITEM_MECHANICS_LANES } from "../scripts/item-mechanics/index.js";
 import { loadArmor, loadEquipment, loadMagicItems, loadWeapons } from "../src/index.js";
 import { RARITY_IDS } from "../src/enums.js";
 
@@ -218,11 +219,25 @@ describe("the generated magic-item bundle", () => {
     expect(rows.filter((row) => row.weightLb !== null)).toEqual([]);
   });
 
-  it("carries content and no mechanics - the four overlay lanes author those", () => {
+  it("carries no mechanics the overlay did not author - the ETL itself emits none", () => {
+    /**
+     * RE-AIMED, and the re-aim is the point. This asserted a flat `=== []` when it was written,
+     * because "the bundle carries no mechanics" was true forever; C7's seam changed what the bundle
+     * MEANS, and all four lanes are contracted to falsify the old form. What is still true - and is
+     * the stronger claim - is that every rider in this generated file came through
+     * `scripts/item-mechanics/`. The ETL emits content; riders arrive only at step 7.
+     *
+     * So this now catches the failure the seam exists to prevent: a rider hand-edited straight into
+     * `magic-items.v1.json`, which parses, ships, and is destroyed without a diff by the next
+     * `npm run build-magic-item-bundle`. `item-mechanics.test.ts` owns the other direction - that
+     * the ETL applies the overlay at all - by running the real generator.
+     */
+    const authored = new Set(ITEM_MECHANICS_LANES.flatMap((lane) => Object.keys(lane.entries)));
     const withMechanics = rows.filter((row) =>
       row.modifiers.length > 0 || row.effects.length > 0 || row.actions.length > 0 ||
       row.casts.length > 0 || row.grantsFeatIds.length > 0 || row.tags.length > 0 || row.cursed);
-    expect(withMechanics.map((row) => row.name), "the ETL emits no riders; the overlay does").toEqual([]);
+    expect(withMechanics.filter((row) => !authored.has(row.id)).map((row) => row.name),
+      "a rider in the generated bundle that no lane authored was hand-edited in, and the next build destroys it").toEqual([]);
     expect(rows.every((row) => row.isMagic)).toBe(true);
     expect(rows.every((row) => row.source === "srd")).toBe(true);
   });
