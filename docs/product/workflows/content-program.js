@@ -2,13 +2,29 @@ export const meta = {
   name: 'content-program',
   description: 'The OzyVTT content program: the weapons ETL home, the overlay ruling, the full SRD magic-item list, Wizard Spell Mastery, and the carriers the zero-author units need.',
   phases: [
-    { title: 'Batch 0', detail: 'serial prerequisites — verify the landed weapons ETL home, then implement the ruled overlay verb' },
     { title: 'Batch 0b', detail: 'two concurrent units — properties reaches the editor, Wizard Spell Mastery' },
-    { title: 'Source and ETL', detail: 'vendor the magic-item source, then generate the 268-row bundle' },
+    { title: 'ETL', detail: 'generate the 268-row magic-item bundle from the vendored source' },
     { title: 'Item mechanics', detail: 'four concurrent authoring lanes over the generated bundle' },
     { title: 'Close', detail: 'adversarial review, mobile back-fill, ledger' },
   ],
 }
+
+/*
+ * WHAT CHANGED, 2026-08-11, and why this script is not what the planner wrote.
+ *
+ * 1. THE SERIAL SPINE NEVER RAN. Both `pipeline()` calls passed thunks as ITEMS with no stage
+ *    functions — `pipeline([() => agent(C5), (c5) => agent(C6)])`. The signature is
+ *    `pipeline(items, stage1, ...)`, so with zero stages the thunks pass through UNCALLED: C1, C2,
+ *    C5 and C6 would never have run, and the four lanes would then have been handed
+ *    `JSON.stringify(bundle)` = `[null,null]` and told the bundle had landed. The `parallel()`
+ *    calls were always correct; only these two were wrong.
+ * 2. BATCH 0 IS SPENT. C1 landed at 36b5a1f and C2 (the ruled `clears` verb) at 14fdb77. The phase
+ *    is deleted rather than re-verified — a phase whose only job is to re-read a landed commit
+ *    spends an agent to produce a paragraph.
+ * 3. C5 LANDED. Vendored at 67d6796, cherry-picked to the program branch at dcd7797, and its owed
+ *    source pin added at 19f0d2a (6 tests; both probes run and restored). The ETL phase is C6 alone
+ *    and is one agent, so it is a plain `agent()` call and not a pipeline of one.
+ */
 
 /* --------------------------------------------------------------- shared ---- */
 
@@ -21,6 +37,27 @@ READ FIRST, in this order:
   1. CLAUDE.md
   2. docs/product/remaining-program-plan.md  — the GOVERNING document. Your work obeys it.
   3. ${PLAN}  — this program's plan. Find YOUR unit's section and follow it exactly.
+
+BRANCH AND BASE, and this is not boilerplate — it is the failure that already happened once here.
+C5 was authored in a worktree whose base was 22 commits stale (3ecb4fb, carrying none of batch 0, 1
+or 2), so it verified green against a tree that did not have C1's bundle guard, and its commit then
+sat on its own branch because nothing owned the merge back. Recovering it cost a cherry-pick and a
+full re-verification. Therefore:
+  - START FROM THE PROGRAM BRANCH TIP. Confirm with \`git log --oneline -3\` before your first edit,
+    and say in your report which SHA you based on.
+  - YOUR COMMIT IS NOT THE DELIVERABLE UNTIL IT IS ON THAT BRANCH. If you are in a worktree you are
+    on a \`worktree-agent-*\` branch; report your SHA and say plainly that it needs merging back. The
+    parent owns that merge — but a SHA you do not report is a SHA nobody merges.
+
+ALREADY LANDED — do not re-plan or re-do any of it:
+  - C2, at 14fdb77: the ruled \`clears\` verb on \`FeatureMechanics\`, its handling in
+    \`applyMechanics\`, its idempotency case, and the dated ruling in decision-log.md. C4 consumes it.
+  - C5, at dcd7797 (cherry-picked) + 19f0d2a (its owed guard): magic-items.md is vendored at the
+    pinned commit, PROVENANCE.json's false claim is split, attribution covers magic items, and
+    test/magic-item-source.test.ts pins the source — sha256, 5,015 lines, the A–Z run at line 578,
+    260 entries of which 258 are items, the nine-category histogram, 140 attuned. C6 reads that file
+    and must not re-vendor it; if your parse disagrees with those pinned numbers, the pin is the
+    measurement and your parse is the defect.
 
 ALREADY LANDED, in commit 36b5a1f — do not re-plan or re-do any of it:
   - C1 in full. Both weapon columns now have an ETL home: build-bundle.ts joins \`mastery\` AND
@@ -117,95 +154,6 @@ const DECISION = {
     recorded: { type: 'string', description: 'Where the ruling was written down, with the SHA.' },
   },
 }
-
-/* ------------------------------------------------------- phase: batch 0 ---- */
-
-phase('Batch 0')
-
-const batch0 = await pipeline([
-  () => agent(`${CONTEXT}
-
-YOUR UNIT: C1 — the weapons ETL home. **IT HAS ALREADY LANDED, in commit 36b5a1f.** Your job is to
-VERIFY it, not to rebuild it. C2 runs after you and reads what you report.
-
-DO NOT run \`npm run build-bundle\`. DO NOT regenerate
-packages/content-srd-5.2.1/bundles/weapons.v1.json. DO NOT re-implement the parser. If you find a
-real defect, report it in \`blocked\` and stop — do not fix it inside this step.
-
-WHAT SHIPPED, and what to check by reading:
-  - build-bundle.ts:585-618 parses the SRD Weapons table out of
-    sources/dnd-5e-srd-markdown/equipment.md into Map<slug, {properties, mastery}> and cross-checks
-    every slug against the 17 WeaponProperty fixtures.
-  - build-bundle.ts:620-641 (\`weaponRecords\`) joins it and THROWS naming the weapon when a row is
-    missing — the SKILL_ABILITY precedent, which is now at build-bundle.ts:670-679.
-  - build-bundle.ts:644-645 fails closed in the other direction: a table row nothing matched.
-  - WeaponReferenceSchema gained \`properties\` at src/schemas.ts:126-139.
-  - The named absence for Versatile's two-handed die is recorded at build-bundle.ts:574-579.
-  - bundle.test.ts:224 — "emits the SRD mastery and property columns for all 38 weapons, by name" —
-    pins every value rather than counting.
-
-WHAT TO MEASURE AND REPORT (read the committed bundle; do not rebuild it):
-  38 rows. Mastery: vex 8, slow 7, sap 6, topple 5, nick 4, push 4, cleave 2, graze 2 = 38.
-  Properties: 70 assignments over exactly the 9 slugs in WEAPON_PROPERTY_IDS —
-  two-handed 13, ammunition 9, heavy 9, light 8, thrown 7, versatile 7, finesse 6, loading 6, reach 5.
-  reach: Glaive, Halberd, Lance, Pike, Whip. finesse: Dagger, Dart, Rapier, Scimitar, Shortsword, Whip.
-  REPORT ANY NUMBER THAT DISAGREES — that is the whole point of this step.
-
-FAR END, already met and recorded here so C2 has it: the regenerated bundle diff was 143 insertions
-and ZERO deletions. Set \`landed: true\` with commit 36b5a1f if the guard passes and the numbers above
-reproduce; put the exact test output in \`farEnd\`.
-
-PROBES: run \`npx vitest run test/bundle.test.ts --root packages/content-srd-5.2.1\` and report it.
-The two non-vacuity probes were run and reported at 36b5a1f; do NOT re-run destructive probes against
-a landed commit. Record them as level "control" and "value" with restored: true and the message
-"already probed at 36b5a1f; verification-only step".
-
-NO 375px pass: this unit has no UI.`,
-    { label: 'C1:weapons-etl-verify', phase: 'Batch 0', schema: UNIT_RESULT }),
-
-  (c1) => agent(`${CONTEXT}
-
-YOUR UNIT: C2 — implement the RULED answer to the hand-authored overlay collision, and record it.
-C1 reported: ${JSON.stringify(c1)}
-
-THE RULING IS TAKEN: **Option 2, the \`clears\` verb, with its three mitigations.** ${PLAN} section 4
-is a record, not a question. Do not re-litigate it; do not spend the step costing options again.
-
-THE PROBLEM IT SOLVES, re-measured at HEAD. For cleric, fighter and wizard
-(build-class-bundle.ts:33) the class record in classes.v1.json is both the ETL's input AND its
-output, so the overlay may only ADD: \`applyMechanics\` refuses to overwrite a key the record already
-carries and fails the build naming both homes (class-mechanics/overlay.ts:139-141, pinned by
-test/mechanics-overlay.test.ts:76, which is the test named "REFUSES to overwrite a value the record
-already carries"). Writing a DIFFERENT key beside it does not dodge the problem either:
-\`oneChoiceForm\` (src/character-content.ts:525-529) refuses a record carrying both \`choice\` and
-\`choices\`, so the build fails at ClassReferenceSchema.parse instead. classes.v1.json is 10,418 lines.
-Measured coverage: cleric carries riders on 10 of 11 features, fighter 11 of 15, wizard 9 of 10 — but
-the collision only fires on a key that is ALREADY THERE, and in this program that is exactly one case
-(wizard.spell-mastery).
-
-WHAT TO BUILD: \`clears?: readonly string[]\` on \`FeatureMechanics\` (overlay.ts:77-85), handled in
-\`applyMechanics\` (overlay.ts:124-162) by deleting the named keys from the record before the merge.
-The three mitigations are part of the ruling and are not optional:
-  - clearing an absent key is a NO-OP, so the second and later builds are clean (idempotent);
-  - a \`clears\` entry is a BUILD ERROR unless the same feature also authors a rider, so it can never
-    be a silent delete-only tool;
-  - the review bar is the git diff of classes.v1.json in the same commit — state that in the ruling,
-    because the collision guard exists precisely because an overwrite would be "unreviewable and
-    un-revertable" (overlay.ts:120-122).
-
-Add one case beside the collision test at mechanics-overlay.test.ts:76 proving the replacement lands
-AND that a second build is a clean no-op — for a hand-authored class the ETL writes back over its own
-input, so idempotency is the property that matters. Add a paragraph to overlay.ts's header. Record it
-as a dated entry in docs/ai-ledger/decision-log.md in that file's own house style.
-
-You are the ONLY unit that touches overlay.ts. C4 consumes \`clears\` from wizard.ts.
-NO 375px pass.`,
-    { label: 'C2:overlay-ruling', phase: 'Batch 0', schema: DECISION })
-    .then((ruling) => ({ weaponsEtl: c1, overlayRuling: ruling })),
-])
-
-const ruling = batch0 && batch0.overlayRuling
-log(`Batch 0 closed. Overlay ruling: ${ruling && ruling.recommendation ? ruling.recommendation : 'not reported'}`)
 
 /* ------------------------------------------------------ phase: batch 0b ---- */
 
@@ -313,63 +261,25 @@ refusal stops happening. (value) set the second block's floor to 1 -> the refusa
 const prereqBlocked = (batch0b || []).filter((r) => r && !r.landed)
 log(`Batch 0b: ${(batch0b || []).filter((r) => r && r.landed).length}/2 landed${prereqBlocked.length ? `; blocked: ${prereqBlocked.map((r) => `${r.unit} ${r.blocked}`).join(' | ')}` : ''}`)
 
-/* ----------------------------------------------- phase: source and ETL ---- */
+/* --------------------------------------------------------- phase: ETL ---- */
 
-phase('Source and ETL')
+phase('ETL')
 
-const bundle = await pipeline([
-  () => agent(`${CONTEXT}
-
-YOUR UNIT: C5 — vendor the SRD magic-item source and repair two false claims. SERIAL; C6 needs you.
-
-MEASURED, AND IT IS THIS PROGRAM'S HEADLINE FINDING: there is no magic-item source in this repository
-at all. The open5e fixtures ship 15 models and none of them is a magic item. equipment.md's own
-"## Magic Items" section (line 2137) is the RULES about magic items — identifying, attunement,
-wearing — and contains zero item entries; it says so itself at line 2139: "Hundreds of magic items
-are detailed in 'Magic Items' later in this document." All 17 headings after 2137 are rules.
-
-sources/dnd-5e-srd-markdown/PROVENANCE.json:15's \`notVendored\` field names EIGHT files left out —
-spells.md, monsters-A-Z.md, animals.md, magic-items.md, rules-glossary.md, playing-the-game.md,
-gameplay-toolbox.md, character-creation.md — with the reason "the corresponding bundles already come
-from the open5e fixtures and are cross-validated." THAT REASON IS FALSE FOR magic-items.md AND TRUE
-FOR THE OTHER SEVEN. There is no magic-item bundle and no magic-item fixture. Split the sentence;
-repair it, do not soften it and do not blanket-delete a reason that holds for seven files.
-
-WHAT TO DO: vendor magic-items.md from downfallx/dnd-5e-srd-markdown at commit
-1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4 — the exact commit PROVENANCE.json already pins for the
-other four files. VERIFIED REACHABLE, re-fetched at re-verification time: HTTP 200, 244,314 bytes,
-5,015 lines. Do not hand-transcribe; PROVENANCE.json records that hand-authoring is "where both
-licensing violations landed."
-
-Then repair BOTH claims in the same commit:
-  - PROVENANCE.json: add the file to \`files\`, and correct \`notVendored\` so it no longer carries a
-    reason that is untrue.
-  - attribution.additionalSources[0].covers currently reads "classes, subclasses, class spell lists,
-    species, backgrounds, feats" (verified in bundles/attribution.json) and becomes untrue the moment
-    this source is used. CC BY attribution is not a place to leave a stale claim. It is emitted from
-    build-bundle.ts:716, so edit there and regenerate bundles/attribution.json.
-    THAT REGENERATES attribution.json ONLY — do NOT let it regenerate weapons.v1.json.
-
-TEST: pin the vendored file's line count and its "## Magic Items A-Z" entry count, so a re-vendor at a
-different commit fails loudly instead of silently shifting 258 rows. MEASURED for you: line 578 opens
-the A-Z section and carries 260 \`####\` entries, of which 2 (Giant Fly, Avatar of Death) are embedded
-creature stat blocks, leaving 258 items, 140 requiring attunement.
-
-THE DISCRIMINATOR IS THE CATEGORY WORD, NOT THE ITALICS — an earlier draft got this wrong and it
-would break the parse. ALL 260 entries carry an italic (\`_..._\`) second line; the two creature blocks
-carry "_Large Beast, Unaligned_" and "_Medium Undead, Neutral Evil_". What separates them is that 258
-of 258 item lines OPEN WITH ONE OF NINE CATEGORY WORDS (Wondrous Item, Weapon, Potion, Ring, Armor,
-Wand, Staff, Rod, Scroll). Skip the two BY NAME with a count assertion, never by a silent filter.
-
-FAR END: the pinned counts match the vendored file. NO 375px pass.`,
-    { label: 'C5:vendor-source', phase: 'Source and ETL', schema: UNIT_RESULT }),
-
-  (c5) => agent(`${CONTEXT}
+const bundle = await agent(`${CONTEXT}
 
 YOUR UNIT: C6 — the magic-item ETL. The longest unit in this program, and it is deliberately ONE
 agent because it is ONE parser over ONE file. The parallelism lives one layer up, in the overlay
 lanes that come after you.
-C5 reported: ${JSON.stringify(c5)}
+
+C5 has landed: the source is vendored and PINNED. Read
+packages/content-srd-5.2.1/test/magic-item-source.test.ts before you write a line of parser — it
+already measures, and holds, everything your parse must reproduce: the A–Z run opens at line 578,
+it holds 260 \`####\` entries, 258 of them open with one of the nine category words, the two that do
+not are Giant Fly and Avatar of Death, the histogram is Wondrous Item 127 / Weapon 33 / Potion 24 /
+Ring 22 / Armor 19 / Wand 13 / Staff 12 / Rod 7 / Scroll 1, and 140 of 258 require attunement.
+Four further \`####\` headings sit ABOVE line 578 and are rules subsections — a parser that scans the
+whole file finds 264 and is wrong by exactly those four. If your parse disagrees with any of it, the
+pin is the measurement and your parse is the defect.
 
 Read ${PLAN} section 1.5 and the C6 section in full before writing anything. The rulings that matter:
 
@@ -447,10 +357,17 @@ count that drops by 268. (value) change one item's parsed slot -> the slot asser
 375px: YES, and it is a real risk rather than a formality — 268 rows land in the browse-and-add list
 and several descriptions carry rendered tables. Check the list and the Armor of Resistance detail at
 375px, and run \`node scripts/tap-audit.mjs 375\`.`,
-    { label: 'C6:magic-item-etl', phase: 'Source and ETL', schema: UNIT_RESULT }),
-])
+    { label: 'C6:magic-item-etl', phase: 'ETL', schema: UNIT_RESULT })
 
 log(`Bundle: ${bundle && bundle.landed ? `landed at ${bundle.commit}` : `NOT landed — ${bundle ? bundle.blocked : 'no result'}`}`)
+
+/*
+ * A BARRIER HERE IS CORRECT, and it is the one place in this script where that is true. The four
+ * lanes below split on C6's COMMITTED `slot` column, and the plan is explicit that their item counts
+ * are an OUTPUT of C6 rather than an input to it — three reading methods give three different
+ * worn/carried answers (57/70, 62/65, 52). So the lanes genuinely cannot start, or even be prompted
+ * honestly, until C6 has landed and reported. Everywhere else, prefer no barrier.
+ */
 
 /* ------------------------------------------------ phase: item mechanics ---- */
 
@@ -495,6 +412,14 @@ re-measurement — that is a judgement, so produce yours and write it down besid
 
 PROBES for every lane: (control) strip your module from index.ts -> your both-paths test fails naming
 its item. (value) change the authored amount -> the far-end number stops moving. Restore both.
+
+VERIFICATION IS THE CONTENDED RESOURCE, NOT THE AUTHORING. All four of you author at once, but every
+lane's far end is an ENGINE outcome, so every lane's proof runs server-side — and the plan caps this
+box at 2 concurrent full-suite runs, never two server suites at once, because the server suite binds
+a live port. So: run the NARROWEST vitest that proves your far end (your own test file, --root
+apps/server), not the full suite. If you see a port-bind failure or an inexplicable red, assume
+contention before you assume regression, wait, and re-run before reporting it. Report the test-file
+count either way. The one full serial suite is C8's job and not yours.
 
 375px for every lane: \`node scripts/tap-audit.mjs 375\` on /homebrew (the count must not rise) and one
 item you authored, checked on a character sheet at 375px.
@@ -656,8 +581,8 @@ const close = await agent(`${CONTEXT}
 YOUR UNIT: C8 — the content program's close. Every lane has merged. The governing plan folds the
 quality layer into each program (ruling 3), so this program carries its own.
 
-Results to audit:
-  batch 0:  ${JSON.stringify(batch0)}
+Results to audit (C1, C2 and C5 landed before this run and are not in these results — audit them
+from the git history if you audit them at all: 36b5a1f, 14fdb77, dcd7797 + 19f0d2a):
   batch 0b: ${JSON.stringify(batch0b)}
   bundle:   ${JSON.stringify(bundle)}
   lanes:    ${JSON.stringify(mechanics)}
@@ -703,7 +628,6 @@ program is wrong.`,
 log(`Close: ${close ? close.verdict : 'no verdict'}${close && close.unwired.length ? ` — ${close.unwired.length} unwired` : ''}${close && close.vacuous.length ? `, ${close.vacuous.length} vacuous` : ''}`)
 
 return {
-  batch0,
   prerequisites: batch0b,
   bundle,
   mechanics,
