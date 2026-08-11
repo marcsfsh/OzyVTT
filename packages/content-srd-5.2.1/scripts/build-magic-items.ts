@@ -17,6 +17,10 @@
  * `attunement` and prose; none lands with `modifiers`, `effects`, `actions`, `casts`, `uses` or
  * `cursed`. Those are the four overlay lanes' work, and the reason they can do it is precisely that
  * this file's output is regenerable from the source with nothing hand-edited into it.
+ *
+ * WHERE THE MECHANICS COME BACK IN is `scripts/item-mechanics/`, merged at step 7 below - the same
+ * build-time seam `scripts/class-mechanics/` is for classes. It ships EMPTY, so today this script's
+ * output is unchanged by it byte for byte; each lane fills one module.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -26,6 +30,8 @@ import { ItemSlotSchema } from "@vtt/schemas";
 import { EquipmentReferenceSchema, type EquipmentReference } from "../src/schemas.js";
 import { RARITY_IDS } from "../src/enums.js";
 import { slug, withTables } from "./markdown.js";
+import { ITEM_MECHANICS } from "./item-mechanics/index.js";
+import { applyItemMechanics } from "./item-mechanics/overlay.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -449,16 +455,40 @@ if (collisions.length > 0 || duplicates.length > 0) {
   ].filter(Boolean).join("\n"));
 }
 
+// ---------------------------------------------------------------------------------------------
+// 7. The mechanics overlay
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * THE HAND-AUTHORED HALF, merged over the parsed half - `scripts/item-mechanics/overlay.ts` holds
+ * the reasoning. It runs HERE, after every guard above and before the sort, the validate and the
+ * write, so an authored rider is validated by the same `z.array(...).parse` the parsed columns are
+ * and an overlay key naming no row stops the build instead of writing a bundle missing a rider.
+ *
+ * It may overwrite freely (plan §1.5): this bundle is an OUTPUT ONLY, rebuilt from a byte-pinned
+ * source every run, so it never inherits the additive-only rule the class overlay needs. With the
+ * overlay empty this call returns the same rows and the file comes out byte-identical.
+ */
+// Caught and re-reported through `die` so an overlay mistake reads like every other guard in this
+// file - one sentence naming the entry - rather than as a stack trace out of a merge helper.
+const merged: EquipmentReference[] = ((): EquipmentReference[] => {
+  try { return applyItemMechanics(rows, ITEM_MECHANICS); }
+  catch (error) { return die(error instanceof Error ? error.message : String(error)); }
+})();
+
 // The fold sorts by name anyway; sorting here keeps the generated diff stable between runs.
-rows.sort((left, right) => left.name.localeCompare(right.name));
-z.array(EquipmentReferenceSchema).parse(rows);
-writeFileSync(join(bundles, "magic-items.v1.json"), `${JSON.stringify(rows, null, 1)}\n`);
+merged.sort((left, right) => left.name.localeCompare(right.name));
+z.array(EquipmentReferenceSchema).parse(merged);
+writeFileSync(join(bundles, "magic-items.v1.json"), `${JSON.stringify(merged, null, 1)}\n`);
 
 const histogram = (values: readonly string[]) => [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map<string, number>())]
   .sort((left, right) => right[1] - left[1]).map(([key, count]) => `${key} ${count}`).join(" · ");
-console.log(`wrote ${rows.length} magic items (${items.length} entries, ${NOT_ITEMS.length} creature stat blocks skipped by name).`);
-console.log(`  slot:     ${histogram(rows.map((row) => row.slot!))}`);
-console.log(`  category: ${histogram(rows.map((row) => row.category))}`);
-console.log(`  rarity:   ${histogram(rows.map((row) => row.rarity!))}`);
-console.log(`  attunement required: ${rows.filter((row) => row.attunement?.required).length}`);
-console.log(`  descriptions cut at the ${DESCRIPTION_LIMIT}-char schema cap: ${rows.filter((row) => row.description!.endsWith(TRUNCATION_MARK)).length}`);
+console.log(`wrote ${merged.length} magic items (${items.length} entries, ${NOT_ITEMS.length} creature stat blocks skipped by name).`);
+console.log(`  slot:     ${histogram(merged.map((row) => row.slot!))}`);
+console.log(`  category: ${histogram(merged.map((row) => row.category))}`);
+console.log(`  rarity:   ${histogram(merged.map((row) => row.rarity!))}`);
+console.log(`  attunement required: ${merged.filter((row) => row.attunement?.required).length}`);
+console.log(`  descriptions cut at the ${DESCRIPTION_LIMIT}-char schema cap: ${merged.filter((row) => row.description!.endsWith(TRUNCATION_MARK)).length}`);
+// Reported every run so "the lanes authored nothing" is a number on the console rather than an
+// assumption - it is 0 until C7a-C7d fill `scripts/item-mechanics/`.
+console.log(`  rows carrying overlay mechanics: ${Object.keys(ITEM_MECHANICS).length}`);
