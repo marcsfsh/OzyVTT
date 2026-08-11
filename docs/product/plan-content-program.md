@@ -21,9 +21,16 @@ editor half then landed 2026-08-11, so C3 is complete.** Every section below is 
 that describe the defect are kept in the past tense where the defect is closed, because the argument
 for the guard is the reason the guard has to stay.
 
-**Scope.** This program owns five pieces plus one obligation: the weapons ETL home, `properties` on
+**Amended 2026-08-11** by the C7a/C7b salvage and the client ruling it forced: **C9, the
+weapon-template mechanism, is a new unit** (§2), the four C7 lane counts are re-measured against the
+committed bundle, and §5 gains a seventh U26 carrier. Everything changed on that date says so where
+it stands, and the numbers it replaces are kept beside it because the arithmetic between them is the
+part a future re-measurement needs.
+
+**Scope.** This program owns six pieces plus one obligation: the weapons ETL home, `properties` on
 the weapon schema, the hand-authored overlay ruling, the full SRD magic-item list, Wizard's Spell
-Mastery, and the carrier obligation for the zero-author units. It owns **no** U-numbered unit. The
+Mastery, **the weapon-template mechanism (C9, added 2026-08-11 — and see §9, whose ownership is
+provisional)**, and the carrier obligation for the zero-author units. It owns **no** U-numbered unit. The
 API-parity program, the engine/vocabulary units U17–U33, and the mastery program U34–U38 plus `vex`
 and `slow` belong to the other three planners; §5 and §9 say precisely where this program's output
 lands in theirs.
@@ -236,14 +243,24 @@ Sizes are estimated from reading the code; the *counts* inside them are measured
 | **C4** | Wizard's Spell Mastery becomes two picks | S | 0b | — |
 | **C5** | vendor the magic-item source; repair the provenance and the attribution | S | 3, serial | C6 |
 | **C6** | the magic-item ETL — 268 rows, typed, folded into the catalog | L | 3, serial | C7a–d |
-| **C7a** | item mechanics — weapons and armour (52 items) | L | 3, concurrent | U20, U23, U29 |
-| **C7b** | item mechanics — wands, staffs, rods, rings, the scroll (55) | L | 3, concurrent | U26, U29, U31 |
-| **C7c** | item mechanics — wondrous, worn (57) | L | 3, concurrent | U26, U29, U31, U32 |
-| **C7d** | item mechanics — potions and carried wondrous (94) | M | 3, concurrent | U32 |
+| **C7a** | item mechanics — weapons and armour (**60 rows**) | L | 3, concurrent — **24 of 60 landed `e7e3ae0`**; the weapon families are blocked on **C9** | U20, U23, U29 |
+| **C7b** | item mechanics — wands, staffs, rods, rings, the scroll (**57**) | L | 3, concurrent — **27 of 57 landed `2e9a050`** | U26, U29, U31 |
+| **C7c** | item mechanics — wondrous, worn (**56**) | L | 3, concurrent | U26, U29, U31, U32 |
+| **C7d** | item mechanics — potions and carried wondrous (**95**) | M | 3, concurrent | U32 |
 | **C8** | the program's close: adversarial review, mobile back-fill, ledger | M | 3, last | — |
+| **C9** | the weapon-template mechanism — a magic weapon applies to a base weapon the player picks | L | after C8; **not** batch 3 | C7a's weapon half, and U20's two items |
 
-**Total ~9–11 agent-days** left, estimated — C1 and C3 are both spent. Eight units
-remain, of which four run concurrently.
+**The four C7 counts are ROWS, and they were re-measured 2026-08-11 against the committed
+`packages/content-srd-5.2.1/bundles/magic-items.v1.json`.** The earlier `52 / 55 / 57 / 94` were
+*entries* on the 258 basis, taken before C6 committed; the lanes are keyed by **row id**, and the
+ladder expansion (§3's "268 = 258 − 5 + 15") splits five entries into fifteen keys. C7a and C7b each
+gain exactly their ladder rows; the C7c/C7d line moved by one item as well, because that boundary is
+C6's committed `slot` column and not the plan's pre-C6 "by name" reading — which is the outcome §3
+predicted in writing. The per-lane table in §3 carries the arithmetic and the attunement column.
+
+**Total ~11–13 agent-days** left, estimated — C1 and C3 are spent, and C7a and C7b are part-landed
+but not closed. Nine units remain, of which four run concurrently; C9 is new and is the largest thing
+added to this program since it was written.
 
 The carrier dossier the governing plan's ruling 5 asks for is **§5 of this document**, delivered now
 rather than as a unit — it is a reading of the SRD, not a code change, and the units that consume it
@@ -435,7 +452,7 @@ a place to leave a stale claim.
 | part | what |
 | --- | --- |
 | **reader** | `loadEquipment()` (`packages/content-srd-5.2.1/src/index.ts:98-124`), which already folds three sources into one catalog (gear `:101`, weapons `:113`, armor `:118`); this adds a fourth. Everything downstream — browse-&-add, `equipmentCatalogOf` (`apps/server/src/equipment-derivation.ts:286`), the sheet — reads the folded catalog and needs no change. |
-| **content** | 258 SRD entries → **268 emitted rows** (see the expansion rule below), each with `id`, `name`, `category`, `slot`, `rarity`, `isMagic: true`, `attunement`, `cursed`, `description`, and a `weapon`/`armor` block where the type line names one. |
+| **content** | 258 SRD entries → **268 emitted rows** (see the expansion rule below), each with `id`, `name`, `category`, `slot`, `rarity`, `isMagic: true`, `attunement`, `cursed`, `description`. ~~and a `weapon`/`armor` block where the type line names one~~ — **struck 2026-08-11, measured false and it was the plan's own error, not the ETL's**: the type line names the base the item *applies to*, never the item's own stats, so **0 of the 33 `weapon` rows and 0 of the 14 `armor` rows carry a block** and no correct parse could have produced one. That is C9's whole subject. |
 | **control** | ships — the entire magic-item form (§1.6). This unit adds none and asserts the existing ones through the harness. |
 | **test** | a bundle guard (row count, category histogram, rarity histogram, attunement count, zero id collisions) plus a both-paths row ending at a rendered item on a character's sheet. |
 
@@ -565,9 +582,14 @@ The split, and why it is this split, is §3. All four lanes share one contract:
 | **test** | at least one both-paths row per lane, ending at an engine outcome, plus the lane's own module-level guard (every key matches a real item id). |
 
 **The admission rule, and it is the `masteryReaches` rule restated for items:** *a lane authors a rider
-only when its reader ships today.* A rider whose reader is a later unit's job is **not** authored — it
+only when its reader ships **and produces the printed effect**.* **The second clause was added
+2026-08-11 and it is not decoration** — both salvages found riders whose readers ship, fire, and
+produce the wrong thing: a `+1` on a weapon row that derives no swing (C7a) and a `casts: cure-wounds`
+that synthesises 2d8 of damage at a wounded ally (C7b). **A rider that reaches a reader and produces
+the wrong effect is worse than an unauthored one**, because prose is visibly prose and a wrong number
+is invisible until the round it lands. A rider that fails either clause is **not** authored — it
 is recorded in the module as a **named absence**: the item, the SRD sentence, the vocabulary it needs
-and the unit that unblocks it, in a comment beside the item's entry. That is exactly the shape
+and the unit **or bug** that unblocks it, in a comment beside the item's entry. That is exactly the shape
 `class-mechanics/wizard.ts:48-74` uses for its nine prose-only records, and it is what turns "we
 skipped it" into "we decided it". §5 is the index of those absences.
 
@@ -587,12 +609,29 @@ modules, four worktrees.
 **Per-lane far ends** (each a rolled number, an applied condition or a refusal — never a surviving
 field):
 
-- **C7a — weapons and armour (52 items · 35 attuned; both re-measured exactly).** Far end: a
-  `+1` weapon's to-hit and damage both move by one, and an `Armor of Resistance` halves a typed damage
-  total on the damage command (*"You have Resistance to one type of damage while you wear this armor"*
-  — the GM picks the type off a d10 table, so the lane authors one and says which). Reserved for U20
-  (`Sun Blade`, `Energy Bow`), U23 (`Vicious Weapon`) and **U29 (`Spellguard Shield`, which is
-  `Armor (Shield)` and therefore this lane's, not C7b's)**.
+- **C7a — weapons and armour (60 rows · 35 attuned; re-measured 2026-08-11 off the committed
+  bundle). PART-LANDED at `e7e3ae0`: 24 of 60 — armour 11, shields 6, ammunition 3, weapons 4 — and
+  its weapon half is BLOCKED on C9.** The lane's original far end was *"a `+1` weapon's to-hit and
+  damage both move by one"* and **it was vacuous**: a magic weapon carries no weapon block, so the
+  row derives no swing for a to-hit to move on, and the number only ever appeared because the test
+  supplied a weapon block the shipped row does not have. The landed far end is armour instead, and it
+  takes nothing from a fixture — an `Armor of Resistance` halves a typed damage total on the damage
+  command (*"You have Resistance to one type of damage while you wear this armor"* — the GM picks the
+  type off a d10 table, so the lane authored **lightning** and says so). **19 weapon rows are named
+  absences citing C9**; the 4 that survive print something that is not a swing (`weapon-of-warning`,
+  `luck-blade`, `trident-of-fish-command`, `frost-brand`), and a guard pins that no weapon row carries
+  a weapon-scoped rider so a later pass cannot quietly put them back. Reserved for U20 (`Sun Blade`,
+  `Energy Bow` — **now behind C9 as well as U20**), U23 (`Vicious Weapon`) and **U29 (`Spellguard
+  Shield`, which is `Armor (Shield)` and therefore this lane's, not C7b's)**.
+  > **The armour half does NOT have the weapon half's problem, and the reason is the SRD's own
+  > wording rather than luck.** `Shield, +2` prints its bonus *"in addition to the Shield's normal
+  > bonus to AC"*, so an `armor-class` rider that stacks on whatever base the bearer is also wearing
+  > is what the source describes. AC is additive by construction — `armorClassFromEquipment`
+  > (`packages/rules-5e/src/character.ts:99`) sums the equipped base's `acBase` and the riders land on
+  > top — where a weapon's `+1` needs a *swing* to attach to and there is none. The residual gap is
+  > real but small and it is C9's too: a bearer who equips **only** the magic row and no mundane base
+  > reads `10 + Dex + N` rather than the base's AC + N, because that row carries no `armor` block
+  > either. Do not "fix" it by inventing an `armor` block — that invents stats the SRD does not print.
   > **This lane must not reach for the Light property as a carrier.** Cross-checked with the mastery
   > program and verified here: there is **no two-weapon / off-hand attack mechanism anywhere in the
   > engine** — `weaponAction` (`equipment-derivation.ts:994-1016`) hard-codes
@@ -601,20 +640,27 @@ field):
   > `tags: ["fighting-style"]`** (*measured: its `feature` block has a description and a tag and no
   > rider*). Light is a real property and C1 authored it on 8 weapons; what it *does* is U21's and
   > U35's mechanism to build. Any Light-based far end in this lane would be vacuous.
-- **C7b — wands, staffs, rods, rings, the scroll (55 items · 44 attuned; both re-measured exactly).**
+- **C7b — wands, staffs, rods, rings, the scroll (57 rows · 46 attuned; re-measured 2026-08-11).
+  PART-LANDED at `2e9a050`: 27 of 57 — wands 9, staffs 8, rings 8, rods 2.**
   Far end: a `Wand of Fireballs` (*"This wand has 7 charges … expend no more than 3 charges to cast
   Fireball (save DC 15)"*) spends a charge, rolls real damage through the item's `casts` block, and
-  **refuses** when the charges are gone. Reserved for U26/U29 (`Wand of the War Mage`, `Staff of the
-  Magi`, `Staff of the Woodlands`, **`Staff of Power`** — see §5) and **U31 (`Ring of Warmth`, which
-  is a `Ring` and therefore this lane's, not C7c's)**.
-- **C7c — wondrous, worn (57 items · 47 attuned, by the "by name" rule re-measured above; the earlier
-  63 · 51 does not reproduce).** Far end: a `Cloak of Protection` (*"You gain a +1 bonus to Armor
+  **refuses** when the charges are gone. **Seven of its `casts` were removed on the same measurement
+  and are absences now**, because `castAction` reads a spell's `damage`/`attackRoll` columns as if
+  they described one cast: both `docs/ai-ledger/known-bugs.md` `[content/spells]` entries are the
+  blocker, and a healing staff pointed at an ally hit them for 2d8 until it was taken out. Reserved
+  for U26/U29 (`Wand of the War Mage`, `Staff of the Magi`, `Staff of the Woodlands`, **`Staff of
+  Power`** — see §5) and **U31 (`Ring of Warmth`, which is a `Ring` and therefore this lane's, not
+  C7c's)**.
+- **C7c — wondrous, worn (56 rows · 46 attuned; re-measured 2026-08-11 off C6's committed `slot`
+  column, which is the boundary — neither the earlier 63 · 51 nor the "by name" 57 · 47 is what
+  shipped).** Far end: a `Cloak of Protection` (*"You gain a +1 bonus to Armor
   Class and saving throws while you wear this cloak"*) moves AC **and** a saving throw the server
   rolls, and comes back off when the cloak does. Reserved for U31 (`Gloves of Missile Snaring`), U32
-  (`Periapt of Wound Closure`) and U26/U29 (`Talisman of Pure Good`, `Talisman of Ultimate Evil`).
+  (`Periapt of Wound Closure`) and U26/U29 (`Talisman of Pure Good`, `Talisman of Ultimate Evil`,
+  and **`Robe of the Archmagi`** — the carrier §5's first draft missed; see the correction there).
   This lane owns `cursed` and re-reads the hidden-until-attuned rule.
-- **C7d — potions and carried wondrous (94 items · 14 attuned, same re-measurement; the earlier
-  88 · 10 does not reproduce).** Far end: a `Potion of Resistance` (*"you have Resistance to one type
+- **C7d — potions and carried wondrous (95 rows · 15 attuned, same re-measurement; the earlier
+  88 · 10 and 94 · 14 are both superseded).** Far end: a `Potion of Resistance` (*"you have Resistance to one type
   of damage for 1 hour"*) applies a typed resistance and expires. The lightest lane per item and the
   heaviest in named absences — most of the 70 carried wondrous items are GM-fiat and stay prose.
   Reserved for **U32 (`Mysterious Deck`, whose Comet card reads *"you have Advantage on Death Saving
@@ -680,6 +726,141 @@ Three things, in order:
 
 ---
 
+### C9 — the weapon-template mechanism: a magic weapon applies to a base weapon the player picks
+
+***NEW UNIT, added 2026-08-11 by client ruling.*** *Found by the C7a salvage (`e7e3ae0`), not by the
+lane reporting it — the lane's headline far end passed green against a fixture it supplied itself,
+and reported that pass as verification. This is the unit that turns 19 named absences back into riders, and it is the largest thing
+added to this program since it was written. It is also the only unit here whose implementation lands
+in `apps/server` and `packages/schemas`, so read §9 before starting it.*
+
+**The finding, measured over the committed `packages/content-srd-5.2.1/bundles/magic-items.v1.json`
+(268 rows).** A magic weapon in the SRD **carries no stats of its own.** The printed type line names
+which **base** weapon the item applies to — `Weapon (Warhammer)`, `Weapon (Longbow or Shortbow)`,
+`Weapon (Any Simple or Martial)` — and the ETL is faithful to it: **0 of the 33 `weapon`-category rows
+carry a `weapon` block.** No damage die, no range, no properties, and therefore no swing.
+
+**The qualifier histogram, measured off the same file — 18 distinct forms over 33 rows, and it is what
+settles the shape of the unit:**
+
+| the type line names | rows | the forms |
+| --- | ---: | --- |
+| **exactly ONE base weapon** | **11** | `Mace` 3 · `Dagger` · `Greatclub` · `Javelin` · `Longsword` · `Quarterstaff` · `Scimitar` · `Trident` · `Warhammer` |
+| **a CHOICE of bases** | **22** | `Any Simple or Martial` 9 · `Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword` 3 · `Any Melee Weapon` 2 · `Glaive, Greatsword, Longsword, or Scimitar` 2 · `Longbow or Shortbow` 2 · `Battleaxe, Greataxe, or Halberd` · `Glaive, Greatsword, Longsword, Rapier, Scimitar, Sickle, or Shortsword` · `Greatsword, Longsword, Rapier, Scimitar, or Shortsword` · `Maul or Warhammer` |
+
+**Two thirds of the list is a choice**, which is the fact that rules out every cheaper answer below.
+
+**THE RULING (client, 2026-08-11): the player picks the base weapon the template applies to.** The
+chosen base supplies the swing — its die, its damage type, its range band and its properties — and the
+magic row's riders scope to that swing. It is an **item-applies-to-item** mechanism and **it does not
+exist anywhere in this repo.** It is a unit, not content work, and no lane may route around it.
+
+**Why the rider produces nothing today, precisely — the chain, so nobody re-derives it.**
+
+- `attack-bonus`, `extra-damage`, `critical-range`, `critical-bonus-dice` and `damage-bonus` are
+  `THIS_ITEM_BY_DEFAULT` (`packages/rules-5e/src/riders.ts:231`), and `scopeOf` resolves them to
+  `"this-item"` whenever the carrier `isWeapon`.
+- `isWeapon` is `effectiveSlot(...) === "weapon" || item.weapon !== undefined`
+  (`apps/server/src/equipment-derivation.ts:610`), and every one of these 33 rows carries
+  `slot: "weapon"` — so they **are** weapon carriers, scope and all.
+- `collectRiders` then requires `context.sourceItemId === carrier.sourceItemId`
+  (`packages/rules-5e/src/riders.ts:259`): the rider applies only to an attack made **with that item**.
+- And there is no such attack. `weaponAction` returns `null` when the row's `weapon` is undefined
+  (`apps/server/src/equipment-derivation.ts:996`), and the browse-and-add picker mints the row's block
+  from the catalog summary's (`inventoryWeaponFrom`, `apps/client/src/encounter/equipment.tsx:66`),
+  which is null here.
+- **Driven end to end on a picker-minted `Dwarven Thrower`** (equipped, attuned, exactly as the
+  shipped data yields): `derivation.carriers` **1**, `weaponActionIds` **`[]`**, `effectiveActions`
+  **`[]`**. The carrier exists and there is nothing for it to modify.
+
+**What already ships, and it is more than it looks — this is the part that sizes the unit.** The
+**reader is not the missing half.** `apps/server/test/item-riders.test.ts` criterion 1 drives exactly
+this mechanism and is green at HEAD: an inventory row that carries a weapon block, plus a catalog
+record with `attack-bonus: 1` and `extra-damage 1d4 lightning`, yields a **rolled** to-hit of **6**
+against a base 5, damage `1d6 + 3` piercing (7) **plus** `1d4` lightning (3) as two typed entries,
+three auditable rolls, and a drop back to 5 when the sword comes off. **So the reader ships and
+produces the printed effect; what fails the admission rule is that no shipped row can reach it.**
+C9 is the unit that lets a shipped row reach a reader that already works — which is why its weight is
+in the ETL, the schema and the control, not in the engine.
+
+| part | what |
+| --- | --- |
+| **reader** | **half ships.** Everything downstream of "the row has a weapon block" is done and proven (above). What C9 writes is the binding: the step that gives a magic-weapon row the picked base's stats, and the `weaponAction` name/id treatment that keeps the derived swing labelled as the *magic* item rather than as the base. |
+| **content** | the **eligibility column** — which bases each of the 33 rows may apply to. **It is not in the bundle today**: the qualifier is prose inside `description`, and `build-magic-items.ts` reads the type line for `category`/`slot`/`rarity`/`attunement` and discards the rest. 18 distinct forms over 33 rows — small enough to close as a vocabulary, far too irregular to leave open — resolved against `weapons.v1.json`'s 38 rows and **failing closed** on any form that does not, exactly as C1's join throws by name. `Any Simple or Martial` and `Any Melee Weapon` are category predicates, not lists, so the column needs both shapes. |
+| **control** | the **pick**, and there are **two** surfaces, not one. (1) the browse-and-add picker, which is where a row is minted (`apps/client/src/encounter/equipment.tsx`) — the 22 choice rows need a base chooser at add time and the 11 single-base rows must not ask. (2) the **homebrew equipment form**, or the SRD half ships a mechanism a GM's own magic weapon cannot use, which is the exact defect C3 existed to close for `properties`. |
+| **test** | one both-paths row ending at **two different rolled swings out of one item row** (far end below), plus a bundle guard pinning all 33 eligibility values by name — the C1 shape, which pins values rather than counting, because a regenerated column that silently empties is this program's known failure. |
+
+**Far end — one shipped row, two picked bases, two different rolled numbers.** `Weapon, +1`
+(*"Any Simple or Martial"*) bound to a **Greatsword** swings `2d6 + 1` off Strength on a STR 12 /
+DEX 15 sheet; **the same row** bound to a **Dagger** swings `1d4 + 2` off Dexterity, because the
+Dagger's `finesse` travels with it into `weaponAbilityModifier`
+(`apps/server/src/equipment-derivation.ts:984`). Two dice, two abilities, one item row, read out of
+the shipped bundle. **A fixture cannot fake this one**: supplying the weapon block is precisely the
+thing the unit builds, so a test that supplies it is testing nothing — which is the mistake this
+unit exists because of. Beside it, `Dwarven Thrower` (*"Weapon (Warhammer)"*) proves the 11
+single-base rows derive a swing with no pick UI at all.
+
+**WHAT C9 DOES NOT UNBLOCK, and getting this wrong would re-ship the exact bug it fixes.** C9 gives
+the `+N` families a swing to attach to. It does **not** make them authorable, because
+`FeatureModifierSchema` has no flat `damage-bonus`: the only damage rider is `extra-damage`, whose
+`formula` is a `DiceFormulaSchema` and therefore requires a die term (*measured in C7a: `{formula:
+"1"}` and `{formula: "1d1"}` are both refused with "Use a safe dice formula such as 1d8 + 3."*). So
+`Weapon, +1` after C9 would author `attack-bonus: 1` and **silently understate damage by one** —
+half-right, invisible at the table, and worse than the absence it replaced. **The `+N` ladder needs
+BOTH C9 and a flat `damage-bonus` in the vocabulary** (limit (A) in
+`packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts`, which has no unit yet). The
+19 absences citing C9 must each be re-read against their own second blocker before any is authored;
+they are not one batch that opens together.
+
+**Rejected alternatives, with their costs — all three were live options and each is wrong differently.**
+
+- **Inherit the single named base for the 11 that name one** (`Dwarven Thrower` → Warhammer's block,
+  copied at ETL time). Cheapest by far, needs no control and no pick. **Leaves the other 22 inert** —
+  two thirds of the list, including every `+1/+2/+3` ladder row and all nine `Any Simple or Martial`
+  items — and it is a *partial* mechanism, so the browse list would have magic weapons that swing
+  beside magic weapons that do nothing, with nothing on screen explaining which is which. Rejected as
+  the answer; **worth keeping as the first slice of C9's own delivery**, because the 11 need no UI.
+- **`scope: "bearer"` on the riders.** It parses today and needs no unit at all, which is what makes
+  it dangerous. It is wrong in a way a table feels: it raises **every** attack the bearer makes with
+  **any** weapon, and **two magic weapons in a pack stack**. A wrong number is worse than an absent
+  one — this is the admission rule's second clause, and it is the specific workaround it forbids.
+- **Invent default stats for the magic rows** (give `Sword of Sharpness` a `1d8 slashing` block).
+  Ships a swing immediately and needs no pick. It **invents content the SRD does not print**: the
+  source says the item applies to a Glaive, Greatsword, Longsword or Scimitar, whose dice are
+  `1d10`/`2d6`/`1d8`/`1d6`, so any single default is wrong for at least three of the four. It is also
+  unfalsifiable — nothing downstream could ever tell the invented die from a parsed one. Same class of
+  refusal as `costGp: null` (§C6): deriving a number the source does not print is not a parse.
+
+**One design question this unit must answer, and it is genuinely open.** Does the picked base travel
+as a **copy** of its weapon block onto the inventory row, or as a **`baseWeaponId` reference**
+resolved at derivation? A copy is nearly free — `InventoryItemSchema.weapon` already exists
+(`packages/schemas/src/index.ts:371-385`) and the picker already mints one — but nothing on the row
+then records *which* base was chosen, so the sheet cannot print "Dwarven Thrower (Warhammer)", a GM
+cannot audit a wrong pick, and errata to a base never reach rows already minted. A reference fixes all
+three and costs a new key on a `.strict()` schema, which is a **state-shape change** and therefore
+`npm run docs`, the API reference and a parent-only merge. **Lean: copy the block AND record the base
+id** — the copy keeps derivation unchanged and the id is what makes the pick reviewable — but this is
+the call I am least confident in, and it is cheap to settle by trying the copy-only shape first and
+seeing whether the sheet can say what it needs to.
+
+**Size: L, and honestly it may be two.** The engine is nearly free and everything else is not: an ETL
+column with a fail-closed join and a closed 18-form vocabulary, a schema field, two controls with
+375px passes each, and a bundle regeneration. If it overruns, the natural split is **C9a** — the
+eligibility column, the schema and the 11 single-base rows, no UI, serial against
+`build-magic-items.ts` — and **C9b**, the pick, the two controls and the 22 choice rows. I have not
+split it here because a column with no reader is the anti-pattern this whole phase exists to end, and
+C9a alone would ship one for the 22.
+
+**Serialization.** `build-magic-items.ts` and `bundles/magic-items.v1.json` (against any live C7
+lane — the bundle is regenerated by `npm run build-magic-item-bundle -w @vtt/content-srd-5.2.1`, never
+by `npm run build-bundle`), `packages/schemas/src/index.ts` if the reference shape is taken, and the
+picker file against any other unit touching it. **Run it after C8**, not beside the lanes.
+
+**375px: yes**, and it is a real one — the base chooser lands inside the browse-and-add flow, which is
+already the densest surface this program touches. `node scripts/tap-audit.mjs 375`, count must not rise.
+
+---
+
 ## 3. How the magic-item list is decomposed, and why
 
 **The crux, stated first: the list splits in two before it splits four ways.**
@@ -737,29 +918,41 @@ nothing this vocabulary can say about them.
 worn/carried boundary that sets C7c against C7d is a reading, and the numbers below are what the
 plan's own "by name" rule produces (see C6's warning):*
 
-| lane | items | attuned |
-| --- | ---: | ---: |
-| **C7a** weapons + armour | 52 | 35 |
-| **C7b** wands, staffs, rods, rings, scroll | 55 | 44 |
-| **C7c** wondrous, worn | 57 | 47 |
-| **C7d** potions + carried wondrous | 94 | 14 |
-| **total** | **258** | **140** |
+**Superseded 2026-08-11 — re-measured off the committed bundle, and these are the numbers a lane
+answers to.** The table below is *rows*, which is what a lane is keyed by; the entry-basis numbers it
+replaces are kept in the paragraph under it because the arithmetic between them is the useful part.
 
-C7a and C7b are pure category sums and reproduce exactly. C7c/C7d moved: the earlier draft said
-63 / 88 with 51 / 10 attuned, and that split is neither reproducible nor internally consistent — it
-implied worn 63 / carried 64 while §3 and C6 both said 62 / 65. **The totals are what hold: 258 items
-and 140 attunements, whichever side of the wondrous line an item falls.**
+| lane | rows | attuned | landed | how it is selected off the committed bundle |
+| --- | ---: | ---: | ---: | --- |
+| **C7a** weapons + armour | 60 | 35 | 24 | `category` ∈ `weapon` 33 · `armor` 14 · `shield` 9 · `ammunition` 4 |
+| **C7b** wands, staffs, rods, rings, scroll | 57 | 46 | 27 | `category` ∈ `wand` 15 · `staff` 12 · `rod` 7 (`slot: held` = 34) · `ring` 22, **plus `spell-scroll`** |
+| **C7c** wondrous, worn | 56 | 46 | 0 | `category: wondrous-item` with a worn `slot` — `neck 15 · shoulders 15 · head 11 · feet 7 · hands 6 · belt 2` |
+| **C7d** potions + carried wondrous | 95 | 15 | 0 | `slot: wondrous` 71 + `category: consumable` 25 − the Spell Scroll |
+| **total** | **268** | **142** | **51** | |
 
-Item counts run 52 / 55 / 57 / 94 — a 1.8× spread, and it is the *wrong* axis to balance on. Most of
-C7d's 94 are GM-fiat prose whose deliverable is a written absence, not a rider; that is why C7d is
+**Where the old `52 / 55 / 57 / 94` came from and why it moved.** Those were *entries* on the 258
+basis, measured before C6 committed. Two things changed and both were predicted here in writing.
+**(1) The ladder expansion.** A lane is keyed by row id, so `weapon-1/-2/-3` are three keys, not one:
+C7a gains 8 rows (`ammunition`, `armor`, `shield`, `weapon`), C7b gains 2 (`Wand of the War Mage`),
+and 268 − 258 = **+10** exactly. Only `Wand of the War Mage` of the five requires attunement, which is
+the whole of 142 − 140 = **+2**. **(2) The wondrous line moved by one item.** C7c/C7d split on C6's
+committed `slot` column — §3's own correction says so — and that column reads `56 / 71` where the
+plan's pre-C6 "by name" rule predicted `57 / 70` and an earlier draft said `63 / 64`. Three methods,
+three answers, exactly as the C6 warning said; **the committed column is the boundary and the other
+two are history.** The pair still sums: 56 + 95 = 57 + 94 = 151, and 46 + 15 = 47 + 14 = 61. **The
+totals hold: 268 rows and 142 attunements, whichever side of the wondrous line an item falls.**
+
+Row counts run 60 / 57 / 56 / 95 — a 1.7× spread, and it is the *wrong* axis to balance on. Most of
+C7d's 95 are GM-fiat prose whose deliverable is a written absence, not a rider; that is why C7d is
 sized M while the other three are L, and why **each lane reports its own expressible-mechanic count as
 an output** rather than being handed one. **Authoring weight, not item count, is the balance the split
-is chosen for.**
+is chosen for** — and the two lanes that have run bear it out: C7a authored 24 of 60 and C7b 27 of 57,
+so **the deliverable is roughly half riders and half written absences**, which no item count predicts.
 
-The wondrous category is 127 items, half the list, so it is the one category that must be sub-split.
-It is sub-split **by body slot** — worn (57 measured) versus carried (70) — because "everything worn
-on the body" is one coherent authoring job (standing modifiers, attunement, on/off symmetry) while
-"everything carried" is another (activation, charges, GM fiat).
+The wondrous category is 127 rows, half the list, so it is the one category that must be sub-split.
+It is sub-split **by body slot** — worn (**56 as committed**) versus carried (**71**) — because
+"everything worn on the body" is one coherent authoring job (standing modifiers, attunement, on/off
+symmetry) while "everything carried" is another (activation, charges, GM fiat).
 
 **One correction to the original argument, because it was the argument's strongest claim.** The
 earlier draft said this sub-split is "as machine-checkable as the category split itself" because
@@ -892,8 +1085,8 @@ matched. Where a lane assignment moved, it moved because the item's category say
 | **U20** weapon-swing override | new rider variant | `monk.martial-arts` die column (`1d6/1d8/1d10/1d12` at 1/5/11/17 — *verified: it lives in the per-level `classResources` inside `levelTable`, not on the feature*) + `Sun Blade` (*"deals Radiant damage instead of Slashing damage"*, and *"functions as a Longsword with the Finesse property"*) + `Energy Bow` (*"deals Force damage instead of Piercing"*) | 3 | monk generated; two items in **C7a** | reserved |
 | **U22** target-scoped effects | new field on `EffectInstance` | `fighter.studied-attacks` (*"you have Advantage on your next attack roll against that creature"*, level 13 — the exact `vex` shape) + `ranger.precise-hunter` (*"You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark"*, level 17) + `barbarian.improved-brutal-strike` Staggering Blow (level 13) | 3 | **all three carry no rider at all today** (*verified*), so all three are clean adds — including the hand-authored fighter | reserved. **Re-measured: 0 of 258 magic items author this shape** — the carrier is not an item |
 | **U23** `extra-damage`, same type as the trigger | schema change (`damageType` is required) | `Vicious Weapon` (*"This extra damage is of the same type as the weapon's normal damage"*) + `evoker.empowered-evocation` (level 10) | 2 | item in **C7a**; evoker carries **no riders at all** (*verified*), so it is a clean add | reserved, shares its record with U30 |
-| **U26** `spell-attack-bonus` | reader only | `Wand of the War Mage, +1/+2/+3` · `Staff of the Magi` · `Staff of the Woodlands` · **`Staff of Power`** · `Talisman of Pure Good` · `Talisman of Ultimate Evil` | **6** | 4 in **C7b**, 2 in **C7c** | reserved — the modifier is collected at `equipment-derivation.ts:682` and applied nowhere, which `apps/server/src/character-build.ts:302` states in the code as `"spell-attack-bonus": "unread"`. Authoring it before U26 ships an item whose printed bonus does nothing |
-| **U29** `attack-kind-is: "spell"` | one line in `attackKindsOf` (`apps/server/src/action-resolution.ts:512`) | the same 6, plus `Spellguard Shield` — 7 items whose text turns on a spell attack roll | **7** | **C7a** (Spellguard Shield is `Armor (Shield)`), **C7b**, **C7c** | reserved |
+| **U26** `spell-attack-bonus` | reader only | `Wand of the War Mage, +1/+2/+3` · `Staff of the Magi` · `Staff of the Woodlands` · **`Staff of Power`** · `Talisman of Pure Good` · `Talisman of Ultimate Evil` · **`Robe of the Archmagi`** | **7 records / 9 rows** *(was 6 / 8)* | 4 records (**6 rows**) in **C7b**, 3 in **C7c** | reserved — the modifier is collected at `equipment-derivation.ts:682` and applied nowhere, which `apps/server/src/character-build.ts:302` states in the code as `"spell-attack-bonus": "unread"`. Authoring it before U26 ships an item whose printed bonus does nothing |
+| **U29** `attack-kind-is: "spell"` | one line in `attackKindsOf` (`apps/server/src/action-resolution.ts:512`) | the same 7, plus `Spellguard Shield` — **8 records / 10 rows** whose text turns on a spell attack roll | **8 records / 10 rows** *(was 7)* | **C7a** 1 (Spellguard Shield is `Armor (Shield)`), **C7b** 4 records / 6 rows, **C7c** 3 | reserved |
 | **U30** `spell-school-is` + `spell-level-is` | producer for `RiderContext.spellSchool` | `evoker.empowered-evocation` (shared with U23 — the same record, which is why they cannot land apart) + `evoker.evocation-savant` (level 3) | 2 | evoker; `evocation-savant` **already carries a `choice`** (*verified*), so a change there is a §4 case while `empowered-evocation` is a clean add | reserved |
 | **U31** `on-taking-damage` + `damage-reduction` | one new `collectRiders` call | `Gloves of Missile Snaring` (*"take a Reaction to reduce the damage by 1d10 plus your Dexterity modifier"*) + `Ring of Warmth` (*"the ring reduces the damage you take by 2d8"*) | 2 | Gloves in **C7c**; **Ring of Warmth is a `Ring` and therefore in C7b** | reserved |
 | **U32** `on-death-save` + `roll-mode: death-save` | one new call site | `Periapt of Wound Closure` (*"Whenever you make a Death Saving Throw, you can change a roll of 9 or lower to a 10"*) + `Mysterious Deck` (the Comet card: *"you have Advantage on Death Saving Throws"*) | 2 | Periapt in **C7c**; **Mysterious Deck is carried wondrous and therefore in C7d**. *Re-measured: these are the only 2 of 258 items whose text names a Death Saving Throw* | reserved |
@@ -901,13 +1094,26 @@ matched. Where a lane assignment moved, it moved because the item's category say
 **Three of these carry a warning the consuming unit must not discover on its own.**
 
 - **U26/U29's items include a `+1/+2/+3` ladder.** `Wand of the War Mage` expands to three rows (§3's
-  expansion rule), so U26's count is 6 records but 8 rows, and a test asserting "not a lone record"
+  expansion rule), so U26's count is 7 records but 9 rows, and a test asserting "not a lone record"
   should count records, not rows.
 - **U26's sixth carrier was missed by the first draft.** `Staff of Power` prints *"you gain a +2 bonus
   to Armor Class, saving throws, and spell attack rolls"*, so it is a `spell-attack-bonus` carrier and
   not only a U29 one. `Spellguard Shield`, by contrast, grants **no** bonus — *"spell attack rolls
   have Disadvantage against you"* — which is why it is U29's alone. *Re-measured: exactly 7 of 258
   items mention a spell attack roll; 6 of the 7 grant a bonus.*
+- **And a SEVENTH carrier was missed for a reason worth keeping: the grep was on the wrong phrase.**
+  *Re-measured 2026-08-11 over the committed 268 rows.* `/spell attack roll/` matches **9 rows / 7
+  records** and reproduces the line above exactly — which is why it read as settled. But **the SRD
+  prints this bonus two ways**, and the second form carries `Robe of the Archmagi`: *"Your spell save
+  DC and spell attack bonus each increase by 2."* It is `wondrous-item`, `slot: shoulders`, so it is
+  **C7c's**, and it is a `spell-attack-bonus` carrier by any reading. `/spell attack bonus/` matches
+  4 more rows and `/spell attack modifier/` 1, but the other four say *"uses **your** spell save DC
+  and spell attack bonus"* — `hat-of-many-spells`, `ioun-stone`, `ring-of-spell-storing`,
+  `staff-of-swarming-insects` — which is a cast **consuming** the bearer's bonus, not an item granting
+  one. So: **U26 is 7 records / 9 rows and U29 is 8 / 10**, and the lesson for anyone re-measuring
+  §5 is that an SRD phrase search is a *lower bound* until the near-miss forms have been read by eye.
+  Two more rows (`ring-of-the-ram`, `feather-token`) *make* a spell attack rather than modifying one;
+  they are neither unit's carrier — they need an item-granted attack action, which is a third shape.
 - **U30's second carrier collides.** `evoker.evocation-savant` already holds a `choice`, so narrowing
   it to the Evocation school is a §4 case. `empowered-evocation` is clean. U30 should reach for the
   clean one and treat the other as the ruling's second consumer.
@@ -940,7 +1146,12 @@ batch 3  (the content program)
   C5  vendor the source           ── SERIAL, one agent, blocks C6
   C6  the magic-item ETL          ── SERIAL, one agent, one parser, blocks C7*
   C7a │ C7b │ C7c │ C7d           ── 4 concurrent, one worktree each, no shared file
+                                     C7a and C7b are PART-LANDED (24/60, 27/57) and not closed
   C8  the close                   ── after all four merge
+
+after batch 3
+  C9  the weapon-template          ── SERIAL. Unblocks C7a's 19 weapon absences, but only together
+                                      with limit (A)'s flat `damage-bonus` — see C9 and §10.7
 ```
 
 **Why C6 is serial even though it is the biggest unit.** It is one parser over one file. Splitting it
@@ -960,10 +1171,16 @@ live port; read `docs/ai-ledger/known-bugs.md` before calling a red test a regre
 
 **What this unblocks, and when.** C1 is landed, so the mastery program can regenerate bundles again and
 U20/U35 have the `properties` data they needed. C3 closed the last half of the editor's weapon block
-below `mastery` on 2026-08-11. C6 unblocks C7a–d. C7a unblocks U20, U23 and U29's shield; C7b unblocks U26, U29 and
+below `mastery` on 2026-08-11. C6 unblocks C7a–d. C7b unblocks U26, U29 and
 U31's ring; C7c unblocks U26, U29, U31 and U32; C7d unblocks U32's second carrier. The
 engine/vocabulary planner and the mastery planner should sequence their units behind those four
 merges, not behind the whole program.
+
+**Corrected 2026-08-11 — C7a unblocks LESS than this paragraph promised.** It supplies U29's
+`Spellguard Shield` and U23's `Vicious Weapon` **as reserved carriers only**; it does **not** supply
+U20's `Sun Blade` or `Energy Bow` as working ones, because a magic weapon derives no swing to override
+(C9). U20 is therefore behind **C9**, not behind C7a, and any schedule that queued it behind the lane
+merge is wrong. U23's carrier is in the same position: the record is there, the swing is not.
 
 ---
 
@@ -982,6 +1199,8 @@ loss waiting to happen.
 | `apps/server/src/equipment-derivation.ts` `IMPLEMENTED_MASTERIES` | the mastery program | one `Set` literal at `:247`, `{graze, sap}` today, seven units. **This program never edits it** — C1 supplied the data, not the gate |
 | **`apps/client/src/homebrew/schemas.ts`, the weapon block** | ~~C3~~, now U38 alone | **six rows at `:763-795`** — C3 added `properties` (sixth) 2026-08-11; U38 adds `mastery` (seventh). C3 is out of the file, so the lock is U38's alone |
 | **`packages/content-srd-5.2.1/src/index.ts` `loadEquipment()`** | C6 alone now | C1/C3 already threaded `properties` through the weapon fold at `:113-117`; C6 adds a fourth source. No third party may edit it in between |
+| **`packages/content-srd-5.2.1/bundles/magic-items.v1.json`** | one C7 lane at a time, then C9 | generated, and **only** by `npm run build-magic-item-bundle -w @vtt/content-srd-5.2.1` — `npm run build-bundle` is a different script and does not emit it. Regeneration IS the merge resolution. Verify `weapons.v1.json` (`45b59185ccb8fa38924cb75c3b8485ff`) and `classes.v1.json` (`456fb5e40b29a439051cb85c36f5fc4b`) are untouched afterwards; both salvages did and both quote the sums |
+| **`packages/content-srd-5.2.1/scripts/build-magic-items.ts`** | C6, then C9 alone | C9 adds the eligibility column to the type-line parse. No C7 lane touches this file — a lane that needs a parsed column is asking for a C9-shaped unit, not an ETL edit |
 | `packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts` | **C2 alone** | C2 adds `clears` to `FeatureMechanics` and `applyMechanics`. C4 consumes it from `wizard.ts` and does not touch this file |
 | full-suite verification | ≤ 2 concurrent | the server suite binds a live port |
 
@@ -1001,14 +1220,18 @@ Chromium is pre-installed at `/opt/pw-browsers`; **never run `playwright install
 | **C4** | a level-18 Wizard is **refused** for answering both rows with level-1 spells | collapse two blocks to one → the refusal stops | set the second block's floor to 1 → the refusal stops | **yes** |
 | **C5** | the pinned entry count matches the vendored file | — (a sourcing unit; its probe is the pin) | change the pinned count → the guard fails | no |
 | **C6** | a browsed-and-added `Wand of the War Mage, +1` renders on a sheet with its rarity and attunement | remove the fourth fold → the census drops by 268 | change one item's parsed slot → the slot assertion names it | **yes** |
-| **C7a** | a `+1` weapon's to-hit **and** damage both move by one | strip the module from `index.ts` → the lane's test names its item | `+1` → `+0` → the number stops moving | yes |
+| ~~**C7a**~~ | ~~a `+1` weapon's to-hit **and** damage both move by one~~ — **struck: vacuous, and the salvage is why.** **Met instead at `e7e3ae0`**, on armour, out of the shipped bundle: an `Armor of Resistance` takes 12 lightning to **6** (`adjustment: "resistance"`, `adjustmentSource: "Armor of Resistance"`, hp 30 → 24), unequipped takes the full 12, and 12 fire lands whole while worn | met — stripping the lane from `index.ts` gives *"rows changed by the overlay: 0 (0 lane(s): none)"* and 4 failures, the first *"the authored lightning resistance did not halve the total: expected 12 to be 6"* | met — lightning → acid keeps the lane composed at 24 rows and fails ONLY the far end, 1 failed / 9 passed | yes |
 | **C7b** | a `Wand of Fireballs` spends 1 of its 7 charges, rolls damage, and **refuses** at zero | strip the module | change the charge limit → the refusal moves | yes |
 | **C7c** | a `Cloak of Protection` moves AC **and** a server-rolled save by +1, and both revert when it comes off | strip the module | change the bonus → both numbers stop moving | yes |
 | **C7d** | a `Potion of Resistance` halves a typed damage total for its hour and expires | strip the module | change the resisted type → the halving stops | yes |
 | **C8** | — | — | — | **this unit is the pass** |
+| **C9** | one shipped row, two picked bases: `Weapon, +1` on a **Greatsword** swings `2d6 + 1` off Strength and on a **Dagger** `1d4 + 2` off Dexterity | remove the eligibility column from the ETL → the pick has nothing to offer and the bundle guard names the row | change one row's eligible bases → the swing the pick produces changes with it | **yes** |
 
 *"The value survived derivation" is not a test.* Every row above ends at a rolled number, a spent
-counter, a refusal or a rendered string.
+counter, a refusal or a rendered string. **C7a is the reason that sentence is in this document
+twice**: its far end read as a rolled number and was one, and the number came from the test's own
+fixture. **A far end must be driven from the SHIPPED bundle**, and where a test has to build a row by
+hand it must build it the way the picker does and no better.
 
 ---
 
@@ -1025,6 +1248,8 @@ Named so nobody re-solves it, and so the handoff is precise.
 | the `weapon.mastery` control (U38) | the mastery planner | C3 left the weapon block one row wider (2026-08-11) and says so in §7. The live bug in `docs/ai-ledger/known-bugs.md` is now narrowed to the `mastery` half, U38's alone |
 | a second die for Versatile | nobody, yet | recorded as a named absence in C1's parser at `build-bundle.ts:574-579`; it needs a vocabulary decision, not a content edit |
 | the seven ability-score and hit-point items | nobody, yet | recorded as named absences in C7a (`Thunderous Greatclub`, `Berserker Axe`), C7c (`Amulet of Health`, `Belt of Giant Strength`, `Gauntlets of Ogre Power`, `Headband of Intellect`) and C7d (`Potion of Giant Strength`), with `ITEM_REFUSED_MODIFIER_TYPES`' own message quoted |
+| a flat `damage-bonus` in `FeatureModifierSchema` | nobody, yet | limit (A) in `packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts`. **It is C9's co-blocker, not a footnote**: without it every `+N` weapon authors its to-hit and understates its damage by N. Whoever schedules C9 must schedule this beside it or the ladder stays absent |
+| **C9 itself, as an ownership question** | **this program, provisionally** | Ruled 2026-08-11 as a C-numbered unit here because this program found it and is blocked by it. It is an **engine** mechanism by shape — its implementation lands in `apps/server` and `packages/schemas`, which nothing else in this program touches — so if the engine/vocabulary planner claims it, the number moves and C9's section becomes the handoff dossier unchanged. Say which before anyone starts it |
 
 ---
 
@@ -1044,11 +1269,22 @@ Named so nobody re-solves it, and so the handoff is precise.
 3. **The `Potions of Healing` reconciliation** is the one place C6 can produce a duplicate row in a
    player-facing list. It is a decision with two defensible answers; the failure mode is taking neither.
    Under the recommended answer the id guard fires **zero** times — which is what a guard should do.
-4. **A lane authoring a rider whose reader does not fire.** The admission rule and C8's adversarial
-   review both exist for this, and it is the failure mode this repo has shipped eight times. §5's lane
-   assignments moved on re-measurement (a shield in the wrong lane, a ring in the wrong lane, a deck in
-   the wrong lane); a lane that authors a reserved carrier because it thought it owned it is the same
+4. **~~A lane authoring a rider whose reader does not fire.~~ IT HAS NOW BITTEN, TWICE, AND IN THE
+   WORSE FORM.** Promoted from a risk to a record on 2026-08-11. Both C7a and C7b authored riders whose
+   readers **do** fire and produce the wrong thing — 18 weapon rows whose `+N` had no swing to attach
+   to, and 7 `casts` that turned healing and buffs into damage. Neither was caught by the lane; both
+   were caught by a review pass afterwards, and in C7a's case the lane's own far end was green
+   against a fixture it supplied itself and was reported as verification. **The admission rule now has a second clause
+   because of this** (see C7a–C7d), and C8's adversarial review must audit *effect*, not merely
+   *reach*. §5's lane assignments moved again on this re-measurement (`Robe of the Archmagi` was never
+   assigned at all); a lane that authors a reserved carrier because it thought it owned it is the same
    failure wearing a different hat.
+7. **C9 will look cheaper than it is, and the shape of the mistake is already known.** Its engine half
+   is nearly free — `apps/server/test/item-riders.test.ts` criterion 1 proves the reader works the
+   moment a row has a weapon block — so the temptation is to "just copy a base block in the ETL" and
+   call it done. That is the rejected third option, it invents content, and it is unfalsifiable
+   downstream. The cost is in the eligibility column, the two controls and the co-blocker (limit (A));
+   anyone sizing C9 off the engine half will size it wrong.
 5. **~~The §4 ruling arriving late.~~** Closed: the ruling is taken (Option 2). What remains is C2's
    implementation, and C4 is the only unit in this program waiting on it.
 6. **~~The inference budget.~~** Spent at `36b5a1f` and now guarded at compile time

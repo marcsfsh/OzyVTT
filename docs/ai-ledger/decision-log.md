@@ -13,6 +13,67 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-11 — a magic weapon applies to a base weapon the player picks, and a rider must produce the PRINTED effect
+
+**Context.** Batch 3's C7a lane (weapons and armour) authored 42 of its 60 magic-item rows and its
+headline far end was green: *"a `+1` weapon's to-hit and damage both move by one."* A review pass
+found the number came from the test's own fixture. **A magic weapon in the SRD carries no stats of its
+own** — the printed type line names which *base* weapon the item applies to (`Weapon (Warhammer)`,
+`Weapon (Any Simple or Martial)`) — and the ETL is faithful to it: **measured over the committed
+`packages/content-srd-5.2.1/bundles/magic-items.v1.json`, 0 of the 33 `weapon`-category rows carry a
+`weapon` block.** So `weaponAction` returns null, the row derives no swing, and an authored `+3` is
+not an overstatement but a number that appears nowhere. Driven end to end on a picker-minted
+`Dwarven Thrower`: `carriers` 1, `weaponActionIds` `[]`, `effectiveActions` `[]`. C7b hit the same
+class of defect from the other side — seven `casts` whose reader fires and produces the wrong thing,
+including a Staff of Healing that hit a wounded ally for 2d8.
+
+**The first ruling: the player picks the base weapon the template applies to.** The chosen base
+supplies the swing — its die, its damage type, its range band, its properties — and the magic row's
+riders scope to that swing. It is an **item-applies-to-item** mechanism and it does not exist in this
+repo. **It is a unit, not content work**, written up as **C9** in
+`docs/product/plan-content-program.md` §2. The measurement that forces the ruling is the qualifier
+histogram: of the 33 rows, **11 name exactly one base weapon and 22 offer a choice** (nine of them
+`Any Simple or Martial`). Any answer that serves only the 11 leaves two thirds of the list inert.
+
+**Rejected, with why.** *Inherit the single named base for the 11* — cheapest, no control, no pick;
+leaves the other 22 inert and ships a browse list where some magic weapons swing and some do nothing
+with nothing on screen to say which. Kept as C9's own first slice, not as the answer. *`scope:
+"bearer"`* — parses today, needs no unit, and is wrong in a way a table feels: it raises every attack
+the bearer makes with any weapon, and two magic weapons stack. *Invent default stats* — `Sword of
+Sharpness` applies to a Glaive, Greatsword, Longsword or Scimitar, whose dice are 1d10/2d6/1d8/1d6, so
+any single default is wrong for at least three of the four; it also invents content the SRD does not
+print and nothing downstream could ever tell the invented die from a parsed one.
+
+**The second ruling, and it is the general lesson: the admission rule gains a clause.** It was *"a
+rider is authored only when its reader ships."* It is now **"only when its reader ships AND produces
+the printed effect."** A rider that reaches a reader and produces the WRONG effect is **worse than an
+unauthored one**, because prose is visibly prose and a wrong number is invisible until the round it
+lands at a table. Both salvages are instances: a `+N` with no swing, and a `casts` that reads a
+spell's `damage` column as if it described one cast.
+
+**What it costs, stated plainly.** **18 authored rows came out of C7a and 5 out of C7b, plus 4 riders
+stripped from entries that survive** — C7a stands at 24 of 60 and C7b at 27 of 57, and the removed
+rows are **named absences**: the item, the SRD sentence, the vocabulary it needs, and the unit or bug
+that unblocks it, in a comment beside where the entry was. That is "we decided it", not "we skipped
+it". **U20 moves behind C9** rather than behind C7a — `Sun Blade` and `Energy Bow` are reserved
+carriers with no swing to override — and U23's `Vicious Weapon` is in the same position. **C9 does not
+unblock the `+N` ladder on its own**: `FeatureModifierSchema` has no flat `damage-bonus` (measured:
+`{formula: "1"}` and `{formula: "1d1"}` are both refused), so a `+1` weapon after C9 would author its
+to-hit and understate its damage by one — half-right and invisible, which is the very failure this
+ruling exists to stop. The two must land together.
+
+**Consequences.** C9's full contract, its far end and its one open design question (copy the base's
+block onto the inventory row, or store a `baseWeaponId` and resolve at derivation) are in
+`docs/product/plan-content-program.md`; the lane-level findings and every absence are in
+`packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` and
+`packages/content-srd-5.2.1/scripts/item-mechanics/wands-rods-rings.ts`; the spell-model half is two
+`[content/spells]` entries in `docs/ai-ledger/known-bugs.md`. **The armour half of C7a is NOT affected
+and the reason is the SRD's own wording** — `Shield, +2` prints its bonus *"in addition to the
+Shield's normal bonus to AC"*, and AC is additive by construction — so nobody should "fix" armour rows
+by inventing an `armor` block for them either. And a bar for every future far end in this program:
+**drive it from the shipped bundle**; where a test must build a row by hand, build it the way the
+picker does and no better.
+
 ## 2026-08-11 — two of the parent decisions the unit programs were waiting on
 
 **Context.** `docs/product/plan-engine-program.md` §7 (D-ENGINE-2) and the U35a scope question were

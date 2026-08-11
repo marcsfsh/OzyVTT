@@ -196,6 +196,34 @@ Format: `[area] — description — suspected cause / status`.
   closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
   slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
 
+- **[content/items] A magic weapon added from the browse list offers no attack at all, because a
+  magic weapon carries no weapon stats.** The SRD's printed type line names which **base** weapon the
+  item applies to — `Weapon (Warhammer)`, `Weapon (Any Simple or Martial)` — never the item's own
+  dice, and the ETL is faithful to it. *Measured 2026-08-11 over the committed
+  `packages/content-srd-5.2.1/bundles/magic-items.v1.json`: **0 of the 33 `weapon`-category rows carry
+  a `weapon` block**, and 0 of the 14 `armor` rows carry an `armor` block.* The picker mints the
+  inventory row's block from the catalog summary's (`inventoryWeaponFrom`,
+  `apps/client/src/encounter/equipment.tsx`), which is null here, so `weaponAction` returns null
+  (`apps/server/src/equipment-derivation.ts`) and there is nothing to swing. **Driven end to end on a
+  picker-minted `Dwarven Thrower`, equipped and attuned: `derivation.carriers` 1, `weaponActionIds`
+  `[]`, `effectiveActions` `[]`.** A GM who adds a Sun Blade to a character gets a line item and no
+  attack. Not a projection or a wire problem — the data is honest and the mechanism to consume it does
+  not exist. **This is also why every `+N` on a weapon row is a named absence rather than a rider:** an
+  authored `+3` would not be an overstatement, it would be a number that appears nowhere, and
+  `scope: "bearer"` is refused as the workaround because it would raise every attack the bearer makes
+  and two magic weapons would stack. Absences are in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` (19 rows cite this).
+  **The armour side is milder and has the same root:** the SRD prints a magic shield's bonus *"in
+  addition to the Shield's normal bonus to AC"*, and AC is additive, so an `armor-class` rider stacked
+  on a separately equipped mundane base is what the source describes and it works today — but a bearer
+  who equips **only** the magic row reads `10 + Dex + N` instead of the base's AC + N, because that row
+  carries no `armor` block either. Wants its own unit — **C9, the weapon-template mechanism**, written
+  up in `docs/product/plan-content-program.md`: the player picks the base the template applies to.
+  Two things gate it and both are named there — the eligibility column (18 distinct qualifier forms
+  over the 33 rows, not parsed today) and a flat `damage-bonus` in `FeatureModifierSchema`, without
+  which a `+1` weapon would author its to-hit and silently understate its damage by one. **Do not
+  invent default stats for these rows**; the source does not print them.
+
 - **[content/spells] There is no healing in the spell model, so anything that casts a healing spell
   deals damage instead.** `SpellReferenceSchema` has no `healing` field at all (*measured: no match
   in `packages/content-srd-5.2.1/src/schemas.ts`*); a spell's dice live in `damage.roll`, and a
