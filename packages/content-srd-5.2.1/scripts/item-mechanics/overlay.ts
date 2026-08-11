@@ -435,6 +435,26 @@ export function applyItemMechanics(
         continue;
       }
 
+      /**
+       * AN UNKNOWN TOP-LEVEL KEY IS A TYPO, AND IT MUST BE LOUD — a regression fix, 2026-08-11.
+       *
+       * The hardening pass introduced this hole while closing six others. Below, the merged row is
+       * built by PICKING the known `ITEM_RIDER_KEYS` out of the entry, so a misspelled key beside a
+       * real one (`modifers` next to `modifiers`) is never handed to the schema at all and
+       * `.strict()` — which caught it before the hardening — never sees it. The build then exits 0
+       * having authored only the half the author spelled correctly, which is the precise failure
+       * this whole overlay exists to make impossible.
+       *
+       * Checked here rather than by spreading the raw entry into the parse, because the pick is what
+       * keeps a lane from setting a PARSED column (`slot`, `rarity`, `attunement`) it must not own.
+       */
+      const unknown = Object.keys(mechanics)
+        .filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
+      if (unknown.length > 0) {
+        refused.push(`${at} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The nine are: ${ITEM_RIDER_KEYS.join(", ")}`);
+        continue;
+      }
+
       const empty = ITEM_RIDER_KEYS
         .map((key) => ({ key, reason: authorsNothing(mechanics[key]) }))
         .filter((named): named is { key: ItemRiderKey; reason: string } => named.reason !== null);

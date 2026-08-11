@@ -196,6 +196,22 @@ Format: `[area] — description — suspected cause / status`.
   closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
   slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
 
+- **[content/spells] There is no healing in the spell model, so anything that casts a healing spell
+  deals damage instead.** `SpellReferenceSchema` has no `healing` field at all (*measured: no match
+  in `packages/content-srd-5.2.1/src/schemas.ts`*); a spell's dice live in `damage.roll`, and a
+  healing spell carries them there with an EMPTY `damage.types`. So `cure-wounds` ships as
+  `{roll: "2d8", types: []}` and `heal` as `{roll: null, types: []}`. A consumer that reads `damage`
+  to synthesise an action cannot tell healing from harm: **measured 2026-08-11, an item authored with
+  `casts: [{spellId: "cure-wounds"}]` synthesises a 2d8 DAMAGE action — point a Staff of Healing at a
+  wounded ally and it hits them for 2d8.** Found by the C7b review pass, which is why that lane's
+  healing items are unmerged.
+  **The empty-type set is not a healing marker and must not be used as one:** 24 of 339 spells carry
+  a damage roll with no type, and they are a mixture — healing (`cure-wounds`, `healing-word`), flat
+  buffs whose dice are a bonus (`bless`, `guidance`, `bane`), temporary hit points (`false-life`) and
+  spells whose type is chosen at cast time (`chromatic-orb`, `dragons-breath`). Telling them apart
+  needs a real field, not a heuristic. Wants its own unit: a `healing` block on the spell reference,
+  the ETL to populate it, and a reader — until then every healing carrier stays a named absence.
+
 - **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
   carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
   now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as

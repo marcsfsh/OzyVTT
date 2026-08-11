@@ -185,6 +185,34 @@ describe("the item mechanics overlay", () => {
     expect(emit(applyItemMechanics(rows, []))).toBe(committed);
   });
 
+  it("refuses a top-level key it does not know, instead of silently dropping the typo", () => {
+    /**
+     * A REGRESSION FIX, 2026-08-11, and it is here because the hardening pass opened it while
+     * closing six other holes — which is the ordinary risk of a hardening pass and the reason the
+     * re-verification existed.
+     *
+     * `applyItemMechanics` builds the merged row by PICKING the nine known rider keys out of the
+     * entry. That pick is deliberate — it is what stops a lane setting a PARSED column like `slot`
+     * or `rarity` that the ETL owns — but it also meant a misspelled key was never handed to the
+     * schema, so `.strict()`, which HAD caught it before the hardening, never saw it. The build then
+     * exited 0 having authored only the half the author spelled correctly.
+     *
+     * The typo beside a REAL key is the shape that matters: with `modifiers` present and correct,
+     * every other guard is satisfied and nothing else would ever have noticed.
+     */
+    expect(() => applyItemMechanics(rows, [lane({
+      "cloak-of-protection": { modifers: [{ type: "armor-class", amount: 1 }], modifiers: [{ type: "armor-class", amount: 1 }] } as unknown as ItemMechanics
+    })])).toThrow('[C7-probe] cloak-of-protection - "modifers" is not a rider key');
+
+    // ...and the parsed columns the ETL owns are refused by the same check, which is what the pick
+    // was protecting in the first place. A lane may not restate what the source printed.
+    for (const owned of ["slot", "rarity", "attunement", "category", "description"]) {
+      expect(() => applyItemMechanics(rows, [lane({
+        "cloak-of-protection": { modifiers: [{ type: "armor-class", amount: 1 }], [owned]: "anything" } as unknown as ItemMechanics
+      })]), owned).toThrow(`"${owned}" is not a rider key`);
+    }
+  });
+
   it("refuses a rider type no consumer reads yet, pointing at the disposition table", () => {
     // THE ADMISSION RULE, enforced. The plan's rule is "a lane authors a rider only when its reader
     // ships today", and the repo already knows which readers ship. Measured before this check:
