@@ -18,7 +18,12 @@ Format: `[area] — description — suspected cause / status`.
   2026-08-11 on `/codex/pages`, GM, 375×667 with touch: the rail's `Menu` popover renders 5 items at
   **44×184** — every one clears the tap floor — and `elementFromPoint` at the centre of three of them
   answers with something else: *New subfolder* ← `div.codex-rail-tools`, *New page here* ←
-  `aside.codex-rail` itself, *Rename folder* ← `input.nh-input`. Only *Delete folder* taps through.
+  `aside.codex-rail` itself, *Rename folder* ← `input.nh-input`. *Move to top level* and *Delete
+  folder* own their centres (an earlier version of this entry said only *Delete folder* did;
+  re-measured 2026-08-11 by the independent review pass, same three thieves, same three items).
+  The theft is position-bound: scrolling the popover (which moves it relative to the fixed tools
+  row and search input) frees the stolen items — a driven `.tap()` that auto-scrolls first lands —
+  which points the diagnosis at the overlap geometry, not the items themselves.
   **It is NOT the `isolation: isolate` trap** that this same rail's tag combobox had (fixed in
   `codex.css`, `.codex-rail:has(.nh-combobox-list)`): every thief here is INSIDE the rail, so lifting
   the rail changes nothing — extending that selector to `details.nh-menu[open]` was tried and
