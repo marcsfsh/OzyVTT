@@ -286,12 +286,6 @@ Format: `[area] — description — suspected cause / status`.
   seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
   party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
 
-- **[tooling] `apps/server/test/homebrew-http.test.ts`'s per-path mount probe is vacuous.** It asserts the
-  router's own headers prove a path is mounted; because `router.use(...)` is declared with no path and the
-  router mounts bare, those headers come back for *any* path — measured, `/completely/unrelated/path`
-  returns 404 carrying both. Its path-set assertion is sound; only the probe loop proves nothing. Left
-  alone as another milestone's file; the Codex equivalent added in M9 reads Express's route table instead.
-
 - **[ux] The marker inspector is dominated by the icon picker.** Measured live at 1440px: the inspector is
   a 300px rail whose icon grid occupies roughly the first 500px, so every *functional* control — linked
   pages, drill-into map, linked scenes, and (new in M1) linked actor at y≈1082 and the journal readback at

@@ -142,16 +142,42 @@ describe("homebrew HTTP authorization gate", () => {
 
   it("declares the same ten paths the router mounts", async () => {
     // A path added to the contract without a route (or the reverse) is a documented endpoint that 404s.
-    const { base } = await fixture();
     const declared = Object.values(HOMEBREW_PATHS);
     expect(declared).toHaveLength(10);
     expect(Object.keys(openApiDocument.paths).filter((path) => path.startsWith("/api/v1/homebrew")).sort()).toEqual([...declared].sort());
-    // A request that falls THROUGH the router never gets the router's own headers, so their presence
-    // is the proof the path is mounted rather than merely documented.
+    // Read Express's route table rather than probing over HTTP. The probe this replaces asserted the
+    // router's own headers came back per path — but `router.use(...)` is declared with no path and the
+    // router mounts bare, so those headers come back for ANY string whatsoever (measured:
+    // `/completely/unrelated/path` 404s carrying both), and the loop proved nothing about mounting.
+    // The route table is exact: it is the set of routes really registered, so a documented-but-
+    // unmounted path cannot hide in it. Same shape as `codex-http.test.ts`'s mount check, which was
+    // written against this file's mistake.
+    const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-mount-"));
+    const store = new HomebrewStore(join(directory, "vtt.sqlite"));
+    await store.initialize();
+    cleanups.push(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+    const router = createHomebrewRouter({
+      store,
+      authorizeGm: (token) => token === "gm-token",
+      authorizePlayer: () => false,
+      notifyChanged: () => {}
+    }) as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
+    const mounted = new Map<string, Set<string>>();
+    for (const layer of router.stack) {
+      if (!layer.route) continue;
+      // Express names a parameter `:id`; OpenAPI writes `{id}`. Same path, two spellings.
+      const path = layer.route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+      const methods = mounted.get(path) ?? new Set<string>();
+      for (const [method, on] of Object.entries(layer.route.methods)) if (on) methods.add(method.toLowerCase());
+      mounted.set(path, methods);
+    }
+    expect([...mounted.keys()].sort()).toEqual([...declared].sort());
+    // ...and per path, the METHODS match the document — without this, a dropped GET hides behind a
+    // surviving PATCH on the same path (measured while probing this very test).
     for (const path of declared) {
-      const probe = await get(base, path.replace("{id}", "hb-nothing-000000"), GM);
-      expect(probe.headers.get("x-request-id"), `${path} is documented but not mounted`).toBeTruthy();
-      expect(probe.headers.get("cache-control"), `${path} is documented but not mounted`).toBe("no-store");
+      const documented = Object.keys((openApiDocument.paths as Record<string, Record<string, unknown>>)[path] ?? {})
+        .filter((method) => ["get", "post", "put", "patch", "delete"].includes(method)).sort();
+      expect([...(mounted.get(path) ?? [])].sort(), `methods on ${path}`).toEqual(documented);
     }
   });
 });

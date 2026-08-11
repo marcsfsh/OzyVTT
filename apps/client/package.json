@@ -6,6 +6,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "check": "tsc -b --pretty false",
+    "docs:parity": "node --import tsx --import ./scripts/style-stub-loader.mjs scripts/generate-parity-audit.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -25,9 +26,12 @@
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/express": "^5.0.1",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "express": "^5.1.0",
     "jsdom": "^30.0.0",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vite": "^6.3.3",
     "vitest": "^4.1.10"
