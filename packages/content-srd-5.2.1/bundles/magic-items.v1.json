@@ -5526,13 +5526,7 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": [
-   {
-    "type": "spell-save-dc",
-    "amount": 2,
-    "when": []
-   }
-  ]
+  "modifiers": []
  },
  {
   "id": "robe-of-useful-items",

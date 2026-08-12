@@ -40,9 +40,6 @@
  *                         `actor-derived.ts:94` into the sheet's skill row.
  *                         MEASURED on `Gloves of Thievery`: Sleight of Hand **+7**, Stealth **+2** -
  *                         the filter really narrows.
- *   `spell-save-dc`       `effective-actions.ts` folds it into `action.save.dc`, and criterion 10
- *                         proves it is the DC the server ENFORCES.
- *                         MEASURED on `Robe of the Archmagi`: a DC-14 action reads **16**.
  *   `grants.damageResistances` / `grants.damageImmunities`
  *                         `hit-points.ts:181-186` - the item's list joins the definition's before
  *                         `adjustDamageParts`, and the item's NAME lands on the damage line as
@@ -51,9 +48,13 @@
  *                         `actor-conditions.ts:52-56` - `setCondition` narrates the skip instead of
  *                         applying. Its own comment names a Periapt as the item that fixed it.
  *   `grants.weapons`      `equipment-derivation.ts:1003` `granted = grantedWeapons.includes(...)`,
- *                         which matches a weapon CATEGORY *or the inventory row's own id*.
+ *                         which matches a weapon CATEGORY *or the inventory row's own id*. That is
+ *                         wider than `./overlay.ts` used to claim, and the seam now CHECKS this key
+ *                         against the weapon ids and the category groups together rather than
+ *                         leaving it open (corrected there, this lane having measured it).
  *                         MEASURED on `Bracers of Archery` with a definition whose
- *                         `proficiencies.weapons` is `[]`: a Longbow's to-hit **2 -> 4**.
+ *                         `proficiencies.weapons` is `[]` and whose `proficiencyBonus` is 3:
+ *                         a Longbow's to-hit **2 -> 5**.
  *   `casts`               `equipment-derivation.ts:922` `castAction` - see W6, which is why only
  *                         five of this lane's twelve printed casts survived.
  *   `actions` + `uses`    `action-resolution.ts:248` spends the pool and `useLimitFor` refuses at
@@ -64,9 +65,10 @@
  *                         save on the target.
  *
  * ==============================================================================================
- * SEVEN LIMITS THIS LANE HITS OVER AND OVER, stated once so 37 absences below can point at a
+ * EIGHT LIMITS THIS LANE HITS OVER AND OVER, stated once so 38 absences below can point at a
  * number. Every one is MEASURED. W6 is C7b's L6 and is restated because it emptied five entries
- * here that looked authorable right up to the moment they were driven.
+ * here that looked authorable right up to the moment they were driven. W8 was added by review: it
+ * emptied a NINETEENTH entry that had already shipped.
  * ==============================================================================================
  *
  * W1. `roll-mode` HAS NO CONSUMER FOR `roll: "check"`, and it is the single biggest killer in this
@@ -116,7 +118,7 @@
  *
  * W5. A CHARGE THAT NEVER COMES BACK IS UNSAYABLE, so an item that is CONSUMED cannot be authored
  *     for its charges. `FeatureUsesSchema.per` is `turn | encounter | short-rest | long-rest`
- *     (`src/character-content.ts:88`) and there is no "never". `Necklace of Fireballs`' beads are
+ *     (`src/character-content.ts:86`) and there is no "never". `Necklace of Fireballs`' beads are
  *     detached and thrown, `Scarab of Protection` "crumbles into powder and is destroyed when its
  *     last charge is expended", and both Talismans are destroyed on their last charge - so a pool
  *     authored for any of them would re-arm on a long rest and hand the table an item the SRD says
@@ -154,18 +156,51 @@
  *     Points") and `Necklace of Prayer Beads` (the Bead of Curing casts Cure Wounds) are both
  *     absences for this reason and no other reasoning is attempted on them.
  *
+ * W8. `spell-save-dc` RAISES EVERY PRINTED DC, NOT THE WEARER'S SPELL SAVE DC - added by review,
+ *     and it is the only limit here found AFTER a rider had shipped. `effective-actions.ts:51` sums
+ *     the rider and `:74` folds it into `action.save.dc` for ANY action carrying a save; nothing on
+ *     that path asks whether the action is a spell, and the engine has no spellcasting-DC field for
+ *     it to reach instead. **MEASURED 2026-08-12 over the SHIPPED bundle through the real
+ *     `ContentLibrary`, on a Wizard 5 wearing `Robe of the Archmagi`:** `Wand of Paralysis` DC 15 ->
+ *     **17**, a Breath-Weapon-shaped definition action DC 13 -> **15**, this lane's own `Eyes of
+ *     Charming` DC 13 -> **15**. Those are FIXED numbers printed on other items and on a stat block,
+ *     and none of them is the wearer's spell save DC. That is an over-grant, so the robe's War Mage
+ *     clause is an absence and the rider was removed. **Needs: a spell save DC on the actor that a
+ *     spell's own DC is computed from, so a rider can raise THAT rather than every save on the
+ *     sheet.** UNBLOCKED BY: `docs/ai-ledger/known-bugs.md` **[content/riders] A `spell-save-dc`
+ *     rider raises the DC of EVERY save-bearing action**, written up from this measurement.
+ *     (`robe-of-the-archmagi` is the whole of this limit's blast radius - MEASURED 2026-08-12: it
+ *     was the only carrier in all 268 rows, and after its removal the string does not occur in ANY
+ *     shipped bundle, classes and feats included. The next author to reach for it, on any carrier,
+ *     meets the bug entry first.)
+ *
  * ----------------------------------------------------------------------------------------------
  * THE ONE SHAPE THIS LANE AUTHORS THAT IS LESS THAN THE PRINTED TEXT, stated once because three
  * entries use it and an unstated exception is how a file starts arguing with itself.
  *
  * **A CHARGED ITEM MAY BE AUTHORED FOR ITS CHARGE ALONE** when (a) the count and the recharge are
- * exactly what the SRD prints, and (b) what the charge buys is something a GM resolves at the table
- * rather than a number the sheet would then be wrong about. C7b set the precedent on
- * `ring-of-evasion`: *"What is real and enforced is the CHARGE ... The GM adjudicates the success;
- * the ring cannot be used a fourth time in a day."* Here it is `winged-boots`, `cloak-of-invisibility`
- * and `robe-of-scintillating-colors`. It is NOT an excuse to author a button for anything: an item
- * with no printed charge count has nothing to enforce (which is why `Wings of Flying`, whose cooldown
- * is a rolled 1d12 hours, is an absence), and one that is consumed rather than recharged fails W5.
+ * exactly what the SRD prints, and (b) the effect the charge buys is one the GM can apply with a
+ * command they already have, so the unauthored half is *narrated* rather than *lost*. C7b set the
+ * precedent on `ring-of-evasion`: *"What is real and enforced is the CHARGE ... The GM adjudicates
+ * the success; the ring cannot be used a fourth time in a day."* Here it is `winged-boots`,
+ * `cloak-of-invisibility` and `robe-of-scintillating-colors`. It is NOT an excuse to author a button
+ * for anything: an item with no printed charge count has nothing to enforce (which is why `Wings of
+ * Flying`, whose cooldown is a rolled 1d12 hours, is an absence), and one that is consumed rather
+ * than recharged fails W5.
+ *
+ * **CLAUSE (b) IS NARROWER THAN IT FIRST READ, AND THE CORRECTION IS REVIEW'S.** The earlier wording
+ * was *"something a GM resolves at the table rather than a number the sheet would then be wrong
+ * about"*, and that is not the line this lane actually draws: `cloak-of-invisibility`'s button buys
+ * the **Invisible** condition, which is a first-class id in `conditions.v1.json` and engine-owned
+ * state, exactly as hit points are - so the stated rule read as if it excluded the cloak, while the
+ * lane authored it. What separates the cloak from `Periapt of Health` is NOT that one is
+ * GM-narrated and the other is a number: it is that healing is refused OUTRIGHT by W7 and the
+ * known-bugs entry behind it, charges or no charges, while a condition has a GM command
+ * (`setCondition`) that already applies it. Both halves of the distinction are now stated so a later
+ * lane inherits the line rather than the sentence that missed it. See `rulingsOwed`: whether a
+ * charge-alone button should be authored at ALL when the effect is engine-owned state is a design
+ * question this lane took conservatively (it authored three, and named every other charge an
+ * absence) and did not settle.
  *
  * ----------------------------------------------------------------------------------------------
  * THIS LANE OWNS `cursed`, AND IT AUTHORS NONE. The rule was re-read before deciding
@@ -182,17 +217,22 @@
  * ----------------------------------------------------------------------------------------------
  * WHAT THIS LANE PRODUCED, as an output rather than a target:
  *
- *   19 of 56 items carry at least one authored rider - **shoulders 6, head 4, neck 4, hands 3,
- *   feet 2, belt 0.** 37 of 56 are prose-only records, every one named below with its reason.
- *   The 37 split:
+ *   18 of 56 items carry at least one authored rider - **shoulders 5, head 4, neck 4, hands 3,
+ *   feet 2, belt 0.** 38 of 56 are prose-only records, every one named below with its reason.
+ *   The 38 split:
  *      4  the schema REFUSES their central mechanic outright (`ability-score`);
  *      4  RESERVED for a later unit (U31, U32, U26/U29 x2);
  *      2  HEALING (W7, and the known-bugs entry it cites);
  *      5  emptied by W6 - a cast whose spell record describes the spell rather than the cast;
- *      9  OVER-GRANTS - the vocabulary can only say something broader than the printed text;
+ *     10  OVER-GRANTS - the vocabulary can only say something broader than the printed text;
  *     13  no vocabulary at all - movement modes, vision, planar travel, GM-fiat tables.
  *
- *   TWELVE of the 19 authored items ALSO carry a per-item absence for a half that is not
+ *   **WAS 19 AND 37 AT `3a8acb3`.** `robe-of-the-archmagi` moved from authored to over-grant when
+ *   review measured what its `spell-save-dc` actually raises (W8); the arithmetic between the two
+ *   readings is 19 - 1 = 18 authored, 9 + 1 = 10 over-grants, 37 + 1 = 38 absences, shoulders 6 - 1
+ *   = 5. Nothing else moved.
+ *
+ *   ELEVEN of the 18 authored items ALSO carry a per-item absence for a half that is not
  *   expressible; those are stated at the entry rather than counted here. Only SEVEN rows in this
  *   whole lane are authored with nothing left over - `bracers-of-defense`, `gloves-of-thievery`,
  *   `hat-of-disguise`, `helm-of-comprehending-languages`, `medallion-of-thoughts`,
@@ -228,7 +268,7 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * by design, quoted here rather than worked around: *"An item cannot change hit points or an
    * ability score yet - those are baked into the sheet and cannot be un-granted when the item comes
    * off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (Both
-   * stay available on a feat.)"* (`src/character-content.ts:263`, enforced at `src/schemas.ts:331`.)
+   * stay available on a feat.)"* (`src/character-content.ts:263`, enforced at `src/schemas.ts:338-341`.)
    * Inventing a modifier type to work around it is a VOCABULARY decision and belongs to a unit, not
    * to a content author. UNBLOCKED BY: a unit that gives an item a layered ability score. Prose.
    */
@@ -251,7 +291,7 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * Attack against you has Disadvantage on the attack roll ... a total of 10 minutes." Three ways
    * this fails: doubling is not a flat `speed` amount and `speed` reaches nothing anyway (W2); the
    * 10-minute budget is a duration, not a use count; and the opportunity-attack half cannot be
-   * narrowed - MEASURED at `action-resolution.ts:606`, the TARGET's `incoming-attack` riders are
+   * narrowed - MEASURED at `action-resolution.ts:602`, the TARGET's `incoming-attack` riders are
    * collected with `{...moment.target.context, moment: pass}` and NO `filters`, so an
    * `attack-kind-is: ["opportunity"]` on a defender's rider has no `attackKinds` to match and fails
    * closed. Authoring it ungated is disadvantage on every incoming attack, forever.
@@ -309,13 +349,20 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
   /**
    * BRACERS OF ARCHERY - "you have proficiency with the Longbow and Shortbow".
    *
-   * `grants.weapons` is documented in `./overlay.ts` as a proficiency GROUP list (`simple|martial`),
-   * which is what the shipped bundles happen to carry - but the reader is wider than that and this
-   * lane checked rather than assumed. `weaponAction` (`equipment-derivation.ts:1003`) computes
-   * `granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id)`, so a
-   * BASE WEAPON ID is a first-class value here. MEASURED on a hero whose `proficiencies.weapons` is
-   * `[]`: an equipped Longbow's derived to-hit is **2** without the bracers and **4** with them -
-   * the proficiency bonus, on the swing, from the bracers.
+   * `grants.weapons` USED to be documented in `./overlay.ts` as a proficiency GROUP list
+   * (`simple|martial`) that no bundle's id column could satisfy - but the reader is wider than that
+   * and this lane checked rather than assumed. `weaponAction` (`equipment-derivation.ts:1003`)
+   * computes `granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id)`,
+   * so a BASE WEAPON ID is a first-class value here, and `longbow` / `shortbow` are two of the 38
+   * ids in `bundles/weapons.v1.json`. MEASURED on a hero whose `proficiencies.weapons` is `[]` and
+   * whose `proficiencyBonus` is 3: an equipped Longbow's derived to-hit is **2** without the bracers
+   * (Dex +2, untrained) and **5** with them - Dex +2 plus the proficiency bonus 3, on the swing,
+   * from the bracers. A Longsword beside it stays at 0, so the grant really is the two bows.
+   *
+   * THE SEAM WAS CORRECTED RATHER THAN LEFT DISAGREEING WITH THIS ENTRY (review finding): `weapons`
+   * sat in `OPEN_BY_DESIGN`, so `long-bow` would have parsed, shipped and granted nothing - check
+   * 5's own stated failure mode, on the one key check 5 was not watching. It is cross-checked now
+   * against the weapon ids and the `category` groups together, and the stale comment is gone.
    *
    * ABSENT: "you gain a +2 bonus to damage rolls made with such weapons." C7a's limit (A): there is
    * no flat `damage-bonus` in `FeatureModifierSchema`, `extra-damage`'s `formula` is a
@@ -709,7 +756,7 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * Disadvantage on attack rolls against you. If you take damage, the property ceases to function
    * until the start of your next turn. This property is suppressed while your Speed is 0."
    *
-   * The reader not only ships, it names this item: `action-resolution.ts:606` collects the TARGET's
+   * The reader not only ships, it names this item: `action-resolution.ts:601-604` collects the TARGET's
    * `incoming-attack` riders under the comment *"The TARGET's own gear (a Cloak of Displacement)
    * claims `incoming-attack` against this attack."* What cannot be said is the SUSPENSION, and it is
    * two thirds of the printed sentence: the cloak switches off for a round whenever the wearer takes
@@ -819,13 +866,23 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * `actionUses` at 1 of 3 and puts `{ability: "wis", dc: 15, conditionId: "stunned"}` on the target
    * as a real pending save. C7b's `staff-of-thunder-and-lightning` is the same authored shape.
    *
-   * ABSENT: "creatures that can see you have Disadvantage on attack rolls against you" for the
-   * duration. That is `roll-mode: incoming-attack`, whose reader ships - but only as a STANDING or
-   * momentary rider on the item, with no way to say "until the end of your next turn, and only after
-   * this action is taken". Authoring it ungated is `cloak-of-displacement`'s over-grant on a robe
-   * that prints a duration. NEEDS: an action that grants a self effect carrying a `roll-mode`
-   * (`ActionSchema.grants` takes an `EffectGrant`, whose modifier vocabulary is the actor-side one).
-   * Unit: NONE YET.
+   * ABSENT, two halves:
+   *   "creatures that can see you have Disadvantage on attack rolls against you" for the duration.
+   *       That is `roll-mode: incoming-attack`, whose reader ships - but only as a STANDING or
+   *       momentary rider on the item, with no way to say "until the end of your next turn, and only
+   *       after this action is taken". Authoring it ungated is `cloak-of-displacement`'s over-grant
+   *       on a robe that prints a duration. NEEDS: an action that grants a self effect carrying a
+   *       `roll-mode` (`ActionSchema.grants` takes an `EffectGrant`, whose modifier vocabulary is
+   *       the actor-side one). Unit: NONE YET.
+   *   "...or have the Stunned condition UNTIL THE EFFECT ENDS" - the DURATION on the stun, added by
+   *       review because the list above named only the attack half and a reader would have taken the
+   *       stun as fully modelled. The save and the condition are real (measured below); what is not
+   *       said is when it lifts. `ActionSchema`'s save carries an ability and a DC and nothing else,
+   *       and `answerSave` hands the GM a `conditionApplied` to commit - after which the condition
+   *       is OPEN-ENDED and the GM clears it by hand. This is the engine's shape rather than a C7c
+   *       invention (C7b's `staff-of-thunder-and-lightning` stuns the same way), and it errs toward
+   *       lasting too long rather than too short, which is why it is disclosed instead of blocking
+   *       the entry. NEEDS: a duration on a condition an action applies. Unit: NONE YET.
    */
   "robe-of-scintillating-colors": {
     actions: [{
@@ -855,21 +912,34 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    */
   "robe-of-stars": { modifiers: [{ type: "save-bonus", amount: 1 }] },
 
-  /**
-   * ROBE OF THE ARCHMAGI - "War Mage. Your spell save DC and spell attack bonus each increase by 2."
+  /*
+   * `robe-of-the-archmagi` - ALL FOUR HALVES ARE ABSENCES, and the first of them was AUTHORED in
+   * `3a8acb3` and taken back out here. It is the one entry in this lane that the admission rule's
+   * second clause caught after the fact, so the measurement that removed it is kept in full.
    *
-   * HALF OF ONE SENTENCE, authored, and the other half refused by the seam rather than by this
-   * comment. `spell-save-dc` is `"standing"` in `CARRIER_RIDER_DISPOSITION`, folded into
-   * `action.save.dc` by `effective-actions.ts`, and criterion 10 proves it is the DC the server
-   * ENFORCES rather than the one displayed - MEASURED here, a DC-14 action on the wearer reads
-   * **16**. `spell-attack-bonus` is `"unread"` and `applyItemMechanics` would refuse it outright.
-   *
-   * C7b set the precedent for authoring a U26-reserved item's other riders: `staff-of-power` carries
-   * its `armor-class` and `save-bonus` while its spell-attack half waits. Same treatment here.
-   *
-   * ABSENT, three halves:
-   *   "...and spell attack bonus each increase by 2" - RESERVED. UNBLOCKED BY: **U26** (a reader for
-   *       `derivation.spellAttackBonus`) and **U29** (`attack-kind-is: "spell"`).
+   *   "War Mage. Your spell save DC and spell attack bonus each increase by 2."
+   *       W8: `spell-save-dc` IS NOT THE WEARER'S SPELL SAVE DC. `effective-actions.ts:51` sums it
+   *       and `:74` folds it into `action.save.dc` for EVERY action that carries a save, with no
+   *       spell test anywhere on the path - so a `spell-save-dc: 2` on the robe raises the FIXED,
+   *       PRINTED DC of the other items the wearer is holding and of every save-bearing action on
+   *       their sheet. **MEASURED 2026-08-12 through the real `ContentLibrary` over the SHIPPED
+   *       bundle, on the same Wizard 5 the lane's test uses:** a `Wand of Paralysis`' printed DC 15
+   *       read **17**; a Breath-Weapon-shaped definition action's DC 13 read **15**; and this lane's
+   *       own `Eyes of Charming` cast, whose 13 is the ITEM's number, read **15**. A wand's printed
+   *       DC is not the wearer's spell save DC, and the slots do not save us - the robe is
+   *       `shoulders` and a wand or staff is `held`, so wizard + robe + wand is the archetypal
+   *       loadout rather than a contrived one.
+   *       The seam cannot catch this: `spell-save-dc` is `"standing"` in
+   *       `CARRIER_RIDER_DISPOSITION`, so check 6 passes it, and the row parses. It is an ADMISSION
+   *       RULE call - the reader ships and fires and produces something wider than the printed text
+   *       - which is why the removal is pinned by a test instead of trusted to this comment.
+   *       The other half, "...and spell attack bonus each increase by 2", is RESERVED and was never
+   *       authorable: `spell-attack-bonus` is `"unread"` and `applyItemMechanics` refuses it.
+   *       UNBLOCKED BY: for the save-DC half, `docs/ai-ledger/known-bugs.md` **[content/riders] A
+   *       `spell-save-dc` rider raises the DC of EVERY save-bearing action** - it wants an
+   *       actor-level spell save DC for the rider to raise, there being none today; for the attack
+   *       half, **U26** (a reader for `derivation.spellAttackBonus`) and **U29**
+   *       (`attack-kind-is: "spell"`).
    *   "Armor. If you aren't wearing armor, your base Armor Class is 15 plus your Dexterity modifier."
    *       This REPLACES the base rather than adding to it. `unarmored-defense` is the closest rider
    *       and it computes `10 + Dex + <ability>`, which cannot be made to say a flat 15, and an
@@ -878,8 +948,10 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    *       NEEDS: a base-AC override. Unit: NONE YET.
    *   "Magic Resistance. You have Advantage on saving throws against spells and other magical
    *       effects." W4. Unit: NONE YET.
+   * Prose. See `rulingsOwed`: the BREADTH of `spell-save-dc` is the vocabulary's, not this lane's -
+   * a class feature authoring it reaches exactly the same four lines - and narrowing it is a unit's
+   * decision, not a content author's.
    */
-  "robe-of-the-archmagi": { modifiers: [{ type: "spell-save-dc", amount: 2 }] },
 
   /*
    * `robe-of-useful-items` - "you can take a Magic action to detach one of the patches, causing it

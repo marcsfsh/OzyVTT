@@ -73,7 +73,7 @@ import { EquipmentReferenceSchema, type EquipmentReference } from "../../src/sch
 import {
   CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_PROPERTY_IDS
 } from "../../src/enums.js";
-import { loadClasses, loadFeats, loadLanguages, loadSkills, loadSpecies, loadSpells } from "../../src/index.js";
+import { loadClasses, loadFeats, loadLanguages, loadSkills, loadSpecies, loadSpells, loadWeapons } from "../../src/index.js";
 
 /**
  * Typed off the schema's INPUT rather than its output, deliberately - the same call the class
@@ -236,7 +236,8 @@ const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
 
 type RefKind =
   | "spell" | "feat" | "skill" | "language" | "class" | "species"
-  | "damage type" | "condition" | "school of magic" | "creature type" | "weapon property";
+  | "damage type" | "condition" | "school of magic" | "creature type" | "weapon property"
+  | "weapon proficiency";
 
 /** Where each kind's ids come from, loaded LAZILY so an empty overlay reads no bundle at all. */
 const VOCABULARIES: Readonly<Record<RefKind, { readonly source: string; readonly ids: () => readonly string[] }>> = {
@@ -250,7 +251,21 @@ const VOCABULARIES: Readonly<Record<RefKind, { readonly source: string; readonly
   condition: { source: "src/enums.ts CONDITION_IDS", ids: () => CONDITION_IDS },
   "school of magic": { source: "src/enums.ts MAGIC_SCHOOL_IDS", ids: () => MAGIC_SCHOOL_IDS },
   "creature type": { source: "src/enums.ts CREATURE_TYPE_IDS", ids: () => CREATURE_TYPE_IDS },
-  "weapon property": { source: "src/enums.ts WEAPON_PROPERTY_IDS", ids: () => WEAPON_PROPERTY_IDS }
+  "weapon property": { source: "src/enums.ts WEAPON_PROPERTY_IDS", ids: () => WEAPON_PROPERTY_IDS },
+  /**
+   * `grants.weapons` IS BOTH HALVES, because its reader is: `weaponAction`
+   * (`apps/server/src/equipment-derivation.ts:1003`) computes
+   * `granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id)`, so a
+   * proficiency GROUP and a base weapon's own id are equally first-class there. Both halves are
+   * derived from the same shipped bundle rather than restated, so a new weapon or a third category
+   * needs no edit here. MEASURED over `bundles/weapons.v1.json`: 38 ids and the 2 categories
+   * `simple`, `martial` - and C7c's `bracers-of-archery` authors `["longbow", "shortbow"]`, which
+   * is the id half in use today.
+   */
+  "weapon proficiency": {
+    source: "bundles/weapons.v1.json (a weapon id, or one of its `category` groups)",
+    ids: () => { const weapons = loadWeapons(); return [...weapons.map((record) => record.id), ...new Set(weapons.map((record) => record.category))]; }
+  }
 };
 
 const resolved = new Map<RefKind, ReadonlySet<string>>();
@@ -274,7 +289,8 @@ const SLUG_REFERENCES: Readonly<Record<string, RefKind>> = {
   conditionId: "condition", conditionIds: "condition", conditionImmunities: "condition",
   skills: "skill", expertise: "skill", languages: "language",
   classId: "class", classIds: "class", speciesIds: "species",
-  schools: "school of magic", creatureTypes: "creature type", properties: "weapon property"
+  schools: "school of magic", creatureTypes: "creature type", properties: "weapon property",
+  weapons: "weapon proficiency"
 };
 
 /** A key holding OBJECTS, one of whose fields is a slug: `grants.spells[].id`, `damage[].type`. */
@@ -293,17 +309,27 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  *       namespace and the sheet's own grouping slugs. Runtime strings, in no bundle.
  *   `uses.pool`, `resource-bonus.poolId` - the live `actionUses` KEY. The schema says so in as many
  *       words: deliberately NOT the class table's `classResources`.
- *   `grants.tools` / `grants.armor` / `grants.weapons` - PROFICIENCY GROUPS, not record ids.
- *       Measured over the shipped bundles: `armor` is `light|medium|heavy|shields` and `weapons` is
- *       `simple|martial`, neither of which is any bundle's id column.
- *   `while-proficient-with.ids` when `kind` is weapon/armor/tool - the same groups. When `kind` is
- *       `"skill"` it IS checked, below.
+ *   `grants.tools` / `grants.armor` - PROFICIENCY GROUPS, not record ids. Measured over the shipped
+ *       bundles: `armor` is `light|medium|heavy|shields`, which is no bundle's id column, and there
+ *       is no tool bundle at all.
+ *       **`grants.weapons` USED TO BE LISTED HERE AND THE REASON GIVEN WAS FALSE.** It said `weapons`
+ *       is `simple|martial` and therefore "not any bundle's id column". C7c measured the reader while
+ *       authoring `Bracers of Archery` and found it wider: `weaponAction`
+ *       (`apps/server/src/equipment-derivation.ts:1003`) is
+ *       `granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id)`, so
+ *       a base weapon id is first-class there and `["longbow", "shortbow"]` is what the lane wrote.
+ *       Left open, a typo'd `long-bow` would have parsed, shipped and granted nothing - check 5's own
+ *       failure mode, on the one key check 5 was not watching. It is CHECKED now, against the weapon
+ *       ids and the `category` groups together, both read off `bundles/weapons.v1.json`.
+ *   `while-proficient-with.ids` when `kind` is weapon/armor/tool - a proficiency TRIGGER rather than
+ *       a grant, and its weapon half is written as a group in the vocabulary that ships. When `kind`
+ *       is `"skill"` it IS checked, below.
  *   `sense` - there is no senses model to check against; the disposition table calls it display-only.
  *   `actions[].id`, `multiattack[].actionId`, `uses` shape - local to the item's own action list.
  *   `grants.saves` - `AbilitySchema`, already a closed zod enum; a bad value never reaches here.
  */
 export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
-  "tags", "endsWithTag", "requiresEffectTag", "pool", "poolId", "tools", "armor", "weapons", "sense", "saves", "actionId"
+  "tags", "endsWithTag", "requiresEffectTag", "pool", "poolId", "tools", "armor", "sense", "saves", "actionId"
 ]);
 
 /** Levenshtein, only ever run against one vocabulary to turn a refusal into a fix. */

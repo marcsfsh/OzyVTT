@@ -66,7 +66,7 @@
  * D1. **AN ITEM THAT IS CONSUMED CANNOT BE AUTHORED AT ALL, AND THAT EMPTIES ALL 24 CONSUMABLES.**
  *     This is C7c's W5 ("a charge that never comes back is unsayable") arriving at a lane where it
  *     is not an edge case but the rule. `FeatureUsesSchema.per` is
- *     `turn | encounter | short-rest | long-rest` (`src/character-content.ts:88`) and there is no
+ *     `turn | encounter | short-rest | long-rest` (`src/character-content.ts:86`) and there is no
  *     "never": a pool authored for a potion re-arms on a long rest and hands the table a bottle the
  *     SRD says was drunk. Authoring the action with NO pool is worse - an unlimited button. So
  *     every potion, every oil, every one-use dust, gem and bead is an absence, and the reason is the
@@ -607,7 +607,7 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * *"An item cannot change hit points or an ability score yet - those are baked into the sheet and
    * cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class,
    * save-bonus, check-bonus, or spell-save-dc. (Both stay available on a feat.)"*
-   * (`src/character-content.ts:263`, enforced at `src/schemas.ts:331`.) Second - and this is why
+   * (`src/character-content.ts:263`, enforced at `src/schemas.ts:338-341`.) Second - and this is why
    * these six are not the same absence as `Potion of Giant Strength` - the increase here is
    * PERMANENT and survives the book: it is an edit to the character sheet that a GM makes once, not
    * a rider an item carries. An item rider is by construction reversible on unequip, so even a
@@ -856,7 +856,7 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * by design, quoted here rather than worked around: *"An item cannot change hit points or an
    * ability score yet - those are baked into the sheet and cannot be un-granted when the item comes
    * off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (Both
-   * stay available on a feat.)"* (`src/character-content.ts:263`, enforced at `src/schemas.ts:331`.)
+   * stay available on a feat.)"* (`src/character-content.ts:263`, enforced at `src/schemas.ts:338-341`.)
    * Inventing a modifier type to work around `ITEM_REFUSED_MODIFIER_TYPES` is a VOCABULARY decision
    * and belongs to a unit, not to a content author. It is also a SET score rather than a bonus - the
    * refused `ability-score` rider is a signed delta with a maximum, not an assignment - it is a

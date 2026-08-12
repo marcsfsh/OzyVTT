@@ -269,6 +269,28 @@ Format: `[area] — description — suspected cause / status`.
   Wants the same unit as the entry above: a cast-time damage/attack model the item carrier can trust,
   rather than a heuristic over prose columns.
 
+- **[content/riders] A `spell-save-dc` rider raises the DC of EVERY save-bearing action, including
+  DCs printed on other items and on a stat block.** `withStandingRiders`
+  (`apps/server/src/effective-actions.ts:51`) sums the rider and folds it into `action.save.dc` at
+  `:74` for any action carrying a `save`; nothing on that path asks whether the action is a spell,
+  and there is no spell-save-DC field on the actor for the rider to reach instead. So the rider says
+  *"every DC you impose goes up"*, not *"your spell save DC goes up"*. **Measured 2026-08-12 through
+  the real `ContentLibrary` over the committed `magic-items.v1.json`, on a Wizard 5 wearing a `Robe
+  of the Archmagi` (`spell-save-dc: 2`):** `Wand of Paralysis`' printed **DC 15 read 17**, a
+  Breath-Weapon-shaped definition action's **DC 13 read 15**, and `Eyes of Charming`'s **DC 13 read
+  15** — three fixed numbers the SRD prints on something other than the wearer's spellcasting. The
+  slots do not conflict (a robe is `shoulders`, a wand is `held`), so wizard + robe + wand is an
+  ordinary loadout. Found by the C7c review pass, which **removed the only carrier in all 268 rows**
+  and records it as a named absence (limit **W8** in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/worn-wondrous.ts`), pinned by
+  `apps/server/test/item-mechanics-c7c.test.ts`. **The breadth is the vocabulary's, not that item's:**
+  `spell-save-dc` is a `featureRiders` type, so a CLASS feature, a subclass or a feat authoring it
+  reaches the same four lines — none does (*measured 2026-08-12: zero occurrences of the string in
+  `classes`, `subclasses`, `feats`, `species`, `backgrounds`, `equipment` and, since the removal,
+  `magic-items`*), which is why this is a trap for the next author rather than a live wrong number. Wants a unit: an actor-level spell save DC that a spell's own DC is computed from, so the
+  rider raises that instead of every printed DC. Until then a `spell-save-dc` on any carrier is an
+  over-grant and belongs in a named absence.
+
 - **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
   carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
   now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as
