@@ -331,6 +331,30 @@ Format: `[area] — description — suspected cause / status`.
   `apps/server/test/item-mechanics-c7d.test.ts`. Wants a unit: an out-of-encounter resolution path
   for item actions that debits the pool.
 
+- **[content/items] The Shield of Missile Attraction is authored as a curse with no benefit, so
+  attuning it does nothing except make it impossible to take off.** Measured 2026-08-12 through the
+  real `ContentLibrary` over the committed
+  `packages/content-srd-5.2.1/bundles/magic-items.v1.json`, on a picker-minted row equipped and
+  attuned: the row carries `cursed: true` and **nothing else** — `modifiers: []`, `casts: []`,
+  `actions: []`, no `grants`, and `armor: null` like every other row in its category — and a sweep of
+  all 87 rider carriers against a bare control found this one of only five that move **no** observable
+  derivation (AC, saves, every skill row, resistances, immunities, condition immunities, initiative
+  mode, derived actions), the other four being momentary or write-path riders that were each driven to
+  a number. What the curse **does** reach is real: `enforceCurse`
+  (`apps/server/src/inventory.ts:107`) refuses a PLAYER write with *"Shield of Missile Attraction will
+  not come off. Ask the GM."* So a GM who hands a player this shield hands them a locked attunement
+  slot and no mechanic. Both printed halves are recorded as named absences at the entry in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` — the Resistance is keyed to a
+  damage *source* (*"attacks made with Ranged weapons"*) rather than a type, and the redirect of
+  nearby ranged attacks has no targeting-override vocabulary — so this is a faithful subset rather
+  than a mistake. **It is nonetheless the exact inversion of a case this same lane's salvage removed:**
+  `armor-of-vulnerability` was emptied because authoring its resistance half alone made cursed armour
+  *strictly better* than plain (pinned by `apps/server/test/item-mechanics-c7a.test.ts`), and this row
+  makes a cursed shield *strictly worse* than none. Which way that asymmetry should fall is a client
+  ruling, not an author's: leave the downside-only curse (faithful, and the item is a trap in the SRD
+  too) or empty the row until both halves can land. **Not changed by the C8 review**, which recorded it
+  rather than guessing. Nothing is wrong with the engine here.
+
 - **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
   carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
   now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as

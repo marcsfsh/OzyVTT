@@ -524,8 +524,13 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   // `weapon`-category rows carry a `weapon` block, so no swing is derived from any of them
   // (`weaponActionIds: []`, `effectiveActions: []` on a picker-minted Dwarven Thrower), and a
   // `this-item`-scoped rider has nothing to bind to.** Every one of them is unauthored here.
-  // **Unit for all 19: NONE YET - the item-applies-to-item mechanism (a magic weapon becomes real
-  // by the player picking the base weapon it applies to). §5 has no row for it.** (Two of the 19 -
+  // **Unit for all 19: C9, the weapon-template mechanism - a magic weapon becomes real by the player
+  // picking the base weapon it applies to.** (This line said "NONE YET ... §5 has no row for it"
+  // until the C8 review; it was written before C9 existed, the (0) paragraph in this file's header
+  // was corrected on the same afternoon and this copy was not, and
+  // `docs/product/plan-content-program.md` now carries C9 in its unit table, its own section and the
+  // phrase "19 absences citing C9". An unblocker quarter that says NONE YET when a unit owns the
+  // work is the half of the contract that turns a decision back into a skip.) (Two of the 19 -
   // `javelin-of-lightning` and `mace-of-disruption` - print no `+N` at all and are here for their
   // on-hit dice, which limit (0) empties by the same mechanism.) Per-item, what else each prints
   // and why THAT is absent:

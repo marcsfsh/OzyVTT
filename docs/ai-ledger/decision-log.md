@@ -13,6 +13,67 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-12 — the content program's own guards: an absence is a test, and a cast rule belongs to the program
+
+**Context.** C8 closes the content program (C7a–C7d, 268 magic-item rows, 87 authored entries, 181
+prose-only records) with an adversarial pass hunting two failure modes and nothing else: a rider
+built whose reader never fires, and a both-paths test whose far end is a surviving field rather than
+an engine outcome. **Neither was found.** Every rider family the four lanes author — `armor-class`,
+`save-bonus`, `check-bonus`, `roll-mode`, `attack-bonus`, `grants.{damageResistances,
+damageImmunities, conditionImmunities, weapons}`, `actions`, `casts`, `cursed` — reaches a live
+reader: a sweep of all 87 carriers against a bare control found 82 move an observable derivation from
+a picker-minted row alone, and the other five (`ammunition-1/2/3`, `bracers-of-archery`,
+`shield-of-missile-attraction`) are momentary or write-path riders that were each driven to a number.
+Each lane's far end was probed by stripping its lane from `scripts/item-mechanics/index.ts`,
+regenerating the bundle and re-running: all four fail at an engine outcome (a damage total that stays
+12 instead of halving to 6, a `casts` list that comes back `[]` where Fireball was, an AC of 12
+instead of 13, a charge counter that never leaves 0), and the bundle was restored by checksum.
+
+**What the pass DID find is that three true claims were guarded by nothing**, which is the shape a
+claim rots in. Three decisions follow.
+
+**1. An absence is a test, not a promise.** All four modules' headers promise *"every one named below
+with its reason"*; each lane's test pins its own AUTHORED count and nothing checks the other side of
+the subtraction. A lane could drop a row from its absence list, or the ETL could add a row nobody has
+looked at, and every existing test stays green. Measured before the guard existed: **0 unrecorded
+across all four lanes.** `apps/server/test/item-mechanics-program.test.ts` now holds it — every row is
+authored or named in backticks in its lane's module, the four scopes partition all 268 rows exactly
+once (60 + 57 + 56 + 95), and the failure NAMES the rows. Probed by renaming one absence record:
+`unrecorded: ["universal-solvent"]`.
+
+**2. The two cast rules are the PROGRAM's, not C7b's.** C7b's salvage removed seven casts over one
+measured fact — `castAction` reads `spell.damage.roll` as a cast's damage and
+`spell.damage.types[0] ?? "force"` as its type, and emits an `attack` block from `spell.attackRoll`,
+none of which the spell records reliably mean — then guarded it with `authoredCasts()` filtered to
+`lane === "C7b"`. **The reader is lane-blind and the guard was not:** it covered 28 of the program's
+43 authored casts. Probed by planting `cure-wounds` and `faerie-fire` on a C7c item:
+`item-mechanics-c7b.test.ts` stayed **green** while the widened sweep named both
+(*"C7c/hat-of-disguise casts cure-wounds … castAction types an untyped roll as \"force\""*). Widened
+to every lane, with the population (43 casts, 29 items, per-lane split) pinned so it cannot go vacuous.
+
+**3. A rider family proved only by a bundle assertion is not proved.** `item-mechanics-c7a.test.ts`
+asserted ammunition's `attack-bonus`, the initiative `roll-mode` and `cursed` as fields surviving the
+merge; the lane's measurements of what they DO live in comments. All three are now driven: the +3
+arrow makes a shot 14 where the control is 11 and leaves a mace swing at 9, all three initiative
+carriers report `advantage` and `normal` when unequipped, and both cursed items refuse a player's
+doff by name and yield to the GM's.
+
+**Also corrected in place.** `scripts/item-mechanics/weapons-armour.ts` still told its 19 limit-(0)
+absences *"Unit for all 19: NONE YET … §5 has no row for it"* while its own header ruled *"EVERY
+`limit (0)` ABSENCE BELOW IS C9's"* and the plan carries C9 in its unit table, its own section and the
+phrase *"19 absences citing C9"*. An unblocker quarter that says NONE YET when a unit owns the work is
+what turns a recorded decision back into a silent skip.
+
+**Rejected, with why.** *Empty `shield-of-missile-attraction`* — it authors `cursed: true` and nothing
+else, so attuning it locks a slot and grants no mechanic, which is the exact inversion of the
+`armor-of-vulnerability` case this lane's salvage removed for being strictly better than plain. Both
+its printed halves are legitimately unsayable and recorded as named absences, so the row is a faithful
+subset rather than a defect; which way that asymmetry should fall is a client ruling and the client is
+away. Written up in `docs/ai-ledger/known-bugs.md` instead. *Widen C7b's "landed every authored rider
+on the COMMITTED bundle" check* — redundant: `packages/content-srd-5.2.1/test/item-mechanics.test.ts`
+already re-runs the real ETL and compares the emitted bundle to the committed one byte for byte, which
+catches a module edited without regenerating for every lane at once.
+
 ## 2026-08-11 — a magic weapon applies to a base weapon the player picks, and a rider must produce the PRINTED effect
 
 **Context.** Batch 3's C7a lane (weapons and armour) authored 42 of its 60 magic-item rows and its
