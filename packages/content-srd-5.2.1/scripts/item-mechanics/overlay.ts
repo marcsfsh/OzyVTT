@@ -213,8 +213,18 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing
 /**
  * The refused half of the mirror, derived rather than restated so the two cannot disagree.
  *
- * `display-only` is NOT refused: `sense` reaches the sheet as prose the way `darkvision` does, which
- * is a real (if thin) outcome. `unread` reaches nothing at all.
+ * `display-only` is NOT refused, and the reason is a MIRRORING one rather than a claim about the
+ * outcome: this set must be derivable from the server's own table, and `sense` is `"display-only"`
+ * there, not `"unread"`. Changing it here would be the drift the mirror exists to prevent.
+ *
+ * **DO NOT READ THAT AS PERMISSION TO AUTHOR ONE.** The earlier wording here said `sense` *"reaches
+ * the sheet as prose the way `darkvision` does, which is a real (if thin) outcome"*, and C7c measured
+ * that and found no such sheet: `EquipmentDerivation` has no senses field, so a `sense` rider on an
+ * item is not even summed, and `CharacterSheet.tsx`'s Senses line is fed by the DEFINITION's
+ * `open5e` extension, which the builder fills from a species and never from an item. An item's
+ * `sense` (and `darkvision`, and `speed` - whose `derivation.speed` is summed and read by nothing)
+ * therefore fails the admission rule's second clause and belongs in a lane's named absences, exactly
+ * as an `unread` rider would. `worn-wondrous.ts`'s limit W2 carries the measurement.
  */
 const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
   Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR).filter(([, disposition]) => disposition === "unread").map(([type]) => type)
