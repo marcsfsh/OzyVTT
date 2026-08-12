@@ -542,7 +542,11 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
 
   it("leaves the four RESERVED items and the four ability-score refusals entirely to prose", () => {
     for (const id of [
-      "gloves-of-missile-snaring", "periapt-of-wound-closure",         // U31, U32
+      // The gloves are NOT waiting on U31. Review measured `on-taking-damage` + `damage-reduction`
+      // already wired (`hit-points.ts:132-136`, driven by `typed-damage.test.ts`), so the module's
+      // "UNBLOCKED BY: U31" was a false record; what actually blocks them is a ROLLED reduction
+      // ("1d10 plus your Dexterity modifier"), the free-hand gate, and the Reaction cost.
+      "gloves-of-missile-snaring", "periapt-of-wound-closure",         // rolled amount; U32
       "talisman-of-pure-good", "talisman-of-ultimate-evil",            // U26 / U29
       "amulet-of-health", "belt-of-giant-strength",                    // ITEM_REFUSED_MODIFIER_TYPES
       "gauntlets-of-ogre-power", "headband-of-intellect"

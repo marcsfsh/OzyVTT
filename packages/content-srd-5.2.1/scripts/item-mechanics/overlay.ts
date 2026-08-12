@@ -54,7 +54,12 @@
  *   5. A SLUG POINTING AT ANOTHER BUNDLE THAT NOTHING RESOLVES. `casts[].spellId`,
  *      `grantsFeatIds[]` and the `grants.*` id lists are open slugs by schema, so `fyre-ball`
  *      parses, ships, and is silent at the table. Every one of them is cross-checked below.
- *   6. A RIDER TYPE NO CONSUMER READS YET (the admission rule, mirrored from the server).
+ *   6. A RIDER TYPE NO CONSUMER READS YET (the admission rule), from TWO sources rather than one -
+ *      review, 2026-08-12. `UNREAD_RIDER_TYPES` is mirrored from the server's own disposition table
+ *      and holds whatever that table marks `"unread"`. `MEASURED_INERT_RIDER_TYPES` holds the three
+ *      this program drove and found inert on an item carrier - `speed`, `darkvision`, `sense` - which
+ *      the mirror cannot name, because the server calls `sense` `"display-only"` and editing that
+ *      here would be the drift the mirror exists to prevent. Both refuse; each says which it is.
  *   7. A MERGED ROW THE SCHEMA REFUSES - the item carrier's two refused modifier types, a curse on
  *      an item requiring no attunement, a malformed action. THE REFUSAL IS THE SCHEMA'S AND THIS
  *      FILE ONLY SURFACES IT: `ITEM_REFUSED_MODIFIER_TYPES` (`src/character-content.ts`) is
@@ -229,6 +234,34 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing
 const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
   Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR).filter(([, disposition]) => disposition === "unread").map(([type]) => type)
 );
+
+/**
+ * THE SECOND REFUSAL SET, AND THE REASON IT IS SEPARATE — added by review, 2026-08-12.
+ *
+ * The paragraph above says an item's `speed`, `darkvision` and `sense` "belongs in a lane's named
+ * absences, exactly as an `unread` rider would" — and then the seam could not refuse one, because
+ * `UNREAD_RIDER_TYPES` is derived from the mirror and the mirror marks exactly ONE type `"unread"`.
+ * MEASURED 2026-08-12: `{type:"speed",amount:10}`, `{type:"darkvision",feet:60}` and
+ * `{type:"sense",sense:"tremorsense",feet:30}` added to a lane entry all ran the real ETL to exit 0
+ * and landed in `bundles/magic-items.v1.json`. In a file whose header says *"EVERY REFUSAL BELOW
+ * EXISTS BECAUSE A LANE CAN OTHERWISE AUTHOR NOTHING AND THE BUILD STAYS QUIET"*, that is the hole.
+ *
+ * It is a SECOND, SEPARATELY NAMED set rather than an edit to the mirror because the mirror must
+ * stay derivable from the server's own table — `sense` is `"display-only"` there and changing it
+ * here is precisely the drift the mirror exists to prevent. This set makes no claim about the
+ * server's table; it records what THIS PROGRAM measured about the three types' readers:
+ *   `speed`      `deriveEquipment` sums it into `derivation.speed` (`equipment-derivation.ts:678`)
+ *                and grepping that field across `apps/server/src`, `packages/rules-5e/src` and
+ *                `apps/client/src` returns the write and NO read.
+ *   `darkvision` `EquipmentDerivation` has no darkvision field, so it is not even summed.
+ *   `sense`      no senses field either; `CharacterSheet.tsx:696`'s Senses line reads
+ *                `extension.senses`, which the builder fills from a SPECIES and never from an item.
+ * `worn-wondrous.ts`'s limit W2 carries the same measurement and names the items it emptied.
+ *
+ * LATENT WHEN ADDED: no lane authors any of the three, so this refuses nothing that exists today.
+ * It exists so the next one meets the measurement instead of a silent build.
+ */
+const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["speed", "darkvision", "sense"]);
 
 // ---------------------------------------------------------------------------------------------
 // THE CROSS-BUNDLE VOCABULARIES. Check 5.
@@ -556,6 +589,16 @@ export function applyItemMechanics(
         .filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
       if (unread.length > 0) {
         refused.push(`${at} - ${unread.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Record it as a named absence in a comment, with the unit that unblocks it`);
+        continue;
+      }
+
+      // The same refusal for the three types this PROGRAM measured inert on an item carrier. Kept
+      // apart from the mirror above so the mirror stays derivable from the server's own table.
+      const inert = parsed.data.modifiers
+        .map((modifier, index) => ({ index, type: modifier.type }))
+        .filter((modifier) => MEASURED_INERT_RIDER_TYPES.has(modifier.type));
+      if (inert.length > 0) {
+        refused.push(`${at} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which C7c measured (limit W2) as reaching NOTHING from an item: derivation.speed is written and never read, and EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Record it as a named absence in a comment, with the unit that unblocks it`);
         continue;
       }
 

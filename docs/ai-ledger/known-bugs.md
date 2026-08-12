@@ -291,6 +291,46 @@ Format: `[area] — description — suspected cause / status`.
   rider raises that instead of every printed DC. Until then a `spell-save-dc` on any carrier is an
   over-grant and belongs in a named absence.
 
+- **[content/riders] A `check-bonus` rider misses the SERVER's own ability-check roll, so the sheet
+  promises a bonus the roll does not pay.** `checkRiderBonus`
+  (`apps/server/src/equipment-derivation.ts:778`) has exactly one consumer — `actor-derived.ts:94`,
+  the derived sheet's skill row. The one place the server rolls an ability check itself does not use
+  it: `BUILTIN_CHECKS` (`apps/server/src/action-resolution.ts:138-143`) resolves at `:758-766` from
+  `abilityModifier` + `skillBonusFromExtension` + `exhaustionPenalty` and never calls
+  `checkRiderBonus`. **Measured 2026-08-12 through the real pipeline over the committed
+  `magic-items.v1.json`, on a Wizard 5 (Dex 14) wearing an attuned `Stone of Good Luck`
+  (`check-bonus: 1`):** `deriveActorSheet(...).skills.find(stealth).bonus` is **3** while the builtin
+  Hide roll through `resolveDefinitionAction(state, builtinAction("hide"), {builtin: true})` on a d20
+  of 10 returns `check.total` **12** — Dex +2 only, the stone's +1 nowhere. It affects all four
+  builtin checks (Hide, Influence, Search, Study). This is the split-brain `actor-derived.ts:15-26`
+  says that block exists to end, in the other direction. Found by the C7d review pass, which records
+  it at the `stone-of-good-luck-luckstone` entry in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/carried-and-potions.ts` and pins the two numbers
+  in `apps/server/test/item-mechanics-c7d.test.ts`. The rider is NOT an over-grant and stays authored
+  — the number it reaches is right, it just does not reach far enough. Wants a unit: `checkRiderBonus`
+  consulted where `BUILTIN_CHECKS` resolves.
+
+- **[content/items] An item action does nothing outside an encounter, and the one that does spends
+  no charge.** Two halves of the same gap, both measured 2026-08-12 over the committed
+  `magic-items.v1.json`. (1) `resolveDefinitionAction` (`apps/server/src/action-resolution.ts:691`)
+  throws *"Start an encounter before resolving actions."* — measured on `crystal-ball`'s Scrying,
+  `sending-stones`' Sending, `gem-of-seeing`'s peer and `pipes-of-haunting`'s play, each with the item
+  equipped and the action present in `effectiveActions`. The only out-of-fight surface is the loose
+  `action.use` route (`apps/server/src/game-operations.ts:1571-1572`, whose own comment says it
+  *"touches no combat state at all"*), whose plan comes from `looseRollPlan`
+  (`apps/server/src/tap-routing.ts:68-79`) and is built solely from `attack` and `damage` — measured
+  `[]` for all four. So an item whose printed use is not a combat activity (scry a distant creature,
+  send a message, open a planar portal, peer for 10 minutes of Truesight) has a button that refuses
+  at the moment the SRD prints it. (2) The converse, on the one shape that DOES reach the loose
+  route: `iron-bands` is the only C7d action carrying an `attack`, `looseRollPlan` returns
+  `[{"formula":"1d20 + 5","purpose":"attack","label":"Throw the Bands"}]`, and that path never
+  increments `actionUses` — so outside an encounter the bands throw unlimited real +5 attacks where
+  the SRD prints one per dawn. Engine-wide: it applies to any charged attack item, C7b's included.
+  Found by the C7d review pass, recorded as limits **D8** and **D9** in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/carried-and-potions.ts` and pinned by
+  `apps/server/test/item-mechanics-c7d.test.ts`. Wants a unit: an out-of-encounter resolution path
+  for item actions that debits the pool.
+
 - **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
   carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
   now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as

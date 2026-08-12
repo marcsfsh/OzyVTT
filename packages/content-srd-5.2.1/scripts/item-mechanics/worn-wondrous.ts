@@ -57,8 +57,13 @@
  *                         a Longbow's to-hit **2 -> 5**.
  *   `casts`               `equipment-derivation.ts:922` `castAction` - see W6, which is why only
  *                         five of this lane's twelve printed casts survived.
- *   `actions` + `uses`    `action-resolution.ts:248` spends the pool and `useLimitFor` refuses at
- *                         zero (criterion 4). A `save` on such an action becomes a real pending save
+ *   `actions` + `uses`    three lines, not one, and review split them because the old wording named
+ *                         the wrong two. `useLimitFor` (`action-resolution.ts:174-182`) RETURNS the
+ *                         pool's size and refuses nothing; the REFUSAL is `:240-246`, which pushes
+ *                         `feature.no-uses-remaining` when `spent >= limit`; `:248` only PLANS the
+ *                         spend (`spendUse = { key, per }`) and the DEBIT is `:1259`,
+ *                         `attacker.actionUses = {...}` (`item-riders.test.ts` criterion 4 drives
+ *                         all three). A `save` on such an action becomes a real pending save
  *                         and `conditionFrom` reads the condition off the prose.
  *                         MEASURED on `Robe of Scintillating Colors`: one press leaves
  *                         `actionUses` at 1 of 3 and puts a `{wis, dc 15, conditionId: "stunned"}`
@@ -106,7 +111,9 @@
  *
  * W4. A SAVE CANNOT BE NARROWED TO WHAT IT IS AGAINST. The `RiderTrigger` filters narrow a save by
  *     the ABILITY rolled (`ability-is`) or by a condition the TARGET already has
- *     (`versus-condition`); none of the thirty names the SOURCE of the save. So "Advantage on saving
+ *     (`versus-condition`); none of the THIRTY-ONE names the SOURCE of the save - counted off
+ *     `RIDER_TRIGGER_KINDS` (`packages/schemas/src/index.ts:117-127`), which has 31 members and not
+ *     the "thirty" this line used to claim. So "Advantage on saving
  *     throws against spells" (Mantle of Spell Resistance, Scarab of Protection, Robe of the
  *     Archmagi) and "Advantage on saving throws to avoid or end the Poisoned condition" (Necklace of
  *     Adaptation, Periapt of Health, Belt of Dwarvenkind) can only be said as advantage on EVERY
@@ -175,32 +182,47 @@
  *     meets the bug entry first.)
  *
  * ----------------------------------------------------------------------------------------------
- * THE ONE SHAPE THIS LANE AUTHORS THAT IS LESS THAN THE PRINTED TEXT, stated once because three
- * entries use it and an unstated exception is how a file starts arguing with itself.
+ * WHERE THIS LANE AUTHORS LESS THAN THE PRINTED TEXT, stated once because an unstated exception is
+ * how a file starts arguing with itself.
+ *
+ * **THE CHARGE-ALONE RULE, WORDED ONCE FOR BOTH LANES.** `./carried-and-potions.ts` carries the
+ * identical paragraph, and review found the two stating the same named rule two different ways after
+ * only one of them was corrected - which is the drift the rule exists to prevent. This is the single
+ * wording; C7d's copy is the same sentences.
  *
  * **A CHARGED ITEM MAY BE AUTHORED FOR ITS CHARGE ALONE** when (a) the count and the recharge are
- * exactly what the SRD prints, and (b) the effect the charge buys is one the GM can apply with a
- * command they already have, so the unauthored half is *narrated* rather than *lost*. C7b set the
- * precedent on `ring-of-evasion`: *"What is real and enforced is the CHARGE ... The GM adjudicates
- * the success; the ring cannot be used a fourth time in a day."* Here it is `winged-boots`,
- * `cloak-of-invisibility` and `robe-of-scintillating-colors`. It is NOT an excuse to author a button
- * for anything: an item with no printed charge count has nothing to enforce (which is why `Wings of
- * Flying`, whose cooldown is a rolled 1d12 hours, is an absence), and one that is consumed rather
- * than recharged fails W5.
+ * exactly what the SRD prints, and (b) the half the charge buys is one the GM can already produce at
+ * the table - by narrating it, by putting the creature or the portal on the map, or with a command
+ * the app already gives them (`setCondition`) - so the unauthored half is *narrated* rather than
+ * *lost*. C7b set the precedent on `ring-of-evasion`: *"What is real and enforced is the CHARGE ...
+ * The GM adjudicates the success; the ring cannot be used a fourth time in a day."* In THIS lane it
+ * is two items, `winged-boots` and `cloak-of-invisibility`; C7d's copy names its own nine.
  *
- * **CLAUSE (b) IS NARROWER THAN IT FIRST READ, AND THE CORRECTION IS REVIEW'S.** The earlier wording
- * was *"something a GM resolves at the table rather than a number the sheet would then be wrong
- * about"*, and that is not the line this lane actually draws: `cloak-of-invisibility`'s button buys
- * the **Invisible** condition, which is a first-class id in `conditions.v1.json` and engine-owned
- * state, exactly as hit points are - so the stated rule read as if it excluded the cloak, while the
- * lane authored it. What separates the cloak from `Periapt of Health` is NOT that one is
- * GM-narrated and the other is a number: it is that healing is refused OUTRIGHT by W7 and the
- * known-bugs entry behind it, charges or no charges, while a condition has a GM command
- * (`setCondition`) that already applies it. Both halves of the distinction are now stated so a later
- * lane inherits the line rather than the sentence that missed it. See `rulingsOwed`: whether a
- * charge-alone button should be authored at ALL when the effect is engine-owned state is a design
- * question this lane took conservatively (it authored three, and named every other charge an
- * absence) and did not settle.
+ * **CLAUSE (b) IS A REFUSAL AS OFTEN AS IT IS A PERMISSION.** It does NOT admit a charge whose half
+ * is a number the sheet would then be wrong about (C7d's `Pearl of Power`: the button would spend
+ * its charge and the player's spell slot would not come back), nor one the program refuses outright
+ * - `Periapt of Health`'s *"regain 2d4 + 2 Hit Points"* is dead under W7 and the known-bugs entry
+ * behind it, charges or no charges. That second half is the correction review made here: the earlier
+ * wording was *"something a GM resolves at the table rather than a number the sheet would then be
+ * wrong about"*, which read as excluding `cloak-of-invisibility` - whose button buys the **Invisible**
+ * condition, a first-class id in `conditions.v1.json` and engine-owned state exactly as hit points
+ * are - while the lane authored it. The line is not GM-narrated versus number; it is *the GM already
+ * has a way to produce this* versus *nothing in the program can*. Nor is it an excuse to author a
+ * button for anything: an item with no printed charge count has nothing to enforce (which is why
+ * `Wings of Flying`, whose cooldown is a rolled 1d12 hours, is an absence), and one that is consumed
+ * rather than recharged fails W5. See `rulingsOwed`: whether a charge-alone button should be authored
+ * at ALL when the effect is engine-owned state is a design question both lanes took conservatively
+ * and neither settled.
+ *
+ * **TWO SHAPES BESIDE IT, NAMED SO THE PARAGRAPH DOES NOT OVER-CLAIM** (review). (1)
+ * `robe-of-scintillating-colors` was listed here and is NOT charge-alone: MEASURED, its action
+ * carries a real `{ability: "wis", dc: 15}` save and `conditionFrom` reads **Stunned** off the prose,
+ * so a genuine outcome is enforced beyond the counter. (2) `hat-of-disguise` and
+ * `helm-of-comprehending-languages` author strictly LESS than the charge-alone items do - MEASURED,
+ * each derives one action with `uses: null, save: null, damage: [], attack: null`, so the only engine
+ * outcome is the rendered spell description. Neither is charged, so neither is admitted by this rule;
+ * both are disclosed at their own entries and pinned by the test that puts the two unlimited
+ * self-casts on the sheet carrying no damage, no attack and no save.
  *
  * ----------------------------------------------------------------------------------------------
  * THIS LANE OWNS `cursed`, AND IT AUTHORS NONE. The rule was re-read before deciding
@@ -238,8 +260,14 @@
  *   `hat-of-disguise`, `helm-of-comprehending-languages`, `medallion-of-thoughts`,
  *   `periapt-of-proof-against-poison`, and the far end `cloak-of-protection`.
  *
- * `apps/server/test/item-mechanics-c7c.test.ts` machine-checks these counts against the bundle, so a
- * row cannot move between groups without this header moving with it.
+ * `apps/server/test/item-mechanics-c7c.test.ts` machine-checks MOST of this against the bundle -
+ * **and review narrowed this sentence, which used to claim all of it.** What the test really pins:
+ * the 56 rows, the 46 attuned, the six-way slot split, the 18 authored BY ID, the 38 remainder, the
+ * per-slot authored split, the 5 W6 casts, the 2 healing rows, the 4 reserved + 4 ability-score
+ * refusals, the 8 advantage-on-check rows and the 0 curses. What it does NOT pin is the
+ * **10 over-grants / 13 no-vocabulary** line: those two groups are editorial readings of the same
+ * prose-only rows, so a row can move between THEM with nothing failing. Every other number above
+ * moves a test if it drifts.
  */
 import type { ItemMechanicsModule } from "./overlay.js";
 
@@ -257,14 +285,24 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    *   "Dwarvish. You know Dwarvish" - C7a's limit (E), re-measured: `equipment-derivation.ts:576`
    *       writes `grants.languages` into `derivation.languages` and NOTHING reads that field.
    *   "Advantage on Charisma (Persuasion) checks made to interact with dwarves and duergar" - W1.
-   *   "Darkvision with a range of 60 feet" - W2.
-   *   "Resilience. You have Resistance to Poison damage" and "Advantage on saving throws you make to
-   *       avoid or end the Poisoned condition" - both printed under *"If you aren't a dwarf or
-   *       duergar"*, which W3 cannot gate, and the save half is W4 on top of that.
+   *   "Darkvision. You have Darkvision with a range of 60 feet" - W2, AND (review) it sits under the
+   *       same *"If you aren't a dwarf or duergar"* gate as the two Resilience halves below, which
+   *       this list used to apply to those two only. So it is W2 and W3 together, not W2 alone.
+   *   "Resilience. You have Resistance to Poison damage. You also have Advantage on saving throws you
+   *       make to avoid or end the Poisoned condition" - both printed under *"If you aren't a dwarf
+   *       or duergar"*, which W3 cannot gate, and the save half is W4 on top of that.
+   *   "while attuned to the belt, you have a 50 percent chance each day at dawn of growing a full
+   *       beard if you can grow one, or a thicker beard if you already have one" - review added this
+   *       one; the entry omitted it entirely. It is a per-day percentage roll with a cosmetic
+   *       outcome: no vocabulary, and nothing at the table to enforce.
    * UNBLOCKED BY: no single unit; W1-W4 each name their own gap. Prose.
    *
-   * `belt-of-giant-strength` - "your Strength changes to a score granted by the belt ... (hill):
-   * Str. 21 ... (storm): Str. 29". One of the SEVEN items whose central mechanic the schema refuses
+   * `belt-of-giant-strength` - "your Strength changes to a score granted by the belt". The scores
+   * are a TABLE rather than a sentence - its `Belt` / `Str.` / `Rarity` columns run from
+   * `Belt of Giant Strength (hill)` at 21 to `(storm)` at 29. (This entry used to render those cells
+   * as one continuous quotation - *"... (hill): Str. 21 ... (storm): Str. 29"* - which reads as
+   * printed prose and is not; review unstitched it. The numbers are exact.) One of the SEVEN items
+   * whose central mechanic the schema refuses
    * by design, quoted here rather than worked around: *"An item cannot change hit points or an
    * ability score yet - those are baked into the sheet and cannot be un-granted when the item comes
    * off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (Both
@@ -302,13 +340,19 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * your carrying capacity or wearing Heavy Armor" (no encumbrance model), "you can jump up to 30
    * feet by spending only 10 feet of movement" (no jump model). UNBLOCKED BY: no unit. Prose.
    *
-   * `slippers-of-spider-climbing` - "You have a Climb Speed equal to your Speed." There is no
-   * movement-mode model: no climb, swim or fly speed anywhere on the actor. UNBLOCKED BY: no unit.
-   * Prose.
+   * `slippers-of-spider-climbing` - "you can move up, down, and across vertical surfaces and along
+   * ceilings, while leaving your hands free. You have a Climb Speed equal to your Speed. However,
+   * the slippers don't allow you to move this way on a slippery surface, such as one covered by ice
+   * or oil." There is no movement-mode model: no climb, swim or fly speed anywhere on the actor -
+   * and (review restored the third sentence) no surface model for the exception that would gate it
+   * even if there were. UNBLOCKED BY: no unit. Prose.
    */
 
   /**
-   * BOOTS OF THE WINTERLANDS - "Cold Resistance. You have Resistance to Cold damage."
+   * BOOTS OF THE WINTERLANDS - "Cold Resistance. You have Resistance to Cold damage ..."
+   * (the ellipsis is review's: the SRD sentence continues "and can tolerate temperatures of 0
+   * degrees Fahrenheit or lower without any additional protection", which the ABSENT list below
+   * already carries. It was cut here with a fabricated full stop.)
    *
    * Unconditional in the printed text, which is what separates it from the two resistances W3
    * refuses: nothing gates it on a species, a gem or a state. The reader is the damage pipeline
@@ -399,9 +443,33 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    *
    * `gloves-of-missile-snaring` - "If you're hit by an attack roll made with a Ranged or Thrown
    * weapon while wearing these gloves, you can take a Reaction to reduce the damage by 1d10 plus
-   * your Dexterity modifier." RESERVED: needs `on-taking-damage` + `damage-reduction` wired
-   * together. UNBLOCKED BY: **U31**. (`damage-reduction` is a flat integer, so even with the moment
-   * wired the "1d10 plus your Dexterity modifier" is a second gap.) Prose.
+   * your Dexterity modifier if you have a free hand. If you reduce the damage to 0, you can catch
+   * the ammunition or weapon if it is small enough for you to hold in that hand."
+   *
+   * **THIS ENTRY USED TO SAY "RESERVED: needs `on-taking-damage` + `damage-reduction` wired
+   * together. UNBLOCKED BY: U31", AND THAT HALF WAS A FALSE RECORD** (review). They ARE wired, in
+   * shipped server code: `damageReductionFor` (`apps/server/src/hit-points.ts:132-136`) collects
+   * riders at `moment: "on-taking-damage"` with the incoming `damageTypes` and sums
+   * `damage-reduction` off them. MEASURED 2026-08-12 by running
+   * `apps/server/test/typed-damage.test.ts -t "on-taking-damage"`: *"honours the on-taking-damage
+   * moment and its damage-type filter"* drives it on an ITEM carrier and passes today (1 passed |
+   * 18 skipped) - 10 fire becomes 7 through the filter and 10 cold stays 10. The plan's U31 is
+   * *"one new `collectRiders` call"* (`docs/product/plan-content-program.md:1091`) and that call
+   * exists. The risk of leaving it pointed here is directional: a later pass that reads this, sees
+   * U31 land and "unblocks" the item would author a flat `damage-reduction` - a rider that reaches
+   * the damage pipeline and pays the wrong number every time.
+   *
+   * IT IS STILL AN ABSENCE, and these three reasons are the whole record now. Each stands alone:
+   *   `damage-reduction` is a FLAT INTEGER and the SRD prints "1d10 plus your Dexterity modifier" -
+   *       a ROLLED amount, which the vocabulary cannot say at any moment. (This is the half U31
+   *       does not cover, and `Ring of Warmth`'s "reduces the damage you take by 2d8" - C7b's, and
+   *       U31's other named carrier - is the same gap, so the unit is under-specified for both.)
+   *   The printed gate is "if you have a free hand". No trigger describes a hand count;
+   *       `while-shield` and `while-unarmored` are the nearest and neither is one.
+   *   It costs a **Reaction**, and an item rider has no reaction economy - so the reduction would
+   *       apply to every qualifying hit, free, rather than once when the player spends for it.
+   * UNBLOCKED BY: a ROLLED `damage-reduction` amount (U31 as written does not deliver it), a
+   * free-hand gate, and a reaction cost on an item rider. No unit for any of the three. Prose.
    *
    * `gloves-of-swimming-and-climbing` - "you have a Climb Speed and a Swim Speed equal to your
    * Speed, and you gain a +5 bonus to Strength (Athletics) checks made to climb or swim." The speeds
@@ -436,7 +504,11 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
   // =============================================================================================
 
   /*
-   * `circlet-of-blasting` - "you can cast Scorching Ray with it (+5 to hit)." W6, twice over.
+   * `circlet-of-blasting` - "you can cast Scorching Ray with it (+5 to hit). The circlet can't cast
+   * this spell again until the next dawn." (Review restored the second sentence: the entry quoted
+   * only the first and so never named the printed 1/dawn - which `uses` COULD have said, and which
+   * a reader would otherwise take as unlimited. It changes nothing here, because the cast itself is
+   * refused and a counter with no cast behind it enforces nothing.) W6, twice over.
    * MEASURED: the derived cast is `damage: [{formula: "2d6", type: "fire"}]` and `attack: {bonus: 2}`
    * - 2d6 is ONE of Scorching Ray's THREE rays (the Wand of Magic Missiles error the round-1 review
    * found), and the bonus is the WEARER's derived number, not the circlet's printed **+5**, because
@@ -471,8 +543,12 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * Intelligence (Investigation) checks made to examine something within that range." W2 and W1, and
    * the range is one foot. Prose.
    *
-   * `eyes-of-the-eagle` - "you have Advantage on Wisdom (Perception) checks that rely on sight." W1.
-   * Prose.
+   * `eyes-of-the-eagle` - "you have Advantage on Wisdom (Perception) checks that rely on sight. In
+   * conditions of clear visibility, you can make out details of even extremely distant creatures and
+   * objects as small as 2 feet across." W1 for the first half; the second (review restored it) is a
+   * perception RANGE, which nothing on the actor carries - the sheet's Senses line is the
+   * definition's species extension and takes no item. UNBLOCKED BY: W1's missing `roll: "check"`
+   * consumer, and a senses model for the range. Prose.
    *
    * `goggles-of-night` - "you have Darkvision out to 60 feet. If you already have Darkvision,
    * wearing the goggles increases its range by 60 feet." W2: `darkvision` is not even summed into
@@ -580,12 +656,21 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * SCHOOL of magic rather than a damage type or a condition - the same gap C7b records on
    * `ring-of-mind-shielding`. UNBLOCKED BY: no unit. Prose.
    *
-   * `amulet-of-the-planes` - "make a DC 15 Intelligence (Arcana) check. On a successful check, you
-   * cast Plane Shift. On a failed check, you and each creature and object within 15 feet of you
-   * travel to a random destination." Nothing in the vocabulary gates a cast behind an ability check,
-   * and authoring `casts: [{spellId: "plane-shift"}]` would delete the check entirely - a guaranteed
-   * planar jump where the SRD prints a 30 percent chance of a d100 mishap table. UNBLOCKED BY: no
-   * unit. Prose.
+   * `amulet-of-the-planes` - "While wearing this amulet, you can take a Magic action to name a
+   * location that you are familiar with on another plane of existence. Then make a DC 15 Intelligence
+   * (Arcana) check. On a successful check, you cast Plane Shift. On a failed check, you and each
+   * creature and object within 15 feet of you travel to a random destination determined by rolling
+   * 1d100 and consulting the following table." Nothing in the vocabulary gates a cast behind an
+   * ability check, and
+   * authoring `casts: [{spellId: "plane-shift"}]` would delete the check entirely - a guaranteed
+   * planar jump where the SRD prints a failed check into a d100 destination table.
+   *
+   * **THE OLD WORDING SAID "a 30 percent chance of a d100 mishap table" AND THE SRD PRINTS NO SUCH
+   * NUMBER** (review). The table (`magic-items.md:673-708`) is 01-60 "Random location on the plane
+   * you named", 61-70 an Inner Plane, 71-80 / 81-90 Outer Planes, 91-00 the Astral Plane - 40 percent
+   * a wrong PLANE, not 30 - and whether the table is rolled at all depends on failing a DC 15 check,
+   * whose odds are the character's and are not printed anywhere. The item is an absence either way;
+   * the invented percentage is the defect. UNBLOCKED BY: no unit. Prose.
    */
 
   /**
@@ -631,8 +716,12 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * UNBLOCKED BY: a non-renewing `per`. Prose.
    *
    * `necklace-of-prayer-beads` - "This necklace has 1d4 + 2 magic beads ... Six types of magic beads
-   * exist. The GM decides the type of each bead ... Bead of Curing, Spell Cure Wounds (level 2
-   * version)." W7 covers the Bead of Curing outright - `cure-wounds` ships as `{roll: "2d8",
+   * exist. The GM decides the type of each bead on the necklace or determines it randomly by rolling
+   * on the table below." The healing one is a TABLE ROW, not a sentence: under the `1d20` / `Bead` /
+   * `Spell` columns, `7-12` is `Bead of Curing` casting `Cure Wounds (level 2 version)`. (Review
+   * unstitched that too - it used to read *"... Bead of Curing, Spell Cure Wounds (level 2
+   * version)."*, which pulls the column header `Spell` into what looks like printed prose.)
+   * W7 covers the Bead of Curing outright - `cure-wounds` ships as `{roll: "2d8",
    * types: []}` and a cast synthesises 2d8 FORCE damage at whoever it is pointed at, which is the
    * exact failure `docs/ai-ledger/known-bugs.md` records. The rest of the item is a GM-fiat
    * composition: which 1d4+2 of six beads this copy carries is decided per necklace, so there is no
@@ -708,9 +797,15 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * modifier is collected at `equipment-derivation.ts:682` and applied by nothing.
    * UNBLOCKED BY: **U26** (the reader) and **U29** (`attack-kind-is: "spell"`, so the bonus can be
    * narrowed to a spell attack).
-   * Their other halves are absences of their own: "A Fiend or an Undead that touches the talisman
-   * takes 8d6 Radiant damage" has no touch moment and `versus-creature-type` has no producer (C7a's
-   * limit B), and the 7- and 6-charge fissures are W5 - both talismans are destroyed when the last
+   * Their other halves are absences of their own, and **the two touch clauses are DIFFERENT
+   * sentences - review found this entry quoting Pure Good's at both items.** Pure Good prints "A
+   * Fiend or an Undead that touches the talisman takes 8d6 Radiant damage and takes the damage again
+   * each time it ends its turn holding or carrying the talisman"; Ultimate Evil prints the inverse,
+   * "A creature that isn't a Fiend or an Undead that touches the talisman takes 8d6 **Necrotic**
+   * damage and takes the damage again each time it ends its turn holding or carrying the talisman."
+   * Both are absent for the same two reasons - there is no touch moment, and `versus-creature-type`
+   * has no producer (C7a's limit B) - but the record must say what each item prints, not what its
+   * sibling does. The 7- and 6-charge fissures are W5: both talismans are destroyed when the last
    * charge is spent, so a long-rest pool would resurrect them. Prose.
    *
    * `talisman-of-the-sphere` - "you have Advantage on any Intelligence (Arcana) check you make to
@@ -730,8 +825,11 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * cast is still refused: W6. MEASURED, the derived cast is
    * `damage: [{formula: "4d6", type: "force"}]` - the SRD's 4d6 is what BOTH creatures take when you
    * arrive in an occupied space, not damage a Dimension Door deals to a target, so every use would
-   * roll it at whoever was targeted. UNBLOCKED BY: known-bugs `[content/spells]`, second entry.
-   * Prose.
+   * roll it at whoever was targeted. ALSO ABSENT (review - the list stopped one clause short):
+   * "When you teleport with that spell, you leave behind a cloud of smoke. The space you left is
+   * Lightly Obscured by that smoke until the end of your next turn." There is no obscurement model
+   * and no rider that marks a SPACE rather than a creature. UNBLOCKED BY: known-bugs
+   * `[content/spells]`, second entry, for the cast; no unit for the smoke. Prose.
    */
 
   /**
@@ -847,8 +945,11 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * that rely on sight" (W1); "Special Senses. You have Darkvision and Truesight, both with a range
    * of 120 feet" (W2 - and `sense` reaches no display either); "Drawbacks. A Light spell cast on the
    * robe or a Daylight spell cast within 5 feet of the robe gives you the Blinded condition for 1
-   * minute" - a rider triggered by ANOTHER creature's spell, which no moment in the vocabulary
-   * describes. Deliberately not authored as `cursed`: the SRD does not print a curse here and the
+   * minute. At the end of each of your turns, you make a Constitution saving throw (DC 11 for Light
+   * or DC 15 for Daylight), ending the condition on yourself on a success." - a rider triggered by
+   * ANOTHER creature's spell, which no moment in the vocabulary describes, and (review restored the
+   * second sentence, which the entry cut) a per-turn repeat save that ends it, which nothing in the
+   * action vocabulary schedules either. Deliberately not authored as `cursed`: the SRD does not print a curse here and the
    * robe comes off, so marking it cursed would lock a benefit on rather than model a drawback.
    * UNBLOCKED BY: no unit. Prose.
    */
@@ -866,7 +967,25 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * `actionUses` at 1 of 3 and puts `{ability: "wis", dc: 15, conditionId: "stunned"}` on the target
    * as a real pending save. C7b's `staff-of-thunder-and-lightning` is the same authored shape.
    *
-   * ABSENT, two halves:
+   * **THE AUTHORED DESCRIPTION USED TO DROP THE LIGHT CLAUSE AND KEEP THE CLAUSE THAT DEPENDS ON
+   * IT** (review). The SRD's middle sentence is *"During this time, the robe sheds Bright Light in a
+   * 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have
+   * Disadvantage on attack rolls against you."* Without it the button read *"...dazzling hues until
+   * the end of your next turn. Any creature in the Bright Light that can see you..."* - a GM-facing
+   * string that names no light and so cannot say WHO has to save. The printed sentence is restored,
+   * which also puts the third printed mechanic (the light itself) in front of the GM instead of only
+   * in the row's `description`. MEASURED after the change: `conditionFrom` still reads **Stunned**
+   * (nothing in the restored clause is a condition word, and it iterates its list in order, not the
+   * text's), and `parseAreaProse` still returns null - its radial pattern needs `Sphere|Emanation`
+   * after the distance and the SRD writes "30-foot radius", so no engine number moved.
+   *
+   * ABSENT, three halves:
+   *   "the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet" -
+   *       added by review, which found it named nowhere in this entry. There is no light model at
+   *       all: no rider emits light, no map surface consumes an emitter, and `parseAreaProse` reads
+   *       only the four TARGETING shapes. The clause is on the button as prose, so the GM can place
+   *       it by hand, and it is what the save's "Any creature in the Bright Light" refers to.
+   *       NEEDS: a light model an item can layer on. Unit: NONE YET.
    *   "creatures that can see you have Disadvantage on attack rolls against you" for the duration.
    *       That is `roll-mode: incoming-attack`, whose reader ships - but only as a STANDING or
    *       momentary rider on the item, with no way to say "until the end of your next turn, and only
@@ -887,7 +1006,7 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
   "robe-of-scintillating-colors": {
     actions: [{
       id: "dazzle", name: "Scintillating Colors", activation: "action",
-      description: "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
+      description: "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
       save: { ability: "wis", dc: 15 },
       uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" }
     }]
@@ -954,12 +1073,16 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    */
 
   /*
-   * `robe-of-useful-items` - "you can take a Magic action to detach one of the patches, causing it
-   * to become the object or creature it represents ... In addition, the robe has 4d4 other patches.
-   * The GM chooses the patches or determines them randomly." GM fiat end to end: the composition is
-   * rolled per copy, the patches become objects and creatures the vocabulary cannot mint, and the
-   * count is 4d4 rather than a number. W5 would refuse a pool for the fixed patches anyway - a
-   * detached patch does not come back. UNBLOCKED BY: no unit. Prose.
+   * `robe-of-useful-items` - "While wearing the robe, you can take a Magic action to detach one of
+   * the patches, causing it to become the object or creature it represents. Once the last patch is
+   * removed, the robe becomes an ordinary garment ... In addition, the robe has 4d4 other patches.
+   * The GM chooses the patches or determines them randomly by rolling on the following table." GM
+   * fiat end to end: the composition is rolled per copy, the patches become objects and creatures the
+   * vocabulary cannot mint, and the EXTRA patches are 4d4 rather than a number. (Two corrections
+   * from review: the quote used to stop at "randomly" with a fabricated full stop, and "the count is
+   * 4d4" was said of the whole robe - the SRD also prints TWO EACH of six fixed patches, so a copy's
+   * total is 12 + 4d4, not 4d4.) W5 would refuse a pool for the fixed patches anyway - a detached
+   * patch does not come back. UNBLOCKED BY: no unit. Prose.
    *
    * `wings-of-flying` - "you can take a Magic action to turn the cloak into a pair of wings ... The
    * wings give you a Fly Speed of 60 feet ... When the wings disappear, you can't use them again for

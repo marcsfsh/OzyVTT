@@ -14,6 +14,8 @@ import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation
 import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
 import { startEncounter } from "../src/encounter.js";
+import { builtinAction } from "../src/builtin-actions.js";
+import { looseRollPlan } from "../src/tap-routing.js";
 
 /**
  * ============================================================================================
@@ -100,8 +102,16 @@ const carried = (id: string, name: string, over: Record<string, unknown> = {}): 
 /** This lane's 95 rows, off the SHIPPED bundle rather than a list retyped here. */
 const LANE_ROWS = loadMagicItems().filter((row) =>
   ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") && row.id !== "spell-scroll");
-const carries = (row: { modifiers: unknown[]; actions: unknown[]; casts: unknown[]; effects: unknown[]; grants?: unknown; grantsFeatIds: unknown[]; uses?: unknown; cursed: boolean }) =>
-  row.modifiers.length > 0 || row.actions.length > 0 || row.casts.length > 0 || row.effects.length > 0
+/**
+ * "Carries a rider" over ALL NINE keys `overlay.ts`'s `ITEM_RIDER_KEYS` admits. `tags` was the
+ * missing ninth (review): a later lane authoring `tags` alone on a C7d row would have shipped a
+ * rider and still passed "authors 18 and leaves 77 as prose". Latent - no lane authors `tags` on
+ * any of the 268 rows, measured - but the guard is this lane's claim that a row cannot move
+ * between groups unnoticed, and it was checking eight of nine.
+ */
+const carries = (row: { tags?: unknown[]; modifiers: unknown[]; actions: unknown[]; casts: unknown[]; effects: unknown[]; grants?: unknown; grantsFeatIds: unknown[]; uses?: unknown; cursed: boolean }) =>
+  (row.tags ?? []).length > 0
+  || row.modifiers.length > 0 || row.actions.length > 0 || row.casts.length > 0 || row.effects.length > 0
   || row.grants !== undefined || row.grantsFeatIds.length > 0 || row.uses !== undefined || row.cursed;
 
 // -------------------------------------------------------------------------------------------------
@@ -189,7 +199,7 @@ describe("C7d far end: the Pipes of Haunting spend a charge, refuse the fourth p
 // The lane's other rider families, each ending at an engine outcome
 // -------------------------------------------------------------------------------------------------
 
-describe("C7d: the one item in the lane whose entire printed sentence lands", () => {
+describe("C7d: the Stone of Good Luck - one half whole, one half short of the roll", () => {
   const ROW = { id: "stone-of-good-luck-luckstone", name: "Stone of Good Luck", category: "wondrous-item" };
 
   it("moves every skill row by +1 and the save the SERVER rolls by +1, and both come off with the stone", () => {
@@ -234,12 +244,71 @@ describe("C7d: the one item in the lane whose entire printed sentence lands", ()
       expect(answered.outcome).toMatchObject({ total, success }); // d20 13, Dex +2, +1 only when attuned
     }
   });
+
+  it("but the SERVER'S OWN ability check does not pay the +1 the sheet promises - the check half is short", () => {
+    // The module used to call this row "the ONLY item in this lane whose entire printed sentence
+    // lands ... nothing left over". Only the SAVE half lands on a roll. `check-bonus` reaches
+    // `checkRiderBonus` -> the derived sheet's skill row and nothing else: `BUILTIN_CHECKS`
+    // (action-resolution.ts:138-143) resolves at :758-766 from `abilityModifier` +
+    // `skillBonusFromExtension` + `exhaustionPenalty` and never calls it. This test is the
+    // measurement, kept so the gap cannot be quietly re-described as complete.
+    const definition = definitionOf();
+    const state = fight(stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]));
+    const sheet = deriveActorSheet(state.actors[0], definition, deriveEquipment(state.actors[0], definition, catalog), skillCatalog);
+    expect(sheet.skills.find((row) => row.id === "stealth")!.bonus).toBe(3); // Dex +2 AND the stone
+
+    const hide = resolveDefinitionAction(state, builtinAction("hide")!,
+      { actorId: IDS.hero, targetIds: [], commandId: cmd(16), builtin: true }, deps([10], definition));
+    expect(hide.check!.total).toBe(12); // d20 10 + Dex 2. The stone's +1 is NOT here. 13 would be whole.
+  });
+});
+
+describe("C7d: D8 and D9 - what this lane's buttons do outside an encounter", () => {
+  it("D8: refuses every one of them, by the server's own words", () => {
+    // 17 of the 18 authored rows produce NOTHING out of combat, and the printed use of most of them
+    // (scry a distant creature, send a message, peer for 10 minutes of Truesight) is not a combat
+    // activity. The module records this as a limit rather than rolling the riders back, because the
+    // failure mode is a button that refuses rather than one that lies - and this is the refusal.
+    const definition = definitionOf();
+    for (const [id, name, actionId] of [
+      ["crystal-ball", "Crystal Ball", "item-crystal-ball-cast-scrying"],
+      ["sending-stones", "Sending Stones", "item-sending-stones-cast-sending"],
+      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"],
+      ["pipes-of-haunting", "Pipes of Haunting", "item-pipes-of-haunting-play"]
+    ] as const) {
+      const state = stateWith([carried(id, name)]); // NO `fight()` - that is the whole point
+      const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === actionId)!;
+      expect(action, `${id} - the button is on the sheet`).toBeDefined();
+      expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(17) }, deps([], definition)))
+        .toThrow("Start an encounter before resolving actions.");
+      // And the loose `action.use` route has nothing to roll for them either: it builds from
+      // `attack`/`damage` only, and none of these four carries either.
+      expect({ id, plan: looseRollPlan(action, { includeDamage: true }) }).toEqual({ id, plan: [] });
+    }
+  });
+
+  it("D9: except the Iron Bands, which the loose route WILL roll - and it spends no charge", () => {
+    // The lane's only authored action carrying an `attack`, so the only one `looseRollPlan` builds a
+    // roll for. `game-operations.ts:1571-1572` says in its own comment that this path "touches no
+    // combat state at all", so `actionUses` is never incremented: outside a fight the bands throw an
+    // unlimited number of real +5 attacks where the SRD prints one per dawn. Engine-wide rather than
+    // an authoring mistake, which is why the rider stays and this pins the leak instead.
+    const definition = definitionOf();
+    const state = stateWith([carried("iron-bands", "Iron Bands", { attuned: false })]);
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-iron-bands-throw")!;
+    expect(looseRollPlan(action, { includeDamage: true })).toEqual([
+      { formula: "1d20 + 5", purpose: "attack", label: "Throw the Bands" }
+    ]);
+  });
 });
 
 describe("C7d: the one printed to-hit in the lane that the vocabulary can say", () => {
   it("derives the Iron Bands' attack from Dex + Proficiency, exactly as the SRD prints it", () => {
     const definition = definitionOf();
-    const state = fight(stateWith([carried("iron-bands", "Iron Bands of Bilarro", { attuned: false })]));
+    // `Iron Bands`, not "Iron Bands of Bilarro" - that is the 2014-era name, it appears nowhere in
+    // the vendored SRD 5.2.1, and this row mints the way the picker mints it or the header is lying.
+    expect(view.equipmentRecord("iron-bands")!.name).toBe("Iron Bands");
+    const state = fight(stateWith([carried("iron-bands", "Iron Bands", { attuned: false })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-iron-bands-throw")!;
     // "an attack bonus equal to your Dexterity modifier plus your Proficiency Bonus" = 2 + 3.
     expect(action.attack).toMatchObject({ bonus: 5, rangeFeet: 60 });
@@ -296,18 +365,31 @@ describe("C7d: the casts that survived the spell-record check", () => {
     }
   });
 
-  it("rations only the Telepathy ball's Suggestion, and leaves its Scrying unlimited", () => {
+  it("D7: the two SENSOR-GATED casts are absent, and a re-author would land a real Charm on any target", () => {
+    // These two SHIPPED and review removed them. The SRD casts both through an active Scrying's
+    // sensor, at a creature near it - "targeting creatures you can see within 30 feet of the spell's
+    // sensor" / "through the sensor on one of those creatures" - and no trigger says either thing,
+    // so the derived buttons had no prerequisite at all. What was measured before removal, and what
+    // this guard exists to stop coming back: the Telepathy orb's Suggestion derived
+    // `{save: {wis, 17}, uses: {limit: 1, per: "long-rest"}}` and, resolved at a foe in melee,
+    // wrote `pendingSaves[0].conditionId === "charmed"` - `conditionFrom` reading "Charmed" out of
+    // Suggestion's own description - which a committed failing save then applied.
     const definition = definitionOf();
-    const state = fight(stateWith([carried("crystal-ball-of-telepathy", "Crystal Ball of Telepathy")]));
-    const actions = effectiveActions(definition, state.actors[0], catalog);
-    const suggest = actions.find((entry) => entry.id === "item-crystal-ball-of-telepathy-cast-suggestion")!;
-    expect(suggest.save).toEqual({ ability: "wis", dc: 17 });
-    expect(suggest.uses).toEqual({ limit: 1, per: "long-rest", pool: "crystal-ball-of-telepathy-suggestion" });
-    expect(actions.find((entry) => entry.id === "item-crystal-ball-of-telepathy-cast-scrying")!.uses).toBeUndefined();
-
-    resolveDefinitionAction(state, suggest, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(12) }, deps([], definition));
-    expect(state.actors[0].actionUses["crystal-ball-of-telepathy-suggestion"]).toBe(1);
-    expect(state.actors[0].actionUses["crystal-ball-of-telepathy-scrying"]).toBeUndefined();
+    for (const [id, name, spell] of [
+      ["crystal-ball-of-telepathy", "Crystal Ball of Telepathy", "suggestion"],
+      ["crystal-ball-of-mind-reading", "Crystal Ball of Mind Reading", "detect-thoughts"]
+    ] as const) {
+      const row = view.equipmentRecord(id)!;
+      expect(row.casts.map((cast) => cast.spellId)).toEqual(["scrying"]);
+      const state = fight(stateWith([carried(id, name)]));
+      const actions = effectiveActions(definition, state.actors[0], catalog);
+      expect(actions.find((entry) => entry.id === `item-${id}-cast-${spell}`)).toBeUndefined();
+      // The orb's OWN printed, ungated Scrying is untouched and still unlimited.
+      expect(actions.find((entry) => entry.id === `item-${id}-cast-scrying`)!.uses).toBeUndefined();
+    }
+    // And the shipped prose still carries the gate, so a GM reads what the button cannot enforce.
+    expect(view.equipmentRecord("crystal-ball-of-telepathy")!.description).toContain("through the sensor on one of those creatures");
+    expect(view.equipmentRecord("crystal-ball-of-mind-reading")!.description).toContain("within 30 feet of the spell's sensor");
   });
 
   it("shares ONE three-charge pool across the Cubic Gate's two spells, and hands the Sending Stones one a day", () => {
@@ -400,6 +482,15 @@ describe("C7d: the lane's counts, measured against the shipped bundle rather tha
     // The bundle agrees: 18 rows carry a rider and 77 do not.
     expect(LANE_ROWS.filter(carries)).toHaveLength(18);
     expect(LANE_ROWS.filter((row) => !carries(row))).toHaveLength(77);
+    // THE ONE ARITHMETIC CLAIM IN THE MODULE HEADER THAT IS CHECKABLE. Its six-way split of the 77
+    // used to sum to 78; the residual group was 39 and is 38, derived from these two numbers. The
+    // editorial groups themselves are not pinnable - a row can move between "over-grant" and "no
+    // vocabulary" with nothing failing, and the header now says so - but their TOTAL is.
+    const absent = LANE_ROWS.filter((row) => !carries(row));
+    expect({
+      consumables: absent.filter((row) => row.category === "consumable").length,
+      carriedWondrous: absent.filter((row) => row.category === "wondrous-item").length
+    }).toEqual({ consumables: 24, carriedWondrous: 53 });
   });
 
   it("D1: NOT ONE of the 24 consumables carries a rider, because a consumed item is unsayable", () => {
