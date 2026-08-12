@@ -621,7 +621,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "pull",
+    "name": "Pull a Fuzzy Object",
+    "activation": "action",
+    "description": "Pull the fuzzy object from the bag and throw it up to 20 feet. When the object lands, it transforms into a creature determined by rolling on the table for the bag's colour. The creature vanishes at the next dawn or when it is reduced to 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "bag-of-tricks-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -911,7 +924,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "summon",
+    "name": "Summon Water Elemental",
+    "activation": "action",
+    "description": "While this bowl is filled with water and you are within 5 feet of it, summon a Water Elemental. It appears in an unoccupied space as close to the bowl as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "bowl-of-commanding-water-elementals-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1014,7 +1040,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "summon",
+    "name": "Summon Fire Elemental",
+    "activation": "action",
+    "description": "While you are within 5 feet of this brazier, summon a Fire Elemental. It appears in an unoccupied space as close to the brazier as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "brazier-of-commanding-fire-elementals-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1179,7 +1218,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "summon",
+    "name": "Summon Air Elemental",
+    "activation": "action",
+    "description": "While gently swinging this censer, summon an Air Elemental. It appears in an unoccupied space as close to the censer as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "censer-of-controlling-air-elementals-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1466,7 +1518,13 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "scrying",
+    "saveDc": 17,
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1491,7 +1549,18 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "scrying",
+    "saveDc": 17,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "detect-thoughts",
+    "saveDc": 17,
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1516,7 +1585,23 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "scrying",
+    "saveDc": 17,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "suggestion",
+    "saveDc": 17,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "crystal-ball-of-telepathy-suggestion"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1541,7 +1626,13 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "scrying",
+    "saveDc": 17,
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1591,7 +1682,26 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "gate",
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "cubic-gate-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "plane-shift",
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "cubic-gate-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2491,7 +2601,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "peer",
+    "name": "Peer Through the Gem",
+    "activation": "action",
+    "description": "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "gem-of-seeing-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3149,7 +3272,25 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "throw",
+    "name": "Throw the Bands",
+    "activation": "action",
+    "description": "Throw the sphere at a Huge or smaller creature you can see within 60 feet of yourself. As the sphere moves through the air, it opens into a tangle of metal bands. On a hit, the target has the Restrained condition until you take a Bonus Action to issue a command that releases it. Doing so or missing with the attack causes the bands to contract and become a sphere once more.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "iron-bands-charges"
+    },
+    "attack": {
+     "ability": "dex",
+     "proficient": true,
+     "rangeFeet": 60
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3174,7 +3315,19 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "trap",
+    "name": "Trap a Creature",
+    "activation": "action",
+    "description": "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
+    "damage": [],
+    "save": {
+     "ability": "wis",
+     "dc": 17
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3964,7 +4117,24 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "play",
+    "name": "Play the Pipes",
+    "activation": "action",
+    "description": "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "pipes-of-haunting-charges"
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 15
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3989,7 +4159,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "call",
+    "name": "Call a Swarm of Rats",
+    "activation": "action",
+    "description": "Play the pipes and expend 1 charge, calling forth one Swarm of Rats if enough rats are within half a mile of you to be called in this fashion (as determined by the GM). If there aren't enough rats to form a swarm, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "pipes-of-the-sewers-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5624,7 +5807,19 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "entangle",
+    "name": "Entangle",
+    "activation": "action",
+    "description": "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
+    "damage": [],
+    "save": {
+     "ability": "dex",
+     "dc": 15
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5703,7 +5898,17 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "sending",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "sending-stones-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -6572,7 +6777,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "summon",
+    "name": "Summon Earth Elemental",
+    "activation": "action",
+    "description": "While touching this stone to the ground, summon an Earth Elemental. It appears in an unoccupied space you choose within 30 feet of yourself, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "stone-of-controlling-earth-elementals-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -6599,7 +6817,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "check-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "save-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "sun-blade",
