@@ -497,6 +497,17 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     }
   });
 
+  it("leaves every row whose mechanic is 'Advantage on a check' to prose - W1 has no consumer", () => {
+    // The module's biggest single claim, machine-checked: `roll-mode` reaches four rolls and `check`
+    // is not one of them, so a flat `check-bonus` would be a different sentence and is not written.
+    const advantageOnChecks = mine.filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? "")).map((row) => row.id).sort();
+    expect(advantageOnChecks).toEqual([
+      "belt-of-dwarvenkind", "boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat",
+      "eyes-of-minute-seeing", "eyes-of-the-eagle", "robe-of-eyes", "talisman-of-the-sphere"
+    ]);
+    for (const id of advantageOnChecks) expect(Object.keys(lane.entries), `${id} must stay prose`).not.toContain(id);
+  });
+
   it("authors no curse, because no row in this lane prints one", () => {
     // The lane OWNS `cursed`; this is the measurement that says it has no carrier, rather than a
     // silence that looks the same as forgetting. `Robe of Eyes` prints a Drawbacks clause and is

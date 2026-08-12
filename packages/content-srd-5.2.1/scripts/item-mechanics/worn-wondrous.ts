@@ -74,10 +74,11 @@
  *     `apps/server/src` finds exactly four rolls - `attack` and `incoming-attack`
  *     (`action-resolution.ts:598,603`), `initiative` (`encounter.ts:57,62`) and `save`
  *     (`saving-throws.ts:64`). `checkRiderBonus` sums `check-bonus` and never looks at `roll-mode`.
- *     **EIGHT of these 56 items print nothing but "you have Advantage on <some> checks"** - Boots and
- *     Cloak of Elvenkind, Eyes of the Eagle, Eyes of Minute Seeing, Belt of Dwarvenkind's Persuasion
- *     half, Cloak of the Bat's Stealth half, Talisman of the Sphere, Robe of Eyes' All-Around Vision.
- *     A flat `check-bonus` is NOT the same sentence and this lane does not substitute one.
+ *     **MEASURED over the committed bundle: EIGHT of these 56 rows print an "Advantage on ... check"
+ *     clause** - `belt-of-dwarvenkind`, `boots-of-elvenkind`, `cloak-of-elvenkind`, `cloak-of-the-bat`,
+ *     `eyes-of-minute-seeing`, `eyes-of-the-eagle`, `robe-of-eyes`, `talisman-of-the-sphere` - and
+ *     ALL EIGHT are absences below, because on none of them does anything else in the row land
+ *     either. A flat `check-bonus` is NOT the same sentence and this lane does not substitute one.
  *     **Needs: a `roll: "check"` consumer on the ability-check path. Unit: NONE YET.**
  *
  * W2. `speed`, `darkvision` AND `sense` REACH NOTHING FROM AN ITEM. Measured 2026-08-12:
