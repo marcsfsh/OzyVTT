@@ -52,9 +52,19 @@
  * **THE RULING: a magic weapon becomes real by the PLAYER PICKING THE BASE WEAPON IT APPLIES TO.**
  * That is an item-applies-to-item mechanism (the chosen base weapon's block becomes the magic row's
  * swing, once, with the magic row's riders scoped to it) and it does not exist. It is a UNIT, not
- * content work. **Unit: NONE YET - the item-applies-to-item mechanism; §5 has no row for it.**
- * Every `attack-bonus` and `extra-damage` this lane would otherwise have written is a named absence
- * citing that unit, and the absences say so item by item below.
+ * content work. **Unit: C9, the weapon-template mechanism** (`docs/product/plan-content-program.md`
+ * §5 and its unit table; added 2026-08-11 by the ruling that forced this salvage, and scheduled
+ * AFTER C8 rather than in batch 3).
+ *
+ * **EVERY `limit (0)` ABSENCE BELOW IS C9's**, and that is the mapping to read this file by: the 19
+ * entries emptied by limit (0) are exactly the ones waiting on the base weapon a player has not yet
+ * been able to pick. They are not listed as C9 one by one, because the limit IS the citation and
+ * restating it 19 times would rot 19 places instead of one. An absence citing "NONE YET" that does
+ * NOT name limit (0) means what it says: no unit owns it, and none is planned.
+ *
+ * (This paragraph was written by the salvage as "Unit: NONE YET"; C9 did not exist until the same
+ * afternoon's decision commit. Corrected in place, because a named absence whose "what unblocks it"
+ * quarter points at nothing is the half of the contract that makes it a decision rather than a skip.)
  *
  * **DO NOT "FIX" THIS WITH `scope: "bearer"`.** It parses, and it is wrong in a way a table would
  * feel: it would raise every attack the bearer makes with any weapon, and two magic weapons in a
@@ -251,9 +261,18 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * **U20**'s new rider variant. ABSENT: "+1 bonus to the attack and damage rolls of your Unarmed
    * Strikes" - the attack half belongs with the swing override it modifies, and the damage half is
    * limit (A); left whole for U20. ABSENT: "Disadvantage on attack rolls against demons" - limit (B),
-   * `versus-creature-type` is inert. ABSENT: the curse's own text ("the demon whose skin was used to
-   * craft the armor appears... you must succeed on a DC 15 Charisma saving throw or fall under its
-   * control") - a GM-narrated possession with no model.
+   * `versus-creature-type` is inert. ABSENT: the curse's own text - "Once you don this cursed armor,
+   * you can't doff it unless you are targeted by a `Remove Curse` spell or similar magic" - which the
+   * `cursed: true` flag models only in part: the flag refuses a PLAYER's removal and lets the GM lift
+   * it (proven by criterion 13 of `apps/server/test/item-riders.test.ts`), but nothing ties the lift
+   * to `Remove Curse` specifically. Unit: NONE YET.
+   *
+   * (An earlier draft of this record quoted a curse about "the demon whose skin was used to craft the
+   * armor" appearing and a DC 15 Charisma save. THAT SENTENCE IS NOT IN THE VENDORED SOURCE - checked,
+   * zero matches in `sources/dnd-5e-srd-markdown/magic-items.md` - and the real curse is the doffing
+   * clause above plus the Disadvantage already recorded. Corrected 2026-08-12. A quote attributed to
+   * the SRD that the SRD does not contain is the exact failure this package vendors its source to
+   * prevent; PROVENANCE.json records that hand-authoring is "where both licensing violations landed".)
    */
   "demon-armor": {
     cursed: true,
@@ -435,7 +454,7 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    *
    * ABSENT: "You gain a +1 bonus to attack rolls and damage rolls made with this magic weapon" -
    * limit (0) for the attack half (no base weapon to attach to) and limit (A) for the damage half.
-   * Unit: NONE YET, the item-applies-to-item mechanism. ABSENT: "Luck" - a once-per-dawn reroll of a
+   * Unit: C9, the weapon-template mechanism. ABSENT: "Luck" - a once-per-dawn reroll of a
    * failed D20 Test; rerolls are not a rider family (`roll-mode` is advantage/disadvantage, which
    * rolls two dice up front rather than re-rolling one after the fact). ABSENT: "Wish" - `casts`
    * could name the spell, but the pool is `1d4 - 1` charges and `FeatureUsesSchema.limit` is a fixed
@@ -456,7 +475,7 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * ABSENT: "When you hit with an attack roll using this magic weapon, the target takes an extra 1d6
    * Cold damage" - limit (0). `extra-damage` is `THIS_ITEM_BY_DEFAULT`, so it scopes to an attack
    * made WITH this item, and there is no such attack until the base weapon can be chosen.
-   * Unit: NONE YET, the item-applies-to-item mechanism. ABSENT: "In freezing temperatures, the weapon
+   * Unit: C9, the weapon-template mechanism. ABSENT: "In freezing temperatures, the weapon
    * sheds Bright Light in a 10-foot radius" - no environment/light model. ABSENT: the once-per-hour
    * extinguishing of nonmagical flames - no ambient-fire model, and `per` offers only the two rests
    * (measured: `z.enum(["short-rest", "long-rest"])`), so "1 hour" has no home either.
@@ -684,7 +703,7 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   //     with weapons other than this one" is separately inexpressible - no rider can name "every
   //     weapon except this one". Complete.
   //
-  // ---- THE MECHANIC CANNOT BE SAID AT ALL (13) ------------------------------------------------
+  // ---- THE MECHANIC CANNOT BE SAID AT ALL (11) ------------------------------------------------
   //
   // `adamantine-armor` - "any Critical Hit against you becomes a normal hit." There is
   //     `critical-range` (which natural roll crits) and `critical-bonus-dice`, but nothing that
