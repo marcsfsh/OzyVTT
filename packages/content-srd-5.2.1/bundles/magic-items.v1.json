@@ -873,6 +873,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "cold"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -923,6 +938,22 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [
+    "longbow",
+    "shortbow"
+   ],
+   "saves": [],
+   "damageResistances": [],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -948,7 +979,19 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 2,
+    "whileArmored": false,
+    "when": [
+     {
+      "type": "while-unarmored",
+      "allowShield": false
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "brazier-of-commanding-fire-elementals",
@@ -998,6 +1041,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "force"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -1198,6 +1256,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "poison"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -1271,7 +1344,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "vanish",
+    "name": "Pull Up the Hood",
+    "activation": "action",
+    "description": "Expend 1 charge to give yourself the Invisible condition for 1 hour. The effect ends early if you pull the hood down (no action required) or cease wearing the cloak.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "cloak-of-invisibility-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1298,7 +1384,19 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   },
+   {
+    "type": "save-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "cloak-of-the-bat",
@@ -2114,7 +2212,18 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "charm-person",
+    "saveDc": 13,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "eyes-of-charming-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2516,7 +2625,23 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "check-bonus",
+    "amount": 5,
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "sleight-of-hand"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "goggles-of-night",
@@ -2611,7 +2736,12 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "disguise-self",
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2713,7 +2843,12 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "comprehend-languages",
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2738,7 +2873,28 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "detect-thoughts",
+    "saveDc": 13,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "helm-of-telepathy-detect-thoughts"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "suggestion",
+    "saveDc": 13,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest",
+     "pool": "helm-of-telepathy-suggestion"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -3346,7 +3502,18 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "detect-thoughts",
+    "saveDc": 13,
+    "uses": {
+     "limit": 5,
+     "per": "long-rest",
+     "pool": "medallion-of-thoughts-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -3707,6 +3874,23 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [],
+   "damageImmunities": [
+    "poison"
+   ],
+   "conditionImmunities": [
+    "poisoned"
+   ],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -5080,7 +5264,24 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "dazzle",
+    "name": "Scintillating Colors",
+    "activation": "action",
+    "description": "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "robe-of-scintillating-colors-charges"
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 15
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5107,7 +5308,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "save-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "robe-of-the-archmagi",
@@ -5136,7 +5343,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-save-dc",
+    "amount": 2,
+    "when": []
+   }
+  ]
  },
  {
   "id": "robe-of-useful-items",
@@ -5438,7 +5651,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "armor-class",
+    "amount": 1,
+    "whileArmored": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "scimitar-of-speed",
@@ -7448,7 +7668,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "fly",
+    "name": "Winged Flight",
+    "activation": "action",
+    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
+    "damage": [],
+    "uses": {
+     "limit": 4,
+     "per": "long-rest",
+     "pool": "winged-boots-charges"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
