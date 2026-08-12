@@ -154,6 +154,37 @@ describe("the item mechanics overlay", () => {
     );
   });
 
+  it("refuses an entry outside its lane's declared SLOTS - the boundary category cannot draw", () => {
+    // The category check above CANNOT separate C7c from C7d: both own `wondrous-item`, and 127 of the
+    // 268 rows carry it, so for every one of them the check passes for both lanes and says nothing.
+    // What was left holding that line was the duplicate-id refusal, which fires only once the OTHER
+    // lane has already authored the item - so a C7c entry on a carried `Bag of Holding` lands, ships
+    // and is found by a reader. `slots` is the same check one column further in.
+    //
+    // `bag-of-holding` is `wondrous-item` / slot `wondrous`; C7c owns the six WORN slots.
+    expect(() => applyItemMechanics(rows, [{
+      lane: "C7c", categories: ["wondrous-item"], slots: ["neck", "shoulders", "head", "feet", "hands", "belt"],
+      entries: { "bag-of-holding": { tags: ["misfiled"] } }
+    }])).toThrow(
+      '[C7c] bag-of-holding - has slot "wondrous" and lane "C7c" owns "neck", "shoulders", "head", "feet", "hands", "belt". Two lanes share the "wondrous-item" category, so the slot is what divides them (plan §3); author this item in the lane that owns it'
+    );
+
+    // IT NARROWS, IT DOES NOT REPLACE. The same entry is still refused by CATEGORY when the slot
+    // would have admitted it, so declaring `slots` cannot widen a lane past its categories.
+    expect(() => applyItemMechanics(rows, [{
+      lane: "C7c", categories: ["wondrous-item"], slots: ["neck", "ring"],
+      entries: { "ring-of-protection": { tags: ["misfiled"] } }
+    }])).toThrow(/is a "ring" and lane "C7c" owns "wondrous-item"/);
+
+    // A lane that declares NO slots is checked exactly as it was - which is C7a and C7b, untouched.
+    expect(() => applyItemMechanics(rows, [lane({ "cloak-of-protection": { tags: ["fine"] } })])).not.toThrow();
+
+    // Present-but-empty admits no row at all, so it is refused at the lane the way `categories` is.
+    expect(() => applyItemMechanics(rows, [{
+      lane: "C7c", categories: ["wondrous-item"], slots: [], entries: { "cloak-of-protection": { tags: ["x"] } }
+    }])).toThrow('lane "C7c" declares an empty "slots" list, which matches no row at all');
+  });
+
   it("fails closed on an entry that names no rider at all, and on one whose riders are empty", () => {
     // An empty entry is indistinguishable from a forgotten one. The plan's shape for "we read this
     // item and it stays prose" is a COMMENT beside the entry, not an entry with nothing in it.
@@ -339,7 +370,18 @@ describe("the item mechanics overlay", () => {
     expect(names, "two lanes cannot share a name - the refusals identify a lane by it").toEqual([...new Set(names)]);
     for (const entry of ITEM_MECHANICS_LANES) {
       expect(entry.categories.length, `${entry.lane} declares no categories`).toBeGreaterThan(0);
+      // `slots` is optional; declared, it may not be empty (that narrows to no row at all).
+      if (entry.slots !== undefined) expect(entry.slots.length, `${entry.lane} declares an empty slots list`).toBeGreaterThan(0);
       for (const id of Object.keys(entry.entries)) expect(rows.map((row) => row.id), `${entry.lane} / ${id}`).toContain(id);
+    }
+    // EVERY DECLARED SLOT MUST EXIST INSIDE THE LANE'S OWN CATEGORIES, or the narrowing is a typo
+    // that silently refuses the lane's own items instead of the other lane's. Checked against the
+    // committed rows rather than a list, so a slug the ETL renames is caught here.
+    for (const entry of ITEM_MECHANICS_LANES) {
+      for (const slot of entry.slots ?? []) {
+        expect(rows.some((row) => entry.categories.includes(row.category) && row.slot === slot),
+          `${entry.lane} declares slot "${slot}", which no row in its own categories carries`).toBe(true);
+      }
     }
   });
 });

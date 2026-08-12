@@ -44,10 +44,13 @@
  *      `{grants: {}}` or `{cursed: false}`. A present-but-empty list satisfies "the key is there"
  *      and authors exactly as much as a forgotten key: nothing. The class overlay already treats
  *      this as absence. A named absence is a COMMENT beside the entry, never an empty value.
- *   4. AN ENTRY OUTSIDE ITS LANE'S CATEGORIES. `plan-content-program.md` §3 justifies the
- *      category split by claiming a lane authoring outside its own category "fails the build the
- *      same way an unmatched key does"; `categories` on the lane is what gives that claim
- *      somewhere to stand.
+ *   4. AN ENTRY OUTSIDE ITS LANE'S CATEGORIES - OR, WHERE THE LANE DECLARES THEM, ITS SLOTS.
+ *      `plan-content-program.md` §3 justifies the category split by claiming a lane authoring
+ *      outside its own category "fails the build the same way an unmatched key does"; `categories`
+ *      on the lane is what gives that claim somewhere to stand. `slots` is the same check one column
+ *      further in, and it exists because category CANNOT separate C7c from C7d: both own
+ *      `wondrous-item` and the worn/carried line between them is `slot`. It is optional and it only
+ *      narrows, so a lane that declares no slots is checked exactly as it was.
  *   5. A SLUG POINTING AT ANOTHER BUNDLE THAT NOTHING RESOLVES. `casts[].spellId`,
  *      `grantsFeatIds[]` and the `grants.*` id lists are open slugs by schema, so `fyre-ball`
  *      parses, ships, and is silent at the table. Every one of them is cross-checked below.
@@ -131,17 +134,38 @@ export type ItemMechanicsModule = Readonly<Record<string, ItemMechanics>>;
  * committed 268 rows: `wondrous-item 127 · weapon 33 · consumable 25 · ring 22 · wand 15 · armor 14
  * · staff 12 · shield 9 · rod 7 · ammunition 4`.
  *
- * THIS SEPARATES C7a FROM C7b FROM {C7c, C7d} AND NO FURTHER, and §3 says so itself: the category
- * comes off the printed type line and the build can check it, but the worn/carried line that splits
- * C7c from C7d is the `slot` column, *"downstream of a judgement rather than free of one"*. Both of
- * those lanes therefore declare `wondrous-item`, and what keeps them off each other's items is
- * check 1 - the duplicate-id refusal - not this field.
+ * CATEGORY ALONE SEPARATES C7a FROM C7b FROM {C7c, C7d} AND NO FURTHER, which is why `slots` exists
+ * beside it. §3 says the split itself: the category comes off the printed type line and the build can
+ * check it, but the worn/carried line that divides C7c from C7d is the `slot` column, *"downstream of
+ * a judgement rather than free of one"*. Both of those lanes declare `wondrous-item`, so for the
+ * 127 rows they share the category check passes for BOTH and stops meaning anything - and what was
+ * left holding that boundary was check 1, the duplicate-id refusal, which only fires once a lane has
+ * ALREADY authored the other lane's item. A review pass called that a real hole and it is: a C7c
+ * entry on a `Bag of Holding` is not a collision with anything (C7d may not have reached it yet), so
+ * it lands, ships, and is discovered by a reader rather than by the build.
+ *
+ * `slots` closes it by NARROWING, never replacing: a lane that declares none is checked exactly as
+ * before, so C7a and C7b are untouched by this field's existence.
  */
 export interface ItemMechanicsLane {
   /** The unit that owns this lane, exactly as the plan spells it: "C7a", "C7b", "C7c", "C7d". */
   readonly lane: string;
   /** The bundle categories this lane owns. An entry on a row outside them is refused. */
   readonly categories: readonly string[];
+  /**
+   * OPTIONAL. The `EquipmentReference.slot` values this lane owns, checked the same way `categories`
+   * is and refused the same way. Omitted = the category check alone, which is every lane whose
+   * category nobody else claims.
+   *
+   * Measured over the committed 268 rows, the `wondrous-item` category splits
+   * `wondrous 71 · neck 15 · shoulders 15 · head 11 · feet 7 · hands 6 · belt 2` - so C7c declares
+   * the six worn slots and C7d is left with `wondrous`, and each is refused at the other's items by
+   * the build rather than by the first reader to notice.
+   *
+   * Present-but-empty is refused at the lane level, for check 3's reason: `slots: []` matches no row
+   * at all, which is a lane that can author nothing rather than a lane that narrows nothing.
+   */
+  readonly slots?: readonly string[];
   /** This lane's riders, keyed by magic-item id. */
   readonly entries: ItemMechanicsModule;
 }
@@ -413,6 +437,12 @@ export function applyItemMechanics(
       refused.push(`lane "${lane.lane}" declares no categories, so nothing can check that its entries are its own; declare the bundle categories it owns`);
       continue;
     }
+    // `slots` is OPTIONAL and narrows; present-but-empty narrows to nothing, which is check 3's shape
+    // one level up - a declaration that can admit no row at all.
+    if (lane.slots !== undefined && lane.slots.length === 0) {
+      refused.push(`lane "${lane.lane}" declares an empty "slots" list, which matches no row at all; name the slots it owns, or omit the field to be checked by category alone`);
+      continue;
+    }
 
     for (const [itemId, mechanics] of entries) {
       const at = `[${lane.lane}] ${itemId}`;
@@ -432,6 +462,14 @@ export function applyItemMechanics(
 
       if (!lane.categories.includes(row.category)) {
         refused.push(`${at} - is a "${row.category}" and lane "${lane.lane}" owns ${lane.categories.map((category) => `"${category}"`).join(", ")}. The lane split is by category (plan §3); author this item in the lane that owns it`);
+        continue;
+      }
+
+      // The SECOND half of check 4, and the only one that can separate two lanes sharing a category.
+      // A row with no `slot` at all fails a declared list rather than passing it: `slot` is optional
+      // on the schema, and "the column is missing" is not evidence that the item is this lane's.
+      if (lane.slots !== undefined && !lane.slots.includes(row.slot ?? "")) {
+        refused.push(`${at} - has slot ${row.slot === undefined ? "(none)" : `"${row.slot}"`} and lane "${lane.lane}" owns ${lane.slots.map((slot) => `"${slot}"`).join(", ")}. Two lanes share the "${row.category}" category, so the slot is what divides them (plan §3); author this item in the lane that owns it`);
         continue;
       }
 
