@@ -964,6 +964,11 @@ export type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly 
  * resolves the level from the spell record itself (`grantedSpell.level ?? record?.level`), which is
  * righter than a number the editor would have to guess (the client's catalog entry carries only
  * prose), and `ability` is authored by exactly one SRD record and falls back to the caster's own.
+ *
+ * **The write takes the bag the rows were read FROM, and that argument is required.** A rebuild is
+ * only safe if it can hand back the keys it has no row for; a write with no memory of the body it is
+ * writing into cannot, and silently deletes them. See `grantsFromRows` for which keys those are and
+ * what one of them costs.
  */
 export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[] {
   return GRANT_KINDS
@@ -977,13 +982,44 @@ export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[
     }));
 }
 
-export function grantsFromRows(rows: readonly GrantRow[]): Record<string, unknown> | undefined {
+/**
+ * The rows back into the bag — **plus every key of the bag this editor has no row for, carried
+ * through untouched.**
+ *
+ * THE REBUILD IS THE DANGEROUS HALF. It emits one key per `GRANT_KINDS` entry and nothing else, so
+ * without the carry loop below any other key `FeatureGrantsSchema` accepts is DELETED by an ordinary
+ * edit — the GM touches one row and loses a field they were never shown.
+ *
+ * Today that is exactly one key and it is not a cosmetic one. **`grants.when` is the condition the
+ * whole block applies under**, and dropping it turns "Immunity to Charmed and Frightened *while your
+ * Rage is active*" into permanent immunity — the precise over-grant the field was added to end,
+ * arriving through the GM's own UI. It is reachable from shipped content: `/duplicate`
+ * `structuredClone`s `path-of-the-berserker` (whose `mindless-rage` carries the gate) into an
+ * editable draft, and `FeatureGrantsSchema` accepts the ungated body on the way out, so nothing
+ * downstream would have refused it.
+ *
+ * **MIRRORED FROM THE `spells` PRECEDENT**, which `write` below still names: `spells` used to be
+ * re-attached verbatim after the bag was rebuilt, because the editor preserved what it could not
+ * edit. `when` gets the same treatment for the same reason — this editor exposes no gate control —
+ * and it is written as "every key with no row" rather than as `if (previous.when)` so that the next
+ * key added to the schema is carried by construction instead of arriving as this bug wearing a
+ * different name. `grant-gate-preservation.mirror.test.ts` pins the partition against
+ * `FeatureGrantsSchema.shape` itself, so a twelfth key fails there rather than in a fight.
+ *
+ * A carried key keeps the block alive on its own: clearing every row leaves `{when}` rather than
+ * `undefined`. That direction is deliberate — a gate with no lists grants nothing, while a rebuild
+ * that dropped the gate on the way through zero rows would put the over-grant two gestures away.
+ */
+export function grantsFromRows(rows: readonly GrantRow[], previous: Record<string, unknown>): Record<string, unknown> | undefined {
   const bag: Record<string, unknown> = {};
   for (const row of rows) {
     if (!row.kind) continue;
     bag[row.kind] = row.kind === "spells"
       ? row.values.map((id) => ({ id, alwaysPrepared: true }))
       : row.values;
+  }
+  for (const [key, carried] of Object.entries(previous)) {
+    if (!GRANT_KINDS.some((kind) => kind.key === key)) bag[key] = carried;
   }
   return Object.keys(bag).length > 0 ? bag : undefined;
 }
@@ -1026,8 +1062,10 @@ function GrantsEditor({
   const rows = useMemo<readonly GrantRow[]>(() => grantRowsOf(grants), [grants]);
 
   // `spells` used to be re-attached HERE, verbatim, after the bag was rebuilt — the editor preserved
-  // what it could not edit. It is a kind like the other ten now, so the boundary is one function.
-  const write = (next: readonly GrantRow[]) => onChange({ ...value, grants: grantsFromRows(next) });
+  // what it could not edit. It is a kind like the other ten now, so the boundary is one function —
+  // and that same preservation is what `grantsFromRows` does with `grants.when`, which is why the
+  // current bag is passed rather than the rows alone.
+  const write = (next: readonly GrantRow[]) => onChange({ ...value, grants: grantsFromRows(next, grants) });
 
   /**
    * **Ten kinds on an item, eleven everywhere else — and the missing one is a refusal, not an

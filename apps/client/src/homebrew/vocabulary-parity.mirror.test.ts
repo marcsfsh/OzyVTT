@@ -839,14 +839,18 @@ const GRANTED = {
     are bespoke JSX inside `GrantsEditor` with no `FieldDef` to look up — writing through the
     exemption would be this test hand-building the body and proving nothing. `grantsFromRows` is the
     function the component itself calls, and the rendered affordance (a `CatalogPicker` over the
-    merged spell catalog, not a `TagInput`) is driven in `pick-fields.test.tsx`. */
+    merged spell catalog, not a `TagInput`) is driven in `pick-fields.test.tsx`.
+
+    The `{}` second argument is the bag the rows are rebuilt OVER — the keys `GrantsEditor` has no
+    row for and carries through rather than deleting. A fixture built from nothing has none, so `{}`
+    is the honest value here; `grant-gate-preservation.mirror.test.ts` is where it is not empty. */
 function authoredFeat(withGrant = true): Draft {
   const shell = authored("feat", GRANTED.featName, [
     ["category", "origin"],
     ["summary", "A blessing for the road."],
     ["description", "You always have the Bless spell prepared."]
   ]);
-  const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }]) : undefined;
+  const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }], {}) : undefined;
   // The feature's own name and description used to be hand-set here, because `FeatureEditor` had no
   // `FieldDef` anywhere and was invisible to the harness. R1 mounted its fields as the row shape of
   // the `custom: "features"` field, so they go through the real control at the feature's OWN scope —
@@ -1897,7 +1901,7 @@ const wardOption = (id: string, name: string): Draft => ({
     ["description", `You have Resistance to ${name} damage until you choose a different type.`]
   ]),
   id,
-  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }])
+  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }], {})
 });
 
 /** The species a GM builds in `/homebrew`: one trait that asks a question, and the clause saying the
@@ -2943,7 +2947,7 @@ const echoOption = (id: string, name: string, gate: string | null, resistance: s
     ...(gate ? ([["requires.offer", GATED.gate], ["requires.id", gate]] as Array<readonly [string, unknown]>) : [])
   ]),
   id,
-  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }])
+  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }], {})
 });
 
 /** The species a GM builds in `/homebrew`: one trait that asks which heritage, and a second whose
