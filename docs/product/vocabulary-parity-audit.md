@@ -11,22 +11,22 @@ the nine homebrew body schemas accept.
 
 ## Headline counts
 
-- **162 distinct object schemas** carrying **709 declared keys**, expanded to **4660 editor-addressable questions**.
+- **162 distinct object schemas** carrying **710 declared keys**, expanded to **5078 editor-addressable questions**.
 - **2818 covered** — the editor has a control (or a composite ancestor control) for the key.
 - **106 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
-- **1736 open**, every one carried by a reasoned exemption row below.
+- **2154 open**, every one carried by a reasoned exemption row below.
 
 | type | covered | open |
 | --- | ---: | ---: |
-| background | 447 | 242 |
-| class | 465 | 253 |
-| equipment | 167 | 61 |
-| feat | 404 | 270 |
+| background | 447 | 308 |
+| class | 465 | 319 |
+| equipment | 167 | 83 |
+| feat | 404 | 336 |
 | monster | 39 | 133 |
-| species | 819 | 526 |
+| species | 819 | 658 |
 | spell | 29 | 4 |
 | spell-list | 5 | 2 |
-| subclass | 443 | 245 |
+| subclass | 443 | 311 |
 
 ## The exemption table — every open address, its reason, and who closes it
 
@@ -68,10 +68,10 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 | group | open | reason |
 | --- | ---: | --- |
 | `*.grants.spells[].**` | 21 | GrantsEditor writes the spells array whole (grantsFromRows, U9); the per-row keys have no FieldDef the probe can see |
-| `*.features[].grants.**` | 30 | bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe |
-| `*.traits[].grants.**` | 20 | bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe |
-| `feat.^feature.grants.**` | 10 | bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone |
-| `*.^grants.**` | 10 | bespoke GrantsEditor JSX at record scope — same probe-blind mount |
+| `*.features[].grants.**` | 96 | bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe |
+| `*.traits[].grants.**` | 64 | bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe |
+| `feat.^feature.grants.**` | 32 | bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone |
+| `*.^grants.**` | 32 | bespoke GrantsEditor JSX at record scope — same probe-blind mount |
 | `equipment.casts[].uses.scaling.**` | 3 | an item cast's scaling — zero SRD authors until the magic-item bundle lands |
 
 ### Owner: D1
@@ -142,8 +142,8 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 | `background\|class\|equipment\|feat\|species\|subclass.effects[].target` | 19 | effect linkage vocabulary with no control — no program unit authors it |
 | `background\|class\|equipment\|feat\|species\|subclass.effects[].voidWhileIncapacitated` | 19 | effect linkage vocabulary with no control — no program unit authors it |
 | `background\|class\|equipment\|feat\|species\|subclass.modifiers[].**` | 33 | the modifier rows beyond U6's type control — neither union's per-key internals (appliesTo/damageTypes on effects; the feature union's filters) have fields |
-| `*.choice.options[].**` | 292 | an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper |
-| `*.choices[].**` | 320 | the plural choices list — the panel writes the singular choice; the list shape has no control at all |
+| `*.choice.options[].**` | 424 | an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper |
+| `*.choices[].**` | 452 | the plural choices list — the panel writes the singular choice; the list shape has no control at all |
 | `*.choice.**` | 10 | the parts of a feature's choice beyond the panel's fields |
 | `*.uses.scaling.table[].**` | 6 | the by-level table at the three mounts the canonicaliser cannot reach — lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered |
 | `*.extraPicks[].**` | 12 | extra-pick rows beyond the resolver U15 wired — no rows control at feature scope |

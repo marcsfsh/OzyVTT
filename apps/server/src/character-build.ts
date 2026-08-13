@@ -538,7 +538,16 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
       ...(carriesUses ? { uses: { limit: synthesizedUses, per: feature.uses!.per, ...(feature.uses!.pool ? { pool: feature.uses!.pool } : {}) } } : {})
     } as unknown as ActorAction);
   }
-  if (feature.grants) {
+  // A GATED grants block is NOT baked, and this is the one place that decides it.
+  //
+  // Baking means writing the ids into the definition, where nothing ever re-reads the condition -
+  // so a block gated on "while you are wearing armour" would become "always", which is the exact
+  // over-grant `FeatureGrantsSchema.when` exists to end. The gate reads live actor state and this
+  // build has no actor: no inventory, no conditions, no current hit points. So a gated block is left
+  // for `deriveEquipment`'s `characterGatedGrants`, which recomputes it whole on every read and
+  // therefore honours the gate on every read. The two halves partition the blocks exactly - ungated
+  // here, gated there - so nothing is granted twice and nothing is dropped.
+  if (feature.grants && (feature.grants.when?.length ?? 0) === 0) {
     into.grantedSkills.push(...feature.grants.skills);
     into.grantedExpertise.push(...feature.grants.expertise);
     into.grantedTools.push(...feature.grants.tools);

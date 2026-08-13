@@ -24,11 +24,11 @@
 import { z } from "zod";
 import {
   AbilitySchema, ActionSchema, AttackBonusVariantSchema, DiceFormulaSchema, EffectGrantSchema,
-  ExtraDamageVariantSchema, HitDieSchema, RollModeVariantSchema, riderGate
+  ExtraDamageVariantSchema, GrantWhenSchema, HitDieSchema, RollModeVariantSchema, riderGate
 } from "@vtt/schemas";
 
 /** Re-exported so the rider gate vocabulary reads as one thing regardless of which package declares it. */
-export { ItemSlotSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, riderLayer, riderGate, type ItemSlot, type RiderTrigger, type RiderTriggerKind } from "@vtt/schemas";
+export { GrantWhenSchema, ItemSlotSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, riderLayer, riderGate, type ItemSlot, type RiderTrigger, type RiderTriggerKind } from "@vtt/schemas";
 
 /** Every identity in the content catalog is an open slug - never a closed enum (principle 3). */
 export const ContentIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(80);
@@ -152,6 +152,25 @@ export type FeatureAction = z.infer<typeof FeatureActionSchema>;
 /**
  * Flat things a feature simply hands the character. All open slugs (principle 3) so a homebrew
  * language, tool, or armor group needs no schema change.
+ *
+ * ONE OPTIONAL `when` GATES THE WHOLE BLOCK. The SRD prints grants under a condition constantly -
+ * `Belt of Dwarvenkind`'s Poison Resistance is "If you aren't a dwarf or duergar",
+ * `Helm of Brilliance`'s Fire Resistance is "As long as the helm has at least one ruby" - and until
+ * this field existed the only way to author either was UNCONDITIONALLY, which is an over-grant, so
+ * the content lanes correctly left them unauthored while `Boots of the Winterlands`' identical but
+ * UNGATED resistance shipped. That asymmetry is what this closes.
+ *
+ * WHY ONE GATE ON THE BLOCK rather than an array of blocks or a gate per list. Every consumer reads
+ * `grants.<list>` directly (`equipment-derivation.ts`'s `takeGrants`, `character-build.ts`'s
+ * `interpretFeature`, `choice-overrides.ts`, and `GrantsEditor` in the homebrew client), so an array
+ * would rewrite all four for a shape the SRD never needs: no printed grant mixes a gated and an
+ * ungated benefit inside ONE sentence - it prints two sentences, which is two records or two
+ * features. A record with no `when` behaves EXACTLY as it did before this field existed, and there
+ * is no migration, because `.optional()` with no default emits no key.
+ *
+ * THE GATE IS EVALUATED, NEVER ASSUMED. `GrantWhenSchema` admits only the trigger kinds a
+ * derivation can answer (static + dynamic gates); a `moment` or a `filter` is refused at authoring
+ * with the reason, because a gate that parses and is then ignored IS the over-grant.
  */
 export const FeatureGrantsSchema = z.object({
   skills: z.array(ContentIdSchema).max(20).default([]),
@@ -165,7 +184,12 @@ export const FeatureGrantsSchema = z.object({
   damageImmunities: z.array(ContentIdSchema).max(20).default([]),
   conditionImmunities: z.array(ContentIdSchema).max(20).default([]),
   /** Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. */
-  spells: z.array(z.object({ id: ContentIdSchema, level: z.number().int().min(0).max(9).optional(), alwaysPrepared: z.boolean().default(true), ability: AbilitySchema.optional() }).strict()).max(30).default([])
+  spells: z.array(z.object({ id: ContentIdSchema, level: z.number().int().min(0).max(9).optional(), alwaysPrepared: z.boolean().default(true), ability: AbilitySchema.optional() }).strict()).max(30).default([]),
+  /**
+   * The condition every list above applies under. ABSENT = unconditional, which is what every record
+   * written before this field meant and still means. See the header for why it gates the block.
+   */
+  when: GrantWhenSchema.optional()
 }).strict();
 
 /**

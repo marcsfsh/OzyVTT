@@ -5503,6 +5503,7 @@ Flat things a feature simply hands the character. All open slugs, so a homebrew 
 | `spells[].level` | integer (0–9) | no |  |
 | `spells[].alwaysPrepared` | boolean | no | Default: `true`. |
 | `spells[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
+| `when` | HomebrewRiderTrigger[] | no | The condition ALL ten lists above apply under. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed - static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always" |
 
 ### `HomebrewFeatureModifier`
 

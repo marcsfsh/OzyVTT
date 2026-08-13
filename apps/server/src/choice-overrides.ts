@@ -97,8 +97,28 @@ export function replaceableOffers(definition: ActorDefinition | undefined, libra
  */
 type GrantingRecord = Readonly<{
   id: string; name?: string;
-  grants?: Readonly<{ damageResistances?: readonly string[]; damageImmunities?: readonly string[] }>;
+  grants?: Readonly<{
+    damageResistances?: readonly string[]; damageImmunities?: readonly string[];
+    /** `FeatureGrantsSchema.when` - see `ungated` below for why this reader refuses a gated block. */
+    when?: readonly unknown[];
+  }>;
 }>;
+
+/**
+ * A gated grants block is NOT read here, deliberately.
+ *
+ * This function answers "what did the character RE-CHOOSE on their last short rest", and it runs
+ * inside the damage maths with no `RiderContext` in hand - there is no bearer state flattened here
+ * to evaluate a `while-armored` or a `while-hp-at-or-below` against. Applying the ids anyway would
+ * ignore the gate, which is an over-grant; so a gated option's defences simply do not arrive through
+ * the re-choice path. That fails CLOSED, and it costs nothing today because no shipped option
+ * carries a gate. The way to lift it is to hand this reader the derivation's `context`, which is
+ * already computed one call away in `applyDamageDetailed`.
+ *
+ * The same test is what keeps SUPPRESSION honest: a superseded option whose grants were gated was
+ * never baked into the definition, so there is nothing of it to subtract.
+ */
+const ungated = (record: GrantingRecord | undefined): boolean => (record?.grants?.when?.length ?? 0) === 0;
 type FeatureRef = Readonly<{ id: string; kind: "class" | "subclass" | "species" | "lineage" | "background" | "option"; sourceId: string }>;
 type FeatureLookup = (ref: FeatureRef) => GrantingRecord | undefined;
 
@@ -124,7 +144,7 @@ const EMPTY_OVERRIDE_DEFENSES: OverrideDamageDefenses = Object.freeze({
 });
 
 const defenceGrantsOf = (record: GrantingRecord | undefined) =>
-  [...(record?.grants?.damageResistances ?? []), ...(record?.grants?.damageImmunities ?? [])];
+  ungated(record) ? [...(record?.grants?.damageResistances ?? []), ...(record?.grants?.damageImmunities ?? [])] : [];
 
 /**
  * WHAT THE CHARACTER ACTUALLY CHOSE, resolved for the damage pipeline.
@@ -166,8 +186,8 @@ export function choiceOverrideDefenses(
     // The re-choice, resolved the same way the builder resolves an inline option: kind "option"
     // under its PARENT feature's id.
     const chosen = featureRecord({ kind: "option", sourceId: featureId, id: chosenId });
-    for (const id of chosen?.grants?.damageResistances ?? []) resistances.push(id);
-    for (const id of chosen?.grants?.damageImmunities ?? []) immunities.push(id);
+    for (const id of ungated(chosen) ? chosen?.grants?.damageResistances ?? [] : []) resistances.push(id);
+    for (const id of ungated(chosen) ? chosen?.grants?.damageImmunities ?? [] : []) immunities.push(id);
     for (const id of defenceGrantsOf(chosen)) {
       const type = normalizeDamageType(id);
       if (!sources.has(type)) sources.set(type, label);

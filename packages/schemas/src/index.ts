@@ -135,6 +135,17 @@ export function riderLayer(when: readonly RiderTrigger[]): "standing" | "conditi
 }
 
 /**
+ * The two rules that hold for EVERY `when` list, whatever it gates. Extracted so the grant gate
+ * below re-uses them instead of restating them - a second copy is how the two would drift.
+ */
+function checkSharedTriggerRules(triggers: readonly RiderTrigger[], context: z.RefinementCtx): void {
+  const identity = triggers.find((trigger) => trigger.type === "while-character-is" && trigger.classIds.length === 0 && trigger.speciesIds.length === 0);
+  if (identity) context.addIssue({ code: z.ZodIssueCode.custom, message: "`while-character-is` needs at least one class or species." });
+  const duplicate = triggers.find((trigger, index) => triggers.findIndex((other) => other.type === trigger.type) !== index);
+  if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.` });
+}
+
+/**
  * An AND-list of at most four triggers, with at most ONE moment. A rider fires at one moment, not
  * two, and a filter with no moment is an authoring mistake (a `versus-size` on a rider that never
  * sees a target), not "always" - so both are rejected with the sentence that explains them.
@@ -147,11 +158,34 @@ export const RiderWhenSchema = z.array(RiderTriggerSchema).max(4).superRefine((t
   if (kinds.includes("filter") && !kinds.includes("moment")) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "A filter needs a moment to narrow - add the roll or event it applies to." });
   }
-  const identity = triggers.find((trigger) => trigger.type === "while-character-is" && trigger.classIds.length === 0 && trigger.speciesIds.length === 0);
-  if (identity) context.addIssue({ code: z.ZodIssueCode.custom, message: "`while-character-is` needs at least one class or species." });
-  const duplicate = triggers.find((trigger, index) => triggers.findIndex((other) => other.type === trigger.type) !== index);
-  if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.` });
+  checkSharedTriggerRules(triggers, context);
 }).default([]);
+
+/**
+ * The gate a GRANT may carry - the same AND-list, narrowed to the two kinds that can be answered
+ * WITHOUT a roll in progress.
+ *
+ * A grant is a STANDING FACT about the sheet ("you have Resistance to Poison"), collected when the
+ * derivation runs, not when a die is thrown. A `static-gate` or a `dynamic-gate` is exactly what
+ * that collection can evaluate: both read the bearer's own state and nothing else. A `moment` and a
+ * `filter` cannot be - by the time `on-attack-roll` is knowable the grant has already been collected
+ * and handed to the damage maths, so honouring one is impossible and IGNORING one is an over-grant,
+ * which is the failure this gate exists to end. So they are REFUSED at authoring, by name, with the
+ * way out in the sentence, rather than parsing and quietly meaning "always".
+ *
+ * NO `.default([])`, unlike `RiderWhenSchema`: it is used as `.optional()` so a record authored
+ * before this existed parses to exactly the object it parsed to before, with no `when` key at all.
+ */
+export const GrantWhenSchema = z.array(RiderTriggerSchema).min(1).max(4).superRefine((triggers, context) => {
+  const offender = triggers.find((trigger) => RIDER_TRIGGER_KINDS[trigger.type] === "moment" || RIDER_TRIGGER_KINDS[trigger.type] === "filter");
+  if (offender) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `A grant is a standing fact, so it cannot wait for a roll: "${offender.type}" is only knowable during one, and the grant has been collected before any roll starts. Gate it on a state instead - attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with, while-effect-tag, while-hp-at-or-below, while-condition - or move the mechanic to a modifier, where a moment IS read.`
+    });
+  }
+  checkSharedTriggerRules(triggers, context);
+});
 
 /**
  * The two gate fields every rider carries. `scope` has a DERIVED default so a GM never sets it: on

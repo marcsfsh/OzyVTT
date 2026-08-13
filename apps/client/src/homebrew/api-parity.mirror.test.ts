@@ -51,7 +51,7 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
   it("pins the walk — the plan's two schema-intrinsic counts, and this file's own expansion", () => {
     // 162/709 are properties of the schemas (plan §2.3); the other four are properties of THIS
     // canonicaliser, pinned on the day it was written so the next agent measures the same thing.
-    expect(stats).toEqual({ objectSchemas: 162, declaredKeys: 709 });
+    expect(stats).toEqual({ objectSchemas: 162, declaredKeys: 710 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,
@@ -62,7 +62,16 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
     // in the same commit — which is precisely the "re-pin the counts above" the row's own direction-2
     // failure demands. One address, because the key is a leaf: the array's members have no schema of
     // their own for the walk to descend into.
-    }).toEqual({ asked: 4660, covered: 2818, forced: 106, open: 1736 });
+    //
+    // **709 → 710 keys / 4660 → 5078 asked / 1736 → 2154 open, 2026-08-13 (`W3`).** ONE declared key
+    // landed — `FeatureGrantsSchema.when`, the condition a granted resistance, immunity or
+    // proficiency applies under — and it costs 418 addresses because the walk descends the whole
+    // `RiderTrigger` union at every one of the five `grants` mounts. Every one of the 418 is OPEN and
+    // every one lands inside an exemption row that already existed: `GrantsEditor` is the bespoke
+    // eleven-arrays component with no `FieldDef` anywhere, so the probe is blind to the entire block
+    // and always has been (`RIDER_EXEMPT`). The test below proves that in both directions, which is
+    // why no row was added here — the editor's gate control is a client unit, not this one's.
+    }).toEqual({ asked: 5078, covered: 2818, forced: 106, open: 2154 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {

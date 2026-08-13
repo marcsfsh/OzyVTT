@@ -99,15 +99,25 @@
  *     there is no display for an item to reach. **Needs: a senses/speed model an item can layer on.
  *     Unit: NONE YET.**
  *
- * W3. `grants.*` CARRIES NO GATE. `FeatureGrantsSchema` (`src/character-content.ts:156`) is a flat
- *     object of id lists with no `riderGate` - unlike `FeatureModifierSchema`, where every variant
- *     spreads `when` + `scope`. So a resistance, an immunity or a proficiency the SRD prints under a
- *     CONDITION can only be authored unconditionally, which is an over-grant. That is why
- *     `Belt of Dwarvenkind`'s Poison Resistance ("If you aren't a dwarf or duergar") and
- *     `Helm of Brilliance`'s Fire Resistance ("As long as the helm has at least one ruby") are
- *     absences while `Boots of the Winterlands`' identical-looking resistance is authored: those two
- *     print a gate and this one does not. **Needs: `riderGate` on `FeatureGrantsSchema` and a
- *     collector that honours it. Unit: NONE YET.**
+ * W3. `grants.*` CARRIES A GATE - **CLOSED 2026-08-13.** `FeatureGrantsSchema` now takes one
+ *     optional `when` over the whole block (`src/character-content.ts`), and it is EVALUATED:
+ *     `equipment-derivation.ts`'s `takeGrants` asks `gatePasses` (`@vtt/rules-5e/riders.ts`, the
+ *     same `collectRiders` every other rider goes through) before it takes anything, the builder
+ *     refuses to BAKE a gated block and `deriveEquipment` picks it up per read instead, and a
+ *     `moment` or a `filter` is refused at authoring rather than parsed and ignored. So a resistance,
+ *     an immunity or a proficiency printed under a state the sheet can answer is now authorable
+ *     without over-granting. Proof: `apps/server/test/grant-gates.test.ts`.
+ *
+ *     **THE TWO ITEMS BELOW ARE STILL ABSENCES, AND FOR THE OTHER HALF OF THEIR GATE.** W3 was never
+ *     the whole blocker on either, which this line used to imply:
+ *       - `Belt of Dwarvenkind` prints *"If you aren't a dwarf or duergar"* - a NEGATED species gate.
+ *         `while-character-is` has `classIds` + `speciesIds` and no `present` flag, so the negation
+ *         is inexpressible. **Needs: a `present` boolean on `while-character-is`, and a ruling on
+ *         whether it fails OPEN or CLOSED for a sheet with no recorded species. Unit: NONE YET.**
+ *       - `Helm of Brilliance` prints *"As long as the helm has at least one ruby"* - a COUNT of gems
+ *         on the item. No trigger reads item state, and there is no gem or charge model to read.
+ *         **Needs: an item-charge/component model. Unit: NONE YET.**
+ *     `Boots of the Winterlands`' resistance is still the contrast: it prints no gate at all.
  *
  * W4. A SAVE CANNOT BE NARROWED TO WHAT IT IS AGAINST. The `RiderTrigger` filters narrow a save by
  *     the ABILITY rolled (`ability-is`) or by a condition the TARGET already has
@@ -290,7 +300,8 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    *       this list used to apply to those two only. So it is W2 and W3 together, not W2 alone.
    *   "Resilience. You have Resistance to Poison damage. You also have Advantage on saving throws you
    *       make to avoid or end the Poisoned condition" - both printed under *"If you aren't a dwarf
-   *       or duergar"*, which W3 cannot gate, and the save half is W4 on top of that.
+   *       or duergar"*. `grants.when` (W3, closed) can now carry a gate, but not a NEGATED species
+   *       one, so the resistance half waits on W3's remaining ruling; the save half is W4 besides.
    *   "while attuned to the belt, you have a 50 percent chance each day at dawn of growing a full
    *       beard if you can grow one, or a thicker beard if you already have one" - review added this
    *       one; the entry omitted it entirely. It is a per-day percentage roll with a cosmetic
@@ -354,8 +365,9 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * degrees Fahrenheit or lower without any additional protection", which the ABSENT list below
    * already carries. It was cut here with a fabricated full stop.)
    *
-   * Unconditional in the printed text, which is what separates it from the two resistances W3
-   * refuses: nothing gates it on a species, a gem or a state. The reader is the damage pipeline
+   * Unconditional in the printed text, which is what separates it from the two resistances still
+   * refused above: nothing gates it on a species, a gem or a state, so it needs no `grants.when` and
+   * has none - the record is byte-identical either side of W3. The reader is the damage pipeline
    * (`hit-points.ts:181`), and it names the item on the damage line.
    *
    * ABSENT: "can tolerate temperatures of 0 degrees Fahrenheit or lower" (no environment model) and
@@ -583,8 +595,9 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    *       a helm resolves to the BEARER (C7b's L4) and would burn every weapon they swing, with no
    *       toggle for the Magic action that lights it and the Bonus Action that puts it out.
    *   "Ruby Resistance. As long as the helm has at least one ruby, you have Resistance to Fire
-   *       damage" - W3. The gate is a COUNT of gems the vocabulary cannot hold, and `grants.*` takes
-   *       no `when`, so it would be permanent Fire resistance on a very-rare helm.
+   *       damage" - W3's remaining half. `grants.when` exists now, but the gate is a COUNT of gems on
+   *       the item and no trigger reads item state, so authoring it is still permanent Fire
+   *       resistance on a very-rare helm.
    *   "Spells ... using one of the helm's gems of the specified type as a component" - the cost is a
    *       gem, not a charge, and the gem is destroyed; W5's shape with no pool to spend.
    *   "Roll 1d20 if you are wearing the helm and take Fire damage ... On a roll of 1, the helm ... is

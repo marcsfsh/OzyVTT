@@ -1,8 +1,8 @@
 import type { Actor } from "@vtt/domain";
 import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 import {
-  abilityModifier, armorWeightOf, collectRiders, effectiveSlot, sumRiders, weaponAbilityModifierFrom,
-  type ArmorWeight, type RiderAbility, type RiderCarrier, type RiderContext, type RiderModifier, type ResolvedRider
+  abilityModifier, armorWeightOf, collectRiders, effectiveSlot, gatePasses, sumRiders, weaponAbilityModifierFrom,
+  type ArmorWeight, type RiderAbility, type RiderCarrier, type RiderContext, type RiderModifier, type RiderTrigger, type ResolvedRider
 } from "@vtt/rules-5e";
 
 /**
@@ -56,6 +56,10 @@ import {
  * (armor, weapons, damageImmunities, conditionImmunities) were authored in the homebrew editor,
  * stored on the record, and dropped here without a trace - the reading surface was the whole
  * silence. Every key below has a consumer; see `takeGrants` and its callers.
+ *
+ * `grants.when` is the ELEVENTH key and the only one that is not a list of things to hand over: it
+ * is the condition the other ten apply under (`FeatureGrantsSchema.when`). Absent on every record
+ * written before it existed, and absent means unconditional, so `takeGrants` behaves identically.
  */
 export type RiderBlockLike = Readonly<{
   modifiers?: readonly RiderModifier[];
@@ -64,6 +68,7 @@ export type RiderBlockLike = Readonly<{
     languages?: readonly string[]; saves?: readonly string[]; damageResistances?: readonly string[];
     armor?: readonly string[]; weapons?: readonly string[];
     damageImmunities?: readonly string[]; conditionImmunities?: readonly string[];
+    when?: readonly RiderTrigger[];
   }>;
   actions?: readonly RiderActionLike[];
   /** Standing effects the item carries while active (see `itemEffectCarrier`). */
@@ -496,6 +501,32 @@ function characterFeatureCarriers(definition: ActorDefinition | undefined, catal
   return carriers;
 }
 
+/**
+ * The character's own feats and features whose GRANTS BLOCK CARRIES A GATE - the records the
+ * builder deliberately did not bake.
+ *
+ * Only gated blocks, and that filter is the whole correctness argument: an ungated block is already
+ * inside `definition.proficiencies` / `damageResistances` / … from build time, so taking it again
+ * here would count a resistance twice on the damage line and print the feature's name beside an
+ * innate defence it did not add. Because no shipped record carries a `when` on its grants, this
+ * function returns an empty array for every one of them and the derivation is unchanged.
+ *
+ * Same fail-open as its two neighbours above: a homebrew feature the GM deleted, or one renamed out
+ * from under a stored sheet, contributes nothing rather than throwing.
+ */
+function characterGatedGrants(definition: ActorDefinition | undefined, catalog: EquipmentCatalog): readonly FeatureRecordLike[] {
+  const gated: FeatureRecordLike[] = [];
+  for (const held of definition?.character?.feats ?? []) {
+    const record = catalog.featRecord?.(held.id);
+    if ((record?.feature.grants?.when?.length ?? 0) > 0) gated.push({ ...record!.feature, id: record!.id, name: record!.name });
+  }
+  for (const held of definition?.character?.features ?? []) {
+    const record = catalog.featureRecord?.(held);
+    if ((record?.grants?.when?.length ?? 0) > 0) gated.push(record!);
+  }
+  return gated;
+}
+
 /** Which of a feat's authored riders this carrier may hand to the collector. */
 function ridesOnTheBearer(modifier: RiderModifier): boolean {
   // Already inside the definition's own numbers - see BUILDER_BAKED_MODIFIER_TYPES.
@@ -543,10 +574,11 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     if (itemIsActive(item, record)) active.push(entry);
   }
   // A character's own feats AND features carry riders whether or not they are holding anything, so
-  // the nothing-equipped shortcut has to clear all three sources before it returns the empty block.
+  // the nothing-equipped shortcut has to clear all FOUR sources before it returns the empty block.
   const featCarriers = characterFeatCarriers(definition, catalog);
   const featureCarriers = characterFeatureCarriers(definition, catalog);
-  if (equipped.length === 0 && featCarriers.length === 0 && featureCarriers.length === 0) return EMPTY_DERIVATION;
+  const gatedGrants = characterGatedGrants(definition, catalog);
+  if (equipped.length === 0 && featCarriers.length === 0 && featureCarriers.length === 0 && gatedGrants.length === 0) return EMPTY_DERIVATION;
   /** Feats the character already HOLDS - so an item that grants one they have adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
 
@@ -566,9 +598,31 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   const weaponProficiencies: Sourced[] = [];
   const itemEffectTags: string[] = [];
 
-  const takeGrants = (block: RiderBlockLike, itemId: string) => {
+  /**
+   * WHAT A GATED GRANT IS EVALUATED AGAINST, and why it is computed HERE rather than reusing the
+   * `context` built at the end of this function.
+   *
+   * That later context folds item-GRANTED training and item effect tags back in, because a rider
+   * gated on "proficient with martial weapons" should fire for training the gauntlets handed over.
+   * A grant's gate cannot read that context without a circularity: the grants are what produce it.
+   * So a grant's gate sees the bearer's OWN sheet and live state - armour worn, shield, class,
+   * species, conditions, hit-point fraction, effects, the training the definition itself records -
+   * and NOT what another grant handed over in this same recompute.
+   *
+   * That is a deliberate fail-CLOSED: a grant chained off another grant does not fire, which is an
+   * under-grant, and an under-grant is visible at the table while an over-grant is not. It also
+   * makes a cycle structurally impossible rather than merely unlikely.
+   */
+  const gateContext = bearerContext(actor, definition, equipped, { weapons: [], armor: [], tools: [], effectTags: [] });
+
+  /** Returns whether the block's gate held, so a caller can skip provenance for one that did not. */
+  const takeGrants = (block: RiderBlockLike, itemId: string): boolean => {
     const grants = block.grants;
-    if (!grants) return;
+    if (!grants) return false;
+    // THE GATE. Absent or empty = unconditional, the identical path every pre-existing record takes.
+    // `gatePasses` is the shared collector, so a trigger this build cannot evaluate refuses the whole
+    // block rather than granting it - see its header.
+    if (!gatePasses(grants.when, gateContext, itemId)) return false;
     for (const id of grants.skills ?? []) skills.push({ id, proficiency: "proficient", sourceItemId: itemId });
     for (const id of grants.expertise ?? []) skills.push({ id, proficiency: "expertise", sourceItemId: itemId });
     for (const id of grants.saves ?? []) saves.push({ id, sourceItemId: itemId });
@@ -580,6 +634,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     for (const id of grants.conditionImmunities ?? []) conditionImmunities.push({ id, sourceItemId: itemId });
     for (const id of grants.armor ?? []) armorProficiencies.push({ id, sourceItemId: itemId });
     for (const id of grants.weapons ?? []) weaponProficiencies.push({ id, sourceItemId: itemId });
+    return true;
   };
 
   /** An item's own effects, read as standing riders (see `ItemEffectLike`). */
@@ -631,6 +686,24 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       }
     }
   }
+  // GATED grants on the character's OWN feats and features land here rather than in the builder.
+  //
+  // `interpretFeature` (`character-build.ts`) BAKES an ungated grants block into the definition at
+  // build time, which is right: an ungated grant never comes back off. It cannot bake a GATED one -
+  // the gate reads live actor state (conditions, hit points, what is worn) and the build has no
+  // actor at all - so it skips those, and this is where they are read instead. The partition is
+  // exact and it is what rules out double counting: the builder takes every block with no `when`,
+  // this loop takes every block that has one, and no block is both.
+  //
+  // The source id is `feature:<id>` rather than an inventory id, and it earns a `sources` row so a
+  // halved damage line and the sheet's skill tooltip name the FEATURE ("Dwarf Resilience") exactly
+  // as they name an item. It can never collide with an item: `gatePasses` looks it up in
+  // `attunedItemIds`, where it is correctly absent, so `attuned` on a feature's gate fails closed.
+  for (const record of gatedGrants) {
+    const sourceId = `feature:${record.id}`;
+    if (takeGrants(record, sourceId)) sources.push({ itemId: sourceId, itemName: record.name, summary: summarise(record) });
+  }
+
   // Weapon attacks come from the EQUIPPED list, not the active one (see above). Item-granted weapon
   // training is collected above, so a gauntlet that grants martial weapons pays the proficiency
   // bonus on the axe in the same recomputation.
@@ -693,7 +766,7 @@ function amountsWithClass(riders: readonly ResolvedRider[], type: string) {
     ? [{ amount: rider.modifier.amount ?? 0, ...(rider.modifier.classId ? { classId: rider.modifier.classId } : {}) }] : []);
 }
 
-function summarise(record: EquipmentRecordLike): string {
+function summarise(record: RiderBlockLike & Readonly<{ grantsFeatIds?: readonly string[] }>): string {
   const parts = (record.modifiers ?? []).map((modifier) => modifier.type);
   if (record.grants) parts.push("proficiencies");
   if ((record.effects?.length ?? 0) > 0) parts.push("effects");

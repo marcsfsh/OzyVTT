@@ -265,6 +265,42 @@ export function collectRiders(carriers: readonly RiderCarrier[], context: RiderC
   return collected;
 }
 
+/**
+ * The probe modifier `gatePasses` hands the collector. Private, and it never escapes this function:
+ * it is built, collected and discarded inside one call, so no consumer can ever see the type.
+ */
+const GATE_PROBE_TYPE = "__gate-probe";
+
+/**
+ * DOES A STANDING GATE HOLD RIGHT NOW - the question a GRANT asks, answered by the collector above
+ * rather than by a second evaluator.
+ *
+ * `FeatureGrantsSchema.when` gates a flat list of ids (a resistance, an immunity, a proficiency)
+ * instead of a numeric rider, so it has no `RiderModifier` to hang on. The temptation is to write a
+ * small `when.every(passes)` loop next to the collection site - and that is exactly how items and
+ * feats drift apart, because the loop would not know about `gatesOf`'s `whileArmored` normalisation,
+ * about `scopeOf`, about the standing/momentary split, or about `passes`' fail-closed `default`. So
+ * this wraps the authored list in a throwaway carrier and asks `collectRiders` the same question it
+ * answers for every other rider: does this survive the STANDING pass?
+ *
+ * That reuse buys the fail-closed property for free and twice over. An unrecognised trigger fails
+ * closed in `passes`; a `moment` or a `filter` that somehow reached here (the authoring schema
+ * refuses both) is dropped by the standing pass and the gate reads FALSE - no grant - rather than
+ * leaking through as "always". A gate that cannot be checked never grants.
+ *
+ * `sourceItemId` binds `attuned` to the right item. Pass the ITEM's id for an item's grants; pass
+ * nothing (or an id no inventory row has) for a feature's, where `attuned` correctly cannot hold.
+ */
+export function gatePasses(when: readonly RiderTrigger[] | undefined, context: Omit<RiderContext, "moment">, sourceItemId?: string): boolean {
+  if (when === undefined || when.length === 0) return true;
+  const carrier: RiderCarrier = {
+    label: "",
+    modifiers: [{ type: GATE_PROBE_TYPE, when, scope: "bearer" }],
+    ...(sourceItemId !== undefined ? { sourceItemId } : {})
+  };
+  return collectRiders([carrier], { ...context, moment: null }).length > 0;
+}
+
 /** Sum the `amount` of every collected rider of one type (the numeric families). Signed, so a curse subtracts. */
 export function sumRiders(riders: readonly ResolvedRider[], type: string): number {
   return riders.reduce((total, rider) => rider.modifier.type === type ? total + (rider.modifier.amount ?? 0) : total, 0);
