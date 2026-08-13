@@ -13,7 +13,62 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-13 — a harvested absence is authored to the check the ENGINE rolls, or it stays an absence
+
+**Context.** Two vocabulary gaps closed the same day: `roll-mode {roll: "check"}` gained a consumer
+(`apps/server/src/ability-checks.ts`) and `FeatureGrantsSchema` gained an optional `when`. The
+magic-item lanes had recorded, item by item, which absences were waiting on each. This entry is the
+ruling the harvest of those records needed, because "the limit closed, so author them all" is the
+over-grant the named-absence contract exists to prevent.
+
+**0. There are exactly FIVE checks the server throws**, and that list is what an author reaches for:
+Hide, Influence, Search, Study (`BUILTIN_CHECKS`) and Escape a Grapple. A clause naming any other
+check — climbing a rope, controlling a Sphere, examining something an inch away — has nothing to
+attach to however good the vocabulary gets.
+
+**1. Author to the narrow the engine actually passes, never to the printed skill.** `BUILTIN_CHECKS`
+(`action-resolution.ts`) carries a `skill` on **Hide alone** — `{dex, stealth}`. Influence, Search and
+Study are bare `{cha}` / `{wis}` / `{int}`, and Escape a Grapple narrows to whichever of
+`{str, athletics}` / `{dex, acrobatics}` won the modifier comparison. `ability-is` and `skill-is` both
+fail CLOSED against a narrow missing their key, so a rider gated `skill-is: ["perception"]` parses,
+ships and fires **nowhere** — the same silence the absence recorded, wearing a rider's clothes. So
+"Advantage on Wisdom (Perception) checks" is authored `ability-is: ["wis"]` and reaches Search.
+
+**2. The approximation that buys is disclosed, and it is the limit of what gets authored.** The
+engine's Search does not separate Perception from the Insight, Medicine and Survival the SRD's Search
+action also admits. `sentinel-shield` and `rod-of-alertness` print that clause with **no qualifier**
+and are authored. `robe-of-eyes` and `eyes-of-the-eagle` print *"that rely on sight"* — a narrowing no
+trigger expresses — and stay absences; the Robe's own Drawbacks give the wearer the **Blinded**
+condition, so authoring it unqualified would hand a blinded wearer advantage on sight-based
+Perception. Same rule refused `belt-of-dwarvenkind` (Persuasion *"to interact with dwarves and
+duergar"*), `eyes-of-minute-seeing` (*"within that range"*, one foot), `talisman-of-the-sphere`
+(controlling a Sphere the engine does not hold) and `quarterstaff-of-the-acrobat` (two of the
+weapon's three forms). Alternatives and their costs are in the modules at each entry.
+
+**3. An absence whose stated reason has been fixed is a false record even when it stays unauthored.**
+Nineteen records cited one of the two closed limits. **Seven became riders** — `boots-of-elvenkind`,
+`cloak-of-elvenkind`, `cloak-of-the-bat` (new entries), `sentinel-shield`, `rod-of-alertness`,
+`champion.remarkable-athlete` (a second modifier beside an initiative rider each already carried) and
+`mindless-rage`. **Twelve were rewritten** to name the reason that actually survives, including three
+that had MIS-cited the limit: `energy-bow`'s escape DC is an item-action gap, not a roll-mode one,
+and `hat-of-many-spells` and `sphere-of-annihilation` want a check's OUTCOME as a gate, which
+reaching a check's die never was. Over the 268 magic-item rows the counts moved 87 → **90 authored** and 181 →
+**178 absences** (C7c 18 → 21; C7a and C7b each gained a second modifier on a row already authored,
+so their counts held; C7d gained nothing). The two class records are outside that population.
+
+**4. `grants.when` has no magic-item carrier at all, and one carrier in the whole SRD.** Measured
+across all 268 rows: 25 print a Resistance or Immunity and every one is either already authored
+ungated, or blocked by something the gate does not touch. The corpus's only gated grant is a class
+feature — Path of the Berserker's `mindless-rage`, *"Immunity to the Charmed and Frightened conditions
+while your Rage is active"*, gated `while-effect-tag: ["raging"]` on the tag Rage's own effect already
+writes. Authored there. **Consequence for the far end:** no shipped record prints a gated
+*resistance*, so the gate's shipped proof ends at a refused condition rather than a halved total; the
+halving stays proved on a parsed record in `apps/server/test/grant-gates.test.ts`.
+
 ## 2026-08-12 — the content program's own guards: an absence is a test, and a cast rule belongs to the program
+
+> **COUNTS MOVED 2026-08-13** — see the entry above. The three decisions below stand unchanged; the
+> population they were measured over is now 90 authored / 178 prose-only.
 
 **Context.** C8 closes the content program (C7a–C7d, 268 magic-item rows, 87 authored entries, 181
 prose-only records) with an adversarial pass hunting two failure modes and nothing else: a rider

@@ -212,6 +212,42 @@ export const barbarian: ClassMechanicsModule = {
           damage: [],
           save: { ability: "wis", dc: { base: 8, ability: "str", proficiencyBonus: true } }
         }]
+      },
+      /**
+       * MINDLESS RAGE - "You have Immunity to the Charmed and Frightened conditions while your Rage
+       * is active."
+       *
+       * **THE ONE GATED GRANT IN THE WHOLE SRD, AND IT WAS AN ABSENCE UNTIL 2026-08-13.** This entry
+       * used to read *"`grants.conditionImmunities` carries no `when` - `riderGate` is on the
+       * MODIFIER vocabulary, not on `FeatureGrantsSchema` - so authoring it would make a level-6
+       * Berserker permanently immune."* That is now false: `FeatureGrantsSchema` takes one optional
+       * `when` over the whole block, and `equipment-derivation.ts` evaluates it per read
+       * (`characterGatedGrants` -> `takeGrants` -> `gatePasses`) instead of the builder baking it.
+       *
+       * THE GATE IS THE TAG RAGE ALREADY WRITES. `rage`'s action grants an effect with
+       * `tags: ["raging"]` (see the Rage record above, where that tag is already load-bearing for
+       * `ActionSchema.requiresEffectTag`), and `bearerContext` folds `actor.effects[].tags` into
+       * `RiderContext.effectTags`, which is what `while-effect-tag` reads. So nothing new is stored:
+       * the immunity is derived from live actor state on every recompute, and it ends the instant the
+       * Raging effect does.
+       *
+       * FAIL-CLOSED, WHICH IS THE RIGHT DIRECTION HERE. `gatePasses` refuses the block outright if a
+       * trigger cannot be evaluated, so a Berserker whose Rage is not running is exactly as
+       * susceptible to Frightened as any other character - the shipped behaviour before this record
+       * existed. Reader: `actor-conditions.ts` `setCondition`, which narrates the skip rather than
+       * applying the condition, and names the FEATURE on the line the table reads.
+       *
+       * WHAT STAYS PROSE: "If you're Charmed or Frightened when you enter your Rage, the condition
+       * ends on you." A grant PREVENTS a condition arriving; nothing in the vocabulary REMOVES one
+       * already on the actor (C7d records the identical gap on `potion-of-poison`'s antidote shape),
+       * and `EffectGrant` has no condition-removal modifier. Entering Rage while Frightened therefore
+       * leaves the condition standing for the GM to clear. Unit: NONE YET.
+       */
+      "mindless-rage": {
+        grants: {
+          conditionImmunities: ["charmed", "frightened"],
+          when: [{ type: "while-effect-tag", tags: ["raging"] }]
+        }
       }
       /**
        * NOT AUTHORED, and each for a stated reason rather than for want of attention:
@@ -220,10 +256,6 @@ export const barbarian: ClassMechanicsModule = {
        *     printed column. `extra-damage` takes a fixed `formula` and neither it nor the effect-side
        *     `damage-bonus` can read a column, so this is the same call the Rage record already makes
        *     about Rage Damage: left prose rather than authored wrong.
-       *   - `mindless-rage` grants Immunity to Charmed and Frightened *while your Rage is active*.
-       *     `grants.conditionImmunities` carries no `when` - `riderGate` is on the MODIFIER
-       *     vocabulary, not on `FeatureGrantsSchema` - so authoring it would make a level-6 Berserker
-       *     permanently immune. See the vocabulary note in the Stage-4 report.
        *   - `retaliation` is a Reaction to "make one melee attack ... using a weapon or an Unarmed
        *     Strike". The weapon is whatever the character is holding, so an authored action would
        *     have neither an attack bonus nor damage - a button that rolls nothing.

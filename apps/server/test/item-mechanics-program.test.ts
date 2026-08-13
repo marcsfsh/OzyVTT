@@ -8,6 +8,7 @@ import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@
 // the same import the four lane tests make, for the same reason: this file's subject IS the lane list.
 import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { builtinAction } from "../src/builtin-actions.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
@@ -131,7 +132,7 @@ const LANES: ReadonlyArray<{
     owns: (row) => ["weapon", "armor", "shield", "ammunition"].includes(row.category) },
   { lane: "C7b", module: "wands-rods-rings.ts", rows: 57, authored: 27,
     owns: (row) => ["wand", "staff", "rod", "ring"].includes(row.category) || row.id === "spell-scroll" },
-  { lane: "C7c", module: "worn-wondrous.ts", rows: 56, authored: 18,
+  { lane: "C7c", module: "worn-wondrous.ts", rows: 56, authored: 21,
     owns: (row) => row.category === "wondrous-item" && WORN_SLOTS.includes(row.slot ?? "") },
   { lane: "C7d", module: "carried-and-potions.ts", rows: 95, authored: 18,
     owns: (row) => ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") && row.id !== "spell-scroll" }
@@ -171,12 +172,19 @@ describe("the content program: every prose-only item carries a recorded absence"
     for (const id of authored) expect(mine.some((row) => row.id === id), `${lane.lane} authors ${id}, which is not one of its own rows`).toBe(true);
   });
 
-  it("walks a real population - 87 authored and 181 absences over the four lanes", () => {
+  it("walks a real population - 90 authored and 178 absences over the four lanes", () => {
     // The non-vacuity anchor for the sweep above: if these numbers ever go to zero the per-lane
     // checks are satisfied trivially and this is what says so.
+    //
+    // WAS 87/181 UNTIL 2026-08-13. The harvest that followed `roll-mode {roll: "check"}` getting a
+    // consumer moved exactly three rows, all C7c's and all the same sentence - `boots-of-elvenkind`,
+    // `cloak-of-elvenkind`, `cloak-of-the-bat`, *"Advantage on Dexterity (Stealth) checks"*. C7a and
+    // C7b each gained a SECOND modifier on a row they already authored (`sentinel-shield`,
+    // `rod-of-alertness`), which moves no count here, and C7d gained nothing: five of its rows cited
+    // the closed limit and every one of them had a second reason that outlived it.
     const authored = ITEM_MECHANICS_LANES.reduce((total, lane) => total + Object.keys(lane.entries).length, 0);
-    expect(authored).toBe(87);
-    expect(ROWS.length - authored).toBe(181);
+    expect(authored).toBe(90);
+    expect(ROWS.length - authored).toBe(178);
   });
 });
 
@@ -271,6 +279,55 @@ describe("the content program: the rider families held only by a bundle assertio
     for (const id of ["sentinel-shield", "weapon-of-warning", "rod-of-alertness"]) {
       expect(initiativeRollMode(stateWith([picked(id)]), IDS.hero, () => definition, catalog), `${id}: the authored advantage did not reach initiativeRollMode`).toBe("advantage");
       expect(initiativeRollMode(stateWith([picked(id, { equipped: false })]), IDS.hero, () => definition, catalog), `${id}: unequipping must be the un-grant`).toBe("normal");
+    }
+  });
+
+  /**
+   * THE HARVEST'S SECOND FAR END, AND IT SPANS TWO LANES - which is why it is here rather than in
+   * either. `sentinel-shield` (C7a) and `rod-of-alertness` (C7b) print the SAME sentence,
+   * *"Advantage on ... Wisdom (Perception) checks"*, and both had to be authored to the ABILITY
+   * rather than the skill: `BUILTIN_CHECKS.search` is `{label: "Wisdom (Search)", ability: "wis"}`
+   * with no `skill` key at all, and `skill-is` fails CLOSED against a narrow that carries none. A
+   * `skill-is: ["perception"]` rider on either row would parse, ship, and fire on nothing - the exact
+   * silence both modules recorded as an absence for two rounds.
+   *
+   * The negative control is the load-bearing half: the SAME rider must leave Hide and Study alone,
+   * or "author to the ability" would mean "advantage on every check the engine rolls".
+   */
+  it("Wisdom (Perception) advantage reaches the SEARCH die on both its carriers, and no other check", () => {
+    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}) => {
+      const definition = definitionOf();
+      const state = fight(stateWith([picked(id, over)]));
+      const resolution = resolveDefinitionAction(state, builtinAction("search")!, {
+        actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`, builtin: true
+      }, deps([6, 19], definition));
+      return { resolution, formula: state.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula };
+    };
+
+    // Wis 10 = +0, so the total IS the die and there is nowhere for a bonus to hide.
+    for (const [n, id, name] of [[30, "sentinel-shield", "Sentinel Shield"], [31, "rod-of-alertness", "Rod of Alertness"]] as const) {
+      const worn = searchWith(id, n);
+      expect(worn.resolution.check, `${id}: Search did not keep the higher die`).toMatchObject({ skill: "Wisdom (Search)", naturalRoll: 19, total: 19 });
+      expect(worn.formula).toBe("2d20kh1+0");
+      expect(worn.resolution.rollMode).toEqual({ mode: "advantage", advantage: [name], disadvantage: [] });
+
+      // THE CONTROL, and for the Rod it is ATTUNEMENT rather than the strap: `picked` sets `attuned`
+      // from the row's own `attunement.required`, so dropping it is the SRD's own gate.
+      const off = searchWith(id, n + 10, id === "rod-of-alertness" ? { attuned: false } : { equipped: false });
+      expect(off.resolution.check, `${id}: taking it off must be the un-grant`).toMatchObject({ naturalRoll: 6, total: 6 });
+      expect(off.formula).toBe("1d20+0");
+      expect(off.resolution.rollMode).toBeUndefined();
+    }
+
+    // AND IT NARROWS. `ability-is: ["wis"]` must not touch Hide (dex) or Study (int).
+    for (const [n, actionId, formula] of [[50, "hide", "1d20+2"], [51, "study", "1d20+3"]] as const) {
+      const definition = definitionOf();
+      const state = fight(stateWith([picked("sentinel-shield")]));
+      const resolution = resolveDefinitionAction(state, builtinAction(actionId)!, {
+        actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-0000000000${n}`, builtin: true
+      }, deps([6, 19], definition));
+      expect(resolution.rollMode, `${actionId} must not see a Wisdom-narrowed rider`).toBeUndefined();
+      expect(state.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe(formula);
     }
   });
 

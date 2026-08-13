@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { setCondition } from "../src/actor-conditions.js";
 import { importActorDefinition } from "../src/actor-roster.js";
+import { builtinAction } from "../src/builtin-actions.js";
+import { addEffect, endEffect } from "../src/effects.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { criticalThreshold, effectiveActions } from "../src/effective-actions.js";
@@ -331,6 +334,80 @@ describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
   });
 });
 
+/**
+ * MINDLESS RAGE - "You have Immunity to the Charmed and Frightened conditions while your Rage is
+ * active."
+ *
+ * **THE HARVEST'S GATED-GRANT FAR END, and the only carrier in the whole SRD.** This feature was a
+ * named absence in `scripts/class-mechanics/barbarian.ts` for one reason - *"`grants.conditionImmunities`
+ * carries no `when` ... so authoring it would make a level-6 Berserker permanently immune"* - and
+ * that reason closed on 2026-08-13 when `FeatureGrantsSchema` gained one optional `when` over the
+ * whole block. `grant-gates.test.ts` proves the ENGINE half on records it parses itself; this is the
+ * proof that a SHIPPED subclass record carries the gate and that the gate really opens and shuts.
+ *
+ * THE FAR END IS A REFUSAL AND ITS ABSENCE - `setCondition` narrating the skip while Rage runs, and
+ * Frightened landing on `actor.conditions` the moment it does not. Both on the SAME character, one
+ * `endEffect` apart, so nothing but the gate can explain the difference.
+ */
+describe("Berserker: Mindless Rage refuses Frightened only while the Rage is running", () => {
+  const built = () => onTheTable(build(barbarianInput(6)));
+
+  it("carries the gate out of the COMMITTED subclass bundle - the first link", () => {
+    const record = view.featureRecord({ kind: "subclass", sourceId: "path-of-the-berserker", id: "mindless-rage" })!;
+    expect(record.grants).toMatchObject({
+      conditionImmunities: ["charmed", "frightened"],
+      when: [{ type: "while-effect-tag", tags: ["raging"] }]
+    });
+  });
+
+  it("is NOT baked into the definition - a gate the builder cannot evaluate must not be a fact", () => {
+    // The whole reason this was unauthorable: `interpretFeature` bakes an UNGATED grants block into
+    // the sheet, and a baked immunity never comes back off. It now skips gated blocks by name.
+    const definition = build(barbarianInput(6));
+    expect(definition.conditionImmunities ?? []).not.toContain("frightened");
+    expect(definition.character!.features!.some((ref) => ref.id === "mindless-rage"), "the feature must still be ON the sheet - it is the derivation that reads it").toBe(true);
+  });
+
+  it("narrates the skip while Raging, and lets Frightened land once the Rage ends", () => {
+    const table = built();
+    // Not raging yet: the condition lands exactly as it does for any other character.
+    const before = setCondition(table.state, IDS.hero, "frightened", true, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
+    expect(before).toEqual([]);
+    expect(table.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+    setCondition(table.state, IDS.hero, "frightened", false, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
+
+    // ENTER RAGE through the real action, so the tag comes from the shipped `rage` record.
+    use(table, "rage");
+    expect(table.hero.effects.flatMap((effect) => effect.tags)).toContain("raging");
+
+    const during = setCondition(table.state, IDS.hero, "frightened", true, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
+    expect(during).toEqual([{ kind: "condition", text: "Ozar is immune to Frightened - not applied.", actorId: IDS.hero }]);
+    expect(table.hero.conditions, "the gate held but the condition landed anyway").toEqual([]);
+
+    // Charmed is the other half of the printed sentence, refused the same way.
+    const charmed = setCondition(table.state, IDS.hero, "charmed", true, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
+    expect(charmed[0]!.text).toBe("Ozar is immune to Charmed - not applied.");
+    expect(table.hero.conditions).toEqual([]);
+
+    // END THE RAGE and the immunity goes with it - the un-grant the absence record demanded.
+    endEffect(table.state, IDS.hero, table.hero.effects[0]!.id);
+    expect(table.hero.effects.flatMap((effect) => effect.tags)).not.toContain("raging");
+    const after = setCondition(table.state, IDS.hero, "frightened", true, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
+    expect(after).toEqual([]);
+    expect(table.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+  });
+
+  it("gives a level-5 Berserker nothing - the feature is gained at 6", () => {
+    // The non-vacuity control on the gate itself: if the immunity came from anywhere other than this
+    // feature, a raging level-5 Barbarian would show it too.
+    const early = onTheTable(build(barbarianInput(5)));
+    use(early, "rage");
+    expect(early.hero.effects.flatMap((effect) => effect.tags)).toContain("raging");
+    expect(setCondition(early.state, IDS.hero, "frightened", true, undefined, { role: "gm" }, { resolveDefinition: () => early.definition, catalog })).toEqual([]);
+    expect(early.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+  });
+});
+
 describe("Barbarian: the Epic Boon a level-19 Barbarian lost outright", () => {
   it("lands on the sheet as a real feat", () => {
     // Audit row 6. Nine of the twelve classes had NO `choice` on `epic-boon` at all.
@@ -425,6 +502,59 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
   it("rolls with advantage from level 3", () => {
     const built = onTheTable(build(fighterInput(5)), { fight: false });
     expect(initiativeRollMode(built.state, IDS.hero, (id) => id === built.hero.definitionId ? built.definition : undefined, catalog)).toBe("advantage");
+  });
+
+  /**
+   * THE SECOND HALF, HARVESTED 2026-08-13 - *"and Strength (Athletics) checks"*. It was a named
+   * absence in `scripts/class-mechanics/fighter.ts` on a claim that is now false (*"Nothing anywhere
+   * reads `roll-mode {roll: "check"}`"*), and Escape a Grapple is where it lands: that branch narrows
+   * to `{ability: "str", skill: "athletics"}` whenever Athletics beats Acrobatics, which is EXACTLY
+   * the printed clause. Authoring it needed `clears: ["modifiers"]`, because Fighter is hand-authored
+   * and the initiative rider was already in the committed record.
+   */
+  it("keeps the higher die on the Strength (Athletics) escape, and breaks a real grapple with it", () => {
+    const grappledChampion = (level: number) => {
+      const built = onTheTable(build(fighterInput(level)));
+      addEffect(built.state, IDS.hero, {
+        id: "grapple", name: "Grappled", tags: [], sourceActorId: IDS.foe, sourceName: "Foe", sourceActionId: null,
+        startedRound: 1, duration: { type: "manual" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+        concentration: false, modifiers: [], linkedConditionIds: ["grappled"], escapeDc: 20, onEnd: [], endsWithTag: null
+      });
+      return built;
+    };
+
+    // Level 5 Champion: Str 19 (+4), Athletics proficient (+3 PB) = +7; Dex 13 (+1) loses the
+    // comparison, so Athletics is the branch that rolls and `skill-is: ["athletics"]` matches it.
+    const champion = grappledChampion(5);
+    const escaped = resolveDefinitionAction(champion.state, builtinAction("escape-grapple")!, {
+      actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000901", builtin: true
+    }, deps(champion, [4, 18]));
+    expect(escaped.check).toMatchObject({ skill: "Escape (Athletics/Acrobatics)", naturalRoll: 18, dc: 20, success: true });
+    expect(escaped.rollMode).toMatchObject({ mode: "advantage", advantage: ["Remarkable Athlete"] });
+    expect(champion.state.rolls.find((roll) => roll.purpose === "check")!.dice.map((die) => die.kept)).toEqual([false, true]);
+    expect(champion.hero.effects, "the grapple should have ended").toEqual([]);
+
+    // THE CONTROL: a level-2 Fighter has no subclass and no such rider. Same queue, same escape DC,
+    // one die - and the grapple holds, so the difference is an outcome rather than a formula.
+    const plain = grappledChampion(2);
+    const stuck = resolveDefinitionAction(plain.state, builtinAction("escape-grapple")!, {
+      actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000902", builtin: true
+    }, deps(plain, [4, 18]));
+    expect(stuck.check).toMatchObject({ naturalRoll: 4, success: false });
+    expect(stuck.rollMode).toBeUndefined();
+    expect(plain.state.rolls.find((roll) => roll.purpose === "check")!.dice).toHaveLength(1);
+    expect(plain.hero.effects).toHaveLength(1);
+  });
+
+  it("does not reach Hide or Study - `skill-is: [\"athletics\"]` fails closed on a check that passes no skill", () => {
+    for (const [n, actionId] of [[911, "hide"], [912, "study"], [913, "search"]] as const) {
+      const built = onTheTable(build(fighterInput(5)));
+      const resolution = resolveDefinitionAction(built.state, builtinAction(actionId)!, {
+        actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-000000000${n}`, builtin: true
+      }, deps(built, [4, 18]));
+      expect(resolution.rollMode, `${actionId} must not see an Athletics-narrowed rider`).toBeUndefined();
+      expect(resolution.check!.naturalRoll).toBe(4);
+    }
   });
 });
 

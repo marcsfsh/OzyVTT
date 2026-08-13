@@ -786,7 +786,30 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "ability-is",
+      "abilities": [
+       "dex"
+      ]
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "stealth"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "boots-of-levitation",
@@ -1373,7 +1396,30 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "ability-is",
+      "abilities": [
+       "dex"
+      ]
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "stealth"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "cloak-of-invisibility",
@@ -1473,7 +1519,30 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "ability-is",
+      "abilities": [
+       "dex"
+      ]
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "stealth"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "cloak-of-the-manta-ray",
@@ -5621,6 +5690,22 @@
     "roll": "initiative",
     "mode": "advantage",
     "when": []
+   },
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "ability-is",
+      "abilities": [
+       "wis"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -5923,6 +6008,22 @@
     "roll": "initiative",
     "mode": "advantage",
     "when": []
+   },
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "ability-is",
+      "abilities": [
+       "wis"
+      ]
+     }
+    ]
    }
   ]
  },

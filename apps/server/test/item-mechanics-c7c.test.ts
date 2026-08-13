@@ -8,6 +8,7 @@ import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@
 import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { deriveActorSheet } from "../src/actor-derived.js";
+import { builtinAction } from "../src/builtin-actions.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
@@ -22,7 +23,7 @@ import { startEncounter } from "../src/encounter.js";
  * C7c - WONDROUS ITEMS YOU WEAR, PROVED AT THE FAR END
  * ============================================================================================
  *
- * `packages/content-srd-5.2.1/scripts/item-mechanics/worn-wondrous.ts` authors 19 of this lane's 56
+ * `packages/content-srd-5.2.1/scripts/item-mechanics/worn-wondrous.ts` authors 21 of this lane's 56
  * items. This file is the proof that the authoring reaches the table, and like C7b's it does NOT
  * inject a fixture catalog the way `item-riders.test.ts` does: it runs the REAL `ContentLibrary`
  * over the REAL committed `magic-items.v1.json`, so a rider the ETL failed to merge, an id that got
@@ -203,6 +204,106 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
       now: () => "2026-08-12T00:00:00.000Z", resolveDefinition: () => definition, catalog
     });
     expect(failed.outcome).toMatchObject({ total: 15, success: false });
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// THE HARVEST'S FAR END - W1 closed, and three rows of this lane now change a die
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * `apps/server/test/ability-check-roll-mode.test.ts` proved the ENGINE half against an INJECTED
+ * record, under a header saying so: *"its bundle record still carries `modifiers: []` - authoring it
+ * is the content lane's move, and this suite injects the record the lane will write."* This block is
+ * the other side of that sentence. Every record below comes out of the COMMITTED bundle through the
+ * real `ContentLibrary`, so it fails if the overlay stopped merging, if `roll-mode` stopped reaching
+ * the die, or if the two drifted apart.
+ *
+ * THE FAR END IS THE DIE THE ENGINE KEPT AND THE DC IT THEN CLEARED, never a derived struct: the
+ * same fixed pair (3, 17) is queued into `resolveDefinitionAction`'s own `random` in every case, and
+ * the assertion is which face survived and what the total did about Hide's DC 15.
+ */
+describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the higher die", () => {
+  /** Resolve one builtin action exactly as the `action.resolve` handler does. */
+  const check = (state: GameState, actionId: string, definition: ActorDefinition, faces: number[], n = 1) =>
+    resolveDefinitionAction(state, builtinAction(actionId)!, {
+      actorId: IDS.hero, targetIds: [], commandId: cmd(n), builtin: true
+    }, deps(faces, definition));
+
+  it("carries the harvested rider out of the COMMITTED bundle - the first link", () => {
+    const record = view.equipmentRecord("boots-of-elvenkind")!;
+    expect(record.slot).toBe("feet");
+    expect(record.modifiers).toEqual([{
+      type: "roll-mode", roll: "check", mode: "advantage",
+      when: [
+        { type: "on-ability-check" },
+        { type: "ability-is", abilities: ["dex"] },
+        { type: "skill-is", skills: ["stealth"] }
+      ]
+    }]);
+  });
+
+  it("rolls 2d20kh1, keeps 17 over 3, and CLEARS Hide's DC 15 - the outcome moved, not just the die", () => {
+    const definition = definitionOf();
+    const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false })]));
+    const resolution = check(state, "hide", definition, [3, 17]);
+
+    // Dex 14 = +2 (this Wizard has no Stealth proficiency, so the +2 is visibly the ability alone).
+    expect(resolution.check).toMatchObject({ skill: "Dexterity (Stealth)", naturalRoll: 17, total: 19, dc: 15, success: true });
+    expect(resolution.rollMode).toEqual({ mode: "advantage", advantage: ["Boots of Elvenkind"], disadvantage: [] });
+    // TWO dice were thrown and one was kept. A derived number could not say this.
+    const record = state.rolls.find((roll) => roll.purpose === "check")!;
+    expect(record.normalizedFormula).toBe("2d20kh1+2");
+    expect(record.dice.map((die) => ({ face: die.face, kept: die.kept }))).toEqual([{ face: 3, kept: false }, { face: 17, kept: true }]);
+    // The success half moved with it: Hiding grants the Invisible-linked effect.
+    expect(state.actors[0].effects.map((effect) => effect.name)).toEqual(["Hiding"]);
+  });
+
+  it("takes the boots off and the SAME queue gives one d20 and a failure", () => {
+    const definition = definitionOf();
+    const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false, equipped: false })]));
+    const resolution = check(state, "hide", definition, [3, 17]);
+
+    expect(resolution.check).toMatchObject({ naturalRoll: 3, total: 5, dc: 15, success: false });
+    expect(resolution.rollMode).toBeUndefined();
+    expect(state.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe("1d20+2");
+    expect(state.actors[0].effects).toEqual([]);
+  });
+
+  it("does NOT reach Search, Study or Influence - the narrow is the whole point", () => {
+    // `skill-is: ["stealth"]` fails CLOSED against a check that passes no skill, and `ability-is`
+    // fails closed against a different ability. Without this, "author to the ability" would have been
+    // the safe default everywhere and three items would quietly cover five checks.
+    for (const [n, actionId, formula] of [[10, "search", "1d20+0"], [11, "study", "1d20+3"], [12, "influence", "1d20+0"]] as const) {
+      const definition = definitionOf();
+      const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false })]));
+      const resolution = check(state, actionId, definition, [3, 17], n);
+      expect(resolution.rollMode, `${actionId} should see no advantage from a Stealth-narrowed rider`).toBeUndefined();
+      expect(state.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe(formula);
+      expect(resolution.check!.naturalRoll).toBe(3);
+    }
+  });
+
+  it("Cloak of Elvenkind is the ATTUNEMENT case: worn is not enough, attuned is", () => {
+    // The Boots require no attunement and cannot prove this; the Cloak's row carries
+    // `attunement.required: true` off the ETL's read of the printed type line.
+    expect(view.equipmentRecord("cloak-of-elvenkind")!.attunement?.required).toBe(true);
+
+    const unattuned = fight(stateWith([worn("cloak-of-elvenkind", "Cloak of Elvenkind", { attuned: false })]));
+    expect(check(unattuned, "hide", definitionOf(), [3, 17], 20).check).toMatchObject({ naturalRoll: 3, total: 5, success: false });
+    expect(unattuned.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe("1d20+2");
+
+    const attuned = fight(stateWith([worn("cloak-of-elvenkind", "Cloak of Elvenkind")]));
+    const resolution = check(attuned, "hide", definitionOf(), [3, 17], 21);
+    expect(resolution.check).toMatchObject({ naturalRoll: 17, total: 19, success: true });
+    expect(resolution.rollMode).toEqual({ mode: "advantage", advantage: ["Cloak of Elvenkind"], disadvantage: [] });
+  });
+
+  it("Cloak of the Bat is the third carrier of the same sentence", () => {
+    const state = fight(stateWith([worn("cloak-of-the-bat", "Cloak of the Bat")]));
+    const resolution = check(state, "hide", definitionOf(), [3, 17], 22);
+    expect(resolution.check).toMatchObject({ naturalRoll: 17, total: 19, success: true });
+    expect(resolution.rollMode).toEqual({ mode: "advantage", advantage: ["Cloak of the Bat"], disadvantage: [] });
   });
 });
 
@@ -489,19 +590,22 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     expect(bySlot).toEqual({ neck: 15, shoulders: 15, head: 11, feet: 7, hands: 6, belt: 2 });
   });
 
-  it("authors exactly 18 of the 56 and names the other 38 as absences - the two add to the lane", () => {
-    // WAS 19 AND 37 AT `3a8acb3`. `robe-of-the-archmagi` moved to the absences when review measured
-    // what its `spell-save-dc` raises (W8), and it is the ONLY row that moved.
+  it("authors exactly 21 of the 56 and names the other 35 as absences - the two add to the lane", () => {
+    // WAS 19 AND 37 AT `3a8acb3`, THEN 18 AND 38 AT `07b6177`. Two readings moved rows in opposite
+    // directions: `robe-of-the-archmagi` moved to the absences when review measured what its
+    // `spell-save-dc` raises (W8), and then W1's consumer landed and the harvest moved THREE the
+    // other way - the three rows whose whole clause is "Advantage on Dexterity (Stealth) checks".
     const authored = Object.keys(lane.entries).sort();
     expect(authored).toEqual([
-      "boots-of-the-winterlands", "bracers-of-archery", "bracers-of-defense", "brooch-of-shielding",
-      "cloak-of-arachnida", "cloak-of-invisibility", "cloak-of-protection", "eyes-of-charming",
+      "boots-of-elvenkind", "boots-of-the-winterlands", "bracers-of-archery", "bracers-of-defense",
+      "brooch-of-shielding", "cloak-of-arachnida", "cloak-of-elvenkind", "cloak-of-invisibility",
+      "cloak-of-protection", "cloak-of-the-bat", "eyes-of-charming",
       "gloves-of-thievery", "hat-of-disguise", "helm-of-comprehending-languages", "helm-of-telepathy",
       "medallion-of-thoughts", "periapt-of-proof-against-poison", "robe-of-scintillating-colors",
       "robe-of-stars", "scarab-of-protection", "winged-boots"
     ]);
-    expect(authored).toHaveLength(18);
-    expect(mine.length - authored.length).toBe(38);
+    expect(authored).toHaveLength(21);
+    expect(mine.length - authored.length).toBe(35);
     // Every authored id is one of the lane's own rows, and every one really carries a rider.
     for (const id of authored) {
       const row = mine.find((entry) => entry.id === id);
@@ -513,7 +617,7 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     }
     const bySlot = Object.fromEntries(WORN_SLOTS.map((slot) =>
       [slot, authored.filter((id) => mine.find((row) => row.id === id)!.slot === slot).length]));
-    expect(bySlot).toEqual({ shoulders: 5, head: 4, neck: 4, hands: 3, feet: 2, belt: 0 });
+    expect(bySlot).toEqual({ shoulders: 7, head: 4, neck: 4, hands: 3, feet: 3, belt: 0 });
   });
 
   it("leaves the FIVE casts W6 measured producing the wrong thing unauthored, by name", () => {
@@ -559,15 +663,43 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     }
   });
 
-  it("leaves every row whose mechanic is 'Advantage on a check' to prose - W1 has no consumer", () => {
-    // The module's biggest single claim, machine-checked: `roll-mode` reaches four rolls and `check`
-    // is not one of them, so a flat `check-bonus` would be a different sentence and is not written.
+  it("splits the eight 'Advantage on a check' rows 3 authored / 5 prose, and says why for each", () => {
+    // The module's biggest single claim, machine-checked. W1 CLOSED 2026-08-13 and this test used to
+    // assert all eight stayed prose; what it asserts now is the SPLIT, because "the limit closed so
+    // author them all" is exactly the over-grant the lane exists to refuse. The set of eight rows is
+    // unchanged - only which side of the line each sits on.
     const advantageOnChecks = mine.filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? "")).map((row) => row.id).sort();
     expect(advantageOnChecks).toEqual([
       "belt-of-dwarvenkind", "boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat",
       "eyes-of-minute-seeing", "eyes-of-the-eagle", "robe-of-eyes", "talisman-of-the-sphere"
     ]);
-    for (const id of advantageOnChecks) expect(Object.keys(lane.entries), `${id} must stay prose`).not.toContain(id);
+
+    // AUTHORED (3): the clause is "Advantage on Dexterity (Stealth) checks" with no qualifier, and
+    // `BUILTIN_CHECKS.hide` passes exactly `{ability: "dex", skill: "stealth"}` - so the rider fires
+    // on that check and, because `ability-is`/`skill-is` fail closed, on nothing else.
+    for (const id of ["boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat"]) {
+      const row = view.equipmentRecord(id)!;
+      expect(row.modifiers, `${id} lost its harvested rider`).toContainEqual({
+        type: "roll-mode", roll: "check", mode: "advantage",
+        when: [
+          { type: "on-ability-check" },
+          { type: "ability-is", abilities: ["dex"] },
+          { type: "skill-is", skills: ["stealth"] }
+        ]
+      });
+    }
+
+    // STILL PROSE (5), each for a SECOND reason W1 never was. If a later pass authors one of these,
+    // this fails with the reason it ignored in the message.
+    for (const [id, why] of [
+      ["belt-of-dwarvenkind", "Persuasion narrowed to dwarves and duergar - no trigger names who you are influencing"],
+      ["eyes-of-minute-seeing", "Investigation within ONE FOOT - nothing measures a distance"],
+      ["eyes-of-the-eagle", "Perception 'that rely on sight' - Search does not know what it relied on"],
+      ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
+      ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
+    ] as const) {
+      expect(Object.keys(lane.entries), `${id} must stay prose: ${why}`).not.toContain(id);
+    }
   });
 
   it("authors no curse, because no row in this lane prints one", () => {

@@ -76,17 +76,34 @@
  * emptied a NINETEENTH entry that had already shipped.
  * ==============================================================================================
  *
- * W1. `roll-mode` HAS NO CONSUMER FOR `roll: "check"`, and it is the single biggest killer in this
- *     lane. C7a found it first; re-measured here: grepping every `"roll-mode"` consumer in
- *     `apps/server/src` finds exactly four rolls - `attack` and `incoming-attack`
- *     (`action-resolution.ts:598,603`), `initiative` (`encounter.ts:57,62`) and `save`
- *     (`saving-throws.ts:64`). `checkRiderBonus` sums `check-bonus` and never looks at `roll-mode`.
- *     **MEASURED over the committed bundle: EIGHT of these 56 rows print an "Advantage on ... check"
- *     clause** - `belt-of-dwarvenkind`, `boots-of-elvenkind`, `cloak-of-elvenkind`, `cloak-of-the-bat`,
- *     `eyes-of-minute-seeing`, `eyes-of-the-eagle`, `robe-of-eyes`, `talisman-of-the-sphere` - and
- *     ALL EIGHT are absences below, because on none of them does anything else in the row land
- *     either. A flat `check-bonus` is NOT the same sentence and this lane does not substitute one.
- *     **Needs: a `roll: "check"` consumer on the ability-check path. Unit: NONE YET.**
+ * W1. `roll-mode` HAS NO CONSUMER FOR `roll: "check"` - **CLOSED 2026-08-13**, and it was the single
+ *     biggest killer in this lane. `apps/server/src/ability-checks.ts` now reaches the DIE:
+ *     `checkRollMode` collects `roll: "check"` riders in the same two-pass shape `saveRollSources`
+ *     uses, `checkDieFor` turns the aggregate into `2d20kh1` / `2d20kl1` / `1d20`, and
+ *     `action-resolution.ts` calls both on the two places the server throws a check's d20 - the
+ *     `BUILTIN_CHECKS` branch (Hide, Influence, Search, Study) and Escape a Grapple.
+ *
+ *     **WHAT IT UNLOCKED IS THREE OF THE EIGHT, NOT EIGHT.** The eight rows printing an
+ *     "Advantage on ... check" clause are unchanged as a set - `belt-of-dwarvenkind`,
+ *     `boots-of-elvenkind`, `cloak-of-elvenkind`, `cloak-of-the-bat`, `eyes-of-minute-seeing`,
+ *     `eyes-of-the-eagle`, `robe-of-eyes`, `talisman-of-the-sphere` - and the harvest split them:
+ *       AUTHORED (3): the rows whose clause is *"Advantage on Dexterity (Stealth) checks"* with no
+ *           qualifier at all. `{ability-is: ["dex"], skill-is: ["stealth"]}` is exactly the narrow
+ *           `BUILTIN_CHECKS.hide` passes, so the rider fires on that check and on nothing else.
+ *       STILL ABSENT (5): every one of them for a SECOND reason that W1 never was, restated at each
+ *           entry - a target-species narrowing (`belt-of-dwarvenkind`), a ONE-FOOT range
+ *           (`eyes-of-minute-seeing`), *"that rely on sight"* (`eyes-of-the-eagle`, `robe-of-eyes`)
+ *           and a Sphere of Annihilation the engine does not hold (`talisman-of-the-sphere`).
+ *
+ *     **THE FAIL-CLOSED RULE THAT DECIDED THE SPLIT, measured rather than reasoned about.**
+ *     `ability-is`/`skill-is` fail CLOSED when the narrow does not carry that key (`riders.ts`
+ *     `passes`), and `BUILTIN_CHECKS` carries a `skill` on Hide ALONE - `influence`, `search` and
+ *     `study` are bare ability checks (`{cha}`, `{wis}`, `{int}`), and Escape a Grapple narrows to
+ *     whichever of `{str, athletics}` / `{dex, acrobatics}` won the modifier comparison. So a rider
+ *     gated `skill-is: ["perception"]` fires NOWHERE, and `ability-is: ["wis"]` fires on Search. That
+ *     is why the two Perception rows here are refused rather than authored to the ability: their
+ *     clause carries *"that rely on sight"*, and Search does not know whether it did.
+ *     A flat `check-bonus` is still NOT the same sentence and this lane still does not substitute one.
  *
  * W2. `speed`, `darkvision` AND `sense` REACH NOTHING FROM AN ITEM. Measured 2026-08-12:
  *     `deriveEquipment` sums `speed` into `derivation.speed` (`equipment-derivation.ts:678`) and
@@ -118,6 +135,17 @@
  *         on the item. No trigger reads item state, and there is no gem or charge model to read.
  *         **Needs: an item-charge/component model. Unit: NONE YET.**
  *     `Boots of the Winterlands`' resistance is still the contrast: it prints no gate at all.
+ *
+ *     **AND THE HARVEST MEASURED THE BLAST RADIUS: `grants.when` HAS NO MAGIC-ITEM CARRIER AT ALL.**
+ *     Scanning all 268 rows for a printed Resistance or Immunity gives 25, and every one of them is
+ *     either already authored ungated (the gate IS wearing the thing), refused for a reason the gate
+ *     does not touch (`armor-of-vulnerability` wants `grants.damageVulnerabilities`;
+ *     `shield-of-missile-attraction` keys resistance by attack kind, not damage type), or one of the
+ *     two above. The whole SRD's ONE gated-grant carrier is a class feature - Path of the
+ *     Berserker's `mindless-rage`, *"Immunity to the Charmed and Frightened conditions while your
+ *     Rage is active"*, gated `while-effect-tag: ["raging"]` on the tag `rage`'s own effect already
+ *     carries (`scripts/class-mechanics/barbarian.ts`). It is authored there, and that is the
+ *     harvest's answer for W3: the vocabulary landed, and the items are not where it lands.
  *
  * W4. A SAVE CANNOT BE NARROWED TO WHAT IT IS AGAINST. The `RiderTrigger` filters narrow a save by
  *     the ABILITY rolled (`ability-is`) or by a condition the TARGET already has
@@ -249,22 +277,25 @@
  * ----------------------------------------------------------------------------------------------
  * WHAT THIS LANE PRODUCED, as an output rather than a target:
  *
- *   18 of 56 items carry at least one authored rider - **shoulders 5, head 4, neck 4, hands 3,
- *   feet 2, belt 0.** 38 of 56 are prose-only records, every one named below with its reason.
- *   The 38 split:
+ *   21 of 56 items carry at least one authored rider - **shoulders 7, head 4, neck 4, hands 3,
+ *   feet 3, belt 0.** 35 of 56 are prose-only records, every one named below with its reason.
+ *   The 35 split:
  *      4  the schema REFUSES their central mechanic outright (`ability-score`);
  *      4  RESERVED for a later unit (U31, U32, U26/U29 x2);
  *      2  HEALING (W7, and the known-bugs entry it cites);
  *      5  emptied by W6 - a cast whose spell record describes the spell rather than the cast;
  *     10  OVER-GRANTS - the vocabulary can only say something broader than the printed text;
- *     13  no vocabulary at all - movement modes, vision, planar travel, GM-fiat tables.
+ *     10  no vocabulary at all - movement modes, vision, planar travel, GM-fiat tables.
  *
- *   **WAS 19 AND 37 AT `3a8acb3`.** `robe-of-the-archmagi` moved from authored to over-grant when
- *   review measured what its `spell-save-dc` actually raises (W8); the arithmetic between the two
- *   readings is 19 - 1 = 18 authored, 9 + 1 = 10 over-grants, 37 + 1 = 38 absences, shoulders 6 - 1
- *   = 5. Nothing else moved.
+ *   **WAS 18 AND 38 AT `07b6177`, AND 19 AND 37 AT `3a8acb3`.** Two readings moved rows, in opposite
+ *   directions. `robe-of-the-archmagi` moved from authored to over-grant when review measured what
+ *   its `spell-save-dc` actually raises (W8): 19 - 1 = 18 authored, 9 + 1 = 10 over-grants, 37 + 1 =
+ *   38 absences, shoulders 6 - 1 = 5. Then W1 closed and the harvest moved THREE the other way -
+ *   `boots-of-elvenkind` (feet 2 -> 3), `cloak-of-elvenkind` and `cloak-of-the-bat` (shoulders 5 ->
+ *   7): 18 + 3 = 21 authored, 38 - 3 = 35 absences, 13 - 3 = 10 with no vocabulary. The five
+ *   remaining "Advantage on a check" rows did NOT move, and each says why at its own entry.
  *
- *   ELEVEN of the 18 authored items ALSO carry a per-item absence for a half that is not
+ *   FOURTEEN of the 21 authored items ALSO carry a per-item absence for a half that is not
  *   expressible; those are stated at the entry rather than counted here. Only SEVEN rows in this
  *   whole lane are authored with nothing left over - `bracers-of-defense`, `gloves-of-thievery`,
  *   `hat-of-disguise`, `helm-of-comprehending-languages`, `medallion-of-thoughts`,
@@ -272,10 +303,10 @@
  *
  * `apps/server/test/item-mechanics-c7c.test.ts` machine-checks MOST of this against the bundle -
  * **and review narrowed this sentence, which used to claim all of it.** What the test really pins:
- * the 56 rows, the 46 attuned, the six-way slot split, the 18 authored BY ID, the 38 remainder, the
+ * the 56 rows, the 46 attuned, the six-way slot split, the 21 authored BY ID, the 35 remainder, the
  * per-slot authored split, the 5 W6 casts, the 2 healing rows, the 4 reserved + 4 ability-score
- * refusals, the 8 advantage-on-check rows and the 0 curses. What it does NOT pin is the
- * **10 over-grants / 13 no-vocabulary** line: those two groups are editorial readings of the same
+ * refusals, the 8 advantage-on-check rows split 3 authored / 5 prose, and the 0 curses. What it does
+ * NOT pin is the **10 over-grants / 10 no-vocabulary** line: those two groups are editorial readings of the same
  * prose-only rows, so a row can move between THEM with nothing failing. Every other number above
  * moves a test if it drifts.
  */
@@ -294,7 +325,13 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    *       when the item comes off."*
    *   "Dwarvish. You know Dwarvish" - C7a's limit (E), re-measured: `equipment-derivation.ts:576`
    *       writes `grants.languages` into `derivation.languages` and NOTHING reads that field.
-   *   "Advantage on Charisma (Persuasion) checks made to interact with dwarves and duergar" - W1.
+   *   "Advantage on Charisma (Persuasion) checks made to interact with dwarves and duergar" - **NOT
+   *       W1 ANY MORE.** `ability-is: ["cha"]` reaches the builtin Influence check, so the rider
+   *       would fire; what it would NOT do is stop at dwarves. No trigger names the creature you are
+   *       influencing (`versus-creature-type` is the nearest and it is C7a's limit (B) - declared,
+   *       read, and written by nothing), so the authorable form is advantage on every Influence check
+   *       against anyone. **Needs: a producer for `RiderContext.targetCreatureType`, and a target on
+   *       the check path to produce it from. Unit: NONE YET.**
    *   "Darkvision. You have Darkvision with a range of 60 feet" - W2, AND (review) it sits under the
    *       same *"If you aren't a dwarf or duergar"* gate as the two Resilience halves below, which
    *       this list used to apply to those two only. So it is W2 and W3 together, not W2 alone.
@@ -323,13 +360,36 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    */
 
   // =============================================================================================
-  // FEET - 7 rows. 2 authored.
+  // FEET - 7 rows. 3 authored.
   // =============================================================================================
 
-  /*
-   * `boots-of-elvenkind` - "your steps make no sound" (no sound model) and "Advantage on Dexterity
-   * (Stealth) checks" (W1). A flat `check-bonus` would be a different sentence. Prose.
+  /**
+   * BOOTS OF ELVENKIND - "You also have Advantage on Dexterity (Stealth) checks."
    *
+   * **W1'S FIRST HARVEST, AND THE ONE THE CLAUSE FITS EXACTLY.** The printed sentence names an
+   * ABILITY and a SKILL, and `BUILTIN_CHECKS.hide` (`action-resolution.ts`) rolls
+   * `{ability: "dex", skill: "stealth"}` - so the three-trigger narrowed form matches the check the
+   * server actually throws, and matches nothing else. A flat `check-bonus` is still a different
+   * sentence and is still not written.
+   *
+   * Reader: `checkRollMode` -> `checkDieFor` -> `resolveDice` (`ability-checks.ts`, consumed at
+   * `action-resolution.ts` on both check paths). MEASURED on the picker-minted row through the
+   * SHIPPED bundle, faces 3 then 17 queued: `2d20kh1+2`, kept 17, total **19** against Hide's DC 15
+   * - a success. Unequipped, the same queue gives `1d20+2`, total **5**, a failure. The outcome
+   * moved, not only the die.
+   *
+   * ABSENT: "your steps make no sound, regardless of the surface you are moving across" - there is
+   * no sound or surface model, and nothing in `featureRiders` describes one. Unit: NONE YET.
+   * This absence list is complete.
+   */
+  "boots-of-elvenkind": {
+    modifiers: [{
+      type: "roll-mode", roll: "check", mode: "advantage",
+      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }]
+    }]
+  },
+
+  /*
    * `boots-of-levitation` - "you can cast Levitate on yourself." W6, and this one is only visible
    * from the far end: `levitate`'s record carries `save: "con"`, so `castAction` emits
    * `save: {ability: "con", dc: 10}` (MEASURED) and the wearer would be prompted to save against
@@ -552,15 +612,22 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   /*
    * `eyes-of-minute-seeing` - "granting you Darkvision within that range and Advantage on
-   * Intelligence (Investigation) checks made to examine something within that range." W2 and W1, and
-   * the range is one foot. Prose.
+   * Intelligence (Investigation) checks made to examine something within that range." W2 for the
+   * Darkvision. The check half is **no longer W1**: the engine rolls Study as `{ability: "int"}`, so
+   * `ability-is: ["int"]` fires - and it fires on every Study, while the printed clause fires only
+   * within ONE FOOT. Nothing in the vocabulary measures a distance, so the narrowing is the whole
+   * item and authoring it unqualified would be advantage on recalling lore from across a library.
+   * **Needs: a range trigger. Unit: NONE YET.** Prose.
    *
    * `eyes-of-the-eagle` - "you have Advantage on Wisdom (Perception) checks that rely on sight. In
    * conditions of clear visibility, you can make out details of even extremely distant creatures and
-   * objects as small as 2 feet across." W1 for the first half; the second (review restored it) is a
-   * perception RANGE, which nothing on the actor carries - the sheet's Senses line is the
-   * definition's species extension and takes no item. UNBLOCKED BY: W1's missing `roll: "check"`
-   * consumer, and a senses model for the range. Prose.
+   * objects as small as 2 feet across." The first half is `robe-of-eyes`' exact shape and is refused
+   * for the same reason and no longer for W1's: Search is rollable now, "that rely on sight" is not
+   * sayable, and a pair of LENSES handing out advantage on a Search made by hearing is the
+   * over-grant in its plainest form. The second (review restored it) is a perception RANGE, which
+   * nothing on the actor carries - the sheet's Senses line is the definition's species extension and
+   * takes no item. **Needs: a relies-on trigger, and a senses model for the range. Unit: NONE YET.**
+   * Prose.
    *
    * `goggles-of-night` - "you have Darkvision out to 60 feet. If you already have Darkvision,
    * wearing the goggles increases its range by 60 feet." W2: `darkvision` is not even summed into
@@ -822,7 +889,12 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * charge is spent, so a long-rest pool would resurrect them. Prose.
    *
    * `talisman-of-the-sphere` - "you have Advantage on any Intelligence (Arcana) check you make to
-   * control a Sphere of Annihilation" (W1) "... you can take a Magic action to move it 10 feet plus
+   * control a Sphere of Annihilation" - **not W1 any more, and the closed limit changed nothing
+   * here.** `skill-is: ["arcana"]` fires NOWHERE (no engine check carries that skill) and
+   * `ability-is: ["int"]` fires on every Study check, while the printed clause fires only against a
+   * Sphere of Annihilation - which is a C7d GM-fiat row that is not an actor, not a condition and
+   * not a state any trigger can read. **Needs: the sphere as something the engine holds. Unit: NONE
+   * YET.** "... you can take a Magic action to move it 10 feet plus
    * a number of additional feet equal to 10 times your Intelligence modifier" (there is no Sphere of
    * Annihilation to control - it is a C7d GM-fiat row - and no vocabulary for moving one).
    * UNBLOCKED BY: no unit. Prose.
@@ -877,11 +949,29 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * That is strictly more than the SRD prints, on a rare item, in the direction a table would never
    * notice. Taken conservatively; see `rulingsOwed`.
    * UNBLOCKED BY: a suppression gate (a rider that a moment turns OFF for a duration). Prose.
-   *
-   * `cloak-of-elvenkind` - "Wisdom (Perception) checks made to perceive you have Disadvantage, and
-   * you have Advantage on Dexterity (Stealth) checks." The first half is a rider on OTHER creatures'
-   * checks about the wearer, which no scope can express; the second is W1. Prose.
    */
+
+  /**
+   * CLOAK OF ELVENKIND - "you have Advantage on Dexterity (Stealth) checks."
+   *
+   * The same clause the Boots print, on an ATTUNED row, which is why both are authored rather than
+   * one: the derivation only makes an attunement-requiring item a carrier once the row is attuned,
+   * so this record proves the gate the Boots cannot. MEASURED on the picker-minted row through the
+   * SHIPPED bundle: worn but NOT attuned, faces 3 then 17 give `1d20+2` and a total of **5**; attune
+   * the same row and the same queue gives `2d20kh1+2`, kept 17, total **19**. `attunement.required`
+   * is the ETL's, off the printed type line, and nothing in this record repeats it.
+   *
+   * ABSENT: "Wisdom (Perception) checks made to perceive you have Disadvantage" - a rider on OTHER
+   * creatures' checks ABOUT the wearer. Every rider in this vocabulary is collected from the
+   * ROLLER's own carriers (`collectRiders` walks `derivation.carriers`, which is the bearer's gear),
+   * and no `scope` names a different actor's roll. Unit: NONE YET. This absence list is complete.
+   */
+  "cloak-of-elvenkind": {
+    modifiers: [{
+      type: "roll-mode", roll: "check", mode: "advantage",
+      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }]
+    }]
+  },
 
   /**
    * CLOAK OF INVISIBILITY - "This cloak has 3 charges and regains 1d3 expended charges daily at
@@ -933,16 +1023,32 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
     ]
   },
 
-  /*
-   * `cloak-of-the-bat` - "you have Advantage on Dexterity (Stealth) checks" (W1); "In an area of Dim
-   * Light or Darkness ... a Fly Speed of 40 feet" (W2, and a light-level gate with no vocabulary);
-   * "While wearing the cloak in an area of Dim Light or Darkness, you can cast Polymorph on yourself
-   * ... The cloak can't be used this way again until the next dawn." The cast is refused for the
-   * same reason `boots-of-levitation` is: `polymorph` carries `save: "wis"` for an unwilling target
-   * and the cloak prints "on yourself", so the derived action would prompt the wearer to save
-   * against their own cloak (W6). The light-level gate has no trigger either.
-   * UNBLOCKED BY: no unit for the light level; known-bugs `[content/spells]` for the cast. Prose.
+  /**
+   * CLOAK OF THE BAT - "While wearing this cloak, you have Advantage on Dexterity (Stealth) checks."
    *
+   * Printed with NO qualifier - the Fly Speed below is gated on Dim Light or Darkness and the
+   * Stealth clause is not, which is why one is authored and the other is not. Same three triggers as
+   * the Boots and the Cloak of Elvenkind; the third row of the same sentence rather than a new shape.
+   *
+   * ABSENT, three halves:
+   *   "In an area of Dim Light or Darkness, you can grip the edges of the cloak and use it to gain a
+   *       Fly Speed of 40 feet" - W2 (no movement-mode model), and a light-level gate with no trigger
+   *       even if there were one.
+   *   "you can cast Polymorph on yourself ... can't be used this way again until the next dawn" - W6.
+   *       `polymorph` carries `save: "wis"` for an UNWILLING target and the cloak prints "on
+   *       yourself", so the derived action would prompt the wearer to save against their own cloak.
+   *   The same light-level gate on the cast.
+   * UNBLOCKED BY: no unit for the light level; known-bugs `[content/spells]` for the cast.
+   * This absence list is complete.
+   */
+  "cloak-of-the-bat": {
+    modifiers: [{
+      type: "roll-mode", roll: "check", mode: "advantage",
+      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }]
+    }]
+  },
+
+  /*
    * `cloak-of-the-manta-ray` - "you can breathe underwater, and you have a Swim Speed of 60 feet."
    * Both halves are W2's gap: there is no movement-mode model and no environment model.
    * UNBLOCKED BY: no unit. Prose.
@@ -955,7 +1061,17 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * UNBLOCKED BY: a `save-against-is` filter. Prose.
    *
    * `robe-of-eyes` - "All-Around Vision. The robe gives you Advantage on Wisdom (Perception) checks
-   * that rely on sight" (W1); "Special Senses. You have Darkvision and Truesight, both with a range
+   * that rely on sight" - **NOT W1 ANY MORE, AND THIS ROW IS WHY THE HARVEST STOPPED WHERE IT DID.**
+   * The roll exists now (Search is `{ability: "wis"}`), so `ability-is: ["wis"]` would fire - and it
+   * would fire on a Search made by LISTENING, which is the half the printed clause excludes. The
+   * robe's own Drawbacks make that concrete rather than theoretical: a Light spell gives the wearer
+   * the **Blinded** condition, and a blinded Robe of Eyes would still be handing out advantage on
+   * every Wisdom check the engine rolls. `while-condition {conditionIds: ["blinded"], present: false}`
+   * would shrink the over-grant without removing it - "relies on sight" is narrower than "is not
+   * Blinded" - and inventing a gate the SRD does not print is the thing this lane refuses.
+   * **Needs: a trigger that says what a check RELIES ON (the same shape W4 needs for a save's
+   * source). Unit: NONE YET.** The rest of the row: "Special Senses. You have Darkvision and
+   * Truesight, both with a range
    * of 120 feet" (W2 - and `sense` reaches no display either); "Drawbacks. A Light spell cast on the
    * robe or a Daylight spell cast within 5 feet of the robe gives you the Blinded condition for 1
    * minute. At the end of each of your turns, you make a Constitution saving throw (DC 11 for Light

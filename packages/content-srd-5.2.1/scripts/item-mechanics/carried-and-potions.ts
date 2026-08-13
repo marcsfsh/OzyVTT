@@ -69,8 +69,11 @@
  *   `check-bonus`         `equipment-derivation.ts:778` `checkRiderBonus`, read by
  *                         `actor-derived.ts:94` into the sheet's skill row - **and by NOTHING ELSE.**
  *                         Review measured the consequence and it is a real gap, recorded at
- *                         `stone-of-good-luck-luckstone` below: the ONE place the server rolls an
- *                         ability check itself does not consult this rider.
+ *                         `stone-of-good-luck-luckstone` below: where the server rolls an ability
+ *                         check itself, it does not consult this rider. (Re-measured 2026-08-13,
+ *                         after W1's consumer landed on those same two call sites: `roll-mode` now
+ *                         reaches that die and `check-bonus` still does not, so the gap narrowed to
+ *                         the flat half and did not close.)
  *   `save-bonus`          `saving-throws.ts` `saveRiderBonus`, summed into the save the SERVER rolls
  *                         (`item-riders.test.ts` criterion 12) - not a number the sheet merely shows.
  *                         MEASURED together on `Stone of Good Luck`: every skill row **+1** and
@@ -418,11 +421,14 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
   /*
    * `candle-of-invocation` - "While you are within that light, you have Advantage on D20 Tests."
    * Advantage on EVERY d20 roll, gated on standing inside the light of a lit candle that burns down
-   * over four hours. Three separate gaps: `roll-mode` reaches attack, incoming-attack, initiative
-   * and save but not ability CHECKS (C7c's W1), no trigger says "while within an item's light", and
-   * a burn-down budget is a duration rather than a use count. Authoring the advantage ungated would
+   * over four hours. **W1 CLOSED 2026-08-13 AND THIS ROW GOT WORSE, NOT BETTER**: the check half now
+   * has a reader, so an unnarrowed `roll: "check"` rider would really fire on Hide, Influence,
+   * Search, Study and Escape a Grapple alike - which is the over-grant arriving rather than staying
+   * theoretical. The two gaps that block it are untouched: no trigger says "while within an item's
+   * light", and a burn-down budget is a duration rather than a use count. Authoring it ungated would
    * hand a very rare candle permanent advantage on everything the engine rolls - pre-ruling 3's
-   * over-grant in its purest form. Prose.
+   * over-grant in its purest form. **Needs: a light/area gate, and a duration budget. Unit: NONE
+   * YET.** Prose.
    */
 
   /**
@@ -693,8 +699,10 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    *
    * `hat-of-many-spells` - Wizard-only, and its centre is an Intelligence (Arcana) check at
    * "DC 10 plus the spell's level" followed, on a failure, by a 1d100 wild-magic table. Neither half
-   * has a vocabulary: no rider makes an ability CHECK a gate (C7c's W1 is the same gap seen from the
-   * bonus side), and a random-effect table is GM fiat. Its Spellcasting Focus clause is real and
+   * has a vocabulary: no rider makes the OUTCOME of an ability check a gate on something else, which
+   * is a different gap from C7c's W1 and outlived it - W1 closed 2026-08-13 and this row did not
+   * move, because reaching a check's die is not the same as branching on whether it beat a DC. And a
+   * random-effect table is GM fiat. Its Spellcasting Focus clause is real and
    * also unsayable - there is no focus model. Prose.
    *
    * `horn-of-blasting` - THE CLOSEST THING IN THIS LANE TO AN AUTHORABLE DAMAGE ROLL, and taken
@@ -969,10 +977,15 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * `portable-hole` - pre-ruling 5 names it, and it is a container besides. See `bag-of-holding`.
    * Prose.
    *
-   * `rope-of-climbing` - an animate rope that moves 10 feet a turn, knots itself, and "grants
-   * Advantage on ability checks made to climb using the rope". C7c's W1: `roll-mode` has no consumer
-   * for `roll: "check"`, so the one mechanical clause in the item has no reader, and the rest is a
-   * rope the GM narrates. Prose.
+   * `rope-of-climbing` - an animate rope that moves 10 feet a turn, knots itself, and "While
+   * knotted, the rope shortens to a 50-foot length and grants Advantage on ability checks made to
+   * climb using the rope". **NO LONGER C7c's W1** - `roll: "check"` has a consumer since 2026-08-13
+   * - and the row is further from authorable than that reads. There is no CLIMB check: the five
+   * checks the server throws are Hide, Influence, Search, Study and Escape a Grapple, and none of
+   * them is climbing, so there is no narrow to gate on. Unnarrowed is advantage on all five, on an
+   * uncommon rope. The other two qualifiers are unsayable too - "while knotted" is item state and
+   * "using the rope" is a fact about how a GM described the climb. **Needs: a climb check, item
+   * state, or both. Unit: NONE YET.** The rest is a rope the GM narrates. Prose.
    */
 
   /**
@@ -1021,9 +1034,11 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    *
    * `sphere-of-annihilation` - pre-ruling 5 names it. A hole in the multiverse that obliterates what
    * it touches (8d10 Force to anything not wholly engulfed), controlled by a DC 25 Intelligence
-   * (Arcana) CHECK that moves it toward you on a failure. An ability check as the control mechanism
-   * (C7c's W1), an instant-destruction outcome with no vocabulary, and a hazard that occupies map
-   * space rather than an inventory row. Prose.
+   * (Arcana) CHECK that moves it toward you on a failure. The check is a CONTROL MECHANISM, not a
+   * rider on one - the same gap `hat-of-many-spells` records above, and not C7c's W1, which closed
+   * 2026-08-13 without touching it: nothing in the vocabulary declares a new check for an item to
+   * roll, nor branches on its result. Plus an instant-destruction outcome with no vocabulary, and a
+   * hazard that occupies map space rather than an inventory row. Prose.
    */
 
   /**
@@ -1068,7 +1083,10 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    *     `resolveDefinitionAction(state, builtinAction("hide"), {builtin: true})` on a d20 of 10
    *     returns `check.total` **12** - Dex +2 only.** The sheet promises the +1 and the server's own
    *     roll does not pay it, which is exactly the split-brain `actor-derived.ts:15-26` says that
-   *     block exists to END. It affects all four builtin checks: Hide, Influence, Search and Study.
+   *     block exists to END. It affects all four builtin checks - Hide, Influence, Search and Study -
+   *     and Escape a Grapple, the fifth check the server throws. **Re-measured 2026-08-13**: W1's
+   *     consumer landed on exactly those call sites and reads `roll-mode` only, so a stone worn
+   *     beside `Boots of Elvenkind` now rolls `2d20kh1` and still adds +2 rather than +3.
    *     Unnarrowed IS still the faithful reading of "ability checks" - C7c's `Gloves of Thievery`
    *     needed a `skill-is` filter because ITS text names one skill and this one names none - so the
    *     rider stays and the gap is recorded rather than the rider removed: the number it does reach
@@ -1137,8 +1155,10 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    *
    * `potion-of-clairvoyance` - D1; a remote sensor with no model. Prose.
    *
-   * `potion-of-climbing` - D1; a Climb Speed (C7c's W2) plus Advantage on Athletics CHECKS to climb
-   * (C7c's W1). Three gaps, any one of them enough. Prose.
+   * `potion-of-climbing` - D1; a Climb Speed (C7c's W2) plus Advantage on Athletics CHECKS to climb -
+   * the same missing CLIMB check `rope-of-climbing` records above, no longer C7c's W1 (closed
+   * 2026-08-13). Three gaps, and **D1 alone would be enough**: the potion is consumed, and this lane
+   * authors no consumable. Prose.
    *
    * `potion-of-diminution` / `potion-of-growth` - D1; the Enlarge/Reduce effects change a creature's
    * SIZE, its damage dice and its Strength checks. `Actor.size` exists but no rider writes it. Prose.

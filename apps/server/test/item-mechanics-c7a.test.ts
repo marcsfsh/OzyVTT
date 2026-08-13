@@ -171,6 +171,14 @@ describe("C7a: the lane's riders are present in the shipped bundle", () => {
     expect(shipped("ammunition-3").modifiers).toContainEqual(expect.objectContaining({ type: "attack-bonus", amount: 3 }));
     expect(shipped("luck-blade").modifiers).toContainEqual(expect.objectContaining({ type: "save-bonus", amount: 1 }));
     expect(shipped("sentinel-shield").modifiers).toContainEqual(expect.objectContaining({ type: "roll-mode", roll: "initiative", mode: "advantage" }));
+    // The Perception half, harvested 2026-08-13 once `roll: "check"` gained a consumer. Gated on the
+    // ABILITY because `BUILTIN_CHECKS.search` passes no skill and `skill-is` fails closed without one
+    // - a `skill-is: ["perception"]` here would ship a rider that fires nowhere. Driven to the die in
+    // `item-mechanics-program.test.ts`, beside the Rod of Alertness that prints the same sentence.
+    expect(shipped("sentinel-shield").modifiers).toContainEqual({
+      type: "roll-mode", roll: "check", mode: "advantage",
+      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+    });
     expect(shipped("plate-armor-of-etherealness").casts).toContainEqual(expect.objectContaining({ spellId: "etherealness" }));
     expect(shipped("armor-of-invulnerability").grants!.damageResistances).toEqual(["bludgeoning", "piercing", "slashing"]);
     expect(shipped("frost-brand").grants!.damageResistances).toEqual(["fire"]);

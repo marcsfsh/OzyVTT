@@ -293,16 +293,20 @@ Format: `[area] — description — suspected cause / status`.
 
 - **[content/riders] A `check-bonus` rider misses the SERVER's own ability-check roll, so the sheet
   promises a bonus the roll does not pay.** `checkRiderBonus`
-  (`apps/server/src/equipment-derivation.ts:778`) has exactly one consumer — `actor-derived.ts:94`,
-  the derived sheet's skill row. The one place the server rolls an ability check itself does not use
-  it: `BUILTIN_CHECKS` (`apps/server/src/action-resolution.ts:138-143`) resolves at `:758-766` from
+  (`apps/server/src/equipment-derivation.ts:851`) has exactly one consumer — `actor-derived.ts:94`,
+  the derived sheet's skill row. Where the server rolls an ability check itself it does not use it:
+  `BUILTIN_CHECKS` (`apps/server/src/action-resolution.ts:139`) resolves at `:762` from
   `abilityModifier` + `skillBonusFromExtension` + `exhaustionPenalty` and never calls
-  `checkRiderBonus`. **Measured 2026-08-12 through the real pipeline over the committed
+  `checkRiderBonus`. **NARROWED, NOT CLOSED, 2026-08-13**: `roll-mode {roll: "check"}` gained a
+  consumer on exactly those call sites (`apps/server/src/ability-checks.ts`), so the ADVANTAGE half of
+  a check rider now reaches the die and the FLAT half still does not — a `Stone of Good Luck` worn
+  beside `Boots of Elvenkind` rolls `2d20kh1` and adds +2, not +3. **Measured 2026-08-12 through the real pipeline over the committed
   `magic-items.v1.json`, on a Wizard 5 (Dex 14) wearing an attuned `Stone of Good Luck`
   (`check-bonus: 1`):** `deriveActorSheet(...).skills.find(stealth).bonus` is **3** while the builtin
   Hide roll through `resolveDefinitionAction(state, builtinAction("hide"), {builtin: true})` on a d20
   of 10 returns `check.total` **12** — Dex +2 only, the stone's +1 nowhere. It affects all four
-  builtin checks (Hide, Influence, Search, Study). This is the split-brain `actor-derived.ts:15-26`
+  builtin checks (Hide, Influence, Search, Study) **and Escape a Grapple**, the fifth check the
+  server throws. This is the split-brain `actor-derived.ts:15-26`
   says that block exists to end, in the other direction. Found by the C7d review pass, which records
   it at the `stone-of-good-luck-luckstone` entry in
   `packages/content-srd-5.2.1/scripts/item-mechanics/carried-and-potions.ts` and pins the two numbers

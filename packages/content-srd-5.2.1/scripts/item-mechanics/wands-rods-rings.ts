@@ -370,19 +370,33 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
    * The Protective Aura is authored for its COUNTER only - once per dawn, spent and refused - with
    * the buff itself in the prose.
    *
-   * NOT AUTHORED, and it is the half a reviewer will look for: **the Perception advantage**.
-   * `roll-mode` with `roll: "check"` parses, and `checkRiderBonus`
-   * (`equipment-derivation.ts:778-786`) collects the `on-ability-check` moment - but it sums
-   * `check-bonus` ONLY. Measured: `aggregateRollMode` has exactly three call sites
-   * (`encounter.ts:65`/`:122` for initiative, `saving-throws.ts:255` for saves,
-   * `action-resolution.ts:846` for attacks) and none of them is an ability check, so advantage on a
-   * check reaches nothing. NEEDS: a roll-mode reader on the ability-check path. UNBLOCKED BY: no
-   * unit. (`check-bonus` IS read, but the SRD prints advantage here, not a number.)
-   * The aura's "+1 bonus to Armor Class and saving throws" for YOU AND YOUR ALLIES is a second
-   * absence: no rider targets another actor.
+   * **THE PERCEPTION ADVANTAGE IS AUTHORED SINCE 2026-08-13.** This entry used to record the reader
+   * as missing - *"`aggregateRollMode` has exactly three call sites ... none of them is an ability
+   * check"* - and that measurement is now stale: `apps/server/src/ability-checks.ts` is the fourth
+   * call site, reached from the `BUILTIN_CHECKS` branch and from Escape a Grapple in
+   * `action-resolution.ts`.
+   *
+   * GATED ON THE ABILITY, NOT THE SKILL, and that is forced rather than chosen. `BUILTIN_CHECKS`
+   * resolves Search as a BARE Wisdom check (`{label: "Wisdom (Search)", ability: "wis"}` with no
+   * `skill` key); `skill-is` fails CLOSED against a narrow that carries no skill (`riders.ts`
+   * `passes`), so `skill-is: ["perception"]` would ship an advantage that fires on nothing - which is
+   * the same silence this entry recorded before, dressed as a rider. `ability-is: ["wis"]` fires on
+   * the one Wisdom check the server throws. MEASURED on the picker-minted, ATTUNED row through the
+   * SHIPPED bundle, faces 6 then 19: `2d20kh1+0`, kept 19, total **19**; drop attunement and the same
+   * queue gives `1d20+0` and **6**. Disclosed with `sentinel-shield`, which prints the identical
+   * clause: the engine's Search does not separate Perception from Insight/Medicine/Survival.
+   *
+   * The aura's "+1 bonus to Armor Class and saving throws" for YOU AND YOUR ALLIES is still an
+   * absence: no rider targets another actor. UNBLOCKED BY: no unit.
    */
   "rod-of-alertness": {
-    modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }],
+    modifiers: [
+      { type: "roll-mode", roll: "initiative", mode: "advantage" },
+      {
+        type: "roll-mode", roll: "check", mode: "advantage",
+        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+      }
+    ],
     casts: [
       { spellId: "detect-evil-and-good" },
       { spellId: "detect-magic" },

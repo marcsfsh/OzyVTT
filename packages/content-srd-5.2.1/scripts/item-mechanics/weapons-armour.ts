@@ -112,13 +112,20 @@
  *       `versus-size` and `versus-condition`, which are both produced at `action-resolution.ts:840-841`.
  *       **Needs: a producer for `RiderContext.targetCreatureType`. Unit: NONE YET.**
  *
- *   (C) `roll-mode` HAS NO CONSUMER FOR `roll: "check"`. The enum offers seven rolls; grepping every
- *       `"roll-mode"` consumer in the server finds exactly four - `attack` and `incoming-attack`
- *       (`action-resolution.ts:598,603`), `initiative` (`encounter.ts:57,62`) and `save`
- *       (`saving-throws.ts:64`). `checkRiderBonus` (`equipment-derivation.ts:783`) sums
- *       `check-bonus` only and never looks at `roll-mode`. So "Advantage on Wisdom (Perception)
- *       checks" is an absence while "Advantage on Initiative rolls" is a rider.
- *       **Needs: a `roll: "check"` consumer on the ability-check path. Unit: NONE YET.**
+ *   (C) `roll-mode` HAS NO CONSUMER FOR `roll: "check"` - **CLOSED 2026-08-13.**
+ *       `apps/server/src/ability-checks.ts` (`checkRollMode` / `checkRollSources` / `checkDieFor`)
+ *       is the consumer, called from the two places `action-resolution.ts` throws a check's d20: the
+ *       `BUILTIN_CHECKS` branch (Hide, Influence, Search, Study) and Escape a Grapple. So
+ *       "Advantage on Wisdom (Perception) checks" is a RIDER now, exactly as "Advantage on
+ *       Initiative rolls" always was, and `sentinel-shield` carries both halves.
+ *
+ *       **IT DID NOT UNBLOCK THE OTHER TWO ROWS THAT CITED IT, and each names its real reason at its
+ *       own entry rather than inheriting a closed limit.** The gate has to match the narrow the check
+ *       passes, and only Hide carries a `skill` (`{dex, stealth}`); Influence/Search/Study are bare
+ *       `{cha}`/`{wis}`/`{int}`, and Escape a Grapple narrows to whichever of `{str, athletics}` /
+ *       `{dex, acrobatics}` won. Both `ability-is` and `skill-is` fail CLOSED on a narrow missing
+ *       their key, so authoring to a skill the engine never passes ships an inert rider - which is
+ *       the failure (C) existed to prevent, not a way around it.
  *
  *   (D) AN AC BONUS CANNOT BE NARROWED TO ONE KIND OF INCOMING ATTACK. `armor-class` is read in the
  *       STANDING pass (`moment: null`), and `collectRiders` skips any rider carrying a filter in that
@@ -356,12 +363,36 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * `roll: "initiative"` makes `startEncounter` keep the higher of two dice. MEASURED here on the
    * picker-minted row: dice 4 then 19 queued, score **19**.
    *
-   * ABSENT: the Wisdom (Perception) half - limit (C). `roll: "check"` parses and no consumer
-   * anywhere reads it, so authoring it would ship an advantage that never applies. Unit: NONE YET.
+   * **THE WISDOM (PERCEPTION) HALF IS AUTHORED TOO SINCE 2026-08-13 - limit (C) CLOSED**, and it is
+   * gated on the ABILITY rather than the skill, which is the whole subtlety. `BUILTIN_CHECKS`
+   * (`action-resolution.ts`) resolves Search as a BARE Wisdom check - `{label: "Wisdom (Search)",
+   * ability: "wis"}`, no `skill` key at all, so `skillBonusFromExtension` is never consulted on that
+   * path. `skill-is`/`ability-is` fail CLOSED against a narrow that does not carry their key
+   * (`riders.ts` `passes`), so `skill-is: ["perception"]` would fire NOWHERE and ship inert - the
+   * exact failure this limit existed to prevent, re-created by an author being literal about the
+   * printed skill. `ability-is: ["wis"]` fires on Search, which is the only Wisdom check the server
+   * throws. MEASURED on the picker-minted row through the SHIPPED bundle, faces 5 then 18 queued:
+   * `2d20kh1+0`, kept 18, total **18**; unequipped, the same queue gives `1d20+0` and **5**.
    *
-   * The row prints nothing else. This absence list is complete.
+   * DISCLOSED, because it is an approximation and not an equivalence: the engine's Search does not
+   * distinguish Perception from the Insight, Medicine and Survival the SRD's Search action also
+   * admits, so the shield helps a Search it would not have helped at a table that called for
+   * Insight. The shield's clause carries NO qualifier of its own ("Advantage on ... Wisdom
+   * (Perception) checks", full stop), which is what separates it from C7c's `robe-of-eyes` and
+   * `eyes-of-the-eagle` - those print *"that rely on sight"*, a narrowing nothing can say, and stay
+   * absences there. See `rulingsOwed`.
+   *
+   * The row prints nothing else. This absence list is empty.
    */
-  "sentinel-shield": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
+  "sentinel-shield": {
+    modifiers: [
+      { type: "roll-mode", roll: "initiative", mode: "advantage" },
+      {
+        type: "roll-mode", roll: "check", mode: "advantage",
+        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+      }
+    ]
+  },
 
   /**
    * PLATE ARMOR OF ETHEREALNESS - "you can take a Magic action and use a command word to gain the
@@ -574,10 +605,16 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   //     no `when` list can express. Complete.
   //
   // `quarterstaff-of-the-acrobat` - "+2 bonus to attack rolls and damage rolls" (limit (0) / (A));
-  //     "Acrobatic Assist ... you have Advantage on Dexterity (Acrobatics) checks" - limit (C);
+  //     "Acrobatic Assist (Quarterstaff and 10-Foot Pole Forms Only) ... you have Advantage on
+  //     Dexterity (Acrobatics) checks" - **NOT limit (C) any more.** Escape a Grapple narrows to
+  //     `{dex, acrobatics}` whenever Acrobatics beats Athletics, so the rider WOULD fire; what blocks
+  //     it is the parenthesis. The weapon has three forms, the clause holds in two of them, and no
+  //     trigger reads an item's own state - `attuned` is the only item-facing gate and it says
+  //     nothing about shape. Authoring it unqualified would keep the advantage while the staff is a
+  //     6-inch rod in a pack. **Needs: item state a trigger can read. Unit: NONE YET.**
   //     "Attack Deflection", a Reaction granting +5 AC against one triggering attack - limit (D) plus
-  //     a reaction-window model; the form-changing (rod / 10-foot pole / Quarterstaff) that gates the
-  //     other two properties - there is no item-state vocabulary at all. Complete.
+  //     a reaction-window model; the form-changing itself - the same missing item-state vocabulary.
+  //     Complete.
   //
   // `holy-avenger` - "+3 bonus to attack rolls and damage rolls" (limit (0) / (A)); "When you hit a
   //     Fiend or an Undead with it, that creature takes an extra 2d10 Radiant damage" - limit (0) for
@@ -662,7 +699,11 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   //     that trades damage for a DC 15 Strength save or the Restrained condition for 1 minute,
   //     escapable on a DC 20 Strength (Athletics) check) - the save and the condition are expressible
   //     on an `actions[]` entry, but "instead of dealing damage" is a per-attack player choice with no
-  //     vocabulary, and the escape check is limit (C); "Arrow of Transport" (teleporting a willing
+  //     vocabulary, and the escape DC was **miscited as limit (C)**: (C) was about a roll-mode reader
+  //     and this is a NUMBER an item action cannot set. `escapeDc` lives on an effect
+  //     (`effects.ts`), and an item action's `onHit` is dropped before it reaches one (C7d's D2), so
+  //     the Restrained condition would arrive with no way out. **Needs: an item action that can set
+  //     an escape DC on the condition it applies. Unit: NONE YET.** "Arrow of Transport" (teleporting a willing
   //     creature or object up to 60 feet) - no teleport/forced-movement model; "Energy Ladder"
   //     (a 60-foot magical ladder for 1 minute) - no terrain model. Also absent: the arrow's Bright
   //     Light in a 20-foot radius - no light model. Unit: NONE YET for those four. Complete.
