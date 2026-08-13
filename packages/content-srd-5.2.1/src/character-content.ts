@@ -150,6 +150,33 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
 export type FeatureAction = z.infer<typeof FeatureActionSchema>;
 
 /**
+ * WHY A GATE AND A GRANTED SPELL CANNOT SHARE ONE BLOCK.
+ *
+ * The other ten lists are RECOMPUTED from the sheet on every read (`equipment-derivation.ts`'s
+ * `takeGrants`, reached for a feature through `characterGatedGrants`), so their gate is answered
+ * every time anyone looks. A granted spell is not read that way at all - it is BAKED at build time
+ * into `definition.spellcasting` by `character-build.ts`, and into four things at once: the spell
+ * row, the prepared/cantrip cap it is excused from, the action a cantrip is linked to, and, for a
+ * character with no class spell list, the ENTIRE caster block (ability, save DC, attack bonus) that
+ * exists only because something granted a spell. `actor.preparedSpellIds` is then written state,
+ * seeded at claim and at every long rest, not a derivation. Nothing re-reads the gate afterwards.
+ *
+ * So a gated spell has nowhere coherent to live, and the measurement is blunt: gating the shipped
+ * `high-elf-cantrip` does not condition Prestidigitation, it deletes `spellcasting` outright and the
+ * spell reaches nothing (`apps/server/test/grant-gates.test.ts`). A grant that is authored, parsed,
+ * stored and read by NOTHING is the exact silence this whole vocabulary exists to end, so the pair
+ * is refused at authoring - loudly, on the record the GM is editing - rather than dropped.
+ *
+ * This is a REFUSAL, not a ruling that gated spells are wrong. Give the derivation a spell channel
+ * (and an answer for the prepared cap and the conjured caster block) and this refinement is what
+ * comes out.
+ */
+export function grantedSpellGateMessage(spellIds: readonly string[]): string {
+  const named = spellIds.map((id) => `"${id}"`).join(", ");
+  return `A gated grant cannot hand over a spell, so a grants block cannot carry "when" and "spells" together: ${named} would reach nothing at all. The other ten lists are recomputed from the sheet on every read, so their gate is answered on every read - but a granted spell is baked into the character's spell list, its prepared count and its cantrip's action when the character is BUILT, and nothing reads the gate again afterwards. Put the spells in a second grants block with no "when" - this record without one, or a second feature - and keep the gate on the ten lists that can carry it.`;
+}
+
+/**
  * Flat things a feature simply hands the character. All open slugs (principle 3) so a homebrew
  * language, tool, or armor group needs no schema change.
  *
@@ -171,8 +198,18 @@ export type FeatureAction = z.infer<typeof FeatureActionSchema>;
  * THE GATE IS EVALUATED, NEVER ASSUMED. `GrantWhenSchema` admits only the trigger kinds a
  * derivation can answer (static + dynamic gates); a `moment` or a `filter` is refused at authoring
  * with the reason, because a gate that parses and is then ignored IS the over-grant.
+ *
+ * AND IT COVERS TEN OF THE ELEVEN LISTS, not all eleven - `spells` is refused beside it, by name.
+ * See `grantedSpellGateMessage` and its header above.
+ *
+ * TWO EXPORTS, AND EVERY AUTHORING DOOR PARSES THROUGH THE SECOND. `FeatureGrantsFieldsSchema` is
+ * the bare object - the eleven lists and the gate - exported only so a KEY CENSUS has a `.shape` to
+ * count (`grant-gate-preservation.mirror.test.ts`, which fails when the editor gains a key it
+ * neither edits nor carries; a `ZodEffects` has no `.shape`, and counting off a hand-written list is
+ * how that census would stop noticing a twelfth key). `FeatureGrantsSchema` is that object PLUS the
+ * one cross-field refusal, and it is the one to parse through.
  */
-export const FeatureGrantsSchema = z.object({
+export const FeatureGrantsFieldsSchema = z.object({
   skills: z.array(ContentIdSchema).max(20).default([]),
   expertise: z.array(ContentIdSchema).max(20).default([]),
   tools: z.array(ContentIdSchema).max(20).default([]),
@@ -186,11 +223,19 @@ export const FeatureGrantsSchema = z.object({
   /** Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. */
   spells: z.array(z.object({ id: ContentIdSchema, level: z.number().int().min(0).max(9).optional(), alwaysPrepared: z.boolean().default(true), ability: AbilitySchema.optional() }).strict()).max(30).default([]),
   /**
-   * The condition every list above applies under. ABSENT = unconditional, which is what every record
-   * written before this field meant and still means. See the header for why it gates the block.
+   * The condition the TEN LIST FIELDS above apply under - every one except `spells`, which cannot be
+   * gated and is refused beside a `when` (see `grantedSpellGateMessage`). ABSENT = unconditional,
+   * which is what every record written before this field meant and still means. See the header for
+   * why one gate covers the block.
    */
   when: GrantWhenSchema.optional()
 }).strict();
+
+export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants, context) => {
+  if (grants.when !== undefined && grants.spells.length > 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["spells"], message: grantedSpellGateMessage(grants.spells.map((spell) => spell.id)) });
+  }
+});
 
 /**
  * Typed numeric riders. A bounded union, deliberately small and grown additively - the same contract

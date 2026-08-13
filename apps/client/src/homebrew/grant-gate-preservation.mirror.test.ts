@@ -41,7 +41,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { EffectInstanceSchema, type ActorDefinition } from "@vtt/schemas";
-import { FeatureGrantsSchema } from "@vtt/content-srd-5.2.1";
+import { FeatureGrantsFieldsSchema } from "@vtt/content-srd-5.2.1";
 import { setCondition } from "../../../server/src/actor-conditions.js";
 import { importActorDefinition } from "../../../server/src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
@@ -63,11 +63,17 @@ const GATE = [{ type: "while-effect-tag", tags: ["raging"] }] as const;
 // -------------------------------------------------------------------------------------------------
 
 /**
- * A grants bag with EVERY key `FeatureGrantsSchema` accepts populated, parsed through the schema
- * itself rather than hand-listed - so a twelfth key added tomorrow is in this fixture the moment it
- * exists, and the partition below has to account for it.
+ * A grants bag with EVERY key the grants vocabulary has populated, parsed through the schema itself
+ * rather than hand-listed - so a twelfth key added tomorrow is in this fixture the moment it exists,
+ * and the partition below has to account for it.
+ *
+ * `FeatureGrantsFieldsSchema` (the object BEFORE the one cross-field refusal) rather than
+ * `FeatureGrantsSchema`, and the difference is the point of this fixture: `spells` beside a `when`
+ * is refused at authoring, because a granted spell is baked into the sheet at build time and no gate
+ * is ever read again. This census is over KEYS - what the editor may silently delete - so it must
+ * hold every key at once, including the one pair a GM may not save together.
  */
-const EVERY_KEY = FeatureGrantsSchema.parse({
+const EVERY_KEY = FeatureGrantsFieldsSchema.parse({
   skills: ["athletics"], expertise: ["athletics"], tools: ["thieves-tools"], languages: ["giant"],
   armor: ["heavy-armor"], weapons: ["martial-weapons"], saves: ["str"],
   damageResistances: ["fire"], damageImmunities: ["poison"], conditionImmunities: ["charmed"],
@@ -81,7 +87,7 @@ describe("the partition: every key is either a row the GM edits or a key the edi
   /** Everything else the schema accepts - what a rebuild deletes unless it is carried across. */
   const carried = Object.keys(EVERY_KEY).filter((key) => !editable.includes(key));
 
-  it("accounts for every key of `FeatureGrantsSchema` exactly once", () => {
+  it("accounts for every key of the grants vocabulary exactly once", () => {
     expect(editable).toEqual([
       "skills", "expertise", "tools", "languages", "armor", "weapons", "saves",
       "damageResistances", "damageImmunities", "conditionImmunities", "spells"
@@ -90,7 +96,7 @@ describe("the partition: every key is either a row the GM edits or a key the edi
     // second dropped key would be the same bug wearing a different name, so a new schema key lands
     // here and fails until someone decides whether it gets a row or gets carried.
     expect(carried, "a key the editor neither edits nor carries is silently deleted by every edit").toEqual(["when"]);
-    expect([...editable, ...carried].sort()).toEqual(Object.keys(FeatureGrantsSchema.shape).sort());
+    expect([...editable, ...carried].sort()).toEqual(Object.keys(FeatureGrantsFieldsSchema.shape).sort());
   });
 
   it("round-trips all twelve through the component's own read and write, losing none", () => {

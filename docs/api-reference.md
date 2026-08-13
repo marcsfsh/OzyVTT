@@ -5498,12 +5498,12 @@ Flat things a feature simply hands the character. All open slugs, so a homebrew 
 | `damageResistances` | string (pattern)[] | no |  |
 | `damageImmunities` | string (pattern)[] | no |  |
 | `conditionImmunities` | string (pattern)[] | no |  |
-| `spells` | object[] | no | Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites |
+| `spells` | object[] | no | Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites. This is the ONE list `when` cannot gate - see `when` below |
 | `spells[].id` | string (pattern) | yes |  |
 | `spells[].level` | integer (0–9) | no |  |
 | `spells[].alwaysPrepared` | boolean | no | Default: `true`. |
 | `spells[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
-| `when` | HomebrewRiderTrigger[] | no | The condition ALL ten lists above apply under. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed - static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always" |
+| `when` | HomebrewRiderTrigger[] | no | The condition the TEN LIST FIELDS above apply under - every one except `spells`, which cannot be gated: a granted spell is baked into the sheet's spell list, its prepared count and its cantrip action when the character is BUILT, so nothing would re-read the gate. A block carrying both `when` and `spells` is refused, naming the spells that would have been lost. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed - static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always" |
 
 ### `HomebrewFeatureModifier`
 

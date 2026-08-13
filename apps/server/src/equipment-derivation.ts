@@ -52,14 +52,27 @@ import {
 /**
  * The rider block every carrier shares (`featureRiders`), as this module reads it.
  *
- * `grants` names ALL TEN keys `FeatureGrantsSchema` offers. It used to name six, and the other four
- * (armor, weapons, damageImmunities, conditionImmunities) were authored in the homebrew editor,
- * stored on the record, and dropped here without a trace - the reading surface was the whole
+ * `grants` names TEN of the ELEVEN lists `FeatureGrantsSchema` offers. It used to name six, and four
+ * of those ten (armor, weapons, damageImmunities, conditionImmunities) were authored in the homebrew
+ * editor, stored on the record, and dropped here without a trace - the reading surface was the whole
  * silence. Every key below has a consumer; see `takeGrants` and its callers.
  *
- * `grants.when` is the ELEVENTH key and the only one that is not a list of things to hand over: it
- * is the condition the other ten apply under (`FeatureGrantsSchema.when`). Absent on every record
- * written before it existed, and absent means unconditional, so `takeGrants` behaves identically.
+ * `grants.when` is the condition those ten apply under (`FeatureGrantsSchema.when`). Absent on every
+ * record written before it existed, and absent means unconditional, so `takeGrants` behaves
+ * identically.
+ *
+ * THE ELEVENTH LIST IS `spells`, AND ITS ABSENCE HERE IS DELIBERATE - stated rather than left as the
+ * same silence the paragraph above describes. This module cannot hand a spell over: a granted spell
+ * is baked into `definition.spellcasting` at build time (`character-build.ts`'s `interpretFeature`),
+ * including the prepared cap and the caster block a non-caster gets only because of it, and there is
+ * no read-time seam that layers one on. So the pair is closed at the authoring door instead - a
+ * grants block carrying both a `when` and a spell is REFUSED (`grantedSpellGateMessage`), and no
+ * gated spell can reach this view to be lost.
+ *
+ * What that refusal does NOT cover, and it is a real remaining hole rather than a tidy edge: an
+ * ITEM's UNGATED `grants.spells` still arrives at `takeGrants` (items never pass through
+ * `interpretFeature`) and is still dropped here. No shipped record uses it. `known-bugs.md` carries
+ * the measurement.
  */
 export type RiderBlockLike = Readonly<{
   modifiers?: readonly RiderModifier[];

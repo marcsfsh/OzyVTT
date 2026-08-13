@@ -335,6 +335,22 @@ Format: `[area] — description — suspected cause / status`.
   `apps/server/test/item-mechanics-c7d.test.ts`. Wants a unit: an out-of-encounter resolution path
   for item actions that debits the pool.
 
+- **[content/items] An ITEM's `grants.spells` reaches nothing — the eleventh grant list has no
+  channel on the derivation.** `FeatureGrantsSchema` has eleven lists; `deriveEquipment`'s
+  `takeGrants` (`apps/server/src/equipment-derivation.ts`) folds ten and has no `spells` arm, and
+  items never pass through `character-build.ts`'s `interpretFeature`, which is the only thing that
+  bakes a granted spell into a sheet. Measured 2026-08-13 on an equipped magic item whose parsed
+  block is `{spells:[{id:"fireball",level:3}], damageResistances:["fire"]}`: `damageResistances`
+  arrives as `["fire"]` while `"spells" in derivation` is `false` and no serialisation of the
+  derivation contains `"fireball"` anywhere. No shipped record uses it — all 41 blocks that grant a
+  spell are on classes, species and subclasses, which take the baked path — so this is latent, not
+  live. The GATED half of the same hole is closed: a grants block carrying both `when` and `spells`
+  is refused at authoring (`grantedSpellGateMessage`, `apps/server/test/grant-gates.test.ts`), which
+  is why an item's silence is now the only one left. Wants a unit: either a spell channel on
+  `EquipmentDerivation` that layers onto `spellcasting` at read time (it needs an answer for the
+  prepared cap and for the caster block a non-caster gets only because of the grant), or the same
+  named refusal extended to an item carrier.
+
 - **[content/items] The Shield of Missile Attraction is authored as a curse with no benefit, so
   attuning it does nothing except make it impossible to take off.** Measured 2026-08-12 through the
   real `ContentLibrary` over the committed

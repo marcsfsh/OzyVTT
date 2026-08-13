@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-import { FeatureGrantsSchema } from "@vtt/content-srd-5.2.1";
+import { FeatureGrantsSchema, grantedSpellGateMessage } from "@vtt/content-srd-5.2.1";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { deriveEquipment, equipmentCatalogOf, type EquipmentCatalog, type EquipmentRecordLike, type FeatureRecordLike } from "../src/equipment-derivation.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
+import { validateForPublish, type HomebrewValidationContext } from "../src/homebrew-validate.js";
+import { EMPTY_AUTHORED_INDEX } from "../src/homebrew-store.js";
 
 /**
  * W3 - A GRANTED RESISTANCE, IMMUNITY OR PROFICIENCY CAN CARRY A CONDITION.
@@ -312,3 +314,143 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
     expect(built.damageResistances).toContain("poison");
   });
 });
+
+// -------------------------------------------------------------------------------------------------
+// THE ELEVENTH LIST. The gate covers ten of them; `spells` is refused beside it rather than dropped.
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * `FeatureGrantsSchema` has ELEVEN lists and the gated path folds TEN. The eleventh is `spells`, and
+ * before this it was not withheld by the gate - it was DELETED by it, silently, at authoring time.
+ *
+ * The measurement that decided the shape of the fix is the first test below: gating the SHIPPED
+ * `high-elf-cantrip` does not make Prestidigitation conditional, it makes `definition.spellcasting`
+ * `undefined` outright. That is because a granted spell is not recomputed the way the other ten
+ * lists are - `character-build.ts` bakes it into four things at build time (the spell row, the
+ * prepared/cantrip cap it is excused from, a cantrip's linked action, and for a character with no
+ * class spell list the ENTIRE caster block that exists only because something granted a spell), and
+ * `actor.preparedSpellIds` is then written state seeded at claim and at every long rest.
+ * `deriveEquipment` has no seam that writes any of that, so "a spell you have only while raging" has
+ * nowhere coherent to live today.
+ *
+ * So the pair is REFUSED at the authoring door, by name, naming the spells that would have been
+ * lost - not carried, and above all not dropped. A grant that is authored, parsed, stored and read
+ * by NOTHING is the silence W1 and W3 both exist to end.
+ */
+describe("the eleventh list: `spells` beside a `when` is refused, never silently dropped", () => {
+  const GATED_FIREBALL = { spells: [{ id: "fireball", level: 3 }], damageResistances: ["fire"], when: [{ type: "while-character-is", speciesIds: ["dwarf"] }] };
+
+  it("refuses the pair at the schema and NAMES the spell that would have gone nowhere", () => {
+    const refused = FeatureGrantsSchema.safeParse(GATED_FIREBALL);
+    expect(refused.success, "before this, the block parsed happily and the spell reached nothing at all").toBe(false);
+    expect(refused.error!.issues.map((issue) => issue.message).join(" ")).toBe(grantedSpellGateMessage(["fireball"]));
+    // Machine-addressable, so the editor points at the `spells` box rather than at the record.
+    expect(refused.error!.issues.map((issue) => issue.path.join("."))).toEqual(["spells"]);
+  });
+
+  it("names EVERY spell in the block, so a GM fixing it knows what to move", () => {
+    const refused = FeatureGrantsSchema.safeParse({ ...GATED_FIREBALL, spells: [{ id: "fireball" }, { id: "haste" }] });
+    expect(refused.error!.issues[0].message).toContain('"fireball", "haste" would reach nothing at all');
+  });
+
+  it("reaches a GM through the real publish door, on the record they are editing", () => {
+    const species = (grants: unknown) => ({
+      id: "hb-flamekin-a1b2c3", name: "Flamekin", source: "homebrew", speedFeet: 30,
+      traits: [{ id: "flamekin-ember", name: "Ember", description: "A spark you carry.", grants }]
+    });
+    // The SAME record without the gate publishes cleanly, so the refusal below is the only thing
+    // wrong with it - `valid: false` here cannot be some other mistake in the fixture.
+    const { when: _gate, ...ungated } = GATED_FIREBALL;
+    expect(validateForPublish("species", species(ungated), publishContext())).toEqual({ valid: true, issues: [] });
+
+    const validity = validateForPublish("species", species(GATED_FIREBALL), publishContext());
+    expect(validity.valid).toBe(false);
+    expect(validity.issues).toHaveLength(1);
+    expect(validity.issues[0].message).toBe(grantedSpellGateMessage(["fireball"]));
+    // Machine-addressable all the way down the record, so the editor opens the right trait and
+    // points at the right box rather than printing prose at the top of the form.
+    expect(validity.issues[0].path.join(".")).toBe("traits.0.grants.spells");
+  });
+
+  it("takes the SAME block once the gate comes off - the refusal is the pair, not the spell", () => {
+    const { when: _gate, ...ungated } = GATED_FIREBALL;
+    expect(FeatureGrantsSchema.safeParse(ungated).success).toBe(true);
+    // And the gate alone is still fine on the other ten, which is what W3 shipped.
+    expect(FeatureGrantsSchema.safeParse({ ...GATED_FIREBALL, spells: [] }).success).toBe(true);
+  });
+});
+
+/**
+ * THE UNGATED PATH, UNCHANGED - proven on a shipped record rather than a fixture.
+ *
+ * `high-elf-cantrip` really is authored as `grants: { spells: [{ id: "prestidigitation", ... }] }` in
+ * `bundles/species.v1.json`, and it is one of 41 shipped blocks that grant a spell with no gate. The
+ * refusal above must not touch any of them.
+ */
+function elfViewGating(gate: readonly unknown[] | null): ContentView {
+  const base = new ContentLibrary().forAudience("gm");
+  const gateTrait = <T extends { id: string; grants?: unknown }>(trait: T): T =>
+    trait.id !== "high-elf-cantrip" || gate === null ? trait : { ...trait, grants: { ...(trait.grants as object), when: gate } };
+  return {
+    ...base,
+    speciesRecord: (id) => {
+      const record = base.speciesRecord(id);
+      if (!record || id !== "elf") return record;
+      return { ...record, lineages: record.lineages.map((lineage) => ({ ...lineage, traits: lineage.traits.map(gateTrait) })) };
+    },
+    featureRecord: (ref) => {
+      const record = base.featureRecord(ref);
+      return record && ref.id === "high-elf-cantrip" ? gateTrait(record as { id: string; grants?: unknown }) as typeof record : record;
+    }
+  };
+}
+
+const highElfInput = (): CharacterCreateRequestInput => ({
+  name: "Aeliel", speciesId: "elf", backgroundId: "soldier", classId: "fighter", level: 1,
+  abilityMethod: "standard-array", baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "perception" },
+    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
+    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
+    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+    { level: 1, kind: "lineage", id: "high-elf" },
+    { level: 1, kind: "skill", id: "insight", payload: { featureId: "elf-keen-senses" } },
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, kind: "language", id: "goblin" },
+    { level: 1, kind: "equipment", id: "fighter-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as unknown as CharacterCreateRequestInput);
+
+describe("an ungated granted spell still arrives, on the shipped record that grants one", () => {
+  const policy = BuilderPolicySchema.parse({});
+
+  it("puts Prestidigitation on a Fighter's sheet, always prepared, with a caster block to cast it from", () => {
+    const built = buildCharacterDefinition(highElfInput(), elfViewGating(null), policy);
+    expect(built.spellcasting!.spells).toEqual([
+      { id: "prestidigitation", name: "Prestidigitation", level: 0, prepared: true, alwaysPrepared: true }
+    ]);
+    // A Fighter has no spell list at all, so this whole block exists ONLY because a trait granted a
+    // spell - and `ability: "int"` is the grant's own, which is what makes the DC the elf's.
+    expect(built.spellcasting!.ability).toBe("int");
+  });
+
+  it("is what gating it USED to destroy - the measurement that made the refusal the right answer", () => {
+    // The gate is applied BELOW the schema on purpose: this is what the old silent path did, and it
+    // is the reason the pair is refused above rather than carried. `spellcasting` does not become
+    // conditional - it ceases to exist, and Prestidigitation is on no sheet anywhere.
+    const built = buildCharacterDefinition(highElfInput(), elfViewGating([{ type: "while-effect-tag", tags: ["raging"] }]), policy);
+    expect(built.spellcasting, "a gated spell had nowhere to live: the caster block went with it").toBeUndefined();
+    expect(JSON.stringify(built)).not.toContain("prestidigitation");
+  });
+});
+
+/** The publish gate's context, with an empty homebrew slice - tier 1 is the record's own schema. */
+function publishContext(): HomebrewValidationContext {
+  return { catalog: new ContentLibrary().forAudience("gm"), spellLists: [], authored: EMPTY_AUTHORED_INDEX };
+}
