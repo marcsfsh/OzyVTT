@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
 import { IconButton, IconX } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
+import { DamageTypeField } from "../encounter/DamageTypeField";
+import { manualDamagePayload, manualDamageType } from "../encounter/manual-damage";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { TokenLibrary } from "../tokens/TokenLibrary";
@@ -31,6 +33,8 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
 }>) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [amount, setAmount] = useState("");
+  /** D7's optional type for the number beside it; untouched = the untyped fast path. */
+  const [damageType, setDamageType] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   const [library, setLibrary] = useState(false);
@@ -72,9 +76,14 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
     const value = Number(amount.trim());
     if (!Number.isInteger(value) || value < 1 || value > 1000) { setFeedback("Enter a whole number (1-1000)."); return; }
     setBusy(true);
-    socket.emit(event, { commandId: newId(), actorId: actor.id, amount: value }, (result: { ok: boolean; message?: string }) => {
+    // D7: only the damage door carries a type. Heal shares this row and has none.
+    const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
+    const payload = event === "actor:apply-damage"
+      ? manualDamagePayload({ commandId: newId(), actorId: actor.id, amount: value, damageType: typed })
+      : { commandId: newId(), actorId: actor.id, amount: value };
+    socket.emit(event, payload, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
-      setFeedback(result.ok ? `${verb} ${value}.` : result.message ?? "That change was rejected.");
+      setFeedback(result.ok ? `${verb} ${typed ? `${value} ${typed}` : value}.` : result.message ?? "That change was rejected.");
       if (result.ok) setAmount("");
     });
   };
@@ -140,6 +149,10 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
         <input type="number" min="1" max="1000" placeholder="HP" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", "Damaged")}>Dmg</button>
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", "Healed")}>Heal</button>
+        {/* D7, on its own line under the buttons. This menu is `.scroll-y` with a measured
+            `max-height`, so the listbox opens into the menu's own scroll region rather than off the
+            viewport — the same reason the size/health choosers sit in flow here. */}
+        <DamageTypeField value={damageType} disabled={busy} onChange={setDamageType} />
       </div>}
       {role === "gm" && <label className="token-context-size">Size
         <select value={currentSize} disabled={busy} onChange={(event) => setSize(event.target.value)}>

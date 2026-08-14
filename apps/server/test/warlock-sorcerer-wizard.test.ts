@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { featurePicks } from "@vtt/content-srd-5.2.1";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -949,5 +950,99 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
       { ...wizardInput(), choices: wizardInput().choices.filter((row) => row.payload?.featureId !== "signature-spells") },
       library, POLICY);
     expect(thrown(without)).toMatch(/"Signature Spells" needs 2 pick\(s\) of kind "spell"/);
+  });
+});
+
+/**
+ * SPELL MASTERY IS A LEVEL-1 PICK **AND** A LEVEL-2 PICK (content program C4).
+ *
+ * The printed text is "Choose a level 1 AND a level 2 spell in your spellbook that have a casting time
+ * of an action." The record said `{ kind: "spell", choose: 2, fromCatalog: "wizard-spells",
+ * maxSpellLevel: 2 }` - ONE pick of two under ONE ceiling - so a level-18 Wizard could take two level-1
+ * spells, or two level-2 spells, and the build accepted both. Neither is the feature.
+ *
+ * THE FAR END IS THE REFUSAL, because the refusal is the whole bug: under the old single block nothing
+ * anywhere said no. Both refusals below are needed to prove there are two DIFFERENT windows rather than
+ * two copies of one - two level-1 spells must fail on the second block's FLOOR, and two level-2 spells
+ * must fail on the first block's CEILING. A single window cannot produce both.
+ *
+ * Authored in `scripts/class-mechanics/wizard.ts` through the overlay's `clears` verb (ruled
+ * 2026-08-10) and merged into `bundles/classes.v1.json` by `build-class-bundle.ts`; this test reads the
+ * shipped bundle through the real `ContentLibrary`, so it fails if either half is reverted.
+ */
+describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two picks under one ceiling", () => {
+  const mastery = (id: string): Row => ({ level: 18, kind: "spell", id, payload: { featureId: "spell-mastery" } }) as Row;
+
+  /**
+   * A level-18 Evoker - the level Spell Mastery arrives at, and one below the Epic Boon, so the
+   * ledger owes exactly the two mastery rows and nothing later. Derived from `wizardInput()`'s
+   * level-20 ledger by dropping the rows for levels 19-20, so the two harnesses cannot drift apart.
+   */
+  const level18 = (masteryRows: readonly Row[]): CharacterCreateRequestInput => ({
+    ...wizardInput(), level: 18,
+    choices: [
+      ...wizardInput().choices.filter((row) => row.level < 18),
+      ...masteryRows
+    ] as CharacterCreateRequestInput["choices"]
+  });
+
+  it("REFUSES a level-18 Wizard who answers both rows with level-1 spells", () => {
+    // THE BUG, at its far end. `magic-missile` and `detect-magic` are both level 1: the first fills the
+    // level-1 block, and the second has nowhere left to go because the only other block floors at 2.
+    // Before C4 this build was accepted and the sheet carried two level-1 spells.
+    //
+    // The message is asserted WHOLE, and the tail is the load-bearing half: "Spell Mastery: 1, Spell
+    // Mastery: 1" is the builder printing the capacity of each offer this feature raised. Two offers
+    // of one. The single block it replaced printed "Spell Mastery: 2" and never got here at all.
+    const message = thrown(() => buildCharacterDefinition(
+      level18([mastery("magic-missile"), mastery("detect-magic")]), library, POLICY));
+    expect(message).toBe('The "spell" pick "detect-magic" exceeds what this build may choose (Spell Mastery: 1, Spell Mastery: 1).');
+  });
+
+  it("REFUSES a level-18 Wizard who answers both rows with level-2 spells, naming the ceiling", () => {
+    // The mirror, and it is what proves the two windows DIFFER. `acid-arrow` and `blur` are both level
+    // 2: one fills the level-2 block and the other is above the level-1 block's ceiling. A pair of
+    // identical windows would accept this; the old single `maxSpellLevel: 2` did.
+    const message = thrown(() => buildCharacterDefinition(
+      level18([mastery("acid-arrow"), mastery("blur")]), library, POLICY));
+    expect(message).toBe('The "spell" pick "blur" exceeds what this build may choose (Spell Mastery: 1, Spell Mastery: 1).');
+  });
+
+  it("REFUSES a cantrip in the level-1 row — a level-0 spell is not \"a level 1 spell\"", () => {
+    // The window's FLOOR, and it is the half C4 shipped without. `wizard-spells` resolves to all 218
+    // Wizard spells, 15 of them cantrips, and `withinSpellWindow` is a plain min/max check - so a
+    // block reading `maxSpellLevel: 1` with no floor accepted a level-0 cantrip as the printed
+    // "level 1 spell". Measured before the fix: `fire-bolt` + `acid-arrow` built CLEAN.
+    //
+    // The client's picker filters cantrips out of a `kind: "spell"` block (build-payload.ts:459), so
+    // this was never reachable by tapping - which is exactly why it needed a server-side test. The
+    // server is the authority and it was not enforcing what the text says.
+    // The refusal is the floor's OWN, not the generic capacity one the other two rows produce —
+    // the builder names the level it got, the minimum it wanted, and the feature that wanted it.
+    const message = thrown(() => buildCharacterDefinition(
+      level18([mastery("fire-bolt"), mastery("acid-arrow")]), library, POLICY));
+    expect(message).toBe('"fire-bolt" is level 0, below the minimum spell level (1) for "Spell Mastery".');
+  });
+
+  it("ACCEPTS the printed pair, and puts both spells on the sheet", () => {
+    // The other side of the refusal: the feature still works, and it works for the pair the SRD prints.
+    const built = buildCharacterDefinition(level18([mastery("magic-missile"), mastery("acid-arrow")]), library, POLICY);
+    expect(spellOf(built, "magic-missile")).toMatchObject({ id: "magic-missile", level: 1 });
+    expect(spellOf(built, "acid-arrow")).toMatchObject({ id: "acid-arrow", level: 2 });
+  });
+
+  it("offers TWO pick rows with DIFFERENT windows, through the accessor the builder reads", () => {
+    // The content half, read the way the engine reads it: `featurePicks` is the single accessor
+    // `character-build.ts` takes a feature's picks through, so this is the same list that became the
+    // two offers above. It is here to make the control probe (collapse the blocks back to one) fail
+    // LOUDLY at the shape as well as at the refusals.
+    const spellMastery = library.classRecord("wizard")!
+      .features.find((feature) => feature.id === "spell-mastery")!;
+    const picks = featurePicks(spellMastery);
+    expect(picks).toHaveLength(2);
+    // BOTH windows are floored as well as capped. The first block's floor of 1 is what keeps a
+    // cantrip out of the level-1 row; before it, this read [null, 1] and level 0 satisfied it.
+    expect(picks.map((pick) => [pick.minSpellLevel ?? null, pick.maxSpellLevel ?? null])).toEqual([[1, 1], [2, 2]]);
+    expect(picks.map((pick) => pick.choose)).toEqual([1, 1]);
   });
 });

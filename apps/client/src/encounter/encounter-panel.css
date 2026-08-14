@@ -378,7 +378,17 @@
 .initiative-row-tools .secondary { padding: .3rem .7rem; font-size: var(--fs-xs); }
 /* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
-.row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
+/* `minmax(0, 1fr)`, not the default `auto` column, which grows to its widest item's MAX-CONTENT and
+   overflows a grid container that has a perfectly definite width. Measured at 375px: the popover was
+   313px wide and its `.hp-editor` row 419.8px, so `Temp` was clipped by the screen edge and `Set` sat
+   entirely beyond it (x 405.7-470.6) with nothing able to scroll to it. Pre-existing — it is what
+   `.hp-editor`'s five `flex: 1` buttons have always summed to — and fixed here because D7's chooser
+   sits in that row and inherits the same overflow. `1fr` is `minmax(auto, 1fr)`, whose auto MINIMUM
+   is the same trap; the `0` is the whole point. Measured after: the row is 291.9px and the five
+   buttons settle at 35.4-45.8px wide, which is what five buttons and a number field cost when they
+   are all required to be ON the screen. Their 38.9px HEIGHT is unchanged, and height is the dimension
+   that was already under the 44px floor, so `scripts/tap-audit.mjs` does not move. */
+.row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .45rem; padding: .6rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
 /* The active row carries the acting console inline, so open its HP/tools popover in-flow ABOVE the
    console (not floating below the whole row), so editing HP shows those controls above the actions. */
 .initiative-list.gm > li.active .row-tools-popover { position: relative; z-index: 41; top: auto; margin-top: .4rem; }
@@ -473,10 +483,22 @@
    the Foundry-style row) and nothing has emitted the bare class since. Verified 2026-08-05 by
    searching the whole tree outside node_modules/dist - the only hits were this stylesheet's own six
    declarations plus two compound selectors it shared with the live `.initiative-score-value`. */
-.hp-editor { display: flex; gap: .35rem; }
-.hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
-.hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
-.hp-editor button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* `flex-wrap` so D7's damage-type chooser can take a whole line of its own under the five buttons
+   (`flex-basis: 100%`, below). The buttons never wrap and are not meant to: `flex: 1` is
+   `flex-basis: 0`, so all five have a hypothetical size of 0 and always share one line.
+   `> input` / `> button` RATHER THAN DESCENDANTS, here and at `.sheet-hp-controls`,
+   `.token-context-hp` and every entry these four have in the material blocks below. The chooser is a
+   shared `Combobox`, and its own box is an `<input>` while each of its thirteen listbox rows is a
+   `<button>` — so the loose selectors were restyling a primitive's internals from outside it.
+   Measured: `.hp-editor input` sized the chooser to the number field's 4.2rem, and
+   `.token-context-hp button`'s `min-height: 2.6rem` shrank every option row to 41.6px, one tap floor
+   short, while the plate `::before` drew a bordered box around each one. Child combinators cost no
+   specificity, so nothing else in these files reorders. */
+.hp-editor { display: flex; flex-wrap: wrap; gap: .35rem; }
+.hp-editor > input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
+.hp-editor .damage-type-field { flex: 1 0 100%; }
+.hp-editor > button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
+.hp-editor > button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* `.health-chip` AND ITS TWO TONES WERE HERE — another `--radius-pill` rule for markup that does
    not exist. Same search as `.initiative-tag` above, same result: `health-chip`, `health-bloodied`
    and `health-down` appear in no `.tsx` anywhere in the repo, and the live DOM renders zero. The
@@ -637,6 +659,15 @@
 .save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem var(--space-2); border: 1px solid transparent; }
 .save-prompt-label { font-size: var(--fs-sm); color: var(--text-dim); }
 .save-prompt-label strong { color: var(--text); }
+/* Issue `4b`'s amend field: its OWN row inside the prompt's column, deliberately not inside
+   .save-prompt-actions. That row already wraps two controls plus a dismiss at 375px, and a third
+   flex item in it put the damage field and the d20 field side by side reading as one pair. A label
+   is the hit area, so the 44px floor is real paint (the .manual-nat20 route above), and the field
+   keeps .action-damage-edit's danger tint - the same control the attack path and the pending-damage
+   proposal already use for "the number about to come off somebody's hit points". */
+.save-damage-amend { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: var(--tap-min); font-size: var(--fs-xs); font-weight: 700; color: var(--text-dim); cursor: pointer; }
+.save-damage-amend > span { flex: 1 1 auto; min-width: 0; }
+.save-damage-amend .action-damage-edit { flex: 0 0 4rem; min-height: var(--tap-min); box-sizing: border-box; }
 .save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .save-prompt-roll { flex: 0 0 auto; }
 .save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; flex: 1 1 12rem; }
@@ -703,9 +734,32 @@
 /* At-a-glance health band (design language §6) under the HP readout; number stays the primary display. */
 .sheet-hp-meter { margin: .3rem 0 .1rem; }
 .sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
-.sheet-hp-controls input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
+/* Same rule as `.hp-editor`'s: D7's chooser takes a whole line so the number and its four buttons keep
+   the row they were measured on. This one already wrapped, so only the basis is new. */
+.sheet-hp-controls .damage-type-field { flex: 1 0 100%; }
+.sheet-hp-controls > input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
 /* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
-.sheet-hp-controls input:disabled { opacity: .5; cursor: default; }
+.sheet-hp-controls > input:disabled { opacity: .5; cursor: default; }
+/* GIVING THE CHOOSER A LINE WAS ONLY HALF OF IT: its open list has to escape the chip too, and
+   `7541dbf` shipped without that half.
+   `.sheet-vital` carries `isolation: isolate` (ruling 45's flat plate, far below) so its `::before`
+   backing layer at `z-index: -1` stays inside it. That isolate is a stacking context, and it TRAPS
+   `.nh-combobox-list`'s `z-index: 40` inside ONE vital — so everything positioned that paints after
+   it covers the list, and positioned is nearly everything (`.nh-btn` and `.nh-chip` both take
+   `position: relative; isolation: isolate` for backing layers of their own). The other two D7 doors
+   never had this: in `.row-tools-popover` the list sits DIRECTLY inside the isolate, so its 40 wins.
+   Measured at 375px on 2026-08-10, GM, on each of the three seeded sheets: all 13 rows rendered at
+   222.2x44 and only 10 answered `elementFromPoint` at their own centre. `Acid` resolved to the AC
+   chip's `<strong>` (Playwright: `<div class="sheet-vital">` intercepts pointer events), `Thunder`
+   to `Long rest` in `.sheet-rest-block`, `Cold` to a condition chip on the sheet that had three; a
+   real `.tap()` on any of them timed out at 6 s and left the chooser empty. Which rows are
+   unreachable varies with what is rendered below the chip, which makes it harder to notice.
+   The isolate is NOT removed — without it the plate escapes upward, the failure `Button.css`
+   documents at length. The chip is LIFTED instead, and only while a list is open, exactly as
+   `.scene-gallery-hub .nh-card:has(details[open])` lifts a card whose ⋯ menu is open. `3` and not
+   `1` because `.sheet-float-resize` is the one explicit z-index inside a sheet and it is `2`.
+   After: 13 of 13 own their centre on all three sheets, and Acid/Thunder/Cold each tap through. */
+.sheet-vital:has(.nh-combobox-list) { z-index: 3; }
 /* Dmg/Heal/Temp/Set now render as <Button size="sm"> (Dmg destructive). */
 /* Conditions section (v3 #2.5): a labelled section instead of a bare "+ Add". */
 .sheet-conditions { margin-top: .85rem; }
@@ -783,6 +837,21 @@
 .sheet-inv-head span { color: var(--text-muted); font: 800 .54rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .sheet-inv-head .sheet-item-name { text-align: left; }
 .sheet-inv-row .sheet-inv-qty, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
+/* PHONE: the five-column row cannot hold a name AND four controls. Measured at 375px in Chromium
+   1194: the stepper, Equip, Attune, × and their gaps take 331 of the row's 355px, leaving the name
+   column ~24px — "Wand of the War Mage, +1" wrapped to one word per line and its text was invisible.
+   That was true of any long name before the SRD's magic items landed; 268 of them is what made it
+   impossible to miss. Below 30rem the row is two lines: the item, then its controls. */
+@media (max-width: 30rem) {
+  .sheet-inv { display: block; }
+  .sheet-inv-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; padding: .45rem .35rem; border-bottom: 1px solid var(--line); }
+  /* The column headings label columns that no longer exist here, and they wrapped to two lines
+     saying so. Written with both classes so it beats the rule above whatever the source order. */
+  .sheet-inv-row.sheet-inv-head { display: none; }
+  .sheet-inv-row .sheet-item-name { flex-basis: 100%; }
+  /* Pushes Equip / Attune / × to the right edge, so the second line reads qty ......... controls. */
+  .sheet-inv-row .sheet-inv-qty { margin-right: auto; }
+}
 /* Route 1: inventory rows are a stacked list 9.6px apart, and 11.2px of `::after` a side would have
    each row's Equip/Attune reaching into the row above and below it. */
 .sheet-toggle-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
@@ -802,22 +871,41 @@
 /* Inventory rows now carry the catalog category as a subtle badge after the name. */
 .sheet-item-name { display: inline-flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
 .sheet-item-cat { color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
+/* The row's own text — a magic item's rarity and attunement requirement live at the head of it.
+   Two lines maximum: an SRD entry runs to 2000 characters and the row has controls beside it. */
+.sheet-item-desc { flex-basis: 100%; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 /* Browse-and-add-from-catalog picker (Modal body). */
 .sheet-picker-controls { display: grid; gap: var(--space-2); margin-bottom: .6rem; }
-.sheet-picker-search { width: 100%; padding: .4rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
+/* 34.3px tall before this — the tenth of the picker's sub-floor controls, and the one a GM types
+   into first now that the list it filters is 400 rows long. */
+.sheet-picker-search { width: 100%; min-height: var(--tap-min); padding: .4rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
 .sheet-picker-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
-.sheet-picker-chip { padding: .22rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+/* ROUTE 1 (paint the floor), not route 2, and the wrap is the reason: these chips sit in a
+   `flex-wrap` row .3rem apart, so an `::after` overhang would reach into the chip beside AND the
+   chip above and steal both. They were 19px tall — nine of the audit's sub-floor controls at 375px
+   — and this unit adds three more of them, which is not a thing to do to a control that misses the
+   floor. `align-items: center` keeps the label optically where it already was. */
+.sheet-picker-chip { display: inline-flex; align-items: center; min-height: var(--tap-min); padding: .22rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
 .sheet-picker-chip.is-active { color: var(--text); background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
 /* `.scroll-y` rides this in equipment.tsx's markup — check (h): a scroller the stylesheet declares on
    its own is a scroller no reader of the component can see. The 52vh cap stays: it bounds a MODAL
    layer, which §7 rule 2 allows and the (g) allowlist already reasons about. */
 .sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; }
 /* v3 #2.9.1: comfortable row padding so names/buttons aren't jammed against the edges. */
-.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: var(--space-2) .4rem; border-bottom: 1px solid var(--line); }
+/* `min-width: 0` so the flex item may shrink below its content width — without it a long single word
+   in the row's own text widens the whole list at 375px. */
+.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: var(--space-2) .4rem; border-bottom: 1px solid var(--line); min-width: 0; }
 .sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .sheet-picker-name { color: var(--text); font-size: var(--fs-sm); font-weight: 600; display: flex; align-items: baseline; gap: .4rem; }
 .sheet-picker-owned { color: var(--cyan); font: 700 var(--fs-2xs)/1 var(--font-mono); }
 .sheet-picker-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+/* One line only. A magic item's rarity and attunement requirement are at the head of its text, and
+   that is the whole reason this line exists — the rest of a 2000-character entry is not browse data.
+   CLAMPED, NOT `white-space: nowrap`, and the difference is measurable: nowrap sizes the flex item to
+   the full 2000 characters, and at 375px `.sheet-picker-list` reported scrollWidth 9086 against
+   clientWidth 303 — a list a GM could swipe sideways off the end of. A line clamp wraps and truncates
+   inside the box instead, and never widens it. */
+.sheet-picker-desc { min-width: 0; color: var(--text-muted); font-size: var(--fs-2xs); line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; overflow-wrap: anywhere; }
 .sheet-picker-add { flex-shrink: 0; padding: .28rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .sheet-picker-add:disabled { opacity: .6; cursor: default; }
 .sheet-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-4) 0; text-align: center; }
@@ -1622,13 +1710,13 @@
 .initiative-score-edit,
 .initiative-reaction,
 .menu-add-row button,
-.hp-editor button,
+.hp-editor > button,
 .action-again,
 .action-save-buttons button,
 .save-prompt-actions button, .save-prompt-confirm button,
 .action-preview .save-prompt-manual button,
 .save-die-mode,
-.sheet-hp-controls input,
+.sheet-hp-controls > input,
 .sheet-roll-chip,
 .sheet-prepare,
 .sheet-toggle-btn,
@@ -1666,13 +1754,13 @@
 .initiative-score-edit::before,
 .initiative-reaction::before,
 .menu-add-row button::before,
-.hp-editor button::before,
+.hp-editor > button::before,
 .action-again::before,
 .action-save-buttons button::before,
 .save-prompt-actions button::before, .save-prompt-confirm button::before,
 .action-preview .save-prompt-manual button::before,
 .save-die-mode::before,
-.sheet-hp-controls input::before,
+.sheet-hp-controls > input::before,
 .sheet-roll-chip::before,
 .sheet-prepare::before,
 .sheet-toggle-btn::before,
@@ -1712,7 +1800,7 @@
 .turn-controls button:hover:not(:disabled)::before, .turn-controls button:focus-visible::before, .turn-controls button:active:not(:disabled)::before,
 .encounter-menu-toggle:hover:not(:disabled)::before, .encounter-menu-toggle:focus-visible::before, .encounter-menu-toggle:active:not(:disabled)::before,
 .menu-add-row button:hover:not(:disabled)::before, .menu-add-row button:focus-visible::before,
-.hp-editor button:hover:not(:disabled)::before, .hp-editor button:focus-visible::before,
+.hp-editor > button:hover:not(:disabled)::before, .hp-editor > button:focus-visible::before,
 .action-again:hover:not(:disabled)::before, .action-again:focus-visible::before,
 .action-save-buttons button:hover:not(:disabled)::before, .action-save-buttons button:focus-visible::before,
 .save-prompt-actions button:hover:not(:disabled)::before, .save-prompt-confirm button:hover:not(:disabled)::before,
@@ -1743,7 +1831,7 @@
 .legendary-offer { border-radius: 0; }
 /* Inert reads as a material state, not only as reduced opacity (ruling 40). */
 .dock-log-door:disabled::before, .encounter-primary:disabled::before, .turn-controls button:disabled::before,
-.hp-editor button:disabled::before, .sheet-prepare:disabled::before, .builtin-chip:disabled::before,
+.hp-editor > button:disabled::before, .sheet-prepare:disabled::before, .builtin-chip:disabled::before,
 .legendary-offer:disabled::before, .monster-browser-add:disabled::before {
   border-color: transparent;
   background: var(--surface-2);

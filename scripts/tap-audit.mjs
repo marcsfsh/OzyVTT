@@ -282,6 +282,114 @@ async function openFirstRecord(page, { rows, expect, what }) {
 }
 
 /**
+ * The feature panel's own row toggles — one per feature (or per species trait), the button that
+ * turns a collapsed `RowEditor` row into the whole authoring surface behind it.
+ *
+ * `> li > .nh-roweditor-head >` on purpose: `RowEditor`s nest four deep inside an open feature
+ * (options, extra picks, re-openable picks, an option's own extra picks), and a loose descendant
+ * selector would treat one of those inner rows as a feature and open the wrong thing.
+ */
+const FEATURE_ROW_TOGGLE =
+  '.hb-detail ul.nh-roweditor-rows[aria-label="feature list"] > li > .nh-roweditor-head > button.nh-roweditor-toggle,'
+  + ' .hb-detail ul.nh-roweditor-rows[aria-label="trait list"] > li > .nh-roweditor-head > button.nh-roweditor-toggle';
+
+/**
+ * A record whose features are a LIST — something to open — and deliberately not "a record with a
+ * feature panel".
+ *
+ * A feat is the whole reason for the distinction: `FeatureEditor`'s `single` mode renders its one
+ * feature with no row around it, so the panel is already on screen and `play-homebrew-record` has
+ * already measured every control in it. Accepting one here measured 36 controls under this heading
+ * against `play-homebrew-record`'s 36 — the same screen, counted twice in the run total under two
+ * names, which is exactly the substitution the docblock at the top of this file forbids. A feat-only
+ * library reports this surface unmeasured instead, and loses nothing.
+ */
+const hasFeatureList = async (page) => (await page.locator(FEATURE_ROW_TOGGLE).count()) > 0;
+
+/** Select rail row `index`, going back to the rail first when the ≤760px fold has hidden it. */
+async function selectHomebrewRow(page, index) {
+  const back = page.locator(".hb-back");
+  if (await back.isVisible().catch(() => false)) {
+    await back.click({ timeout: 8_000 });
+    await page.waitForTimeout(400);
+  }
+  await page.locator(".hb-rail button.hb-row").nth(index).click({ timeout: 10_000 });
+  await page.waitForSelector(".hb-detail", { timeout: 10_000 });
+  await page.waitForTimeout(900);
+}
+
+/**
+ * OPEN A FEATURE, AND EVERYTHING INSIDE IT — the surface every control the pick family added lives on,
+ * and the one this script measured NOTHING of until it existed.
+ *
+ * Measured 2026-08-10 at 375px against a duplicated SRD Cleric, with `play-homebrew-record` in its own
+ * state (a record open, nothing expanded): `.hb-detail` held **191 live controls, 0 of them inside a
+ * `.hb-feature`, 0 inside a `.hb-choice`, and 0 level chips** — because every feature is a collapsed
+ * `RowEditor` row (`RowEditor.tsx`, `[hidden] { display: none }`) and the zero-box guard in MEASURE
+ * correctly drops all of it. "play-homebrew-record - 200 controls, 0 below 44px" was a true statement
+ * about 200 controls, not one of which was a control the choice panel draws. One tap on a feature row
+ * takes `.hb-detail` to 247; opening the rows inside that feature takes it to 368 — **177 inside the
+ * feature panel, 140 inside a choice block, 20 level chips** — which this surface reports as 377 for
+ * the shell it measures (`root: "main"`).
+ *
+ * Which feature: the first that ASKS A CHOICE, because the block is where the density is — the source
+ * segmented control, the spell window, `fromPicks`, the inline options and their own gates and grants.
+ * `rowLabel` says so in the row's own summary ("asks a choice" / "asks 3 choices"), so the search reads
+ * what a GM reads rather than a fixture's name. No choice-bearing feature anywhere in the record and
+ * the first feature is opened instead — a feature still carries the level chips, `extraPicks`,
+ * `replaces` and Supersedes.
+ *
+ * WHICH RECORD IS SEARCHED FOR, NEVER ASSUMED. `play-homebrew-record` opens whatever the rail lists
+ * first, and a library whose first record is a spell or an item has no feature panel at all. This walks
+ * the rail until a record has one and throws when none does, per the docblock's rule: a surface it
+ * cannot reach is reported, never substituted.
+ */
+async function openHomebrewFeature(page) {
+  // The surface before this one leaves a record open, and at ≤760px the rail it would be re-opened
+  // from is the hidden half of the master-detail. Reuse it when it already carries a feature list.
+  if (!(await hasFeatureList(page))) {
+    const total = await page.locator(".hb-rail button.hb-row").count();
+    if (total === 0) throw new Error("the homebrew library is empty - no record to open a feature panel from");
+    let found = false;
+    for (let index = 0; index < total && !found; index++) {
+      await selectHomebrewRow(page, index);
+      found = await hasFeatureList(page);
+    }
+    if (!found) throw new Error("no homebrew record carries a feature LIST - a class, subclass, species or background; a feat's single feature is already open and play-homebrew-record measures it");
+  }
+
+  const toggles = page.locator(FEATURE_ROW_TOGGLE);
+  const count = await toggles.count();
+  let target = 0;
+  for (let index = 0; index < count; index++) {
+    const label = (await toggles.nth(index).innerText()).replace(/\s+/g, " ");
+    if (/asks (a|\d+) choices?/.test(label)) { target = index; break; }
+  }
+  await toggles.nth(target).scrollIntoViewIfNeeded();
+  await toggles.nth(target).click({ timeout: 8_000 });
+  await page.waitForTimeout(700);
+  /* `:visible` is load-bearing, not tidiness. A collapsed `RowEditor` row keeps its whole body in the
+     DOM under `hidden`, so `.hb-feature` MATCHES for every feature of a record whose features are all
+     shut, and a bare `count()` answers "a panel is open" about a screen showing none. Measured: with
+     the tap above disabled, a count-only assertion passed and the surface measured 200 controls —
+     `play-homebrew-record`'s number to the control. */
+  if (await page.locator(".hb-detail .hb-feature:visible").count() === 0) throw new Error("the feature row opened no panel");
+
+  /* Then everything the panel itself keeps collapsed — an inline option, its `requires` gate and its
+     own extra picks, the feature's `extraPicks` and `replaces` rows. Opening one row reveals more, so
+     this is a fixed-point loop rather than a single sweep; the bound is a guard against a row that
+     re-collapses, not an expected count (a Cleric's Divine Order settles in 5). `:visible` because a
+     row nested in a container that is still closed has a laid-out box and cannot be clicked. */
+  for (let round = 0; round < 12; round++) {
+    const row = page.locator('.hb-feature .nh-roweditor-toggle[aria-expanded="false"]:visible').first();
+    if (await row.count() === 0) break;
+    await row.scrollIntoViewIfNeeded();
+    await row.click({ timeout: 6_000 });
+    await page.waitForTimeout(300);
+  }
+}
+
+/**
  * Every address the sidebar lists, plus the record-level surfaces that a section address alone does not
  * reach. `open` runs after the address lands and is where the dense clusters get opened.
  *
@@ -511,9 +619,10 @@ const SURFACES = [
   { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" },
   /**
    * `/homebrew` — a GM-only address this audit has never loaded, on a tab whose whole job is dense
-   * forms. Two entries because the library and the editor share almost no controls: the rail is rows
-   * and filters, and every field a GM actually authors is inside `RecordDetail`. Measuring only the
-   * first would report "the homebrew tab is clean" about a screen containing no fields.
+   * forms. Several entries because the library, the editor, its choosers and its feature panel share
+   * almost no controls: the rail is rows and filters, and every field a GM actually authors is inside
+   * `RecordDetail`. Measuring only the first would report "the homebrew tab is clean" about a screen
+   * containing no fields.
    *
    * The editor entry opens whatever record the rail lists first, the same way the page and quest
    * editors do here — never a named fixture, which is what made two Codex surfaces report NOT
@@ -551,6 +660,18 @@ const SURFACES = [
       await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
       await page.waitForTimeout(600);
     } },
+  /**
+   * ...and one with a FEATURE PANEL OPEN. See `openHomebrewFeature` for the measurement that made this
+   * a surface: with every feature collapsed — which is how `play-homebrew-record` finds the editor and
+   * how a GM finds it too — this audit measured **zero** of the controls the choice panel, the level
+   * chips, `extraPicks`, `replaces` and the inline options draw, on five record types, while reporting
+   * the editor clean. The whole pick family shipped behind a `[hidden]` attribute the zero-box guard
+   * was right to drop and nothing was ever opening.
+   *
+   * Separate from the entries above for the reason they are separate from each other: a library with
+   * no feature-bearing record reports THIS surface unmeasured and still measures the others.
+   */
+  { name: "play-homebrew-feature", path: "/homebrew", root: "main", ready: ".hb-root", open: openHomebrewFeature },
   // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
   // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
   // inside the sheet frame now, which is exactly the row this measurement should see.
@@ -564,6 +685,35 @@ const SURFACES = [
       }, `/characters/${id}`);
       await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
       await page.waitForTimeout(700);
+    } },
+  // The sheet's browse-and-add picker, a MODAL over that layer and reachable from no address, so
+  // the entry above stopped one tap short of it and nothing had ever measured its rows. Its Add
+  // button paints 45x27 and reaches the floor only through `.tap-target`'s centred `::after`; it
+  // sat under the floor unnoticed because until the catalog->inventory payload was fixed, tapping
+  // it did nothing at all, and a control that does nothing is a control nobody reports. The
+  // `<dialog>` renders inline inside the sheet, so `root: "main"` sees it.
+  { name: "play-sheet-picker", path: "/table", root: "main", ready: ".table-layout", open: async (page) => {
+      // Same not-already-open guard as `play-homebrew-picker`, and for the same reason: `walk`
+      // re-pushes the previous address, which the router treats as a no-op, so the sheet the entry
+      // above opened is still on screen.
+      if (await page.locator(".sheet-standalone").count() === 0) {
+        const id = await page.evaluate(() => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null);
+        if (!id) throw new Error("no character token on the table to open a sheet from");
+        await page.evaluate((target) => {
+          history.pushState(null, "", target);
+          dispatchEvent(new PopStateEvent("popstate", { state: null }));
+          dispatchEvent(new PopStateEvent("popstate", { state: null }));
+        }, `/characters/${id}`);
+        await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
+      }
+      const browse = page.getByRole("button", { name: /Browse SRD gear/i }).first();
+      if (await browse.count() === 0) throw new Error("the sheet has no browse-and-add picker to open");
+      await browse.scrollIntoViewIfNeeded();
+      await browse.click({ timeout: 8_000 });
+      // The list, not the dialog: an empty catalog renders `.sheet-picker-empty` and would measure
+      // the search and the filter chips while silently contributing no item rows at all.
+      await page.waitForSelector(".sheet-picker-list", { timeout: 8_000 });
+      await page.waitForTimeout(600);
     } }
 ];
 

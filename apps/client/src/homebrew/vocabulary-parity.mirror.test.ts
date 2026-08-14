@@ -839,14 +839,18 @@ const GRANTED = {
     are bespoke JSX inside `GrantsEditor` with no `FieldDef` to look up — writing through the
     exemption would be this test hand-building the body and proving nothing. `grantsFromRows` is the
     function the component itself calls, and the rendered affordance (a `CatalogPicker` over the
-    merged spell catalog, not a `TagInput`) is driven in `pick-fields.test.tsx`. */
+    merged spell catalog, not a `TagInput`) is driven in `pick-fields.test.tsx`.
+
+    The `{}` second argument is the bag the rows are rebuilt OVER — the keys `GrantsEditor` has no
+    row for and carries through rather than deleting. A fixture built from nothing has none, so `{}`
+    is the honest value here; `grant-gate-preservation.mirror.test.ts` is where it is not empty. */
 function authoredFeat(withGrant = true): Draft {
   const shell = authored("feat", GRANTED.featName, [
     ["category", "origin"],
     ["summary", "A blessing for the road."],
     ["description", "You always have the Bless spell prepared."]
   ]);
-  const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }]) : undefined;
+  const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }], {}) : undefined;
   // The feature's own name and description used to be hand-set here, because `FeatureEditor` had no
   // `FieldDef` anywhere and was invisible to the harness. R1 mounted its fields as the row shape of
   // the `custom: "features"` field, so they go through the real control at the feature's OWN scope —
@@ -1897,7 +1901,7 @@ const wardOption = (id: string, name: string): Draft => ({
     ["description", `You have Resistance to ${name} damage until you choose a different type.`]
   ]),
   id,
-  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }])
+  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }], {})
 });
 
 /** The species a GM builds in `/homebrew`: one trait that asks a question, and the clause saying the
@@ -2458,7 +2462,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
   });
 
-  it("2. SRD content authors the same shapes — 16 ceilings, 4 floors, 7 epic boons", () => {
+  it("2. SRD content authors the same shapes — 17 ceilings, 6 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{ id: string; kind: string; max?: number; min?: number; maximum?: number; fromCatalog?: string }> = [];
     // A choice block carries no id of its own, so the nearest enclosing one travels with the walk —
@@ -2482,16 +2486,29 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     carriers(library.subclassSummaries(), (id) => library.subclassRecord(id));
     carriers(library.featSummaries(), (id) => library.featRecord(id));
 
-    // Measured at the time of writing: 16 ceilings (9 class, 6 feat, 1 subclass), 4 floors — all
-    // four Mystic Arcana, each with its ceiling set to the SAME number, which is what makes the pick
-    // exact — and 7 ceilings on the epic boons.
+    // Measured 2026-08-11, and the numbers MOVED — this is the census catching content that changed
+    // shape, which is the whole reason it counts rather than samples.
+    //
+    // Was: 16 ceilings (9 class, 6 feat, 1 subclass) and 4 floors, all four Mystic Arcana. Now 17
+    // and 6, both from ONE record. C4 split the Wizard's Spell Mastery from a single
+    // `{choose: 2, maxSpellLevel: 2}` — one pick of two under one ceiling, which let a Wizard take
+    // two level-1 spells — into the printed "a level 1 AND a level 2 spell": two blocks, each
+    // `choose: 1`, each floored and capped at its own level. So one ceiling became two, and two
+    // floors arrived where there were none.
+    //
+    // The Mystic Arcanum invariant SURVIVES the arrival, and that is the load-bearing part: every
+    // floor in this list still has `min === max`. A floor exists to make a pick EXACT — "a level 6
+    // Warlock spell" is 6, not "6 or lower" — and both Spell Mastery blocks are exact in the same
+    // sense. The first block's floor is what makes that true: without it the block read
+    // `{maxSpellLevel: 1}` and a level-0 CANTRIP satisfied the printed "a level 1 spell".
     const ceilings = found.filter((entry) => entry.max !== undefined);
     const floors = found.filter((entry) => entry.min !== undefined);
     const maxima = found.filter((entry) => entry.maximum !== undefined);
-    expect(ceilings).toHaveLength(16);
+    expect(ceilings).toHaveLength(17);
     expect(floors.map((entry) => entry.id).sort()).toEqual([
       "mystic-arcanum-level-6-spell", "mystic-arcanum-level-7-spell",
-      "mystic-arcanum-level-8-spell", "mystic-arcanum-level-9-spell"
+      "mystic-arcanum-level-8-spell", "mystic-arcanum-level-9-spell",
+      "spell-mastery", "spell-mastery"
     ]);
     expect(floors.every((entry) => entry.min === entry.max)).toBe(true);
     expect(maxima).toHaveLength(7);
@@ -2930,7 +2947,7 @@ const echoOption = (id: string, name: string, gate: string | null, resistance: s
     ...(gate ? ([["requires.offer", GATED.gate], ["requires.id", gate]] as Array<readonly [string, unknown]>) : [])
   ]),
   id,
-  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }])
+  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }], {})
 });
 
 /** The species a GM builds in `/homebrew`: one trait that asks which heritage, and a second whose

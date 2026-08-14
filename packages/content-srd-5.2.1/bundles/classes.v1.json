@@ -10376,12 +10376,22 @@
     "name": "Spell Mastery",
     "level": 18,
     "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action. You always have those spells prepared, and you can cast them at their lowest level without expending a spell slot.",
-    "choice": {
-     "kind": "spell",
-     "choose": 2,
-     "fromCatalog": "wizard-spells",
-     "maxSpellLevel": 2
-    }
+    "choices": [
+     {
+      "kind": "spell",
+      "choose": 1,
+      "fromCatalog": "wizard-spells",
+      "minSpellLevel": 1,
+      "maxSpellLevel": 1
+     },
+     {
+      "kind": "spell",
+      "choose": 1,
+      "fromCatalog": "wizard-spells",
+      "minSpellLevel": 2,
+      "maxSpellLevel": 2
+     }
+    ]
    },
    {
     "id": "epic-boon",

@@ -1,8 +1,11 @@
 /**
  * Fighter mechanics - the HAND_AUTHORED half of the overlay for this class and for Champion.
  *
- * `classes.v1.json` carries this class's PROSE (the ETL copies the record through
- * verbatim); this overlay is merged on top of it and may only ADD.
+ * `classes.v1.json` carries this class's PROSE and `subclasses.v1.json` carries Champion's (the ETL
+ * copies the records through verbatim); this overlay is merged on top of them. It may only ADD -
+ * **except where an entry says `clears`**, which is the ruled verb for superseding a key the record
+ * already carries, and `champion.remarkable-athlete` uses it (see its entry for why and for the
+ * build error that forces it).
  *
  * Stage 4 lane B1. Author here and nowhere else: this file is the only place a Fighter
  * rider, pick, or option mechanic belongs, so two authors working on two classes never touch one
@@ -65,24 +68,53 @@ export const fighter: ClassMechanicsModule = {
       /**
        * "You have Advantage on Initiative rolls and Strength (Athletics) checks."
        *
-       * ONLY THE INITIATIVE HALF IS AUTHORED, and that is the point of writing it down: `encounter.ts`
-       * `initiativeRollMode` reads `roll-mode {roll: "initiative"}` off the carriers, so this rider
-       * changes the dice. Nothing anywhere reads `roll-mode {roll: "check"}` - `actor-derived.ts`
-       * folds `check-bonus` into the sheet's numbers and has no advantage channel - so authoring the
-       * Athletics half would ship a rider that parses, stores and does nothing, which is the exact
-       * failure this vocabulary exists to end. It stays prose until a consumer exists.
+       * **BOTH HALVES ARE AUTHORED SINCE 2026-08-13, AND THE SECOND ONE IS A HARVEST.** This entry
+       * used to read *"Nothing anywhere reads `roll-mode {roll: "check"}` ... so authoring the
+       * Athletics half would ship a rider that parses, stores and does nothing"*, and that is now
+       * false: `apps/server/src/ability-checks.ts` is the consumer, called from both places
+       * `action-resolution.ts` throws a check's d20.
        *
-       * The move-after-a-crit clause is movement and stays prose too.
+       *   - INITIATIVE: `encounter.ts` `initiativeRollMode` reads `roll-mode {roll: "initiative"}`
+       *     off the carriers, unchanged.
+       *   - STRENGTH (ATHLETICS): Escape a Grapple narrows to `{ability: "str", skill: "athletics"}`
+       *     whenever Athletics beats Acrobatics on the bearer's sheet, which is EXACTLY the printed
+       *     clause - so the three-trigger narrowed form fires there and, because `ability-is` and
+       *     `skill-is` both fail closed, on none of the other four checks. It is the same 1:1 shape
+       *     `boots-of-elvenkind` has on Hide, on the other side of the vocabulary.
+       *
+       * The move-after-a-crit clause is movement and stays prose.
+       *
+       * WHY `clears`, and it is the second use of the verb in this package (Wizard's Spell Mastery is
+       * the first, and its entry carries the full reasoning). Fighter is HAND_AUTHORED, so this
+       * record's `modifiers` array is already in `bundles/subclasses.v1.json` carrying the initiative
+       * rider - and the overlay REFUSES to overwrite a key that is already there. Measured, by
+       * running the build without this line:
+       *     Mechanics overlay keys matching no feature (1):
+       *       champion.remarkable-athlete.modifiers (already authored on the record - remove it from
+       *       one of the two homes)
+       * `clears: ["modifiers"]` announces the supersession: the array is deleted and the TWO riders
+       * below replace it in the same entry, which is what mitigation 2 ("never delete-only, per key")
+       * requires. Idempotent on every later build, because the entry re-supplies the same key. The
+       * review bar is the `git diff` of `bundles/subclasses.v1.json` in this commit: one modifier in,
+       * nothing out.
        */
       "remarkable-athlete": {
-        modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
+        clears: ["modifiers"],
+        modifiers: [
+          { type: "roll-mode", roll: "initiative", mode: "advantage" },
+          {
+            type: "roll-mode", roll: "check", mode: "advantage",
+            when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }, { type: "skill-is", skills: ["athletics"] }]
+          }
+        ]
       }
       /**
        * NOT AUTHORED: `heroic-warrior` grants Heroic Inspiration, which is not modelled anywhere on
        * the actor; `survivor`'s regeneration is a start-of-turn heal gated on Bloodied, and its
-       * Death-Save advantage would be `roll-mode {roll: "death-save"}`, which - like the `check`
-       * form above - no consumer reads. `additional-fighting-style` already carries its own catalog
-       * choice in the bundle.
+       * Death-Save advantage would be `roll-mode {roll: "death-save"}` - a form that is still
+       * unread, and it did NOT come with the `check` form above: `deathSaveRollMode` does not exist
+       * and `rollDeathSave` (`death-saves.ts`) takes no carriers. `additional-fighting-style`
+       * already carries its own catalog choice in the bundle.
        */
     }
   }

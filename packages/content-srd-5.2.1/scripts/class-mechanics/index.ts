@@ -28,7 +28,7 @@ import { sorcerer } from "./sorcerer.js";
 import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
-export { applyMechanics } from "./overlay.js";
+export { HAND_AUTHORED, applyMechanics } from "./overlay.js";
 export type { ClassMechanicsModule, FeatureMechanics, MechanicsOverlay, OptionMechanics } from "./overlay.js";
 
 /** The twelve SRD 5.2.1 classes. A missing key here is a compile error, not a silent absence. */

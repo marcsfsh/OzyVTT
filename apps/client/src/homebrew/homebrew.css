@@ -470,6 +470,29 @@
 .hb-rail, .hb-main { --material-fill: var(--material-scanline), var(--material-plate); }
 .hb-modebar, .hb-section--advanced, .hb-fieldset { --material-fill: var(--material-plate); }
 
+/* THE ISOLATE TRAPS AN OPEN LIST, AND THIS IS THE THIRD SURFACE IT HAS DONE IT ON.
+   The `isolation: isolate` above is load-bearing — it is what keeps each backing layer at
+   `z-index: -1` inside its own panel, the escape `Button.css` documents at length — but it is
+   also a stacking context, so `.nh-combobox-list`'s `z-index: 40` is resolved INSIDE one
+   fieldset and never above it. Everything positioned that paints after the fieldset therefore
+   covers the list's tail, and it needs no z-index of its own to do it: neither `.nh-switch` nor
+   `.nh-numberfield` declares one, they simply come later.
+   Measured at 375×667 with touch on 2026-08-10, on `fromPicks.offer` ("Answers to" — the one
+   `pick` box in this editor that sits inside a fieldset): the box is 44×257 and all ten rows are
+   44×247, yet the LAST row answered `elementFromPoint` with something else and a real `.tap()`
+   on it timed out at 7,004 ms leaving the chooser empty. WHICH thief varies with what the choice
+   renders below the fieldset, which is exactly what hid it — `kind: subclass-feature` gave
+   `button.nh-switch--labeled` ("The same option can be chosen more than once"), `kind: spell`
+   gave `div.nh-numberfield` (the spell window). "What kind of choice" escapes only because it
+   has no fieldset ancestor.
+   Same fix as the sheet's (`encounter-panel.css`, `.sheet-vital:has(.nh-combobox-list)`, and
+   `.scene-gallery-hub .nh-card:has(details[open])` before it): the isolate STAYS and the
+   fieldset is LIFTED, only while a list is open. `1` and not the sheet's `3` because nothing
+   inside this panel declares a positive z-index at all — the thieves win on source order alone,
+   so the smallest lift that beats `auto` is the whole of the fix.
+   After: 10 of 10 rows own their centre in both states, and the last row taps through in both. */
+.hb-fieldset:has(.nh-combobox-list) { z-index: 1; }
+
 /* THE SCROLLER RULE, and it is the one mechanical trap in this whole job. `.hb-detail` is the
    pane's declared region (`.scroll-y` in the markup) and AN ABSOLUTELY-POSITIONED CHILD OF A
    SCROLL CONTAINER IS LAID OUT AGAINST THE SCROLLED BOX — so a backing layer on the scroller

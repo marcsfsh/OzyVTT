@@ -2,13 +2,29 @@ export const meta = {
   name: 'content-program',
   description: 'The OzyVTT content program: the weapons ETL home, the overlay ruling, the full SRD magic-item list, Wizard Spell Mastery, and the carriers the zero-author units need.',
   phases: [
-    { title: 'Batch 0', detail: 'serial prerequisites — the weapons ETL home, then the hand-authored overlay ruling' },
-    { title: 'Batch 0b', detail: 'two concurrent units — properties reaches the fight, Wizard Spell Mastery' },
-    { title: 'Source and ETL', detail: 'vendor the magic-item source, then generate the 268-row bundle' },
+    { title: 'Batch 0b', detail: 'two concurrent units — properties reaches the editor, Wizard Spell Mastery' },
+    { title: 'ETL', detail: 'generate the 268-row magic-item bundle from the vendored source' },
     { title: 'Item mechanics', detail: 'four concurrent authoring lanes over the generated bundle' },
     { title: 'Close', detail: 'adversarial review, mobile back-fill, ledger' },
   ],
 }
+
+/*
+ * WHAT CHANGED, 2026-08-11, and why this script is not what the planner wrote.
+ *
+ * 1. THE SERIAL SPINE NEVER RAN. Both `pipeline()` calls passed thunks as ITEMS with no stage
+ *    functions — `pipeline([() => agent(C5), (c5) => agent(C6)])`. The signature is
+ *    `pipeline(items, stage1, ...)`, so with zero stages the thunks pass through UNCALLED: C1, C2,
+ *    C5 and C6 would never have run, and the four lanes would then have been handed
+ *    `JSON.stringify(bundle)` = `[null,null]` and told the bundle had landed. The `parallel()`
+ *    calls were always correct; only these two were wrong.
+ * 2. BATCH 0 IS SPENT. C1 landed at 36b5a1f and C2 (the ruled `clears` verb) at 14fdb77. The phase
+ *    is deleted rather than re-verified — a phase whose only job is to re-read a landed commit
+ *    spends an agent to produce a paragraph.
+ * 3. C5 LANDED. Vendored at 67d6796, cherry-picked to the program branch at dcd7797, and its owed
+ *    source pin added at 19f0d2a (6 tests; both probes run and restored). The ETL phase is C6 alone
+ *    and is one agent, so it is a plain `agent()` call and not a pipeline of one.
+ */
 
 /* --------------------------------------------------------------- shared ---- */
 
@@ -21,6 +37,40 @@ READ FIRST, in this order:
   1. CLAUDE.md
   2. docs/product/remaining-program-plan.md  — the GOVERNING document. Your work obeys it.
   3. ${PLAN}  — this program's plan. Find YOUR unit's section and follow it exactly.
+
+BRANCH AND BASE, and this is not boilerplate — it is the failure that already happened once here.
+C5 was authored in a worktree whose base was 22 commits stale (3ecb4fb, carrying none of batch 0, 1
+or 2), so it verified green against a tree that did not have C1's bundle guard, and its commit then
+sat on its own branch because nothing owned the merge back. Recovering it cost a cherry-pick and a
+full re-verification. Therefore:
+  - START FROM THE PROGRAM BRANCH TIP. Confirm with \`git log --oneline -3\` before your first edit,
+    and say in your report which SHA you based on.
+  - YOUR COMMIT IS NOT THE DELIVERABLE UNTIL IT IS ON THAT BRANCH. If you are in a worktree you are
+    on a \`worktree-agent-*\` branch; report your SHA and say plainly that it needs merging back. The
+    parent owns that merge — but a SHA you do not report is a SHA nobody merges.
+
+ALREADY LANDED — do not re-plan or re-do any of it:
+  - C2, at 14fdb77: the ruled \`clears\` verb on \`FeatureMechanics\`, its handling in
+    \`applyMechanics\`, its idempotency case, and the dated ruling in decision-log.md. C4 consumes it.
+  - C5, at dcd7797 (cherry-picked) + 19f0d2a (its owed guard): magic-items.md is vendored at the
+    pinned commit, PROVENANCE.json's false claim is split, attribution covers magic items, and
+    test/magic-item-source.test.ts pins the source — sha256, 5,015 lines, the A–Z run at line 578,
+    260 entries of which 258 are items, the nine-category histogram, 140 attuned. C6 reads that file
+    and must not re-vendor it; if your parse disagrees with those pinned numbers, the pin is the
+    measurement and your parse is the defect.
+
+ALREADY LANDED, in commit 36b5a1f — do not re-plan or re-do any of it:
+  - C1 in full. Both weapon columns now have an ETL home: build-bundle.ts joins \`mastery\` AND
+    \`properties\` in from sources/dnd-5e-srd-markdown/equipment.md, fails closed in both directions,
+    and cross-checks every slug against the 17 WeaponProperty fixtures. The regenerated bundle was
+    143 insertions and ZERO deletions. bundle.test.ts:224 pins all 38 masteries and all 70 property
+    assignments BY NAME. **NEVER run \`npm run build-bundle\`; never regenerate weapons.v1.json.**
+  - C3's plumbing half. \`properties\` reaches WeaponReferenceSchema, the ETL emit,
+    EquipmentWeaponStatsSchema + the loadEquipment() fold, and the catalog->inventory copy in
+    character-build.ts. A Rapier rolls off Dexterity and a Glaive threatens at 10 feet TODAY.
+    C3 retains its EDITOR CONTROL half only.
+  - The overlay ruling is TAKEN: Option 2, the \`clears\` verb. C2 implements it; it is not an
+    open question.
 
 THE BAR, and it does not move:
   - A FAR-END PROOF. The test ends at a rolled number, a spent counter, a refusal or a rendered
@@ -38,9 +88,17 @@ OPERATIONAL TRAPS that have each cost an agent real time:
     client workspace and it never appears.
   - Never run two full suites concurrently: the server suite binds a live port.
   - Read docs/ai-ledger/known-bugs.md before calling a red test a regression.
-  - If you are in a worktree, node_modules must be HARD-LINKED (\`cp -al\`), never symlinked.
-    POSIX resolves a symlink first, so a symlinked worktree tests the ORIGINAL tree and every
-    cross-package unit produces a green run that proves nothing. Every unit here is cross-package.
+  - IF YOU ARE IN A WORKTREE, YOUR FIRST COMMAND IS:
+        cp -al /home/user/OzyVTT/node_modules "\$PWD/node_modules"
+    A worktree starts with NO node_modules — npm workspaces hoist to the repo root and
+    \`git worktree add\` copies none of it. MEASURED: without this, \`npx vitest run <file> --root
+    apps/server\` collects 0 test files, prints no failure and EXITS 0 IN 211ms. It looks exactly
+    like a pass. With it (0.3s, ~0 real disk) the same command runs the tests for real.
+    NEVER symlink instead: POSIX resolves a symlink first, so a symlinked worktree tests the
+    ORIGINAL tree and every cross-package unit produces a green run that proves nothing about its
+    own. Every unit here is cross-package.
+    QUOTE THE TEST-FILE COUNT in your evidence. A run that does not say how many files it
+    collected is not evidence that anything ran.
 
 FILES THAT ARE PARENT-ONLY — do not touch them:
   docs/api-reference.md, docs/app-map.md (generated; regeneration IS the merge resolution),
@@ -97,82 +155,6 @@ const DECISION = {
   },
 }
 
-/* ------------------------------------------------------- phase: batch 0 ---- */
-
-phase('Batch 0')
-
-const batch0 = await pipeline([
-  () => agent(`${CONTEXT}
-
-YOUR UNIT: C1 — the weapons ETL home. It is SERIAL and it blocks the entire remaining program.
-Nothing else runs while you hold it, because regenerating bundles is what destroys the mastery column.
-
-THE DEFECT, measured: packages/content-srd-5.2.1/bundles/weapons.v1.json carries a \`mastery\` column
-on all 38 rows, and \`weaponRecords\` at packages/content-srd-5.2.1/scripts/build-bundle.ts:549-559
-never emits it. \`WeaponReferenceSchema.mastery\` is \`.optional()\`, so \`validateBundle\` passes and the
-write drops all 38 values in silence. Nothing catches it: bundle.test.ts:174 spot-checks Battleaxe's
-category and damage and never its mastery.
-
-THE SOURCE, and it is already vendored: sources/dnd-5e-srd-markdown/equipment.md carries the SRD
-Weapons table with the columns Name / Damage / Properties / Mastery / Weight / Cost — 38 data rows,
-in the same HTML-table shape build-class-bundle.ts already parses. Joining it to the bundle on the
-name slug was MEASURED: 38 of 38 matched, 0 unmatched either way, 0 mastery mismatches, and the
-Properties column yields 70 assignments over the 9 slugs in WEAPON_PROPERTY_IDS.
-
-WHAT TO BUILD: parse that table once into a map, look each weapon up in \`weaponRecords\`, and THROW
-naming the weapon when a row is missing — the SKILL_ABILITY precedent at build-bundle.ts:582-601.
-Emit BOTH columns; they are one parse, one join and one guard, and writing the join twice is how the
-two halves drift. Add \`properties\` to WeaponReferenceSchema. Strip the parenthetical from a property
-cell — the table prints "Thrown (Range 20/60)" and "Versatile (1d10)" and riders match the bare slug.
-Record Versatile's two-handed die as a NAMED ABSENCE in the parser's comment: EquipmentWeaponStatsSchema
-has nowhere to put a second die and inventing one here would be a vocabulary addition with no reader.
-
-FAR END: regenerate and show the diff. The mastery column must be BYTE-IDENTICAL on all 38 rows —
-vex 8, slow 7, sap 6, topple 5, nick 4, push 4, graze 2, cleave 2 — and the only additions are the
-\`properties\` arrays. Pin both in bundle.test.ts so a future rebuild fails instead of shipping.
-
-PROBES: (control) delete the join -> the guard fails naming both columns and a count.
-(value) flip Battleaxe's table cell from Topple to Vex -> the mastery guard fails naming \`battleaxe\`.
-Restore after each and report the exact messages.
-
-NO 375px pass: this unit has no UI.`,
-    { label: 'C1:weapons-etl', phase: 'Batch 0', schema: UNIT_RESULT }),
-
-  (c1) => agent(`${CONTEXT}
-
-YOUR UNIT: C2 — rule ONCE on the hand-authored overlay collision, and record it.
-C1 reported: ${JSON.stringify(c1)}
-
-THE PROBLEM, measured. For cleric, fighter and wizard (build-class-bundle.ts:33) the class record in
-classes.v1.json is both the ETL's input AND its output, so the overlay may only ADD: \`applyMechanics\`
-refuses to overwrite a key the record already carries and fails the build naming both homes
-(class-mechanics/overlay.ts:139-141, pinned by test/mechanics-overlay.test.ts:76). Writing a
-DIFFERENT key beside it does not dodge the problem either: \`oneChoiceForm\`
-(src/character-content.ts:525-527) refuses a record carrying both \`choice\` and \`choices\`, so the
-build fails at ClassReferenceSchema.parse instead. classes.v1.json is 10,418 lines.
-
-Read ${PLAN} section 4 in full. It costs four options and recommends Option 2 — a \`clears\` verb on
-FeatureMechanics naming keys to delete before the merge, with three mitigations: clearing an absent
-key is a no-op (idempotent across rebuilds), a \`clears\` entry is a build error unless the same
-feature also authors a rider, and the review bar is the git diff of classes.v1.json in the same
-commit. Option 1 (hand-edit the JSON) is cheaper at N=1 and reintroduces the shared-file workflow the
-overlay was extended to end.
-
-YOUR JOB: confirm or refute that analysis against the code, take the ruling, IMPLEMENT it if it needs
-code, and record it as a dated entry in docs/ai-ledger/decision-log.md in that file's own house style.
-If you implement \`clears\`, add one case beside the collision test at mechanics-overlay.test.ts:76
-proving the replacement lands AND that a second build is a clean no-op — for a hand-authored class the
-ETL writes back over its own input, so idempotency is the property that matters.
-
-Do not route around this per unit. The point of the unit is that the ruling is taken once.
-NO 375px pass.`,
-    { label: 'C2:overlay-ruling', phase: 'Batch 0', schema: DECISION })
-    .then((ruling) => ({ weaponsEtl: c1, overlayRuling: ruling })),
-])
-
-const ruling = batch0 && batch0.overlayRuling
-log(`Batch 0 closed. Overlay ruling: ${ruling && ruling.recommendation ? ruling.recommendation : 'not reported'}`)
-
 /* ------------------------------------------------------ phase: batch 0b ---- */
 
 phase('Batch 0b')
@@ -180,74 +162,91 @@ phase('Batch 0b')
 const batch0b = await parallel([
   () => agent(`${CONTEXT}
 
-YOUR UNIT: C3 — \`properties\` reaches the fight. C1 has landed; the bundle now carries the column.
-Work in your own git worktree (isolation is set for you). HARD-LINK node_modules with \`cp -al\`.
+YOUR UNIT: C3 — \`properties\` reaches the EDITOR. **This is the CONTROL HALF ONLY.** All four data
+shapes landed in 36b5a1f; do not touch them.
+Work in your own git worktree (isolation is set for you). YOUR FIRST COMMAND IS
+\`cp -al /home/user/OzyVTT/node_modules "$PWD/node_modules"\` — see the standing rules above; without
+it vitest collects 0 files and exits 0, which looks exactly like a pass.
 
-THIS IS NOT A SCHEMA LINE. Measured: the live-play half is already fully plumbed and the content half
-is empty, so every weapon in the game currently swings with \`properties: []\`, and three defects are
-live on shipped sheets right now:
-  1. A Rapier rolls off STRENGTH. \`weaponAbilityModifier\` (apps/server/src/equipment-derivation.ts:984-991)
-     reads \`finesse\` to take the better of Str and Dex, and that branch never fires.
-  2. A Glaive, Halberd, Lance, Pike and Whip all have 5-FOOT reach. \`weaponAction\`
-     (equipment-derivation.ts:993-1012) reads \`reach\` for 10 feet, and that branch never fires.
-  3. \`weapon-property-is\` is inert on every weapon — \`weaponPropertiesOf\` (:1044) always returns [].
+WHAT IS ALREADY TRUE AT HEAD, so you do not go looking for it:
+  1. A Rapier rolls off DEXTERITY. \`weaponAbilityModifier\` (apps/server/src/equipment-derivation.ts:984-991)
+     reads \`finesse\` to take the better of Str and Dex, and it fires.
+  2. Glaive, Halberd, Lance, Pike and Whip threaten at 10 FEET. \`weaponAction\`
+     (equipment-derivation.ts:994-1016) reads \`reach\` at :1011.
+  3. \`weapon-property-is\` fires on SRD weapons — \`weaponPropertiesOf\` (:1044) -> riders.ts:194.
+  4. The catalog carries the column (EquipmentWeaponStatsSchema at
+     packages/content-srd-5.2.1/src/schemas.ts:245-261, the loadEquipment() fold at src/index.ts:113-117)
+     and the inventory row carries it (apps/server/src/character-build.ts:1591).
 
-C1 closed shapes 1 and 2 of four (WeaponReferenceSchema, the ETL emit). YOU close shapes 3 and 4:
-  3. EquipmentWeaponStatsSchema (packages/content-srd-5.2.1/src/schemas.ts:226-234) and the
-     loadEquipment() weapon fold (packages/content-srd-5.2.1/src/index.ts:113-117).
-  4. The catalog->inventory copy at apps/server/src/character-build.ts:1586, which lists five weapon
-     keys and omits \`properties\`.
-Plus the CONTROL: a sixth row in the client's weapon block (apps/client/src/homebrew/schemas.ts:764-770,
-five rows today). Use WEAPON_PROPERTY_IDS, which apps/client/src/homebrew/useSchemaContext.ts already
-imports. Keep it OPEN — a homebrew property must stay typable, like every other SRD vocabulary control.
-Shipping the four shapes without the control manufactures a fresh SRD-only row, which is the exact
-mirror defect this phase exists to end.
+WHAT IS STILL BROKEN, and it is your whole unit: **a GM cannot give a homebrew weapon a property.**
+The client's weapon block (apps/client/src/homebrew/schemas.ts:764-770) is still FIVE rows — category,
+damage dice, damage type, range, long range. An SRD Rapier is Finesse; a GM's rapier can never be.
+docs/ai-ledger/known-bugs.md carries this as a live bug and names you as its owner. Add the SIXTH row:
+a tag/multiselect over WEAPON_PROPERTY_IDS. Keep it OPEN — a homebrew property must stay typable, like
+every other SRD vocabulary control.
 
-WATCH — this hazard is documented at schemas.ts:218-225 and it has bitten before: adding a key to
-EquipmentWeaponStatsSchema is what pushed \`z.infer\` past TypeScript's expansion budget and silently
-truncated packages/domain/src/catalog-choice.ts's view of SpellReference, with no error at the edit
-site. Run \`npm run check\` at the ROOT, and assert explicitly that catalog-choice.ts still sees
-SpellReference.attackRoll and .rangeFeet.
+DO NOT reach for \`ctx.weaponProperties\` for the suggestions. Measured:
+apps/client/src/homebrew/useSchemaContext.ts:33 builds WEAPON_SLUGS as
+[...WEAPON_PROPERTY_IDS, ...WEAPON_MASTERY_IDS] and hands that UNION to the context as
+\`weaponProperties\` (:138; same union at schema.ts:136). The union is right for the
+\`weapon-property-is\` TRIGGER, which matches either family. It is wrong for the weapon block, where
+offering \`topple\` as a property suggests a value the weapon column cannot mean. Suggest
+WEAPON_PROPERTY_IDS.
 
-WATCH, second: a character built before this unit has no \`properties\` on its stored inventory rows.
+FAR END: a GM-authored weapon carrying \`finesse\`, built through the REAL editor controls, published,
+equipped on a DEX 15 / STR 12 character, SWINGS OFF DEXTERITY — a changed attack bonus and a changed
+damage string on the sheet. The mirrored SRD assertion (a catalog Rapier) is the control group and is
+already green at HEAD; the EDITOR row is the new claim. Not "the array survived the form".
+
+PROBES: (control) delete the weapon.properties row from the weapon block -> the editor path throws
+from the authoring harness. The message shape is
+  No field "weapon.properties" in the equipment form — the test is addressing a field that does not exist.
+(apps/client/src/homebrew/authoring-harness.ts:180-187 — the weapon block flattens to TOP-LEVEL keys,
+so this is NOT the container-shaped \`Field "a → b"\` message). Report the exact string you observe.
+(value) author \`heavy\` instead of \`finesse\` through the same control -> the bonus falls back to
+Strength and the far end fails. Restore both.
+
+WATCH: you add no schema key, so the z.infer expansion-budget hazard is not live for you — it was
+spent at 36b5a1f and is now pinned by a COMPILE-TIME guard at
+packages/content-srd-5.2.1/test/bundle.test.ts:19-31, which asserts SpellReference.attackRoll and
+SpellReference.range (an object — NOT \`rangeFeet\`, which is the domain summary's own flattening).
+Run \`npm run check\` at the ROOT all the same.
+
+WATCH, second: a character built before 36b5a1f has no \`properties\` on its stored inventory rows.
 That is what the governing plan's ruling 7 (schemaVersion bump + GM-triggered rebuild) is for. Do NOT
 invent a second migration. Your tests build a fresh character.
 
-FAR END, three of them, two being live defects: a DEX 15 / STR 12 character's Rapier attack bonus and
-damage move to Dexterity; a Glaive's reach becomes 10 ft and a Mace's stays 5; a
-\`weapon-property-is: ["finesse"]\` rider fires on the Rapier and not the Mace. Both paths — the SRD
-path out of the catalog, the editor path through the real controls, one assertion body over both.
-
-PROBES: (control) filter weapon.properties out of the form's fields -> the mirror test names the
-missing field. (value) author \`heavy\` instead of \`finesse\` on the Rapier -> its bonus falls back to
-Strength and far end 1 fails. Restore both.
-
 375px: YES. \`node scripts/tap-audit.mjs 375\` on /homebrew — the count must not rise — and check the
 new control with touch at a narrow viewport.`,
-    { label: 'C3:properties', phase: 'Batch 0b', schema: UNIT_RESULT, isolation: 'worktree' }),
+    { label: 'C3:properties-control', phase: 'Batch 0b', schema: UNIT_RESULT, isolation: 'worktree' }),
 
   () => agent(`${CONTEXT}
 
-YOUR UNIT: C4 — Wizard's Spell Mastery becomes two picks. C2 has ruled on the overlay collision;
-read that ruling in docs/ai-ledger/decision-log.md and land through the home it names.
-Work in your own git worktree. HARD-LINK node_modules with \`cp -al\`.
+YOUR UNIT: C4 — Wizard's Spell Mastery becomes two picks. C2 has implemented the ruled \`clears\` verb;
+read that ruling in docs/ai-ledger/decision-log.md and land through it.
+Work in your own git worktree. YOUR FIRST COMMAND IS
+\`cp -al /home/user/OzyVTT/node_modules "$PWD/node_modules"\` — see the standing rules above; without
+it vitest collects 0 files and exits 0, which looks exactly like a pass.
 
-THE DEFECT, measured. bundles/classes.v1.json's Wizard record carries, on \`spell-mastery\`:
+THE DEFECT, re-measured at HEAD. bundles/classes.v1.json's Wizard record carries, on \`spell-mastery\`
+(level 18):
   { "kind": "spell", "choose": 2, "fromCatalog": "wizard-spells", "maxSpellLevel": 2 }
-against printed text reading "Choose a level 1 AND a level 2 spell." Two level-1 spells is a legal
-build today; so is two level-2 spells. The correct shape is \`choices\` — one block capped at level 1,
-one floored and capped at level 2. \`choices\` has been exposed on FeatureMechanics since ef54720
-(class-mechanics/overlay.ts:78) and the panel has edited a LIST of blocks since d02e894.
+against printed text reading "Choose a level 1 and a level 2 spell in your spellbook that have a
+casting time of an action." Two level-1 spells is a legal build today; so is two level-2 spells. The
+correct shape is \`choices\` — one block capped at level 1, one floored and capped at level 2.
+\`choices\` has been exposed on FeatureMechanics since c63fa75 (class-mechanics/overlay.ts:78) and the
+panel has edited a LIST of blocks since d02e894.
 
 WHY IT IS NOT A ONE-LINE OVERLAY EDIT, and this is the whole reason C2 exists: wizard is one of the
 three HAND_AUTHORED classes (build-class-bundle.ts:33), the record already carries \`choice\`, the
-overlay is additive-only for those three, and \`oneChoiceForm\` (src/character-content.ts:525-527)
-refuses a record carrying both spellings — so writing \`choices\` beside \`choice\` fails the build at
-ClassReferenceSchema.parse rather than merging.
+overlay is additive-only for those three (build-class-bundle.ts:836-838), and \`oneChoiceForm\`
+(src/character-content.ts:525-529) refuses a record carrying both spellings — so writing \`choices\`
+beside \`choice\` fails the build at ClassReferenceSchema.parse rather than merging.
 
 RIDE-ALONG, SAME COMMIT: class-mechanics/wizard.ts:66-73 reports this as blocked and gives the WRONG
-reason — it says overlay.ts exposes \`choice\` and not \`choices\`, and overlay.ts:78 now exposes both.
-The code is truth and the comment is the defect. Fix it in place.
+reason — it says overlay.ts's FeatureMechanics "exposes \`choice\` and not \`choices\`" and that
+overlay.ts is "frozen for Stage 4". overlay.ts:78 exposes both, and Stage 4 is over. Verified still
+present and still wrong at HEAD. The code is truth and the comment is the defect. Fix it in place.
 
 FAR END: a level-18 Wizard's build offers TWO pick rows with DIFFERENT windows, and a build answering
 both rows with level-1 spells is REFUSED BY NAME. The refusal is the far end — it is the whole bug.
@@ -262,62 +261,34 @@ refusal stops happening. (value) set the second block's floor to 1 -> the refusa
 const prereqBlocked = (batch0b || []).filter((r) => r && !r.landed)
 log(`Batch 0b: ${(batch0b || []).filter((r) => r && r.landed).length}/2 landed${prereqBlocked.length ? `; blocked: ${prereqBlocked.map((r) => `${r.unit} ${r.blocked}`).join(' | ')}` : ''}`)
 
-/* ----------------------------------------------- phase: source and ETL ---- */
+/* --------------------------------------------------------- phase: ETL ---- */
 
-phase('Source and ETL')
+phase('ETL')
 
-const bundle = await pipeline([
-  () => agent(`${CONTEXT}
-
-YOUR UNIT: C5 — vendor the SRD magic-item source and repair two false claims. SERIAL; C6 needs you.
-
-MEASURED, AND IT IS THIS PROGRAM'S HEADLINE FINDING: there is no magic-item source in this repository
-at all. The open5e fixtures ship 15 models and none of them is a magic item. equipment.md's own
-"## Magic Items" section (line 2137) is the RULES about magic items — identifying, attunement,
-wearing — and contains zero item entries; it says so itself: "Hundreds of magic items are detailed in
-'Magic Items' later in this document." Every heading after 2137 is a rule.
-
-sources/dnd-5e-srd-markdown/PROVENANCE.json's \`notVendored\` field names magic-items.md among eight
-files left out, with the reason "the corresponding bundles already come from the open5e fixtures and
-are cross-validated." THAT REASON IS FALSE for this one file. There is no magic-item bundle and no
-magic-item fixture. It is a defect; repair it, do not soften it.
-
-WHAT TO DO: vendor magic-items.md from downfallx/dnd-5e-srd-markdown at commit
-1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4 — the exact commit PROVENANCE.json already pins for the
-other four files. VERIFIED REACHABLE: HTTP 200, 244,314 bytes, 5,015 lines. Do not hand-transcribe;
-PROVENANCE.json records that hand-authoring is "where both licensing violations landed."
-
-Then repair BOTH claims in the same commit:
-  - PROVENANCE.json: add the file to \`files\`, and correct \`notVendored\` so it no longer carries a
-    reason that is untrue.
-  - attribution.additionalSources[0].covers currently reads "classes, subclasses, class spell lists,
-    species, backgrounds, feats" and becomes untrue the moment this source is used. CC BY attribution
-    is not a place to leave a stale claim. It is emitted from build-bundle.ts, so edit there and
-    regenerate bundles/attribution.json.
-
-TEST: pin the vendored file's line count and its "## Magic Items A-Z" entry count, so a re-vendor at a
-different commit fails loudly instead of silently shifting 258 rows. MEASURED for you: line 578 opens
-the A-Z section and carries 260 \`####\` entries, of which 2 (Giant Fly, Avatar of Death) are embedded
-creature stat blocks — their second line is a creature line, not an italic type line — leaving 258
-items, 258 of 258 with a parseable italic type line, 140 requiring attunement.
-
-FAR END: the pinned counts match the vendored file. NO 375px pass.`,
-    { label: 'C5:vendor-source', phase: 'Source and ETL', schema: UNIT_RESULT }),
-
-  (c5) => agent(`${CONTEXT}
+const bundle = await agent(`${CONTEXT}
 
 YOUR UNIT: C6 — the magic-item ETL. The longest unit in this program, and it is deliberately ONE
 agent because it is ONE parser over ONE file. The parallelism lives one layer up, in the overlay
 lanes that come after you.
-C5 reported: ${JSON.stringify(c5)}
+
+C5 has landed: the source is vendored and PINNED. Read
+packages/content-srd-5.2.1/test/magic-item-source.test.ts before you write a line of parser — it
+already measures, and holds, everything your parse must reproduce: the A–Z run opens at line 578,
+it holds 260 \`####\` entries, 258 of them open with one of the nine category words, the two that do
+not are Giant Fly and Avatar of Death, the histogram is Wondrous Item 127 / Weapon 33 / Potion 24 /
+Ring 22 / Armor 19 / Wand 13 / Staff 12 / Rod 7 / Scroll 1, and 140 of 258 require attunement.
+Four further \`####\` headings sit ABOVE line 578 and are rules subsections — a parser that scans the
+whole file finds 264 and is wrong by exactly those four. If your parse disagrees with any of it, the
+pin is the measurement and your parse is the defect.
 
 Read ${PLAN} section 1.5 and the C6 section in full before writing anything. The rulings that matter:
 
 A SEPARATE GENERATED BUNDLE, not 268 rows appended to equipment.v1.json. Appending would make a
-hand-authored file both the ETL's input and its output — which is exactly the condition that produces
-the overlay collision C2 just had to rule on. A generated bundle is an output only. Fold it into
-loadEquipment() (packages/content-srd-5.2.1/src/index.ts:98-125) as a FOURTH source beside gear,
-weapons and armor; everything downstream reads the folded catalog and needs no change.
+hand-authored file both the ETL's input and its output — which is exactly the condition that produced
+the overlay collision C2 just implemented \`clears\` for. A generated bundle is an output only. Fold it
+into loadEquipment() (packages/content-srd-5.2.1/src/index.ts:98-124 — gear at :101, weapons at :113,
+armor at :118) as a FOURTH source; everything downstream, including \`equipmentCatalogOf\`
+(apps/server/src/equipment-derivation.ts:286), reads the folded catalog and needs no change.
 
 THE EXPANSION RULE. 258 entries become 268 rows: expand the five "+1, +2, or +3" ladders into one row
 per tier (Ammunition, Armor, Shield, Weapon, Wand of the War Mage — 5 entries, 15 rows, net +10,
@@ -327,31 +298,46 @@ description (Belt of Giant Strength, Feather Token, Figurine of Wondrous Power, 
 Giant Strength, Potions of Healing, Spell Scroll) — expanding Armor of Resistance into ten
 near-identical rows is a worse browse list than one row and a table.
 
-THE ID GUARD IS NOT OPTIONAL. Raw name slugs collide with equipment.v1.json + weapons.v1.json +
-armor.v1.json on 0 of 258 (measured) — but expansion mints ids the hand-authored catalog already owns:
-"Potions of Healing" expanded would mint \`potion-of-healing\`, which equipment.v1.json ships and
-bundle.test.ts:212 asserts. FAIL CLOSED on any minted id already present in the other three bundles,
-naming both homes — the same rule the overlay applies to riders.
+THE ID GUARD IS NOT OPTIONAL, AND IT IS A PRECAUTION AGAINST THE BRANCH NOT TAKEN. Re-measured:
+under the recommended rule the ids are CLEAN — 0 of 258 raw name slugs collide with equipment.v1.json
++ weapons.v1.json + armor.v1.json (183 ids), 0 of 268 after the +1/+2/+3 expansion, and 0 internal
+duplicates. The guard earns its place on the alternative: "Potions of Healing" EXPANDED would mint
+\`potion-of-healing\`, which equipment.v1.json ships and bundle.test.ts:305 asserts. FAIL CLOSED on any
+minted id already present in the other three bundles, naming both homes — the same rule the overlay
+applies to riders. Expect it to fire zero times; that is what a guard should do.
 
 ONE RECONCILIATION TO DECIDE AND WRITE DOWN: keep the grouped "Potions of Healing" row and leave the
 existing mundane potion-of-healing alone (cost: two similar rows in the browse list), OR expand the
-four printed tiers and delete the hand-authored row (cost: one assertion moves at bundle.test.ts:212).
+four printed tiers and delete the hand-authored row (cost: one assertion moves at bundle.test.ts:305).
 Both are defensible. The failure mode is taking neither.
 
 MEASURED FOR YOU — assert these, do not re-derive them blind, and REPORT ANY THAT DISAGREE:
   categories: Wondrous Item 127, Weapon 33, Potion 24, Ring 22, Armor 19, Wand 13, Staff 12, Rod 7,
-    Scroll 1  (= 258)
-  rarity: Rare 82, Uncommon 73, Very Rare 55, Legendary 32, Varies 7, Common 2, Artifact 1,
-    plus 6 entries whose type line carries a ladder
-  attunement: 140 of 258
+    Scroll 1  (= 258)   [re-measured, exact]
+  rarity: Rare 82, Uncommon 73, Very Rare 55, Legendary 32, Varies 7, Common 2, Artifact 1  (= 252),
+    plus 6 entries whose type line prints a LADDER of rarities: the five "+1, +2, or +3" rows and
+    "Horn of Valhalla" ("Rare (Silver or Brass), Very Rare (Bronze), or Legendary (Iron)"), which the
+    expansion rule leaves as ONE row and which therefore needs a rarity decision of its own. 252+6=258.
+  attunement: 140 of 258   [re-measured, exact]
   the two embedded stat blocks are skipped BY NAME with a count assertion, never by a silent filter
-  costGp is null on every row — the SRD prints a value BAND by rarity, not a per-item price, and
+  costGp is null on every row — the SRD prints a value BAND by rarity ("### Magic Item Values by
+    Rarity", line 177 of the source, an H3 under "## Magic Item Rarity"), not a per-item price, and
     deriving a number from a band would be inventing content
 
 SLOT is a closed enum the engine switches on (packages/schemas/src/index.ts:29-37). Derive it from the
-type line and the item name, and ASSERT it in the bundle guard rather than trusting it. Measured
-distribution for Wondrous Item: 62 worn (neck 19, shoulders 14, head 13, feet 7, hands 6, belt 2,
-ioun 1) and 65 carried.
+type line and the item name, and ASSERT it in the bundle guard rather than trusting it. Two edge cases
+that a naive category->slot map gets wrong: 2 of the 33 Weapon-category entries say
+"Weapon (Any Ammunition)" (Ammunition +1/+2/+3; Ammunition of Slaying) and are \`ammunition\`; 7 of the
+19 Armor-category entries say "Armor (Shield)" and are \`shield\`.
+
+*** THE WONDROUS WORN/CARRIED SPLIT IS A READING, NOT A COUNT — DO NOT TAKE A TARGET NUMBER. ***
+An earlier draft of this script said "62 worn (neck 19, shoulders 14, head 13, feet 7, hands 6,
+belt 2, ioun 1) and 65 carried". That does not reproduce, and \`ioun\` is not even a member of
+ItemSlotSchema. Re-measuring by the plan's own "by name" rule gives 57 worn / 70 carried —
+neck 15, shoulders 14, head 13 (Ioun Stone included), feet 7, hands 6, belt 2 — and a scan for
+worn-location PROSE gives a third answer, 52. THREE METHODS, THREE ANSWERS. Derive the slot by a rule
+you write down, ASSERT whatever your parser produces, and REPORT THE NUMBER. C7c and C7d split on your
+committed \`slot\` column, so their item counts are an OUTPUT of this unit, not an input to it.
 
 Prose may contain the same HTML tables build-class-bundle.ts already renders with \`tableAsText\`.
 Reuse that, do not write a second one.
@@ -371,10 +357,17 @@ count that drops by 268. (value) change one item's parsed slot -> the slot asser
 375px: YES, and it is a real risk rather than a formality — 268 rows land in the browse-and-add list
 and several descriptions carry rendered tables. Check the list and the Armor of Resistance detail at
 375px, and run \`node scripts/tap-audit.mjs 375\`.`,
-    { label: 'C6:magic-item-etl', phase: 'Source and ETL', schema: UNIT_RESULT }),
-])
+    { label: 'C6:magic-item-etl', phase: 'ETL', schema: UNIT_RESULT })
 
 log(`Bundle: ${bundle && bundle.landed ? `landed at ${bundle.commit}` : `NOT landed — ${bundle ? bundle.blocked : 'no result'}`}`)
+
+/*
+ * A BARRIER HERE IS CORRECT, and it is the one place in this script where that is true. The four
+ * lanes below split on C6's COMMITTED `slot` column, and the plan is explicit that their item counts
+ * are an OUTPUT of C6 rather than an input to it — three reading methods give three different
+ * worn/carried answers (57/70, 62/65, 52). So the lanes genuinely cannot start, or even be prompted
+ * honestly, until C6 has landed and reported. Everywhere else, prefer no barrier.
+ */
 
 /* ------------------------------------------------ phase: item mechanics ---- */
 
@@ -403,95 +396,148 @@ of them have ever had.
 
 SEVEN ITEMS WHOSE CENTRAL MECHANIC THE VOCABULARY REFUSES, and it is a schema decision rather than an
 oversight: ITEM_REFUSED_MODIFIER_TYPES is ["hit-points-per-level", "ability-score"]
-(packages/content-srd-5.2.1/src/character-content.ts:262). Measured, 6 of 258 items set an ability
-score — Amulet of Health, Belt of Giant Strength, Gauntlets of Ogre Power, Headband of Intellect,
-Potion of Giant Strength, Thunderous Greatclub — and Berserker Axe raises a Hit Point maximum. All
-seven ship as prose with the schema's own refusal message quoted beside them. DO NOT work around this
-by inventing a modifier type; that is a vocabulary decision and it belongs to a unit, not to you.
+(packages/content-srd-5.2.1/src/character-content.ts:262, message at :263, enforced at
+src/schemas.ts:329-333). Re-measured — all seven present in the source, with the lane each falls in:
+6 of 258 set an ability score — Amulet of Health (C7c), Belt of Giant Strength (C7c), Gauntlets of
+Ogre Power (C7c), Headband of Intellect (C7c), Potion of Giant Strength (C7d), Thunderous Greatclub
+(C7a) — and Berserker Axe (C7a) raises a Hit Point maximum. All seven ship as prose with the schema's
+own refusal message quoted beside them. DO NOT work around this by inventing a modifier type; that is
+a vocabulary decision and it belongs to a unit, not to you.
+
+YOUR ITEM COUNT AND YOUR EXPRESSIBLE-MECHANIC COUNT ARE OUTPUTS, NOT TARGETS. The item and attunement
+counts below are re-measured for C7a and C7b (pure category sums, exact) and DERIVED for C7c/C7d from
+a worn/carried reading that three methods disagree about. Split on C6's committed \`slot\` column and
+report what you actually find. No prior draft's "N with an expressible mechanic" number survives
+re-measurement — that is a judgement, so produce yours and write it down beside your named absences.
 
 PROBES for every lane: (control) strip your module from index.ts -> your both-paths test fails naming
 its item. (value) change the authored amount -> the far-end number stops moving. Restore both.
 
+VERIFICATION IS THE CONTENDED RESOURCE, NOT THE AUTHORING. All four of you author at once, but every
+lane's far end is an ENGINE outcome, so every lane's proof runs server-side — and the plan caps this
+box at 2 concurrent full-suite runs, never two server suites at once, because the server suite binds
+a live port. So: run the NARROWEST vitest that proves your far end (your own test file, --root
+apps/server), not the full suite. If you see a port-bind failure or an inexplicable red, assume
+contention before you assume regression, wait, and re-run before reporting it. Report the test-file
+count either way. The one full serial suite is C8's job and not yours.
+
 375px for every lane: \`node scripts/tap-audit.mjs 375\` on /homebrew (the count must not rise) and one
 item you authored, checked on a character sheet at 375px.
 
-Work in your own git worktree. HARD-LINK node_modules with \`cp -al\` — a symlink makes your run test
+Work in your own git worktree. YOUR FIRST COMMAND IS
+\`cp -al /home/user/OzyVTT/node_modules "$PWD/node_modules"\` — with no node_modules vitest collects 0
+files and exits 0, and a symlink instead makes your run test
 the ORIGINAL tree and prove nothing.`
 
 const LANES = [
   {
     key: 'C7a',
     label: 'weapons and armour',
-    detail: `52 items, 47 with an expressible mechanic, 35 attuned.
+    detail: `52 items, 35 attuned (both re-measured exactly — this lane is a pure category sum).
 
 FAR END: a +1 weapon's to-hit AND damage both move by one, and an Armor of Resistance halves a typed
-damage total on the damage command.
+damage total on the damage command. Note the SRD text: "You have Resistance to one type of damage
+while you wear this armor. The GM chooses the type or determines it randomly" off a d10 table — the
+item prints no fixed type, so author one and say which in the module.
 
 RESERVE, do not author — record as named absences with the unit id:
-  - U20 (weapon-swing override): Sun Blade ("deals Radiant damage instead of Slashing", and "functions
-    as a Longsword with the Finesse property") and Energy Bow ("deals Force damage instead of
-    Piercing"). Their third carrier is monk.martial-arts and is not yours.
+  - U20 (weapon-swing override): Sun Blade ("deals Radiant damage instead of Slashing damage", and
+    "functions as a Longsword with the Finesse property") and Energy Bow ("deals Force damage instead
+    of Piercing"). Their third carrier is monk.martial-arts and is not yours.
   - U23 (extra-damage, same type as the trigger): Vicious Weapon — "This extra damage is of the same
     type as the weapon's normal damage", which is the exact shape U23 exists for. ExtraDamageVariantSchema
     REQUIRES damageType today, so it cannot be authored before U23 lands.
+  - U29 (attack-kind-is: "spell"): Spellguard Shield. It is "Armor (Shield)" and therefore YOURS, not
+    C7b's — an earlier draft filed it under the wand lane. Its text is "spell attack rolls have
+    Disadvantage against you"; it grants NO spell-attack bonus, so it is U29's carrier and not U26's.
 
 DO NOT REACH FOR THE LIGHT PROPERTY AS A CARRIER. Verified with the mastery program: there is NO
 two-weapon / off-hand attack mechanism anywhere in the engine — weaponAction
-(apps/server/src/equipment-derivation.ts:993-1012) hard-codes activation: "action" — and the SRD
-two-weapon-fighting fighting style at bundles/feats.v1.json:302 carries nothing but
-tags: ["fighting-style"]. Light is real and C1 authors it on 8 weapons; what it DOES is U21's and
+(apps/server/src/equipment-derivation.ts:994-1016) hard-codes activation: "action" at :1007 — and the
+SRD two-weapon-fighting fighting style at bundles/feats.v1.json:302 carries nothing but
+tags: ["fighting-style"]. Light is real and C1 authored it on 8 weapons; what it DOES is U21's and
 U35's mechanism to build. Any Light-based far end here would be vacuous.`,
   },
   {
     key: 'C7b',
     label: 'wands, staffs, rods, rings and the scroll',
-    detail: `55 items, 41 with an expressible mechanic, 44 attuned. The charges-and-casts lane.
+    detail: `55 items, 44 attuned (both re-measured exactly — this lane is a pure category sum). The
+charges-and-casts lane.
 
-FAR END: a Wand of Fireballs spends a charge, rolls real damage through the item's \`casts\` block, and
+FAR END: a Wand of Fireballs ("This wand has 7 charges ... expend no more than 3 charges to cast
+Fireball (save DC 15)") spends a charge, rolls real damage through the item's \`casts\` block, and
 REFUSES when the charges are gone. The refusal is the strongest half — author \`uses\` blocks properly.
 
 RESERVE, do not author — record as named absences with the unit id:
-  - U26 (spell-attack-bonus): Wand of the War Mage +1/+2/+3, Staff of the Magi, Staff of the Woodlands.
-    The modifier is COLLECTED at equipment-derivation.ts:682 and APPLIED NOWHERE, so authoring it now
-    ships an item whose printed bonus does nothing.
-  - U29 (attack-kind-is: "spell"): the same items plus Spellguard Shield and Staff of Power — 7 items
-    whose text turns on a spell attack roll.
+  - U26 (spell-attack-bonus): Wand of the War Mage +1/+2/+3, Staff of the Magi, Staff of the
+    Woodlands, and STAFF OF POWER — which an earlier draft filed under U29 only. Its text is "you gain
+    a +2 bonus to Armor Class, saving throws, and spell attack rolls", so it is a U26 carrier too.
+    (The other two U26 carriers, Talisman of Pure Good and Talisman of Ultimate Evil, are C7c's.)
+    The modifier is COLLECTED at equipment-derivation.ts:682 and APPLIED NOWHERE — the code says so
+    itself at apps/server/src/character-build.ts:302, "spell-attack-bonus": "unread" — so authoring it
+    now ships an item whose printed bonus does nothing.
+  - U29 (attack-kind-is: "spell"): the same four, plus Spellguard Shield (C7a's) and the two talismans
+    (C7c's) — 7 items in all whose text turns on a spell attack roll. Re-measured: exactly 7 of 258
+    mention one, and 6 of the 7 grant a bonus.
+  - U31 (on-taking-damage + damage-reduction): RING OF WARMTH — "If you take Cold damage while wearing
+    this ring, the ring reduces the damage you take by 2d8." It is a Ring and therefore YOURS, not
+    C7c's, which is where an earlier draft filed it.
   Note for whoever writes the test later: Wand of the War Mage expands to THREE rows under C6's ladder
   rule, so a "not a lone record" count should count records, not rows.`,
   },
   {
     key: 'C7c',
     label: 'wondrous items that are worn',
-    detail: `63 items, 49 with an expressible mechanic, 51 attuned. The body-slot lane, and the heaviest
-on attunement.
+    detail: `~57 items, ~47 attuned by the "by name" reading — but YOUR lane boundary is C6's committed
+\`slot\` column and your real counts are whatever it says. An earlier draft claimed 63/51; that does not
+reproduce. Report what you find. The body-slot lane, and the heaviest on attunement.
 
-FAR END: a Cloak of Protection moves AC AND a saving throw the server rolls, and both come back off
-when the cloak does. The on/off symmetry is the point — a bonus that survives unequipping is the bug.
+FAR END: a Cloak of Protection ("You gain a +1 bonus to Armor Class and saving throws while you wear
+this cloak") moves AC AND a saving throw the server rolls, and both come back off when the cloak does.
+The on/off symmetry is the point — a bonus that survives unequipping is the bug.
 
-THIS LANE OWNS \`cursed\`. Re-read the hiding rule at packages/content-srd-5.2.1/src/schemas.ts:269-275
+THIS LANE OWNS \`cursed\`. Re-read the hiding rule at packages/content-srd-5.2.1/src/schemas.ts:296-302
 before authoring one: hidden until attunement and NOTHING more, and the schema refuses a cursed item
-that does not require attunement (schemas.ts:291-299). Do not invent a second hiding rule.
+that does not require attunement (schemas.ts:319-326, "A cursed item must require attunement —
+attunement is both what springs the curse and what reveals it"). Do not invent a second hiding rule.
 
 RESERVE, do not author — record as named absences with the unit id:
   - U31 (on-taking-damage + damage-reduction): Gloves of Missile Snaring ("take a Reaction to reduce
-    the damage by 1d10 plus your Dexterity modifier") and Ring of Warmth.
+    the damage by 1d10 plus your Dexterity modifier"). Ring of Warmth is U31's OTHER carrier and it is
+    C7b's, not yours — it is a Ring.
   - U32 (on-death-save + roll-mode: death-save): Periapt of Wound Closure ("Whenever you make a Death
-    Saving Throw, you can change a roll of 9 or lower to a 10") and Mysterious Deck.
-  - U26/U29 also reach two items in your lane: Talisman of Pure Good and Talisman of Ultimate Evil.`,
+    Saving Throw, you can change a roll of 9 or lower to a 10"). Mysterious Deck is U32's other
+    carrier and it is C7d's, not yours — it is carried wondrous.
+  - U26/U29 reach two items in your lane: Talisman of Pure Good and Talisman of Ultimate Evil (both
+    "You gain a +2 bonus to spell attack rolls while you wear or hold it").
+  - Four of the seven refused ability-score items are yours: Amulet of Health, Belt of Giant Strength,
+    Gauntlets of Ogre Power, Headband of Intellect. Prose, with the refusal message quoted.`,
   },
   {
     key: 'C7d',
     label: 'potions and carried wondrous items',
-    detail: `88 items, 30 with an expressible mechanic, 10 attuned. The most items and the least
-mechanics — that asymmetry is why this lane is sized smaller, and why it carries the largest number of
-named absences to write down.
+    detail: `~94 items, ~14 attuned by the "by name" reading — but YOUR lane boundary is C6's committed
+\`slot\` column and your real counts are whatever it says. An earlier draft claimed 88/10; that does not
+reproduce. Report what you find. The most items and the least mechanics — that asymmetry is why this
+lane is sized smaller, and why it carries the largest number of named absences to write down.
 
-FAR END: a Potion of Resistance applies a typed resistance for its duration and expires.
+FAR END: a Potion of Resistance ("When you drink this potion, you have Resistance to one type of
+damage for 1 hour") applies a typed resistance and expires. The type is rolled off a d10 table rather
+than printed, so author one and say which.
 
-MOST OF THE 65 CARRIED WONDROUS ITEMS ARE GM-FIAT PROSE — Bag of Beans, Deck of Illusions, Portable
-Hole, Sphere of Annihilation, Mirror of Life Trapping. Writing each absence down with its reason IS
-the deliverable for those; a lane that quietly authors nothing for 65 items is indistinguishable from
-one that forgot. Three of the seven refused ability-score items are yours (Potion of Giant Strength).`,
+MOST OF THE ~70 CARRIED WONDROUS ITEMS ARE GM-FIAT PROSE — Bag of Beans, Deck of Illusions, Portable
+Hole, Sphere of Annihilation, Mirror of Life Trapping (all five verified present). Writing each absence
+down with its reason IS the deliverable for those; a lane that quietly authors nothing for ~70 items is
+indistinguishable from one that forgot.
+
+EXACTLY ONE of the seven refused ability-score items is yours: Potion of Giant Strength. An earlier
+draft of this script said "three of the seven"; re-measured, four are C7c's and two are C7a's.
+
+RESERVE, do not author — record as a named absence with the unit id:
+  - U32 (on-death-save + roll-mode: death-save): MYSTERIOUS DECK, whose Comet card reads "you have
+    Advantage on Death Saving Throws". It is carried wondrous and therefore YOURS, not C7c's, which is
+    where an earlier draft filed it. Re-measured: Mysterious Deck and Periapt of Wound Closure are the
+    ONLY 2 of 258 items whose text names a Death Saving Throw.`,
   },
 ]
 
@@ -535,8 +581,8 @@ const close = await agent(`${CONTEXT}
 YOUR UNIT: C8 — the content program's close. Every lane has merged. The governing plan folds the
 quality layer into each program (ruling 3), so this program carries its own.
 
-Results to audit:
-  batch 0:  ${JSON.stringify(batch0)}
+Results to audit (C1, C2 and C5 landed before this run and are not in these results — audit them
+from the git history if you audit them at all: 36b5a1f, 14fdb77, dcd7797 + 19f0d2a):
   batch 0b: ${JSON.stringify(batch0b)}
   bundle:   ${JSON.stringify(bundle)}
   lanes:    ${JSON.stringify(mechanics)}
@@ -560,13 +606,16 @@ THREE THINGS, IN ORDER.
    BEFORE and AFTER — it must not rise. Chromium is at /opt/pw-browsers; never run
    \`playwright install\`.
 
-3. THE LEDGER. docs/ai-ledger/current-state.md is EXACTLY at its enforced 150-line ceiling and is
-   PARENT-ONLY — do not edit it; report the replacement lines you would make instead.
-   docs/ai-ledger/known-bugs.md and docs/ai-ledger/decision-log.md take this program's entries: the
-   three live defects C3 fixed (Finesse rolling off Strength, Reach weapons at 5 feet,
-   weapon-property-is inert), and the fact that regenerating weapons.v1.json used to be silently
-   destructive. Re-run \`npm run docs\` ONLY if something touched state/command/HTTP/OpenAPI — nothing
-   in this program should have, and if something did, that is a finding, not a doc chore.
+3. THE LEDGER. docs/ai-ledger/current-state.md is EXACTLY at its enforced 150-line ceiling (verified,
+   wc -l = 150) and is PARENT-ONLY — do not edit it; report the replacement lines you would make
+   instead. docs/ai-ledger/known-bugs.md and docs/ai-ledger/decision-log.md take this program's
+   entries. Note what is ALREADY recorded and must not be double-entered: the three defects
+   (Finesse rolling off Strength, Reach weapons at 5 feet, weapon-property-is inert) and the silently
+   destructive weapons.v1.json rebuild were all fixed and logged at 36b5a1f. What is OPEN in
+   known-bugs.md is the CONTROL-half entry — "A homebrew weapon cannot be given properties or a
+   mastery" — and C3 NARROWS it rather than deleting it, because U38 still owns the \`mastery\` half.
+   Re-run \`npm run docs\` ONLY if something touched state/command/HTTP/OpenAPI — nothing in this
+   program should have, and if something did, that is a finding, not a doc chore.
 
 Run the full suite ONCE, serially. Never two suites at the same time — the server suite binds a live
 port. Build only the client workspace, or \`npm run test\` collects compiled server tests too
@@ -579,7 +628,6 @@ program is wrong.`,
 log(`Close: ${close ? close.verdict : 'no verdict'}${close && close.unwired.length ? ` — ${close.unwired.length} unwired` : ''}${close && close.vacuous.length ? `, ${close.vacuous.length} vacuous` : ''}`)
 
 return {
-  batch0,
   prerequisites: batch0b,
   bundle,
   mechanics,

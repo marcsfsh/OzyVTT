@@ -14,20 +14,154 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
-- **[combat/weapons] A Rapier rolls off Strength, and every reach weapon threatens at five feet.**
-  `weaponAbilityModifier` and `weaponAction` already read `finesse`, `thrown` and `reach` off
-  `weapon.properties` — and no SRD weapon carries a `properties` array, so the readers run against an
-  empty column. Finesse weapons never use Dexterity; Glaive, Halberd, Lance, Pike and Whip all have
-  5-foot reach. Found 2026-08-10 by PLANNER-CONTENT; the vendored SRD Weapons table already carries
-  the data (70 property assignments, joined 38/38). Owner: content program **C3**
-  (`docs/product/plan-content-program.md`).
+- **[codex/rail] Three of the folder menu's five items cannot be tapped at 375px.** Measured
+  2026-08-11 on `/codex/pages`, GM, 375×667 with touch: the rail's `Menu` popover renders 5 items at
+  **44×184** — every one clears the tap floor — and `elementFromPoint` at the centre of three of them
+  answers with something else: *New subfolder* ← `div.codex-rail-tools`, *New page here* ←
+  `aside.codex-rail` itself, *Rename folder* ← `input.nh-input`. *Move to top level* and *Delete
+  folder* own their centres (an earlier version of this entry said only *Delete folder* did;
+  re-measured 2026-08-11 by the independent review pass, same three thieves, same three items).
+  The theft is position-bound: scrolling the popover (which moves it relative to the fixed tools
+  row and search input) frees the stolen items — a driven `.tap()` that auto-scrolls first lands —
+  which points the diagnosis at the overlap geometry, not the items themselves.
+  **It is NOT the `isolation: isolate` trap** that this same rail's tag combobox had (fixed in
+  `codex.css`, `.codex-rail:has(.nh-combobox-list)`): every thief here is INSIDE the rail, so lifting
+  the rail changes nothing — extending that selector to `details.nh-menu[open]` was tried and
+  re-measured at still 3 stolen. Suspected cause: the primitives in `.codex-rail-tools` and the
+  `.nh-input` beside them carry `isolation: isolate` of their own, so each is a stacking context that
+  the popover's `z-index: 40` is competing with rather than clearing. Wants its own diagnosis; the
+  popover may need to leave the rail's subtree entirely (the `Modal`/`Drawer` route) rather than win
+  a z-index argument inside it. **The 44px audit cannot see this** — `scripts/tap-audit.mjs` measures
+  size, not reach, and never opens this popover.
 
-- **[content/etl] Regenerating the bundles silently deletes every weapon's mastery.** The `mastery`
-  column in `weapons.v1.json` has no ETL home — measured in a scratch copy, `npm run build-bundle`
-  drops it from all 38 rows, nothing pins it (`bundle.test.ts` checks category and damage only), and
-  the build stays green. That column is the whole data basis of the mastery program. **Do not
-  regenerate bundles** until content program **C1** lands the parser for the already-vendored SRD
-  Weapons table.
+- **[encounter/saves] A save preview projects the PRE-defence number, so the prompt prints more than
+  the commit lands against any resistant target.** `answerSave`'s preview arm returns `outcomeDamage`
+  — the halved, re-typed total — and it `return`s from ABOVE the call to `applyDamageDetailed`
+  (`apps/server/src/saving-throws.ts`, the `if (!commit) return` immediately preceding it). Only the
+  commit arm reports `application.totalApplied`. Every defence is therefore invisible to the preview:
+  resistance, vulnerability, immunity, Petrified/Underwater and flat `damage-reduction` riders.
+  Measured 2026-08-10 through the client's own payload builder, the server's `.strict()` schema and
+  `answerSave`, on a fire-resistant target with `halfOnSuccess` and a save that succeeded 18 vs DC 15:
+  an amend of **12** projects **6** and the commit applies **3**. Pinned as it behaves — not as the
+  prompt claims — by *"projects the PRE-defence number on a recheck"* in
+  `apps/client/src/encounter/save-damage.mirror.test.ts`; when this is fixed those numbers converge
+  and that test changes on purpose. **Not specific to the amend:** the un-amended Roll preview has the
+  identical shape (17 projected, 8 applied), so the fix belongs to the preview path, not to `4b`. The
+  honest fix is a dry-run projection through the same pipeline that applies nothing — no hit points
+  moved and no receipt a commit would double-count — which is a change to the authoritative damage
+  path and wants its own review pass. `SavePrompt`'s docblock and `current-state.md:31` both used to
+  assert the opposite; corrected 2026-08-11.
+
+- **[encounter/damage] Editing the pre-filled number on a parked player hit drops its damage types, so
+  Apply bypasses every defence.** `resolvePendingDamage`'s `amount !== undefined` arm
+  (`apps/server/src/player-damage.ts:83-85`) builds `{ amount, critical, sourceName }` and never
+  forwards `proposal.proposedDamageParts`, so `damagePartsOf` returns null in `applyDamageDetailed`
+  (`apps/server/src/hit-points.ts:170`) and the whole typed pipeline — resistance, immunity,
+  vulnerability, Petrified/Underwater, flat `damage-reduction` — is skipped. Measured 2026-08-10
+  against a fire-resistant target holding a 10-fire proposal: an untouched Apply lands **5** with
+  `parts` naming the halving; typing **12** lands **12**, not 6, with `parts` empty. The GM's route
+  to it is the editable field in `PendingDamagePrompt`
+  (`apps/client/src/encounter/EncounterPanel.tsx:694`), whose own docblock at `:673-678` says Apply
+  goes "through the typed-defense pipeline" — the server's docblock is honest about the override
+  ("no defense math"), the client's is not. **`ActionRunner`'s Apply already carries the fix for this
+  exact shape** and its comment says so (`apps/client/src/encounter/ActionRunner.tsx:150-154` — "a GM
+  correcting 17 to 12 handed a fire-resistant target all 12"): send the parts and let the server
+  re-weight them. The same shape is owed here, and `DamageResolveSchema`
+  (`apps/server/src/game-commands.ts:239`) carries no `damageOverride` for the amend to ride on.
+
+- **[encounter/damage] The save and reaction acks carry a typed breakdown nothing reads.**
+  `SaveAnswerResult.outcome.parts` / `.flatReduction` (`packages/domain/src/index.ts:1028`) and
+  `ReactionAnswerResult`'s pair (`:1030`) are computed and put on the ack by `game-operations.ts`;
+  `SavePrompt` and `ReactionPrompt` (`apps/client/src/encounter/EncounterPanel.tsx`) take
+  `success`/`total`/`dc`/`appliedDamage`/`conditionApplied`/`rollMode` and stop. Measured 2026-08-10:
+  `outcome.parts` has two client readers and both are mirror tests
+  (`apps/client/src/encounter/save-damage.mirror.test.ts`); **`flatReduction` has no reader anywhere
+  outside the server that writes it** — it appears only in `hit-points.ts`, `saving-throws.ts`,
+  `reactions.ts`, `game-operations.ts` and one server test. So a hit halved by resistance and then cut
+  by a `damage-reduction` rider explains itself on `actor.apply-damage`'s path
+  (`apps/client/src/encounter/ActionRunner.tsx:166`) and stays a bare number on the save's and the
+  reaction's.
+
+- **[repo/verify] The sheet and its browse-and-add picker are measured BY HAND, because the tap audit
+  cannot reach either.** Both `play-sheet` and `play-sheet-picker` resolve their address from
+  `[data-token-id]` on `/table`, which exists only for a combatant in a running fight — on a dev
+  database with a PC merely on the roster both report NOT MEASURED, and every control on the two
+  surfaces contributes nothing to the number the audit prints. That is not a small blind spot: it is
+  the 451-row catalog and the inventory row, on the surface a phone is mostly holding.
+  Their previous entry here — the picker's *ten* sub-floor controls, `input.sheet-picker-search` at
+  34.3px and nine 19px `button.sheet-picker-chip` — was **fixed 2026-08-11** in the magic-item ETL
+  commit (`min-height: var(--tap-min)` on both, route 1 rather than `.tap-target`, because the chips
+  wrap and an `::after` overhang would steal from the chip above). Re-measured there directly in
+  Chromium 1194 at 375×667 with touch: all **12** chips 44px tall, search 303×44.
+  An earlier version of this entry then named `.sheet-remove` at **29.6×29.6** as a remaining
+  sub-floor control; **that was a false violation and is retracted** (2026-08-11, the C6 review pass).
+  `.sheet-remove` is an `IconButton`, `IconButton` adds `tap-target` unconditionally
+  (`packages/ui/src/primitives/Button.tsx:83`), `.tap-target::after` is a centred
+  `max(100%, var(--tap-min))` = 44px (`design-tokens.css`), and the audit's own size is
+  `max(rect, ::after)` (`scripts/tap-audit.mjs`). 29.6 is its **paint**, and
+  `packages/ui/src/primitives/Button.css` names `.nh-iconbtn` exempt from the paint floor for exactly
+  this reason — "they reach the floor by route 2". The control measures 44×44 and always did. Logged
+  here because the audit's own docblock calls this failure out by name: *"a false violation is worse
+  than none: it sends the next session to 'fix' working code."*
+  **Still true and still owed:** the audit reaches neither surface, so nothing on them is in the
+  printed number. That is a fixture gap rather than a structural one — with a fight seeded, the
+  2026-08-10 run *did* measure `play-sheet-picker` at 328 controls.
+
+- **[ui/touch] The row-tools popover and the token context menu ship sub-floor controls, and the tap
+  audit opens neither surface.** Measured 2026-08-10 in Chromium 1194 at 375×667 (dsf 2, isMobile,
+  hasTouch) by design-language §4's own rule. The initiative row's popover (`.hp-editor`,
+  `apps/client/src/encounter/EncounterPanel.tsx:1342`) is **six** controls all **38.9px tall** —
+  Amount 67.2 wide, Dmg 40.4, KO 35.4, Heal 39.8, Temp 45.8, Set 35.4. The token menu
+  (`apps/client/src/scene/TokenContextMenu.tsx`) is **eleven**: Amount 54.4×41.6, Dmg and Heal
+  63×41.6, two `select` at 190×38, `summary.token-context-conditions-summary` 190×35.3, and five
+  `button.token-context-item` 190×41.6 — the 41.6 is `.token-context-hp > button`'s
+  `min-height: 2.6rem` (`apps/client/src/scene/encounter-map.css:759`) exactly. **None of the
+  seventeen is in the audit's 30**: neither surface is in `scripts/tap-audit.mjs`'s route list, which
+  touches `[data-token-id]` only to read an actor id for the sheet address. Same blind spot the
+  `[codex/verify]` entry below records for `.dice-custom > summary`, on the surface a GM adjusts hit
+  points from.
+
+- **[repo/verify] `scripts/tap-audit.mjs`'s `play-homebrew-picker` surface cannot open, so the audit's
+  non-zero exit is not always a floor failure.** Its opener takes the `.first()` combobox inside
+  `.hb-detail` and clicks it. Measured 2026-08-10 with one real record in the rail: that first match
+  is the `Answers to` box, **0×0 inside a `div.nh-roweditor-body` carrying `hidden`** — the collapsed
+  `RowEditor` row the script's own docblock already knows about — so the click waits out its 8s and
+  the surface reports NOT MEASURED, while `play-homebrew-record` measures 203 controls (78 inside a
+  closed disclosure) and `play-homebrew-feature` 288, both clean, for a run of 2622 controls and
+  **one** unmeasured surface. On an **empty** library — which is what the dev database holds, the two
+  earlier fixtures having been soft-deleted — all three homebrew surfaces go unmeasured instead ("no
+  homebrew row in the rail"): 2131 measured, 30 below the floor, 1 unreachable, **3** surfaces NOT
+  MEASURED. (That 30 is the 2026-08-10 total and **ten of it is now fixed** — the picker's search and
+  nine chips, in the C6 commit — so a re-run on the same database would print 20. The figure is left
+  as measured rather than adjusted on paper; what it dates is the run, not today.)
+  Either way the exit code is 1 for the unmeasured surfaces, not for the 30. Its sibling
+  `play-homebrew-feature` finds its target by walking the rail; this one does not.
+
+- **[codex/touch] The pin inspector's "Show the pin" is the audit's one unreachable control.**
+  `node scripts/tap-audit.mjs 375` at HEAD (2026-08-10): on `pin-inspector` (`/codex/atlas`),
+  `button.nh-btn nh-btn--ghost interactive "Show the pin"` measures **44 tall × 158.1 wide with
+  reach 0** — the size is fine and `elementFromPoint` at its own centre answers with something else.
+  It is the only `UNREACH` row in a 2131-control run and it is in the **active** layer, so it is not
+  the overlay/disclosure exemption the `[codex/verify]` entry below describes. Unowned; what is
+  painted over it has not been identified.
+
+- **[repo/tooling] `npx vitest run --root apps/client` from the repo root reds
+  `design-conventions.test.ts` for a reason that is not the code.** `CLIENT_SRC` and `UI_SRC` are
+  built from `process.cwd()` (`apps/client/src/design-conventions-shape.ts:38-39`), and `--root`
+  moves vitest's root without moving the process's cwd — so `assertRoots` looks for `main.tsx` under
+  the repo root, and the suite fails to COLLECT with `ENOENT`, printing "1 failed / no tests".
+  Measured both ways 2026-08-10: from the repo root the file does not collect; `cd apps/client` then
+  `npx vitest run src/design-conventions.test.ts` is **34 passed**. Three separate lanes reported it
+  on 2026-08-10, so it is not a one-off. Run a workspace suite from inside the workspace.
+
+- **[homebrew/editor] A homebrew weapon cannot be given a mastery.** The API accepts `mastery` on
+  `equipment.weapon` and the engine reads it, but the editor's weapon block has no row for it, so a
+  GM's greatsword can never Graze. Owner: mastery program **U38**, gated on all eight slugs reaching;
+  it is the CONTROL half only — the data shapes and the readers landed 2026-08-10 in batch 0.
+  **`properties` was the other half of this bug and is FIXED** (2026-08-11, content program **C3**):
+  the weapon block's sixth row is a `tags` chooser over `WEAPON_PROPERTY_IDS`, open like every other
+  SRD vocabulary control, and `weapon-properties.mirror.test.ts` swings a GM-authored Finesse weapon
+  off Dexterity through the real controls, the real wire and the real catalog.
 
 - **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
   `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces
@@ -61,6 +195,210 @@ Format: `[area] — description — suspected cause / status`.
   `extensions["open5e.srd-2024"]` keys that appear zero times in the published contract. (3) The
   closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
   slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
+
+- **[content/items] A magic weapon added from the browse list offers no attack at all, because a
+  magic weapon carries no weapon stats.** The SRD's printed type line names which **base** weapon the
+  item applies to — `Weapon (Warhammer)`, `Weapon (Any Simple or Martial)` — never the item's own
+  dice, and the ETL is faithful to it. *Measured 2026-08-11 over the committed
+  `packages/content-srd-5.2.1/bundles/magic-items.v1.json`: **0 of the 33 `weapon`-category rows carry
+  a `weapon` block**, and 0 of the 14 `armor` rows carry an `armor` block.* The picker mints the
+  inventory row's block from the catalog summary's (`inventoryWeaponFrom`,
+  `apps/client/src/encounter/equipment.tsx`), which is null here, so `weaponAction` returns null
+  (`apps/server/src/equipment-derivation.ts`) and there is nothing to swing. **Driven end to end on a
+  picker-minted `Dwarven Thrower`, equipped and attuned: `derivation.carriers` 1, `weaponActionIds`
+  `[]`, `effectiveActions` `[]`.** A GM who adds a Sun Blade to a character gets a line item and no
+  attack. Not a projection or a wire problem — the data is honest and the mechanism to consume it does
+  not exist. **This is also why every `+N` on a weapon row is a named absence rather than a rider:** an
+  authored `+3` would not be an overstatement, it would be a number that appears nowhere, and
+  `scope: "bearer"` is refused as the workaround because it would raise every attack the bearer makes
+  and two magic weapons would stack. Absences are in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` (19 rows cite this).
+  **The armour side is milder and has the same root:** the SRD prints a magic shield's bonus *"in
+  addition to the Shield's normal bonus to AC"*, and AC is additive, so an `armor-class` rider stacked
+  on a separately equipped mundane base is what the source describes and it works today — but a bearer
+  who equips **only** the magic row reads `10 + Dex + N` instead of the base's AC + N, because that row
+  carries no `armor` block either. Wants its own unit — **C9, the weapon-template mechanism**, written
+  up in `docs/product/plan-content-program.md`: the player picks the base the template applies to.
+  Two things gate it and both are named there — the eligibility column (18 distinct qualifier forms
+  over the 33 rows, not parsed today) and a flat `damage-bonus` in `FeatureModifierSchema`, without
+  which a `+1` weapon would author its to-hit and silently understate its damage by one. **Do not
+  invent default stats for these rows**; the source does not print them.
+
+- **[content/spells] There is no healing in the spell model, so anything that casts a healing spell
+  deals damage instead.** `SpellReferenceSchema` has no `healing` field at all (*measured: no match
+  in `packages/content-srd-5.2.1/src/schemas.ts`*); a spell's dice live in `damage.roll`, and a
+  healing spell carries them there with an EMPTY `damage.types`. So `cure-wounds` ships as
+  `{roll: "2d8", types: []}` and `heal` as `{roll: null, types: []}`. A consumer that reads `damage`
+  to synthesise an action cannot tell healing from harm: **measured 2026-08-11, an item authored with
+  `casts: [{spellId: "cure-wounds"}]` synthesises a 2d8 DAMAGE action — point a Staff of Healing at a
+  wounded ally and it hits them for 2d8.** Found by the C7b review pass, which is why that lane's
+  healing items are unmerged.
+  **The empty-type set is not a healing marker and must not be used as one:** 24 of 339 spells carry
+  a damage roll with no type, and they are a mixture — healing (`cure-wounds`, `healing-word`), flat
+  buffs whose dice are a bonus (`bless`, `guidance`, `bane`), temporary hit points (`false-life`) and
+  spells whose type is chosen at cast time (`chromatic-orb`, `dragons-breath`). Telling them apart
+  needs a real field, not a heuristic. Wants its own unit: a `healing` block on the spell reference,
+  the ETL to populate it, and a reader — until then every healing carrier stays a named absence.
+
+- **[content/spells] A spell's `damage` and `attackRoll` columns describe its TEXT, not what one cast
+  rolls, and `castAction` reads them as if they did.** The sibling of the entry above and the wider
+  half of it: healing is one shape of "the printed dice are not damage at a target", and there are
+  others. `castAction` (`apps/server/src/equipment-derivation.ts:922-961`) takes `spell.damage.roll`
+  as a cast's damage formula, **`spell.damage.types[0] ?? "force"`** as its damage type, and emits an
+  `attack` block whenever `spell.attackRoll` is true. Measured 2026-08-11 against the committed
+  `packages/content-srd-5.2.1/bundles/spells.v1.json` (339 records), four spells whose records are
+  faithful to the SRD text become four wrong item actions: **`web`** is `{roll: "2d4",
+  types: ["fire"]}` — which the SRD deals only *"to any creature that starts its turn in the fire"*
+  after somebody ignites the webs — so a cast rolls it every time; **`magic-missile`** is
+  `{roll: "1d4 + 1"}`, which is what ONE of the spell's **three** darts deals, so a cast averages
+  ~3.5 where the spell averages ~10.5; and `cure-wounds`/`heal` are the entry above.
+  **`attackRoll` is separately over-broad**: 42 of the 339 carry it, and three were read against
+  their own text here and make no attack roll at all — `faerie-fire` (*"Each creature in the Cube is
+  also outlined if it fails a Dexterity saving throw"*), `protection-from-evil-and-good` (*"Creatures
+  of those types have Disadvantage on attack rolls against the target"*) and `ray-of-enfeeblement`
+  (*"The target must make a Constitution saving throw"*). Each merely *mentions* an attack roll
+  somebody else makes. The population is larger than three and unaudited: **13 of the 42 carry no
+  damage roll at all** and **11 also force a saving throw** — `bane`, `bless`, `blur`, `invisibility`,
+  `magic-weapon`, `mirror-image` among them — shapes a spell attack does not have.
+  `ray-of-enfeeblement` is both defects at once: `attackRoll: true` plus `{roll: "1d8", types: []}`
+  makes a **1d8 Force spell attack** out of a spell whose 1d8 is what the TARGET subtracts from its
+  own damage rolls. Found by the C7b salvage, which removed seven authored casts over it and records
+  each as a named absence in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/wands-rods-rings.ts` (limit **L6**). Not a
+  projection or a wire problem — the records are honest and the CONSUMER's reading of them is not.
+  Wants the same unit as the entry above: a cast-time damage/attack model the item carrier can trust,
+  rather than a heuristic over prose columns.
+
+- **[content/riders] A `spell-save-dc` rider raises the DC of EVERY save-bearing action, including
+  DCs printed on other items and on a stat block.** `withStandingRiders`
+  (`apps/server/src/effective-actions.ts:51`) sums the rider and folds it into `action.save.dc` at
+  `:74` for any action carrying a `save`; nothing on that path asks whether the action is a spell,
+  and there is no spell-save-DC field on the actor for the rider to reach instead. So the rider says
+  *"every DC you impose goes up"*, not *"your spell save DC goes up"*. **Measured 2026-08-12 through
+  the real `ContentLibrary` over the committed `magic-items.v1.json`, on a Wizard 5 wearing a `Robe
+  of the Archmagi` (`spell-save-dc: 2`):** `Wand of Paralysis`' printed **DC 15 read 17**, a
+  Breath-Weapon-shaped definition action's **DC 13 read 15**, and `Eyes of Charming`'s **DC 13 read
+  15** — three fixed numbers the SRD prints on something other than the wearer's spellcasting. The
+  slots do not conflict (a robe is `shoulders`, a wand is `held`), so wizard + robe + wand is an
+  ordinary loadout. Found by the C7c review pass, which **removed the only carrier in all 268 rows**
+  and records it as a named absence (limit **W8** in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/worn-wondrous.ts`), pinned by
+  `apps/server/test/item-mechanics-c7c.test.ts`. **The breadth is the vocabulary's, not that item's:**
+  `spell-save-dc` is a `featureRiders` type, so a CLASS feature, a subclass or a feat authoring it
+  reaches the same four lines — none does (*measured 2026-08-12: zero occurrences of the string in
+  `classes`, `subclasses`, `feats`, `species`, `backgrounds`, `equipment` and, since the removal,
+  `magic-items`*), which is why this is a trap for the next author rather than a live wrong number. Wants a unit: an actor-level spell save DC that a spell's own DC is computed from, so the
+  rider raises that instead of every printed DC. Until then a `spell-save-dc` on any carrier is an
+  over-grant and belongs in a named absence.
+
+- **[content/riders] A `check-bonus` rider misses the SERVER's own ability-check roll, so the sheet
+  promises a bonus the roll does not pay.** `checkRiderBonus`
+  (`apps/server/src/equipment-derivation.ts:851`) has exactly one consumer — `actor-derived.ts:94`,
+  the derived sheet's skill row. Where the server rolls an ability check itself it does not use it:
+  `BUILTIN_CHECKS` (`apps/server/src/action-resolution.ts:139`) resolves at `:762` from
+  `abilityModifier` + `skillBonusFromExtension` + `exhaustionPenalty` and never calls
+  `checkRiderBonus`. **NARROWED, NOT CLOSED, 2026-08-13**: `roll-mode {roll: "check"}` gained a
+  consumer on exactly those call sites (`apps/server/src/ability-checks.ts`), so the ADVANTAGE half of
+  a check rider now reaches the die and the FLAT half still does not — a `Stone of Good Luck` worn
+  beside `Boots of Elvenkind` rolls `2d20kh1` and adds +2, not +3. **Measured 2026-08-12 through the real pipeline over the committed
+  `magic-items.v1.json`, on a Wizard 5 (Dex 14) wearing an attuned `Stone of Good Luck`
+  (`check-bonus: 1`):** `deriveActorSheet(...).skills.find(stealth).bonus` is **3** while the builtin
+  Hide roll through `resolveDefinitionAction(state, builtinAction("hide"), {builtin: true})` on a d20
+  of 10 returns `check.total` **12** — Dex +2 only, the stone's +1 nowhere. It affects all four
+  builtin checks (Hide, Influence, Search, Study) **and Escape a Grapple**, the fifth check the
+  server throws. This is the split-brain `actor-derived.ts:15-26`
+  says that block exists to end, in the other direction. Found by the C7d review pass, which records
+  it at the `stone-of-good-luck-luckstone` entry in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/carried-and-potions.ts` and pins the two numbers
+  in `apps/server/test/item-mechanics-c7d.test.ts`. The rider is NOT an over-grant and stays authored
+  — the number it reaches is right, it just does not reach far enough. Wants a unit: `checkRiderBonus`
+  consulted where `BUILTIN_CHECKS` resolves.
+
+- **[content/items] An item action does nothing outside an encounter, and the one that does spends
+  no charge.** Two halves of the same gap, both measured 2026-08-12 over the committed
+  `magic-items.v1.json`. (1) `resolveDefinitionAction` (`apps/server/src/action-resolution.ts:691`)
+  throws *"Start an encounter before resolving actions."* — measured on `crystal-ball`'s Scrying,
+  `sending-stones`' Sending, `gem-of-seeing`'s peer and `pipes-of-haunting`'s play, each with the item
+  equipped and the action present in `effectiveActions`. The only out-of-fight surface is the loose
+  `action.use` route (`apps/server/src/game-operations.ts:1571-1572`, whose own comment says it
+  *"touches no combat state at all"*), whose plan comes from `looseRollPlan`
+  (`apps/server/src/tap-routing.ts:68-79`) and is built solely from `attack` and `damage` — measured
+  `[]` for all four. So an item whose printed use is not a combat activity (scry a distant creature,
+  send a message, open a planar portal, peer for 10 minutes of Truesight) has a button that refuses
+  at the moment the SRD prints it. (2) The converse, on the one shape that DOES reach the loose
+  route: `iron-bands` is the only C7d action carrying an `attack`, `looseRollPlan` returns
+  `[{"formula":"1d20 + 5","purpose":"attack","label":"Throw the Bands"}]`, and that path never
+  increments `actionUses` — so outside an encounter the bands throw unlimited real +5 attacks where
+  the SRD prints one per dawn. Engine-wide: it applies to any charged attack item, C7b's included.
+  Found by the C7d review pass, recorded as limits **D8** and **D9** in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/carried-and-potions.ts` and pinned by
+  `apps/server/test/item-mechanics-c7d.test.ts`. Wants a unit: an out-of-encounter resolution path
+  for item actions that debits the pool.
+
+- **[content/items] An ITEM's `grants.spells` reaches nothing — the eleventh grant list has no
+  channel on the derivation.** `FeatureGrantsSchema` has eleven lists; `deriveEquipment`'s
+  `takeGrants` (`apps/server/src/equipment-derivation.ts`) folds ten and has no `spells` arm, and
+  items never pass through `character-build.ts`'s `interpretFeature`, which is the only thing that
+  bakes a granted spell into a sheet. Measured 2026-08-13 on an equipped magic item whose parsed
+  block is `{spells:[{id:"fireball",level:3}], damageResistances:["fire"]}`: `damageResistances`
+  arrives as `["fire"]` while `"spells" in derivation` is `false` and no serialisation of the
+  derivation contains `"fireball"` anywhere. No shipped record uses it — all 41 blocks that grant a
+  spell are on classes, species and subclasses, which take the baked path — so this is latent, not
+  live. The GATED half of the same hole is closed: a grants block carrying both `when` and `spells`
+  is refused at authoring (`grantedSpellGateMessage`, `apps/server/test/grant-gates.test.ts`), which
+  is why an item's silence is now the only one left. Wants a unit: either a spell channel on
+  `EquipmentDerivation` that layers onto `spellcasting` at read time (it needs an answer for the
+  prepared cap and for the caster block a non-caster gets only because of the grant), or the same
+  named refusal extended to an item carrier.
+
+- **[homebrew] The grants editor preserves every top-level key but flattens `grants.spells`'
+  sub-keys.** `grantsFromRows` (`apps/client/src/homebrew/RiderEditor.tsx`) carries every key with
+  no row back untouched, which is what stops it deleting `when` — but `spells` HAS a row, so it is
+  rebuilt from that row's ids alone. Measured 2026-08-13 by adversarial review of `8bee7db`: a
+  `spells` entry authored `{id, level, ability, alwaysPrepared: false}` comes back out of an
+  unrelated row edit as `{id, alwaysPrepared: true}`, losing `level` and `ability` and flipping the
+  prepared flag. **Latent, not live**: all 41 shipped blocks that grant a spell sit on classes,
+  species and subclasses, and the editor cannot reach a class body, so no shipped record can lose
+  anything today. It becomes live the day a GM authors a species trait granting a levelled spell.
+  Distinct from the top-level partition above, which IS pinned — `grant-gate-preservation.mirror.test.ts`
+  asserts no top-level key is dropped, and none is. Wants the same treatment one level down: rebuild
+  a `spells` row from the previous entry rather than from its id.
+
+- **[content/items] The Shield of Missile Attraction is authored as a curse with no benefit, so
+  attuning it does nothing except make it impossible to take off.** Measured 2026-08-12 through the
+  real `ContentLibrary` over the committed
+  `packages/content-srd-5.2.1/bundles/magic-items.v1.json`, on a picker-minted row equipped and
+  attuned: the row carries `cursed: true` and **nothing else** — `modifiers: []`, `casts: []`,
+  `actions: []`, no `grants`, and `armor: null` like every other row in its category — and a sweep of
+  all 87 rider carriers against a bare control found this one of only five that move **no** observable
+  derivation (AC, saves, every skill row, resistances, immunities, condition immunities, initiative
+  mode, derived actions), the other four being momentary or write-path riders that were each driven to
+  a number. What the curse **does** reach is real: `enforceCurse`
+  (`apps/server/src/inventory.ts:107`) refuses a PLAYER write with *"Shield of Missile Attraction will
+  not come off. Ask the GM."* So a GM who hands a player this shield hands them a locked attunement
+  slot and no mechanic. Both printed halves are recorded as named absences at the entry in
+  `packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` — the Resistance is keyed to a
+  damage *source* (*"attacks made with Ranged weapons"*) rather than a type, and the redirect of
+  nearby ranged attacks has no targeting-override vocabulary — so this is a faithful subset rather
+  than a mistake. **It is nonetheless the exact inversion of a case this same lane's salvage removed:**
+  `armor-of-vulnerability` was emptied because authoring its resistance half alone made cursed armour
+  *strictly better* than plain (pinned by `apps/server/test/item-mechanics-c7a.test.ts`), and this row
+  makes a cursed shield *strictly worse* than none. Which way that asymmetry should fall is a client
+  ruling, not an author's: leave the downside-only curse (faithful, and the item is a trap in the SRD
+  too) or empty the row until both halves can land. **Not changed by the C8 review**, which recorded it
+  rather than guessing. Nothing is wrong with the engine here.
+
+- **[api/content] A feature with two pick blocks is served under BOTH spellings, and the older one
+  carries only the first block.** Measured 2026-08-11 while landing C4: the Wizard's `spell-mastery`
+  now authors `choices` (a level-1 block and a level-2 block), and the wire populates `choice` as
+  well — set to the FIRST block, not to null. A consumer reading only `choice` therefore sees "pick
+  one level-1 spell" and silently drops the level-2 pick entirely. The client is not affected:
+  `featurePicksOf` (`apps/client/src/builder/build-payload.ts:130`) prefers `choices` whenever it is
+  non-empty, which is why the builder renders two rows. It is the PUBLIC API surface that misleads,
+  and the trap grows with every feature converted to the two-block shape (Magic Initiate and the
+  four Mystic Arcana are already there). Not a projection leak — both spellings are player-facing
+  content. Suspected fix: serve `choice` as null when `choices` holds more than one block, or drop
+  the compatibility spelling from the published contract and say so in the API reference.
 
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and
@@ -171,12 +509,6 @@ Format: `[area] — description — suspected cause / status`.
   GM publishes (M11's O-1), and the audit lists seven record kinds and not that. Contract-compliant — the
   seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
   party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
-
-- **[tooling] `apps/server/test/homebrew-http.test.ts`'s per-path mount probe is vacuous.** It asserts the
-  router's own headers prove a path is mounted; because `router.use(...)` is declared with no path and the
-  router mounts bare, those headers come back for *any* path — measured, `/completely/unrelated/path`
-  returns 404 carrying both. Its path-set assertion is sound; only the probe loop proves nothing. Left
-  alone as another milestone's file; the Codex equivalent added in M9 reads Express's route table instead.
 
 - **[ux] The marker inspector is dominated by the icon picker.** Measured live at 1440px: the inspector is
   a 300px rail whose icon grid occupies roughly the first 500px, so every *functional* control — linked
@@ -446,26 +778,28 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   opener stop presenting itself as a toggle it cannot untoggle?
 
 - **[codex/verify] `scripts/tap-audit.mjs` withholds its reach verdict for every control outside the
-  active layer — and never opens some layers at all.** At HEAD (2026-08-05) the footer at 375px reads
-  **1223 controls measured, 9 below the 44px floor, 0 unreachable in the active layer**. Reach is
+  active layer — and never opens some layers at all.** At HEAD (2026-08-10) the footer at 375px reads
+  **2131 controls measured, 30 below the 44px floor, 1 unreachable in the active layer, 3 surfaces
+  NOT MEASURED** — it read 1223 / 9 / 0 on 2026-08-05, before the play shell's surfaces were walked.
+  Reach is
   *not judged* for the controls that sit behind an open overlay (a modal `<dialog>`, which the
   platform makes inert by spec, or an open non-modal `Drawer` — the entry above) or inside a closed
   `<details>`. They are still sized and still counted in the below-floor total; only the reach verdict
   is withheld, so nothing measures whether they are reachable once their own layer becomes the active
   one. That is the gap.
   **The split is quoted with its provenance, because this entry once carried a stale one as if it were
-  current.** The last measured breakdown is `765e232`'s: **184 unjudged — 130 behind an open overlay,
-  54 inside a closed disclosure**. It has not been re-measured since; the phase that followed cleared
-  115 sub-floor controls and deleted a `<details>` whose contents were surfaced, so the population
-  moved and only the totals above were re-read. `node scripts/tap-audit.mjs 375` settles it. (The
-  numbers this entry used to quote — 187 unjudged of 1259 measured, 124 below the floor — were a
-  phase-opening snapshot, and 187 was `765e232`'s 184 mis-added as 130+57.)
-  **A second, larger blind spot is the state the audit opens a surface IN.** "9" means nine on the
+  current.** Re-measured 2026-08-10 at HEAD: **541 unjudged — 508 behind an open overlay, 33 inside a
+  closed disclosure**, against `765e232`'s 184 (130 / 54). The population moved with the play shell,
+  so quote the pair from one run and never across two. (The numbers this entry used to quote — 187
+  unjudged of 1259 measured, 124 below the floor — were a phase-opening snapshot, and 187 was
+  `765e232`'s 184 mis-added as 130+57.)
+  **A second, larger blind spot is the state the audit opens a surface IN.** "30" means thirty on the
   surfaces its route list opens, as it finds them. Controls behind a collapsed tab or a closed
   disclosure are never measured at all: `.dice-custom > summary` x2 at 19.5x375 (the phone sheet
   mounts one tab's body at a time and the audit only ever measures the default tab) and
   `button.api-copy` at 27.3x48.9 inside a closed `details.api-reference` on `/settings`. Both are
-  pre-existing and both are real sub-floor controls that would raise the 9 if the audit drove them.
+  pre-existing and both are real sub-floor controls that would raise the 30 if the audit drove them,
+  as would the seventeen in the `[ui/touch]` row-tools/token-menu entry above.
   This entry used to blame the old "unresolved" column on SVG children and on controls that could not
   be scrolled to the viewport centre. **Both causes measure zero.** SVG controls resolve —
   `g.encounter-token` walks out to reach 21 against its own 15.8px box, `g.codex-graph-node` to 29-31 —

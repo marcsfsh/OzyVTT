@@ -30,6 +30,28 @@
       "type": "roll-mode",
       "roll": "initiative",
       "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "athletics"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -1202,7 +1224,21 @@
     "id": "mindless-rage",
     "name": "Mindless Rage",
     "level": 6,
-    "description": "You have Immunity to the Charmed and Frightened conditions while your Rage is active. If you're Charmed or Frightened when you enter your Rage, the condition ends on you."
+    "description": "You have Immunity to the Charmed and Frightened conditions while your Rage is active. If you're Charmed or Frightened when you enter your Rage, the condition ends on you.",
+    "grants": {
+     "conditionImmunities": [
+      "charmed",
+      "frightened"
+     ],
+     "when": [
+      {
+       "type": "while-effect-tag",
+       "tags": [
+        "raging"
+       ]
+      }
+     ]
+    }
    },
    {
     "id": "retaliation",

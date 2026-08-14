@@ -49,6 +49,15 @@ are nearly free here (`cp -al` of `node_modules`, 0.4 s, ~0 disk).
 the symlink first, so `<wt>/node_modules/@vtt/domain` lands on the *original* tree and every
 cross-package unit produces a green run that proves nothing about its own worktree. Hard-link instead.
 
+**And a worse sibling of that trap, measured 2026-08-10: a worktree starts with NO `node_modules` at
+all**, because npm workspaces hoist to the repo root and `git worktree add` copies none of it. The
+failure is not an error — `npx vitest run <file> --root apps/server` in a fresh worktree collects
+**0 test files, prints no failure and exits 0 in 211 ms**. An agent that runs its suite before
+linking gets a green run over nothing and reports success. `cp -al <repo>/node_modules <wt>/node_modules`
+costs **0.3 s** and ~0 real disk (226 MB apparent, all hard links), after which tests run for real.
+**Every worktree agent links first and quotes a non-zero test-file count in its evidence** — a run
+that does not say how many files it collected is not evidence.
+
 ---
 
 ## 2. Decisions taken (client rulings, 2026-08-10)
@@ -120,9 +129,17 @@ an implementing agent does:
 **Batch 3 — the content program.** The full SRD magic-item list, plus the carriers the zero-author
 units need, plus Wizard's Spell Mastery. Longest pole; starts as early as batch 0 allows.
 
-**Batches 4–7 — the units**, four concurrent agents in separate worktrees, grouped so no two share a
-file, ordered by the three real dependencies. The three invariant-touching units (U22, U36, U37) get a
-dedicated agent each and a viewer-safety audit before merge.
+**Batches 4–7 — the units**, up to four concurrent agents in separate worktrees, grouped so no two
+share a file, ordered by the three real dependencies. The three invariant-touching units (U22, U36,
+U37) get a dedicated agent each and a viewer-safety audit before merge.
+
+> **Four is a CEILING these batches will rarely reach, ruled 2026-08-11.** D-ENGINE-2 was answered
+> *do not split `RiderEditor.tsx`* — see the decision log. Twelve units need a control in that one
+> 1365-line file (eight engine: U18, U19, U20, U21a, U22, U23+U30, U28, U33; four more from the API
+> program's lane β), and "no two share a file" then permits **at most one of them per batch**. Plan
+> the unit batches as one `RiderEditor` unit plus up to three that avoid it entirely, not as four of
+> anything. A schedule drawn from the old "four concurrent agents" reading will deadlock on its
+> second lane.
 
 **Closers.** U38 (after all eight mastery slugs), U33 (after its seven).
 
@@ -160,6 +177,13 @@ Measured. Each is a merge conflict or a silent data loss waiting to happen:
 - **`apps/client/src/homebrew/vocabularies.test.ts`** — carries exact counts and an ordered list.
 - **`apps/client/src/homebrew/vocabulary-parity.mirror.test.ts`**'s census array — an exact ordered set.
 - **`apps/server/src/equipment-derivation.ts`'s `IMPLEMENTED_MASTERIES`** — one Set literal, seven units.
+- **`apps/client/src/homebrew/RiderEditor.tsx`** — **the widest one, and it is here because of a
+  ruling rather than a measurement.** 1365 lines, twelve units need a control in it, and D-ENGINE-2
+  (2026-08-11) ruled it stays whole. Those twelve therefore run **one per batch**, and this is the
+  constraint most likely to be missed, because the file is not obviously shared the way a census
+  array is — each unit touches a different *region* of it and reads as independent right up until
+  the merge. Re-open the split (prep unit `R2`, §7 of the engine plan) if the queue becomes the
+  critical path; until then, treat it as a lock.
 - **Full-suite verification** — at most 2 concurrent on this box.
 
 ---

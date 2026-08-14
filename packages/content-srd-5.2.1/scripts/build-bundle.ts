@@ -546,24 +546,103 @@ const spellRecords = onlySrd(spells).map((spell) => {
   };
 });
 
-const weaponRecords = onlySrd(weapons).map((weapon) => ({
-  id: slugOf(weapon.pk),
-  name: weapon.fields.name,
-  category: weapon.fields.is_simple ? "simple" as const : "martial" as const,
-  improvised: weapon.fields.is_improvised,
-  damage: { dice: weapon.fields.damage_dice, type: weapon.fields.damage_type },
-  // range 0 means a melee weapon; open5e's srd-2024 model does not link per-weapon
-  // properties (Finesse, Light, ...) - the property texts ship separately below.
-  rangeFeet: weapon.fields.range || null,
-  longRangeFeet: weapon.fields.long_range || null
-}));
-
 const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
   id: slugOf(property.pk),
   name: property.fields.name,
   kind: property.fields.type === "Mastery" ? "mastery" as const : "property" as const,
   description: property.fields.desc
 }));
+
+/**
+ * THE WEAPON TABLE'S TWO MISSING COLUMNS - Properties and Mastery - joined in from the vendored
+ * markdown SRD, because the open5e fixtures do not carry them.
+ *
+ * `sources/open5e-srd-2024/Weapon.json` has nine fields (damage_dice, damage_type, distance_unit,
+ * document, is_improvised, is_simple, long_range, name, range) and neither column is among them.
+ * The property and mastery TEXTS do ship, as 17 `WeaponProperty` rows, but nothing links a weapon
+ * to any of them - so there was no mapping to write and both columns had no home here.
+ *
+ * `mastery` was hand-added on top of this ETL's output instead. Every `build-bundle` run therefore
+ * deleted all 38 of them, in silence: `WeaponReferenceSchema.mastery` is `.optional()`, so
+ * `validateBundle` passed with the column gone, and that column is the entire data basis for
+ * `masteryByActionId` (`apps/server/src/equipment-derivation.ts`). This is the second time this
+ * package has had that exact hazard - see `SKILL_ABILITY` below, whose note says the same thing
+ * about the skill->ability column - and it is fixed the same way, except that this one has a real
+ * source rather than a curated table: `sources/dnd-5e-srd-markdown/equipment.md` prints the whole
+ * Weapons table, in the same HTML shape `build-class-bundle.ts` already parses.
+ *
+ * NAMED ABSENCE: the parenthetical in a property cell is dropped. `Versatile (1d10)` becomes
+ * `versatile` and the two-handed die is thrown away; `Thrown (Range 20/60)` becomes `thrown` and the
+ * band is already carried by the fixture's own `range`/`long_range`. Riders match the BARE slug
+ * (`enums.ts` strips the bundle's own `-wp` suffix for exactly this reason), and
+ * `EquipmentWeaponStatsSchema` has nowhere to put a second damage die - inventing a home for it
+ * here would be a vocabulary addition with no reader.
+ */
+const weaponTableSource = readFileSync(join(root, "sources", "dnd-5e-srd-markdown", "equipment.md"), "utf8");
+const stripTags = (value: string) => value.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "'").trim();
+const tableSlug = (value: string) => stripTags(value).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+const weaponTable = (() => {
+  const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
+  if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
+  const rows = new Map<string, { properties: readonly string[]; mastery: string }>();
+  for (const [, row] of (table[1].match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+    // The four category bands ("Simple Melee Weapons", ...) are `<th colspan="6">` rows with no
+    // `<td>` at all, so they fall out here rather than needing to be named.
+    const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1]);
+    if (cells.length === 0) continue;
+    if (cells.length !== 6) throw new Error(`Weapons table row has ${cells.length} cells, expected 6: ${stripTags(row)}`);
+    const properties = stripTags(cells[2]);
+    rows.set(tableSlug(cells[0]), {
+      properties: properties === "" || properties === "—" || properties === "-"
+        ? []
+        : properties.split(",").map((entry) => tableSlug(entry.replace(/\(.*/, ""))).filter((entry) => entry !== ""),
+      mastery: tableSlug(cells[3])
+    });
+  }
+  // Both vocabularies come from the fixtures rather than a second hand-written list: the 17
+  // `WeaponProperty` rows ARE the vocabulary, so a slug the table prints and the bundle does not
+  // publish cannot survive the build. Bare ids, because the pks are suffixed (`light-wp`,
+  // `topple-mastery`) and every rider trigger matches the bare word - `enums.ts`'s own rule.
+  const bareIds = (kind: "property" | "mastery") =>
+    new Set(weaponPropertyRecords.filter((property) => property.kind === kind).map((property) => property.id.replace(/-(wp|mastery)$/, "")));
+  const knownProperties = bareIds("property");
+  const knownMasteries = bareIds("mastery");
+  for (const [id, row] of rows) {
+    if (!knownMasteries.has(row.mastery)) throw new Error(`Weapons table: "${id}" has mastery "${row.mastery}", not one of the ${knownMasteries.size} the SRD publishes.`);
+    for (const property of row.properties) {
+      if (!knownProperties.has(property)) throw new Error(`Weapons table: "${id}" has property "${property}", not one of the ${knownProperties.size} the SRD publishes.`);
+    }
+  }
+  return rows;
+})();
+
+const weaponRecords = onlySrd(weapons).map((weapon) => {
+  const id = slugOf(weapon.pk);
+  const row = weaponTable.get(id);
+  // Fail closed rather than emit a weapon whose mastery silently does nothing and whose property
+  // list silently reads empty - both are the "parses, then is inert" failure this package keeps
+  // finding, and the same throw `SKILL_ABILITY` uses for the same reason.
+  if (!row) throw new Error(`No SRD Weapons-table row for "${id}" - check the name slug in sources/dnd-5e-srd-markdown/equipment.md.`);
+  return {
+    id,
+    name: weapon.fields.name,
+    category: weapon.fields.is_simple ? "simple" as const : "martial" as const,
+    improvised: weapon.fields.is_improvised,
+    mastery: row.mastery,
+    // `[]` rather than an absent key when the table prints "—": a Mace really has no properties,
+    // and "recorded, and it has none" is a different claim from "not recorded".
+    properties: row.properties,
+    damage: { dice: weapon.fields.damage_dice, type: weapon.fields.damage_type },
+    // range 0 means a melee weapon.
+    rangeFeet: weapon.fields.range || null,
+    longRangeFeet: weapon.fields.long_range || null
+  };
+});
+// The join is only honest if it is total in BOTH directions: a table row nothing matched is a name
+// that drifted, and it would silently leave a weapon with the wrong columns rather than none.
+const unmatched = [...weaponTable.keys()].filter((id) => !weaponRecords.some((weapon) => weapon.id === id));
+if (unmatched.length > 0) throw new Error(`Weapons table rows matched no open5e weapon: ${unmatched.join(", ")}.`);
 
 const armorRecords = onlySrd(armors).map((armor) => ({
   id: slugOf(armor.pk),
@@ -634,7 +713,7 @@ const attribution = {
     vendoredFrom: "https://github.com/downfallx/dnd-5e-srd-markdown",
     commit: "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4",
     retrieved: "2026-07-27",
-    covers: "classes, subclasses, class spell lists, species, backgrounds, feats"
+    covers: "classes, subclasses, class spell lists, species, backgrounds, feats, magic items"
   }]
 };
 

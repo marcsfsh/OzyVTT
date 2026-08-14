@@ -65,8 +65,16 @@ describe("canonical SRD vocabularies", () => {
   it("GEAR_CATEGORY_IDS covers every hand-authored gear category", () => {
     // Weapons and armour are mapped in by `loadEquipment` under the engine's own three literals, so
     // the hand-authored slice is what a homebrew author is choosing among.
+    //
+    // `!isMagic` JOINED THAT FILTER WHEN THE MAGIC-ITEM BUNDLE LANDED, and it is a repair of this
+    // test's own stated premise rather than a widening of it. "No weapon and no armour sub-object"
+    // isolated the hand-authored gear only while those were the sole three sources; the 268
+    // generated magic items carry neither sub-object either (the SRD prints no damage dice for
+    // `Weapon, +1`), so without this the set became the SRD's magic-item vocabulary - `ring`,
+    // `wand`, `staff`, `rod`, `wondrous-item` - and the constant would have had to grow five words
+    // that are not gear to describe gear. The generated rows are guarded by their own bundle test.
     const authored = sorted([
-      ...new Set(loadEquipment().filter((item) => !item.weapon && !item.armor).map((item) => item.category))
+      ...new Set(loadEquipment().filter((item) => !item.weapon && !item.armor && !item.isMagic).map((item) => item.category))
     ]);
     expect(GEAR_CATEGORY_IDS).toEqual(authored);
   });

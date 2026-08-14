@@ -187,7 +187,32 @@ describe("an open slug always keeps its “other”", () => {
     // distinct controls, one of them counted twice because `whenField()` is exported both bare and
     // nested. An exact number, so a `pick` that lands without a unit behind it fails here on the way
     // in, which is the mirror-defect guard the phase is built on.
-    expect(picks.length).toBe(11);
+    //
+    // **11 → 71: the feature panel's six offer boxes, 2026-08-10.** The docblock above says this
+    // number moves "the day a tenth `pick` lands"; this is that day, so it is re-derived rather
+    // than relaxed. `choice.kind`, `extraPicks[].offer`, `replaces[].offer`, `fromPicks.offer`,
+    // `requires.offer` and `requires.id` were `<input list>` datalists — no arrow, no cue, and on
+    // iOS Safari no control at all — which is the same rule-5 defect `3d` fixed for damage types,
+    // on a surface Wave 2 shipped.
+    //
+    // SIX declarations census as SIXTY, and the arithmetic is worth writing down because the next
+    // reader will otherwise assume a miscount. `featuresField` (`schemas.ts`) mounts
+    // `featureFields()` as the `rows` of its `custom: "features"` field on FIVE record types —
+    // class, subclass, species, background, feat — and `everyField` walks TWELVE entries per mount:
+    //   · 5 at FEATURE scope over block 0 — `choice.kind`, `choice.fromPicks.offer`, and the three
+    //     inside `choice.options`: `requires.offer`, `requires.id`, an option's `extraPicks` `offer`;
+    //   · the same 5 again off the `choices` rows, because `firstBlockField` ALIASES a block's
+    //     controls at feature scope rather than re-declaring them, and both spellings are walked;
+    //   · 2 the feature itself carries — `extraPicks` `offer` and `replaces` `offer`.
+    // 11 + 5 × 12 = 71. Still EXACT, for the reason it always was: a seventh box cannot land here
+    // unmeasured, and a reader who disagrees with the total has the derivation to check it against.
+    //
+    // **71 → 72: the weapon block's `properties` row, 2026-08-11 (`C3`).** One declaration, one mount,
+    // one entry — the equipment form is not one of the five types `featuresField` multiplies. It is a
+    // `tags` pick over `WEAPON_PROPERTY_IDS` rather than over `ctx.weaponProperties`, because that
+    // context key is the properties∪masteries union the `weapon-property-is` trigger wants and this
+    // column cannot mean `topple`. Re-derived, not relaxed: 11 + 5 × 12 + 1 = 72.
+    expect(picks.length).toBe(72);
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
       // A FLAG ON TWO KINDS, never a kind of its own. `text` renders `Combobox` directly; `tags`

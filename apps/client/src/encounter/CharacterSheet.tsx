@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { resolveSpellcasting, type ActorDefinition, type ActorDerivedSheet, type ContentActionSummary, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
-import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
+import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc, weaponAbilityModifierFrom } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
-import { EquipmentPicker } from "./equipment";
+import { DamageTypeField } from "./DamageTypeField";
+import { manualDamagePayload, manualDamageType } from "./manual-damage";
+import { EquipmentPicker, inventoryWeaponFrom } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
@@ -80,19 +82,44 @@ type SrdExtension = Partial<{
   traits: ReadonlyArray<{ name: string; description: string }>;
 }>;
 
-/** Compact HP tracker inside the sheet; the server enforces scope (GM anyone, player self). */
-function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: string; allowSet: boolean; onFeedback: (text: string) => void }>) {
+/**
+ * Compact HP tracker inside the sheet; the server enforces scope (GM anyone, player self).
+ *
+ * **Exported for `damage-type.test.tsx`, and that export is the fix to a real hole.** D7 gave three
+ * doors one payload builder and only the token menu was joined to it by a test: a hostile review on
+ * 2026-08-10 replaced this component's `manualDamageType(...)` with `undefined` and the whole client
+ * suite stayed green at 65 files / 917 tests. Rendering the sheet WHOLE to reach these five controls
+ * would need a definition fetch, a skill catalog and a targeting context, none of which are the thing
+ * under test — so the door is exported at the same grain `SavePrompt` is.
+ */
+export function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: string; allowSet: boolean; onFeedback: (text: string) => void }>) {
   const [amount, setAmount] = useState("");
+  /**
+   * D7's type, on the one damage door a PLAYER can also reach.
+   *
+   * The decision says "the GM's damage entry", and this component renders for both roles - only the
+   * extra `Set` button is GM-gated. It gets the field anyway, because the server already accepts
+   * `damageType` from a player scope (`actorApplyDamage` has no GM grade; `adjustableActor` restricts
+   * WHICH character, not what may be said about the damage), and because the alternative is a `Dmg`
+   * button that quietly means something different depending on who taps it. A player typing "12 fire"
+   * on their own sheet gets their own resistance applied, which is the correct answer and the one they
+   * would otherwise have to ask the GM for.
+   */
+  const [damageType, setDamageType] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const send = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", label: string) => {
     const value = Number(amount.trim());
     const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { onFeedback(`Enter a whole number (${minimum}-1000).`); return; }
     setBusy(true);
-    const payload = event === "actor:set-hp" ? { commandId: newId(), actorId, current: value } : { commandId: newId(), actorId, amount: value };
+    // Only Dmg carries the type; Heal, Temp and Set share the row and none of them has one.
+    const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
+    const payload = event === "actor:set-hp" ? { commandId: newId(), actorId, current: value }
+      : event === "actor:apply-damage" ? manualDamagePayload({ commandId: newId(), actorId, amount: value, damageType: typed })
+      : { commandId: newId(), actorId, amount: value };
     socket.emit(event, payload as never, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
-      onFeedback(result.ok ? `${label} ${value}.` : result.message ?? "The hit point change was rejected.");
+      onFeedback(result.ok ? `${label} ${typed ? `${value} ${typed}` : value}.` : result.message ?? "The hit point change was rejected.");
       if (result.ok) setAmount("");
     });
   };
@@ -102,6 +129,7 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
     <Button size="sm" disabled={busy} onClick={() => send("actor:heal", "Healed")}>Heal</Button>
     <Button size="sm" disabled={busy} onClick={() => send("actor:set-temp-hp", "Temp set to")}>Temp</Button>
     {allowSet && <Button size="sm" disabled={busy} onClick={() => send("actor:set-hp", "HP set to")}>Set</Button>}
+    <DamageTypeField value={damageType} disabled={busy} onChange={setDamageType} />
   </div>;
 }
 
@@ -514,13 +542,20 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
   // Equipped weapons become rollable attack actions on the sheet (v6 #5): to-hit = ability mod + PB,
-  // damage = the weapon die + ability mod. Ranged weapons use Dex, melee uses Str (finesse isn't vendored
-  // in the SRD weapon table, so this is the common case). Client-derived + tap-to-roll like the other
-  // sheet actions; the server-authoritative attack flow is unchanged.
+  // damage = the weapon die + ability mod. Client-derived + tap-to-roll like the other sheet actions;
+  // the server-authoritative attack flow is unchanged.
+  //
+  // The ability comes from `weaponAbilityModifierFrom`, the same function the server derives its
+  // authoritative attack with, because a preview that computes its own number is a preview that can
+  // disagree with the roll it is previewing. This read `rangeFeet != null ? dex : str` under a note
+  // that finesse "isn't vendored in the SRD weapon table" - accurate when written, and falsified the
+  // moment the `properties` column reached the inventory row. It was then wrong twice over: it
+  // missed finesse (a Rapier previewed off Strength) and it called every thrown weapon ranged (a
+  // Javelin previewed off Dexterity, when throwing one is a Strength attack).
   const equippedWeaponActions = (actor.kind === "player-character" && definition)
     ? inventory.filter((item) => item.equipped && item.weapon && item.quantity > 0).map((item) => {
         const weapon = item.weapon!;
-        const abilityMod = modifierOf(definition.abilityScores[weapon.rangeFeet != null ? "dex" : "str"]);
+        const abilityMod = weaponAbilityModifierFrom(weapon.properties ?? [], weapon.rangeFeet, modifierOf(definition.abilityScores.str), modifierOf(definition.abilityScores.dex));
         const toHit = abilityMod + definition.proficiencyBonus;
         const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
         // ACTIVE, not merely magical: riders apply while equipped, and while ATTUNED as well when the
@@ -554,7 +589,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
       ...(item.description ? { description: item.description } : {}),
       // Carry the mechanical stats so equipping has effect (v6 #5): weapon → a rollable attack; armor → AC.
-      ...(item.weapon ? { weapon: item.weapon } : {}),
+      // The weapon block is NARROWED, not spread: the browse summary carries a browse-only `mastery`
+      // the strict wire schema refuses. See `inventoryWeaponFrom`.
+      ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
       ...(item.armor ? { armor: item.armor } : {})
     } }, ack);
   };
@@ -737,7 +774,14 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
               <span>Qty</span><span>Equip</span><span>Attune</span><span></span>
             </div>
             {inventory.map((item) => <div key={item.id} className="sheet-inv-row">
-              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}</span>
+              {/* The description was already being COPIED onto every added row and then never shown.
+                  That was invisible while the catalog was mundane gear; with the SRD's 268 magic
+                  items in it, the row's own text is the only place a rarity or an attunement
+                  requirement appears on this sheet - `ItemMagicMarkerSchema` carries neither and
+                  the browse summary has no `rarity` key at all. Clamped to two lines so a
+                  reference-length entry cannot push the Equip/Attune controls off a phone. */}
+              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}
+                {item.description ? <span className="sheet-item-desc">{item.description}</span> : null}</span>
               <Stepper className="sheet-inv-qty" value={item.quantity} min={0} disabled={busy} aria-label={`Quantity of ${item.name}`} onChange={(quantity) => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity } }, ack); }} />
               <button type="button" className={`sheet-toggle-btn${item.equipped ? " on" : ""}`} disabled={busy} aria-pressed={item.equipped} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "Equipped" : "Equip"}</button>
               <button type="button" className={`sheet-toggle-btn${item.attuned ? " on" : ""}`} disabled={busy} aria-pressed={item.attuned} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } }, ack); }}>{item.attuned ? "Attuned" : "Attune"}</button>

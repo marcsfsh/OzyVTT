@@ -1163,7 +1163,7 @@ Adds, updates, or removes (quantity 0) one of a character's inventory items and 
 | `item.weightEach` | number (≥ 0) | no |  |
 | `item.description` | string | no |  |
 | `item.category` | string (pattern) | no |  |
-| `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet |
+| `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet. NOT `mastery`: that is browse-only and is rejected here. |
 | `item.armor` | object | no | Armor/shield stats (from the SRD catalog); equipping derives Armor Class |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
@@ -5321,7 +5321,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `category` | string (pattern) | yes | Open slug, never a closed enum - "relic", "vehicle", "trinket" need no schema change. Display and grouping; `slot` is what the engine switches on |
 | `costGp` | number \| null | yes |  |
 | `weightLb` | number \| null | yes |  |
-| `description` | string \| null | yes |  |
+| `description` | string \| null | yes | Raised from 2000 to 4000 on 2026-08-11 to match both `EquipmentReferenceSchema` and `InventoryItemSchema.description`, the row this string is copied onto by add-from-catalog. Widening a maxLength accepts everything the old bound did, so no caller that validated before stops validating |
 | `weapon` | HomebrewEquipmentWeapon \| null | no | Populated for weapons only |
 | `armor` | HomebrewEquipmentArmor \| null | no | Populated for armor and shields only |
 | `slot` | `weapon` \| `shield` \| `armor` \| `head` \| `neck` \| `shoulders` \| `hands` \| `ring` \| `belt` \| `feet` \| `held` \| `wondrous` \| `consumable` \| `ammunition` \| `none` | no | WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield) |
@@ -5348,6 +5348,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `rangeFeet` | integer \| null | yes |  |
 | `longRangeFeet` | integer \| null | yes | Attacks past `rangeFeet` up to this roll at disadvantage |
 | `mastery` | `cleave` \| `graze` \| `nick` \| `push` \| `sap` \| `slow` \| `topple` \| `vex` | no | The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery. |
+| `properties` | string (pattern)[] | no | The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` keeps a ranged weapon on a melee reach, and `reach` makes it 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none. |
 
 ### `HomebrewExtraPick`
 
@@ -5497,11 +5498,12 @@ Flat things a feature simply hands the character. All open slugs, so a homebrew 
 | `damageResistances` | string (pattern)[] | no |  |
 | `damageImmunities` | string (pattern)[] | no |  |
 | `conditionImmunities` | string (pattern)[] | no |  |
-| `spells` | object[] | no | Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites |
+| `spells` | object[] | no | Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites. This is the ONE list `when` cannot gate - see `when` below |
 | `spells[].id` | string (pattern) | yes |  |
 | `spells[].level` | integer (0–9) | no |  |
 | `spells[].alwaysPrepared` | boolean | no | Default: `true`. |
 | `spells[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
+| `when` | HomebrewRiderTrigger[] | no | The condition the TEN LIST FIELDS above apply under - every one except `spells`, which cannot be gated: a granted spell is baked into the sheet's spell list, its prepared count and its cantrip action when the character is BUILT, so nothing would re-read the gate. A block carrying both `when` and `spells` is refused, naming the spells that would have been lost. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed - static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always" |
 
 ### `HomebrewFeatureModifier`
 

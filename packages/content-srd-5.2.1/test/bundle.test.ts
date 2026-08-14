@@ -4,11 +4,52 @@ import { ActorDefinitionSchema } from "@vtt/schemas";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import {
   applySpellListOverlay, ArmorReferenceSchema, ConditionReferenceSchema, EquipmentReferenceSchema,
-  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadEquipment, loadMonsterDefinitions,
+  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadEquipment, loadMagicItems,
+  loadMonsterDefinitions,
   loadRules, loadSkills, loadSpells, loadWeaponProperties, loadWeapons, resolveSpellLists,
   RuleReferenceSchema, SkillReferenceSchema, spellListMemberIds, SpellListReferenceSchema,
-  SpellReferenceSchema, WeaponPropertyReferenceSchema, WeaponReferenceSchema
+  SpellReferenceSchema, WeaponPropertyReferenceSchema, WeaponReferenceSchema,
+  type EquipmentReference, type SpellReference, type WeaponReference
 } from "../src/index.js";
+
+/**
+ * THE INFERENCE-BUDGET GUARD, and it is a TYPE assertion on purpose - it cannot be a runtime one.
+ *
+ * `EquipmentReferenceSchema` is the largest object in this package. Inlining one more property in it
+ * once pushed `z.infer` past TypeScript's expansion budget, and the compiler responded by silently
+ * truncating a DIFFERENT inferred type: the spell shape `packages/domain`'s `catalog-choice.ts`
+ * reads went missing its attack-roll and range fields, with no error at the edit site. That is why
+ * `EquipmentWeaponStatsSchema` is a NAMED schema (`schemas.ts`), and adding a key to it - as
+ * `properties` did - is exactly the move that broke it.
+ *
+ * `Has` fails to compile when the key is missing, when its type has collapsed to `any` or `never`,
+ * or when it no longer satisfies the expected shape - so the failure lands here at `npm run check`
+ * (this package typechecks `test`) rather than as a mystery two packages away. Runtime
+ * `toMatchObject` cannot catch it: the VALUE is always there; it is the TYPE that goes.
+ *
+ * Both collapse arms are load-bearing and neither is reachable through plain `extends`. A bare
+ * `T[K] extends Expected` answers TRUE for `any` (a conditional on `any` returns both branches
+ * unioned, and `true | never` is `true`) and TRUE for `never` (which extends everything), so the
+ * two shapes a truncated inference actually takes were the two this guard used to wave through.
+ *
+ * SCOPE, because this guard is easy to over-read: it proves these types are intact IN THIS
+ * PACKAGE'S program. Instantiation budgets are per-program, so it cannot reproduce exhaustion in a
+ * larger one - and the historic truncation surfaced in `packages/domain`. The matching assertion
+ * for that program lives beside the code that suffered it, in `packages/domain/test/catalog-choice.test.ts`.
+ */
+type Has<T, K extends keyof T, Expected> =
+  0 extends (1 & T[K]) ? never
+  : [T[K]] extends [never] ? never
+  : T[K] extends Expected ? true : never;
+const _inferenceBudget: [
+  Has<SpellReference, "attackRoll", boolean>,
+  Has<SpellReference, "range", { distance: number | null; unit: string | null; text: string | null }>,
+  Has<WeaponReference, "mastery", string | undefined>,
+  Has<WeaponReference, "properties", readonly string[] | undefined>,
+  Has<NonNullable<EquipmentReference["weapon"]>, "properties", readonly string[] | undefined>,
+  Has<NonNullable<EquipmentReference["weapon"]>, "damageDice", string>
+] = [true, true, true, true, true, true];
+void _inferenceBudget;
 
 describe("SRD 5.2.1 monster bundle", () => {
   const monsters = loadMonsterDefinitions();
@@ -181,12 +222,79 @@ describe("SRD 5.2.1 reference bundles", () => {
     expect(armor.find((piece) => piece.id === "breastplate")).toMatchObject({ acBase: 14, addDexModifier: true, dexModifierCap: 2 });
   });
 
-  it("folds the vendored gear bundle together with weapons and armor into one addable catalog", () => {
+  /**
+   * THE REBUILD GUARD for the weapon table's two JOINED-IN columns.
+   *
+   * Neither exists in the vendored open5e `Weapon` fixtures; both are joined from the markdown SRD's
+   * Weapons table by `build-bundle.ts`. Both are `.optional()` on `WeaponReferenceSchema`, so a
+   * bundle missing either validates clean and ships inert - which is exactly what `mastery` did. It
+   * was hand-added on top of the ETL output, so every `build-bundle` run deleted all 38 in silence,
+   * and the weapon assertion above spot-checked Battleaxe's category and damage and never noticed.
+   *
+   * So this pins every value BY NAME rather than spot-checking or counting. The 38 masteries are the
+   * whole data basis for weapon mastery, and the 70 property assignments decide which ability a
+   * weapon swings with and what its reach is - a silent re-transcription is a wrong number on a
+   * character sheet, and it should be a red test here instead.
+   */
+  it("emits the SRD mastery and property columns for all 38 weapons, by name", () => {
+    const weapons = loadWeapons();
+    // The SRD 5.2.1 Weapons table, in the printed order of its four category bands.
+    const table: Record<string, [string, string[]]> = {
+      // Simple melee
+      club: ["slow", ["light"]], dagger: ["nick", ["finesse", "light", "thrown"]], greatclub: ["push", ["two-handed"]],
+      handaxe: ["vex", ["light", "thrown"]], javelin: ["slow", ["thrown"]], "light-hammer": ["nick", ["light", "thrown"]],
+      mace: ["sap", []], quarterstaff: ["topple", ["versatile"]], sickle: ["nick", ["light"]], spear: ["sap", ["thrown", "versatile"]],
+      // Simple ranged
+      dart: ["vex", ["finesse", "thrown"]], "light-crossbow": ["slow", ["ammunition", "loading", "two-handed"]],
+      shortbow: ["vex", ["ammunition", "two-handed"]], sling: ["slow", ["ammunition"]],
+      // Martial melee
+      battleaxe: ["topple", ["versatile"]], flail: ["sap", []], glaive: ["graze", ["heavy", "reach", "two-handed"]],
+      greataxe: ["cleave", ["heavy", "two-handed"]], greatsword: ["graze", ["heavy", "two-handed"]],
+      halberd: ["cleave", ["heavy", "reach", "two-handed"]], lance: ["topple", ["heavy", "reach", "two-handed"]],
+      longsword: ["sap", ["versatile"]], maul: ["topple", ["heavy", "two-handed"]], morningstar: ["sap", []],
+      pike: ["push", ["heavy", "reach", "two-handed"]], rapier: ["vex", ["finesse"]], scimitar: ["nick", ["finesse", "light"]],
+      shortsword: ["vex", ["finesse", "light"]], trident: ["topple", ["thrown", "versatile"]], warhammer: ["push", ["versatile"]],
+      "war-pick": ["sap", ["versatile"]], whip: ["slow", ["finesse", "reach"]],
+      // Martial ranged
+      blowgun: ["vex", ["ammunition", "loading"]], "hand-crossbow": ["vex", ["ammunition", "light", "loading"]],
+      "heavy-crossbow": ["push", ["ammunition", "heavy", "loading", "two-handed"]],
+      longbow: ["slow", ["ammunition", "heavy", "two-handed"]], musket: ["slow", ["ammunition", "loading", "two-handed"]],
+      pistol: ["vex", ["ammunition", "loading"]]
+    };
+    expect(Object.keys(table).length).toBe(38);
+    expect(weapons.map((weapon) => weapon.id).sort()).toEqual(Object.keys(table).sort());
+
+    // BY NAME, both columns at once: the failure message says which weapon and what it lost.
+    const actual = Object.fromEntries(weapons.map((weapon) => [weapon.id, [weapon.mastery, weapon.properties]]));
+    expect(actual, "a build-bundle run changed or dropped the MASTERY / PROPERTIES columns").toEqual(table);
+    // 70 assignments over 9 slugs - the count the join is measured by, restated so a wholesale drop
+    // reads as a number rather than as a diff.
+    expect(weapons.flatMap((weapon) => weapon.properties!).length).toBe(70);
+
+    // Every slug used is one the weapon-property bundle actually publishes, bare of the fixture's
+    // own `-wp`/`-mastery` suffix - so a typo cannot reach a reader that matches on the bare word.
+    const bare = (kind: "property" | "mastery") =>
+      new Set(loadWeaponProperties().filter((row) => row.kind === kind).map((row) => row.id.replace(/-(wp|mastery)$/, "")));
+    expect(bare("property").size).toBe(9);
+    expect(bare("mastery").size).toBe(8);
+    for (const weapon of weapons) {
+      expect(bare("mastery"), weapon.id).toContain(weapon.mastery);
+      for (const property of weapon.properties!) expect(bare("property"), `${weapon.id}: ${property}`).toContain(property);
+    }
+    // A Mace really has no properties, and that is a different claim from "not recorded" - the
+    // reason the column is an empty array here rather than an absent key.
+    expect(weapons.find((weapon) => weapon.id === "mace")!.properties).toEqual([]);
+  });
+
+  it("folds the vendored gear bundle together with weapons, armor and the magic items into one addable catalog", () => {
     const equipment = loadEquipment();
-    // The gear bundle (ammunition/gear/tools/packs/focuses/consumables) plus every non-improvised
-    // weapon and every armor piece, mapped into the unified shape.
+    // THE CATALOG CENSUS - four sources, each counted from its own bundle rather than from a
+    // remembered total, so dropping any one fold names the count it dropped by. The gear bundle
+    // (ammunition/gear/tools/packs/focuses/consumables) plus every non-improvised weapon, every
+    // armor piece, and the 268 generated magic-item rows.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
-    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length);
+    expect(loadMagicItems().length).toBe(268);
+    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length + 268);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).
@@ -205,6 +313,9 @@ describe("SRD 5.2.1 reference bundles", () => {
     // A weapon mapped in from weapons.v1.json carries its structured weapon sub-object, no armor.
     const longsword = equipment.find((item) => item.id === "longsword");
     expect(longsword).toMatchObject({ category: "weapon", weapon: { category: "martial", damageDice: "1d8", damageType: "slashing" }, armor: null });
+    // Both transcribed columns survive the fold. `properties` has to, or the catalog->inventory copy
+    // in `character-build.ts` has nothing to copy and `weaponPropertiesOf` answers [] forever.
+    expect(equipment.find((item) => item.id === "dagger")!.weapon).toMatchObject({ mastery: "nick", properties: ["finesse", "light", "thrown"] });
     // The shield row is classified from its low base AC; body armor keeps its own category.
     expect(equipment.find((item) => item.id === "shield")).toMatchObject({ category: "shield", armor: { acBase: 2 } });
     expect(equipment.find((item) => item.id === "plate-armor")).toMatchObject({ category: "armor", armor: { acBase: 18 } });

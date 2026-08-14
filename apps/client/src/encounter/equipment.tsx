@@ -46,10 +46,41 @@ export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEqu
   return { catalog, attribution: attributionCache };
 }
 
+/**
+ * THE CATALOG'S WEAPON BLOCK, NARROWED TO WHAT AN INVENTORY ROW MAY CARRY.
+ *
+ * These are two different shapes and the difference is load-bearing. The browse summary is the
+ * catalog record's own block, so it carries `mastery`; `ItemWeaponSchema` (`@vtt/schemas`) is
+ * `.strict()` and has no such key, because a mastery is gated on the bearer having UNLOCKED that
+ * weapon and resolves against the catalog by item id rather than travelling on the row. Spreading
+ * the summary's block wholesale therefore made `character.set-inventory` refuse every SRD weapon
+ * with *"Unrecognized key(s) in object: 'mastery'"* - the browse-and-add picker could not add a
+ * sword.
+ *
+ * `properties` goes the other way and must be carried: `weaponPropertiesOf` reads it off the
+ * INVENTORY row, and it is what makes a Rapier swing off Dexterity and a Glaive threaten at 10 feet.
+ *
+ * Exported so `catalog-add.mirror.test.ts` can drive the real SRD catalog through it and the
+ * server's own schema, which is the seam where those two shapes have to agree.
+ */
+export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary["weapon"]>) {
+  return {
+    category: weapon.category, damageDice: weapon.damageDice, damageType: weapon.damageType,
+    rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet,
+    ...(weapon.properties ? { properties: [...weapon.properties] } : {})
+  };
+}
+
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const categoryLabel = (category: string) => category.split("-").map(titleCase).join(" ");
 
-/** The filter groups the picker offers, each folding one or more catalog categories. */
+/**
+ * The filter groups the picker offers, each folding one or more catalog categories.
+ *
+ * The last three arrived with the SRD's 268 magic items. Without them `wondrous-item`, `ring`,
+ * `wand`, `staff` and `rod` were reachable only from "All" - a 400-row list on a phone - because
+ * every existing chip names a category the mundane bundle already had.
+ */
 const FILTERS: ReadonlyArray<{ id: string; label: string; categories: readonly string[] }> = [
   { id: "all", label: "All", categories: [] },
   { id: "weapon", label: "Weapons", categories: ["weapon"] },
@@ -59,7 +90,10 @@ const FILTERS: ReadonlyArray<{ id: string; label: string; categories: readonly s
   { id: "focus", label: "Focuses", categories: ["focus"] },
   { id: "consumable", label: "Consumables", categories: ["consumable"] },
   { id: "pack", label: "Packs", categories: ["equipment-pack"] },
-  { id: "ammunition", label: "Ammo", categories: ["ammunition"] }
+  { id: "ammunition", label: "Ammo", categories: ["ammunition"] },
+  { id: "wondrous", label: "Wondrous", categories: ["wondrous-item"] },
+  { id: "ring", label: "Rings", categories: ["ring"] },
+  { id: "implement", label: "Wands & Rods", categories: ["wand", "staff", "rod"] }
 ];
 
 /** "2 gp" / "1 sp" / "5 cp" - render the smallest whole coin so sub-gp costs read naturally. */
@@ -123,11 +157,22 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
         {results.map((item) => {
           const owned = ownedCounts.get(item.id) ?? 0;
           return <li key={item.id}>
+            {/* The description's own first sentence is the SRD's printed type line, so a magic item
+                shows its rarity and attunement requirement here. It has to be this field: a magic
+                row carries no cost and no weight, so `metaLine` alone would read "Wondrous Item"
+                for all 127 of them. Clamped to one line - the entry itself runs to 2000 characters
+                and this is a 400-row list read mostly on a phone. */}
             <div className="sheet-picker-item">
               <span className="sheet-picker-name">{item.name}{owned > 0 && <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>×{owned}</span>}</span>
               <span className="sheet-picker-meta">{metaLine(item)}</span>
+              {item.description && <span className="sheet-picker-desc">{item.description}</span>}
             </div>
-            <button type="button" className="sheet-picker-add" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => onAdd(item)}>Add</button>
+            {/* Route 2 (`.tap-target`): the button paints 45x27 and reaches the 44px floor through a
+                centred `::after`, so the row's rhythm does not change. `::before` is the material's
+                here, `::after` was free. It matters more than it looks: this control did nothing at
+                all until the browse-and-add payload was fixed, so its touch ergonomics had never
+                once been exercised - a 27px-tall target on the phone the sheet is mostly read on. */}
+            <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => onAdd(item)}>Add</button>
           </li>;
         })}
       </ul>}

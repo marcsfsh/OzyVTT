@@ -13,6 +13,212 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-13 — a harvested absence is authored to the check the ENGINE rolls, or it stays an absence
+
+**Context.** Two vocabulary gaps closed the same day: `roll-mode {roll: "check"}` gained a consumer
+(`apps/server/src/ability-checks.ts`) and `FeatureGrantsSchema` gained an optional `when`. The
+magic-item lanes had recorded, item by item, which absences were waiting on each. This entry is the
+ruling the harvest of those records needed, because "the limit closed, so author them all" is the
+over-grant the named-absence contract exists to prevent.
+
+**0. There are exactly FIVE checks the server throws**, and that list is what an author reaches for:
+Hide, Influence, Search, Study (`BUILTIN_CHECKS`) and Escape a Grapple. A clause naming any other
+check — climbing a rope, controlling a Sphere, examining something an inch away — has nothing to
+attach to however good the vocabulary gets.
+
+**1. Author to the narrow the engine actually passes, never to the printed skill.** `BUILTIN_CHECKS`
+(`action-resolution.ts`) carries a `skill` on **Hide alone** — `{dex, stealth}`. Influence, Search and
+Study are bare `{cha}` / `{wis}` / `{int}`, and Escape a Grapple narrows to whichever of
+`{str, athletics}` / `{dex, acrobatics}` won the modifier comparison. `ability-is` and `skill-is` both
+fail CLOSED against a narrow missing their key, so a rider gated `skill-is: ["perception"]` parses,
+ships and fires **nowhere** — the same silence the absence recorded, wearing a rider's clothes. So
+"Advantage on Wisdom (Perception) checks" is authored `ability-is: ["wis"]` and reaches Search.
+
+**2. The approximation that buys is disclosed, and it is the limit of what gets authored.** The
+engine's Search does not separate Perception from the Insight, Medicine and Survival the SRD's Search
+action also admits. `sentinel-shield` and `rod-of-alertness` print that clause with **no qualifier**
+and are authored. `robe-of-eyes` and `eyes-of-the-eagle` print *"that rely on sight"* — a narrowing no
+trigger expresses — and stay absences; the Robe's own Drawbacks give the wearer the **Blinded**
+condition, so authoring it unqualified would hand a blinded wearer advantage on sight-based
+Perception. Same rule refused `belt-of-dwarvenkind` (Persuasion *"to interact with dwarves and
+duergar"*), `eyes-of-minute-seeing` (*"within that range"*, one foot), `talisman-of-the-sphere`
+(controlling a Sphere the engine does not hold) and `quarterstaff-of-the-acrobat` (two of the
+weapon's three forms). Alternatives and their costs are in the modules at each entry.
+
+**3. An absence whose stated reason has been fixed is a false record even when it stays unauthored.**
+Nineteen records cited one of the two closed limits. **Seven became riders** — `boots-of-elvenkind`,
+`cloak-of-elvenkind`, `cloak-of-the-bat` (new entries), `sentinel-shield`, `rod-of-alertness`,
+`champion.remarkable-athlete` (a second modifier beside an initiative rider each already carried) and
+`mindless-rage`. **Twelve were rewritten** to name the reason that actually survives, including three
+that had MIS-cited the limit: `energy-bow`'s escape DC is an item-action gap, not a roll-mode one,
+and `hat-of-many-spells` and `sphere-of-annihilation` want a check's OUTCOME as a gate, which
+reaching a check's die never was. Over the 268 magic-item rows the counts moved 87 → **90 authored** and 181 →
+**178 absences** (C7c 18 → 21; C7a and C7b each gained a second modifier on a row already authored,
+so their counts held; C7d gained nothing). The two class records are outside that population.
+
+**4. `grants.when` has no magic-item carrier at all, and one carrier in the whole SRD.** Measured
+across all 268 rows: 25 print a Resistance or Immunity and every one is either already authored
+ungated, or blocked by something the gate does not touch. The corpus's only gated grant is a class
+feature — Path of the Berserker's `mindless-rage`, *"Immunity to the Charmed and Frightened conditions
+while your Rage is active"*, gated `while-effect-tag: ["raging"]` on the tag Rage's own effect already
+writes. Authored there. **Consequence for the far end:** no shipped record prints a gated
+*resistance*, so the gate's shipped proof ends at a refused condition rather than a halved total; the
+halving stays proved on a parsed record in `apps/server/test/grant-gates.test.ts`.
+
+## 2026-08-12 — the content program's own guards: an absence is a test, and a cast rule belongs to the program
+
+> **COUNTS MOVED 2026-08-13** — see the entry above. The three decisions below stand unchanged; the
+> population they were measured over is now 90 authored / 178 prose-only.
+
+**Context.** C8 closes the content program (C7a–C7d, 268 magic-item rows, 87 authored entries, 181
+prose-only records) with an adversarial pass hunting two failure modes and nothing else: a rider
+built whose reader never fires, and a both-paths test whose far end is a surviving field rather than
+an engine outcome. **Neither was found.** Every rider family the four lanes author — `armor-class`,
+`save-bonus`, `check-bonus`, `roll-mode`, `attack-bonus`, `grants.{damageResistances,
+damageImmunities, conditionImmunities, weapons}`, `actions`, `casts`, `cursed` — reaches a live
+reader: a sweep of all 87 carriers against a bare control found 82 move an observable derivation from
+a picker-minted row alone, and the other five (`ammunition-1/2/3`, `bracers-of-archery`,
+`shield-of-missile-attraction`) are momentary or write-path riders that were each driven to a number.
+Each lane's far end was probed by stripping its lane from `scripts/item-mechanics/index.ts`,
+regenerating the bundle and re-running: all four fail at an engine outcome (a damage total that stays
+12 instead of halving to 6, a `casts` list that comes back `[]` where Fireball was, an AC of 12
+instead of 13, a charge counter that never leaves 0), and the bundle was restored by checksum.
+
+**What the pass DID find is that three true claims were guarded by nothing**, which is the shape a
+claim rots in. Three decisions follow.
+
+**1. An absence is a test, not a promise.** All four modules' headers promise *"every one named below
+with its reason"*; each lane's test pins its own AUTHORED count and nothing checks the other side of
+the subtraction. A lane could drop a row from its absence list, or the ETL could add a row nobody has
+looked at, and every existing test stays green. Measured before the guard existed: **0 unrecorded
+across all four lanes.** `apps/server/test/item-mechanics-program.test.ts` now holds it — every row is
+authored or named in backticks in its lane's module, the four scopes partition all 268 rows exactly
+once (60 + 57 + 56 + 95), and the failure NAMES the rows. Probed by renaming one absence record:
+`unrecorded: ["universal-solvent"]`.
+
+**2. The two cast rules are the PROGRAM's, not C7b's.** C7b's salvage removed seven casts over one
+measured fact — `castAction` reads `spell.damage.roll` as a cast's damage and
+`spell.damage.types[0] ?? "force"` as its type, and emits an `attack` block from `spell.attackRoll`,
+none of which the spell records reliably mean — then guarded it with `authoredCasts()` filtered to
+`lane === "C7b"`. **The reader is lane-blind and the guard was not:** it covered 28 of the program's
+43 authored casts. Probed by planting `cure-wounds` and `faerie-fire` on a C7c item:
+`item-mechanics-c7b.test.ts` stayed **green** while the widened sweep named both
+(*"C7c/hat-of-disguise casts cure-wounds … castAction types an untyped roll as \"force\""*). Widened
+to every lane, with the population (43 casts, 29 items, per-lane split) pinned so it cannot go vacuous.
+
+**3. A rider family proved only by a bundle assertion is not proved.** `item-mechanics-c7a.test.ts`
+asserted ammunition's `attack-bonus`, the initiative `roll-mode` and `cursed` as fields surviving the
+merge; the lane's measurements of what they DO live in comments. All three are now driven: the +3
+arrow makes a shot 14 where the control is 11 and leaves a mace swing at 9, all three initiative
+carriers report `advantage` and `normal` when unequipped, and both cursed items refuse a player's
+doff by name and yield to the GM's.
+
+**Also corrected in place.** `scripts/item-mechanics/weapons-armour.ts` still told its 19 limit-(0)
+absences *"Unit for all 19: NONE YET … §5 has no row for it"* while its own header ruled *"EVERY
+`limit (0)` ABSENCE BELOW IS C9's"* and the plan carries C9 in its unit table, its own section and the
+phrase *"19 absences citing C9"*. An unblocker quarter that says NONE YET when a unit owns the work is
+what turns a recorded decision back into a silent skip.
+
+**Rejected, with why.** *Empty `shield-of-missile-attraction`* — it authors `cursed: true` and nothing
+else, so attuning it locks a slot and grants no mechanic, which is the exact inversion of the
+`armor-of-vulnerability` case this lane's salvage removed for being strictly better than plain. Both
+its printed halves are legitimately unsayable and recorded as named absences, so the row is a faithful
+subset rather than a defect; which way that asymmetry should fall is a client ruling and the client is
+away. Written up in `docs/ai-ledger/known-bugs.md` instead. *Widen C7b's "landed every authored rider
+on the COMMITTED bundle" check* — redundant: `packages/content-srd-5.2.1/test/item-mechanics.test.ts`
+already re-runs the real ETL and compares the emitted bundle to the committed one byte for byte, which
+catches a module edited without regenerating for every lane at once.
+
+## 2026-08-11 — a magic weapon applies to a base weapon the player picks, and a rider must produce the PRINTED effect
+
+**Context.** Batch 3's C7a lane (weapons and armour) authored 42 of its 60 magic-item rows and its
+headline far end was green: *"a `+1` weapon's to-hit and damage both move by one."* A review pass
+found the number came from the test's own fixture. **A magic weapon in the SRD carries no stats of its
+own** — the printed type line names which *base* weapon the item applies to (`Weapon (Warhammer)`,
+`Weapon (Any Simple or Martial)`) — and the ETL is faithful to it: **measured over the committed
+`packages/content-srd-5.2.1/bundles/magic-items.v1.json`, 0 of the 33 `weapon`-category rows carry a
+`weapon` block.** So `weaponAction` returns null, the row derives no swing, and an authored `+3` is
+not an overstatement but a number that appears nowhere. Driven end to end on a picker-minted
+`Dwarven Thrower`: `carriers` 1, `weaponActionIds` `[]`, `effectiveActions` `[]`. C7b hit the same
+class of defect from the other side — seven `casts` whose reader fires and produces the wrong thing,
+including a Staff of Healing that hit a wounded ally for 2d8.
+
+**The first ruling: the player picks the base weapon the template applies to.** The chosen base
+supplies the swing — its die, its damage type, its range band, its properties — and the magic row's
+riders scope to that swing. It is an **item-applies-to-item** mechanism and it does not exist in this
+repo. **It is a unit, not content work**, written up as **C9** in
+`docs/product/plan-content-program.md` §2. The measurement that forces the ruling is the qualifier
+histogram: of the 33 rows, **11 name exactly one base weapon and 22 offer a choice** (nine of them
+`Any Simple or Martial`). Any answer that serves only the 11 leaves two thirds of the list inert.
+
+**Rejected, with why.** *Inherit the single named base for the 11* — cheapest, no control, no pick;
+leaves the other 22 inert and ships a browse list where some magic weapons swing and some do nothing
+with nothing on screen to say which. Kept as C9's own first slice, not as the answer. *`scope:
+"bearer"`* — parses today, needs no unit, and is wrong in a way a table feels: it raises every attack
+the bearer makes with any weapon, and two magic weapons stack. *Invent default stats* — `Sword of
+Sharpness` applies to a Glaive, Greatsword, Longsword or Scimitar, whose dice are 1d10/2d6/1d8/1d6, so
+any single default is wrong for at least three of the four; it also invents content the SRD does not
+print and nothing downstream could ever tell the invented die from a parsed one.
+
+**The second ruling, and it is the general lesson: the admission rule gains a clause.** It was *"a
+rider is authored only when its reader ships."* It is now **"only when its reader ships AND produces
+the printed effect."** A rider that reaches a reader and produces the WRONG effect is **worse than an
+unauthored one**, because prose is visibly prose and a wrong number is invisible until the round it
+lands at a table. Both salvages are instances: a `+N` with no swing, and a `casts` that reads a
+spell's `damage` column as if it described one cast.
+
+**What it costs, stated plainly.** **18 authored rows came out of C7a and 5 out of C7b, plus 4 riders
+stripped from entries that survive** — C7a stands at 24 of 60 and C7b at 27 of 57, and the removed
+rows are **named absences**: the item, the SRD sentence, the vocabulary it needs, and the unit or bug
+that unblocks it, in a comment beside where the entry was. That is "we decided it", not "we skipped
+it". **U20 moves behind C9** rather than behind C7a — `Sun Blade` and `Energy Bow` are reserved
+carriers with no swing to override — and U23's `Vicious Weapon` is in the same position. **C9 does not
+unblock the `+N` ladder on its own**: `FeatureModifierSchema` has no flat `damage-bonus` (measured:
+`{formula: "1"}` and `{formula: "1d1"}` are both refused), so a `+1` weapon after C9 would author its
+to-hit and understate its damage by one — half-right and invisible, which is the very failure this
+ruling exists to stop. The two must land together.
+
+**Consequences.** C9's full contract, its far end and its one open design question (copy the base's
+block onto the inventory row, or store a `baseWeaponId` and resolve at derivation) are in
+`docs/product/plan-content-program.md`; the lane-level findings and every absence are in
+`packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` and
+`packages/content-srd-5.2.1/scripts/item-mechanics/wands-rods-rings.ts`; the spell-model half is two
+`[content/spells]` entries in `docs/ai-ledger/known-bugs.md`. **The armour half of C7a is NOT affected
+and the reason is the SRD's own wording** — `Shield, +2` prints its bonus *"in addition to the
+Shield's normal bonus to AC"*, and AC is additive by construction — so nobody should "fix" armour rows
+by inventing an `armor` block for them either. And a bar for every future far end in this program:
+**drive it from the shipped bundle**; where a test must build a row by hand, build it the way the
+picker does and no better.
+
+## 2026-08-11 — two of the parent decisions the unit programs were waiting on
+
+**Context.** `docs/product/plan-engine-program.md` §7 (D-ENGINE-2) and the U35a scope question were
+both left open by the 2026-08-10 re-verification pass, and both gate work that cannot start without
+them. Put to the client 2026-08-11; both answered.
+
+**D-ENGINE-2 — `RiderEditor.tsx` is NOT split. Ruled: leave it, and serialise the work instead.**
+Eight engine units (U18, U19, U20, U21a, U22, U23+U30, U28, U33) plus four from the API program's
+lane β all need a control in that one 1365-line file. The plan offered a prep unit `R2` to split it
+first and recommended taking it; the client declined. **The consequence is a scheduling one and it is
+now binding: no two units that touch `RiderEditor.tsx` may run in the same batch.** Twelve units
+therefore queue through it one at a time rather than fanning out, and any plan text that assumes
+four concurrent agents across those units is wrong until this is re-opened. The upside the client
+bought: no refactor of a file that eight shipped units already depend on, and no window where a
+half-split file is the merge base for concurrent work.
+
+> The split remains available. If the queue becomes the critical path, re-open this with the
+> measurement — how much wall-clock the serialisation actually cost — rather than the argument.
+
+**U35a — the Light-property extra attack is its OWN unit, not a mastery.** Size L. It is a core 2024
+rule available to every character who wields a light weapon, so it does not belong inside the
+weapon-mastery system, which exists for the per-weapon special cases. This unblocks U35b, which in
+turn is one of the eight slugs U38 is gated on.
+
+**Still open**, and named so the next session does not think this closed them: the engine U18/U22 →
+mastery-program sequencing (the vex/slow agents stop-and-report if it is got wrong), the C6 wondrous
+split, Horn of Valhalla's rarity, the multiattack census row, and who owns
+`equipment.weapon.properties`.
+
 ## 2026-08-10 — the remaining program: twenty client rulings, and one home for decisions
 
 **Context.** The feature-implementations branch (PR #55) closed 17 vocabulary-parity units across
@@ -72,6 +278,71 @@ was never delivered** and is batch-0 work), D5 (schema gaps close by addition, n
 (the GM's damage entry gains an optional type — **server half only; the client half is owed** and
 runs before any new unit, with issue `4b`'s client half beside it). Future decisions: dated entries
 here, no parallel numbering anywhere.
+
+## 2026-08-10 — the overlay gets a `clears` verb, and the delete it authorises is one-way
+
+**Context.** Ruled by the client on 2026-08-10 as ruling 14 of the entry above, and **implemented in
+that same form** as batch 0's last prerequisite. It is recorded in full here because the summary line
+above cannot carry the hazard, and the hazard is the reason the mitigations are not optional.
+
+For `cleric`, `fighter` and `wizard` the class record in `packages/content-srd-5.2.1/bundles/classes.v1.json`
+is both the ETL's **input and its output** — those three are hand-authored and carried through
+verbatim, so the mechanics overlay may only **add**. `applyMechanics` refuses to overwrite a key the
+record already carries and fails the build naming both homes. A *second* edit to a shipped rider was
+therefore unauthorable from the class module, and the only home left was a hand edit to a
+10,418-line bundle. Measured across the whole remaining program, that bites in **exactly one case**:
+Wizard's Spell Mastery, printed as "choose a level 1 **and** a level 2 spell" and shipped as one pick
+of two capped at level 2. (Re-verified at implementation: `evoker.empowered-evocation` and
+`fighter.studied-attacks` carry no riders at all, so the units that land on them are clean adds.)
+
+**The ruling: a `clears?: readonly RiderKey[]` on `FeatureMechanics`.** The named keys are deleted
+from the record before the merge, so a module can say *"this feature's `choice` is superseded — the
+list beside it replaces it."* It is the general form of the problem, it keeps one home per rider for
+all twelve classes, and it makes the collision message's own advice ("remove it from one of the two
+homes") expressible in the module. The decisive argument was not code cost — at N = 1 a hand edit is
+cheaper — it is that this program's shape is four concurrent agents in four worktrees, and a hand
+edit is paid in the one currency the program is short of: a shared 10,418-line file.
+
+**The hazard, stated because it does not go away.** On a hand-authored record the ETL writes the
+merged record back over its own input, so a `clears` is a **one-way, irreversible** edit to committed
+JSON. Deleting the `clears` line later does not bring the old value back. Three mitigations, all
+part of the ruling:
+
+1. **`clears` is idempotent.** Clearing an absent key is a no-op, never an error — so the second and
+   later builds are clean and the module stays truthful instead of becoming a build error the moment
+   it works.
+2. **Every key a `clears` names must be replaced by the same entry, or the build fails.** The verb
+   can never be a silent delete-only tool. An invalid entry deletes *nothing*: it contributes none
+   of itself rather than the irreversible half. *Corrected 2026-08-10, same day:* this first shipped
+   as the weaker "unless the same feature also authors **a** rider", which is a per-entry test — so
+   `{ clears: ["choice"], tags: [...] }` satisfied it, deleted a whole `choice`, replaced nothing and
+   returned clean. That is the irreversible unreplaced delete the mitigation exists to fence, so the
+   code was tightened to the promise rather than the promise weakened to the code. "Replaced" means
+   the key itself or the other form of it for `choice`/`choices`, which cannot coexist on a record
+   (`oneChoiceForm`) and so must supersede each other — the one-becomes-several case the verb was
+   built for, and the reason the test is not simply "the identical key comes back".
+3. **The review bar is the `git diff` of `classes.v1.json` in the same commit.** Stated here because
+   the collision guard's whole argument was that an unannounced overwrite would be *"unreviewable and
+   un-revertable"*. `clears` makes the overwrite authorable, so the review is what has to make it
+   reviewable again.
+
+**Rejected, with why.** *Hand-edit the three bundles* — cheapest at N = 1, but it reinstates the
+shared-file workflow the overlay was extended to end, and splits the authoring surface so an author
+reading `wizard.ts` sees nothing of what Wizard actually authors. *Teach the guard that `choices`
+supersedes `choice`* — five lines, but a special case for whichever pair happens to be first; the
+next case (a `uses` that must change) needs a second one. *Move the three onto the generated path* —
+freezes 242 records' worth of prose into a hand-maintained copy the cross-check deliberately does not
+compare, to gain somewhere to hang three lines of riders. The full costing is
+`docs/product/plan-content-program.md` §4.
+
+**Consequences.** The verb and both code-enforced mitigations live in
+`packages/content-srd-5.2.1/scripts/class-mechanics/overlay.ts`; `HAND_AUTHORED` moved there from
+`packages/content-srd-5.2.1/scripts/build-class-bundle.ts` because it is a property of the merge, not
+of the parse, and one home is what lets a test hold the merge to the same three classes. The proof is
+in `packages/content-srd-5.2.1/test/mechanics-overlay.test.ts`: a build over a copy of the real
+bundle, run **twice**, ending at the picks the twice-built record offers. Because the hand-edit option
+was *not* taken, `classes.v1.json` does **not** become a serialization point for concurrent agents —
+a `clears` is a module edit, and modules are one file per class by design.
 
 ## 2026-08-09 — the calendar's two clocks are independent, and an era is derived from the year
 

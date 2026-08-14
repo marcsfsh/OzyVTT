@@ -1,5 +1,13 @@
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "../scripts/class-mechanics/index.js";
+import { z } from "zod";
+import { CLASS_MECHANICS, HAND_AUTHORED, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "../scripts/class-mechanics/index.js";
+import type { FeatureMechanics, MechanicsOverlay } from "../scripts/class-mechanics/index.js";
+import { ClassReferenceSchema, featurePicks } from "../src/character-content.js";
 import { loadClasses, loadSubclasses } from "../src/index.js";
 
 /**
@@ -83,6 +91,55 @@ describe("the mechanics overlay", () => {
     expect(features[0].tags).toEqual(["already-here"]);
   });
 
+  it("`clears` supersedes a value the record already carries, and clearing an absent key is a no-op", () => {
+    // THE INVERSE OF THE TEST ABOVE, and the whole point of the verb (ruled 2026-08-10, decision-log;
+    // the alternatives are costed in `docs/product/plan-content-program.md` §4). The collision
+    // message's own advice - "remove it from one of the two homes" - becomes something the class
+    // module can SAY, instead of requiring a hand edit to a 10,000-line bundle to satisfy it.
+    //
+    // `modifiers` is cleared too and the record does not carry one: MITIGATION 1, idempotence. A
+    // `clears` that has already done its work must stay legal, or the module becomes a build error
+    // the moment it succeeds and the next author deletes the line that explains the deletion. It is
+    // authored beside its `clears` like any other superseded key - mitigation 2 is per KEY - which
+    // is the shape the SECOND build of a hand-authored record takes anyway: run 1 writes the new
+    // value into the bundle, run 2 clears what run 1 wrote and authors the identical thing.
+    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const misses = applyMechanics("barbarian", features, {
+      barbarian: { rage: { clears: ["tags", "modifiers"], tags: ["raging"], modifiers: [{ type: "speed", amount: 10 }] } }
+    });
+    expect(misses).toEqual([]);
+    expect(features[0].tags).toEqual(["raging"]);
+    expect(features[0].modifiers).toEqual([{ type: "speed", amount: 10 }]);
+  });
+
+  it("REFUSES a `clears` with no rider beside it, and deletes nothing", () => {
+    // MITIGATION 2: the verb can never be a silent delete-only tool. On a hand-authored record the
+    // ETL writes the merged record back over its own input, so a delete is one-way - a module that
+    // removed a rider and put nothing in its place would be an irreversible edit with no replacement
+    // to review it against. Nothing is deleted on this path either: an invalid entry contributes
+    // NOTHING rather than half of itself.
+    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const misses = applyMechanics("barbarian", features, { barbarian: { rage: { clears: ["tags"] } } });
+    expect(misses).toEqual(["barbarian.rage.clears [tags] (deletes without replacing - author the superseding rider in the same entry)"]);
+    expect(features[0].tags).toEqual(["already-here"]);
+  });
+
+  it("REFUSES a `clears` whose key is unreplaced even when the entry authors a DIFFERENT rider", () => {
+    // The hole the per-entry form of mitigation 2 left open, and the reason it is now per KEY.
+    // Asking only "does this entry author something" is satisfied by any unrelated rider, so
+    // `{ clears: ["choice"], tags: [...] }` passed while deleting a whole `choice` and replacing
+    // nothing - on a hand-authored record, an irreversible edit to committed JSON, which is the one
+    // outcome the verb was fenced against. Only `choice` is named; `tags` is legitimately authored.
+    const features = [{ id: "rage", name: "Rage", description: "x", choice: { id: "c", options: [{ id: "o", name: "O" }] }, tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const misses = applyMechanics("barbarian", features, {
+      barbarian: { rage: { clears: ["choice", "tags"], tags: ["raging"] } }
+    });
+    expect(misses).toEqual(["barbarian.rage.clears [choice] (deletes without replacing - author the superseding rider in the same entry)"]);
+    // Nothing is deleted on the refusal path - the entry contributes NOTHING, not half of itself.
+    expect(features[0].choice).toEqual({ id: "c", options: [{ id: "o", name: "O" }] });
+    expect(features[0].tags).toEqual(["already-here"]);
+  });
+
   it("treats an empty rider list as absent, so a bundle's `[]` is not a collision", () => {
     const features = [{ id: "rage", name: "Rage", description: "x", modifiers: [] }] as Array<{ id: string } & Record<string, unknown>>;
     expect(applyMechanics("barbarian", features, { barbarian: { rage: { modifiers: [{ type: "speed", amount: 10 }] } } })).toEqual([]);
@@ -129,5 +186,106 @@ describe("the mechanics overlay", () => {
     // twelve in parallel, and "Monk contributes nothing" stopped being true the hour its lane began.
     expect(Object.entries(CLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
     expect(Object.entries(SUBCLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
+  });
+});
+
+/**
+ * `clears` THROUGH THE BUILD - the far end the unit tests above cannot reach.
+ *
+ * The unit tests prove `applyMechanics` deletes and merges. They cannot prove the thing that makes
+ * the verb hazardous enough to need a ruling: on a HAND_AUTHORED class the ETL reads
+ * `bundles/classes.v1.json`, merges the overlay into the records it read, and writes them back over
+ * that same file - so a `clears` is a ONE-WAY edit to committed JSON, and the SECOND build reads what
+ * the first one wrote. Only running it twice can show that the superseded key is gone from the file
+ * and that the module which removed it is still legal on the next run.
+ *
+ * The three statements below ARE the ETL's hand-authored branch (`build-class-bundle.ts:841-846` and
+ * `:973`); the script is top-level code that reads sources and rewrites bundles on import, so a test
+ * cannot call it. It is replicated rather than imported, and the replica is PINNED to the loop it
+ * stands for - see the first assertion - so it cannot drift into passing about nothing. It runs over
+ * a COPY in a temp directory: the committed bundle is never touched.
+ */
+describe("`clears` through the class-bundle build", () => {
+  const bundlePath = fileURLToPath(new URL("../bundles/classes.v1.json", import.meta.url));
+  const scriptPath = fileURLToPath(new URL("../scripts/build-class-bundle.ts", import.meta.url));
+
+  type ChoiceInput = NonNullable<FeatureMechanics["choice"]>;
+  type FeatureShape = { id: string; choice?: ChoiceInput; choices?: ChoiceInput[] };
+  type RecordShape = { id: string; features: FeatureShape[] };
+
+  /** One run of the ETL's hand-authored branch over `path`, returning the misses that fail the build. */
+  const buildOnce = (path: string, overlay: MechanicsOverlay): string[] => {
+    const all = JSON.parse(readFileSync(path, "utf8")) as RecordShape[];
+    const misses: string[] = [];
+    for (const record of all.filter((entry) => HAND_AUTHORED.has(entry.id))) {
+      misses.push(...applyMechanics(record.id, record.features, overlay));
+      ClassReferenceSchema.parse(record);
+    }
+    writeFileSync(path, `${JSON.stringify(all, null, 1)}\n`);
+    return misses;
+  };
+
+  it("removes the superseded key from the written bundle, lands the replacement, and is clean on the second run", async () => {
+    // THE PIN. If the hand-authored branch stops doing exactly what `buildOnce` does, this fails here
+    // rather than leaving the rest of the test green about a loop that no longer exists.
+    const script = readFileSync(scriptPath, "utf8");
+    expect(script).toContain("applyMechanics(record.id, record.features, CLASS_MECHANICS)");
+    expect(script).toContain("ClassReferenceSchema.parse(record)");
+    expect(script).toContain('writeFileSync(join(bundles, "classes.v1.json")');
+    expect(script).toContain("JSON.stringify(allClasses, null, 1)");
+
+    // THE CARRIER IS CHOSEN BY PROPERTY, NOT BY NAME: the first hand-authored feature that still
+    // ships a `choice`. The program's one measured case is `wizard.spell-mastery` ("choose a level 1
+    // AND a level 2 spell", shipped as one pick of two capped at level 2) and C4 supersedes it FOR
+    // REAL through this verb - at which point that feature stops carrying a `choice` and a test that
+    // named it would go red for the best possible reason. The rule keeps working; the property is
+    // what is being tested.
+    const shipped = JSON.parse(readFileSync(bundlePath, "utf8")) as RecordShape[];
+    const carrier = shipped
+      .filter((record) => HAND_AUTHORED.has(record.id))
+      .flatMap((record) => record.features.map((feature) => ({ recordId: record.id, feature })))
+      .find(({ feature }) => feature.choice !== undefined && feature.choices === undefined);
+    expect(carrier, "no hand-authored feature ships a `choice` for `clears` to supersede").toBeDefined();
+    const { recordId, feature: before } = carrier!;
+    expect(featurePicks(before)).toHaveLength(1);
+
+    // The replacement is DERIVED from the record's own pick, so it is schema-valid for whichever
+    // feature the rule above landed on, and it is the shape of the measured case: one pick becomes
+    // two. `choice` and `choices` cannot coexist on a record (`oneChoiceForm`), which is the second
+    // mechanism - beside the collision guard - that made this unauthorable before `clears`.
+    const replacement: ChoiceInput[] = [{ ...before.choice!, choose: 1 }, { ...before.choice!, choose: 1 }];
+    const overlay: MechanicsOverlay = { [recordId]: { [before.id]: { clears: ["choice"], choices: replacement } } };
+
+    const directory = await mkdtemp(join(tmpdir(), "vtt-overlay-clears-"));
+    try {
+      const path = join(directory, "classes.v1.json");
+      copyFileSync(bundlePath, path);
+
+      expect(buildOnce(path, overlay)).toEqual([]);
+      const afterFirst = readFileSync(path, "utf8");
+
+      // MITIGATION 1, where it actually matters: run 2 reads the file run 1 wrote, finds no `choice`
+      // left to clear, and neither errors nor changes a byte. The module stays truthful.
+      expect(buildOnce(path, overlay)).toEqual([]);
+      expect(readFileSync(path, "utf8")).toBe(afterFirst);
+
+      // THE FAR END. Not "the value survived the merge" - the twice-built bundle, parsed with the
+      // schema `loadClasses()` itself uses (`src/index.ts:152-154`), offers TWO picks through
+      // `featurePicks`, the one accessor `character-build.ts` reads a feature's picks through.
+      const built = z.array(ClassReferenceSchema).parse(JSON.parse(afterFirst));
+      const after = built.find((record) => record.id === recordId)!.features.find((entry) => entry.id === before.id)!;
+      const picks = featurePicks(after);
+      expect(picks).toHaveLength(2);
+      expect(picks.map((pick) => pick.choose)).toEqual([1, 1]);
+
+      // And the superseded key is GONE FROM THE FILE, not merely absent from a parse - the one-way
+      // edit the ruling's third mitigation (review the bundle's `git diff`) exists for.
+      const raw = (JSON.parse(afterFirst) as RecordShape[])
+        .find((record) => record.id === recordId)!.features.find((entry) => entry.id === before.id)!;
+      expect(Object.keys(raw)).not.toContain("choice");
+      expect(Object.keys(raw)).toContain("choices");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

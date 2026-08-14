@@ -34,7 +34,7 @@ Node.js **24+** required. Run from the repo root.
 | `npm run test` | Vitest, every workspace that has a `test` script. |
 | `npm run build` | Build every workspace that has a `build` script (the client and the server; packages are consumed as TS sources). |
 | `npm run start` | Build, then run the single LAN service on `:3001`. |
-| `npm run docs` | Regenerate `docs/app-map.md` **and** `docs/api-reference.md`. Required after any state/command/HTTP/OpenAPI change — a test fails otherwise. |
+| `npm run docs` | Regenerate `docs/app-map.md`, `docs/api-reference.md` **and** `docs/product/vocabulary-parity-audit.md`. Required after any state/command/HTTP/OpenAPI or homebrew-form change — a test fails otherwise. |
 | `npm run map` | Regenerate `docs/app-map.md` alone — the faster half of `npm run docs`. |
 
 Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `apps/server`
@@ -72,8 +72,8 @@ Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `
   restated code. Use `vtt-context-router` to pick the 2-4 that apply; don't read the tree.
 - **`docs/ai-ledger/`** — `known-bugs.md`, `decision-log.md` on demand; history in `docs/archive/`.
 - **`docs/adr/`**, **`docs/product/`**, **`BUILD_PLAN.md`** — durable decisions and roadmap.
-- **`docs/app-map.md`** and **`docs/api-reference.md`** are generated and freshness-tested.
-  Never hand-edit either; regenerate with the commands above.
+- **`docs/app-map.md`**, **`docs/api-reference.md`** and **`docs/product/vocabulary-parity-audit.md`** are generated and freshness-tested.
+  Never hand-edit any of them; regenerate with the commands above.
 
 ## How to work
 

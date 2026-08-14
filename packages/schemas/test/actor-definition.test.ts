@@ -1,11 +1,14 @@
-import Ajv2020 from "ajv/dist/2020.js";
+// ajv is CJS, so under `module: NodeNext` a default import resolves to the whole module namespace
+// (no construct signature). The named export is the same class object at runtime, and it is what
+// every other ajv call site in the repo already uses.
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
-import character from "../../test-fixtures/actors/player-character.v1.json";
-import monster from "../../test-fixtures/actors/monster.v1.json";
-import torva from "../../test-fixtures/actors/torva-grimtusk.v1.json";
-import pip from "../../test-fixtures/actors/pip-underbough.v1.json";
-import sable from "../../test-fixtures/actors/sable-vex.v1.json";
-import jsonSchema from "../json/actor-definition.v1.schema.json";
+import character from "../../test-fixtures/actors/player-character.v1.json" with { type: "json" };
+import monster from "../../test-fixtures/actors/monster.v1.json" with { type: "json" };
+import torva from "../../test-fixtures/actors/torva-grimtusk.v1.json" with { type: "json" };
+import pip from "../../test-fixtures/actors/pip-underbough.v1.json" with { type: "json" };
+import sable from "../../test-fixtures/actors/sable-vex.v1.json" with { type: "json" };
+import jsonSchema from "../json/actor-definition.v1.schema.json" with { type: "json" };
 import { ActorDefinitionSchema, ActorSchema, EffectModifierSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, characterChoices, makeHitDicePool, resolveSpellcasting, riderLayer, toRollModes } from "../src/index.js";
 
 describe("actor definition v1", () => {

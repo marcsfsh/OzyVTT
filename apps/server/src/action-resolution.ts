@@ -1,6 +1,7 @@
 import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
 import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AttackKind, type DiceExpression, type RandomSource, type RiderContext, type RiderMoment, type RollModeSource } from "@vtt/rules-5e";
 import { toRollModes, type ActorDefinition } from "@vtt/schemas";
+import { checkDieFor, checkRollMode } from "./ability-checks.js";
 import { criticalThreshold, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, UNARMED_STRIKE_ACTION_ID, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
@@ -504,10 +505,33 @@ type RiderMomentContext = Readonly<{
 }>;
 
 /**
+ * Whether THIS swing is being made at range. A weapon carrying only one of the two is settled by
+ * that alone; a Thrown weapon carries BOTH and needs the measured distance, so one used inside its
+ * reach stays melee.
+ *
+ * When the distance is unmeasurable - no map loaded, a combatant not yet placed, an uncalibrated
+ * grid, all ordinary at this table - a both-ways weapon resolves to RANGED. That is the reading
+ * that keeps a mapless table safe: defaulting to melee hands a thrown javelin every melee-gated
+ * rider on the sheet, a Paladin's Radiant Strikes among them. It is also the classification every
+ * such weapon had before the SRD `properties` column reached the inventory row and gave these
+ * derived actions a reach at all.
+ *
+ * Three rules ask this question - the kind filter below, the underwater disadvantage, and the
+ * ranged-attack penalties - and they answered it three slightly different ways, which is how the
+ * underwater rule came to disagree with the kind filter about an unmeasured javelin. One helper so
+ * they cannot drift again.
+ */
+function attackUsedAsRanged(attack: { reachFeet?: number; rangeFeet?: number }, distance: number | null): boolean {
+  if (attack.rangeFeet === undefined) return false;
+  if (attack.reachFeet === undefined) return true;
+  return distance === null || distance > attack.reachFeet + 1e-6;
+}
+
+/**
  * How this attack is being made. `melee` / `ranged` / `thrown` are derivable from the action's own
- * reach and range (and the measured distance, so a thrown weapon used inside its reach stays melee);
- * `reaction` and `opportunity` are NOT derivable and must be announced by the caller through
- * `input.attackKinds` - which is exactly what `reactions.ts` does for an opportunity attack.
+ * reach and range (see `attackUsedAsRanged` for the distance rule); `reaction` and `opportunity`
+ * are NOT derivable and must be announced by the caller through `input.attackKinds` - which is
+ * exactly what `reactions.ts` does for an opportunity attack.
  */
 function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: number | null): AttackKind[] {
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
@@ -515,8 +539,7 @@ function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: 
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
-    const usedAsRanged = ranged && (!melee || (distance !== null && distance > attack.reachFeet! + 1e-6));
-    if (usedAsRanged) kinds.add("ranged");
+    if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
     else if (melee) kinds.add("melee");
     if (melee && ranged) kinds.add("thrown");
   }
@@ -621,7 +644,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   // (the SRD's dagger/javelin/shortsword/spear/trident list, generalized to its shared damage type).
   if (state.combat.underwater && action.attack?.reachFeet !== undefined) {
     const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
-    const usedAsRanged = action.attack.rangeFeet !== undefined && distance !== null && distance > action.attack.reachFeet + 1e-6;
+    const usedAsRanged = attackUsedAsRanged(action.attack, distance);
     const piercing = action.damage.some((part) => part.type === "piercing");
     if (!usedAsRanged && !piercing) disadvantage.push({ source: "underwater-melee", label: "Underwater (non-piercing melee)" });
   }
@@ -630,7 +653,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   // actually ranged (a thrown weapon used within its reach stays melee) and distance is measurable.
   if (action.attack?.rangeFeet !== undefined && deps.distanceFeet) {
     const distance = deps.distanceFeet(attacker.id, target.id);
-    const usingMelee = action.attack.reachFeet !== undefined && distance !== null && distance <= action.attack.reachFeet + 1e-6;
+    const usingMelee = !attackUsedAsRanged(action.attack, distance);
     if (!usingMelee) {
       const normal = action.attack.rangeNormalFeet;
       if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
@@ -733,6 +756,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   let check: NonNullable<ActionResolution["check"]> | null = null;
   let hiddenGranted: ActionResolution["effectGranted"] = null;
   const effectsEnded: Array<{ actorId: string; actorName: string; name: string }> = [];
+  // Hoisted above the check branch (it used to be declared beside `attack`, below) so a CHECK can
+  // explain its own advantage on the same field an attack does. Nothing reads it before here.
+  let rollMode: ActionResolution["rollMode"];
   const checkSpec = input.builtin ? BUILTIN_CHECKS[action.id] : undefined;
   if (checkSpec) {
     let modifier = abilityModifier(deps.definition, checkSpec.ability);
@@ -741,7 +767,13 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       if (skillBonus !== null) modifier = skillBonus;
     }
     modifier += exhaustionPenalty(attacker);
-    const resolution = resolveDice(parseDiceFormula(`1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
+    // `roll-mode {roll: "check"}` reaches the DIE here (`ability-checks.ts`), which is the only place
+    // it can: `checkRiderBonus` computes a displayed bonus and rolls nothing, so Boots of Elvenkind
+    // could be worn, derived and shown while Hide still threw one d20. Narrowed by the builtin's own
+    // ability AND skill so `ability-is`/`skill-is` match the check that is actually happening.
+    const aggregated = checkRollMode(derivation, { ability: checkSpec.ability, ...(checkSpec.skill ? { skill: checkSpec.skill } : {}) });
+    if (aggregated.mode !== "normal") rollMode = aggregated;
+    const resolution = resolveDice(parseDiceFormula(`${checkDieFor(aggregated.mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
     recordRoll(state, resolution, { ...rollBase, id: deps.newRollId(), purpose: "check" });
     const checkDice = resolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
     const naturalCheckRoll = (checkDice.dice.find((die) => die.kept) ?? checkDice.dice[0]).face;
@@ -780,7 +812,14 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const athletics = skillBonusFromExtension(deps.definition, "athletics") ?? abilityModifier(deps.definition, "str");
     const acrobatics = skillBonusFromExtension(deps.definition, "acrobatics") ?? abilityModifier(deps.definition, "dex");
     const modifier = Math.max(athletics, acrobatics) + exhaustionPenalty(attacker);
-    const resolution = resolveDice(parseDiceFormula(`1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
+    // The SECOND place a check's d20 is thrown, and it gets the same consumer - a check path the
+    // riders could not see would be a gap that reviews as working. "The better of Athletics or
+    // Acrobatics" picks the ability too, so the rider is narrowed by the branch that actually won:
+    // Gauntlets of Ogre Power help you shove out of a grapple, they do not help you tumble out.
+    const escapeNarrow = athletics >= acrobatics ? { ability: "str" as const, skill: "athletics" } : { ability: "dex" as const, skill: "acrobatics" };
+    const aggregated = checkRollMode(derivation, escapeNarrow);
+    if (aggregated.mode !== "normal") rollMode = aggregated;
+    const resolution = resolveDice(parseDiceFormula(`${checkDieFor(aggregated.mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
     recordRoll(state, resolution, { ...rollBase, id: deps.newRollId(), purpose: "check" });
     const escapeDice = resolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
     const success = resolution.total >= escapable.escapeDc;
@@ -792,7 +831,6 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   let attack: ActionResolution["attack"] = null;
-  let rollMode: ActionResolution["rollMode"];
   let crit = false;
   // WHICH SPELL this action is, when it is one. `spell-id-is` matches against it, so it belongs on
   // BOTH branches: a spell that forces a save and rolls no attack ("when you cast Fireball") must

@@ -122,7 +122,18 @@ export const ActionResolveSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, { message: "Supply either a natural d20 or a final total, not both." });
-export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), /** Issue `4b`: the damage this save applies, hand-entered instead of the auto-rolled proposal. Applied BEFORE the success halving, and the proposal's damage TYPES are kept (re-weighted), so an amended number still meets the target's resistances. A player may amend only their own claimed character's save - the same boundary that governs answering it at all. */ damageOverride: z.number().int().min(0).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict()
+/**
+ * THE refusal for a hand-entered save damage that is out of bounds, on every arm of the bound.
+ *
+ * `save.answer` is one of the two commands that surface the failing zod issue's own message rather
+ * than a per-command "malformed" line (`game-operations.ts` `parse(..., preferIssueMessage)`), so
+ * whatever text sits here is what the save prompt puts in front of the answerer. It used to sit
+ * nowhere: the bound was a bare `.max(1000)`, the GM's fat-fingered 9999 came back as zod's own
+ * **"Number must be less than or equal to 1000"**, and the engine carried a hand-written sentence
+ * that the schema had already made unreachable.
+ */
+const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
+export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), /** Issue `4b`: the damage this save applies, hand-entered instead of the auto-rolled proposal. Applied BEFORE the success halving, and the proposal's damage TYPES are kept (re-weighted), so an amended number still meets the target's resistances. A player may amend only their own claimed character's save - `adjustableActor` turns any other target away before the amend is read. */ damageOverride: z.number({ invalid_type_error: SAVE_DAMAGE_BOUND }).int(SAVE_DAMAGE_BOUND).min(0, SAVE_DAMAGE_BOUND).max(1000, SAVE_DAMAGE_BOUND).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Answer a pending reaction prompt: use (spend the reaction - halve the parked damage, or swing the opportunity attack) or decline. `actionId` picks the melee action for a leaves-reach answer (default: first melee attack, else Unarmed Strike). */

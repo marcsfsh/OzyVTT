@@ -538,7 +538,25 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
       ...(carriesUses ? { uses: { limit: synthesizedUses, per: feature.uses!.per, ...(feature.uses!.pool ? { pool: feature.uses!.pool } : {}) } } : {})
     } as unknown as ActorAction);
   }
-  if (feature.grants) {
+  // A GATED grants block is NOT baked, and this is the one place that decides it.
+  //
+  // Baking means writing the ids into the definition, where nothing ever re-reads the condition -
+  // so a block gated on "while you are wearing armour" would become "always", which is the exact
+  // over-grant `FeatureGrantsSchema.when` exists to end. The gate reads live actor state and this
+  // build has no actor: no inventory, no conditions, no current hit points. So a gated block is left
+  // for `deriveEquipment`'s `characterGatedGrants`, which recomputes it whole on every read and
+  // therefore honours the gate on every read.
+  //
+  // THE TWO HALVES PARTITION TEN OF THE ELEVEN LISTS EXACTLY - ungated here, gated there, so none of
+  // those ten is granted twice or dropped. `spells` is the ELEVENTH and it is NOT part of that
+  // partition: `takeGrants` has no spell channel to hand one to, because the line below bakes a
+  // granted spell into `spellcasting` (the row, the prepared cap, a cantrip's action, and for a
+  // character with no class list the whole caster block) rather than recomputing it. A GATED block
+  // naming spells used to lose them here without a word - gating `high-elf-cantrip` deleted
+  // `spellcasting` outright. It is now refused at authoring instead (`grantedSpellGateMessage`),
+  // which is what lets this branch push all eleven lists and still be complete: no block that
+  // reaches it can carry both a `when` and a spell.
+  if (feature.grants && (feature.grants.when?.length ?? 0) === 0) {
     into.grantedSkills.push(...feature.grants.skills);
     into.grantedExpertise.push(...feature.grants.expertise);
     into.grantedTools.push(...feature.grants.tools);
@@ -1583,7 +1601,12 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
         ...(record?.description ? { description: record.description.slice(0, 4000) } : {}),
         ...(record ? { category: record.category } : {}),
-        ...(record?.weapon ? { weapon: { category: record.weapon.category, damageDice: record.weapon.damageDice, damageType: record.weapon.damageType, rangeFeet: record.weapon.rangeFeet, longRangeFeet: record.weapon.longRangeFeet } } : {}),
+        // `properties` rides along, `mastery` deliberately does not: properties are read off the
+        // INVENTORY row (`weaponPropertiesOf`), while a mastery resolves against the catalog by item
+        // id and is gated on the bearer having unlocked THIS weapon, so copying it here would put an
+        // unearned behaviour on the sheet. Omit the key entirely when the catalog records none -
+        // absent means "not recorded", which is not the same claim as an empty list.
+        ...(record?.weapon ? { weapon: { category: record.weapon.category, damageDice: record.weapon.damageDice, damageType: record.weapon.damageType, rangeFeet: record.weapon.rangeFeet, longRangeFeet: record.weapon.longRangeFeet, ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {}) } } : {}),
         ...(record?.armor ? { armor: { acBase: record.armor.acBase, addDexModifier: record.armor.addDexModifier, dexModifierCap: record.armor.dexModifierCap, stealthDisadvantage: record.armor.stealthDisadvantage, strengthRequired: record.armor.strengthRequired } } : {})
       });
     }

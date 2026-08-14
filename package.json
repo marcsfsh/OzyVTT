@@ -11,7 +11,7 @@
     "test": "npm run test --workspaces --if-present",
     "start": "npm run build && npm run start --workspace=@vtt/server",
     "map": "npm run docs:map --workspace=@vtt/server",
-    "docs": "npm run map && npm run docs:generate --workspace=@vtt/api-contract"
+    "docs": "npm run map && npm run docs:generate --workspace=@vtt/api-contract && npm run docs:parity --workspace=@vtt/web"
   },
   "engines": { "node": ">=24" },
   "devDependencies": { "concurrently": "^9.1.2" }

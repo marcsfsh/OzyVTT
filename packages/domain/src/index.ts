@@ -756,8 +756,15 @@ export type ContentSpellsResult = { ok: boolean; message?: string; spells?: read
  * category must derive its groups from the data, because there is no closed list to switch on. Four
  * values still carry mechanical meaning - "weapon", "armor" and "shield" drive AC and attack
  * derivation, everything else is inert - so a new slug displays and stacks but derives nothing.
+ *
+ * The `weapon` block is the catalog record's own, passed through whole
+ * (`content-library.ts` `equipmentSummaries`), so it is WIDER than `ItemWeaponSchema`: it carries
+ * `mastery`, which is browse-only and must NOT be copied onto an inventory row (a mastery is gated
+ * on the bearer having unlocked that weapon, and `ItemWeaponSchema` is `.strict()`, so sending it
+ * is a refusal). Declaring both optional keys here is what lets a caller SEE the difference -
+ * `inventoryWeaponFrom` in `encounter/equipment.tsx` is the one projection that takes it.
  */
-export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; mastery?: string; properties?: readonly string[] }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 
 // ---------- Character-builder catalogs ----------
@@ -1104,7 +1111,18 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (D26). Default hidden. */
   "actor:set-sheet-preview": (payload: { commandId: string; actorId: string; enabled: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-speed": (payload: { commandId: string; actorId: string; speedFeet: number | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; nonlethal?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
+  /**
+   * `damageType` and `damageOverride` are the two halves of "entering a number no longer discards its
+   * type" (`4a`/`4b`, register D7). Both were on `ApplyDamageSchema` and on NEITHER side of this
+   * contract, which is how `ActionRunner`'s `damageOverride` reached the server uncontracted: a NAMED
+   * excess property fails typecheck, a conditional spread does not.
+   *
+   * `damageType` names the type of a bare manual `amount` (absent or `"untyped"` = the old exact fast
+   * path; open text, so a homebrew type still matches a homebrew defence). `damageOverride` replaces a
+   * rolled total while KEEPING its types. Both are ignored where the other's shape wins - `damageType`
+   * when `parts` is present, since `parts` carries its own.
+   */
+  "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; damageType?: string; damageOverride?: number; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; nonlethal?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-temp-hp": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -1144,7 +1162,8 @@ export interface ClientToServerEvents {
   // hit-dice pool instead of dropping it (a Fighter 3 / Wizard 2 is 3d10 + 2d6, not 5 of one size).
   "character:set-identity": (payload: { commandId: string; actorId: string; character: { classes: ReadonlyArray<{ id: string; name: string; subclass?: { id: string; name: string }; level: number; hitDie?: HitDie }>; race?: { id: string; name: string; subrace?: { id: string; name: string } }; background?: { id: string; name: string }; feats: ReadonlyArray<{ id: string; name: string; description?: string }> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-proficiencies": (payload: { commandId: string; actorId: string; proficiencies: { saves: ReadonlyArray<"str" | "dex" | "con" | "int" | "wis" | "cha">; skills: ReadonlyArray<{ id: string; proficiency: "proficient" | "expertise" }>; saveOverrides?: Record<string, number>; skillOverrides?: Record<string, number> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; rollMode?: "advantage" | "disadvantage" | "normal"; commit?: boolean; legendaryResistance?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
+  /** `damageOverride` is issue `4b`'s amend: the PRE-halving damage the answerer means to apply, kept in the proposal's damage types and applied before "half on a success". A player may amend only their own claimed character's save. */
+  "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; rollMode?: "advantage" | "disadvantage" | "normal"; commit?: boolean; legendaryResistance?: boolean; damageOverride?: number; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "reaction:answer": (payload: { commandId: string; reactionId: string; use: boolean; actionId?: string; commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; attackNatural?: number; expectedRevision?: number }, acknowledgement: (result: ReactionAnswerResult) => void) => void;
   "reaction:dismiss": (payload: { commandId: string; reactionId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

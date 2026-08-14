@@ -484,19 +484,36 @@ export function resolveSuggestions(field: FieldDef, ctx: SchemaContext, draft: D
 }
 
 /**
- * What a `pick` row READS as: `"very-rare"` → "Very Rare", `"fire"` → "Fire".
+ * What a `pick` row READS as: `"very-rare"` → "Very Rare", `"fire"` → "Fire",
+ * `"feature:divine-order"` → "Feature: Divine Order".
  *
  * A derived label rather than a hand-written map, because a map is a second list to keep in step
  * with the first — the exact drift `RARITY_IDS`/`DAMAGE_TYPE_IDS` were centralised to end. Every
  * vocabulary these controls offer is a lowercase-hyphen slug of ordinary English words, so one rule
  * covers all of them and a new list is readable the day it lands with nothing to remember.
  *
+ * **The colon is a SEPARATOR, not a word character**, which the hyphen-only rule got wrong the
+ * moment the feature panel's six offer boxes became `pick`s: a pick budget is
+ * `<namespace>:<slug>` (`PickBudgetKeySchema`), so `feature:divine-order` split on hyphens alone
+ * read "Feature:divine Order" — the one word in the label that is not a word. Splitting on the
+ * colon first is a strict no-op for every colonless slug (a one-element split rejoins to itself),
+ * so it can only move the `feature:<id>` form. Measured rather than argued: over the 122 distinct
+ * strings the whole field census can reach, 5 moved — four synthesised `feature:<id>` offers and
+ * the `feature:my-feature` placeholder — and the other 117 came back byte-identical.
+ *
+ * **It round-trips.** `Combobox` commits an exact label match as the option's ID rather than as the
+ * words, and `pickValue` folds the space this adds back into the colon, so "Feature: Divine Order"
+ * typed by hand is still `feature:divine-order`.
+ *
  * The VALUE is untouched: the slug is what is picked, stored and matched on. This is display only.
  * A field that needs a label the slug cannot produce is a `kind: "select"` with `options`, which is
  * what that member is for.
  */
 export function suggestionLabel(slug: string): string {
-  return slug.split("-").map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word)).join(" ");
+  return slug
+    .split(":")
+    .map((part) => part.split("-").map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word)).join(" "))
+    .join(": ");
 }
 
 /**
@@ -508,9 +525,15 @@ export function suggestionLabel(slug: string): string {
  * unpublishable at a gate that names a regex. Whitespace collapses to the hyphen the slug uses and
  * case is dropped; nothing else is removed, because deleting characters a GM typed is how a value
  * becomes something they never wrote.
+ *
+ * **The one exception is the space a colon takes.** A pick budget is `<namespace>:<slug>`
+ * (`PickBudgetKeySchema`), and `suggestionLabel` reads it back as "Feature: Divine Order" — so a GM
+ * copying the label they can see would otherwise write `feature:-divine-order`, a key naming no
+ * budget the build has. The colon eats its own padding and keeps the rest of the rule exactly as it
+ * was: no colon in the text, no change at all.
  */
 export function pickValue(text: string): string {
-  return text.trim().toLowerCase().replace(/\s+/g, "-");
+  return text.trim().toLowerCase().replace(/\s*:\s*/g, ":").replace(/\s+/g, "-");
 }
 
 /** Every visible field of a section, flattened through `group` but NOT through `rows`

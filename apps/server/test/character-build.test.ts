@@ -6,6 +6,7 @@ import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { deriveEquipment, weaponPropertiesOf } from "../src/equipment-derivation.js";
 import { startEncounter } from "../src/encounter.js";
 
 /**
@@ -341,6 +342,37 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     const quarterstaff = (definition.startingInventory ?? []).find((item) => item.id === "quarterstaff");
     expect(quarterstaff?.quantity).toBe(2); // one from wizard-a, one from sage-a
     expect(definition.startingCurrency?.gp).toBe(13);
+  });
+
+  /**
+   * THE WEAPON-PROPERTY BRIDGE, at the far end that made it worth building.
+   *
+   * `weaponAbilityModifier` has always read `finesse` off the inventory row's `properties`, and no
+   * catalog record could carry one - so the column was empty for every weapon in the game and every
+   * Finesse weapon swung off Strength. This Wizard is the cleanest possible demonstration: STR 10
+   * and DEX 14, holding a Dagger (Finesse) and a Quarterstaff (not), both handed out by the same
+   * build, both Simple, both proficient. If the copy at `character-build.ts` drops the column the
+   * two swing at the same bonus.
+   */
+  it("copies the catalog's weapon properties onto the built inventory, so a Dagger swings off Dexterity", () => {
+    const carried = (id: string) => (definition.startingInventory ?? []).find((item) => item.id === id)!;
+    expect(carried("dagger").weapon?.properties).toEqual(["finesse", "light", "thrown"]);
+    expect(carried("quarterstaff").weapon?.properties).toEqual(["versatile"]);
+    // Batch 0's stated acceptance, on the row a real build produced.
+    expect(weaponPropertiesOf("dagger", definition.startingInventory ?? [])).toContain("light");
+    // `mastery` deliberately does NOT ride along: it resolves against the catalog by item id and is
+    // gated on the bearer unlocking that weapon, and `ItemWeaponSchema` is strict.
+    expect("mastery" in (carried("dagger").weapon ?? {})).toBe(false);
+
+    // The far end: two swings, one character, differing only by Finesse. DEX +2, STR +0, PB +2.
+    const state = emptyState();
+    importActorDefinition(state, definition, ACTOR_ID, "public");
+    const derivation = deriveEquipment(state.actors[0], definition, { equipmentRecord: (id: string) => library.equipmentRecord(id) });
+    const swing = (id: string) => derivation.actions.find((action) => action.id === `item-${id}`)!;
+    expect(swing("dagger").attack!.bonus).toBe(4);
+    expect(swing("dagger").damage![0].formula).toBe("1d4 + 2");
+    expect(swing("quarterstaff").attack!.bonus).toBe(2);
+    expect(swing("quarterstaff").damage![0].formula).toBe("1d6");
   });
 
   it("seeds a live actor whose slot pools and prepared list follow the assembled sheet", () => {

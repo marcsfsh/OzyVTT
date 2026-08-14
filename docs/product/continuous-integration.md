@@ -19,8 +19,12 @@ invisible and the dead-path check silently passes while doing nothing, so it shi
 fails loudly on a shallow clone instead.
 
 The workflow has read-only repository permissions, a 15-minute timeout, and cancels superseded
-runs on the same ref. Branch protection can require the **Test, type-check, and build** check
-once the repository settings are ready for it.
+runs. Its concurrency group keys on the **head branch name**, not on `github.ref`: a commit on a
+`claude/**` branch with an open PR fires both triggers, those two events see different refs and
+different trees, and keying on the ref filed them separately so both ran and could disagree. One
+group means one verdict. The workflow's own comment carries the case-by-case reasoning and the
+residual tradeoff. Branch protection can require the **Test, type-check, and build** check once the
+repository settings are ready for it.
 
 **Not covered:** nothing runs on a schedule, so a repository with no commits for three months
 runs these checks zero times. Rot that arrives from outside the repo — a transitive dependency, a

@@ -164,10 +164,28 @@ describe("save.answer narrates the adjustment it used to swallow", () => {
 });
 
 describe("both reaction paths narrate the adjustment they used to swallow", () => {
-  /** Bite Borin so his Uncanny Dodge parks the hit's damage on a prompt. */
+  /**
+   * Bite Borin so his Uncanny Dodge parks the hit's damage on a prompt.
+   *
+   * SEEDED ATTACK DIE, and it is load-bearing. +20 vs AC 12 hits on every face except a natural 1,
+   * which the resolver calls a FUMBLE - a miss, so no damage rolls, so no reaction prompt is minted
+   * and `pendingReactions[0]` is `undefined`. That is the whole of the flake this file carried: one
+   * bite in twenty erased the far end these two tests exist to assert, and with two bites per run the
+   * file failed roughly one run in ten (captured: `TypeError: Cannot read properties of undefined
+   * (reading 'proposedDamage')` at the DECLINED test).
+   *
+   * `attackNatural` is the public contract's own door for exactly this ("apply this exact d20 face
+   * for the attack instead of rolling"), so nothing about the server moves to make the test stable -
+   * the opportunity-attack test below already pins its d20 the same way. 18 hits and is below the
+   * critical threshold (20, and no rider here widens it), so the swing lands as an ordinary hit.
+   *
+   * Only the ATTACK die is pinned. The `4d6 + 6` damage still rolls for real and every assertion
+   * downstream derives its expectation from the number that came back, so the far-end proof stays a
+   * real rolled number rather than a hard-coded one.
+   */
   async function biteBorin(base: string, gmToken: string, mapAssetId: string): Promise<void> {
     expect((await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: DRAGON }, { actorId: BORIN }] })).status).toBe(200);
-    expect((await post(base, GAME_PATHS.actionResolve, gmToken, { commandId: randomUUID(), actorId: DRAGON, actionId: "bite", targetIds: [BORIN] })).status).toBe(200);
+    expect((await post(base, GAME_PATHS.actionResolve, gmToken, { commandId: randomUUID(), actorId: DRAGON, actionId: "bite", targetIds: [BORIN], attackNatural: 18 })).status).toBe(200);
   }
 
   it("explains the halved reaction damage when the reaction is USED", async () => {
@@ -195,6 +213,9 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
     const { base, server, gmToken, mapAssetId } = await boot();
     await biteBorin(base, gmToken, mapAssetId);
     const prompt = server.store.snapshot.combat.pendingReactions[0];
+    // Same guard as the USED test above: this line is where an unseeded fumble surfaced, and a named
+    // failure beats `TypeError: Cannot read properties of undefined`.
+    expect(prompt, "the bite parked no reaction prompt").toBeDefined();
     const parked = prompt.proposedDamage;
     const before = hpOf(server, BORIN);
 
@@ -285,6 +306,34 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect(row.text).toContain("12 fire → 6, resistance");
   });
 
+  it("refuses a fat-fingered 9999 in words a GM can act on, and moves nothing", async () => {
+    // THE REFUSAL A GM READS, through the door the prompt posts through. The field is four
+    // characters wide, so 1001-9999 is typeable and `saveDamageAmend` lets it travel on purpose -
+    // swallowing it client-side would quietly apply the auto-rolled number instead. What came back
+    // until 2026-08-10 was zod's own "Number must be less than or equal to 1000": the 0..1000 bound
+    // was bare, and the sentence below lived only on an `answerSave` guard the schema had already
+    // made unreachable. The bound carries it now, which is the only place that can produce it.
+    const { base, server, gmToken, mapAssetId } = await boot([]);
+    await breatheOnBorin(base, gmToken, mapAssetId);
+    const save = server.store.snapshot.combat.pendingSaves[0];
+    const before = hpOf(server, BORIN);
+    const answer = (damageOverride: unknown) => post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride });
+
+    for (const typo of [9999, 1001, -1, 12.5, "12"]) {
+      const refused = await answer(typo);
+      expect(refused.status, `${JSON.stringify(typo)} was not refused`).toBe(400);
+      expect((await refused.json()).error.message, `${JSON.stringify(typo)} was refused in the wrong words`).toBe("Enter the damage as a whole number from 0 to 1000.");
+    }
+    // Nothing moved and the save is still owed, so the GM can simply retype the number.
+    expect(hpOf(server, BORIN)).toBe(before);
+    expect(server.store.snapshot.combat.pendingSaves.some((entry) => entry.id === save.id)).toBe(true);
+
+    // The far edge of the bound is INSIDE it - the sentence is a refusal, not a wall at 999.
+    const accepted = await answer(1000);
+    expect(accepted.status).toBe(200);
+    expect(before - hpOf(server, BORIN)).toBeGreaterThan(0);
+  });
+
   it("refuses a player amending somebody else's save", async () => {
     const { base, server, gmToken, mapAssetId } = await boot([]);
     await breatheOnBorin(base, gmToken, mapAssetId);
@@ -301,5 +350,53 @@ describe("save.answer takes a hand-entered damage total", () => {
     const allowed = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride: 3 });
     expect(allowed.status).toBe(200);
     expect(hpOf(server, BORIN)).toBe(37);
+  });
+});
+
+describe("actor.apply-damage narrates the type the GM named", () => {
+  /**
+   * D7's CLIENT HALF MADE THIS PATH REACHABLE. `damageType` had been on `ApplyDamageSchema` since
+   * `4a` and no client control sent one, so the whole branch - including the GM-only typo warning
+   * below - was HTTP-callers-only and had no test anywhere in the repo. The chooser that now sits in
+   * the three hand-entry doors is what a GM types into; these are the rows it produces.
+   */
+  const damageBorin = (base: string, token: string, body: Record<string, unknown>) =>
+    post(base, GAME_PATHS.actorDamage.replace("{actorId}", BORIN), token, { commandId: randomUUID(), actorId: BORIN, ...body });
+
+  it("halves a named type against resistance and puts the reason in the row the TABLE reads", async () => {
+    const { base, server, gmToken } = await boot();
+    const before = hpOf(server, BORIN);
+    expect((await damageBorin(base, gmToken, { amount: 10, damageType: "fire" })).status).toBe(200);
+    expect(before - hpOf(server, BORIN)).toBe(5);
+
+    const row = (await feed(base, gmToken)).find((entry) => entry.kind === "damage" && entry.text.includes("Borin"))!;
+    expect(row.text).toBe("Borin took 5 damage (10 fire → 5, resistance).");
+    // Not GM-only: a halved number the table cannot explain is the defect ADR-0020 exists to prevent.
+    const playerToken = server.auth.issuePlayerSession();
+    expect((await feed(base, playerToken)).some((entry) => entry.text.includes("10 fire → 5, resistance"))).toBe(true);
+  });
+
+  it("warns the GM about a type the SRD does not know, and tells the table nothing about it", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    const before = hpOf(server, BORIN);
+    // The vocabulary is open, so this lands in full rather than being refused - which is exactly why
+    // a typo here is silently inert and worth one line to the person who can fix it.
+    expect((await damageBorin(base, gmToken, { amount: 10, damageType: "fier" })).status).toBe(200);
+    expect(before - hpOf(server, BORIN)).toBe(10);
+
+    const warning = (await feed(base, gmToken)).find((entry) => entry.text.includes("is not one of the SRD damage types"));
+    expect(warning, "the GM was never told the type matched nothing").toBeDefined();
+    expect(warning!.text).toBe("\"fier\" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.");
+    // The GM's typo is the GM's business: the table sees the damage row and not the warning.
+    expect((await feed(base, playerToken)).some((entry) => entry.text.includes("SRD damage types"))).toBe(false);
+  });
+
+  it("stays silent for the untyped path and for a type the SRD does know", async () => {
+    const { base, gmToken } = await boot();
+    expect((await damageBorin(base, gmToken, { amount: 10 })).status).toBe(200);
+    expect((await damageBorin(base, gmToken, { amount: 3, damageType: "untyped" })).status).toBe(200);
+    expect((await damageBorin(base, gmToken, { amount: 3, damageType: "fire" })).status).toBe(200);
+    expect((await feed(base, gmToken)).some((entry) => entry.text.includes("SRD damage types"))).toBe(false);
   });
 });
