@@ -148,13 +148,20 @@ export type EquipmentRecordLike = RiderBlockLike & Readonly<{
   id: string; name: string; category?: string;
   slot?: string;
   /**
-   * The weapon block, read for its MASTERY only - the damage/range half already reaches the engine
-   * through the inventory row. Resolved from the catalog by item id rather than stored on the row,
-   * which is the same rule an item's riders follow ("Mechanics resolve by `item.id` against the
-   * content catalog, which never leaves the server"). No schema change on the wire, no migration, and
-   * a GM who re-authors a homebrew weapon's mastery sees it on the next read.
+   * The weapon block. Read for its MASTERY on the carrying item's own record (the damage/range half
+   * already reaches the engine through the inventory row - resolved by item id, the same rule an
+   * item's riders follow), and read IN FULL when the record is the BASE of a C9 bind: the server
+   * copies these stats onto a template row at set-inventory time, so the shape here is the whole
+   * stats block rather than the one key the mastery lookup used to need.
    */
-  weapon?: Readonly<{ mastery?: string }> | null;
+  weapon?: Readonly<{ category?: string; damageDice?: string; damageType?: string; rangeFeet?: number | null; longRangeFeet?: number | null; mastery?: string; properties?: readonly string[] }> | null;
+  /** The armor block, read when the record is the BASE of a C9 armor bind. */
+  armor?: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null;
+  /**
+   * C9's eligibility column: which bases a template item may bind to. `baseIds` are RESOLVED ids
+   * (predicates were expanded at build/authoring time), so the bind check is a membership test.
+   */
+  appliesTo?: Readonly<{ label: string; baseIds: readonly string[] }> | null;
   isMagic?: boolean;
   attunement?: Readonly<{ required?: boolean; restrictedTo?: readonly string[] }> | null;
   cursed?: boolean;
@@ -733,10 +740,15 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     if (!weaponAttack) continue;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
-    const mastery = catalog.equipmentRecord(entry.item.id)?.weapon?.mastery;
+    // A C9-bound template row follows its `baseId` to the BASE weapon's record: a "Weapon, +1"
+    // bound to a greatsword IS a greatsword, so it carries the greatsword's mastery, and a mastery
+    // pick spent on "greatsword" covers it (the SRD's pick is per weapon KIND, not per object).
+    const baseRecord = entry.item.baseId !== undefined ? catalog.equipmentRecord(entry.item.baseId) : undefined;
+    const mastery = catalog.equipmentRecord(entry.item.id)?.weapon?.mastery ?? baseRecord?.weapon?.mastery;
+    const unlockedHere = unlocked.has(entry.item.id) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
     // BOTH gates: the weapon has a mastery AND the bearer unlocked THIS weapon - plus the third,
     // that the engine can actually honour it (see `masteryReaches`).
-    if (mastery && unlocked.has(entry.item.id) && masteryReaches(mastery)) {
+    if (mastery && unlockedHere && masteryReaches(mastery)) {
       masteryByActionId[weaponAttack.id] = { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition) };
     }
   }
@@ -1086,8 +1098,11 @@ export function weaponAction(item: InventoryItem, definition: ActorDefinition | 
   const properties = weapon.properties ?? [];
   const modifier = weaponAbilityModifier(item, definition);
   const trained = definition.proficiencies?.weapons;
-  const granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id);
-  const proficient = granted || trained === undefined || trained.includes(weapon.category) || trained.includes(item.id);
+  // A C9-bound row also answers to its BASE weapon's id: proficiency with "warhammer" covers a
+  // Dwarven Thrower bound to one, because the bound item IS a warhammer.
+  const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
+  const granted = grantedWeapons.includes(weapon.category) || ids.some((id) => grantedWeapons.includes(id));
+  const proficient = granted || trained === undefined || trained.includes(weapon.category) || ids.some((id) => trained.includes(id));
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const damageFormula = `${weapon.damageDice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
   return {

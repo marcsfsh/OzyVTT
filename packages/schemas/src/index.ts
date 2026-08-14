@@ -412,6 +412,16 @@ export const InventoryItemSchema = z.object({
   description: z.string().max(4000).optional(),
   /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping and (with weapon/armor below) mechanical effect. Additive. */
   category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional(),
+  /**
+   * C9: WHICH base a template magic item is bound to ("dwarven-thrower" -> "warhammer"). Recorded,
+   * not merely applied, so the sheet can print "(Warhammer)", a wrong pick is auditable, and the
+   * mastery/proficiency lookups can follow it to the base. The stats themselves are COPIED onto
+   * `weapon`/`armor` by the SERVER at set-inventory time: the bind validates the pick against the
+   * catalog record's `appliesTo` and OVERWRITES any client-supplied block on a template row -
+   * what a weapon does is never trusted from a client. Additive-optional; absent on every
+   * non-template row and on a legacy template row not yet bound (which derives nothing).
+   */
+  baseId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
   weapon: ItemWeaponSchema.optional(),
   armor: ItemArmorSchema.optional(),
   /** Display-only marker so the sheet can offer Attune without the catalog; NEVER the riders. Additive-optional. */

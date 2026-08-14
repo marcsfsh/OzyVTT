@@ -112,11 +112,70 @@ function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps
   if (releasing) throw new CommandRejectedError(`${existing.name} will not come off. Ask the GM.`);
 }
 
+/**
+ * C9: BIND a template magic item to the base the player picked - server-side, because what a weapon
+ * does is a game decision. A catalog record carrying `appliesTo` is a TEMPLATE (the SRD's "Weapon
+ * (Any Simple or Martial)"): its row derives nothing until bound, and its stats come only from here.
+ *
+ *   - The pick is VALIDATED: a `baseId` outside the record's resolved list is refused naming the
+ *     printed eligibility ("Dwarven Thrower applies to Warhammer"), so a client can never bind a
+ *     hammer to a greatsword.
+ *   - The base's stats are COPIED onto the row by the server, verbatim from the catalog - any
+ *     client-supplied `weapon`/`armor` block on a template row is overwritten (bound) or stripped
+ *     (unbound), never trusted. The copy re-runs on every write, so base-weapon errata reach
+ *     already-bound rows on their next touch.
+ *   - A single-base template AUTO-BINDS (client ruling 2026-08-14: no question with one answer),
+ *     which is also what quietly repairs a legacy row on its first touch.
+ *   - An UNBOUND choice template stays a legal row (legacy saves hold them): it derives no attack
+ *     and no AC, and the sheet offers the pick. Refusing it here would break every ordinary edit
+ *     (quantity, equip) to a pre-C9 row.
+ */
+function bindTemplateItem(item: InventoryItem, deps: InventoryDeps): InventoryItem {
+  const record = deps.catalog?.equipmentRecord(item.id);
+  const appliesTo = record?.appliesTo;
+  if (!record || !appliesTo) return item;
+  const baseId = item.baseId ?? (appliesTo.baseIds.length === 1 ? appliesTo.baseIds[0] : undefined);
+  if (baseId === undefined) {
+    const { weapon: _weapon, armor: _armor, ...unbound } = item;
+    return unbound;
+  }
+  if (!appliesTo.baseIds.includes(baseId)) {
+    throw new CommandRejectedError(`${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of its printed bases.`);
+  }
+  const base = deps.catalog?.equipmentRecord(baseId);
+  const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
+  if (record.category === "weapon") {
+    const stats = base?.weapon;
+    if (!stats?.damageDice || !stats.damageType || !stats.category) {
+      throw new CommandRejectedError(`The catalog has no weapon stats for "${baseId}" - ${item.name} cannot be bound to it.`);
+    }
+    return {
+      ...bare, baseId,
+      weapon: {
+        category: stats.category === "martial" ? "martial" : "simple",
+        damageDice: stats.damageDice, damageType: stats.damageType,
+        rangeFeet: stats.rangeFeet ?? null, longRangeFeet: stats.longRangeFeet ?? null,
+        ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
+      }
+    };
+  }
+  const stats = base?.armor;
+  if (!stats) throw new CommandRejectedError(`The catalog has no armor stats for "${baseId}" - ${item.name} cannot be bound to it.`);
+  return {
+    ...bare, baseId,
+    armor: {
+      acBase: stats.acBase, addDexModifier: stats.addDexModifier, dexModifierCap: stats.dexModifierCap,
+      stealthDisadvantage: stats.stealthDisadvantage, strengthRequired: stats.strengthRequired
+    }
+  };
+}
+
 /** Upsert one inventory item by id; quantity 0 removes it. Owner-scoped by the caller. Re-derives the
  *  whole equipment contribution (AC, slot maxima) from the resulting loadout. */
 export function setInventoryItem(state: GameState, actorId: string, item: InventoryItem, resolveDefinition: (definitionId: string) => ActorDefinition | undefined, deps: InventoryDeps = {}): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  item = bindTemplateItem(item, deps);
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, deps);
   if (item.quantity <= 0) actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);

@@ -11,18 +11,18 @@ the nine homebrew body schemas accept.
 
 ## Headline counts
 
-- **163 distinct object schemas** carrying **714 declared keys**, expanded to **5078 editor-addressable questions**.
+- **164 distinct object schemas** carrying **718 declared keys**, expanded to **5081 editor-addressable questions**.
 - **2818 covered** — the editor has a control (or a composite ancestor control) for the key.
 - **106 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
-- **2154 open**, every one carried by a reasoned exemption row below.
+- **2157 open**, every one carried by a reasoned exemption row below.
 
 | type | covered | open |
 | --- | ---: | ---: |
 | background | 447 | 308 |
 | class | 465 | 319 |
-| equipment | 167 | 83 |
+| equipment | 167 | 85 |
 | feat | 404 | 336 |
-| monster | 39 | 133 |
+| monster | 39 | 134 |
 | species | 819 | 658 |
 | spell | 29 | 4 |
 | spell-list | 5 | 2 |
@@ -114,7 +114,7 @@ in both directions). `permanent:` rows are gaps no unit will close, each with wh
 | `monster.proficiencies.**` | 8 | 0 of 330 SRD monsters author it, and a control would change which rung saves resolve on (§4, B1's trap) |
 | `monster.spellcasting.**` | 20 | a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4) |
 | `monster.character.**` | 15 | a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4) |
-| `monster.startingInventory[].**` | 21 | a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4) |
+| `monster.startingInventory[].**` | 22 | a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4) |
 | `monster.startingCurrency.**` | 5 | a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4) |
 
 ### Owner: U21a
