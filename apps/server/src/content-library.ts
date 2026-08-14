@@ -494,7 +494,10 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
   // in and sorts by name), so the server just re-emits it as the transport-owned type.
   const equipmentSummaries: readonly ContentEquipmentSummary[] = equipment.map((item) => ({
     id: item.id, name: item.name, category: item.category, costGp: item.costGp, weightLb: item.weightLb, description: item.description,
-    weapon: item.weapon ?? null, armor: item.armor ?? null
+    weapon: item.weapon ?? null, armor: item.armor ?? null,
+    // C9: the eligibility column crosses to the picker so the base chooser can offer the printed
+    // list. Printed SRD text plus resolved ids - reference content, nothing GM-secret rides here.
+    appliesTo: item.appliesTo ?? null
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

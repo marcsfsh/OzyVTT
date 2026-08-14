@@ -6,7 +6,7 @@ import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
 import { DamageTypeField } from "./DamageTypeField";
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
-import { EquipmentPicker, inventoryWeaponFrom } from "./equipment";
+import { BindItemModal, EquipmentPicker, inventoryWeaponFrom, useEquipmentReference } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
@@ -260,6 +260,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
   const [newItem, setNewItem] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // C9: which unbound template row (a pre-C9 magic weapon/armor) has its chooser open, and the
+  // catalog the row detail resolves its template against. The shared fetch is session-cached.
+  const [bindingRowId, setBindingRowId] = useState<string | null>(null);
+  const { catalog: equipmentCatalog } = useEquipmentReference();
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
@@ -580,12 +584,16 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
   // and carries the catalog's category/weight/description so the sheet can group and describe it.
   const ownedCounts = new Map(inventory.map((item) => [item.id, item.quantity]));
-  const addFromCatalog = (item: ContentEquipmentSummary) => {
+  const addFromCatalog = (item: ContentEquipmentSummary, baseId?: string) => {
     const existing = inventory.find((entry) => entry.id === item.id);
     setBusy(true);
     socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: {
       id: item.id, name: item.name, quantity: (existing?.quantity ?? 0) + 1, category: item.category,
       ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
+      // C9: the pick made in the chooser, or the pick an owned template row already carries - a
+      // re-add must not unbind the stack. The SERVER validates the pick and copies the base's
+      // stats onto the row; this client only ever names the choice.
+      ...(baseId ? { baseId } : existing?.baseId ? { baseId: existing.baseId } : {}),
       ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
       ...(item.description ? { description: item.description } : {}),
       // Carry the mechanical stats so equipping has effect (v6 #5): weapon → a rollable attack; armor → AC.
@@ -780,7 +788,17 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                   requirement appears on this sheet - `ItemMagicMarkerSchema` carries neither and
                   the browse summary has no `rarity` key at all. Clamped to two lines so a
                   reference-length entry cannot push the Equip/Attune controls off a phone. */}
-              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}
+              {/* C9: a bound template names its base right in the row - "Dwarven Thrower (Warhammer)"
+                  - straight off the recorded pick (titleised slug, no catalog lookup to go stale).
+                  An UNBOUND template gets the one sheet-side chooser: pre-C9 rows predate the pick
+                  and must not lose the item, so the row keeps everything and offers the choice. */}
+              <span className="sheet-item-name">{item.name}{item.baseId ? <span className="sheet-item-cat">({item.baseId.split("-").map(titleCase).join(" ")})</span> : null}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}
+                {(() => {
+                  const summary = equipmentCatalog.find((entry) => entry.id === item.id);
+                  return !item.baseId && summary?.appliesTo && summary.appliesTo.baseIds.length > 0
+                    ? <button type="button" className="sheet-toggle-btn tap-target" disabled={busy} onClick={() => setBindingRowId(item.id)}>Choose what it is</button>
+                    : null;
+                })()}
                 {item.description ? <span className="sheet-item-desc">{item.description}</span> : null}</span>
               <Stepper className="sheet-inv-qty" value={item.quantity} min={0} disabled={busy} aria-label={`Quantity of ${item.name}`} onChange={(quantity) => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity } }, ack); }} />
               <button type="button" className={`sheet-toggle-btn${item.equipped ? " on" : ""}`} disabled={busy} aria-pressed={item.equipped} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "Equipped" : "Equip"}</button>
@@ -790,6 +808,19 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
           </div>}
           {attunedCount > 0 && <p className="sheet-attunement"><Badge tone={attunedCount > 3 ? "danger" : "neutral"}>Attunement {attunedCount}/3</Badge></p>}
           {pickerOpen && <EquipmentPicker ownedCounts={ownedCounts} busy={busy} onAdd={addFromCatalog} onClose={() => setPickerOpen(false)} />}
+          {(() => {
+            if (!bindingRowId) return null;
+            const rowItem = inventory.find((entry) => entry.id === bindingRowId);
+            const summary = equipmentCatalog.find((entry) => entry.id === bindingRowId);
+            if (!rowItem || !summary) return null;
+            // Binding a legacy row RESENDS the row it already is, plus the pick - the server
+            // validates the pick, copies the base's stats, and the attack appears on the next read.
+            return <BindItemModal template={summary} busy={busy} onClose={() => setBindingRowId(null)} onPick={(baseId) => {
+              setBusy(true);
+              socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...rowItem, baseId } }, ack);
+              setBindingRowId(null);
+            }} />;
+          })()}
           <div className="sheet-coins">
             {COINS.map((coin) => <label key={coin}>{coin}<input type="number" min="0" max="1000000" value={coins[coin]} onChange={(event) => setCoins((prev) => ({ ...prev, [coin]: Math.max(0, Math.min(1000000, Math.floor(Number(event.target.value) || 0))) }))} /></label>)}
             <Button size="sm" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-currency", { commandId: newId(), actorId: actor.id, currency: coins }, ack); }}>Save coins</Button>

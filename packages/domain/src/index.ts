@@ -764,7 +764,7 @@ export type ContentSpellsResult = { ok: boolean; message?: string; spells?: read
  * is a refusal). Declaring both optional keys here is what lets a caller SEE the difference -
  * `inventoryWeaponFrom` in `encounter/equipment.tsx` is the one projection that takes it.
  */
-export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; mastery?: string; properties?: readonly string[] }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; mastery?: string; properties?: readonly string[] }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null; appliesTo: Readonly<{ label: string; baseIds: readonly string[] }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 
 // ---------- Character-builder catalogs ----------
@@ -1156,7 +1156,11 @@ export interface ClientToServerEvents {
   "actor:spend-hit-dice": (payload: { commandId: string; actorId: string; count: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-slot": (payload: { commandId: string; actorId: string; level: number; remaining: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-prepared": (payload: { commandId: string; actorId: string; spellId: string; prepared: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "character:set-inventory": (payload: { commandId: string; actorId: string; item: { id: string; name: string; quantity?: number; equipped?: boolean; attuned?: boolean; weightEach?: number; description?: string; category?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  // The item's OPTIONAL mechanical keys (weapon/armor/baseId/magic) are declared here even though
+  // conditional spreads at the call sites would compile without them - an undeclared wire key is how
+  // a payload type quietly understates the contract. `baseId` is C9's pick; the server validates it
+  // against the catalog's eligibility and copies the base's stats itself.
+  "character:set-inventory": (payload: { commandId: string; actorId: string; item: { id: string; name: string; quantity?: number; equipped?: boolean; attuned?: boolean; weightEach?: number; description?: string; category?: string; baseId?: string; weapon?: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; properties?: readonly string[] }>; armor?: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }>; magic?: Readonly<{ isMagic?: boolean; attunementRequired?: boolean; slot?: string }> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-currency": (payload: { commandId: string; actorId: string; currency: { cp?: number; sp?: number; ep?: number; gp?: number; pp?: number }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   // `classes[].hitDie` carries the per-class hit die so an identity edit REBUILDS the multiclass
   // hit-dice pool instead of dropping it (a Fighter 3 / Wizard 2 is 3d10 + 2d6, not 5 of one size).

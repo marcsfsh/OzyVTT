@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentEquipmentSummary } from "@vtt/domain";
-import { Modal } from "@vtt/ui";
+import { Input, Modal } from "@vtt/ui";
 import { socket } from "../socket";
 import { registerContentCache } from "../content/invalidate";
 
@@ -120,20 +120,76 @@ function metaLine(item: ContentEquipmentSummary): string {
 }
 
 /**
+ * C9: the eligible-base list for a TEMPLATE magic item ("Weapon (Any Simple or Martial)"), shared by
+ * the picker's chooser step and the sheet's bind-a-legacy-row prompt so the two can never drift.
+ * Each row shows the base's own numbers - the pick is a real decision (a greatsword and a dagger are
+ * different weapons) and the player should not need a rulebook open to make it. Bases the catalog
+ * cannot resolve (a homebrew base since deleted) are omitted rather than offered: the server would
+ * refuse the bind anyway, and offering a dead option is worse than a shorter list.
+ */
+export function BaseOptionList({ template, catalog, busy, query, onPick }: Readonly<{
+  template: ContentEquipmentSummary;
+  catalog: readonly ContentEquipmentSummary[];
+  busy: boolean;
+  query: string;
+  onPick: (baseId: string) => void;
+}>) {
+  const needle = query.trim().toLowerCase();
+  const bases = (template.appliesTo?.baseIds ?? [])
+    .map((id) => catalog.find((entry) => entry.id === id))
+    .filter((base): base is ContentEquipmentSummary => base !== undefined)
+    .filter((base) => !needle || base.name.toLowerCase().includes(needle));
+  if (bases.length === 0) return <p className="sheet-picker-empty">{needle ? "No base matches that search." : "None of this item's bases are in the catalog."}</p>;
+  return <ul className="sheet-picker-list scroll-y">
+    {bases.map((base) => <li key={base.id}>
+      <div className="sheet-picker-item">
+        <span className="sheet-picker-name">{base.name}</span>
+        <span className="sheet-picker-meta">{metaLine(base)}</span>
+      </div>
+      <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Make it a ${base.name}`} onClick={() => onPick(base.id)}>Pick</button>
+    </li>)}
+  </ul>;
+}
+
+/** The sheet's one-off chooser for a pre-C9 row that predates the pick: same list, its own modal. */
+export function BindItemModal({ template, busy, onPick, onClose }: Readonly<{
+  template: ContentEquipmentSummary;
+  busy: boolean;
+  onPick: (baseId: string) => void;
+  onClose: () => void;
+}>) {
+  const { catalog } = useEquipmentReference();
+  const [query, setQuery] = useState("");
+  return <Modal open onClose={onClose} size="lg" accent="cyan" title={`${template.name} — what is it?`} ariaLabel={`Choose which ${template.category} ${template.name} is`}>
+    <p className="sheet-picker-empty">{template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is - its numbers come from that choice.</p>
+    <div className="sheet-picker-controls">
+      <Input type="search" className="sheet-picker-search" value={query} maxLength={60} placeholder="Search…" aria-label="Search bases" onChange={(event) => setQuery(event.target.value)} autoFocus />
+    </div>
+    <BaseOptionList template={template} catalog={catalog} busy={busy} query={query} onPick={onPick} />
+  </Modal>;
+}
+
+/**
  * Browse-and-add-from-catalog picker for the sheet's Inventory. Presentational: it surfaces the SRD
  * catalog (searchable, category-filtered) and calls `onAdd` with the chosen entry; the sheet owns the
  * mutation so it can increment an existing stack instead of replacing it. Owner + GM only (the sheet
  * gates it), and the Modal renders full-screen on mobile.
+ *
+ * C9: a TEMPLATE item with a real choice ("Weapon, +1 - Any Simple or Martial") inserts ONE step:
+ * the same window swaps to the eligible-base list and the add completes with the pick. A single-base
+ * template (Dwarven Thrower is always a warhammer) never asks - the server auto-binds - and a
+ * re-add of an owned template increments the stack keeping its existing pick, chooser skipped.
  */
 export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<{
   ownedCounts: ReadonlyMap<string, number>;
   busy: boolean;
-  onAdd: (item: ContentEquipmentSummary) => void;
+  onAdd: (item: ContentEquipmentSummary, baseId?: string) => void;
   onClose: () => void;
 }>) {
   const { catalog, attribution } = useEquipmentReference();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [choosing, setChoosing] = useState<ContentEquipmentSummary | null>(null);
   const active = FILTERS.find((entry) => entry.id === filter) ?? FILTERS[0];
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -143,6 +199,30 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
       return true;
     });
   }, [catalog, query, active]);
+
+  const startAdd = (item: ContentEquipmentSummary) => {
+    const owned = (ownedCounts.get(item.id) ?? 0) > 0;
+    // The chooser opens only when there is a real choice to make AND the row is new - an owned
+    // template already made its pick (rows are keyed by item id, so a second differently-based
+    // copy cannot exist anyway) and re-adding just grows the stack.
+    if (!owned && item.appliesTo && item.appliesTo.baseIds.length > 1) {
+      setQuery("");
+      setChoosing(item);
+      return;
+    }
+    onAdd(item);
+  };
+
+  if (choosing) {
+    return <Modal open onClose={onClose} size="lg" accent="cyan" title={`${choosing.name} — what is it?`} ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}>
+      <p className="sheet-picker-empty">{choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is - its dice, reach and properties come from that choice.</p>
+      <div className="sheet-picker-controls">
+        <Input type="search" className="sheet-picker-search" value={query} maxLength={60} placeholder="Search…" aria-label="Search bases" onChange={(event) => setQuery(event.target.value)} autoFocus />
+        <button type="button" className="sheet-picker-chip" onClick={() => { setQuery(""); setChoosing(null); }}>Back to the list</button>
+      </div>
+      <BaseOptionList template={choosing} catalog={catalog} busy={busy} query={query} onPick={(baseId) => { onAdd(choosing, baseId); setQuery(""); setChoosing(null); }} />
+    </Modal>;
+  }
 
   return <Modal open onClose={onClose} size="lg" accent="cyan" title="Add equipment" ariaLabel="Browse the SRD equipment catalog">
     <div className="sheet-picker-controls">
@@ -172,7 +252,7 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
                 here, `::after` was free. It matters more than it looks: this control did nothing at
                 all until the browse-and-add payload was fixed, so its touch ergonomics had never
                 once been exercised - a 27px-tall target on the phone the sheet is mostly read on. */}
-            <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => onAdd(item)}>Add</button>
+            <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => startAdd(item)}>Add</button>
           </li>;
         })}
       </ul>}

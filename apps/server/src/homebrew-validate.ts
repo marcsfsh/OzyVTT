@@ -4,7 +4,7 @@ import { type ActorDefinition } from "@vtt/schemas";
 import {
   featurePicks, HOMEBREW_BODY_SCHEMAS,
   resolveSpellLists, spellListMemberIds,
-  type BackgroundReference, type ClassReference, type ContentSpellcasting, type FeatReference,
+  type BackgroundReference, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference,
   type FeatureChoice, type FeatureModifier, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
   type SpellListReference, type SubclassReference
 } from "@vtt/content-srd-5.2.1";
@@ -164,11 +164,13 @@ export function validateForPublish(
     case "feat": featIssues(record as FeatReference, checks); break;
     case "monster": monsterIssues(record as ActorDefinition, id, checks); break;
     case "spell-list": spellListIssues(record as SpellListReference, checks); break;
-    // A spell and an equipment record name no other record. `SpellReference.classes` entries are open
-    // membership TAGS (a list that does not exist yet is not an error - it may be authored later),
-    // and `EquipmentReferenceSchema` is the one `.strict()` content schema, so a typo'd key is
-    // already a tier-1 failure rather than a silently-stripped one.
-    case "spell": case "equipment": break;
+    // A spell names no other record. `SpellReference.classes` entries are open membership TAGS (a
+    // list that does not exist yet is not an error - it may be authored later), and
+    // `EquipmentReferenceSchema` is the one `.strict()` content schema, so a typo'd key is already
+    // a tier-1 failure rather than a silently-stripped one. Since C9, an EQUIPMENT record CAN name
+    // other records - a template's `appliesTo.baseIds` - so it grew the referential arm below.
+    case "spell": break;
+    case "equipment": equipmentIssues(record as EquipmentReference, checks); break;
   }
 
   return { valid: issues.length === 0, issues };
@@ -317,6 +319,37 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
   const facts = statblockFacts(definition);
   if (facts.challengeRating === null) checks.add(["extensions"], `This creature has no challenge rating, so the bestiary would list it as CR 0. Put a numeric "challengeRating" in the "${STATBLOCK_EXTENSION}" extension bag.`);
   if (facts.creatureType === null) checks.add(["extensions"], `This creature has no creature type, so the bestiary would list it as "unknown" and type search would never find it. Put a "type" in the "${STATBLOCK_EXTENSION}" extension bag.`);
+}
+
+/**
+ * C9's referential half. A template's `appliesTo.baseIds` is exactly what the bind validates a
+ * player's pick against, so a base the catalog cannot resolve is a pick that can never succeed -
+ * the "publishes clean and is silently inert" failure this file exists to refuse by name. Checked
+ * against the MERGED catalog (bundled + published homebrew), the same view the bind reads, and
+ * against the same branch the bind takes: `category === "weapon"` copies weapon stats, anything
+ * else copies armor stats.
+ */
+function equipmentIssues(item: EquipmentReference, checks: Checks) {
+  const appliesTo = item.appliesTo;
+  if (!appliesTo) return;
+  if (item.category !== "weapon" && item.category !== "armor") {
+    checks.add(["appliesTo"], `"${item.name}" has an "applies to" list but its category is "${item.category}" - a template must be a weapon or an armor, because those are the stats a bind copies.`);
+    return;
+  }
+  if (item.category === "weapon" ? item.weapon != null : item.armor != null) {
+    checks.add(["appliesTo"], `"${item.name}" has both its own ${item.category} stats and an "applies to" list. Give it one or the other: fixed stats make it one specific ${item.category}; the list makes it a template whose stats come from the player's pick.`);
+  }
+  const summaries = checks.catalog.equipmentSummaries();
+  appliesTo.baseIds.forEach((baseId, index) => {
+    const base = summaries.find((entry) => entry.id === baseId);
+    if (!base) {
+      checks.add(["appliesTo", "baseIds", index], `"${baseId}" is not in the equipment catalog, so "${item.name}" could never be bound to it. Name a real ${item.category} id, or publish the base first.`);
+      return;
+    }
+    if (item.category === "weapon" ? !base.weapon : !base.armor) {
+      checks.add(["appliesTo", "baseIds", index], `"${baseId}" has no ${item.category} stats to copy, so "${item.name}" could never be bound to it.`);
+    }
+  });
 }
 
 function spellListIssues(list: SpellListReference, checks: Checks) {

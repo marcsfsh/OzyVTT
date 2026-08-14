@@ -56,7 +56,13 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
     // variant landed (the "+1 weapon"'s damage half, C7a's limit (A)): one new object schema carrying
     // `type`/`amount`/`when`/`scope`. All four key NAMES already exist on sibling variants with live
     // controls, so the walk grows and the open set does not.
-    expect(stats).toEqual({ objectSchemas: 163, declaredKeys: 714 });
+    //
+    // **163 → 164 / 714 → 718, same day, same batch.** C9's eligibility column: `ItemAppliesToSchema`
+    // ({label, baseIds}) plus its `appliesTo` mount on the equipment record. Both leaf addresses have
+    // controls in the editor's Magic section (the template pair), so the open set again does not move
+    // - the census's first red run on this key is what forced the controls to land in the same
+    // commit, which is the guard doing the exact job ruling 10 bought it for.
+    expect(stats).toEqual({ objectSchemas: 164, declaredKeys: 718 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,
@@ -76,7 +82,12 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
     // eleven-arrays component with no `FieldDef` anywhere, so the probe is blind to the entire block
     // and always has been (`RIDER_EXEMPT`). The test below proves that in both directions, which is
     // why no row was added here — the editor's gate control is a client unit, not this one's.
-    }).toEqual({ asked: 5078, covered: 2818, forced: 106, open: 2154 });
+    // **5078 → 5081 asked / 2818 → 2820 covered / 2154 → 2155 open, 2026-08-14 (C9).** Three new
+    // addresses: `appliesTo.label` and `appliesTo.baseIds` probe COVERED (the Magic section's
+    // template pair landed in the same commit), and the `appliesTo` container itself lands open
+    // inside an already-reasoned exemption group, as container keys with no `FieldDef` of their own
+    // do (§2.3 cause 1).
+    }).toEqual({ asked: 5081, covered: 2820, forced: 106, open: 2155 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {

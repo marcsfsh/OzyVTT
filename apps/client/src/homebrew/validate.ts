@@ -455,6 +455,16 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         casts.some((cast) => blank(cast.spellId))
           ? { text: "Choose which spell this item casts, or take the empty row off.", sectionId: "magic" }
           : null,
+        // C9's template pair is both-or-neither: a label with no bases is a choice with no options,
+        // and bases with no label is a chooser with no sentence to show. The schema requires both
+        // inside the object, so catching it here is what keeps the server's refusal from being the
+        // GM's first hint.
+        !blank(getAt(draft, "appliesTo.label")) && blank(getAt(draft, "appliesTo.baseIds"))
+          ? { text: "List the bases this item can be, or clear its “applies to” line.", sectionId: "magic", path: "appliesTo.baseIds" }
+          : null,
+        blank(getAt(draft, "appliesTo.label")) && !blank(getAt(draft, "appliesTo.baseIds"))
+          ? { text: "Give the “applies to” choice its printed wording, or clear the base list.", sectionId: "magic", path: "appliesTo.label" }
+          : null,
         // `cursed` without attunement is a curse you take off by taking the hat off —
         // and attunement is both what springs it and the boundary the hiding rule needs.
         draft.cursed === true && getAt(draft, "attunement.required") !== true

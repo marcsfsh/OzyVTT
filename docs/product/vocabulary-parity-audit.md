@@ -12,15 +12,15 @@ the nine homebrew body schemas accept.
 ## Headline counts
 
 - **164 distinct object schemas** carrying **718 declared keys**, expanded to **5081 editor-addressable questions**.
-- **2818 covered** — the editor has a control (or a composite ancestor control) for the key.
+- **2820 covered** — the editor has a control (or a composite ancestor control) for the key.
 - **106 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
-- **2157 open**, every one carried by a reasoned exemption row below.
+- **2155 open**, every one carried by a reasoned exemption row below.
 
 | type | covered | open |
 | --- | ---: | ---: |
 | background | 447 | 308 |
 | class | 465 | 319 |
-| equipment | 167 | 85 |
+| equipment | 169 | 83 |
 | feat | 404 | 336 |
 | monster | 39 | 134 |
 | species | 819 | 658 |
