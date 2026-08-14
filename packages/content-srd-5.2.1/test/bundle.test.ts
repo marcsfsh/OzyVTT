@@ -271,6 +271,24 @@ describe("SRD 5.2.1 reference bundles", () => {
     // reads as a number rather than as a diff.
     expect(weapons.flatMap((weapon) => weapon.properties!).length).toBe(70);
 
+    // THE THIRD JOINED COLUMN: the table's category band, as melee/ranged, pinned by name like the
+    // other two. It is the whole data basis for "Weapon (Any Melee Weapon)" eligibility (Defender,
+    // Flame Tongue), and it has the same failure mode: `melee` is `.optional()`, so a rebuild that
+    // dropped the band parse would validate clean and resolve those two items against nothing.
+    const meleeIds = weapons.filter((weapon) => weapon.melee === true).map((weapon) => weapon.id).sort();
+    const rangedIds = weapons.filter((weapon) => weapon.melee === false).map((weapon) => weapon.id).sort();
+    expect(meleeIds, "the 28 melee-band weapons, by name").toEqual([
+      "battleaxe", "club", "dagger", "flail", "glaive", "greataxe", "greatclub", "greatsword", "halberd",
+      "handaxe", "javelin", "lance", "light-hammer", "longsword", "mace", "maul", "morningstar", "pike",
+      "quarterstaff", "rapier", "scimitar", "shortsword", "sickle", "spear", "trident", "war-pick",
+      "warhammer", "whip"
+    ]);
+    expect(rangedIds, "the 10 ranged-band weapons, by name").toEqual([
+      "blowgun", "dart", "hand-crossbow", "heavy-crossbow", "light-crossbow", "longbow", "musket",
+      "pistol", "shortbow", "sling"
+    ]);
+    expect(meleeIds.length + rangedIds.length, "every weapon sits in exactly one band").toBe(38);
+
     // Every slug used is one the weapon-property bundle actually publishes, bare of the fixture's
     // own `-wp`/`-mastery` suffix - so a typo cannot reach a reader that matches on the bare word.
     const bare = (kind: "property" | "mastery") =>

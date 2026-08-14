@@ -107,6 +107,15 @@ export const WeaponReferenceSchema = z.object({
   name: z.string().min(1).max(80),
   source: ContentSourceSchema,
   category: z.enum(["simple", "martial"]),
+  /**
+   * The Weapons table's category BAND - the melee/ranged half of what `category` says about
+   * simple/martial. A third joined-in column (see `mastery`/`properties` below), because nothing
+   * else can answer it: a thrown Dagger has a range band and IS a melee weapon, a Dart has one and
+   * is not. Exists for the magic-item eligibility column ("Weapon (Any Melee Weapon)"), pinned for
+   * all 38 by name in `bundle.test.ts`. OPTIONAL like its two siblings: absent means "not
+   * recorded", and the pin is what keeps the SRD rows honest.
+   */
+  melee: z.boolean().optional(),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),

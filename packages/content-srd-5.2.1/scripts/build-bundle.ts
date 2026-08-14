@@ -585,19 +585,34 @@ const tableSlug = (value: string) => stripTags(value).toLowerCase().replace(/['�
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
-  const rows = new Map<string, { properties: readonly string[]; mastery: string }>();
+  const rows = new Map<string, { properties: readonly string[]; mastery: string; melee: boolean }>();
+  // The four category bands ("Simple Melee Weapons", ...) are `<th colspan="6">` rows. They used to
+  // fall out unread; now they are the MELEE column's source - the SRD prints no per-row melee flag
+  // anywhere, and the open5e fixture has none either (its `range` cannot answer it: a thrown Dagger
+  // has a range band and is a melee weapon, a Dart has one and is not). The band a row sits under is
+  // the printed truth, so a data row appearing before any band, or a band this pattern does not
+  // recognise, fails the build by name rather than guessing.
+  let band: { melee: boolean } | null = null;
   for (const [, row] of (table[1].match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
-    // The four category bands ("Simple Melee Weapons", ...) are `<th colspan="6">` rows with no
-    // `<td>` at all, so they fall out here rather than needing to be named.
+    const heading = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
+    if (heading) {
+      const label = stripTags(heading[1]);
+      const match = label.match(/^(?:Simple|Martial) (Melee|Ranged) Weapons$/);
+      if (!match) throw new Error(`Weapons table: unrecognised band heading "${label}".`);
+      band = { melee: match[1] === "Melee" };
+      continue;
+    }
     const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1]);
     if (cells.length === 0) continue;
     if (cells.length !== 6) throw new Error(`Weapons table row has ${cells.length} cells, expected 6: ${stripTags(row)}`);
+    if (band === null) throw new Error(`Weapons table: data row before any category band: ${stripTags(row)}`);
     const properties = stripTags(cells[2]);
     rows.set(tableSlug(cells[0]), {
       properties: properties === "" || properties === "—" || properties === "-"
         ? []
         : properties.split(",").map((entry) => tableSlug(entry.replace(/\(.*/, ""))).filter((entry) => entry !== ""),
-      mastery: tableSlug(cells[3])
+      mastery: tableSlug(cells[3]),
+      melee: band.melee
     });
   }
   // Both vocabularies come from the fixtures rather than a second hand-written list: the 17
@@ -628,6 +643,10 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     id,
     name: weapon.fields.name,
     category: weapon.fields.is_simple ? "simple" as const : "martial" as const,
+    // The Weapons table's category BAND, joined in like `mastery` and `properties` below. It exists
+    // for the magic-item eligibility column: "Weapon (Any Melee Weapon)" (Defender, Flame Tongue)
+    // must resolve against a real column or fail closed, and no other field can answer it.
+    melee: row.melee,
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
     // `[]` rather than an absent key when the table prints "—": a Mace really has no properties,
