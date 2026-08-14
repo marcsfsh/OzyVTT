@@ -1004,7 +1004,9 @@ export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[
  * and it is written as "every key with no row" rather than as `if (previous.when)` so that the next
  * key added to the schema is carried by construction instead of arriving as this bug wearing a
  * different name. `grant-gate-preservation.mirror.test.ts` pins the partition against
- * `FeatureGrantsSchema.shape` itself, so a twelfth key fails there rather than in a fight.
+ * `FeatureGrantsFieldsSchema.shape` itself, so a twelfth key fails there rather than in a fight.
+ * (The FIELDS schema, not `FeatureGrantsSchema`: the latter is that object plus the one cross-field
+ * refusal refusing `when` beside `spells`, which makes it a `ZodEffects` with no `.shape` to read.)
  *
  * A carried key keeps the block alive on its own: clearing every row leaves `{when}` rather than
  * `undefined`. That direction is deliberate — a gate with no lists grants nothing, while a rebuild

@@ -351,6 +351,19 @@ Format: `[area] — description — suspected cause / status`.
   prepared cap and for the caster block a non-caster gets only because of the grant), or the same
   named refusal extended to an item carrier.
 
+- **[homebrew] The grants editor preserves every top-level key but flattens `grants.spells`'
+  sub-keys.** `grantsFromRows` (`apps/client/src/homebrew/RiderEditor.tsx`) carries every key with
+  no row back untouched, which is what stops it deleting `when` — but `spells` HAS a row, so it is
+  rebuilt from that row's ids alone. Measured 2026-08-13 by adversarial review of `8bee7db`: a
+  `spells` entry authored `{id, level, ability, alwaysPrepared: false}` comes back out of an
+  unrelated row edit as `{id, alwaysPrepared: true}`, losing `level` and `ability` and flipping the
+  prepared flag. **Latent, not live**: all 41 shipped blocks that grant a spell sit on classes,
+  species and subclasses, and the editor cannot reach a class body, so no shipped record can lose
+  anything today. It becomes live the day a GM authors a species trait granting a levelled spell.
+  Distinct from the top-level partition above, which IS pinned — `grant-gate-preservation.mirror.test.ts`
+  asserts no top-level key is dropped, and none is. Wants the same treatment one level down: rebuild
+  a `spells` row from the previous entry rather than from its id.
+
 - **[content/items] The Shield of Missile Attraction is authored as a curse with no benefit, so
   attuning it does nothing except make it impossible to take off.** Measured 2026-08-12 through the
   real `ContentLibrary` over the committed
