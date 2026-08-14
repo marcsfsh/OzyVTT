@@ -16,6 +16,7 @@ import type {
 import { featurePicks, NAMED_PICK_BUDGET_KEYS } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, UNARMED_STRIKE_ACTION_ID, type CharacterFeatureRef } from "./equipment-derivation.js";
+import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -1595,7 +1596,12 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       // AC); an item the catalog does not know stays display-only (ADR-0008 fail-open) - the
       // authored option already names it, so the player still receives it.
       const record = library.equipmentRecord(item.id);
-      inventory.push({
+      // C9 (2026-08-14 review): this is a PICKLESS minting path, so a template item named in
+      // starting equipment routes through the same server-side bind the picker path gets - a
+      // single-base template auto-binds here exactly per the ruling, and a multi-base one stays
+      // unbound with the sheet's chooser as the designed pick. Without this the row arrived
+      // equipped and dead, quietly contradicting the documented auto-bind.
+      inventory.push(bindTemplateItem({
         id: item.id, name: record?.name ?? item.name, quantity: item.quantity,
         equipped: record ? record.category === "armor" || record.category === "shield" || record.category === "weapon" : false,
         attuned: false,
@@ -1609,7 +1615,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         // absent means "not recorded", which is not the same claim as an empty list.
         ...(record?.weapon ? { weapon: { category: record.weapon.category, damageDice: record.weapon.damageDice, damageType: record.weapon.damageType, rangeFeet: record.weapon.rangeFeet, longRangeFeet: record.weapon.longRangeFeet, ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {}) } } : {}),
         ...(record?.armor ? { armor: { acBase: record.armor.acBase, addDexModifier: record.armor.addDexModifier, dexModifierCap: record.armor.dexModifierCap, stealthDisadvantage: record.armor.stealthDisadvantage, strengthRequired: record.armor.strengthRequired } } : {})
-      });
+      }, { catalog: { equipmentRecord: (id) => library.equipmentRecord(id), featRecord: () => undefined } }));
     }
   };
   consumeEquipmentOption("class", classRecord.startingEquipment);

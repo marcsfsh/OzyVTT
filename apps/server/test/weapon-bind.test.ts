@@ -109,15 +109,26 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
       .toThrow(new CommandRejectedError('Dwarven Thrower applies to Warhammer - "greatsword" is not one of its printed bases.'));
   });
 
-  it("auto-binds a single-base template - no question with one answer", () => {
+  it("auto-binds a single-base template - no question with one answer - and its riders land whole", () => {
     const state = stateWith();
-    // Sun Blade is always a longsword; the row arrives with NO baseId and binds anyway.
-    setInventoryItem(state, IDS.hero, row({ id: "sun-blade", name: "Sun Blade", equipped: true, attuned: true, category: "weapon" }), resolve, { catalog: CATALOG });
+    // Dwarven Thrower is always a warhammer; the row arrives with NO baseId and binds anyway,
+    // and its authored +3/+3 lands: attack 1 (str) + 2 (prof) + 3 = 6, damage 1d8 + 1 + 3.
+    setInventoryItem(state, IDS.hero, row({ id: "dwarven-thrower", name: "Dwarven Thrower", equipped: true, attuned: true, category: "weapon" }), resolve, { catalog: CATALOG });
     const stored = state.actors[0].inventory[0];
-    expect(stored.baseId).toBe("longsword");
-    expect(stored.weapon).toMatchObject({ damageDice: "1d8", damageType: "slashing" });
-    expect(effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-sun-blade")!.damage)
-      .toEqual([{ formula: "1d8 + 1", type: "slashing" }]);
+    expect(stored.baseId).toBe("warhammer");
+    expect(stored.weapon).toMatchObject({ damageDice: "1d8", damageType: "bludgeoning" });
+    const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-dwarven-thrower")!;
+    expect(action.attack!.bonus).toBe(6);
+    expect(action.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning" }]);
+  });
+
+  it("Sun Blade and Energy Bow do NOT bind - a wrong swing may not replace an honest absence", () => {
+    // The 2026-08-14 review's finding: their print is MORE than the base (Radiant/Force conversion,
+    // +2/+1 - U20's mechanism), so the ETL withholds their appliesTo and the rows stay dead.
+    const state = stateWith();
+    setInventoryItem(state, IDS.hero, row({ id: "sun-blade", name: "Sun Blade", equipped: true, attuned: true, category: "weapon" }), resolve, { catalog: CATALOG });
+    expect(state.actors[0].inventory[0].baseId).toBeUndefined();
+    expect(effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-sun-blade")).toBeUndefined();
   });
 
   it("never trusts a client-supplied block on a template row - bound it is overwritten, unbound it is stripped", () => {
@@ -189,5 +200,67 @@ describe("the C9 bind: armor", () => {
     const state = stateWith();
     expect(() => setInventoryItem(state, IDS.hero, row({ id: "adamantine-armor", name: "Adamantine Armor", equipped: true, category: "armor", baseId: "hide-armor" }), resolve, { catalog: CATALOG }))
       .toThrow(/applies to Any Medium or Heavy, Except Hide Armor/);
+  });
+});
+
+describe("the C9 bind: the 2026-08-14 review's four write-path rules", () => {
+  it("a stale pick fails OPEN on an existing bind, and the row stays removable by anyone", () => {
+    const state = stateWith();
+    setInventoryItem(state, IDS.hero, row({ id: "sword-of-sharpness", name: "Sword of Sharpness", equipped: true, category: "weapon", baseId: "greatsword" }), resolve, { catalog: CATALOG });
+    // The base leaves the catalog (a homebrew base soft-deleted, a template narrowed).
+    const drifted: EquipmentCatalog = { equipmentRecord: (id) => id === "greatsword" ? undefined : RECORDS.find((record) => record.id === id), featRecord: () => undefined };
+    // An ordinary edit keeps the frozen copied stats rather than throwing...
+    setInventoryItem(state, IDS.hero, row({ ...state.actors[0].inventory[0], equipped: false }), resolve, { catalog: drifted, role: "player" });
+    expect(state.actors[0].inventory[0].weapon).toMatchObject({ damageDice: "2d6" });
+    expect(state.actors[0].inventory[0].baseId).toBe("greatsword");
+    // ...and the row is still REMOVABLE - the review's stuck-row reproduction, closed.
+    setInventoryItem(state, IDS.hero, row({ id: "sword-of-sharpness", name: "Sword of Sharpness", quantity: 0, category: "weapon", baseId: "greatsword" }), resolve, { catalog: drifted, role: "player" });
+    expect(state.actors[0].inventory).toHaveLength(0);
+  });
+
+  it("a non-template row STRIPS a forged baseId - proficiency and mastery cannot be self-granted", () => {
+    const definition = definitionOf({ proficiencies: { saves: [], skills: [], weapons: ["rapier"] }, character: { classes: [{ id: "fighter", name: "Fighter", level: 3 }], feats: [], choices: [{ kind: "weapon-mastery", id: "rapier" }] } });
+    const state = stateWith();
+    // A plain greatsword row arrives claiming to BE a rapier: the forged identity dies at the door.
+    setInventoryItem(state, IDS.hero, row({ id: "greatsword", name: "Greatsword", equipped: true, category: "weapon", baseId: "rapier" }), () => definition, { catalog: CATALOG, role: "player" });
+    expect(state.actors[0].inventory[0].baseId).toBeUndefined();
+    const derivation = deriveEquipment(state.actors[0], definition, CATALOG);
+    expect(derivation.masteryByActionId["item-greatsword"]).toBeUndefined();
+  });
+
+  it("a baseId-less write INHERITS the stored pick - the free-text slug collision cannot unbind", () => {
+    const state = stateWith();
+    setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", baseId: "dagger" }), resolve, { catalog: CATALOG });
+    // The free-text add mints the same slug with no baseId; the write must not unbind the row.
+    setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", quantity: 2 }), resolve, { catalog: CATALOG });
+    const stored = state.actors[0].inventory[0];
+    expect(stored.quantity).toBe(2);
+    expect(stored.baseId).toBe("dagger");
+    expect(stored.weapon).toMatchObject({ damageDice: "1d4" });
+  });
+
+  it("a player cannot swap an existing pick in place; the GM can (the audited override)", () => {
+    const state = stateWith();
+    setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", baseId: "dagger" }), resolve, { catalog: CATALOG });
+    expect(() => setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", baseId: "greatsword" }), resolve, { catalog: CATALOG, role: "player" }))
+      .toThrow(/already bound - remove it and add it again/);
+    setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", baseId: "greatsword" }), resolve, { catalog: CATALOG, role: "gm" });
+    expect(state.actors[0].inventory[0].weapon).toMatchObject({ damageDice: "2d6" });
+  });
+
+  it("authored on-hit dice DOUBLE on a critical hit - a Flame Tongue crit deals 4d6 fire, as printed", () => {
+    const state = stateWith();
+    setInventoryItem(state, IDS.hero, row({ id: "flame-tongue", name: "Flame Tongue", equipped: true, attuned: true, category: "weapon", baseId: "longsword" }), resolve, { catalog: CATALOG });
+    const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-flame-tongue")!;
+    startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+    // d20 = 20 (crit): the longsword's 1d8 doubles to 2d8 (3 + 4), and the rider's 2d6 fire doubles
+    // to 4d6 (2 + 2 + 3 + 3) - SRD 5.2.1 Critical Hits: "you also roll those dice twice".
+    const crit = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000220" }, deps([20, 3, 4, 2, 2, 3, 3]));
+    expect(crit.attack?.outcome).toBe("crit");
+    expect(crit.damage).toEqual([
+      { formula: "2d8 + 1", type: "slashing", total: 8 },
+      { formula: "4d6", type: "fire", total: 10 }
+    ]);
+    expect(crit.damageTotal).toBe(18);
   });
 });

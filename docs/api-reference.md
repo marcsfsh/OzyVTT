@@ -1163,6 +1163,7 @@ Adds, updates, or removes (quantity 0) one of a character's inventory items and 
 | `item.weightEach` | number (≥ 0) | no |  |
 | `item.description` | string | no |  |
 | `item.category` | string (pattern) | no |  |
+| `item.baseId` | string (pattern) | no | C9: the picked base for a TEMPLATE magic item - one of the catalog record's appliesTo.baseIds. Validated server-side; the base's weapon/armor stats are COPIED by the server and any client-supplied block on a template row is overwritten. Omit on non-template items (it is stripped there); a single-base template auto-binds without it; on a bound row an omitted baseId inherits the stored pick, and a non-GM write may not change one - remove and re-add instead |
 | `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet. NOT `mastery`: that is browse-only and is rejected here. |
 | `item.armor` | object | no | Armor/shield stats (from the SRD catalog); equipping derives Armor Class |
 

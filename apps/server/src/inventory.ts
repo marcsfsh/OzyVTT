@@ -129,43 +129,76 @@ function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps
  *   - An UNBOUND choice template stays a legal row (legacy saves hold them): it derives no attack
  *     and no AC, and the sheet offers the pick. Refusing it here would break every ordinary edit
  *     (quantity, equip) to a pre-C9 row.
+ *
+ * Four rules the 2026-08-14 adversarial review added, each a hole it reproduced:
+ *
+ *   - A NON-TEMPLATE row STRIPS a client-supplied `baseId` instead of storing it: the derivation
+ *     trusts `baseId` as a second identity for proficiency and weapon mastery, so a forged one on an
+ *     ordinary greatsword row would self-grant both. No legitimate payload carries it there.
+ *   - A write that OMITS `baseId` INHERITS the stored row's pick: the sheet's free-text add mints
+ *     ids by slug ("Weapon, +1" -> "weapon-1"), and without the inherit that collision silently
+ *     unbound a bound row. A never-bound row still edits unrefused and stays unbound.
+ *   - A non-GM write may not CHANGE an existing pick: changing the pick is remove-and-re-add (the
+ *     client's ruling), and an in-place swap would also hollow `enforceCurse` - re-binding a cursed
+ *     row is re-choosing what it is without ever taking it off. A GM write may (the audited
+ *     override, same as the slot and attunement caps).
+ *   - A STALE pick FAILS OPEN on an existing bind: when the recorded base no longer resolves (a
+ *     homebrew base deleted, a template narrowed), an already-bound row keeps its stored copied
+ *     stats rather than throwing - otherwise every edit AND the removal itself would refuse, and
+ *     the row would be stuck on the sheet for the GM too. A FRESH bind to an invalid base still
+ *     refuses by name.
  */
-function bindTemplateItem(item: InventoryItem, deps: InventoryDeps): InventoryItem {
+export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
   const record = deps.catalog?.equipmentRecord(item.id);
   const appliesTo = record?.appliesTo;
-  if (!record || !appliesTo) return item;
-  const baseId = item.baseId ?? (appliesTo.baseIds.length === 1 ? appliesTo.baseIds[0] : undefined);
+  if (!record || !appliesTo) {
+    if (item.baseId === undefined) return item;
+    const { baseId: _forged, ...rest } = item;
+    return rest;
+  }
+  const baseId = item.baseId ?? stored?.baseId ?? (appliesTo.baseIds.length === 1 ? appliesTo.baseIds[0] : undefined);
   if (baseId === undefined) {
     const { weapon: _weapon, armor: _armor, ...unbound } = item;
     return unbound;
   }
-  if (!appliesTo.baseIds.includes(baseId)) {
-    throw new CommandRejectedError(`${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of its printed bases.`);
+  if (deps.role !== "gm" && stored?.baseId !== undefined && baseId !== stored.baseId) {
+    throw new CommandRejectedError(`${item.name} is already bound - remove it and add it again to change what it is.`);
   }
   const base = deps.catalog?.equipmentRecord(baseId);
+  const stats = record.category === "weapon" ? base?.weapon : base?.armor;
+  const shieldBase = record.category !== "weapon" && base?.category === "shield";
+  const invalid = !appliesTo.baseIds.includes(baseId) || shieldBase
+    || (record.category === "weapon" ? !(base?.weapon?.damageDice && base.weapon.damageType && base.weapon.category) : !stats);
+  if (invalid) {
+    // The stale-pick fail-open: the row already carried this pick and the server's own copy of its
+    // stats. Keep both frozen (no errata can reach a base that is gone) and let the write through.
+    if (stored?.baseId === baseId && (stored.weapon !== undefined || stored.armor !== undefined)) {
+      const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
+      return { ...bare, baseId, ...(stored.weapon !== undefined ? { weapon: { ...stored.weapon } } : {}), ...(stored.armor !== undefined ? { armor: { ...stored.armor } } : {}) };
+    }
+    if (!appliesTo.baseIds.includes(baseId)) throw new CommandRejectedError(`${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of its printed bases.`);
+    if (shieldBase) throw new CommandRejectedError(`"${baseId}" is a shield, and a shield cannot be a template's base - its armor block carries its +2 bonus, not a body AC.`);
+    throw new CommandRejectedError(`The catalog has no ${record.category === "weapon" ? "weapon" : "armor"} stats for "${baseId}" - ${item.name} cannot be bound to it.`);
+  }
   const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
   if (record.category === "weapon") {
-    const stats = base?.weapon;
-    if (!stats?.damageDice || !stats.damageType || !stats.category) {
-      throw new CommandRejectedError(`The catalog has no weapon stats for "${baseId}" - ${item.name} cannot be bound to it.`);
-    }
+    const weaponStats = base!.weapon!;
     return {
       ...bare, baseId,
       weapon: {
-        category: stats.category === "martial" ? "martial" : "simple",
-        damageDice: stats.damageDice, damageType: stats.damageType,
-        rangeFeet: stats.rangeFeet ?? null, longRangeFeet: stats.longRangeFeet ?? null,
-        ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
+        category: weaponStats.category === "martial" ? "martial" : "simple",
+        damageDice: weaponStats.damageDice!, damageType: weaponStats.damageType!,
+        rangeFeet: weaponStats.rangeFeet ?? null, longRangeFeet: weaponStats.longRangeFeet ?? null,
+        ...(weaponStats.properties !== undefined ? { properties: [...weaponStats.properties] } : {})
       }
     };
   }
-  const stats = base?.armor;
-  if (!stats) throw new CommandRejectedError(`The catalog has no armor stats for "${baseId}" - ${item.name} cannot be bound to it.`);
+  const armorStats = base!.armor!;
   return {
     ...bare, baseId,
     armor: {
-      acBase: stats.acBase, addDexModifier: stats.addDexModifier, dexModifierCap: stats.dexModifierCap,
-      stealthDisadvantage: stats.stealthDisadvantage, strengthRequired: stats.strengthRequired
+      acBase: armorStats.acBase, addDexModifier: armorStats.addDexModifier, dexModifierCap: armorStats.dexModifierCap,
+      stealthDisadvantage: armorStats.stealthDisadvantage, strengthRequired: armorStats.strengthRequired
     }
   };
 }
@@ -175,7 +208,9 @@ function bindTemplateItem(item: InventoryItem, deps: InventoryDeps): InventoryIt
 export function setInventoryItem(state: GameState, actorId: string, item: InventoryItem, resolveDefinition: (definitionId: string) => ActorDefinition | undefined, deps: InventoryDeps = {}): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  item = bindTemplateItem(item, deps);
+  // A removal copies no stats, so it never binds: a row whose recorded base has left the catalog
+  // must still be removable, by its owner and by the GM alike (the review's stuck-row reproduction).
+  if (item.quantity > 0) item = bindTemplateItem(item, deps, actor.inventory.find((entry) => entry.id === item.id));
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, deps);
   if (item.quantity <= 0) actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);

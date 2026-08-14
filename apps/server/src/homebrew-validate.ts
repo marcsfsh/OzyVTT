@@ -330,6 +330,7 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
  * else copies armor stats.
  */
 function equipmentIssues(item: EquipmentReference, checks: Checks) {
+  damageBonusMomentIssues(item.modifiers, ["modifiers"], item.name, checks);
   const appliesTo = item.appliesTo;
   if (!appliesTo) return;
   if (item.category !== "weapon" && item.category !== "armor") {
@@ -344,6 +345,12 @@ function equipmentIssues(item: EquipmentReference, checks: Checks) {
     const base = summaries.find((entry) => entry.id === baseId);
     if (!base) {
       checks.add(["appliesTo", "baseIds", index], `"${baseId}" is not in the equipment catalog, so "${item.name}" could never be bound to it. Name a real ${item.category} id, or publish the base first.`);
+      return;
+    }
+    // The ETL's own ruling, held for homebrew too: a shield is never a bind target - its armor
+    // block carries its +2 BONUS as acBase, so binding would set the wearer's whole AC to 2.
+    if (item.category === "armor" && base.category === "shield") {
+      checks.add(["appliesTo", "baseIds", index], `"${baseId}" is a shield, and a shield cannot be a template's base - its armor block carries its +2 bonus, not a body AC. Make the magic shield its own fixed item instead.`);
       return;
     }
     if (item.category === "weapon" ? !base.weapon : !base.armor) {
@@ -430,7 +437,31 @@ function featureIssues(feature: FeatureRecord, path: Path, checks: Checks, grant
  * cannot say it (a `.superRefine` inside a `z.discriminatedUnion` is not legal in Zod 3), so it is
  * refused HERE, at publish, which is where the codebase already puts authoring errors.
  */
+/**
+ * The moments the DAMAGE pass actually collects (`action-resolution.ts`'s passes list). A
+ * `damage-bonus` gated on any other moment parses, publishes and lands NOWHERE - `on-attack-roll`
+ * is an attack-pass moment whose collection reads `attack-bonus` only. The 2026-08-14 review
+ * reproduced the silent drop; this refusal is what turns it into a named message. Scoped to
+ * `damage-bonus` (born this batch, so no stored record can be demoted by the new rule);
+ * `extra-damage`'s identical exposure predates C9 and is recorded in `known-bugs.md` instead.
+ */
+const DAMAGE_PASS_MOMENTS = new Set(["on-hit", "on-damage-roll", "on-critical-hit", "on-critical-miss"]);
+const RIDER_MOMENTS = new Set([
+  "on-attack-roll", "on-hit", "on-critical-hit", "on-critical-miss", "on-damage-roll", "on-saving-throw",
+  "on-ability-check", "on-initiative-roll", "on-death-save", "on-taking-damage", "on-spell-cast"
+]);
+function damageBonusMomentIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
+  (modifiers ?? []).forEach((modifier, index) => {
+    if (modifier.type !== "damage-bonus") return;
+    const moment = (modifier.when ?? []).map((trigger) => trigger.type).find((type) => RIDER_MOMENTS.has(type) && !DAMAGE_PASS_MOMENTS.has(type));
+    if (moment !== undefined) {
+      checks.add([...path, index], `"${label}" gates a damage-bonus on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on "on-hit", "on-damage-roll" or "on-critical-hit" instead (or drop the moment for an always-on bonus).`);
+    }
+  });
+}
+
 function riderIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
+  damageBonusMomentIssues(modifiers, path, label, checks);
   (modifiers ?? []).forEach((modifier, index) => {
     if (modifier.type !== "extra-damage") return;
     if (modifier.formula === undefined && modifier.abilityModifier === undefined) {

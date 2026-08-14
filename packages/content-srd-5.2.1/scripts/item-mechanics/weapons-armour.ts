@@ -442,9 +442,12 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * different magic arrows in one quiver would both apply.
    *
    * ABSENT (all three rows): the "and damage rolls" half. NOT limit (A) any more - a `damage-bonus`
-   * gated `on-attack-roll` + `attack-kind-is: ["ranged"]` (the exact gates the attack half carries)
-   * is expressible since 2026-08-14 and would land as a labelled bonusDamage line on ranged
-   * resolutions. It stays unauthored because that day's ruling converted the WEAPON rows only
+   * gated `on-hit` (or `on-damage-roll`) + `attack-kind-is: ["ranged"]` is expressible since
+   * 2026-08-14 and would land as a labelled bonusDamage line on ranged resolutions. NOT
+   * `on-attack-roll`, which the attack half carries: that is an attack-pass moment, and the damage
+   * pass collects only null/on-damage-roll/on-hit/on-critical-hit - a damage rider gated on it
+   * publishes clean and lands nowhere (the 2026-08-14 review reproduced it; the publish gate now
+   * refuses the pairing by name). It stays unauthored because that day's ruling converted the WEAPON rows only
    * ("made with this magic weapon"); these print "made with this piece of magic ammunition", and
    * the same bearer-ranged residue the attack half discloses would apply. Owed a ruling, not a
    * vocabulary.
@@ -543,7 +546,7 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    */
   "frost-brand": {
     grants: { damageResistances: ["fire"] },
-    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold" }]
+    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }]
   },
 
   /**
@@ -772,7 +775,7 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    *
    * ABSENT: the 40-foot Bright Light the flames shed - no light model. Unit: NONE YET. Complete.
    */
-  "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire" }] },
+  "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }] },
 
   /**
    * SWORD OF WOUNDING - "When you hit a creature with an attack using this magic weapon, the target
@@ -784,7 +787,7 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * modifier (there is no healing-block vocabulary), and the recurring end-of-turn save is its own
    * missing shape. Unit: NONE YET. Complete.
    */
-  "sword-of-wounding": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic" }] }
+  "sword-of-wounding": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }] }
 
   // ===============================================================================================
   // PROSE-ONLY RECORDS - 18 of the lane's 60 items author NO rider. Each is here with its reason,

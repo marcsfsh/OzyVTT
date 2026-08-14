@@ -2680,13 +2680,7 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
-  "appliesTo": {
-   "label": "Longbow or Shortbow",
-   "baseIds": [
-    "longbow",
-    "shortbow"
-   ]
-  },
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2929,7 +2923,7 @@
     "type": "extra-damage",
     "formula": "2d6",
     "damageType": "fire",
-    "doubleOnCritical": false,
+    "doubleOnCritical": true,
     "when": []
    }
   ]
@@ -3014,7 +3008,7 @@
     "type": "extra-damage",
     "formula": "1d6",
     "damageType": "cold",
-    "doubleOnCritical": false,
+    "doubleOnCritical": true,
     "when": []
    }
   ]
@@ -7789,12 +7783,7 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
-  "appliesTo": {
-   "label": "Longsword",
-   "baseIds": [
-    "longsword"
-   ]
-  },
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7918,7 +7907,7 @@
     "type": "extra-damage",
     "formula": "2d6",
     "damageType": "necrotic",
-    "doubleOnCritical": false,
+    "doubleOnCritical": true,
     "when": []
    }
   ]

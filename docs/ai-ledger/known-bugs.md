@@ -34,6 +34,18 @@ Format: `[area] — description — suspected cause / status`.
   a z-index argument inside it. **The 44px audit cannot see this** — `scripts/tap-audit.mjs` measures
   size, not reach, and never opens this popover.
 
+- **[homebrew/riders] An `extra-damage` rider gated on a moment the damage pass never collects
+  publishes clean and lands nowhere.** The damage pass collects `null`/`on-damage-roll`/`on-hit`/
+  `on-critical-hit`(/`on-critical-miss`) only (`apps/server/src/action-resolution.ts`, the passes
+  list), while the schema accepts any of the eleven moments - so `extra-damage` gated
+  `on-attack-roll` (or `on-saving-throw`, ...) parses, publishes and silently adds nothing, the
+  hardest homebrew failure to diagnose. Found by the 2026-08-14 C9 review, which reproduced the
+  identical drop for the new `damage-bonus` and closed THAT half with a publish refusal
+  (`homebrew-validate.ts` `damageBonusMomentIssues`). `extra-damage` is left out of the refusal
+  deliberately: it predates C9, and widening the gate could demote an already-published record on
+  its next edit - the demote-on-PATCH hazard this ledger already records. Wants the same refusal
+  behind a one-time sweep of stored records (or the F4 advisory channel, currently deferred).
+
 - **[encounter/saves] A save preview projects the PRE-defence number, so the prompt prints more than
   the commit lands against any resistant target.** `answerSave`'s preview arm returns `outcomeDamage`
   — the halved, re-typed total — and it `return`s from ABOVE the call to `applyDamageDetailed`

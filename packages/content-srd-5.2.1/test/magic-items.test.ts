@@ -356,7 +356,6 @@ describe("the eligibility column", () => {
       "dwarven-plate": "Half Plate Armor or Plate Armor",
       "dwarven-thrower": "Warhammer",
       "elven-chain": "Chain Mail or Chain Shirt",
-      "energy-bow": "Longbow or Shortbow",
       "flame-tongue": "Any Melee Weapon",
       "frost-brand": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
       "giant-slayer": "Any Simple or Martial",
@@ -374,7 +373,6 @@ describe("the eligibility column", () => {
       "plate-armor-of-etherealness": "Half Plate Armor or Plate Armor",
       "quarterstaff-of-the-acrobat": "Quarterstaff",
       "scimitar-of-speed": "Scimitar",
-      "sun-blade": "Longsword",
       "sword-of-life-stealing": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
       "sword-of-sharpness": "Glaive, Greatsword, Longsword, or Scimitar",
       "sword-of-wounding": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
@@ -415,7 +413,6 @@ describe("the eligibility column", () => {
       "Half Plate Armor or Plate Armor": ["half-plate-armor", "plate-armor"],
       "Javelin": ["javelin"],
       "Longbow or Shortbow": ["longbow", "shortbow"],
-      "Longsword": ["longsword"],
       "Mace": ["mace"],
       "Maul or Warhammer": ["maul", "warhammer"],
       "Plate Armor": ["plate-armor"],
@@ -437,7 +434,12 @@ describe("the eligibility column", () => {
   });
 
   it("is total on weapons and body armor, and absent everywhere else - the ammunition ruling included", () => {
-    expect(rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo)).toEqual([]);
+    // Two weapon rows are WITHHELD by name (2026-08-14 review): the SRD prints Sun Blade and
+    // Energy Bow as MORE than their base (Radiant/Force conversion, +2/+1 - U20's weapon-swing
+    // override), so a bare-base bind would derive a wrong swing where an honest absence stood.
+    // They stay dead rows until U20; the ETL guard pins exactly these two and no third.
+    expect(rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo).map((row) => row.id).sort())
+      .toEqual(["energy-bow", "sun-blade"]);
     expect(rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo)).toEqual([]);
     // The client ruling (2026-08-14): magic AMMUNITION is out of C9 - no ammunition model exists,
     // and binding it to a bow would invent one. SHIELDS bind to nothing because a shield IS the

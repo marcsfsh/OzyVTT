@@ -461,7 +461,19 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
  * would mean inventing that model inside a unit about something else. Needs: an ammunition model.
  * Unit: none yet.
  */
+/**
+ * Rows whose bind is WITHHELD even though the type line names a base, added by the 2026-08-14
+ * adversarial review: the SRD prints these as MORE than their base ("functions as a Longsword with
+ * the Finesse property... the blade emits Radiant damage", "+2 bonus... Force damage"), and the
+ * conversions are U20's weapon-swing override, which does not exist. A bare-base auto-bind would
+ * derive a real, rollable swing whose damage TYPE and bonus are both wrong against the print - a
+ * wrong number where an honest absence used to be, which is the exact trade C9's own ruling forbids.
+ * They return to `appliesTo: null` (the pre-C9 dead-row state, prose intact) until U20 lands.
+ */
+const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
+
 function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesTo | null {
+  if (RESERVED_UNBINDABLE.has(slug(entry.name))) return null;
   if (type.category === "Weapon" && slotId === "weapon") {
     if (!type.qualifier) return die(`${entry.name} (line ${entry.line}): a weapon row whose type line names no base weapon.`);
     return { label: type.qualifier, baseIds: [...weaponBaseIds(entry, type.qualifier)] };
@@ -545,8 +557,10 @@ if (badRarities.length > 0) die(`${badRarities.length} row(s) carry a rarity out
 // The eligibility column is TOTAL on weapons and body armor and ABSENT everywhere else - both
 // directions, like every join in this package. A weapon row without it is a template nothing can
 // bind; a wand with one would be a pick with no meaning.
-const missingAppliesTo = rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo);
+const missingAppliesTo = rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id));
 if (missingAppliesTo.length > 0) die(`${missingAppliesTo.length} weapon/armor row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`);
+const boundReserved = rows.filter((row) => RESERVED_UNBINDABLE.has(row.id) && row.appliesTo);
+if (boundReserved.length > 0) die(`${boundReserved.length} U20-reserved row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`);
 const strayAppliesTo = rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo);
 if (strayAppliesTo.length > 0) die(`${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`);
 

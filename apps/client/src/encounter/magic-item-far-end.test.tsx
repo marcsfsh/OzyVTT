@@ -203,3 +203,70 @@ describe("the C9 base chooser", () => {
     expect(added).toEqual([{ id: "dwarven-thrower" }, { id: "weapon-1" }]);
   });
 });
+
+describe("the C9 wire seam - the real sheet ships the pick", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  /** Serve the catalog AND capture every mutation emit, so the assertion is on the wire itself. */
+  function captureEmits(): Array<{ event: string; payload: Record<string, unknown> }> {
+    const emits: Array<{ event: string; payload: Record<string, unknown> }> = [];
+    (socket.emit as unknown as { mockImplementation: (fn: unknown) => void }).mockImplementation(
+      (event: string, payload: Record<string, unknown>, ack?: (result: unknown) => void) => {
+        if (event === "content:equipment") { ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." }); return; }
+        emits.push({ event, payload });
+        ack?.({ ok: true });
+      }
+    );
+    return emits;
+  }
+
+  it("addFromCatalog carries the chooser's pick as baseId, and ships NO stats - the server copies them", async () => {
+    const emits = captureEmits();
+    render(<CharacterSheet actor={ACTOR} role="player" onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+    await user.click(await screen.findByRole("button", { name: "Make it a Dagger" }));
+
+    const emit = emits.find((entry) => entry.event === "character:set-inventory");
+    expect(emit, "the pick never reached the wire").toBeTruthy();
+    expect(emit!.payload.item).toMatchObject({ id: "weapon-1", baseId: "dagger", quantity: 1 });
+    // A template's catalog summary has weapon: null, so the client ships no block; binding is the
+    // server's. A payload that carried stats here would be the client deciding what a weapon does.
+    expect((emit!.payload.item as Record<string, unknown>).weapon).toBeUndefined();
+  });
+
+  it("a re-add of a bound row keeps its stored pick on the wire, chooser skipped", async () => {
+    const emits = captureEmits();
+    const bound = {
+      id: "weapon-1", name: "Weapon, +1", quantity: 1, equipped: true, attuned: false,
+      category: "weapon", baseId: "dagger",
+      weapon: { category: "simple", damageDice: "1d4", damageType: "piercing", rangeFeet: 20, longRangeFeet: 60, properties: ["finesse", "light", "thrown"] }
+    };
+    const holding = { ...ACTOR, inventory: [bound] } as unknown as PlayerActor;
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+
+    // No chooser: the emit went straight out, quantity 2, the stored pick riding along.
+    const emit = emits.find((entry) => entry.event === "character:set-inventory");
+    expect(emit!.payload.item).toMatchObject({ id: "weapon-1", baseId: "dagger", quantity: 2 });
+  });
+
+  it("an unbound legacy row shows its base chooser, and the bind rides the row it already is", async () => {
+    const emits = captureEmits();
+    const legacy = { id: "weapon-2", name: "Weapon, +2", quantity: 1, equipped: true, attuned: false, category: "weapon" };
+    const holding = { ...ACTOR, inventory: [legacy] } as unknown as PlayerActor;
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    const user = userEvent.setup();
+    // The bound-base display is absent and the one sheet-side chooser is offered instead.
+    await user.click(await screen.findByRole("button", { name: "Choose what it is" }));
+    await user.click(await screen.findByRole("button", { name: "Make it a Warhammer" }));
+
+    const emit = emits.find((entry) => entry.event === "character:set-inventory");
+    expect(emit!.payload.item).toMatchObject({ id: "weapon-2", baseId: "warhammer", quantity: 1, equipped: true });
+  });
+});
