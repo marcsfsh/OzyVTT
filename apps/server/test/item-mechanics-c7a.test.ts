@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-import { loadMagicItems } from "@vtt/content-srd-5.2.1";
+import { loadEquipment, loadMagicItems } from "@vtt/content-srd-5.2.1";
+import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
+import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 
 /**
@@ -30,6 +33,14 @@ import { applyDamageDetailed } from "../src/hit-points.js";
  * nothing to bind to. The test was measuring its own fixture. So every inventory row below is minted
  * the way the browse-and-add picker mints one - id, name, category, equipped, attuned, and NOTHING
  * else - and `mintsTheWayThePickerDoes` below is the guard that keeps it that way.
+ *
+ * THE ONE SANCTIONED EXCEPTION, 2026-08-14: the C9 far ends mint their inventory rows the way the
+ * C9 BIND mints one - the magic item's own id/name plus the chosen BASE weapon's block copied
+ * VERBATIM from the shipped equipment catalog (`boundTo` below reads it out of `loadEquipment()`
+ * rather than writing dice by hand, minus the `mastery` column `ItemWeaponSchema` does not carry).
+ * That is not the retired far end's failure returning: the retired fixture supplied stats NO
+ * shipped surface carried, while the bind copies stats the base weapon's own shipped row carries -
+ * and the CATALOG record under test still comes only from `loadMagicItems()`.
  * ==============================================================================================
  */
 
@@ -83,6 +94,46 @@ function stateWith(inventory: InventoryItem[]): GameState {
     { id: IDS.hero, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 30, maximum: 30 }, armorClass: 12, definitionId: "def-hero", inventory },
     { id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: 12 }
   ] });
+}
+
+// -------------------------------------------------------------------------------------------------
+// C9-bind helpers (2026-08-14). See the header's sanctioned exception.
+// -------------------------------------------------------------------------------------------------
+
+const EQUIPMENT = loadEquipment();
+
+/**
+ * The inventory row the C9 bind mints: the MAGIC item's id/name/category and the two booleans, plus
+ * the chosen BASE weapon's block copied verbatim from its own shipped catalog row (the same
+ * `loadEquipment()` weapon mapping the picker reads; `mastery` stays behind because
+ * `ItemWeaponSchema` is strict and does not carry it).
+ */
+const boundTo = (magicId: string, baseId: string, over: Record<string, unknown> = {}): InventoryItem => {
+  const base = EQUIPMENT.find((record) => record.id === baseId)?.weapon;
+  if (!base) throw new Error(`C7a: no shipped equipment row "${baseId}" carries a weapon block to bind`);
+  return asPicked(magicId, {
+    weapon: {
+      category: base.category, damageDice: base.damageDice, damageType: base.damageType,
+      rangeFeet: base.rangeFeet, longRangeFeet: base.longRangeFeet,
+      ...(base.properties ? { properties: [...base.properties] } : {})
+    },
+    ...over
+  });
+};
+
+const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
+const GM_SESSION = "30000000-0000-4000-8000-00000000000a";
+function fight(state: GameState): GameState {
+  startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+  return state;
+}
+function deps(faces: number[], catalog: EquipmentCatalog, definition: ActorDefinition): ResolveDependencies {
+  let index = 0;
+  return {
+    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    newRollId: () => `40000000-0000-4000-8000-0000000000${String(index++).padStart(2, "0")}`,
+    gmSessionId: GM_SESSION, now: () => "2026-08-14T00:00:00.000Z", definition, catalog
+  };
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -159,6 +210,114 @@ describe("C7a: the armour and shield rows move a real Armor Class", () => {
 });
 
 // -------------------------------------------------------------------------------------------------
+// THE C9 FAR ENDS (2026-08-14) - the re-authored weapon rows, driven from the SHIPPED bundle on a
+// bound base-weapon block to ROLLED numbers. The catalog record is `loadMagicItems()`'s in every
+// case; only the inventory row is minted the way the bind mints one (`boundTo`, header exception).
+// -------------------------------------------------------------------------------------------------
+
+describe("C9 far end: the shipped +1 weapon record on a bound base weapon block", () => {
+  const catalog = catalogOf([shipped("weapon-1")]);
+
+  it("(a) on a greatsword: prints 2d6 + 4 at attack bonus 6, and the ROLLED total pays the +1", () => {
+    // STR 16 (+3), prof 2, martial-proficient (definitionOf): to-hit 3 + 2 + 1 = 6, damage
+    // str +3 and the flat +1 folded into ONE printed formula.
+    const definition = definitionOf();
+    const state = fight(stateWith([boundTo("weapon-1", "greatsword")]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-weapon-1")!;
+    expect(action.damage, "C7a/weapon-1: the shipped damage-bonus did not fold into the greatsword swing").toEqual([{ formula: "2d6 + 4", type: "slashing" }]);
+    expect(action.attack!.bonus).toBe(6);
+
+    // The ROLL: d20 = 10 -> 16 vs AC 12 (hit); 2d6 = 3 + 4 -> 11 damage, the +1 inside the total.
+    const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000201" }, deps([10, 3, 4], catalog, definition));
+    expect(resolution.attack).toMatchObject({ total: 16, naturalRoll: 10, targetAc: 12, outcome: "hit" });
+    expect(resolution.damage).toEqual([{ formula: "2d6 + 4", type: "slashing", total: 11 }]);
+    expect(resolution.damageTotal).toBe(11);
+  });
+
+  it("(b) on a dagger: finesse travels with the bound block - dex swings it when dex is the better", () => {
+    // COMPUTED HONESTLY, and the honest rule is `Math.max(str, dex)` (`weaponAbilityModifierFrom`,
+    // @vtt/rules-5e): under (a)'s STR 16 / DEX 14 hero a finesse dagger still swings STRENGTH, so
+    // proving the property TRAVELED needs a bearer whose dex wins. STR 10 (+0) / DEX 14 (+2),
+    // prof 2, simple-proficient: to-hit 2 + 2 + 1 = 5, damage dex +2 and the flat +1 -> "1d4 + 3".
+    // (If the properties had NOT been copied onto the bound row, str +0 would print "1d4 + 1".)
+    const definition = {
+      ...definitionOf(),
+      abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
+      proficiencies: { saves: [], skills: [], weapons: ["simple"], armor: [], tools: [] }
+    } as unknown as ActorDefinition;
+    const state = fight(stateWith([boundTo("weapon-1", "dagger")]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-weapon-1")!;
+    expect(action.damage, "C7a/weapon-1: finesse did not travel with the bound dagger block").toEqual([{ formula: "1d4 + 3", type: "piercing" }]);
+    expect(action.attack!.bonus).toBe(5);
+
+    // The ROLL: d20 = 10 -> 15 vs AC 12 (hit); 1d4 = 2 -> 5 damage.
+    const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000202" }, deps([10, 2], catalog, definition));
+    expect(resolution.damage).toEqual([{ formula: "1d4 + 3", type: "piercing", total: 5 }]);
+    expect(resolution.damageTotal).toBe(5);
+  });
+
+  it("(d) unequipped, the bound row derives no swing at all - the negative control for the +N family", () => {
+    const definition = definitionOf();
+    const state = fight(stateWith([boundTo("weapon-1", "greatsword", { equipped: false })]));
+    expect(effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-weapon-1")).toBeUndefined();
+  });
+});
+
+describe("C9 far end: the shipped on-hit dice on a bound melee block", () => {
+  it("(c) flame-tongue on a longsword: the resolution carries TWO typed entries, slashing + 2d6 fire", () => {
+    const definition = definitionOf();
+    const catalog = catalogOf([shipped("flame-tongue")]);
+    const state = fight(stateWith([boundTo("flame-tongue", "longsword")]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-flame-tongue")!;
+    // No +N on this row: str +3 + prof 2 and nothing else. The die lands at resolution, typed.
+    expect(action.attack!.bonus).toBe(5);
+
+    // d20 = 10 (hit); longsword 1d8 = 5 -> 8 slashing; rider 2d6 = 2 + 6 -> 8 fire.
+    const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000203" }, deps([10, 5, 2, 6], catalog, definition));
+    expect(resolution.damage, "C7a/flame-tongue: the shipped 2d6 fire did not land as its own typed entry").toEqual([
+      { formula: "1d8 + 3", type: "slashing", total: 8 },
+      { formula: "2d6", type: "fire", total: 8 }
+    ]);
+    expect(resolution.damageTotal).toBe(16);
+  });
+
+  it("frost-brand and sword-of-wounding land their dice the same way, each from its shipped record", () => {
+    const definition = definitionOf();
+    for (const [id, formula, faces, type, total] of [
+      ["frost-brand", "1d6", [10, 5, 4], "cold", 4],
+      ["sword-of-wounding", "2d6", [10, 5, 2, 6], "necrotic", 8]
+    ] as const) {
+      const catalog = catalogOf([shipped(id)]);
+      const state = fight(stateWith([boundTo(id, "longsword")]));
+      const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === `item-${id}`)!;
+      const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000204" }, deps([...faces], catalog, definition));
+      expect(resolution.damage, `C7a/${id}: the shipped ${formula} ${type} did not land`).toEqual([
+        { formula: "1d8 + 3", type: "slashing", total: 8 },
+        { formula, type, total }
+      ]);
+    }
+  });
+
+  it("(d) unattuned, the die and the +1 pair stay off while the swing itself remains - the attunement control", () => {
+    const definition = definitionOf();
+    // flame-tongue: the bound swing still derives (the block is the inventory row's), but the
+    // carrier is inactive, so the resolution has ONE damage entry.
+    const flameCatalog = catalogOf([shipped("flame-tongue")]);
+    const cold = fight(stateWith([boundTo("flame-tongue", "longsword", { attuned: false })]));
+    const flameAction = effectiveActions(definition, cold.actors[0], flameCatalog).find((entry) => entry.id === "item-flame-tongue")!;
+    const resolution = resolveDefinitionAction(cold, flameAction, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000205" }, deps([10, 5], flameCatalog, definition));
+    expect(resolution.damage).toEqual([{ formula: "1d8 + 3", type: "slashing", total: 8 }]);
+
+    // luck-blade (attunement-gated +N carrier): unattuned, the printed numbers are the longsword's own.
+    const luckCatalog = catalogOf([shipped("luck-blade")]);
+    const plain = fight(stateWith([boundTo("luck-blade", "longsword", { attuned: false })]));
+    const luckAction = effectiveActions(definition, plain.actors[0], luckCatalog).find((entry) => entry.id === "item-luck-blade")!;
+    expect(luckAction.attack!.bonus).toBe(5);
+    expect(luckAction.damage).toEqual([{ formula: "1d8 + 3", type: "slashing" }]);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
 // The lane's own module-level guards, against the SHIPPED bundle.
 // -------------------------------------------------------------------------------------------------
 
@@ -185,28 +344,75 @@ describe("C7a: the lane's riders are present in the shipped bundle", () => {
     expect(shipped("demon-armor").cursed).toBe(true);
   });
 
-  it("pins limit (0): NO weapon-category row carries a weapon-scoped rider, because none can fire", () => {
+  it("pins the re-authored weapon rows BY NAME AND VALUE - and every other weapon row to none", () => {
     /**
-     * THE LANE'S GOVERNING FINDING, held as a test so a later pass cannot quietly re-add the riders
-     * this salvage removed. `attack-bonus` and `extra-damage` are `THIS_ITEM_BY_DEFAULT`
-     * (`packages/rules-5e/src/riders.ts:231`) and every one of these rows carries `slot: "weapon"`, so
-     * `scopeOf` resolves them to `"this-item"` - and `weaponAction` derives no swing without a
-     * `weapon` block, so there is no `sourceItemId` for them to match. Measured: `weaponActionIds: []`
-     * and `effectiveActions: []` on a picker-minted Dwarven Thrower.
+     * INVERTED 2026-08-14. Until C9 this pin held the lane's governing finding - NO weapon row may
+     * carry a weapon-scoped rider, because with no `weapon` block none could fire. C9's bind copies
+     * the chosen base weapon's block onto the inventory row at mint time, the client ruling
+     * re-authored the printed riders, and the pin now holds the OTHER direction: exactly these rows
+     * carry exactly these riders (the C1 discipline - names and values, never a count), and a row
+     * this map does not name carries none of the five weapon-scoped families at all.
+     *
+     * Two premises of the old pin survive unchanged and stay pinned: the lane still has 33 weapon
+     * rows, and none of them carries a `weapon` block of its own - the swing is the BASE weapon's,
+     * arriving only at bind time.
      */
     const weapons = MAGIC_ITEMS.filter((row) => row.category === "weapon");
     expect(weapons).toHaveLength(33);
     expect(weapons.filter((row) => row.weapon != null), "the premise moved: a weapon row now carries a weapon block").toHaveLength(0);
-    const weaponScoped = weapons.flatMap((row) => (row.modifiers ?? [])
-      .filter((modifier) => ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"].includes(modifier.type))
-      .map((modifier) => `${row.id}/${modifier.type}`));
-    expect(weaponScoped, "a weapon-scoped rider on a row with no weapon block can never fire - record it as a named absence instead").toEqual([]);
+
+    const AUTHORED: Readonly<Record<string, readonly string[]>> = {
+      "weapon-1": ["attack-bonus +1", "damage-bonus +1"],
+      "weapon-2": ["attack-bonus +2", "damage-bonus +2"],
+      "weapon-3": ["attack-bonus +3", "damage-bonus +3"],
+      "dwarven-thrower": ["attack-bonus +3", "damage-bonus +3"],
+      "defender": ["attack-bonus +3", "damage-bonus +3"],
+      "vorpal-sword": ["attack-bonus +3", "damage-bonus +3"],
+      "holy-avenger": ["attack-bonus +3", "damage-bonus +3"],
+      "scimitar-of-speed": ["attack-bonus +2", "damage-bonus +2"],
+      "nine-lives-stealer": ["attack-bonus +2", "damage-bonus +2"],
+      "quarterstaff-of-the-acrobat": ["attack-bonus +2", "damage-bonus +2"],
+      "dagger-of-venom": ["attack-bonus +1", "damage-bonus +1"],
+      "giant-slayer": ["attack-bonus +1", "damage-bonus +1"],
+      "dragon-slayer": ["attack-bonus +1", "damage-bonus +1"],
+      "mace-of-smiting": ["attack-bonus +1", "damage-bonus +1"],
+      "hammer-of-thunderbolts": ["attack-bonus +1", "damage-bonus +1"],
+      "berserker-axe": ["attack-bonus +1", "damage-bonus +1"],
+      "luck-blade": ["attack-bonus +1", "damage-bonus +1"],
+      "flame-tongue": ["extra-damage 2d6 fire"],
+      "frost-brand": ["extra-damage 1d6 cold"],
+      "sword-of-wounding": ["extra-damage 2d6 necrotic"]
+    };
+    const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"];
+    const nameOf = (modifier: { type: string; amount?: number; formula?: string; damageType?: string }): string =>
+      modifier.type === "extra-damage"
+        ? `extra-damage ${modifier.formula} ${modifier.damageType}`
+        : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`;
+    const actual = Object.fromEntries(weapons
+      .map((row) => [row.id, (row.modifiers ?? [])
+        .filter((modifier) => WEAPON_SCOPED.includes(modifier.type))
+        .map((modifier) => nameOf(modifier as { type: string; amount?: number; formula?: string; damageType?: string }))] as const)
+      .filter(([, riders]) => riders.length > 0));
+    expect(actual, "the shipped weapon-scoped riders moved: a row this map does not name must stay empty, and a named row must carry exactly its printed values").toEqual(AUTHORED);
+
+    // Every +N pair carries NO explicit gate and NO explicit scope: `THIS_ITEM_BY_DEFAULT` is the
+    // "made with this magic weapon", and `scope: "bearer"` would stack two magic weapons in a pack.
+    for (const row of weapons) {
+      for (const modifier of row.modifiers ?? []) {
+        if (!WEAPON_SCOPED.includes(modifier.type)) continue;
+        expect((modifier as { when?: unknown[] }).when, `${row.id}/${modifier.type} must stay ungated`).toEqual([]);
+        expect((modifier as { scope?: string }).scope, `${row.id}/${modifier.type} must not set an explicit scope`).toBeUndefined();
+      }
+    }
   });
 
   it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
-    // U20 (Sun Blade, Energy Bow), U23 (Vicious Weapon), U29 (Spellguard Shield), and the two the
-    // schema refuses outright (Berserker Axe, Thunderous Greatclub).
-    for (const id of ["sun-blade", "energy-bow", "vicious-weapon", "spellguard-shield", "berserker-axe", "thunderous-greatclub"]) {
+    // U20 (Sun Blade, Energy Bow), U23 (Vicious Weapon), U29 (Spellguard Shield), and the
+    // schema-refusal group's remaining undisturbed carrier (Thunderous Greatclub). `berserker-axe`
+    // left this list 2026-08-14: the client ruling named it among the +N carriers, so its printed
+    // pair is authored and pinned by name and value above - the hit-points-per-level refusal itself
+    // is unchanged and still recorded at its entry.
+    for (const id of ["sun-blade", "energy-bow", "vicious-weapon", "spellguard-shield", "thunderous-greatclub"]) {
       const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
       expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
       expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);
@@ -236,19 +442,21 @@ describe("C7a: the lane's riders are present in the shipped bundle", () => {
   });
 
   it("holds the module's own counts, so the header cannot drift from the bundle", () => {
-    // `weapons-armour.ts` states "24 of 60 carry a rider - 11 armour, 6 shields, 3 ammunition, 4
-    // weapons" and "36 of 60 are prose-only". A row moving between those groups without the header
-    // moving with it is exactly the "we skipped it / we decided it" confusion this lane exists to end.
+    // `weapons-armour.ts` states "42 of 60 carry a rider - 11 armour, 6 shields, 3 ammunition, 22
+    // weapons" and "18 of 60 are prose-only" (24/36 with 4 weapons until 2026-08-14, when the C9
+    // bind and the closed limit (A) re-authored 18 weapon rows). A row moving between those groups
+    // without the header moving with it is exactly the "we skipped it / we decided it" confusion
+    // this lane exists to end.
     const carriesRider = (row: (typeof laneRows)[number]) =>
       (row.modifiers?.length ?? 0) > 0 || (row.casts?.length ?? 0) > 0 || row.cursed === true
       || (row.grants !== undefined && Object.values(row.grants).some((value) => Array.isArray(value) && value.length > 0));
 
     expect(laneRows, "the lane's category footprint moved").toHaveLength(60);
     const authored = laneRows.filter(carriesRider);
-    expect(authored, "the module header says 24 of 60").toHaveLength(24);
-    expect(laneRows.length - authored.length, "the module header says 36 prose-only").toBe(36);
+    expect(authored, "the module header says 42 of 60").toHaveLength(42);
+    expect(laneRows.length - authored.length, "the module header says 18 prose-only").toBe(18);
     const byCategory = Object.fromEntries(LANE_CATEGORIES.map((category) =>
       [category, authored.filter((row) => row.category === category).length]));
-    expect(byCategory).toEqual({ armor: 11, shield: 6, ammunition: 3, weapon: 4 });
+    expect(byCategory).toEqual({ armor: 11, shield: 6, ammunition: 3, weapon: 22 });
   });
 });

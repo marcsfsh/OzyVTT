@@ -16,21 +16,25 @@
  *
  * Everything else is a NAMED ABSENCE - a comment beside the item naming the SRD sentence, the
  * vocabulary it would need, and the unit that unblocks it. `apps/server/test/item-riders.test.ts`
- * (13 criteria) and `apps/server/test/homebrew-inert-fields.test.ts` are the authoritative list of
- * readers, and every rider below cites the one that fires it.
+ * (criteria 1-13 and 16) and `apps/server/test/homebrew-inert-fields.test.ts` are the authoritative
+ * list of readers, and every rider below cites the one that fires it.
  *
  * ==============================================================================================
- * (0) THE LANE'S GOVERNING FINDING: **A MAGIC WEAPON'S OWN BONUS HAS NOTHING TO ATTACH TO.**
+ * (0) THE LANE'S GOVERNING FINDING - **CLOSED 2026-08-14 by C9, the weapon-template mechanism.**
+ * The finding was: a magic weapon's own bonus has nothing to attach to.
  * ==============================================================================================
  *
  * A magic weapon in the SRD carries NO stats of its own - the printed type line names which BASE
  * weapon it applies to ("Weapon (Warhammer)", "Weapon (Longbow or Shortbow)", "Weapon (Any)") - and
- * the bundle reflects that faithfully. **MEASURED over the committed 268 rows: 0 of the 33
- * `weapon`-category rows carry a `weapon` block, and 0 of the 14 `armor`-category rows carry an
- * `armor` block.** So there is no damage die, no range, no properties, and no derived swing.
+ * the bundle reflects that faithfully: 0 of the 33 `weapon`-category rows carry a `weapon` block,
+ * and 0 of the 14 `armor`-category rows carry an `armor` block. That is STILL TRUE and deliberate.
+ * What changed is that the row now carries the printed base qualifier AS DATA - `appliesTo:
+ * {label, baseIds}` on every weapon and armor row (C9 phase 3), resolved against
+ * `bundles/weapons.v1.json`'s `melee`/`category` columns and fail-closed - and the BIND mints the
+ * magic item's inventory row with the chosen base weapon's `weapon` block copied verbatim from the
+ * catalog. So the swing derives, and a `this-item`-scoped rider has something to bind to.
  *
- * That is fatal to exactly two rider families, and the mechanism is worth stating precisely because
- * it is not obvious from the vocabulary:
+ * The mechanism, still worth stating precisely because it is what the bind plugs into:
  *
  *   - `attack-bonus`, `extra-damage`, `critical-range`, `critical-bonus-dice` and `damage-bonus` are
  *     `THIS_ITEM_BY_DEFAULT` (`packages/rules-5e/src/riders.ts:231`), and `scopeOf` (`:232-235`)
@@ -40,42 +44,32 @@
  *     `slot: "weapon"` - so they ARE weapon carriers, scope and all.
  *   - `collectRiders` then requires `context.sourceItemId === carrier.sourceItemId`
  *     (`riders.ts:259`): the rider applies only to an attack made WITH that item.
- *   - And there is no such attack. `weaponAction` returns `null` when `item.weapon` is undefined
- *     (`equipment-derivation.ts:996`), and the picker mints the inventory row from the catalog
- *     summary's `weapon` block (`apps/client/src/encounter/equipment.tsx:66`), which is null here.
+ *   - `weaponAction` derives that attack from the INVENTORY row's `weapon` block
+ *     (`equipment-derivation.ts`), which is exactly the block the bind copies in. Before the bind,
+ *     the picker minted the row with no block, `weaponAction` returned null, and a MEASURED
+ *     picker-minted `Dwarven Thrower` derived `weaponActionIds: []`, `effectiveActions: []` - the
+ *     carrier existed with nothing to modify, which is why this lane's first pass was salvaged.
  *
- * **MEASURED end to end on a picker-minted `Dwarven Thrower` (equipped, attuned, no weapon block,
- * exactly as the shipped data yields): `derivation.carriers` 1, `weaponActionIds` `[]`,
- * `effectiveActions` `[]`.** The carrier exists and there is nothing for it to modify. An authored
- * `+3` on that row is not a small overstatement - it is a number that never appears anywhere.
+ * **THE RE-AUTHORING (2026-08-14, client ruling):** with the bind supplying the swing, the rows the
+ * old limit (0) emptied are authored again below - every "+N bonus to attack rolls and damage rolls
+ * made with this magic weapon" as an `attack-bonus` + `damage-bonus` pair (limit (A) closed the same
+ * day, see below), and the unconditional on-hit dice as `extra-damage`. Their residual absences
+ * (granted properties, creature-type gates, stateful powers) stay per-row, each with its own reason.
+ * Proven end to end out of the SHIPPED bundle in `apps/server/test/item-mechanics-c7a.test.ts`: the
+ * shipped `weapon-1` record on a bound greatsword block prints "2d6 + 4" at attack bonus 6 and the
+ * resolution ROLLS it.
  *
- * **THE RULING: a magic weapon becomes real by the PLAYER PICKING THE BASE WEAPON IT APPLIES TO.**
- * That is an item-applies-to-item mechanism (the chosen base weapon's block becomes the magic row's
- * swing, once, with the magic row's riders scoped to it) and it does not exist. It is a UNIT, not
- * content work. **Unit: C9, the weapon-template mechanism** (`docs/product/plan-content-program.md`
- * §5 and its unit table; added 2026-08-11 by the ruling that forced this salvage, and scheduled
- * AFTER C8 rather than in batch 3).
- *
- * **EVERY `limit (0)` ABSENCE BELOW IS C9's**, and that is the mapping to read this file by: the 19
- * entries emptied by limit (0) are exactly the ones waiting on the base weapon a player has not yet
- * been able to pick. They are not listed as C9 one by one, because the limit IS the citation and
- * restating it 19 times would rot 19 places instead of one. An absence citing "NONE YET" that does
- * NOT name limit (0) means what it says: no unit owns it, and none is planned.
- *
- * (This paragraph was written by the salvage as "Unit: NONE YET"; C9 did not exist until the same
- * afternoon's decision commit. Corrected in place, because a named absence whose "what unblocks it"
- * quarter points at nothing is the half of the contract that makes it a decision rather than a skip.)
- *
- * **DO NOT "FIX" THIS WITH `scope: "bearer"`.** It parses, and it is wrong in a way a table would
- * feel: it would raise every attack the bearer makes with any weapon, and two magic weapons in a
- * pack would stack. A wrong number is worse than an absent one.
+ * **`scope: "bearer"` IS STILL WRONG.** It parses, and a table would feel it: it would raise every
+ * attack the bearer makes with any weapon, and two magic weapons in a pack would stack. The pairs
+ * below carry NO explicit scope - `THIS_ITEM_BY_DEFAULT` resolves them to `"this-item"` on these
+ * weapon-slot carriers, which is the printed "made with this magic weapon".
  *
  * ----------------------------------------------------------------------------------------------
- * (0b) WHAT SURVIVES ON A WEAPON ROW ANYWAY, and this is a MEASURED CORRECTION to the reasoning
- * above rather than an exception to it. The ruling is about the two WEAPON-SCOPED families. A
- * weapon-slot item is still an ordinary rider carrier, and four of these rows print something that
- * is not a swing at all - a saving throw, an initiative roll, a spell, a resistance. Each was driven
- * on a picker-minted row with NO weapon block, against a control run with the rider removed:
+ * (0b) WHAT SURVIVED ON A WEAPON ROW EVEN BEFORE THE BIND, kept as the measured record of why four
+ * rows were authored while limit (0) stood. A weapon-slot item is an ordinary rider carrier for
+ * anything that is NOT weapon-scoped, and four of these rows print something that is not a swing at
+ * all - a saving throw, an initiative roll, a spell, a resistance. Each was driven on a
+ * picker-minted row with NO weapon block, against a control run with the rider removed:
  *
  *   `weapon-of-warning`        roll-mode/initiative     score **17** with, **3** without
  *   `luck-blade`               save-bonus               `derivation.saveBonus` **1**, `saveTotalFor(dex)` **3** vs **2**
@@ -83,27 +77,33 @@
  *   `frost-brand`              grants.damageResistances 12 fire -> **6**, `adjustmentSource: "Frost Brand"`
  *
  * None of the four is in `THIS_ITEM_BY_DEFAULT`, so none is `this-item`-scoped and none needs a
- * weapon block. They are authored; their weapon-scoped halves are absences beside them. **17 of the
- * 21 weapon rows an earlier draft of this lane authored change nothing at a table; these 4 do.**
+ * weapon block. Since 2026-08-14 their weapon-scoped halves are authored beside them (`luck-blade`'s
+ * +1 pair, `frost-brand`'s 1d6 cold) rather than recorded as absences.
  *
  * ----------------------------------------------------------------------------------------------
  * FOUR MORE VOCABULARY LIMITS MEASURED WHILE AUTHORING THIS LANE. Each is why a whole family of
  * printed sentences below is an absence, so they are stated once here instead of thirteen times:
  * ----------------------------------------------------------------------------------------------
  *
- *   (A) A FLAT "+N TO DAMAGE ROLLS" IS NOT EXPRESSIBLE. There is no `damage-bonus` in
- *       `FeatureModifierSchema`; the only damage rider is `extra-damage`, whose `formula` is
- *       `DiceFormulaSchema` and therefore requires a die term - MEASURED: `{formula: "1"}` and
- *       `{formula: "1d1"}` are both refused with *"Use a safe dice formula such as 1d8 + 3."*, while
- *       `1d4` and `2d6` parse. Its other channel, `abilityModifier`, resolves against the BEARER and
- *       cannot say "1". The effect-side `damage-bonus` IS a flat integer but is an `EffectModifier`
- *       read only from `attacker.effects`, and an ITEM effect carrying one is dropped at
- *       `equipment-derivation.ts:736` (`case "damage-bonus": return []`) under a comment saying so.
- *       **On this lane it is now MOOT for weapons** - limit (0) removes the attack half too, so a
- *       "+N to attack rolls and damage rolls" item is absent whole rather than half-authored. It is
- *       kept on the record because it is the reason a flat crit rider (Mace of Smiting's 7, Sword of
- *       Sharpness's 14, Sword of Life Stealing's 15) would still be unsayable after limit (0) is
- *       lifted. **Needs: a flat `damage-bonus` in the FeatureModifier vocabulary. Unit: NONE YET.**
+ *   (A) A FLAT "+N TO DAMAGE ROLLS" IS NOT EXPRESSIBLE - **CLOSED 2026-08-14.**
+ *       `FeatureModifierSchema` carries the 22nd variant `{type: "damage-bonus", amount: -10..10,
+ *       when?, scope?}` (`src/character-content.ts`), deliberately NOT the effect-side
+ *       `damage-bonus` (that older `EffectModifier` branch has no rider gate and its item reading is
+ *       still dropped at `equipment-derivation.ts` under a comment saying so). Standing, it folds
+ *       into the FIRST damage part's printed formula (`effective-actions.ts` `withStandingRiders`:
+ *       "2d6 + 3" becomes "2d6 + 4"), so the sheet, the roll and the resolver read one number -
+ *       exactly as `attack-bonus` folds into the to-hit; moment-gated, it lands as its own labelled
+ *       `bonusDamage` line at resolution (`action-resolution.ts`). Proven by criterion 16
+ *       (`apps/server/test/item-riders.test.ts`), whose third case is the crit-only flat 7 this
+ *       limit used to name as unsayable.
+ *
+ *       **WHAT THE CLOSURE DID NOT UNBLOCK, so the numbers do not inherit a closed limit:** the
+ *       variant's amount is bounded to +/-10, so Sword of Sharpness's flat 14, Sword of Life
+ *       Stealing's 15 and Vorpal Sword's 30 are STILL out of range - each names that at its own
+ *       entry. Mace of Smiting's crit-only 7 IS in range and expressible today; it stays unauthored
+ *       because the 2026-08-14 ruling converted only the "+N to attack rolls and damage rolls"
+ *       family and the three unconditional on-hit dice - named at its entry as owed a ruling, not a
+ *       vocabulary.
  *
  *   (B) `versus-creature-type` IS AUTHORABLE BUT INERT. `RiderTriggerSchema` says so itself
  *       (*"Authorable but INERT until `ActorDefinition` carries a creature type"*) and it
@@ -149,16 +149,20 @@
  * WHAT THIS LANE PRODUCED, as an output rather than a target (the plan asks each lane to report its
  * own count beside its absences, and explicitly does not set one):
  *
- *   24 of 60 items carry at least one authored rider - 11 armour, 6 shields, 3 ammunition, 4 weapons.
- *   36 of 60 are prose-only records. Every one is named below with its reason.
+ *   42 of 60 items carry at least one authored rider - 11 armour, 6 shields, 3 ammunition,
+ *   22 weapons (was 24/60 with 4 weapons until 2026-08-14, when C9's bind and the closed limit (A)
+ *   re-authored the 18 weapon rows the old limit (0) had emptied).
+ *   18 of 60 are prose-only records. Every one is named below with its reason.
  *
- * The 36 split: 19 emptied by limit (0), 4 RESERVED for a later unit (U20 x2, U23, U29), 2 whose
- * central mechanic the schema REFUSES outright, and 11 whose mechanic this vocabulary cannot say at
- * all. (Every count in this file is machine-checked against the bundle by
- * `apps/server/test/item-mechanics-c7a.test.ts`, which fails if a row moves between groups without
- * this header moving with it.) Three items authored above ALSO carry a per-item absence
- * (`demon-armor`'s language,
- * `luck-blade`'s and `frost-brand`'s weapon halves), stated at the entry rather than here.
+ * The 18 split: 2 still prose-only after the C9 bind (`javelin-of-lightning`,
+ * `mace-of-disruption` - their mechanics were never the +N pair), 4 RESERVED for a later unit
+ * (U20 x2, U23, U29), 1 whose central mechanic the schema REFUSES outright
+ * (`thunderous-greatclub`; `berserker-axe` left this group when the ruling authored its printed +1
+ * pair), and 11 whose mechanic this vocabulary cannot say at all. (Every count in this file is
+ * machine-checked against the bundle by `apps/server/test/item-mechanics-c7a.test.ts`, which fails
+ * if a row moves between groups without this header moving with it.) Most authored weapon rows ALSO
+ * carry per-item residual absences (granted properties, creature-type dice, stateful powers),
+ * stated at the entry rather than here.
  * ----------------------------------------------------------------------------------------------
  *
  * ONE GM CHOICE THIS FILE MAKES AND STATES, because the SRD prints a table rather than a value:
@@ -266,8 +270,10 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * ABSENT: "the armor's clawed gauntlets allow your Unarmed Strikes to deal 1d8 Slashing damage
    * instead of the usual Bludgeoning" - a weapon-swing damage-type override, which is exactly
    * **U20**'s new rider variant. ABSENT: "+1 bonus to the attack and damage rolls of your Unarmed
-   * Strikes" - the attack half belongs with the swing override it modifies, and the damage half is
-   * limit (A); left whole for U20. ABSENT: "Disadvantage on attack rolls against demons" - limit (B),
+   * Strikes" - the attack half belongs with the swing override it modifies, and the damage half -
+   * a flat `damage-bonus` is in the vocabulary since 2026-08-14 - has no unarmed-strike gate to
+   * scope it (on an ARMOR carrier it is bearer-scoped and would raise every attack the wearer
+   * makes); left whole for U20. ABSENT: "Disadvantage on attack rolls against demons" - limit (B),
    * `versus-creature-type` is inert. ABSENT: the curse's own text - "Once you don this cursed armor,
    * you can't doff it unless you are targeted by a `Remove Curse` spell or similar magic" - which the
    * `cursed: true` flag models only in part: the flag refuses a PLAYER's removal and lets the GM lift
@@ -435,7 +441,13 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * ones using THIS ammunition - there is no "attack made with this ammunition" trigger, and two
    * different magic arrows in one quiver would both apply.
    *
-   * ABSENT (all three rows): the "and damage rolls" half - limit (A). Unit: NONE YET.
+   * ABSENT (all three rows): the "and damage rolls" half. NOT limit (A) any more - a `damage-bonus`
+   * gated `on-attack-roll` + `attack-kind-is: ["ranged"]` (the exact gates the attack half carries)
+   * is expressible since 2026-08-14 and would land as a labelled bonusDamage line on ranged
+   * resolutions. It stays unauthored because that day's ruling converted the WEAPON rows only
+   * ("made with this magic weapon"); these print "made with this piece of magic ammunition", and
+   * the same bearer-ranged residue the attack half discloses would apply. Owed a ruling, not a
+   * vocabulary.
    * The rows print nothing else. These absence lists are complete.
    */
   "ammunition-1": {
@@ -450,8 +462,10 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
 
   // =============================================================================================
   // THE FOUR WEAPON ROWS THAT PRINT SOMETHING THAT IS NOT A SWING.
-  // Each authors only its bearer-scoped half; each carries its weapon half as an absence citing
-  // limit (0). See (0b) above for the measurement that separates these four from the other 29.
+  // Each was authored for its bearer-scoped half while limit (0) stood - see (0b) above for the
+  // measurement. Since 2026-08-14 `luck-blade` and `frost-brand` carry their weapon-scoped halves
+  // too; `weapon-of-warning` and `trident-of-fish-command` print no +N and no on-hit die, so the
+  // bind changes nothing on them.
   // =============================================================================================
 
   /**
@@ -475,7 +489,8 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
   /**
-   * LUCK BLADE - "While the weapon is on your person, you also gain a +1 bonus to saving throws."
+   * LUCK BLADE - "You gain a +1 bonus to attack rolls and damage rolls made with this magic weapon.
+   * While the weapon is on your person, you also gain a +1 bonus to saving throws."
    *
    * The save bonus is authored: reader is criterion 12, which proves `save-bonus` sums into the total
    * the server actually rolls for a save. `save-bonus` is not `THIS_ITEM_BY_DEFAULT`, so it is a
@@ -483,30 +498,42 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * `saveTotalFor(dex)` **3** against a control of **2**. "On your person" is read as equipped, which
    * is what makes the item active at all.
    *
-   * ABSENT: "You gain a +1 bonus to attack rolls and damage rolls made with this magic weapon" -
-   * limit (0) for the attack half (no base weapon to attach to) and limit (A) for the damage half.
-   * Unit: C9, the weapon-template mechanism. ABSENT: "Luck" - a once-per-dawn reroll of a
+   * The +1 pair is authored beside it since 2026-08-14 (client ruling; limit (0) closed by C9's
+   * bind, limit (A) closed by the `damage-bonus` variant, criterion 16). Weapon-scoped by default -
+   * no explicit scope, see the header.
+   *
+   * ABSENT: "Luck" - a once-per-dawn reroll of a
    * failed D20 Test; rerolls are not a rider family (`roll-mode` is advantage/disadvantage, which
    * rolls two dice up front rather than re-rolling one after the fact). ABSENT: "Wish" - `casts`
-   * could name the spell, but the pool is `1d4 - 1` charges and `FeatureUsesSchema.limit` is a fixed
-   * integer with no way to say a rolled quantity. Unit: NONE YET for both.
+   * could name the spell, but the pool is rolled (`1d3` charges) and `FeatureUsesSchema.limit` is a
+   * fixed integer with no way to say a rolled quantity. Unit: NONE YET for both.
    *
    * The row prints nothing else. This absence list is complete.
    */
-  "luck-blade": { modifiers: [{ type: "save-bonus", amount: 1 }] },
+  "luck-blade": {
+    modifiers: [
+      { type: "save-bonus", amount: 1 },
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   /**
-   * FROST BRAND - "while you hold the weapon, you have Resistance to Fire damage."
+   * FROST BRAND - "When you hit with an attack roll using this magic weapon, the target takes an
+   * extra 1d6 Cold damage. In addition, while you hold the weapon, you have Resistance to Fire
+   * damage."
    *
-   * Reader: `homebrew-inert-fields.test.ts` row 2, the same `grants.damageResistances` path the
-   * armour uses - `takeGrants` collects it off any active item regardless of slot, so no weapon block
-   * is involved. MEASURED on the picker-minted row: **12 fire -> 6**, `adjustmentSource:
-   * "Frost Brand"`.
+   * Resistance reader: `homebrew-inert-fields.test.ts` row 2, the same `grants.damageResistances`
+   * path the armour uses - `takeGrants` collects it off any active item regardless of slot, so no
+   * weapon block is involved. MEASURED on the picker-minted row: **12 fire -> 6**,
+   * `adjustmentSource: "Frost Brand"`.
    *
-   * ABSENT: "When you hit with an attack roll using this magic weapon, the target takes an extra 1d6
-   * Cold damage" - limit (0). `extra-damage` is `THIS_ITEM_BY_DEFAULT`, so it scopes to an attack
-   * made WITH this item, and there is no such attack until the base weapon can be chosen.
-   * Unit: C9, the weapon-template mechanism. ABSENT: "In freezing temperatures, the weapon
+   * The 1d6 Cold is authored since 2026-08-14: the printed sentence is UNCONDITIONAL on a hit (no
+   * command word, no state - re-read above), so it is a plain `extra-damage` the moment C9's bind
+   * gives the row a swing to scope to. Reader: criterion 1, the extra typed damage entry on the
+   * damage command.
+   *
+   * ABSENT: "In freezing temperatures, the weapon
    * sheds Bright Light in a 10-foot radius" - no environment/light model. ABSENT: the once-per-hour
    * extinguishing of nonmagical flames - no ambient-fire model, and `per` offers only the two rests
    * (measured: `z.enum(["short-rest", "long-rest"])`), so "1 hour" has no home either.
@@ -514,7 +541,10 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    *
    * The row prints nothing else. This absence list is complete.
    */
-  "frost-brand": { grants: { damageResistances: ["fire"] } },
+  "frost-brand": {
+    grants: { damageResistances: ["fire"] },
+    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold" }]
+  },
 
   /**
    * TRIDENT OF FISH COMMAND - "This magic weapon has 3 charges ... you can expend 1 charge to cast
@@ -534,165 +564,274 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * family; the description carries it and the GM reads it.
    *
    * The row prints nothing else - it is one of the few magic weapons in the SRD with no +N at all,
-   * which is why limit (0) costs it nothing. This absence list is complete.
+   * so neither the old limit (0) nor the 2026-08-14 re-authoring touches it. This absence list is
+   * complete.
    */
   "trident-of-fish-command": {
     casts: [{ spellId: "dominate-beast", saveDc: 15, uses: { limit: 3, per: "long-rest" } }]
-  }
+  },
+
+  // =============================================================================================
+  // THE +N WEAPON ROWS AND THE UNCONDITIONAL ON-HIT DICE - RE-AUTHORED 2026-08-14 (client ruling).
+  //
+  // C9's bind supplies the swing (header (0)); the closed limit (A) supplies the damage half
+  // (`damage-bonus`, criterion 16). Every "+N bonus to attack rolls and damage rolls made with
+  // this magic weapon" below is the pair `attack-bonus` + `damage-bonus`, both amount N, both
+  // WITHOUT an explicit scope: `THIS_ITEM_BY_DEFAULT` resolves them to `"this-item"` on a
+  // weapon-slot carrier, which is the printed "made with this magic weapon" - and `scope: "bearer"`
+  // would stack two magic weapons in a pack (header (0), still wrong). Residual absences stay
+  // per-row below. Far ends: `apps/server/test/item-mechanics-c7a.test.ts` drives the SHIPPED
+  // `weapon-1` and `flame-tongue` records on bound base-weapon blocks to rolled totals.
+  // =============================================================================================
+
+  /**
+   * WEAPON, +1 / +2 / +3 - "You have a bonus to attack rolls and damage rolls made with this magic
+   * weapon. The bonus is determined by the weapon's rarity." (Uncommon +1, Rare +2, Very Rare +3 -
+   * the ladder expands to one row per tier, so each row's N is fixed.)
+   *
+   * The rows print nothing else. These absence lists are complete.
+   */
+  "weapon-1": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "weapon-2": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+  "weapon-3": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+
+  /**
+   * DWARVEN THROWER - "You gain a +3 bonus to attack rolls and damage rolls made with this magic
+   * weapon." Authored; this row is the item the salvage's retired far end faked, now real.
+   *
+   * ABSENT: "It has the Thrown property with a normal range of 20 feet and a long range of 60 feet"
+   * - the bind copies the BASE Warhammer's block VERBATIM, and a Warhammer has no Thrown and no
+   * range; there is still no rider that adds a property or a range to the bound block. Unit: NONE
+   * YET (a granted-property rider on top of C9's bind). ABSENT: "an extra 1d8 Force damage" on a
+   * ranged hit - the ranged gate can never be true while the Thrown grant above is absent, so
+   * authoring the die would land it on melee swings, which is wrong rather than partial. ABSENT:
+   * "an extra 2d8 Force damage if the target is a Giant" - limit (B) on top of that. ABSENT: the
+   * fly-back-to-your-hand clause - not a mechanic the engine models. Complete.
+   */
+  "dwarven-thrower": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+
+  /**
+   * DEFENDER - "You gain a +3 bonus to attack rolls and damage rolls made with this magic weapon."
+   *
+   * ABSENT: "you can transfer some or all of the weapon's bonus to your Armor Class" - a per-turn,
+   * player-chosen reallocation between two rider families; nothing in this vocabulary is
+   * re-authorable at the table. The authored +3/+3 is the weapon's whole bonus, which is the item's
+   * printed default before any transfer. Unit: NONE YET. Complete.
+   */
+  "defender": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+
+  /**
+   * VORPAL SWORD - "You gain a +3 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: "the weapon ignores Resistance to Slashing damage" - resistance-piercing is not a rider
+   * family. ABSENT: the natural-20 decapitation - a GM ruling; its "extra 30 Slashing damage"
+   * fallback is out of `damage-bonus`'s +/-10 range even moment-gated (limit (A)'s closure note).
+   * Unit: NONE YET for both. Complete.
+   */
+  "vorpal-sword": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+
+  /**
+   * HOLY AVENGER - "You gain a +3 bonus to attack rolls and damage rolls made with this magic
+   * weapon." Attunement is restricted to a Paladin, which the ETL already parsed onto the row.
+   *
+   * ABSENT: "When you hit a Fiend or an Undead with it, that creature takes an extra 2d10 Radiant
+   * damage" - limit (B); authoring it ungated would hand every target 2d10 Radiant. ABSENT: the
+   * 10-foot Emanation granting allies Advantage on saves against spells - no aura/emanation model,
+   * and no "against spells" gate on a save. Unit: NONE YET. Complete.
+   */
+  "holy-avenger": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+
+  /**
+   * SCIMITAR OF SPEED - "You gain a +2 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: "you can make one attack with it as a Bonus Action on each of your turns" -
+   * `weaponAction` hard-codes `activation: "action"` and there is no bonus-action attack mechanism;
+   * `extra-attack` is the wrong rider (it multiplies the Attack action, it does not add a Bonus
+   * Action). Unit: U21/U35 own that mechanism. Complete.
+   */
+  "scimitar-of-speed": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+
+  /**
+   * NINE LIVES STEALER - "You gain a +2 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: "Life Stealing" - a rolled `1d8 + 1` charge pool (`FeatureUsesSchema.limit` is a fixed
+   * integer) spent only when a natural 20 hits a creature under 100 HP that fails a DC 15 save; the
+   * trigger is a conjunction of a crit, a target HP threshold and a save outcome, which no `when`
+   * list can express. Unit: NONE YET. Complete.
+   */
+  "nine-lives-stealer": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+
+  /**
+   * QUARTERSTAFF OF THE ACROBAT - "You have a +2 bonus to attack rolls and damage rolls made with
+   * this magic weapon."
+   *
+   * ABSENT: "Acrobatic Assist (Quarterstaff and 10-Foot Pole Forms Only)" - the check-advantage
+   * WOULD fire (Escape a Grapple narrows to `{dex, acrobatics}` when Acrobatics wins), but the
+   * parenthesis gates it on the weapon's FORM and no trigger reads an item's own state; authoring
+   * it unqualified would keep the advantage while the staff is a 6-inch rod in a pack. **Needs:
+   * item state a trigger can read. Unit: NONE YET.** ABSENT: "Attack Deflection", a Reaction
+   * granting +5 AC against one triggering attack - limit (D) plus a reaction-window model. ABSENT:
+   * the form-changing itself and the thrown Quarterstaff-form range - the same missing item-state
+   * vocabulary, plus the granted-property gap named at `dwarven-thrower`. Complete.
+   */
+  "quarterstaff-of-the-acrobat": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+
+  /**
+   * DAGGER OF VENOM - "You gain a +1 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: the Bonus Action poison coating (DC 15 Constitution save or 2d10 Poison damage and the
+   * Poisoned condition, once per dawn) - the save, the damage and the condition are each
+   * expressible on an `actions[]` entry, but the mechanic is a STATEFUL coat-then-deliver: the
+   * poison arms on a Bonus Action, persists for a minute, and discharges on the next hit with the
+   * weapon. There is no item-state vocabulary to hold "armed". Unit: NONE YET. Complete.
+   */
+  "dagger-of-venom": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+
+  /**
+   * GIANT SLAYER - "You gain a +1 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: "When you hit a Giant with this weapon, the Giant takes an extra 2d6 damage of the
+   * weapon's type and must succeed on a DC 15 Strength saving throw or have the Prone condition" -
+   * DOUBLE-BLOCKED: limit (B) for the gate, and **U23** for the untyped die ("of the weapon's
+   * type" - `ExtraDamageVariantSchema` requires a `damageType` today). Complete.
+   */
+  "giant-slayer": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+
+  /**
+   * DRAGON SLAYER - "You gain a +1 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: "The weapon deals an extra 3d6 damage of the weapon's type if the target is a Dragon" -
+   * blocked exactly as Giant Slayer: limit (B) and **U23**. Complete.
+   */
+  "dragon-slayer": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+
+  /**
+   * MACE OF SMITING - "You gain a +1 bonus to attack rolls and damage rolls made with this magic
+   * weapon."
+   *
+   * ABSENT: "The bonus increases to +3 when you use the weapon to attack a Construct" - limit (B).
+   * ABSENT: "the target takes an extra 7 Bludgeoning damage" on a natural 20 - EXPRESSIBLE since
+   * 2026-08-14 (a `damage-bonus` gated `on-critical-hit` is criterion 16's third case, and 7 is in
+   * the +/-10 range) but NOT part of that day's ruling, which converted only the +N pairs and the
+   * unconditional on-hit dice - owed a ruling, not a vocabulary. Its "or 14 Bludgeoning damage if
+   * it's a Construct" escalation is limit (B) and out of range besides; the Construct-destruction
+   * clause is a GM ruling on a HP threshold no trigger reads. Complete.
+   */
+  "mace-of-smiting": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+
+  /**
+   * HAMMER OF THUNDERBOLTS - "You gain a +1 bonus to attack rolls and damage rolls made with this
+   * magic weapon."
+   *
+   * ABSENT: the 5-charge thrown thunderclap (a ranged attack it does not otherwise have, then a
+   * 30-foot-radius DC 17 save applying Stunned to every creature but you) - an area effect centred
+   * on the target, which the action vocabulary has no shape for, on top of the granted-Thrown gap
+   * named at `dwarven-thrower`. ABSENT: "Giant's Bane", whose condition is being attuned to a
+   * SECOND named item - there is no cross-item trigger. ABSENT: "Might of Giants", which raises the
+   * Strength score bestowed by that second item by 4 (to a maximum of 30) - a modifier on another
+   * item's grant, and `ability-score` is refused on items outright anyway (see
+   * `thunderous-greatclub`). Unit: NONE YET for all three. Complete.
+   */
+  "hammer-of-thunderbolts": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+
+  /**
+   * BERSERKER AXE - "You gain a +1 bonus to attack rolls and damage rolls made with this magic
+   * weapon." Authored per the 2026-08-14 ruling, which names this row beside the other +N carriers
+   * - it is no longer the schema-refusal group's undisturbed carrier (`thunderous-greatclub` still
+   * is; the refusal itself is unchanged and recorded there).
+   *
+   * ABSENT: "your Hit Point maximum increases by 1 for each level you have attained" - that is
+   * `hit-points-per-level`, REFUSED outright by `ITEM_REFUSED_MODIFIER_TYPES`
+   * (`src/character-content.ts`, enforced by `EquipmentReferenceSchema`'s `superRefine`): "An item
+   * cannot grant {type}: it is baked into the character's numbers and could not be un-granted when
+   * the item comes off." ABSENT: the curse - `cursed: true` is expressible (the SRD gates the item
+   * behind attunement) but was not in the ruling's batch, and the flag alone would model neither
+   * the berserk mechanic (a DC 15 save on taking damage, then forced targeting) nor "Disadvantage
+   * on attack rolls with weapons other than this one" - no rider can name "every weapon except this
+   * one". Left whole for its own ruling. Complete.
+   */
+  "berserker-axe": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+
+  /**
+   * FLAME TONGUE - "While holding this magic weapon, you can take a Bonus Action and use a command
+   * word to cause flames to engulf the damage-dealing part of the weapon. ... While the weapon is
+   * ablaze, it deals an extra 2d6 Fire damage on a hit. The flames last until you take a Bonus
+   * Action to issue the command again or until you drop, stow, or sheathe the weapon."
+   *
+   * Authored ALWAYS-ON per the 2026-08-14 client ruling: the lit/unlit command word is unmodelable
+   * item state, and a drawn Flame Tongue in combat is lit. This ruling is the precedent for "while
+   * activated" items. The command-word sentence is quoted above so the approximation is visible: a
+   * wielder who deliberately fights with the flames out is the case this authoring gets wrong, and
+   * the GM edits the damage line that once.
+   *
+   * ABSENT: the 40-foot Bright Light the flames shed - no light model. Unit: NONE YET. Complete.
+   */
+  "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire" }] },
+
+  /**
+   * SWORD OF WOUNDING - "When you hit a creature with an attack using this magic weapon, the target
+   * takes an extra 2d6 Necrotic damage and must succeed on a DC 15 Constitution saving throw or be
+   * unable to regain Hit Points for 1 hour."
+   *
+   * The 2d6 Necrotic is unconditional on a hit and authored (reader: criterion 1). ABSENT, still:
+   * the "can't regain Hit Points" half - not a condition in `CONDITION_IDS` and not an effect
+   * modifier (there is no healing-block vocabulary), and the recurring end-of-turn save is its own
+   * missing shape. Unit: NONE YET. Complete.
+   */
+  "sword-of-wounding": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic" }] }
 
   // ===============================================================================================
-  // PROSE-ONLY RECORDS - 36 of the lane's 60 items author NO rider. Each is here with its reason,
+  // PROSE-ONLY RECORDS - 18 of the lane's 60 items author NO rider. Each is here with its reason,
   // because "we did not think of it" and "we decided it" must not look the same to the next reader.
   // Where a record says "This absence list is complete" it means every mechanical sentence the SRD
   // prints on that row is accounted for above or below - an earlier draft's per-item lists read as
   // exhaustive and were not, so the claim is now made explicitly or not at all.
   // ===============================================================================================
   //
-  // ---- EMPTIED BY LIMIT (0): THE MAGIC WEAPON HAS NO BASE WEAPON TO ATTACH TO (19) -------------
+  // ---- STILL PROSE-ONLY AFTER THE C9 BIND (2) --------------------------------------------------
   //
-  // These 19 rows print a `+N to attack rolls and damage rolls`, an on-hit die, or both, and an
-  // earlier draft of this lane authored the attack half on most of them. **MEASURED: 0 of the 33
-  // `weapon`-category rows carry a `weapon` block, so no swing is derived from any of them
-  // (`weaponActionIds: []`, `effectiveActions: []` on a picker-minted Dwarven Thrower), and a
-  // `this-item`-scoped rider has nothing to bind to.** Every one of them is unauthored here.
-  // **Unit for all 19: C9, the weapon-template mechanism - a magic weapon becomes real by the player
-  // picking the base weapon it applies to.** (This line said "NONE YET ... §5 has no row for it"
-  // until the C8 review; it was written before C9 existed, the (0) paragraph in this file's header
-  // was corrected on the same afternoon and this copy was not, and
-  // `docs/product/plan-content-program.md` now carries C9 in its unit table, its own section and the
-  // phrase "19 absences citing C9". An unblocker quarter that says NONE YET when a unit owns the
-  // work is the half of the contract that turns a decision back into a skip.) (Two of the 19 -
-  // `javelin-of-lightning` and `mace-of-disruption` - print no `+N` at all and are here for their
-  // on-hit dice, which limit (0) empties by the same mechanism.) Per-item, what else each prints
-  // and why THAT is absent:
-  //
-  // `weapon-1` / `weapon-2` / `weapon-3` - "You have a bonus to attack rolls and damage rolls made
-  //     with this magic weapon. The bonus is determined by the weapon's rarity." Limit (0) for the
-  //     attack half, limit (A) for the damage half. The rows print nothing else; complete.
-  //
-  // `dwarven-thrower` - "+3 bonus to attack rolls and damage rolls" (limit (0) / limit (A)); "It has
-  //     the THROWN PROPERTY with a normal range of 20 feet and a long range of 60 feet" - a granted
-  //     weapon PROPERTY and a granted range, which is the same item-applies-to-item gap wearing
-  //     another hat: there is no rider that adds a property to a weapon, and the row has no `weapon`
-  //     block to put one on. **This is the gate an earlier far end depended on** - that test supplied
-  //     `properties: ["thrown"], rangeFeet: 20, longRangeFeet: 60` in a fixture and the shipped row
-  //     carries none of it, which is precisely why it passed while the data did nothing.
-  //     "an extra 1d8 Force damage" on a ranged hit - limit (0), and the ranged gate it needs is the
-  //     Thrown property this row cannot grant. "or an extra 2d8 Force damage if the target is a
-  //     Giant" - limit (B) as well. "Immediately after hitting or missing, the weapon flies back to
-  //     your hand" - not a mechanic the engine models. Complete.
-  //
-  // `defender` - "+3 bonus to attack rolls and damage rolls" (limit (0) / (A)); "you can transfer
-  //     some or all of the weapon's bonus to your Armor Class" - a per-turn, player-chosen
-  //     reallocation between two rider families, and nothing in this vocabulary is re-authorable at
-  //     the table. Complete.
-  //
-  // `vorpal-sword` - "+3 bonus to attack rolls and damage rolls" (limit (0) / (A)); "the weapon
-  //     ignores Resistance to Slashing damage" - resistance-piercing is not a rider family; the
-  //     natural-20 decapitation is a GM ruling and its "extra 30 Slashing damage" fallback is limit
-  //     (A) (a flat amount, and `formula` requires a die). Complete.
-  //
-  // `scimitar-of-speed` - "+2 bonus to attack rolls and damage rolls" (limit (0) / (A)); "you can
-  //     make one attack with it as a Bonus Action on each of your turns" - `weaponAction` hard-codes
-  //     `activation: "action"` (`equipment-derivation.ts:1007`) and there is no bonus-action attack
-  //     mechanism anywhere in the engine; `extra-attack` is the wrong rider (it multiplies the Attack
-  //     action, it does not add a Bonus Action). Unit: U21/U35 own that mechanism. Complete.
-  //
-  // `nine-lives-stealer` - "+2 bonus to attack rolls and damage rolls" (limit (0) / (A)); "Life
-  //     Stealing" - a `1d8 + 1` charge pool (item `uses` cannot be rolled for; `FeatureUsesSchema.limit`
-  //     is an integer) spent only when a natural 20 slays a creature under 100 HP that fails a DC 15
-  //     save. The trigger is a conjunction of a crit, a target HP threshold and a save outcome, which
-  //     no `when` list can express. Complete.
-  //
-  // `quarterstaff-of-the-acrobat` - "+2 bonus to attack rolls and damage rolls" (limit (0) / (A));
-  //     "Acrobatic Assist (Quarterstaff and 10-Foot Pole Forms Only) ... you have Advantage on
-  //     Dexterity (Acrobatics) checks" - **NOT limit (C) any more.** Escape a Grapple narrows to
-  //     `{dex, acrobatics}` whenever Acrobatics beats Athletics, so the rider WOULD fire; what blocks
-  //     it is the parenthesis. The weapon has three forms, the clause holds in two of them, and no
-  //     trigger reads an item's own state - `attuned` is the only item-facing gate and it says
-  //     nothing about shape. Authoring it unqualified would keep the advantage while the staff is a
-  //     6-inch rod in a pack. **Needs: item state a trigger can read. Unit: NONE YET.**
-  //     "Attack Deflection", a Reaction granting +5 AC against one triggering attack - limit (D) plus
-  //     a reaction-window model; the form-changing itself - the same missing item-state vocabulary.
-  //     Complete.
-  //
-  // `holy-avenger` - "+3 bonus to attack rolls and damage rolls" (limit (0) / (A)); "When you hit a
-  //     Fiend or an Undead with it, that creature takes an extra 2d10 Radiant damage" - limit (0) for
-  //     the die and limit (B) for the gate, and authoring it ungated would hand every target 2d10
-  //     Radiant; the 10-foot Emanation granting allies Advantage on saves against spells - no
-  //     aura/emanation model, and no "against spells" gate on a save. Attunement is restricted to a
-  //     Paladin, which the ETL already parsed onto the row. Complete.
-  //
-  // `dagger-of-venom` - "+1 bonus to attack rolls and damage rolls" (limit (0) / (A)); the Bonus
-  //     Action poison coating (DC 15 Constitution save or 2d10 Poison damage and the Poisoned
-  //     condition, once per dawn). The save, the damage and the condition are each expressible on an
-  //     `actions[]` entry, but the mechanic is a STATEFUL coat-then-deliver: the poison arms on a
-  //     Bonus Action, persists for a minute, and discharges on the next hit with the weapon. There is
-  //     no item-state vocabulary to hold "armed". Complete.
-  //
-  // `giant-slayer` - "+1 bonus to attack rolls and damage rolls" (limit (0) / (A)); "When you hit a
-  //     Giant with this weapon, the Giant takes an extra 2d6 damage of the weapon's type and must
-  //     succeed on a DC 15 Strength saving throw or have the Prone condition." TRIPLE-BLOCKED: limit
-  //     (0), limit (B) for the gate, and **U23** for the untyped die ("of the weapon's type" -
-  //     `ExtraDamageVariantSchema` requires a `damageType` today). Complete.
-  //
-  // `dragon-slayer` - "+1 bonus to attack rolls and damage rolls" (limit (0) / (A)); "The weapon
-  //     deals an extra 3d6 damage of the weapon's type if the target is a Dragon" - blocked exactly
-  //     as Giant Slayer: limit (0), limit (B), and **U23**. Complete.
-  //
-  // `mace-of-smiting` - "+1 bonus to attack rolls and damage rolls" (limit (0) / (A)); "The bonus
-  //     increases to +3 when you use the weapon to attack a Construct" - limit (B) on top of limit
-  //     (0); "the target takes an extra 7 Bludgeoning damage" on a natural 20 - the moment is
-  //     authorable (`on-critical-hit` is real and criterion 9 proves a crit-only typed die fires) but
-  //     **7 is a flat amount and `formula` requires a die**, limit (A) in its crit-only form, on top
-  //     of limit (0). Complete.
-  //
-  // `hammer-of-thunderbolts` - "+1 bonus to attack rolls and damage rolls" (limit (0) / (A)); the
-  //     5-charge thunderclap (a 30-foot-radius DC 17 save applying Stunned to every creature but you)
-  //     - an area effect centred on the target, which the action vocabulary has no shape for;
-  //     "Giant's Bane", whose condition is being attuned to a SECOND named item - there is no
-  //     cross-item trigger; "Might of Giants", which raises a Strength score to 23 and is refused
-  //     outright by `ITEM_REFUSED_MODIFIER_TYPES` (see the two records below for the message).
-  //     Complete.
-  //
-  // `sword-of-wounding` - "When you hit a creature with an attack using this magic weapon, the target
-  //     takes an extra 2d6 Necrotic damage" - limit (0); "must succeed on a DC 15 Constitution saving
-  //     throw or be unable to regain Hit Points for 1 hour", with a repeated save at the end of each
-  //     of its turns - "cannot regain Hit Points" is not a condition in `CONDITION_IDS` and not an
-  //     effect modifier (there is no healing-block vocabulary), and the recurring end-of-turn save is
-  //     its own missing shape. Complete.
-  //
-  // `flame-tongue` - "While the weapon is ablaze, it deals an extra 2d6 Fire damage on a hit" -
-  //     limit (0). An earlier draft authored this die ALWAYS-ON, reasoning that a die that always
-  //     fires beats one that never does; limit (0) removes the question, because the die could not
-  //     have fired either way. The command-word toggle and the 40-foot Bright Light it sheds are
-  //     separately absent: there is no item-state vocabulary (`while-effect-tag` reads
-  //     `actor.effects[].tags` and nothing would ever create such an effect for this item) and no
-  //     light model. Complete.
+  // This group held 19 rows as "EMPTIED BY LIMIT (0): THE MAGIC WEAPON HAS NO BASE WEAPON TO ATTACH
+  // TO" until 2026-08-14. C9 landed the bind - the row's printed base qualifier is data
+  // (`appliesTo`), the player picks the base weapon, and the bind mints the inventory row with that
+  // weapon's block copied verbatim - so the swing exists and the group's one shared reason is gone.
+  // 17 of the 19 were re-authored above per the client ruling (the +N pairs, `flame-tongue`'s and
+  // `sword-of-wounding`'s dice), each keeping its still-true residual absences at its entry. These
+  // 2 remain prose-only because their mechanics were never the +N pair - each names its own reason:
   //
   // `javelin-of-lightning` - "you can have it deal LIGHTNING DAMAGE INSTEAD OF PIERCING" (a
   //     weapon-swing damage-type override, **U20** in shape, though §5 does not name this item) and a
   //     5-foot-wide, 120-foot-long Line dealing 4d6 Lightning on a DC 13 save (an area, which the
-  //     action vocabulary has no shape for). Both sit on top of limit (0). Complete.
+  //     action vocabulary has no shape for). The bound swing gives these something to sit on and
+  //     changes neither blocker. There is no +N and no unconditional die. Complete.
   //
   // `mace-of-disruption` - "When you hit a Fiend or an Undead with this magic weapon, that creature
   //     takes an extra 2d6 Radiant damage", and the Frightened / destroyed-outright rider on a low-HP
-  //     target - limit (0) for the die, limit (B) for the gate. Its Light property is real and
-  //     already on the row; what Light DOES is U21/U35's mechanism. There is no +N here, which is why
-  //     it sits in this group rather than beside Holy Avenger. Complete.
+  //     target - limit (B) for the gate (authoring the die ungated would hand every target 2d6
+  //     Radiant), and the destruction clause reads a HP threshold no trigger carries. Its Light
+  //     property is real and already on the row; what Light DOES is U21/U35's mechanism. There is no
+  //     +N here. Complete.
   //
   // ---- RESERVED FOR A LATER UNIT (4) ----------------------------------------------------------
-  // These four are ALSO emptied by limit (0), and are listed separately because §5 names them as a
-  // named unit's carrier: authoring anything on them now would leave that unit a record that already
-  // carries riders it did not write.
+  // Listed separately because §5 names each as a named unit's carrier: authoring anything on them
+  // now - INCLUDING the +N pairs on `sun-blade` and `energy-bow`, expressible since 2026-08-14 and
+  // deliberately not in that day's ruling - would leave the unit a record that already carries
+  // riders it did not write.
   //
   // `sun-blade` - "+2 bonus to attack rolls and damage rolls made with this weapon, WHICH DEALS
   //     RADIANT DAMAGE INSTEAD OF SLASHING DAMAGE", and "functions as a Longsword with the Finesse
-  //     property". Needs: a weapon-swing damage-type override, plus a way to add a weapon property -
-  //     and, under limit (0), a base weapon for either to modify. Unit: **U20**. Its "extra 1d8
-  //     Radiant to an Undead" is separately blocked by limit (B). Complete.
+  //     property". The +N pair is expressible now and RESERVED with the rest of the row: the pair
+  //     is inseparable from the damage-type override printed in the same sentence. Needs: a
+  //     weapon-swing damage-type override, plus a way to add a weapon property. Unit: **U20**. Its
+  //     "extra 1d8 Radiant to an Undead" is separately blocked by limit (B). Complete.
   //
-  // `energy-bow` - "+1 bonus to attack rolls and damage rolls" (limit (0) / (A)); "An arrow produced
+  // `energy-bow` - "+1 bonus to attack rolls and damage rolls" (RESERVED with the row, as
+  //     `sun-blade`'s pair is); "An arrow produced
   //     by this weapon deals FORCE DAMAGE INSTEAD OF PIERCING damage on a hit" - the same
   //     weapon-swing override, Unit: **U20** (§5 names it alongside Sun Blade). **The row prints
   //     three more properties an earlier draft did not name:** "Arrow of Restraint" (a ranged attack
@@ -710,19 +849,19 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   //
   // `vicious-weapon` - "This magic weapon deals an extra 2d6 damage to any creature it hits. THIS
   //     EXTRA DAMAGE IS OF THE SAME TYPE AS THE WEAPON'S NORMAL DAMAGE." Needs: `extra-damage`
-  //     without a required `damageType` (it is required today - measured). Unit: **U23** - and note
-  //     that U23 alone is no longer enough: "the weapon's normal damage" is a fact about the base
-  //     weapon, which limit (0) says this row does not have. Complete.
+  //     without a required `damageType` (it is required today - measured). Unit: **U23** - and the
+  //     C9 bind is what makes U23 sufficient now: "the weapon's normal damage" is a fact about the
+  //     base weapon, and the bound block carries it. Complete.
   //
   // `spellguard-shield` - "While holding this Shield, you have Advantage on saving throws against
   //     spells and other magical effects, and SPELL ATTACK ROLLS HAVE DISADVANTAGE AGAINST YOU."
-  //     It is `Armor (Shield)` and therefore this lane's item, not C7b's - and being a shield it is
-  //     untouched by limit (0). Needs: `attack-kind-is: "spell"` to be produced by `attackKindsOf` so
+  //     It is `Armor (Shield)` and therefore this lane's item, not C7b's - and being a shield the
+  //     weapon rows' bind story never touched it. Needs: `attack-kind-is: "spell"` to be produced by `attackKindsOf` so
   //     an `incoming-attack` roll-mode can be narrowed to spell attacks. Unit: **U29**. It grants no
   //     spell-attack BONUS, so it is U29's carrier and not U26's. The save half needs an "against
   //     spells" gate that does not exist either. Complete.
   //
-  // ---- THE VOCABULARY REFUSES THE CENTRAL MECHANIC (2) ----------------------------------------
+  // ---- THE VOCABULARY REFUSES THE CENTRAL MECHANIC (1) ----------------------------------------
   // `ITEM_REFUSED_MODIFIER_TYPES` is `["hit-points-per-level", "ability-score"]`
   // (`src/character-content.ts`), enforced by `EquipmentReferenceSchema`'s `superRefine`. The refusal
   // is the schema's and this file only records it; NO lane may work around it by inventing a modifier
@@ -731,23 +870,22 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   //     "An item cannot grant {type}: it is baked into the character's numbers and could not be
   //      un-granted when the item comes off."
   //
+  // (This group held `berserker-axe` too, "left unauthored so the refusal keeps a clean carrier",
+  // until the 2026-08-14 ruling named that row among the +N carriers and authored its printed pair -
+  // its entry above records the refusal and the rest of its absences. `thunderous-greatclub` is the
+  // group's remaining, still-undisturbed carrier.)
+  //
   // `thunderous-greatclub` - "While you are attuned to this magic weapon, YOUR STRENGTH IS 20 unless
   //     your Strength is already equal to or greater than that score." That is `ability-score`,
   //     refused. **The row prints three more mechanics an earlier draft did not name:** "an extra 1d8
-  //     Thunder damage to any creature it hits" - limit (0) (and the plan additionally reserves this
-  //     item as a prose-only record so the refusal keeps an undisturbed carrier); "an extra 3d8
-  //     Thunder damage to objects it hits that aren't being worn or carried" - objects are not actors
-  //     and there is no object-target model; "Clap of Thunder" (a 30-foot Cone, DC 15 Strength or
-  //     Prone) and "Earthquake" (a 50-foot-radius seismic effect with a DC 20 Dexterity save, Prone,
-  //     a Concentration break and a fissure, once per dawn) - both are areas, which the action
+  //     Thunder damage to any creature it hits" - expressible since the C9 bind, and left unauthored
+  //     because the plan reserves this item as a prose-only record so the refusal keeps an
+  //     undisturbed carrier (that reserve, not a vocabulary gap, is now the whole reason); "an extra
+  //     3d8 Thunder damage to objects it hits that aren't being worn or carried" - objects are not
+  //     actors and there is no object-target model; "Clap of Thunder" (a 30-foot Cone, DC 15 Strength
+  //     or Prone) and "Earthquake" (a 50-foot-radius seismic effect with a DC 20 Dexterity save,
+  //     Prone, a Concentration break and a fissure, once per dawn) - both are areas, which the action
   //     vocabulary has no shape for. Unit: NONE YET for all but the first. Complete.
-  //
-  // `berserker-axe` - "while you are attuned to this weapon, YOUR HIT POINT MAXIMUM INCREASES BY 1
-  //     FOR EACH LEVEL you have attained." That is `hit-points-per-level`, refused. Its "+1 bonus to
-  //     attack rolls and damage rolls" is separately limit (0) / limit (A); its curse is expressible
-  //     and is left unauthored so the refusal keeps a clean carrier; its "Disadvantage on attack rolls
-  //     with weapons other than this one" is separately inexpressible - no rider can name "every
-  //     weapon except this one". Complete.
   //
   // ---- THE MECHANIC CANNOT BE SAID AT ALL (11) ------------------------------------------------
   //
@@ -761,12 +899,12 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   //     earlier draft recorded the reason as "both facts live in the row's own `armor` block
   //     (`stealthDisadvantage`, `strengthRequired`), which is a PARSED column the overlay may not
   //     author". **The row has NO `armor` block - measured, `armor: null`, and 0 of the 14
-  //     `armor`-category rows carry one.** The real reason is the same one limit (0) states for
-  //     weapons: those two facts live on the BASE armor ("Any Medium or Heavy, Except Hide"), which
-  //     this row names in prose and does not reference, and there is no item-applies-to-item
-  //     mechanism to reach it. Even given one, "suppress a property of the base item" is a
-  //     subtraction no rider family expresses. **Unit: NONE YET** - the item-applies-to-item
-  //     mechanism, plus a suppression rider. The row prints nothing else. Complete.
+  //     `armor`-category rows carry one.** Those two facts live on the BASE armor ("Any Medium or
+  //     Heavy, Except Hide") - which, since C9, the row DOES reference as data (`appliesTo`), so the
+  //     item-applies-to-item half of the old reason is gone. What remains is the whole of it:
+  //     "suppress a property of the base item" is a subtraction no rider family expresses, so even a
+  //     bound block's `stealthDisadvantage`/`strengthRequired` cannot be switched off from here.
+  //     **Unit: NONE YET** - a suppression rider. The row prints nothing else. Complete.
   //
   // `animated-shield` - "you can take a Bonus Action to cause it to animate ... leaving your hands
   //     free." No AC change at all; the whole mechanic is hands-free wielding, and there is no
@@ -789,23 +927,27 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   // `ammunition-of-slaying` - "If a creature OF THAT TYPE takes damage from the ammunition, the
   //     creature makes a DC 17 Constitution saving throw, taking an extra 6d10 Force damage on a
   //     failed save." The die and its type are authorable; the gate is limit (B), and the whole item
-  //     is nothing but the gate. It is `ammunition`, so limit (0) does not touch it - this one really
+  //     is nothing but the gate. It is `ammunition`, so no weapon bind is involved - this one really
   //     is only the creature-type producer. Unit: NONE YET. Complete.
   //
   // `oathbow` - "If the attack hits, your SWORN ENEMY takes an extra 3d6 Piercing damage", plus
-  //     Advantage against that enemy and Disadvantage with every other weapon. Limit (0) for the die;
-  //     "sworn enemy" is a persistent, player-declared mark on ONE creature and there is no
-  //     target-scoped effect model. Unit: **U22** owns target-scoped effects, though §5 does not list
+  //     Advantage against that enemy and Disadvantage with every other weapon. The die is
+  //     expressible on a bound bow since the C9 bind, but every one of the three mechanics is gated
+  //     on "sworn enemy" - a persistent, player-declared mark on ONE creature - and there is no
+  //     target-scoped effect model; authoring the die ungated would land 3d6 on every target.
+  //     Unit: **U22** owns target-scoped effects, though §5 does not list
   //     this item as its carrier. Complete.
   //
   // `sword-of-life-stealing` - "that target takes an extra 15 NECROTIC damage" on a natural 20. The
-  //     moment is real (`on-critical-hit`, proven by criterion 9) and the type is real; 15 is a FLAT
-  //     amount and `formula` requires a die - limit (A) - on top of limit (0). The Temporary Hit
+  //     moment is real (`on-critical-hit`, criterion 9) and the closed limit (A) put a flat
+  //     crit-gated amount in the vocabulary - but `damage-bonus` is bounded to +/-10 and 15 is out
+  //     of range (limit (A)'s closure note names this row). The Temporary Hit
   //     Points it grants the wielder are a second missing shape. Unit: NONE YET. Complete.
   //
   // `sword-of-sharpness` - "that target takes an extra 14 Slashing damage and gains 1 Exhaustion
   //     level" on a natural 20, plus "maximize your weapon damage dice" against objects. Flat 14 is
-  //     limit (A) on top of limit (0); maximising dice is not a rider family; objects are not actors.
+  //     out of `damage-bonus`'s +/-10 range (limit (A)'s closure note); maximising dice is not a
+  //     rider family; objects are not actors.
   //     Unit: NONE YET. Complete.
   //
   // `armor-of-vulnerability` - **REMOVED 2026-08-11, AND THE REMOVAL IS THE POINT.** "While wearing

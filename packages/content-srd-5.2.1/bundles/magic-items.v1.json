@@ -891,7 +891,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "boots-of-elvenkind",
@@ -1951,7 +1962,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "dancing-sword",
@@ -2096,7 +2118,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3,
+    "when": []
+   }
+  ]
  },
  {
   "id": "demon-armor",
@@ -2318,7 +2351,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "dust-of-disappearance",
@@ -2469,7 +2513,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3,
+    "when": []
+   }
+  ]
  },
  {
   "id": "efficient-quiver",
@@ -2869,7 +2924,15 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "extra-damage",
+    "formula": "2d6",
+    "damageType": "fire",
+    "doubleOnCritical": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "folding-boat",
@@ -2946,7 +3009,15 @@
    "conditionImmunities": [],
    "spells": []
   },
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "extra-damage",
+    "formula": "1d6",
+    "damageType": "cold",
+    "doubleOnCritical": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "gauntlets-of-ogre-power",
@@ -3105,7 +3176,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "glamoured-studded-leather",
@@ -3295,7 +3377,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "handy-haversack",
@@ -3606,7 +3699,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3,
+    "when": []
+   }
+  ]
  },
  {
   "id": "horn-of-blasting",
@@ -3969,6 +4073,16 @@
     "type": "save-bonus",
     "amount": 1,
     "when": []
+   },
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
    }
   ]
  },
@@ -4032,7 +4146,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "mace-of-terror",
@@ -4496,7 +4621,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": []
+   }
+  ]
  },
  {
   "id": "oathbow",
@@ -5429,7 +5565,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": []
+   }
+  ]
  },
  {
   "id": "ring-of-animal-influence",
@@ -6626,7 +6773,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": []
+   }
+  ]
  },
  {
   "id": "sending-stones",
@@ -7755,7 +7913,15 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "extra-damage",
+    "formula": "2d6",
+    "damageType": "necrotic",
+    "doubleOnCritical": false,
+    "when": []
+   }
+  ]
  },
  {
   "id": "talisman-of-pure-good",
@@ -8114,7 +8280,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3,
+    "when": []
+   }
+  ]
  },
  {
   "id": "wand-of-binding",
@@ -8773,7 +8950,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": []
+   }
+  ]
  },
  {
   "id": "weapon-2",
@@ -8841,7 +9029,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": []
+   }
+  ]
  },
  {
   "id": "weapon-3",
@@ -8909,7 +9108,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3,
+    "when": []
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3,
+    "when": []
+   }
+  ]
  },
  {
   "id": "well-of-many-worlds",

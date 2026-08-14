@@ -149,6 +149,25 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
   });
 });
 
+describe("the C9 headline far end: the +N ladder lands whole through the real bind", () => {
+  it("one shipped 'Weapon, +1' row, bound to a greatsword: +1 to hit AND +1 damage, derived and ROLLED", () => {
+    const state = stateWith();
+    setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", baseId: "greatsword" }), resolve, { catalog: CATALOG });
+    const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-weapon-1")!;
+    // Str +1, proficiency 2, and the SHIPPED attack-bonus rider's +1 = 4; the SHIPPED damage-bonus
+    // folds into the printed formula: 2d6 + 1 (str) + 1 (flat) = "2d6 + 2". This is the number the
+    // plan said must never be understated - the whole reason limit (A) was co-scheduled with C9.
+    expect(action.attack!.bonus).toBe(4);
+    expect(action.damage).toEqual([{ formula: "2d6 + 2", type: "slashing" }]);
+
+    startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+    const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000210" }, deps([10, 3, 4]));
+    expect(resolution.attack).toMatchObject({ total: 14, outcome: "hit" });
+    expect(resolution.damage).toEqual([{ formula: "2d6 + 2", type: "slashing", total: 9 }]);
+    expect(resolution.damageTotal).toBe(9);
+  });
+});
+
 describe("the C9 bind: armor", () => {
   it("binds Armor of Vulnerability to chain mail: worn alone, the real base AC derives", () => {
     const state = stateWith();

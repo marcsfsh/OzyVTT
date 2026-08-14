@@ -128,7 +128,10 @@ const LANES: ReadonlyArray<{
   readonly lane: string; readonly module: string; readonly rows: number; readonly authored: number;
   readonly owns: (row: (typeof ROWS)[number]) => boolean;
 }> = [
-  { lane: "C7a", module: "weapons-armour.ts", rows: 60, authored: 24,
+  // C7a was 24 until 2026-08-14: C9's bind plus the closed limit (A) re-authored the 18 weapon rows
+  // the old limit (0) had emptied (the +N pairs, flame-tongue's, frost-brand's and
+  // sword-of-wounding's dice - `item-mechanics-c7a.test.ts` pins each by name and value).
+  { lane: "C7a", module: "weapons-armour.ts", rows: 60, authored: 42,
     owns: (row) => ["weapon", "armor", "shield", "ammunition"].includes(row.category) },
   { lane: "C7b", module: "wands-rods-rings.ts", rows: 57, authored: 27,
     owns: (row) => ["wand", "staff", "rod", "ring"].includes(row.category) || row.id === "spell-scroll" },
@@ -172,7 +175,7 @@ describe("the content program: every prose-only item carries a recorded absence"
     for (const id of authored) expect(mine.some((row) => row.id === id), `${lane.lane} authors ${id}, which is not one of its own rows`).toBe(true);
   });
 
-  it("walks a real population - 90 authored and 178 absences over the four lanes", () => {
+  it("walks a real population - 108 authored and 160 absences over the four lanes", () => {
     // The non-vacuity anchor for the sweep above: if these numbers ever go to zero the per-lane
     // checks are satisfied trivially and this is what says so.
     //
@@ -182,9 +185,14 @@ describe("the content program: every prose-only item carries a recorded absence"
     // C7b each gained a SECOND modifier on a row they already authored (`sentinel-shield`,
     // `rod-of-alertness`), which moves no count here, and C7d gained nothing: five of its rows cited
     // the closed limit and every one of them had a second reason that outlived it.
+    //
+    // WAS 90/178 UNTIL 2026-08-14. C9's bind and the closed limit (A) added exactly 18 new C7a
+    // entries, all weapon rows - the sixteen "+N to attack rolls and damage rolls" pairs plus
+    // `flame-tongue`'s and `sword-of-wounding`'s on-hit dice. `luck-blade` and `frost-brand` gained
+    // their weapon-scoped halves on entries they already had, which moves no count here.
     const authored = ITEM_MECHANICS_LANES.reduce((total, lane) => total + Object.keys(lane.entries).length, 0);
-    expect(authored).toBe(90);
-    expect(ROWS.length - authored).toBe(178);
+    expect(authored).toBe(108);
+    expect(ROWS.length - authored).toBe(160);
   });
 });
 

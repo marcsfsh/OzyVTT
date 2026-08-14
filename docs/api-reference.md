@@ -4696,6 +4696,7 @@ One of the following:
 | `equipment[].description` | string \| null | yes |  |
 | `equipment[].weapon` | object \| null | yes | Populated for weapons only |
 | `equipment[].armor` | object \| null | yes | Populated for armor and shields only |
+| `equipment[].appliesTo` | object \| null | yes | C9: the eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player's pick binds it to one of `baseIds`, validated and copied server-side at set-inventory. |
 | `attribution` | string | yes |  |
 
 ### `ContentExtraPick`
@@ -5325,6 +5326,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `weapon` | HomebrewEquipmentWeapon \| null | no | Populated for weapons only |
 | `armor` | HomebrewEquipmentArmor \| null | no | Populated for armor and shields only |
 | `slot` | `weapon` \| `shield` \| `armor` \| `head` \| `neck` \| `shoulders` \| `hands` \| `ring` \| `belt` \| `feet` \| `held` \| `wondrous` \| `consumable` \| `ammunition` \| `none` | no | WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield) |
+| `appliesTo` | object \| null | no | C9: makes the item a TEMPLATE (the SRD's "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a non-weapon/armor category, and fixed stats alongside a template. The picked base's stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`. |
 | `rarity` | string (pattern) | no | Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook |
 | `isMagic` | boolean | no | Default: `false`. |
 | `attunement` | HomebrewItemAttunement | no | Attunement requirement and its advisory class/species restriction |
