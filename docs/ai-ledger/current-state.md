@@ -121,13 +121,13 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **The feature-implementations program (PR #55) — Waves 0–2 DONE, the rest planned, the branch
-  splitting.** The 30 client-reported issues are closed; a 19-agent discovery pass (2026-08-10)
-  re-measured the remaining 22 units (only two are "add a control" work) and found ~80
-  API-authorable capabilities the editor cannot reach. **Read
-  `docs/product/remaining-program-plan.md` FIRST** — it carries the twenty client rulings (decision
-  log 2026-08-10); the four `plan-*-program.md` beside it carry every remaining unit with measured
-  sizes, carriers and workflow scripts. Waves 0–2 merge to `main`; each next batch is its own PR.
+- **The feature-implementations program — waves 0–2 and batches 0–3 MERGED (PR #56, `c2b5206`,
+  2026-08-14); the rest planned.** The 30 client-reported issues are closed. Merged with them: the
+  API↔editor parity guard (4,660 questions, generating `vocabulary-parity-audit.md`) and the content
+  program — 268 SRD magic items, 94 with authored mechanics, the rest named absences. **Read
+  `docs/product/remaining-program-plan.md` FIRST** — twenty client rulings (decision log 2026-08-10);
+  the four `plan-*-program.md` beside it carry every remaining unit, measured. **Next: C9, the
+  weapon-template mechanism** — 33 magic weapons change nothing without it. Each batch is its own PR.
 - **"The screen is the page" refresh + round 2 — landed through wave 5, QA run.** Rulings:
   `docs/product/refresh-round-2-decisions.md` (66 — read before touching round-2 work); evidence and
   residue: `refresh-round-2-fixes.md`. The three P0s this page carried through 2026-08-08 were
