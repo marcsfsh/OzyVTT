@@ -71,7 +71,10 @@ One component serves both roles (`replay/ReplayPanel.tsx`).
 
 **Content.** SRD 5.2.1 bundles (`packages/content-srd-5.2.1`, ADR-0015); GM homebrew authoring with its
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
-(`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters.
+(`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters. **Magic weapons and
+armor BIND (C9, 2026-08-14):** a template row (`appliesTo` — printed qualifier + RESOLVED base ids) takes
+the player's pick at add time; the SERVER validates it and copies the base's stats (`inventory.ts`
+`bindTemplateItem`); the flat `damage-bonus` rider makes the `+N` ladder whole. 108 of 268 items work.
 
 **The screen is the page** (D15/D30, refresh A1). `body` is locked and `<main>` is a 100dvh grid —
 [connection row][tab bar][content pane] (`apps/client/src/styles.css`); every surface owns a real
@@ -121,13 +124,10 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **The feature-implementations program (PR #55) — Waves 0–2 DONE, the rest planned, the branch
-  splitting.** The 30 client-reported issues are closed; a 19-agent discovery pass (2026-08-10)
-  re-measured the remaining 22 units (only two are "add a control" work) and found ~80
-  API-authorable capabilities the editor cannot reach. **Read
-  `docs/product/remaining-program-plan.md` FIRST** — it carries the twenty client rulings (decision
-  log 2026-08-10); the four `plan-*-program.md` beside it carry every remaining unit with measured
-  sizes, carriers and workflow scripts. Waves 0–2 merge to `main`; each next batch is its own PR.
+- **The remaining program: batches 0–3 merged (PR #56); C9 built 2026-08-14.** Read
+  `docs/product/remaining-program-plan.md` FIRST (twenty rulings, decision log 2026-08-10) plus the
+  2026-08-14 entry: the ruled queue is the flourishes starter (M0 + Topple + Push) + U28, with U33,
+  B2–B4, F2–F4 (except F1) and A1-until-needed deferred, and the party-shaped units parked.
 - **"The screen is the page" refresh + round 2 — landed through wave 5, QA run.** Rulings:
   `docs/product/refresh-round-2-decisions.md` (66 — read before touching round-2 work); evidence and
   residue: `refresh-round-2-fixes.md`. The three P0s this page carried through 2026-08-08 were

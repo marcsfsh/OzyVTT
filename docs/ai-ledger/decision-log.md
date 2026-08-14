@@ -13,6 +13,52 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-14 — C9 lands: the bind's charter, the pick's shape, and the queue after it (client rulings, four discovery rounds)
+
+**Context.** C9 (the weapon-template mechanism, ruled 2026-08-11) was built this day on
+`claude/ozyvtt-roadmap-explanation-5rwyro`, after four rounds of client discovery. Every ruling below
+is the client's, given against verified measurements rather than the plan's claims (the 2026-08-11
+spec was re-verified against `c2b5206` first; all three of its parts held).
+
+**1. The flat `damage-bonus` ships INSIDE the C9 batch** — the 2026-08-11 entry's "the two must land
+together" is executed, not deferred. `FeatureModifierSchema`'s 22nd variant; standing it folds into
+the first damage part's printed formula (the `attack-bonus` treatment, so sheet and roll agree),
+moment-gated it lands as its own labelled line. The acceptance far end is the WHOLE number: a bound
+`Weapon, +1` proves `2d6 + 2`, never the understated `2d6 + 1` the spec's own example carried.
+
+**2. Armor binds too; magic AMMUNITION is out.** The client chose weapons + armor over weapons-only
+(the worn-alone `10 + Dex + N` misread dies with the same mechanism). Ammunition stays a named
+absence in `build-magic-items.ts`: it rides another weapon's attack and is consumed, and no
+ammunition model exists — binding it would invent one inside a unit about something else.
+
+**3. The pick: silent for single-base, at add time, an abstract weapon KIND.** Dwarven Thrower just
+IS a warhammer (no question with one answer); a choice template swaps the picker to the eligible-base
+list and the add completes with the pick; the player picks a kind, never one of their owned rows —
+no ownership requirement, no linked-row bookkeeping. Changing a pick is remove-and-re-add for now
+(attunement here is a free toggle); a per-row re-pick control waits until the friction is real.
+
+**4. Legacy rows prompt; the obvious ones auto-bind.** A pre-C9 template row keeps everything and
+gains the one sheet-side chooser ("Choose what it is"); a single-base template auto-binds on any
+touch. Nobody loses an item; nothing rebinds silently.
+
+**5. The bind is SERVER-owned end to end.** `appliesTo` stores RESOLVED base ids (predicates expand
+at build/authoring time against the weapons/armor bundles' new band columns and fail closed by name),
+the pick validates as a membership test, the base's stats are copied by the server and a
+client-supplied block on a template row is overwritten or stripped. Homebrew gets the identical
+mechanism (the template pair in the Magic section) with a publish-time referential arm.
+
+**6. Flame Tongue burns always-on — the precedent for "while activated" items.** The lit/unlit
+command word is unmodelable item state; a drawn Flame Tongue in combat is lit at every real table.
+Recorded at the item's entry; future while-activated absences cite this ruling rather than re-asking.
+
+**7. The queue after C9 (client-ruled, Round 4).** Next: the flourishes starter (M0 + Topple + Push)
+plus U28 (the shield-lowers-AC bug). Deferred by name: U33 (labelling sweep), B2–B4 (monster display
+rows), F2–F4 (API defects except F1's badge), and A1's parity guard waits until the next
+editor-heavy batch rather than "before everything" — a dated reversal of ruling 10's ordering, taken
+knowingly. The three party-shaped units (U20 Monk die + Sun Blade, U17 Magical Secrets, U35a
+two-weapon fighting) go to the back of the queue until the client's next campaign has a party; U35a's
+scope ruling stays OWED.
+
 ## 2026-08-13 — a harvested absence is authored to the check the ENGINE rolls, or it stays an absence
 
 **Context.** Two vocabulary gaps closed the same day: `roll-mode {roll: "check"}` gained a consumer
