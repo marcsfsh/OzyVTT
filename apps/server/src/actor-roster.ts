@@ -1,7 +1,7 @@
 import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
 import {
-  abilityModifier, armorClassFromEquipment, hitDicePool, multiclassCasterLevel, multiclassPactSlots, multiclassSpellSlots,
-  type ClassLevelEntry
+  ABILITIES, abilityModifier, armorClassFromEquipment, hitDicePool, multiclassCasterLevel, multiclassPactSlots, multiclassSpellSlots,
+  type Ability, type ClassLevelEntry, type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { endEffectsSustainedBy } from "./effects.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -136,10 +136,38 @@ export function armorClassRiderOf(definition: ActorDefinition): number {
   return 0;
 }
 
+/**
+ * This sheet's Unarmored Defense, in the two numbers the AC math takes - or null, which is every
+ * monster, every PDF import and every character without the feature.
+ *
+ * It has to be READ BACK rather than recomputed because AC is re-derived from the live loadout in
+ * three places that have no class content in hand, and a shield alone makes that derivation answer:
+ * without this a Barbarian who picked a shield up lost their Constitution to it (U28), and the live
+ * actor contradicted the very definition it was built from. Same open extension bag, same fail-open
+ * discipline and the same writer as `armorClassRiderOf` above - `buildCharacterDefinition` step 11.
+ *
+ * The bag stores the ABILITY, not the modifier, so the score and the bonus cannot drift apart; the
+ * ability is checked against `ABILITIES` because an unknown string would index `abilityScores` to
+ * `undefined` and quietly turn the whole AC into NaN.
+ */
+export function unarmoredDefenseOf(definition: ActorDefinition): UnarmoredDefense | null {
+  const extension = definition.extensions?.["open5e.srd-2024"];
+  if (extension && typeof extension === "object") {
+    const value = (extension as { unarmoredDefense?: unknown }).unarmoredDefense;
+    if (value && typeof value === "object") {
+      const { ability, allowShield } = value as { ability?: unknown; allowShield?: unknown };
+      if (typeof ability === "string" && (ABILITIES as readonly string[]).includes(ability)) {
+        return { bonus: abilityModifier(definition.abilityScores[ability as Ability]), allowShield: allowShield === true };
+      }
+    }
+  }
+  return null;
+}
+
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string, catalog?: EquipmentCatalog) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog), unarmoredDefenseOf(definition));
   // The SECOND of the two reconciliation points (the other is every inventory write). Seeding through
   // the same derivation is what makes a monster or a PDF import - neither of which ever runs the
   // character builder - carry its equipment's riders from the moment it reaches the table.
@@ -267,7 +295,7 @@ export function rebuildActorDefinition(state: GameState, actorId: string, defini
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog), unarmoredDefenseOf(definition));
   const derivation = deriveEquipment({ ...actor, inventory } as Actor, definition, catalog);
   const previousMaximum = actor.hp.maximum;
   const maximum = definition.hitPoints.maximum;

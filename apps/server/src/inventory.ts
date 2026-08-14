@@ -1,7 +1,7 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { ActorDefinition, Currency, InventoryItem } from "@vtt/schemas";
 import { abilityModifier, armorClassFromEquipment, effectiveSlot } from "@vtt/rules-5e";
-import { armorClassRiderOf, spellSlotMaxima } from "./actor-roster.js";
+import { armorClassRiderOf, spellSlotMaxima, unarmoredDefenseOf } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -44,7 +44,10 @@ export type InventoryDeps = Readonly<{
 export function reconcileEquipment(actor: Actor, definition: ActorDefinition | undefined, deps: InventoryDeps = {}): void {
   if (!definition) return;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
-  const derived = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(actor.inventory, deps.catalog));
+  // Unarmored Defense travels with the definition (`unarmoredDefenseOf`) because THIS is the write a
+  // shield actually arrives on: equipping one used to replace a Barbarian's Constitution AC with a
+  // flat 10 + Dex + 2 and leave them worse off than bare-handed (U28).
+  const derived = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(actor.inventory, deps.catalog), unarmoredDefenseOf(definition));
   // The builder's flat non-equipment rider (the Defense fighting style) still rides on top; the item
   // riders join it. Both are re-applied from scratch, so neither can be dropped by the other.
   actor.armorClass = (derived === null ? definition.armorClass : derived + armorClassRiderOf(definition)) + derivation.armorClass;

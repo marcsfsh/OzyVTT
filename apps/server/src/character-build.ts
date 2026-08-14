@@ -1638,8 +1638,22 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const dexModifier = abilityModifier(finalScores.dex);
   // The SAME AC function `instantiate` re-runs on import (risk 3): equipment first, then Unarmored
   // Defense while nothing is worn, then the unarmored 10 + DEX floor; flat riders stack on top.
-  const equipmentAc = armorClassFromEquipment(dexModifier, inventory);
-  const unarmoredAc = interpreted.unarmoredDefense ? 10 + dexModifier + abilityModifier(finalScores[interpreted.unarmoredDefense.ability]) : null;
+  //
+  // Unarmored Defense is handed DOWN into that first step rather than waiting for the `??` below,
+  // because a SHIELD ALONE makes the equipment branch answer - and answering 10 + DEX + shield is how
+  // a Barbarian used to LOSE Constitution by picking a shield up (U28). `allowShield` is the authored
+  // half of that decision and this is its one reader: the Barbarian prints true, the Monk false.
+  //
+  // The SRD's third author, Draconic Resilience, prints neither - "while you aren't wearing armor"
+  // and no sentence about a Shield - so it takes the schema default (false) and a shield replaces it.
+  // That is exactly what the engine did before this change, so no number moves; whether the silence
+  // should read as the Barbarian's answer instead is a CONTENT question, owned by
+  // `scripts/class-mechanics/sorcerer.ts` and settled by a bundle rebuild, not by this reader.
+  const unarmoredDefense = interpreted.unarmoredDefense
+    ? { bonus: abilityModifier(finalScores[interpreted.unarmoredDefense.ability]), allowShield: interpreted.unarmoredDefense.allowShield }
+    : null;
+  const equipmentAc = armorClassFromEquipment(dexModifier, inventory, unarmoredDefense);
+  const unarmoredAc = unarmoredDefense ? 10 + dexModifier + unarmoredDefense.bonus : null;
   const wearingArmor = inventory.some((item) => item.equipped && item.category === "armor" && item.armor);
   // The flat, NON-equipment part of this character's AC. `instantiate` re-derives AC from the live
   // loadout, so it has to be told about the rider or it silently drops it (task-packet risk 3):
@@ -1668,7 +1682,22 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
     // The prose layer: EVERY feature lands as a trait (riders only ADD mechanics on top), in the
     // extensions block CharacterSheet.tsx already renders for imported sheets.
-    extensions: { "open5e.srd-2024": { traits: interpreted.traits, ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}) } },
+    //
+    // `unarmoredDefense` rides the same open bag as `armorClassBonus`, and for the same reason: THREE
+    // other places re-derive AC from the live loadout (`instantiate`, `rebuildActorDefinition`, and
+    // every inventory write through `reconcileEquipment`), none of them has the class content in
+    // hand, and `ActorDefinition` models only the AC TOTAL. Without this the fix above would hold
+    // until the character picked a shield up AT THE TABLE and then be undone by the reconciliation -
+    // the definition saying 17 while the actor said 14. The ABILITY is stored rather than the
+    // modifier so the reader re-derives from the definition's own scores and the two cannot drift;
+    // `unarmoredDefenseOf` in actor-roster.ts is that reader.
+    extensions: {
+      "open5e.srd-2024": {
+        traits: interpreted.traits,
+        ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}),
+        ...(interpreted.unarmoredDefense ? { unarmoredDefense: { ability: interpreted.unarmoredDefense.ability, allowShield: interpreted.unarmoredDefense.allowShield } } : {})
+      }
+    },
     ...(interpreted.damageResistances.length > 0 ? { damageResistances: dedupe(interpreted.damageResistances) } : {}),
     ...(interpreted.damageImmunities.length > 0 ? { damageImmunities: dedupe(interpreted.damageImmunities) } : {}),
     ...(interpreted.conditionImmunities.length > 0 ? { conditionImmunities: dedupe(interpreted.conditionImmunities) } : {}),

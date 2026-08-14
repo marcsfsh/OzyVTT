@@ -11,6 +11,7 @@ import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { masteryHitEffects, masteryHitPushes, masteryHitSaves, masteryMissDamage, type MasterySwing } from "./weapon-mastery.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 type LiveActor = GameState["actors"][number];
@@ -74,6 +75,21 @@ export type ResolveDependencies = Readonly<{
    * Resolve it for the GM audience: a player must still be able to roll their own cursed item.
    */
   catalog?: EquipmentCatalog;
+  /**
+   * SRD FORCED MOVEMENT (the Push mastery): move a combatant straight away from another one and
+   * report how far it really went, or null when the map cannot express the distance.
+   *
+   * This file has no geometry and must not gain any - the map's one snapping implementation lives in
+   * `token-placement.ts` (`docs/ai-context/map-grid.md`) and the operation layer has already fetched
+   * the grid for its distance rules, so the callback is built THERE (`game-operations.ts`) and
+   * `forced-movement.ts` does the arithmetic. It takes no direction and no destination: both are the
+   * server's to derive, which is why nothing about a push crosses the wire.
+   *
+   * Optional, and its absence is honest rather than silent: `reactions.ts` resolves opportunity
+   * attacks without geometry, so a pike that hits on a reaction narrates "move the token" instead of
+   * moving it. Wiring that path needs the reaction operation to fetch the map first.
+   */
+  pushToken?: (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) => Readonly<{ value: number; unit: string }> | null;
 }>;
 
 /**
@@ -968,25 +984,31 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
   }
   /**
-   * WEAPON MASTERY: GRAZE. "If your attack roll with this weapon misses a creature, you can deal
-   * damage to that creature equal to the ability modifier you used to make the attack roll. This
-   * damage is the same type dealt by the weapon."
+   * WEAPON MASTERY, first of two call sites. The rules themselves live in `weapon-mastery.ts` - one
+   * registry keyed by slug, whose keys ARE the implemented set the derivation gates on - because a
+   * mastery is a small rule at one moment of a swing and eight of them inline here is one hunk edited
+   * eight times.
    *
-   * The one mastery that fires on a MISS, which is why it sits outside the damage block above - that
-   * block is gated on hit/crit/unknown by design, and Graze is the exception the SRD writes.
+   * The swing context is built once, here, and null unless a mastery is in force on an attack that
+   * actually rolled: `attack !== null` is what guarantees the single target the SRD's masteries all
+   * act on, so the handlers read the target off `attack` and have no way to name a second.
    *
-   * A FUMBLE is still a miss and still grazes: the SRD gives no carve-out for a natural 1, and the
-   * feature is a floor on the swing rather than a reward for rolling well.
-   *
-   * `bonusDamage` is the right channel and not a compromise - it is flat integers with a source
-   * label, which is exactly what "damage equal to your ability modifier" is, and the roll card
-   * already renders it as its own explainable line. A non-positive modifier deals nothing rather than
-   * healing the target.
+   * The ON-MISS hook fires HERE, outside the damage block above, because Graze is the one mastery
+   * that fires on a MISS and that block is gated on hit/crit/unknown by design.
    */
   const mastery = derivation.masteryByActionId[action.id];
-  if (mastery?.id === "graze" && attack !== null && (attack.outcome === "miss" || attack.outcome === "fumble") && mastery.abilityModifier > 0) {
-    bonusDamage.push({ amount: mastery.abilityModifier, type: action.damage[0]?.type ?? "untyped", source: "Graze" });
-  }
+  const masterySwing: MasterySwing | null = mastery && attack !== null
+    ? {
+        mastery, attack,
+        attacker: { id: attacker.id, name: attacker.name },
+        damageType: action.damage[0]?.type ?? "untyped",
+        proficiencyBonus: deps.definition?.proficiencyBonus ?? 0,
+        actionId: action.id,
+        commandId: input.commandId,
+        round: state.combat.round
+      }
+    : null;
+  bonusDamage.push(...masteryMissDamage(masterySwing));
 
   // TYPED RIDER DAMAGE: criterion 1's "extra 1d4 lightning" and criterion 9's "extra 1d6 fire on a
   // critical hit". Neither existing channel can carry it - `bonusDamage` is flat integers only, and
@@ -1089,44 +1111,72 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   /**
-   * WEAPON MASTERY: SAP. "If you hit a creature with this weapon, that creature has Disadvantage on
-   * its next attack roll before the start of your next turn."
+   * WEAPON MASTERY, second call site: the ON-HIT hook (Sap today). It sits after the declared on-hit
+   * riders because that is the order the two used to run in and the roll card lists `effectsApplied`
+   * in the order it was filled.
    *
-   * A real effect on the TARGET, carrying `attack-disadvantage` - the variant whose own comment reads
-   * "the bearer's own attack rolls have disadvantage" - and ending at the start of the attacker's next
-   * turn, which is what `until-source-next-turn` already means for Reckless Attack and Dodge.
-   *
-   * KNOWN APPROXIMATION, stated rather than hidden: the SRD ends Sap on the target's NEXT attack roll
-   * or the attacker's next turn, whichever comes first, and nothing in the effect vocabulary expires
-   * on use. So a target that attacks twice in that window rolls both at Disadvantage instead of one.
-   * This is the same shape the shipped Help builtin already has (`attack-advantage`, same duration,
-   * also "the next attack roll" in the SRD), so it follows the engine's existing convention rather
-   * than inventing a second one. A one-shot duration is the fix, and it fixes both together.
-   *
-   * NO condition is linked: Sap is not a named condition, and putting one on the row would make the
-   * token render a status it does not have.
+   * The handler BUILDS the effect and this loop ADDS it - `weapon-mastery.ts` deliberately imports
+   * nothing at runtime so `equipment-derivation.ts` can depend on its registry keys without dragging
+   * `effects.ts` into a leaf. `addEffect`'s RETURN is what gets narrated: it is idempotent by id, so a
+   * retried command reports the effect that is really on the actor rather than the one just built.
    */
-  if (mastery?.id === "sap" && attack !== null && (attack.outcome === "hit" || attack.outcome === "crit")) {
-    const sapped = targets[0];
-    const effect = addEffect(state, sapped.id, {
-      id: `${input.commandId}:mastery:sap:${sapped.id}`,
-      name: `Sapped by ${attacker.name}`,
-      tags: ["sap"],
+  for (const applied of masteryHitEffects(masterySwing)) {
+    const effect = addEffect(state, applied.targetId, applied.effect);
+    effectsApplied.push({ targetId: applied.targetId, targetName: applied.targetName, name: effect.name, conditionIds: applied.effect.linkedConditionIds });
+  }
+
+  /**
+   * WEAPON MASTERY, third call site: the ON-HIT SAVE (Topple today). The handler computed the DC and
+   * named the condition; this parks a real prompt through the SAME door every other save uses, so
+   * answering it rolls the target's own Constitution save and applies Prone through `setCondition`.
+   *
+   * The prompt is NOT mirrored into this resolution's `save` field. That field means "this action
+   * calls for a save", and the runner's note beneath it counts prompts by `actionName` - which for a
+   * mastery is the mastery's, not the weapon's, so mirroring it there would print "All saving throws
+   * for Quarterstaff resolved" over a Topple save that is still owed. A warning line says the true
+   * thing instead, and the tracker row is where it is answered either way.
+   */
+  for (const forced of masteryHitSaves(masterySwing)) {
+    createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
-      sourceActionId: `${action.id}:sap`,
-      startedRound: state.combat.round,
-      duration: { type: "until-source-next-turn" },
-      endsWhenSourceDefeated: true,
-      voidWhileIncapacitated: false,
-      concentration: false,
-      modifiers: [{ type: "attack-disadvantage" }],
-      linkedConditionIds: [],
-      escapeDc: null,
-      onEnd: [],
-      endsWithTag: null
+      actionName: forced.actionName,
+      ability: forced.ability,
+      dc: forced.dc,
+      targetIds: [forced.targetId],
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionId: forced.conditionId,
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
     });
-    effectsApplied.push({ targetId: sapped.id, targetName: sapped.name, name: effect.name, conditionIds: [] });
+    warnings.push(`${forced.actionName}: ${forced.targetName} must make a DC ${forced.dc} ${forced.ability.toUpperCase()} save${forced.conditionId === null ? "" : ` or have the ${conditionLabel(forced.conditionId)} condition`} - the prompt is in the turn order.`);
+  }
+
+  /**
+   * WEAPON MASTERY, fourth call site: FORCED MOVEMENT (Push today). The handler named the pair, the
+   * distance and the SRD's size gate; the callback owns the geometry (see `pushToken` on
+   * `ResolveDependencies`, and `forced-movement.ts` for why this is not `applyMovementRules`).
+   *
+   * `targets[0]` is the pushed creature and is the SAME creature `forced.targetId` names - an attack
+   * resolves against exactly one target or this function has already thrown, so the size read here
+   * cannot belong to anyone else. It is read the way the declared on-hit riders read theirs.
+   *
+   * EVERY failure degrades to a sentence, never a rejection: too large, unplaced, an uncalibrated
+   * and unscaled map, a resolver with no callback. A swing that hit must not be undone because the
+   * map could not answer a geometry question, so the line tells the GM to move the token - the
+   * builtin Shove's own shape.
+   */
+  for (const forced of masteryHitPushes(masterySwing)) {
+    if (!sizeAtMost(targets[0].size, forced.maxTargetSize)) {
+      // Capitalised to match how the SRD prints a creature size in prose ("Large or smaller").
+      warnings.push(`${forced.targetName} is bigger than ${forced.maxTargetSize[0].toUpperCase()}${forced.maxTargetSize.slice(1)} and can't be pushed.`);
+      continue;
+    }
+    const moved = deps.pushToken?.({ actorId: forced.targetId, awayFromActorId: forced.awayFromActorId, distanceFeet: forced.distanceFeet }) ?? null;
+    warnings.push(moved !== null && moved.value > 0
+      ? `${forced.targetName} is pushed ${Math.round(moved.value * 10) / 10} ${moved.unit} straight away from ${attacker.name}.`
+      : `${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name} - move the token.`);
   }
 
   // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,

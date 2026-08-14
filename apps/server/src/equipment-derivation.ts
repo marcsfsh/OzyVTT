@@ -4,6 +4,10 @@ import {
   abilityModifier, armorWeightOf, collectRiders, effectiveSlot, gatePasses, sumRiders, weaponAbilityModifierFrom,
   type ArmorWeight, type RiderAbility, type RiderCarrier, type RiderContext, type RiderModifier, type RiderTrigger, type ResolvedRider
 } from "@vtt/rules-5e";
+import { IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
+
+/** Re-exported so `MasteryInForce`'s importers keep one name; it is declared beside the handlers that read it. */
+export type { MasteryInForce };
 
 /**
  * ============================================================================================
@@ -238,7 +242,8 @@ export type CharacterFeatureRef = Readonly<{ id: string; kind: "class" | "subcla
  * `effective-actions.ts`'s `withStandingRiders` against `weaponActionIds` below.
  *
  * It lives HERE, next to the filter that reads it, rather than in `character-build.ts` where the
- * baking happens: this module imports no other server module, so `character-build.ts` can import it
+ * baking happens: this module imports no server module that imports anything itself - `weapon-mastery.ts`
+ * is the only one and it is a deliberate runtime leaf - so `character-build.ts` can import this file
  * without a cycle, while the reverse would drag the whole content library into a leaf.
  */
 export const BUILDER_BAKED_MODIFIER_TYPES = [
@@ -248,37 +253,16 @@ export const BUILDER_BAKED_MODIFIER_TYPES = [
 const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES);
 
 /**
- * WHICH OF THE EIGHT MASTERIES THE ENGINE ACTUALLY IMPLEMENTS - the one place that answers it.
+ * Does this mastery slug reach a real behaviour today? The derivation omits it entirely when not, so
+ * this is the single public gate between "the weapon prints a mastery" and "the engine honours it".
  *
- * The SRD defines exactly eight mastery properties, and all 38 weapons now name one. That data is
- * worth nothing on its own: a slug on 38 records that no engine path reads is the "built but unwired"
- * failure this repo has already shipped three times, and it looks identical to a feature that works.
- * So the derivation refuses to advertise a mastery it cannot honour, and this set is the gate.
- *
- * Implemented, and proved at the far end (a rolled number, a die that changes):
- *   graze - `action-resolution.ts` rolls the ability modifier as damage on a MISS.
- *   sap   - `action-resolution.ts` puts a real effect on the target; its next attack rolls 2d20kl1.
- *
- * NOT implemented, and therefore deliberately inert rather than half-wired. Each needs engine surface
- * that does not exist yet, sized in the Stage 5 report:
- *   push   - moves a token 10 feet directly away; needs the attack path to write a position.
- *   slow   - -10 Speed until the attacker's next turn; the effect vocabulary has no speed modifier.
- *   topple - a Constitution save the WEAPON triggers, then Prone; the save path is action-declared.
- *   cleave - a second attack roll against a different creature inside one resolution.
- *   nick   - moves the Light property's extra attack out of the bonus action; a turn-economy change.
- *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target
- *            scoping, so there is nowhere to hang "against this one foe" today.
+ * The ANSWER is not written here. `IMPLEMENTED_MASTERIES` is derived from the handler registry in
+ * `weapon-mastery.ts` - a slug is in it because a handler answers to it - so implementing a mastery
+ * is registering one, and no unit has to remember to edit a literal in this file. That module is the
+ * one exception to this file's no-server-imports rule and it earns it by having no runtime imports of
+ * its own (its header explains why that has to stay true); the six slugs still owed are listed there,
+ * beside the registry a new one joins.
  */
-const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(["graze", "sap"]);
-/**
- * One weapon swing's mastery, as the resolver needs it. The ability modifier travels with the slug
- * because Graze deals "damage equal to the ability modifier you used to make the attack roll", and
- * that choice (finesse takes the better of Str/Dex, a ranged weapon takes Dex) is `weaponAction`'s
- * to make - recomputing it at the resolver would be a second copy of the rule, free to drift.
- */
-export type MasteryInForce = Readonly<{ id: string; abilityModifier: number }>;
-
-/** Does this mastery slug reach a real behaviour today? The derivation omits it entirely when not. */
 export const masteryReaches = (mastery: string): boolean => IMPLEMENTED_MASTERIES.has(mastery);
 
 export type EquipmentCatalog = Readonly<{

@@ -26,6 +26,7 @@ import { addCombatant, endEncounter, nextInitiativeTurn, rollRemainingInitiative
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { rollDeathSave } from "./death-saves.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
+import { pushTokenAway } from "./forced-movement.js";
 import { activateScene, createScene, duplicateScene, removeScene, renameScene, reorderScenes, setSceneCombatants } from "./scenes.js";
 import { buildEncounterArchive, type EncounterArchiveDocument } from "./encounter-archive.js";
 import { launchReplay } from "./replay-launch.js";
@@ -1244,7 +1245,19 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog() });
+        // SRD forced movement (the Push mastery): the resolver has no geometry and must not grow any,
+        // so the token write is built HERE, where the grid was already fetched for `distanceFeet`, and
+        // runs through `moveEncounterToken`'s snapping like the GM's own drag. It takes no client
+        // input - the direction is derived from the two token positions and the distance is the
+        // rule's - and it degrades to null (which the resolver narrates) rather than throwing.
+        //
+        // NO EXTRA AUTHORIZATION LIVES HERE, and that is not an omission. Only `targets[0]` of an
+        // attack that already hit can be pushed, and a player's target ids were cleared by
+        // `canPlayerTarget` above - so a player can never move a hidden combatant's token, and the
+        // one they CAN move is the creature the rules just said they may shove.
+        const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
+          pushTokenAway(state, input, geometry);
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog(), pushToken });
         // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
         // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
         // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.

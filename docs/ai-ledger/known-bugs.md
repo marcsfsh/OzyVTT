@@ -175,12 +175,6 @@ Format: `[area] — description — suspected cause / status`.
   SRD vocabulary control, and `weapon-properties.mirror.test.ts` swings a GM-authored Finesse weapon
   off Dexterity through the real controls, the real wire and the real catalog.
 
-- **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
-  `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces
-  the Constitution/Wisdom AC path instead of adding +2 to it. Found 2026-08-10 by PLANNER-ENGINE.
-  Owner: engine program **U28** (`docs/product/plan-engine-program.md`), together with
-  `unarmored-defense.allowShield` (2 SRD authors: Barbarian `true`, Monk `false`).
-
 - **[homebrew/editor] The "inherit the damage type" empty box mints unpublishable records.**
   `RiderEditor`'s extra-damage row documents an empty `damageType` as "same as the weapon's", and
   `blankModifier` seeds exactly that — but the schema refuses both `""` ("String must contain at
