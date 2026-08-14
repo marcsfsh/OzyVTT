@@ -326,3 +326,124 @@ describe("the generated magic-item bundle", () => {
     expect(wand).toMatchObject({ name: "Wand of the War Mage, +1", category: "wand", slot: "held", rarity: "uncommon" });
   });
 });
+
+/**
+ * THE ELIGIBILITY GUARD (C9). The `appliesTo` column is the whole data basis for the weapon/armor
+ * bind - the player's pick is validated against `baseIds` server-side, so a silently emptied or
+ * re-resolved column is a wrong pick list at a real table. Pinned the C1 way: every VALUE by name,
+ * never a count. Two tables rather than one flat 47-row dump: rows share their printed FORM, so the
+ * per-row half pins which form each row carries and the per-form half pins what each form resolves
+ * to - a predicate that starts resolving differently fails once, naming the form.
+ */
+describe("the eligibility column", () => {
+  it("carries the printed base qualifier for every weapon and armor row, by name", () => {
+    const labels = Object.fromEntries(rows.filter((row) => row.appliesTo).map((row) => [row.id, row.appliesTo!.label]));
+    expect(labels, "a rebuild changed or dropped the appliesTo LABEL column").toEqual({
+      "adamantine-armor": "Any Medium or Heavy, Except Hide Armor",
+      "armor-1": "Any Light, Medium, or Heavy",
+      "armor-2": "Any Light, Medium, or Heavy",
+      "armor-3": "Any Light, Medium, or Heavy",
+      "armor-of-invulnerability": "Plate Armor",
+      "armor-of-resistance": "Any Light, Medium, or Heavy",
+      "armor-of-vulnerability": "Any Light, Medium, or Heavy",
+      "berserker-axe": "Battleaxe, Greataxe, or Halberd",
+      "dagger-of-venom": "Dagger",
+      "dancing-sword": "Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+      "defender": "Any Melee Weapon",
+      "demon-armor": "Any Light, Medium, or Heavy",
+      "dragon-scale-mail": "Scale Mail",
+      "dragon-slayer": "Any Simple or Martial",
+      "dwarven-plate": "Half Plate Armor or Plate Armor",
+      "dwarven-thrower": "Warhammer",
+      "elven-chain": "Chain Mail or Chain Shirt",
+      "energy-bow": "Longbow or Shortbow",
+      "flame-tongue": "Any Melee Weapon",
+      "frost-brand": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+      "giant-slayer": "Any Simple or Martial",
+      "glamoured-studded-leather": "Studded Leather Armor",
+      "hammer-of-thunderbolts": "Maul or Warhammer",
+      "holy-avenger": "Any Simple or Martial",
+      "javelin-of-lightning": "Javelin",
+      "luck-blade": "Glaive, Greatsword, Longsword, Rapier, Scimitar, Sickle, or Shortsword",
+      "mace-of-disruption": "Mace",
+      "mace-of-smiting": "Mace",
+      "mace-of-terror": "Mace",
+      "mithral-armor": "Any Medium or Heavy, Except Hide Armor",
+      "nine-lives-stealer": "Any Simple or Martial",
+      "oathbow": "Longbow or Shortbow",
+      "plate-armor-of-etherealness": "Half Plate Armor or Plate Armor",
+      "quarterstaff-of-the-acrobat": "Quarterstaff",
+      "scimitar-of-speed": "Scimitar",
+      "sun-blade": "Longsword",
+      "sword-of-life-stealing": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+      "sword-of-sharpness": "Glaive, Greatsword, Longsword, or Scimitar",
+      "sword-of-wounding": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+      "thunderous-greatclub": "Greatclub",
+      "trident-of-fish-command": "Trident",
+      "vicious-weapon": "Any Simple or Martial",
+      "vorpal-sword": "Glaive, Greatsword, Longsword, or Scimitar",
+      "weapon-1": "Any Simple or Martial",
+      "weapon-2": "Any Simple or Martial",
+      "weapon-3": "Any Simple or Martial",
+      "weapon-of-warning": "Any Simple or Martial"
+    });
+  });
+
+  it("resolves every printed form to the same base ids, pinned in full", () => {
+    // Rows sharing a label must share the resolution - asserted first, so the per-form table below
+    // is a complete claim about every row rather than a sample.
+    const byLabel = new Map<string, readonly string[]>();
+    for (const row of rows) {
+      if (!row.appliesTo) continue;
+      const previous = byLabel.get(row.appliesTo.label);
+      if (previous) expect(row.appliesTo.baseIds, `${row.id} resolves "${row.appliesTo.label}" differently from a sibling`).toEqual(previous);
+      byLabel.set(row.appliesTo.label, row.appliesTo.baseIds);
+    }
+    expect(Object.fromEntries(byLabel), "a rebuild changed a form's RESOLVED base list").toEqual({
+      "Any Light, Medium, or Heavy": ["breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "hide-armor", "leather-armor", "padded-armor", "plate-armor", "ring-mail", "scale-mail", "splint-armor", "studded-leather-armor"],
+      "Any Medium or Heavy, Except Hide Armor": ["breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "plate-armor", "ring-mail", "scale-mail", "splint-armor"],
+      "Any Melee Weapon": ["battleaxe", "club", "dagger", "flail", "glaive", "greataxe", "greatclub", "greatsword", "halberd", "handaxe", "javelin", "lance", "light-hammer", "longsword", "mace", "maul", "morningstar", "pike", "quarterstaff", "rapier", "scimitar", "shortsword", "sickle", "spear", "trident", "war-pick", "warhammer", "whip"],
+      "Any Simple or Martial": ["battleaxe", "blowgun", "club", "dagger", "dart", "flail", "glaive", "greataxe", "greatclub", "greatsword", "halberd", "hand-crossbow", "handaxe", "heavy-crossbow", "javelin", "lance", "light-crossbow", "light-hammer", "longbow", "longsword", "mace", "maul", "morningstar", "musket", "pike", "pistol", "quarterstaff", "rapier", "scimitar", "shortbow", "shortsword", "sickle", "sling", "spear", "trident", "war-pick", "warhammer", "whip"],
+      "Battleaxe, Greataxe, or Halberd": ["battleaxe", "greataxe", "halberd"],
+      "Chain Mail or Chain Shirt": ["chain-mail", "chain-shirt"],
+      "Dagger": ["dagger"],
+      "Glaive, Greatsword, Longsword, Rapier, Scimitar, Sickle, or Shortsword": ["glaive", "greatsword", "longsword", "rapier", "scimitar", "sickle", "shortsword"],
+      "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword": ["glaive", "greatsword", "longsword", "rapier", "scimitar", "shortsword"],
+      "Glaive, Greatsword, Longsword, or Scimitar": ["glaive", "greatsword", "longsword", "scimitar"],
+      "Greatclub": ["greatclub"],
+      "Greatsword, Longsword, Rapier, Scimitar, or Shortsword": ["greatsword", "longsword", "rapier", "scimitar", "shortsword"],
+      "Half Plate Armor or Plate Armor": ["half-plate-armor", "plate-armor"],
+      "Javelin": ["javelin"],
+      "Longbow or Shortbow": ["longbow", "shortbow"],
+      "Longsword": ["longsword"],
+      "Mace": ["mace"],
+      "Maul or Warhammer": ["maul", "warhammer"],
+      "Plate Armor": ["plate-armor"],
+      "Quarterstaff": ["quarterstaff"],
+      "Scale Mail": ["scale-mail"],
+      "Scimitar": ["scimitar"],
+      "Studded Leather Armor": ["studded-leather-armor"],
+      "Trident": ["trident"],
+      "Warhammer": ["warhammer"]
+    });
+    // Every resolved id is a row of the base bundle it points into - the cross-bundle half.
+    const weaponIds = new Set(loadWeapons().map((weapon) => weapon.id));
+    const armorIds = new Set(loadArmor().map((piece) => piece.id));
+    for (const row of rows) {
+      if (!row.appliesTo) continue;
+      const pool = row.category === "weapon" ? weaponIds : armorIds;
+      for (const id of row.appliesTo.baseIds) expect(pool.has(id), `${row.id}: base "${id}" is not in its base bundle`).toBe(true);
+    }
+  });
+
+  it("is total on weapons and body armor, and absent everywhere else - the ammunition ruling included", () => {
+    expect(rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo)).toEqual([]);
+    expect(rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo)).toEqual([]);
+    // The client ruling (2026-08-14): magic AMMUNITION is out of C9 - no ammunition model exists,
+    // and binding it to a bow would invent one. SHIELDS bind to nothing because a shield IS the
+    // base. Both are absences by decision, recorded in `build-magic-items.ts`; this pins them.
+    expect(rows.filter((row) => row.category === "ammunition").map((row) => row.id).sort())
+      .toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);
+    expect(rows.filter((row) => row.category === "shield")).toHaveLength(9);
+  });
+});

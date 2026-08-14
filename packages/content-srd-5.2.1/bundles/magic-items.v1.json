@@ -10,6 +10,19 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Medium or Heavy, Except Hide Armor",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -35,6 +48,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -60,6 +74,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -101,6 +116,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -142,6 +158,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -183,6 +200,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -208,6 +226,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -233,6 +252,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -258,6 +278,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -283,6 +304,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -308,6 +330,12 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Plate Armor",
+   "baseIds": [
+    "plate-armor"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -350,6 +378,23 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Light, Medium, or Heavy",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "hide-armor",
+    "leather-armor",
+    "padded-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor",
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -390,6 +435,23 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Light, Medium, or Heavy",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "hide-armor",
+    "leather-armor",
+    "padded-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor",
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -415,6 +477,23 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Light, Medium, or Heavy",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "hide-armor",
+    "leather-armor",
+    "padded-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor",
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -447,6 +526,23 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Light, Medium, or Heavy",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "hide-armor",
+    "leather-armor",
+    "padded-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor",
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -479,6 +575,23 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Light, Medium, or Heavy",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "hide-armor",
+    "leather-armor",
+    "padded-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor",
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -511,6 +624,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -536,6 +650,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -561,6 +676,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -586,6 +702,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -611,6 +728,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -649,6 +767,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -674,6 +793,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "common",
   "isMagic": true,
   "attunement": {
@@ -699,6 +819,7 @@
   "weapon": null,
   "armor": null,
   "slot": "belt",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -724,6 +845,7 @@
   "weapon": null,
   "armor": null,
   "slot": "belt",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -749,6 +871,14 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Battleaxe, Greataxe, or Halberd",
+   "baseIds": [
+    "battleaxe",
+    "greataxe",
+    "halberd"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -774,6 +904,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -822,6 +953,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -847,6 +979,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -872,6 +1005,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -897,6 +1031,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -937,6 +1072,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -975,6 +1111,7 @@
   "weapon": null,
   "armor": null,
   "slot": "hands",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1016,6 +1153,7 @@
   "weapon": null,
   "armor": null,
   "slot": "hands",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1053,6 +1191,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1091,6 +1230,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1131,6 +1271,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1156,6 +1297,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -1181,6 +1323,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1206,6 +1349,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -1231,6 +1375,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1269,6 +1414,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1294,6 +1440,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1319,6 +1466,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -1359,6 +1507,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1384,6 +1533,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1432,6 +1582,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -1470,6 +1621,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1507,6 +1659,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1555,6 +1708,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1580,6 +1734,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -1611,6 +1766,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -1642,6 +1798,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -1673,6 +1830,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -1704,6 +1862,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1729,6 +1888,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -1773,6 +1933,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Dagger",
+   "baseIds": [
+    "dagger"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1798,6 +1964,16 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+   "baseIds": [
+    "greatsword",
+    "longsword",
+    "rapier",
+    "scimitar",
+    "shortsword"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -1823,6 +1999,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1848,6 +2025,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -1873,6 +2051,39 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Melee Weapon",
+   "baseIds": [
+    "battleaxe",
+    "club",
+    "dagger",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "handaxe",
+    "javelin",
+    "lance",
+    "light-hammer",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "pike",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortsword",
+    "sickle",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -1898,6 +2109,23 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Light, Medium, or Heavy",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "hide-armor",
+    "leather-armor",
+    "padded-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor",
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -1930,6 +2158,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -1955,6 +2184,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "artifact",
   "isMagic": true,
   "attunement": {
@@ -1980,6 +2210,12 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Scale Mail",
+   "baseIds": [
+    "scale-mail"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2027,6 +2263,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2052,6 +2331,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2077,6 +2357,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2102,6 +2383,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2127,6 +2409,13 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Half Plate Armor or Plate Armor",
+   "baseIds": [
+    "half-plate-armor",
+    "plate-armor"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2159,6 +2448,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Warhammer",
+   "baseIds": [
+    "warhammer"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2187,6 +2482,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2212,6 +2508,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2237,6 +2534,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2262,6 +2560,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2287,6 +2586,13 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Chain Mail or Chain Shirt",
+   "baseIds": [
+    "chain-mail",
+    "chain-shirt"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2319,6 +2625,13 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Longbow or Shortbow",
+   "baseIds": [
+    "longbow",
+    "shortbow"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2344,6 +2657,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2369,6 +2683,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2405,6 +2720,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2430,6 +2746,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2455,6 +2772,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -2480,6 +2798,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -2505,6 +2824,39 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Melee Weapon",
+   "baseIds": [
+    "battleaxe",
+    "club",
+    "dagger",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "handaxe",
+    "javelin",
+    "lance",
+    "light-hammer",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "pike",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortsword",
+    "sickle",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2530,6 +2882,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2555,6 +2908,17 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+   "baseIds": [
+    "glaive",
+    "greatsword",
+    "longsword",
+    "rapier",
+    "scimitar",
+    "shortsword"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2595,6 +2959,7 @@
   "weapon": null,
   "armor": null,
   "slot": "hands",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2620,6 +2985,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2645,6 +3011,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2683,6 +3050,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2708,6 +3118,12 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Studded Leather Armor",
+   "baseIds": [
+    "studded-leather-armor"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2740,6 +3156,7 @@
   "weapon": null,
   "armor": null,
   "slot": "hands",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2765,6 +3182,7 @@
   "weapon": null,
   "armor": null,
   "slot": "hands",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2790,6 +3208,7 @@
   "weapon": null,
   "armor": null,
   "slot": "hands",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2831,6 +3250,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2856,6 +3276,13 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Maul or Warhammer",
+   "baseIds": [
+    "maul",
+    "warhammer"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -2881,6 +3308,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -2906,6 +3334,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2936,6 +3365,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -2963,6 +3393,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -2988,6 +3419,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3013,6 +3445,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3043,6 +3476,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3089,6 +3523,7 @@
   "weapon": null,
   "armor": null,
   "slot": "head",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3114,6 +3549,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -3141,6 +3619,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3166,6 +3645,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -3191,6 +3671,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3216,6 +3697,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3241,6 +3723,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3266,6 +3749,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3291,6 +3775,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -3316,6 +3801,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3359,6 +3845,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -3396,6 +3883,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Javelin",
+   "baseIds": [
+    "javelin"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3421,6 +3914,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3446,6 +3940,18 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Glaive, Greatsword, Longsword, Rapier, Scimitar, Sickle, or Shortsword",
+   "baseIds": [
+    "glaive",
+    "greatsword",
+    "longsword",
+    "rapier",
+    "scimitar",
+    "sickle",
+    "shortsword"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -3477,6 +3983,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Mace",
+   "baseIds": [
+    "mace"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3502,6 +4014,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Mace",
+   "baseIds": [
+    "mace"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3527,6 +4045,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Mace",
+   "baseIds": [
+    "mace"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3552,6 +4076,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3577,6 +4102,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3602,6 +4128,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3627,6 +4154,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3652,6 +4180,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3677,6 +4206,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3702,6 +4232,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3738,6 +4269,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3763,6 +4295,19 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Any Medium or Heavy, Except Hide Armor",
+   "baseIds": [
+    "breastplate",
+    "chain-mail",
+    "chain-shirt",
+    "half-plate-armor",
+    "plate-armor",
+    "ring-mail",
+    "scale-mail",
+    "splint-armor"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3788,6 +4333,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -3813,6 +4359,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -3838,6 +4385,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3863,6 +4411,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3892,6 +4441,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3917,6 +4509,13 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Longbow or Shortbow",
+   "baseIds": [
+    "longbow",
+    "shortbow"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3942,6 +4541,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -3967,6 +4567,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3992,6 +4593,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4017,6 +4619,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4044,6 +4647,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4069,6 +4673,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4111,6 +4716,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4136,6 +4742,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4161,6 +4768,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4203,6 +4811,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4241,6 +4850,13 @@
   "weapon": null,
   "armor": null,
   "slot": "armor",
+  "appliesTo": {
+   "label": "Half Plate Armor or Plate Armor",
+   "baseIds": [
+    "half-plate-armor",
+    "plate-armor"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -4275,6 +4891,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4300,6 +4917,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4325,6 +4943,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4350,6 +4969,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "common",
   "isMagic": true,
   "attunement": {
@@ -4375,6 +4995,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4400,6 +5021,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -4425,6 +5047,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4450,6 +5073,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -4475,6 +5099,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4500,6 +5125,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4525,6 +5151,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4550,6 +5177,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4575,6 +5203,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -4600,6 +5229,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4625,6 +5255,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4650,6 +5281,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4675,6 +5307,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -4700,6 +5333,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -4725,6 +5359,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -4750,6 +5385,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -4775,6 +5411,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Quarterstaff",
+   "baseIds": [
+    "quarterstaff"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -4800,6 +5442,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4855,6 +5498,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -4880,6 +5524,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -4905,6 +5550,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4943,6 +5589,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4968,6 +5615,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -4993,6 +5641,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5018,6 +5667,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5048,6 +5698,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5073,6 +5724,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5110,6 +5762,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5135,6 +5788,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5175,6 +5829,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5231,6 +5886,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5256,6 +5912,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5281,6 +5938,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5306,6 +5964,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5336,6 +5995,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5361,6 +6021,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5386,6 +6047,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5411,6 +6073,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5441,6 +6104,7 @@
   "weapon": null,
   "armor": null,
   "slot": "ring",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5466,6 +6130,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5491,6 +6156,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5533,6 +6199,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5564,6 +6231,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5593,6 +6261,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5618,6 +6287,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5643,6 +6313,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5720,6 +6391,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5745,6 +6417,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5770,6 +6443,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5811,6 +6485,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5836,6 +6511,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5861,6 +6537,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -5898,6 +6575,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -5930,6 +6608,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Scimitar",
+   "baseIds": [
+    "scimitar"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -5955,6 +6639,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -5990,6 +6675,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -6038,6 +6724,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6063,6 +6750,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6095,6 +6783,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -6127,6 +6816,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6159,6 +6849,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6191,6 +6882,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -6216,6 +6908,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -6241,6 +6934,7 @@
   "weapon": null,
   "armor": null,
   "slot": "consumable",
+  "appliesTo": null,
   "rarity": "varies",
   "isMagic": true,
   "attunement": {
@@ -6266,6 +6960,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shield",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6291,6 +6986,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -6316,6 +7012,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6376,6 +7073,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6431,6 +7129,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6486,6 +7185,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6515,6 +7215,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6556,6 +7257,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6581,6 +7283,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6626,6 +7329,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -6672,6 +7376,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -6697,6 +7402,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6756,6 +7462,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6822,6 +7529,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6847,6 +7555,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6885,6 +7594,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -6921,6 +7631,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Longsword",
+   "baseIds": [
+    "longsword"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6946,6 +7662,17 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+   "baseIds": [
+    "glaive",
+    "greatsword",
+    "longsword",
+    "rapier",
+    "scimitar",
+    "shortsword"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -6971,6 +7698,15 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Glaive, Greatsword, Longsword, or Scimitar",
+   "baseIds": [
+    "glaive",
+    "greatsword",
+    "longsword",
+    "scimitar"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -6996,6 +7732,17 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
+   "baseIds": [
+    "glaive",
+    "greatsword",
+    "longsword",
+    "rapier",
+    "scimitar",
+    "shortsword"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7021,6 +7768,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -7049,6 +7797,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -7074,6 +7823,7 @@
   "weapon": null,
   "armor": null,
   "slot": "neck",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -7099,6 +7849,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Greatclub",
+   "baseIds": [
+    "greatclub"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7124,6 +7880,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7149,6 +7906,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7174,6 +7932,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7199,6 +7958,12 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Trident",
+   "baseIds": [
+    "trident"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7234,6 +7999,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -7259,6 +8025,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7284,6 +8093,15 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Glaive, Greatsword, Longsword, or Scimitar",
+   "baseIds": [
+    "glaive",
+    "greatsword",
+    "longsword",
+    "scimitar"
+   ]
+  },
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -7309,6 +8127,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7334,6 +8153,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7372,6 +8192,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7408,6 +8229,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7446,6 +8268,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7484,6 +8307,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7519,6 +8343,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7544,6 +8369,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7588,6 +8414,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7626,6 +8453,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7664,6 +8492,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7691,6 +8520,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7718,6 +8548,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7745,6 +8576,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7772,6 +8604,7 @@
   "weapon": null,
   "armor": null,
   "slot": "held",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7810,6 +8643,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7842,6 +8718,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7867,6 +8786,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -7892,6 +8854,49 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
+  "appliesTo": {
+   "label": "Any Simple or Martial",
+   "baseIds": [
+    "battleaxe",
+    "blowgun",
+    "club",
+    "dagger",
+    "dart",
+    "flail",
+    "glaive",
+    "greataxe",
+    "greatclub",
+    "greatsword",
+    "halberd",
+    "hand-crossbow",
+    "handaxe",
+    "heavy-crossbow",
+    "javelin",
+    "lance",
+    "light-crossbow",
+    "light-hammer",
+    "longbow",
+    "longsword",
+    "mace",
+    "maul",
+    "morningstar",
+    "musket",
+    "pike",
+    "pistol",
+    "quarterstaff",
+    "rapier",
+    "scimitar",
+    "shortbow",
+    "shortsword",
+    "sickle",
+    "sling",
+    "spear",
+    "trident",
+    "war-pick",
+    "warhammer",
+    "whip"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -7917,6 +8922,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
   "attunement": {
@@ -7942,6 +8948,7 @@
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -7967,6 +8974,7 @@
   "weapon": null,
   "armor": null,
   "slot": "feet",
+  "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -8005,6 +9013,7 @@
   "weapon": null,
   "armor": null,
   "slot": "shoulders",
+  "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
   "attunement": {

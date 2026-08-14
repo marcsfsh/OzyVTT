@@ -167,6 +167,13 @@ export const ArmorReferenceSchema = z.object({
   source: ContentSourceSchema,
   /** Body armor carries its full base AC (11-18); the shield row carries its +2 bonus. */
   acBase: z.number().int().min(2).max(25),
+  /**
+   * The Armor table's category BAND (Light/Medium/Heavy/Shield), joined from the markdown SRD the
+   * way the weapon table's `melee` is. Exists for the magic-item eligibility column: "Armor (Any
+   * Medium or Heavy, Except Hide Armor)" (Demon Armor's family) cannot resolve against anything
+   * else. OPTIONAL like every joined column; `bundle.test.ts` pins all 13 by name.
+   */
+  category: z.enum(["light", "medium", "heavy", "shield"]).optional(),
   addDexModifier: z.boolean(),
   dexModifierCap: z.number().int().nullable(),
   stealthDisadvantage: z.boolean(),
@@ -269,6 +276,21 @@ const EquipmentWeaponStatsSchema = z.object({
   properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
 });
 
+/**
+ * THE ELIGIBILITY COLUMN (C9): which BASE weapons or armors a template item may bind to. The SRD's
+ * printed type-line qualifier ("Weapon (Any Simple or Martial)", "Armor (Half Plate Armor or Plate
+ * Armor)") as data: `label` is the qualifier verbatim, `baseIds` the RESOLVED id list. Predicates
+ * are expanded at BUILD or AUTHORING time against the real weapon/armor tables and fail closed
+ * there, so nothing at play time ever evaluates one - the server's bind check is a membership test
+ * and the picker's chooser is a list. Named (not inlined) for the same inference-budget reason as
+ * `EquipmentWeaponStatsSchema` above.
+ */
+export const ItemAppliesToSchema = z.object({
+  label: z.string().min(1).max(120),
+  baseIds: z.array(z.string().regex(/^[a-z0-9-]+$/).max(60)).min(1).max(40)
+}).strict();
+export type ItemAppliesTo = z.infer<typeof ItemAppliesToSchema>;
+
 export const EquipmentReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),
@@ -307,6 +329,12 @@ export const EquipmentReferenceSchema = z.object({
 
   /** WHERE it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
   slot: ItemSlotSchema.optional(),
+  /**
+   * The eligibility column (above). A row carrying this and no `weapon`/`armor` block is a
+   * TEMPLATE: it derives nothing until the player's pick binds it to one of `baseIds`, server-side.
+   * Absent or null = not a template; whatever stats it has are its own blocks.
+   */
+  appliesTo: ItemAppliesToSchema.nullable().optional(),
   /** Display and filtering only ("uncommon", "legendary"). An OPEN slug - rarity is identity, not a mechanical hook. */
   rarity: ContentIdSchema.optional(),
   isMagic: z.boolean().default(false),

@@ -27,7 +27,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ItemSlotSchema } from "@vtt/schemas";
-import { EquipmentReferenceSchema, type EquipmentReference } from "../src/schemas.js";
+import { ArmorReferenceSchema, EquipmentReferenceSchema, WeaponReferenceSchema, type EquipmentReference, type ItemAppliesTo } from "../src/schemas.js";
 import { RARITY_IDS } from "../src/enums.js";
 import { slug, withTables } from "./markdown.js";
 import { ITEM_MECHANICS_LANES } from "./item-mechanics/index.js";
@@ -384,6 +384,96 @@ function renderDescription(entry: Entry, printedTypeLine: string): { text: strin
 }
 
 // ---------------------------------------------------------------------------------------------
+// 5b. The eligibility column (C9) - the printed base qualifier, resolved and fail-closed
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A magic weapon or armor in the SRD carries NO stats of its own; the type-line qualifier names
+ * which BASE the item applies to - "Weapon (Warhammer)", "Weapon (Any Simple or Martial)",
+ * "Armor (Any Medium or Heavy, Except Hide Armor)". This section turns that prose into the
+ * `appliesTo` column: the label verbatim, plus the base ids RESOLVED here, at build time, against
+ * the two committed base bundles - so play time never evaluates a predicate, and a qualifier this
+ * grammar cannot resolve fails the build by name (the C1 join rule).
+ *
+ * The base bundles are INPUTS of this script now: `weapons.v1.json` supplies the category and
+ * melee/ranged columns ("Any Simple or Martial", "Any Melee Weapon") and `armor.v1.json` the armor
+ * category band ("Any Light, Medium, or Heavy"). Both columns exist for exactly this join.
+ */
+const BASE_WEAPONS = z.array(WeaponReferenceSchema).parse(JSON.parse(readFileSync(join(bundles, "weapons.v1.json"), "utf8"))).filter((weapon) => !weapon.improvised);
+const BASE_ARMOR = z.array(ArmorReferenceSchema).parse(JSON.parse(readFileSync(join(bundles, "armor.v1.json"), "utf8")));
+
+/** Split "A, B, or C" / "A or B" into its printed parts, in printed order. */
+const namedParts = (qualifier: string): string[] =>
+  qualifier.split(/,\s*(?:or\s+)?|\s+or\s+/i).map((part) => part.trim()).filter((part) => part !== "");
+
+function namedBaseIds(entry: Entry, qualifier: string, byName: ReadonlyMap<string, string>, kind: string): readonly string[] {
+  const parts = namedParts(qualifier);
+  if (parts.length === 0) return die(`${entry.name} (line ${entry.line}): empty ${kind} qualifier "${qualifier}".`);
+  return parts.map((part) => {
+    const id = byName.get(slug(part));
+    if (!id) return die(`${entry.name} (line ${entry.line}): "${part}" in "(${qualifier})" matches no ${kind} in the ${kind} bundle - fail closed by name, never guess.`);
+    return id;
+  });
+}
+
+function weaponBaseIds(entry: Entry, qualifier: string): readonly string[] {
+  if (/^any simple or martial$/i.test(qualifier)) return BASE_WEAPONS.map((weapon) => weapon.id);
+  if (/^any melee weapon$/i.test(qualifier)) {
+    const melee = BASE_WEAPONS.filter((weapon) => weapon.melee === true).map((weapon) => weapon.id);
+    if (melee.length === 0) return die(`${entry.name} (line ${entry.line}): "(${qualifier})" resolved to zero weapons - the melee band column is missing from weapons.v1.json.`);
+    return melee;
+  }
+  if (/^any\b/i.test(qualifier)) return die(`${entry.name} (line ${entry.line}): unrecognised weapon predicate "(${qualifier})".`);
+  return namedBaseIds(entry, qualifier, new Map(BASE_WEAPONS.map((weapon) => [slug(weapon.name), weapon.id])), "weapon");
+}
+
+function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
+  const bodyArmor = BASE_ARMOR.filter((piece) => piece.category !== "shield");
+  const predicate = qualifier.match(/^any (.+?)(?:, except (.+))?$/i);
+  if (predicate) {
+    const categories = namedParts(predicate[1]).map((part) => part.toLowerCase());
+    for (const category of categories) {
+      if (!["light", "medium", "heavy"].includes(category)) return die(`${entry.name} (line ${entry.line}): unrecognised armor category "${category}" in "(${qualifier})".`);
+    }
+    let ids = bodyArmor.filter((piece) => categories.includes(piece.category ?? "")).map((piece) => piece.id);
+    if (predicate[2]) {
+      const excluded = slug(predicate[2]);
+      if (!ids.includes(excluded)) return die(`${entry.name} (line ${entry.line}): "(${qualifier})" excepts "${excluded}", which the named categories do not contain.`);
+      ids = ids.filter((id) => id !== excluded);
+    }
+    if (ids.length === 0) return die(`${entry.name} (line ${entry.line}): "(${qualifier})" resolved to zero armors - the category band column is missing from armor.v1.json.`);
+    return ids;
+  }
+  return namedBaseIds(entry, qualifier, new Map(bodyArmor.map((piece) => [slug(piece.name), piece.id])), "armor");
+}
+
+/**
+ * Weapon and body-armor rows get the column; everything else gets an explicit null.
+ *
+ * SHIELDS bind to nothing on purpose: a magic shield IS the base - the SRD prints its bonus "in
+ * addition to the Shield's normal bonus to AC", the +2 is `armor.v1.json`'s own shield row, and
+ * the item's `armor-class` rider stacks on whatever the bearer wears. There is no pick to make.
+ *
+ * AMMUNITION IS OUT BY CLIENT RULING (2026-08-14, C9 Round 1). NAMED ABSENCE: "Ammunition,
+ * +1, +2, or +3" and "Ammunition of Slaying" print bonuses that ride ANOTHER weapon's attack and
+ * are consumed by the shot, and this app has no ammunition model at all - no consumption on the
+ * shot, no quiver, no per-shot rider on the bow's swing. Binding ammunition to a bow under C9
+ * would mean inventing that model inside a unit about something else. Needs: an ammunition model.
+ * Unit: none yet.
+ */
+function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesTo | null {
+  if (type.category === "Weapon" && slotId === "weapon") {
+    if (!type.qualifier) return die(`${entry.name} (line ${entry.line}): a weapon row whose type line names no base weapon.`);
+    return { label: type.qualifier, baseIds: [...weaponBaseIds(entry, type.qualifier)] };
+  }
+  if (type.category === "Armor" && slotId === "armor") {
+    if (!type.qualifier) return die(`${entry.name} (line ${entry.line}): an armor row whose type line names no base armor.`);
+    return { label: type.qualifier, baseIds: [...armorBaseIds(entry, type.qualifier)] };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------------
 // 6. Emit
 // ---------------------------------------------------------------------------------------------
 
@@ -394,6 +484,7 @@ for (const entry of items) {
   const type = parseTypeLine(entry);
   const slotId = slotOf(entry, type);
   const category = categoryOfRow(type, slotId);
+  const appliesTo = appliesToOf(entry, type, slotId);
   const printedCategory = `${type.category}${type.qualifier ? ` (${type.qualifier})` : ""}`;
   const attunementSuffix = type.attunementClause === null ? "" : ` (Requires Attunement${type.attunementClause})`;
 
@@ -432,6 +523,7 @@ for (const entry of items) {
       description: description.text,
       weapon: null,
       armor: null,
+      appliesTo,
       isMagic: true,
       rarity,
       attunement: { required: type.attunement.required, restrictedTo: [...type.attunement.restrictedTo] }
@@ -449,6 +541,14 @@ if (badSlots.length > 0) die(`${badSlots.length} row(s) carry a slot that is not
 
 const badRarities = rows.filter((row) => !RARITY_IDS.includes(row.rarity ?? ""));
 if (badRarities.length > 0) die(`${badRarities.length} row(s) carry a rarity outside RARITY_IDS: ${badRarities.map((row) => `${row.name} -> ${row.rarity}`).join(", ")}`);
+
+// The eligibility column is TOTAL on weapons and body armor and ABSENT everywhere else - both
+// directions, like every join in this package. A weapon row without it is a template nothing can
+// bind; a wand with one would be a pick with no meaning.
+const missingAppliesTo = rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo);
+if (missingAppliesTo.length > 0) die(`${missingAppliesTo.length} weapon/armor row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`);
+const strayAppliesTo = rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo);
+if (strayAppliesTo.length > 0) die(`${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`);
 
 /**
  * THE ID GUARD, and it is a precaution against the reconciliation NOT taken.

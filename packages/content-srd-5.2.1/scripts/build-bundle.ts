@@ -663,15 +663,53 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
 const unmatched = [...weaponTable.keys()].filter((id) => !weaponRecords.some((weapon) => weapon.id === id));
 if (unmatched.length > 0) throw new Error(`Weapons table rows matched no open5e weapon: ${unmatched.join(", ")}.`);
 
-const armorRecords = onlySrd(armors).map((armor) => ({
-  id: slugOf(armor.pk),
-  name: armor.fields.name,
-  acBase: armor.fields.ac_base,
-  addDexModifier: armor.fields.ac_add_dexmod,
-  dexModifierCap: armor.fields.ac_cap_dexmod,
-  stealthDisadvantage: armor.fields.grants_stealth_disadvantage,
-  strengthRequired: armor.fields.strength_score_required
-}));
+/**
+ * The Armor table's category bands, parsed exactly the way the Weapons table's are above: the
+ * markdown SRD prints "Light Armor (…)" / "Medium Armor (…)" / "Heavy Armor (…)" / "Shield (…)" as
+ * `<th>` rows inside the body, and the band a row sits under is the printed category. Needed by the
+ * magic-item eligibility column ("Armor (Any Medium or Heavy, Except Hide Armor)") and answerable
+ * from nothing else. Fails closed on an unrecognised band and on a data row before any band.
+ */
+const armorTable = (() => {
+  const table = weaponTableSource.match(/\*\*Armor\*\*\s*(<table>[\s\S]*?<\/table>)/);
+  if (!table) throw new Error("No **Armor** table in sources/dnd-5e-srd-markdown/equipment.md.");
+  const categories = new Map<string, "light" | "medium" | "heavy" | "shield">();
+  let band: "light" | "medium" | "heavy" | "shield" | null = null;
+  for (const [, row] of (table[1].match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+    const heading = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
+    if (heading) {
+      const label = stripTags(heading[1]);
+      const match = label.match(/^(Light|Medium|Heavy) Armor\b|^(Shield)\b/);
+      if (!match) throw new Error(`Armor table: unrecognised band heading "${label}".`);
+      band = match[2] ? "shield" : (match[1]!.toLowerCase() as "light" | "medium" | "heavy");
+      continue;
+    }
+    const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1]);
+    if (cells.length === 0) continue;
+    if (band === null) throw new Error(`Armor table: data row before any category band: ${stripTags(row)}`);
+    categories.set(tableSlug(cells[0]), band);
+  }
+  return categories;
+})();
+
+const armorRecords = onlySrd(armors).map((armor) => {
+  const id = slugOf(armor.pk);
+  const category = armorTable.get(id);
+  if (!category) throw new Error(`No SRD Armor-table row for "${id}" - check the name slug in sources/dnd-5e-srd-markdown/equipment.md.`);
+  return {
+    id,
+    name: armor.fields.name,
+    acBase: armor.fields.ac_base,
+    category,
+    addDexModifier: armor.fields.ac_add_dexmod,
+    dexModifierCap: armor.fields.ac_cap_dexmod,
+    stealthDisadvantage: armor.fields.grants_stealth_disadvantage,
+    strengthRequired: armor.fields.strength_score_required
+  };
+});
+// Total in both directions, like the weapons join above.
+const unmatchedArmor = [...armorTable.keys()].filter((id) => !armorRecords.some((armor) => armor.id === id));
+if (unmatchedArmor.length > 0) throw new Error(`Armor table rows matched no open5e armor: ${unmatchedArmor.join(", ")}.`);
 
 const describesRecords = (rows: Fixture<DescribesFields>[]) => onlySrd(rows).map((row) => ({
   id: row.fields.describes,

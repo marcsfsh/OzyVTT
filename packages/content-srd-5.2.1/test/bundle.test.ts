@@ -289,6 +289,15 @@ describe("SRD 5.2.1 reference bundles", () => {
     ]);
     expect(meleeIds.length + rangedIds.length, "every weapon sits in exactly one band").toBe(38);
 
+    // The ARMOR table's band, same join, same failure mode, pinned for all 13 by name.
+    const armorCategories = Object.fromEntries(loadArmor().map((piece) => [piece.id, piece.category]));
+    expect(armorCategories, "a build-bundle run changed or dropped the armor CATEGORY column").toEqual({
+      "padded-armor": "light", "leather-armor": "light", "studded-leather-armor": "light",
+      "hide-armor": "medium", "chain-shirt": "medium", "scale-mail": "medium", breastplate: "medium", "half-plate-armor": "medium",
+      "ring-mail": "heavy", "chain-mail": "heavy", "splint-armor": "heavy", "plate-armor": "heavy",
+      shield: "shield"
+    });
+
     // Every slug used is one the weapon-property bundle actually publishes, bare of the fixture's
     // own `-wp`/`-mastery` suffix - so a typo cannot reach a reader that matches on the bare word.
     const bare = (kind: "property" | "mastery") =>
