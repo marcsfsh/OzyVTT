@@ -5524,6 +5524,7 @@ One of the following, discriminated by `type`:
 - `HomebrewRiderRollMode`
 - `HomebrewModifierSaveBonus`
 - `HomebrewModifierCheckBonus`
+- `HomebrewModifierDamageBonus`
 - `HomebrewModifierSpellSaveDc`
 - `HomebrewModifierSpellAttackBonus`
 - `HomebrewModifierSpellSlot`
@@ -5681,6 +5682,17 @@ Score a critical hit on this natural roll or higher (19 for a keen weapon).
 | --- | --- | --- | --- |
 | `type` | const `"critical-range"` | yes |  |
 | `threshold` | integer (15–20) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierDamageBonus`
+
+A flat bonus to damage rolls - the other half of a "+1 weapon" (`attack-bonus` is the to-hit half). Standing, it folds into the swing's printed damage formula; gated on a moment ("+7 on a critical hit") it lands as its own labelled line at resolution. Weapon-scoped by default on an item with a weapon block, so two magic weapons never stack. This is the FEATURE/ITEM branch; the effect vocabulary keeps its older, differently-shaped `damage-bonus` ({amount, appliesTo}) on HomebrewEffectModifier.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-bonus"` | yes |  |
+| `amount` | integer (-10–10) | yes |  |
 | `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
 | `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 

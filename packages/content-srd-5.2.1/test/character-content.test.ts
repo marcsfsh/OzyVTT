@@ -1175,8 +1175,9 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(item({ id: "hb-b", modifiers: secondHalf }).modifiers).toHaveLength(8);
     // ...and the identical array parses on a chosen OPTION inside a choice, and on a plain feature.
     expect(FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers).toHaveLength(8);
-    // 21 variants: the 8 that existed, the 3 shared with EffectModifierSchema, the 10 new ones.
-    expect(FeatureModifierSchema.options).toHaveLength(21);
+    // 22 variants: the 8 that existed, the 3 shared with EffectModifierSchema, the 11 the
+    // magic-item vocabulary added (`damage-bonus` - the "+1 weapon"'s damage half - is the 11th).
+    expect(FeatureModifierSchema.options).toHaveLength(22);
   });
 
   it("15. an item that grants a feat", () => {

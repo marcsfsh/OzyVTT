@@ -401,6 +401,7 @@ describe("Zod / OpenAPI parity", () => {
       "roll-mode": { roll: "concentration", mode: "advantage", scope: "bearer" },
       "save-bonus": { amount: 1, when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] },
       "check-bonus": { amount: 5, when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["sleight-of-hand"] }] },
+      "damage-bonus": { amount: 7, when: [{ type: "on-critical-hit" }] },
       "spell-save-dc": { amount: 1, classId: "wizard" }, "spell-attack-bonus": { amount: 2 }, "spell-slot": { level: 3, amount: 1 },
       "resource-bonus": { poolId: "channel-divinity", amount: 1 }, "critical-range": { threshold: 19 }, "critical-bonus-dice": { count: 1 },
       "damage-reduction": { amount: 3, when: [{ type: "on-taking-damage" }, { type: "damage-type-is", damageTypes: ["cold"] }] },

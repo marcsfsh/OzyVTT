@@ -279,6 +279,7 @@ const MODIFIER_TYPES: readonly SelectOption[] = [
   ROLLS("check-bonus", "Ability checks"),
   ROLLS("initiative", "Initiative"),
   ROLLS("roll-mode", "Advantage or disadvantage"),
+  HARM("damage-bonus", "Damage rolls"),
   HARM("extra-damage", "Extra damage"),
   HARM("critical-range", "Critical hit range"),
   HARM("critical-bonus-dice", "Extra dice on a critical hit"),
@@ -315,6 +316,7 @@ function blankModifier(type: string): Draft {
     case "unarmored-defense": return { type, ability: "con", allowShield: false };
     case "darkvision": return { type, feet: 60 };
     case "attack-bonus": return { type, amount: 1 };
+    case "damage-bonus": return { type, amount: 1 };
     case "save-bonus": return { type, amount: 1 };
     case "check-bonus": return { type, amount: 1 };
     case "extra-damage": return { type, formula: "1d6", damageType: "", doubleOnCritical: false };
@@ -335,7 +337,7 @@ function blankModifier(type: string): Draft {
     anywhere else. The default is derived from the carrier, so the only reason a GM ever
     sees the control is to BROADEN one — which is why it is a single switch on a single
     family and not a per-rider setting. */
-const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice"];
+const WEAPON_SCOPED = ["attack-bonus", "damage-bonus", "extra-damage", "critical-range", "critical-bonus-dice"];
 
 /**
  * The two riders an ITEM may not carry, refused by `EquipmentReferenceSchema` itself —
@@ -407,7 +409,7 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -5, max: 5, help: "Negative for a curse.", visibleWhen: hasType("ability-score", "hit-points-per-level", "armor-class", "spell-save-dc", "spell-attack-bonus") },
     { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -30, max: 60, unit: "ft", help: "Negative for a curse.", visibleWhen: hasType("speed") },
     { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -5, max: 10, help: "Negative for a curse.", visibleWhen: hasType("initiative") },
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -10, max: 10, help: "Negative for a curse.", visibleWhen: hasType("attack-bonus", "save-bonus", "check-bonus") },
+    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -10, max: 10, help: "Negative for a curse.", visibleWhen: hasType("attack-bonus", "damage-bonus", "save-bonus", "check-bonus") },
     { key: "amount", label: "Extra slots", kind: "number", allowNegative: true, min: -4, max: 4, visibleWhen: hasType("spell-slot") },
     { key: "amount", label: "Extra uses", kind: "number", allowNegative: true, min: -20, max: 20, visibleWhen: hasType("resource-bonus") },
     { key: "amount", label: "Damage reduced by", kind: "number", min: 1, max: 30, visibleWhen: hasType("damage-reduction") },

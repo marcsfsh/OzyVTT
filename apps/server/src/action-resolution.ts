@@ -1009,6 +1009,19 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const already = new Set<unknown>();
     for (const moment of passes) {
       for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
+        // A MOMENT-GATED flat `damage-bonus` ("+7 Bludgeoning on a critical hit") lands as its own
+        // explainable line beside Rage and Graze - flat integers with a source label are exactly
+        // that channel. The `moment === null` skip is the double-count guard: a STANDING
+        // damage-bonus was already folded into the formula by `withStandingRiders`, and the null
+        // pass would re-collect it here. Typed as the damage it joins; no damage rolled, no bonus.
+        if (rider.modifier.type === "damage-bonus") {
+          if (moment === null || already.has(rider.modifier)) continue;
+          const amount = rider.modifier.amount ?? 0;
+          if (amount === 0 || damage.length === 0) continue;
+          already.add(rider.modifier);
+          bonusDamage.push({ amount, type: damage[0].type, source: rider.label });
+          continue;
+        }
         if (rider.modifier.type !== "extra-damage" || already.has(rider.modifier)) continue;
         // AN ABILITY MODIFIER IS AN AMOUNT, NOT A DIE. "Add your Charisma modifier to the damage"
         // (Agonizing Blast) resolves against the BEARER's own sheet at the roll, so no authored

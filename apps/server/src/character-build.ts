@@ -298,6 +298,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<Record<CarrierRiderType, "standing" | 
   "extra-attack": "standing",        // effective-actions extraAttacksFor raises attack.count on a weapon swing
   "roll-mode": "at-its-moment",      // attacks (action-resolution), saves (saving-throws), initiative (encounter)
   "extra-damage": "at-its-moment",   // action-resolution rolls it as its own typed damage entry
+  "damage-bonus": "standing",        // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in action-resolution
   "check-bonus": "standing",         // actor-derived.ts checkRiderBonus, into every check and skill row
   "spell-attack-bonus": "unread",    // reaches derivation.spellAttackBonus; no spell-attack path reads it yet
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionFor, applied to the total after resistances

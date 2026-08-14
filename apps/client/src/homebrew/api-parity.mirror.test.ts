@@ -51,7 +51,12 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
   it("pins the walk — the plan's two schema-intrinsic counts, and this file's own expansion", () => {
     // 162/709 are properties of the schemas (plan §2.3); the other four are properties of THIS
     // canonicaliser, pinned on the day it was written so the next agent measures the same thing.
-    expect(stats).toEqual({ objectSchemas: 162, declaredKeys: 710 });
+    //
+    // **162 → 163 schemas / 710 → 714 keys, 2026-08-14 (C9 batch).** The feature-side `damage-bonus`
+    // variant landed (the "+1 weapon"'s damage half, C7a's limit (A)): one new object schema carrying
+    // `type`/`amount`/`when`/`scope`. All four key NAMES already exist on sibling variants with live
+    // controls, so the walk grows and the open set does not.
+    expect(stats).toEqual({ objectSchemas: 163, declaredKeys: 714 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,

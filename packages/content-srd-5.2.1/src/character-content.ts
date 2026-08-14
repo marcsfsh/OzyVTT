@@ -280,11 +280,24 @@ export const FeatureModifierSchema = z.discriminatedUnion("type", [
   AttackBonusVariantSchema,
   ExtraDamageVariantSchema,
   RollModeVariantSchema,
-  // ---- the ten the magic-item vocabulary adds -------------------------------------------------
+  // ---- the eleven the magic-item vocabulary adds ----------------------------------------------
   /** A flat bonus to saving throws. Narrow it with `when: [{type: "ability-is", abilities: ["dex"]}]`. */
   z.object({ type: z.literal("save-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is literally this. */
   z.object({ type: z.literal("check-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
+  /**
+   * A flat bonus to damage rolls - the other half of a "+1 weapon" (`attack-bonus` is the to-hit
+   * half). Weapon-scoped by default on an item with a weapon block (`THIS_ITEM_BY_DEFAULT` in
+   * @vtt/rules-5e reserved the name before this variant existed), so two magic weapons in a pack
+   * can never stack. Standing, it folds into the swing's printed formula ("2d6 + 2"); gated on a
+   * moment ("+7 Bludgeoning on a critical hit") it lands as its own labelled line at resolution.
+   *
+   * DELIBERATELY NOT the effect-side `damage-bonus` (@vtt/schemas `EffectModifierSchema`), which
+   * predates the rider gate - `{amount, appliesTo}` with no `when`. Giving that older branch a gate
+   * its reader ignores would ship the known dropped-gate bug; the two unify the day effect-side
+   * gates are honoured (unit E0).
+   */
+  z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** `classId` targets one caster on a multiclass sheet; absent = every caster the bearer has. */
   z.object({ type: z.literal("spell-save-dc"), amount: z.number().int().min(-5).max(5), classId: ContentIdSchema.optional(), ...riderGate }).strict(),
   /** The sibling of the above. A Wand of the War Mage is exactly this and nothing else. */

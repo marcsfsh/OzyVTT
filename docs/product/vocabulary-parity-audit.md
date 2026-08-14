@@ -11,7 +11,7 @@ the nine homebrew body schemas accept.
 
 ## Headline counts
 
-- **162 distinct object schemas** carrying **710 declared keys**, expanded to **5078 editor-addressable questions**.
+- **163 distinct object schemas** carrying **714 declared keys**, expanded to **5078 editor-addressable questions**.
 - **2818 covered** — the editor has a control (or a composite ancestor control) for the key.
 - **106 system-forced** — stamped by the store or the row, never authored (id/type/source/schema stamps).
 - **2154 open**, every one carried by a reasoned exemption row below.
