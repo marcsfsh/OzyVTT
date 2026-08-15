@@ -46,6 +46,27 @@ Format: `[area] — description — suspected cause / status`.
   its next edit - the demote-on-PATCH hazard this ledger already records. Wants the same refusal
   behind a one-time sweep of stored records (or the F4 advisory channel, currently deferred).
 
+- **[rules-engine] Push applies automatically where the SRD prints "you CAN push", and an actor
+  already on the roster keeps a stale Armor Class until something writes its inventory.** Two
+  residues of the 2026-08-14 flourishes batch, both named in code beside the mechanism they limit.
+  (1) `push` (greatclub, heavy crossbow, pike, warhammer) shoves on every hit; the printed mastery
+  makes it the attacker's option, so a player cannot decline a shove that would carry a foe out of
+  their own reach before a second Extra Attack swing. The vocabulary it needs is one optional
+  boolean the attacker declares on the resolve payload PLUS the control that sends it - the field
+  alone is unusable, because the shipped client sends no flag and either default is wrong for
+  somebody. Named absence in `apps/server/src/weapon-mastery.ts`. (2) `actor.armorClass` is cached
+  live state written by three sites (`instantiate`, `rebuildActorDefinition`, `reconcileEquipment`),
+  so U28's corrected Unarmored Defence reaches a character already on the table only once some
+  inventory write reconciles it - which equipping the shield itself does, so the reported symptom is
+  covered and the residue is a sheet that already held one. A startup backfill was considered and
+  declined (it writes persisted state to recover what the reader resolves for free); the honest fix
+  is a reconcile pass whenever the content catalog changes under a stored sheet.
+  Also still open from the same batch: push never fires on the opportunity-attack path
+  (`reactions.ts` holds no geometry and resolves without the callback), where it now correctly
+  narrates "move the token" instead of moving it, and neither Push nor Topple reaches the shared
+  table feed - both narrate as GM-only rules notes, so the table watches a token jump with no line
+  explaining why.
+
 - **[encounter/saves] A save preview projects the PRE-defence number, so the prompt prints more than
   the commit lands against any resistant target.** `answerSave`'s preview arm returns `outcomeDamage`
   — the halved, re-typed total — and it `return`s from ABOVE the call to `applyDamageDetailed`

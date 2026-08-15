@@ -13,6 +13,44 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-14 — the flourishes starter, and the rule a fix must reach the data it claims to fix
+
+**Context.** M0 (the mastery dispatch seam), Topple, Push and U28 (the shield-lowers-AC bug) were
+built by a four-agent workflow, then reviewed by four hostile lenses (19 confirmed of 25) and a
+re-review of the fixes themselves (10 more). These are the rulings that came out of it.
+
+**1. A FIX IS NOT DONE WHEN IT WORKS ON NEW DATA.** U28 shipped keyed on a field only the character
+builder writes, so it reached no character already on a table — the very bug it claimed to close.
+The repair reads the AUTHORED RIDER through the live catalog from what the sheet already claims, so
+it reaches every sheet that names the feature without a migration. Then the re-review found the same
+shape one level down: the stored snapshot was read BEFORE the content, so a Sorcerer built before the
+same batch's content correction kept the stale flag. **The live content wins; the stored bag is the
+fallback for the one case that needs it** (a homebrew record deleted out from under a stored sheet).
+Generalise both: when a build-time snapshot and its authored source disagree, the SOURCE is the
+truth, and a fix that cannot reach existing rows is not finished — it is a migration waiting to be
+written, or an entry that belongs back in `known-bugs.md`.
+
+**2. Deleting a bug entry is a claim, and it is checkable.** U28's `[server/ac]` entry was deleted
+while the defect still reproduced on every existing sheet. The rule stands as `known-bugs.md` states
+it — every entry reproducible at HEAD, or deleted — but the deletion must be justified by a test that
+reproduces the ORIGINAL report, not by the fix compiling.
+
+**3. Content is fixed in the content.** Draconic Resilience made a Sorcerer strictly worse for
+picking up a shield because its record authored no `allowShield`. The reader was right; the record
+was wrong. Fixed in `class-mechanics/sorcerer.ts` after reading the print (`classes.md` restricts
+only WEARING armor; only the Monk's printing adds "or wielding a Shield"), never by special-casing a
+class id in the engine.
+
+**4. An optional printed rider that ships automatic is a NAMED ABSENCE, not a feature.** Push applies
+on every hit where the SRD prints "you CAN push". The wire field alone cannot fix it — the shipped
+client sends no flag, so either default is wrong for somebody — so the divergence is recorded in
+`weapon-mastery.ts` and `known-bugs.md` naming the unit that would close it (the field PLUS the
+control that sends it). The same applies to the shared-feed channel for an accomplished push.
+
+**5. A per-hit save opts out of replace-by-key.** `createPendingSaves` replaces a prompt matching
+(target, action, source), which is right for a re-cast spell and wrong for a mastery that fires on
+every hit — two Topple hits left one owed save. The flag defaults to the old behaviour.
+
 ## 2026-08-14 — C9 lands: the bind's charter, the pick's shape, and the queue after it (client rulings, four discovery rounds)
 
 **Context.** C9 (the weapon-template mechanism, ruled 2026-08-11) was built this day on

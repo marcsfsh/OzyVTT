@@ -19,7 +19,10 @@ fight (`scenes.ts`). Every map tool reaches the GM through **one collapsible too
 
 **5e rules engine** (ADR-0020, server-owned). Action resolution, typed damage, persistent effects and
 conditions, saves, reactions and opportunity attacks, concentration, spell and pact slots, hit dice,
-rests, legendary actions, death saves (`apps/server/src/action-resolution.ts` and its neighbours). How
+rests, legendary actions, death saves (`apps/server/src/action-resolution.ts` and its neighbours).
+**Weapon masteries dispatch through one registry** (`weapon-mastery.ts`, 4 of 8 slugs, the Set derived
+from its handlers): graze, sap, **topple** (a real CON save applying prone) and **push** (the token
+moves 10 ft, snapped, `forced-movement.ts`). How
 strictly it polices is a **standing table policy** (`GameState.rulesPolicy`, set in Settings → The
 table) each fight inherits at `encounter.start`, plus per-family exceptions (`combat.ruleExceptions`,
 `effectiveModeFor` in `rules-families.ts`) so "don't police movement" doesn't also switch off the
@@ -49,10 +52,10 @@ custom formula, level cap (enforced on BOTH doors — the builder and the sheet'
 (auto-claimed, per-session cap) and `character.rebuild` levels their own character up, down or into a
 respec. Builds record their rolled hit points in the choice ledger and a rebuild carries forward what
 it does not re-roll, so a 5→3→5 round trip lands on the same maximum. `builder.roll-abilities` moves
-the wizard's dice server-side into the feed. A player also dresses their own character:
-`actor.set-token-image` and the token library's doors take a player session, curated by a GM-set
-per-entry `hidden` flag — one picker for both roles (`tokens/TokenLibrary.tsx`). Archived characters
-are out of play server-side — refused by claim, scene staging and fight start/add.
+the wizard's dice server-side into the feed. A player also dresses their own character
+(`actor.set-token-image`; the token library's doors take a player session, curated by a GM-set
+per-entry `hidden` flag — one picker for both roles). Archived characters are out of play
+server-side — refused by claim, scene staging and fight start/add.
 
 **Homebrew keeps its promises** (D21), and since 2026-08-09 the editor's vocabulary is under a guard
 (`apps/client/src/homebrew/authoring-harness.ts` + `vocabulary-parity.mirror.test.ts` — every control
@@ -62,12 +65,11 @@ multi-block choices / extraPicks / replaces / spell windows are authorable — a
 classes build and level 1–20** (Extra Attack swings, capstones reach their DCs).
 
 **Replays** (D25/D26/D3). `replay.launch` parks the live table as a scene switch does and makes one
-recorded moment live, cloning everyone under new ids (`replay-launch.ts`). The clone is **kept and
-hidden** (D3): scene-scoped, off every roster, unclaimable, deleted with the scene — a launch no
-longer spends a scene slot forever, and both refusals name their way out. An archive stays hidden
-until shared; a player then reads a COMPUTED replay (`replay-projection.ts`) — no session ids,
-journal, raw states or stat blocks, that fight's map and no other. Unshared reads 404, never 403.
-One component serves both roles (`replay/ReplayPanel.tsx`).
+recorded moment live, cloning everyone under new ids (`replay-launch.ts`); the clone is **kept and
+hidden** — scene-scoped, off every roster, unclaimable, deleted with the scene, both refusals naming
+their way out. An archive stays hidden until shared; a player then reads a COMPUTED replay
+(`replay-projection.ts`) — no session ids, journal, raw states or stat blocks, that fight's map and
+no other. Unshared reads 404, never 403. One component serves both roles (`replay/ReplayPanel.tsx`).
 
 **Content.** SRD 5.2.1 bundles (`packages/content-srd-5.2.1`, ADR-0015); GM homebrew authoring with its
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
@@ -87,17 +89,16 @@ structural: `.pane-scene > .scroll-y` reserves the bright band, so no row rests 
 **Settings — one tab, three groups, one page** (A7/D24, `apps/client/src/settings/SettingsPage.tsx`).
 *Mine* reaches every role; *The table* and *Players* are never rendered without a GM token. The rules
 dial lives here and reads **Enforce / Advise / Off** (D6 — copy only; the wire stays
-`strict|assisted|freeform`), one toggle per server rule family; `builderPolicy` gets its first client
-control; `/setup` folded into *Access & integrations*. `SETTINGS_GROUPS` is data, pinned by
-`settings-groups.test.ts`.
+`strict|assisted|freeform`), one toggle per server rule family; `builderPolicy` has its first client
+control. `SETTINGS_GROUPS` is data, pinned by `settings-groups.test.ts`.
 
 **Everything has an address** (D29, `apps/client/src/router.ts`): `/table` (both roles), `/settings`,
 `/builder`, `/characters/<id>`, `/characters/<id>/level`, `/replays/<id>`, `/scenes/new`,
-`/scenes/<id>`, `/scenes/maps`. `layerOf` reads back which layer is open, `litGmTab` keeps its owning
+`/scenes/<id>`, `/scenes/maps`; `layerOf` reads back which layer is open, `litGmTab` keeps its owning
 tab lit, and `/encounter` · `/setup` · `/scenes?view=maps` redirect rather than 404. `isGmOnlyPath`
-shrank — table, settings, replays, sheets and builder are player-REACHABLE, and a data guard renders
-not-found when the thing behind one is not theirs. Levelling is the same wizard aimed at a character
-that exists (`builder/LevelFlow.tsx`), previewing what a level-down drops (`level-ledger.ts`).
+shrank — table, settings, replays, sheets and builder are player-REACHABLE, with a data guard
+rendering not-found when the thing behind one is not theirs. Levelling is the same wizard aimed at an
+existing character (`builder/LevelFlow.tsx`), previewing what a level-down drops (`level-ledger.ts`).
 
 **Coherence is enforced, not documented** (D28). One copy scanner (`apps/client/src/copy-scan.ts`)
 serves both vocabulary locks (`codex/vocabulary.test.ts`, the play-wide `play-vocabulary.test.ts` —
@@ -105,8 +106,8 @@ everything under `apps/client/src` minus a pinned exclusion list, so a new direc
 a retired word fails `npm run test` with the replacement named. `design-conventions.test.ts` does the
 same for glyphs, raw inputs, colours, breakpoints and undeclared scroll regions — shrink-only.
 
-**Table viewer / second screen.** Pairing codes exchanged for a hashed cookie session, an SSE feed, and
-a player-safe projection that never carries `GameState` (`apps/server/src/viewer-http.ts`,
+**Table viewer / second screen.** Pairing codes exchanged for a hashed cookie session, an SSE feed,
+and a player-safe projection that never carries `GameState` (`apps/server/src/viewer-http.ts`,
 `viewer-presentation.ts`; `docs/ai-context/viewer-mode.md`).
 
 **Worldbuilding Codex.** Typed pages and folders, atlas, journal and timeline, sessions with prep and
@@ -114,27 +115,26 @@ recap (staged `sceneIds` GM-only always), quests, calendar, downtime, party stan
 relationship graph, search, revisions, backup. Every player-facing read goes through
 `apps/server/src/codex-projections.ts` (`docs/ai-context/codex.md`).
 
-**Public integration API v1** (ADR-0016). Versioned envelopes over the same handlers as the UI,
-GM-minted scoped credentials, an OpenAPI document at `/api/v1/openapi.json` (`packages/api-contract`).
+**Public integration API v1** (ADR-0016). Versioned envelopes over the same handlers as the UI, GM-minted
+scoped credentials, an OpenAPI document at `/api/v1/openapi.json` (`packages/api-contract`).
 
-**Realtime and persistence.** One command pipeline: zod-validate → authorize per command from the
-signed token → commit receipt + event + projection in one SQLite transaction → broadcast a per-role
-projection. Idempotent by `commandId`, revision-checked, with presence and reconnect grace
-(`apps/server/src/index.ts`, `server.ts`).
+**Realtime and persistence.** One command pipeline: zod-validate → authorize per command from the signed
+token → commit receipt + event + projection in one SQLite transaction → broadcast a per-role projection.
+Idempotent by `commandId`, revision-checked, with presence and reconnect grace (`index.ts`, `server.ts`).
 
 ## In flight
 
-- **The remaining program: batches 0–3 merged (PR #56); C9 built 2026-08-14.** Read
-  `docs/product/remaining-program-plan.md` FIRST (twenty rulings, decision log 2026-08-10) plus the
-  2026-08-14 entry: the ruled queue is the flourishes starter (M0 + Topple + Push) + U28, with U33,
-  B2–B4, F2–F4 (except F1) and A1-until-needed deferred, and the party-shaped units parked.
+- **The remaining program: batches 0–3 merged (PR #56); C9 and the flourishes starter built
+  2026-08-14.** Read `docs/product/remaining-program-plan.md` FIRST (twenty rulings, decision log
+  2026-08-10), the 2026-08-14 entry, and `plan-mastery-starter.md` (that batch's plan, written as a
+  cold-start handoff). Deferred by ruling: U33, B2–B4, F2–F4 except F1, A1-until-needed; the
+  party-shaped units (U20, U17, U35a) are parked until there is a party.
 - **"The screen is the page" refresh + round 2 — landed through wave 5, QA run.** Rulings:
-  `docs/product/refresh-round-2-decisions.md` (66 — read before touching round-2 work); evidence and
-  residue: `refresh-round-2-fixes.md`. The three P0s this page carried through 2026-08-08 were
-  re-measured 2026-08-10 and are closed; the tap-floor audit runs 9 viewports, `/table` passes all 9.
+  `docs/product/refresh-round-2-decisions.md` (66 — read before touching round-2 work); residue:
+  `refresh-round-2-fixes.md`. Its three P0s closed 2026-08-10; `/table` passes all 9 tap viewports.
 - **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
   rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
-- **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
+  **No phase exit gate has been claimed;** `BUILD_PLAN.md` carries the roadmap.
 
 ## Known broken
 
