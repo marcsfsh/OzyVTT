@@ -160,8 +160,11 @@ describe("the mechanics overlay", () => {
   it("reaches a GENERATED subclass, which had no authoring surface at all", () => {
     expect(Object.keys(SUBCLASS_MECHANICS)).toContain("draconic-sorcery");
     const draconic = loadSubclasses().find((record) => record.id === "draconic-sorcery")!;
+    // `allowShield: true` is AUTHORED, not the schema default: the printed feature restricts only
+    // "wearing armor", and the SRD keeps that apart from wielding a Shield. See the reasoning beside
+    // the record in `scripts/class-mechanics/sorcerer.ts`; the far end is `unarmored-defense-shield.test.ts`.
     expect(draconic.features.find((entry) => entry.id === "draconic-resilience")!.modifiers)
-      .toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: false, when: [] }]);
+      .toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
   });
 
   it("composes the same three exports the ETL consumed before the per-class split", () => {

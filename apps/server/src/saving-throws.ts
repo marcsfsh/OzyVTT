@@ -166,6 +166,16 @@ export function createPendingSaves(state: GameState, input: Readonly<{
   targetIds: readonly string[]; proposedDamage: number; proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>; halfOnSuccess: boolean; conditionId: string | null;
   saveBonus?: number;
   onFailEffect?: PendingSave["onFailEffect"];
+  /**
+   * Whether this prompt REPLACES an older one sharing its (target, actionName, source) key. True by
+   * default, because a re-cast is a second spend of the same action and one owed save per target is
+   * what keeps the tracker readable.
+   *
+   * A rider that fires per HIT passes false. Extra Attack lands two swings inside ONE Attack action
+   * and the SRD owes a save for each, so replacing there would silently forgive one - and the roll
+   * card, which narrates per hit, would claim two saves the tracker never held.
+   */
+  replaceExisting?: boolean;
   newSaveId: () => string; createdAt: number;
 }>) {
   const additions: PendingSave[] = input.targetIds.map((targetActorId) => ({
@@ -185,7 +195,9 @@ export function createPendingSaves(state: GameState, input: Readonly<{
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt (one owed save per target per source action keeps the tracker readable).
-  const remaining = state.combat.pendingSaves.filter((entry) => !additions.some((added) => added.targetActorId === entry.targetActorId && added.actionName === entry.actionName && added.sourceActorId === entry.sourceActorId));
+  const remaining = input.replaceExisting === false
+    ? state.combat.pendingSaves
+    : state.combat.pendingSaves.filter((entry) => !additions.some((added) => added.targetActorId === entry.targetActorId && added.actionName === entry.actionName && added.sourceActorId === entry.sourceActorId));
   const pendingSaves = [...remaining, ...additions];
   if (pendingSaves.length > 100) throw new CommandRejectedError("Too many unanswered saving throws. Resolve or dismiss some first.");
   state.combat = { ...state.combat, pendingSaves };

@@ -1255,8 +1255,17 @@ export function createGameOperations(context: GameOperationsContext) {
         // attack that already hit can be pushed, and a player's target ids were cleared by
         // `canPlayerTarget` above - so a player can never move a hidden combatant's token, and the
         // one they CAN move is the creature the rules just said they may shove.
+        //
+        // THE GRID WAS FETCHED BEFORE THIS MUTATION OPENED (`tokenGeometryFor` is real file I/O), so a
+        // scene switch that committed inside that window would snap and bound-clamp this token against
+        // a map the fight no longer stands on - the departed map's lattice, the departed map's bounds,
+        // and a narrated distance measured on it. Every other token-position WRITE in this file spends
+        // a rejection on that hazard (`tokenMove`, and the template branch above), but forced movement
+        // never throws: a swing that already hit must not be undone because the map moved. So the
+        // stale case degrades to null, which the resolver narrates as the same "move the token"
+        // sentence an unmeasurable map already earns.
         const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
-          pushTokenAway(state, input, geometry);
+          state.combat.mapAssetId === mapAssetId ? pushTokenAway(state, input, geometry) : null;
         resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog(), pushToken });
         // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
         // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
@@ -1386,6 +1395,17 @@ export function createGameOperations(context: GameOperationsContext) {
             const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : "resolved";
             const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} - ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage${detail}` : ""}.`;
             context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
+            // The off-turn swing runs the SAME resolver the on-turn one does, so it produces the same
+            // rules notes - and this was the one resolve path that dropped them on the floor. That
+            // matters most for a mastery the reaction path cannot fully honour: Push resolves here
+            // WITHOUT the geometry callback by design, so its "move the token" sentence is the whole
+            // of what it does off-turn, and Topple's DC line is how the GM learns a save was parked.
+            // Dropping them turned a named absence into a silent skip. Same shape as `actionResolve`'s
+            // drain: GM-only, because the GM is who moves tokens and reads DCs out. `used` excludes
+            // the preview (`reactions.ts` returns `used: false` there), so nothing is said twice.
+            for (const warning of outcome.resolution.warnings ?? []) {
+              context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [outcome.actorId], gmOnly: true });
+            }
           }
         } else if (outcome.used) {
           const text = `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`;

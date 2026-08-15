@@ -138,19 +138,54 @@ export function armorClassRiderOf(definition: ActorDefinition): number {
 
 /**
  * This sheet's Unarmored Defense, in the two numbers the AC math takes - or null, which is every
- * monster, every PDF import and every character without the feature.
+ * monster and every sheet that claims no such feature.
  *
- * It has to be READ BACK rather than recomputed because AC is re-derived from the live loadout in
- * three places that have no class content in hand, and a shield alone makes that derivation answer:
- * without this a Barbarian who picked a shield up lost their Constitution to it (U28), and the live
- * actor contradicted the very definition it was built from. Same open extension bag, same fail-open
- * discipline and the same writer as `armorClassRiderOf` above - `buildCharacterDefinition` step 11.
+ * It has to be READ rather than recomputed at build time alone because AC is re-derived from the
+ * live loadout in three places, and a shield alone makes that derivation answer: without this a
+ * Barbarian who picked a shield up lost their Constitution to it (U28), and the live actor
+ * contradicted the very definition it was built from.
  *
- * The bag stores the ABILITY, not the modifier, so the score and the bonus cannot drift apart; the
- * ability is checked against `ABILITIES` because an unknown string would index `abilityScores` to
- * `undefined` and quietly turn the whole AC into NaN.
+ * TWO SOURCES, and both are needed - the first alone is what made U28's fix reach only sheets built
+ * after it landed:
+ *
+ *   1. The open `open5e.srd-2024` bag, written by `buildCharacterDefinition` step 11. The fast path,
+ *      and the ONLY one when no catalog is in hand - `resolvePendingImport` below instantiates
+ *      without one, a pre-existing gap this does not close and cannot, since the caller that would
+ *      supply it is the operation layer. Its blast radius is the SEED alone: every inventory write
+ *      afterwards - and a shield arriving IS one - reconciles with a catalog. The bag stores the
+ *      ABILITY, not the modifier, so the score and the bonus cannot drift apart; the ability is
+ *      checked against `ABILITIES` because an unknown string would index `abilityScores` to
+ *      `undefined` and quietly turn the whole AC into NaN.
+ *   2. THE AUTHORED RIDER, resolved through the catalog from what the sheet already says it holds.
+ *      A definition written before the bag carried this key - every Barbarian and Monk saved before
+ *      2026-08-14 - reads null from (1) and used to fall straight back to the pre-U28 arithmetic,
+ *      so the bug survived on the exact character the bug report described until someone happened to
+ *      level or respec them. Nothing was lost, though: `character.features` still names the feature
+ *      and its class, and every caller that re-derives AC is already handed the catalog that
+ *      resolves it. That is the same rule every other rider follows - "the riders live on the
+ *      catalog record, so a respec needs no migration" (`characterFeatureCarriers`) - so this needs
+ *      no backfill and no migration, only the content the reader could have consulted all along.
+ *
+ * Still null, correctly, for every sheet that NAMES no such feature - a bundled monster, a D&D Beyond
+ * PDF import (`packages/dndbeyond-pdf` writes no `character.features` at all), a hand-written
+ * definition. Deriving Unarmored Defense there from a class name would be inventing a number, and an
+ * absent number beats a wrong one.
  */
-export function unarmoredDefenseOf(definition: ActorDefinition): UnarmoredDefense | null {
+export function unarmoredDefenseOf(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
+  // THE LIVE CONTENT WINS OVER THE STORED BAG, and the order is the whole point rather than a
+  // preference. The extension key is a BUILD-TIME SNAPSHOT of an authored rider; the rider itself is
+  // the source of truth, and the two disagree exactly when the content has been corrected since the
+  // sheet was written. That is not hypothetical - it is this batch: `draconic-resilience` gained
+  // `allowShield: true` here, and every Sorcerer built before it carries `false` in its bag. Reading
+  // the bag first would have handed those sheets the very defect the content fix repairs, which is
+  // the same "the fix never reaches existing data" shape U28 itself was reopened for.
+  //
+  // The bag stays as the FALLBACK, and it earns that: it is the only source left when the feature
+  // cannot be resolved - no catalog in hand, or a homebrew class the GM has since deleted out from
+  // under a stored sheet. Losing a character's Unarmored Defense because its class record was
+  // deleted would be a worse failure than a stale flag.
+  const fromContent = unarmoredDefenseFromContent(definition, catalog);
+  if (fromContent) return fromContent;
   const extension = definition.extensions?.["open5e.srd-2024"];
   if (extension && typeof extension === "object") {
     const value = (extension as { unarmoredDefense?: unknown }).unarmoredDefense;
@@ -164,10 +199,39 @@ export function unarmoredDefenseOf(definition: ActorDefinition): UnarmoredDefens
   return null;
 }
 
+/**
+ * Source (2): the sheet's own claim on a feature or a feat, resolved against the live content.
+ *
+ * The two loops cover exactly what `interpretFeature` folds - `character.features` (class, subclass,
+ * species, lineage, background and every chosen inline option) and `character.feats`, whose records
+ * hold their riders one level down. LAST ONE WINS, matching that fold's own overwrite, and features
+ * are read before feats because that is the order the builder grants them in; the SRD never grants
+ * two (its own rule is that a Monk/Sorcerer picks one), so the order only settles homebrew.
+ *
+ * Fails open at every step the way its neighbours do: no catalog, no `featureRecord`, a homebrew
+ * class the GM has since deleted or a feature renamed out from under a stored sheet all contribute
+ * nothing rather than throwing.
+ */
+function unarmoredDefenseFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
+  if (!catalog) return null;
+  const blocks = [
+    ...(definition.character?.features ?? []).map((held) => catalog.featureRecord?.(held)),
+    ...(definition.character?.feats ?? []).map((held) => catalog.featRecord?.(held.id)?.feature)
+  ];
+  let found: UnarmoredDefense | null = null;
+  for (const block of blocks) {
+    for (const modifier of block?.modifiers ?? []) {
+      if (modifier.type !== "unarmored-defense" || modifier.ability === undefined) continue;
+      found = { bonus: abilityModifier(definition.abilityScores[modifier.ability]), allowShield: modifier.allowShield === true };
+    }
+  }
+  return found;
+}
+
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string, catalog?: EquipmentCatalog) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog), unarmoredDefenseOf(definition));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog), unarmoredDefenseOf(definition, catalog));
   // The SECOND of the two reconciliation points (the other is every inventory write). Seeding through
   // the same derivation is what makes a monster or a PDF import - neither of which ever runs the
   // character builder - carry its equipment's riders from the moment it reaches the table.
@@ -295,7 +359,7 @@ export function rebuildActorDefinition(state: GameState, actorId: string, defini
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog), unarmoredDefenseOf(definition));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog), unarmoredDefenseOf(definition, catalog));
   const derivation = deriveEquipment({ ...actor, inventory } as Actor, definition, catalog);
   const previousMaximum = actor.hp.maximum;
   const maximum = definition.hitPoints.maximum;

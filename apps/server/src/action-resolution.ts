@@ -87,7 +87,9 @@ export type ResolveDependencies = Readonly<{
    *
    * Optional, and its absence is honest rather than silent: `reactions.ts` resolves opportunity
    * attacks without geometry, so a pike that hits on a reaction narrates "move the token" instead of
-   * moving it. Wiring that path needs the reaction operation to fetch the map first.
+   * moving it - and `reactionAnswer` drains these warnings into the GM's feed exactly as
+   * `actionResolve` does, or the sentence would be a silent skip wearing a named absence's clothes.
+   * Wiring the push itself needs the reaction operation to fetch the map first.
    */
   pushToken?: (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) => Readonly<{ value: number; unit: string }> | null;
 }>;
@@ -1147,6 +1149,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       proposedDamage: 0,
       halfOnSuccess: false,
       conditionId: forced.conditionId,
+      // A mastery fires on EVERY hit, and Extra Attack lands two of them inside one Attack action, so
+      // this prompt is parked BESIDE its predecessor instead of replacing it (see `createPendingSaves`).
+      // The warning below is written per hit; replacing here would print two saves and owe one.
+      replaceExisting: false,
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
@@ -1163,9 +1169,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
    * cannot belong to anyone else. It is read the way the declared on-hit riders read theirs.
    *
    * EVERY failure degrades to a sentence, never a rejection: too large, unplaced, an uncalibrated
-   * and unscaled map, a resolver with no callback. A swing that hit must not be undone because the
-   * map could not answer a geometry question, so the line tells the GM to move the token - the
-   * builtin Shove's own shape.
+   * and unscaled map, a resolver with no callback, a map the fight has already left. A swing that hit
+   * must not be undone because the map could not answer a geometry question, so the line tells the GM
+   * to move the token - the builtin Shove's own shape.
    */
   for (const forced of masteryHitPushes(masterySwing)) {
     if (!sizeAtMost(targets[0].size, forced.maxTargetSize)) {
@@ -1174,9 +1180,21 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       continue;
     }
     const moved = deps.pushToken?.({ actorId: forced.targetId, awayFromActorId: forced.awayFromActorId, distanceFeet: forced.distanceFeet }) ?? null;
-    warnings.push(moved !== null && moved.value > 0
-      ? `${forced.targetName} is pushed ${Math.round(moved.value * 10) / 10} ${moved.unit} straight away from ${attacker.name}.`
-      : `${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name} - move the token.`);
+    // THE OUTCOMES ARE THREE, NOT TWO. Null is "the map could not answer" - unplaced, uncalibrated,
+    // no callback, a map the fight has left - and only that one asks the GM to move the token by
+    // hand. A measured ZERO is the opposite: the map DID answer, and `moveEncounterToken`'s own bounds
+    // and footprint checks refused every square along that line (a token pinned at the edge, or a
+    // regional map whose cell is wider than the shove), so telling the GM to move it 10 feet there
+    // asks for a placement the map has already declined. Rounded before the comparison, the way
+    // `narrateTokenMove` rounds a drag, so snapping dust cannot print "pushed 0 ft".
+    if (moved === null) {
+      warnings.push(`${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name} - move the token.`);
+      continue;
+    }
+    const travelled = Math.round(moved.value * 10) / 10;
+    warnings.push(travelled > 0
+      ? `${forced.targetName} is pushed ${travelled} ${moved.unit} straight away from ${attacker.name}.`
+      : `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`);
   }
 
   // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,

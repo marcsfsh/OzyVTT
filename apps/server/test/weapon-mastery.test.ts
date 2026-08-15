@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { loadWeapons } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
@@ -8,6 +12,8 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf, masteryReaches } from "../src/equipment-derivation.js";
+import { createGameOperations, type GameOperationsContext } from "../src/game-operations.js";
+import { GameStore } from "../src/game-store.js";
 import { startEncounter } from "../src/encounter.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { pushTokenAway } from "../src/forced-movement.js";
@@ -54,9 +60,15 @@ type MutableInput = { -readonly [K in keyof CharacterCreateRequestInput]: Charac
  * number below belongs to the weapon or the class.
  *
  * Str 15 +2 (background) = 17 (+3); proficiency 2 at level 3.
+ *
+ * AT LEVEL 5 the same sheet is the one two-hits-in-one-action tests need: Extra Attack makes ONE
+ * Attack action two swings, the level-4 ASI takes Str to 19 (+4) and proficiency reaches 3 - so a
+ * mastery DC computed off those moves to 15, a different number from every test above and therefore
+ * one that has to be read rather than remembered. A fourth mastery pick lands at level 4, so the
+ * first three of `masteries` are the level-1 picks and any beyond them are that one.
  */
-const fighter = (masteries: readonly string[]): MutableInput => ({
-  name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level: 3,
+const fighter = (masteries: readonly string[], level: 3 | 5 = 3): MutableInput => ({
+  name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level,
   subclassId: "champion", abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
@@ -65,7 +77,15 @@ const fighter = (masteries: readonly string[]): MutableInput => ({
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-    ...masteries.map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id }) as Row),
+    ...masteries.slice(0, 3).map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id }) as Row),
+    ...masteries.slice(3).map((id) => ({ level: 4, classId: "fighter", kind: "weapon-mastery", id }) as Row),
+    ...(level === 5
+      ? [
+          { level: 4, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
+          { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+          { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } }
+        ] as Row[]
+      : []),
     { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
@@ -117,8 +137,8 @@ function weaponRow(weaponId: string): InventoryItem {
   });
 }
 
-function table(masteries: readonly string[], extraWeaponIds: readonly string[] = [], geometry: TokenMapGeometry = GEOMETRY): Built {
-  const built = buildCharacterDefinition(fighter(masteries) as CharacterCreateRequestInput, view, POLICY);
+function table(masteries: readonly string[], extraWeaponIds: readonly string[] = [], geometry: TokenMapGeometry = GEOMETRY, level: 3 | 5 = 3): Built {
+  const built = buildCharacterDefinition(fighter(masteries, level) as CharacterCreateRequestInput, view, POLICY);
   const definition = extraWeaponIds.length === 0
     ? built
     : { ...built, startingInventory: [...built.startingInventory ?? [], ...extraWeaponIds.map(weaponRow)] };
@@ -135,11 +155,14 @@ function table(masteries: readonly string[], extraWeaponIds: readonly string[] =
 }
 
 let command = 0;
+// Minted across the whole file rather than per resolve, because the real `context.newId` is: two
+// swings of the same weapon used to hand their pending saves the SAME id, so answering one answered
+// both and a second owed prompt could not even be expressed here.
+let rollId = 0;
 function deps(built: Built, definition: ActorDefinition, faces: number[]): ResolveDependencies {
-  let index = 0;
   return {
     random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
-    newRollId: () => `40000000-0000-4000-8000-0000000000${String(index++).padStart(2, "0")}`,
+    newRollId: () => `40000000-0000-4000-8000-${String(++rollId).padStart(12, "0")}`,
     gmSessionId: IDS.gmSession, now: () => "2026-08-08T00:00:00.000Z",
     definition, catalog,
     resolveDefinition: (definitionId: string) => built.state.definitions.find((entry) => entry.id === definitionId)?.definition
@@ -349,6 +372,33 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     expect(built.foe.conditions).toEqual([]);
   });
 
+  it("owes a save for EVERY hit - Extra Attack's two swings do not collapse into one prompt", () => {
+    // Level 5, so ONE Attack action is two swings and Str 19 (+4) with proficiency 3 sets DC 15.
+    // The SRD puts no once-per-turn limit on Topple (contrast Nick's explicit one), so two hits owe
+    // two saves - and the prompt's dedupe key is (target, actionName, source), identical for both.
+    const built = table(["quarterstaff", "longbow", "rapier", "flail"], ["quarterstaff"], GEOMETRY, 5);
+    const staff = effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-quarterstaff")!;
+    expect(staff.attack?.count).toBe(2);
+    const first = swing(built, "item-quarterstaff", [15, 3]);
+    const second = swing(built, "item-quarterstaff", [15, 3]);
+    expect([first.attack?.outcome, second.attack?.outcome]).toEqual(["hit", "hit"]);
+    expect(second.warnings).toContain("Topple: Foe must make a DC 15 CON save or have the Prone condition - the prompt is in the turn order.");
+    // TWO rows in the tracker, both live: the second hit parks BESIDE the first instead of evicting it.
+    expect(built.state.combat.pendingSaves).toMatchObject([
+      { targetActorId: IDS.foe, ability: "con", dc: 15, conditionId: "prone", actionName: "Topple" },
+      { targetActorId: IDS.foe, ability: "con", dc: 15, conditionId: "prone", actionName: "Topple" }
+    ]);
+
+    // THE FAR END, and it takes both dice to reach: the foe MAKES the first save (17 + 2 = 19) and is
+    // still standing, then fails the second (3 + 2 = 5 < 15) and ends on the floor. With one prompt
+    // swallowed, that first success was the whole answer and the foe walked away.
+    expect(answer(built, [17]).outcome).toMatchObject({ success: true, total: 19, conditionApplied: false });
+    expect(built.foe.conditions).toEqual([]);
+    expect(answer(built, [3]).outcome).toMatchObject({ success: false, total: 5, dc: 15, conditionApplied: true });
+    expect(built.foe.conditions.map((condition) => condition.id)).toEqual(["prone"]);
+    expect(built.state.combat.pendingSaves).toEqual([]);
+  });
+
   it("forces nothing when the Fighter did not pick the quarterstaff - same weapon, same swing", () => {
     // The negative control: the staff is still in his hands, the mastery is still on the record, and
     // the only difference is the three picks.
@@ -397,13 +447,24 @@ const positionOf = (built: Built, actorId: string) => built.state.combat.tokens.
  * `game-operations.ts` hands the resolver - the operation's only extra work is fetching the map -
  * so passing `wired: false` is exactly the shape `reactions.ts` resolves with today.
  */
-const pushSwing = (built: Built, actionId: string, faces: number[], wired = true) =>
+const pushSwing = (built: Built, actionId: string, faces: number[], wired = true, geometry: TokenMapGeometry = GRID) =>
   resolveDefinitionAction(
     built.state,
     effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === actionId)!,
     { actorId: IDS.hero, targetIds: [IDS.foe], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
-    { ...deps(built, built.definition, faces), ...(wired ? { pushToken: (input) => pushTokenAway(built.state, input, GRID) } : {}) }
+    { ...deps(built, built.definition, faces), ...(wired ? { pushToken: (input) => pushTokenAway(built.state, input, geometry) } : {}) }
   );
+
+/**
+ * The OTHER map a table plays on: no grid at all, just a saved image scale (`map-catalog.ts`
+ * `saveScale` stores exactly this, with `calibration` still null). 5 ft every 12 px, so 10 feet is 24
+ * px - and unlike the lattice above, nothing rounds the landing point back onto a nice number, which
+ * is what makes it the branch where an inverted ratio would hide.
+ */
+const SCALED = {
+  width: 900, height: 600, calibration: null,
+  scale: { kind: "image-scale", distancePerPixel: 5 / 12, unit: "ft" }
+} as const satisfies TokenMapGeometry;
 
 describe("Push moves the target's token 10 feet straight away", () => {
   it("shoves the foe two cells down the row, and the table's own measure reads 10 ft", () => {
@@ -443,6 +504,23 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(after).toEqual(cell(7, 4));
     // And the snap did not cost the push its distance: still exactly 10 ft by the table's measure.
     expect(mapDistance(GRID, before, after)).toEqual({ value: 10, unit: "ft" });
+    expect(hit.warnings).toContain("Foe is pushed 10 ft straight away from Borin.");
+  });
+
+  it("measures the same 10 feet in PIXELS on a gridless map with a saved scale", () => {
+    // The scaled branch is the whole geometry an uncalibrated battlemap has: feet become pixels
+    // through `distancePerPixel` rather than cells, and there is no snap to a lattice to hide an
+    // inverted ratio behind. Nothing else in the repo drives it.
+    const built = table(["warhammer", "longbow", "rapier"], ["warhammer"], SCALED);
+    moveEncounterToken(built.state, IDS.hero, { x: 300, y: 300 }, SCALED);
+    moveEncounterToken(built.state, IDS.foe, { x: 330, y: 300 }, SCALED);
+    const before = positionOf(built, IDS.foe)!;
+    const hit = pushSwing(built, "item-warhammer", [15, 4], true, SCALED);
+    expect(hit.attack?.outcome).toBe("hit");
+
+    // THE FAR END: 24 px further along the line, which is what 10 ft costs at 5 ft per 12 px.
+    expect(positionOf(built, IDS.foe)).toEqual({ x: 354, y: 300 });
+    expect(mapDistance(SCALED, before, positionOf(built, IDS.foe)!)).toEqual({ value: 10, unit: "ft" });
     expect(hit.warnings).toContain("Foe is pushed 10 ft straight away from Borin.");
   });
 
@@ -503,6 +581,22 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
   });
 
+  it("says the map REFUSED the shove when it measures zero, not 'move the token'", () => {
+    // Pinned at the last column of a 900 px map: the destination is off the edge, `bounded` clamps it,
+    // and the snap finds no other fitting square - so the map ANSWERED, with nothing. "Move the token
+    // 10 feet" would send the GM somewhere the same bounds check has already refused.
+    const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(16, 2), cell(17, 2));
+    const before = positionOf(built, IDS.foe)!;
+    expect(before).toEqual({ x: 875, y: 125 });
+    const hit = pushSwing(built, "item-warhammer", [15, 4]);
+    expect(hit.attack?.outcome).toBe("hit");
+    expect(hit.damageTotal).toBe(7);
+
+    expect(positionOf(built, IDS.foe)).toEqual(before);
+    expect(hit.warnings).toContain("Foe is pushed straight away from Borin, but the map has nowhere to put it - the token stays where it is.");
+    expect(hit.warnings).not.toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
+  });
+
   it("degrades when the resolver has no geometry callback at all - the reaction path today", () => {
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
     const before = positionOf(built, IDS.foe)!;
@@ -510,6 +604,139 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.attack?.outcome).toBe("hit");
     expect(positionOf(built, IDS.foe)).toEqual(before);
     expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// THE OFF-TURN SWING - where a mastery's named absence has to be SPOKEN, not merely produced.
+// -------------------------------------------------------------------------------------------------
+
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+
+type FeedLine = Readonly<{ kind: string; text: string; gmOnly?: boolean }>;
+
+/**
+ * The OPERATION layer, because "the resolution carries the sentence" is not narration - a rules note
+ * is only real once something receives one. Everything that is not the feed is a stub, and the two
+ * capture arrays ARE the far end: `logged` is the durable table feed, `broadcast` the transient toast.
+ */
+async function operationsFor(built: Built, duringGeometryFetch?: (live: GameStore) => Promise<void>) {
+  const directory = await mkdtemp(join(tmpdir(), "vtt-mastery-reaction-"));
+  const store = new GameStore(join(directory, "game.sqlite"), built.state);
+  await store.initialize();
+  cleanups.push(async () => { await rm(directory, { recursive: true, force: true }); });
+  const logged: FeedLine[] = [];
+  const broadcast: FeedLine[] = [];
+  const unused = () => { throw new Error("answering a reaction must not touch this"); };
+  const operations = createGameOperations({
+    store, contentLibrary: new ContentLibrary(),
+    combatLog: { append: () => {} },
+    mapCatalog: { get: () => undefined },
+    tokenCatalog: { get: () => undefined, touchLastUsed: () => {}, rememberForDefinition: () => {} },
+    // The real one is a file read, and `actionResolve` awaits it OUTSIDE the command queue - so the
+    // hook is where a test can commit another command in the window that await opens.
+    tokenGeometryFor: async () => { if (duringGeometryFetch) await duringGeometryFetch(store); return GRID; },
+    publishGameState: async () => {},
+    presentSceneMap: async () => {},
+    broadcastTableEvent: (event: FeedLine) => { broadcast.push({ kind: event.kind, text: event.text, gmOnly: event.gmOnly }); },
+    appendLog: (entry: FeedLine) => { logged.push({ kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly }); },
+    logTurnBegin: () => {}, logTimelineOutcome: () => {}, scheduleAnnotationExpiry: () => {},
+    gmView: unused, playerView: unused,
+    // Every die the swing still rolls after `attackNatural` pins the d20 - the pike's damage.
+    random: () => 4,
+    newId: () => randomUUID()
+  } as unknown as GameOperationsContext);
+  return { operations, store, logged, broadcast };
+}
+
+/** A `leaves-reach` prompt shaped exactly as `movement-rules.ts` mints one: Borin's pike, the foe walking out. */
+function parkOpportunityAttack(built: Built): string {
+  const id = "60000000-0000-4000-8000-000000000001";
+  built.state.combat = {
+    ...built.state.combat,
+    pendingReactions: [...built.state.combat.pendingReactions, {
+      id, kind: "leaves-reach" as const, actorId: IDS.hero, actionId: "opportunity-attack", actionName: "Opportunity Attack",
+      sourceActorId: IDS.foe, sourceName: "Foe", targetActorId: IDS.foe,
+      triggerCommandId: "50000000-0000-4000-8000-0000000000ff",
+      proposedDamage: 0, proposedDamageParts: [], critical: false, createdAt: 0
+    }]
+  };
+  return id;
+}
+
+describe("a mastery that cannot act off-turn says so where the GM reads it", () => {
+  it("puts Push's 'move the token' sentence in the feed when a pike hits on an opportunity attack", async () => {
+    // The pike is the reach weapon of the four that carry Push, so it is the one most often swung
+    // off-turn - and `reactions.ts` resolves with NO geometry callback by design, so the whole of what
+    // Push does here is the sentence. Dropping it made a named absence a silent skip.
+    const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
+    const reactionId = parkOpportunityAttack(built);
+    const { operations, store, logged, broadcast } = await operationsFor(built);
+    const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
+
+    // +5 to hit vs AC 13, so a pinned natural 18 lands without the die queue this file's unit tests use.
+    await operations.reactionAnswer({ kind: "gm", sessionId: IDS.gmSession }, {
+      commandId: randomUUID(), reactionId, use: true, actionId: "item-pike", commit: true, attackNatural: 18
+    });
+
+    // THE FAR END: a row in the feed, GM-only, naming the push the engine could not perform.
+    expect(logged).toContainEqual({
+      kind: "action", gmOnly: true,
+      text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
+    });
+    // ...and the swing itself is untouched: it still hit, still narrated, and the token really did NOT
+    // move, which is what makes the sentence an instruction rather than a report.
+    expect(broadcast.some((line) => line.kind === "reaction" && line.text.includes("made an opportunity attack against Foe - HIT"))).toBe(true);
+    expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(before);
+  });
+
+  it("does not shove a token onto the map the fight just left", async () => {
+    // `actionResolve` reads the grid BEFORE its mutation opens, so a scene switch committing in that
+    // window would snap and bound-clamp against the departed map and then narrate that distance as
+    // the truth. Forced movement never rejects, so the stale map degrades to the same sentence an
+    // unmeasurable one gets - the swing that already hit stands.
+    const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
+    const { operations, store, logged } = await operationsFor(built, async (live) => {
+      await live.execute({ id: randomUUID(), type: "test.scene-switch" }, (state) => {
+        state.combat = { ...state.combat, mapAssetId: "20000000-0000-5000-8000-000000000002" };
+      });
+    });
+    const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
+
+    await operations.actionResolve({ kind: "gm", sessionId: IDS.gmSession }, {
+      commandId: randomUUID(), actorId: IDS.hero, actionId: "item-warhammer", targetIds: [IDS.foe], attackNatural: 18
+    });
+
+    // THE FAR END: the foe stands exactly where it stood, and the GM is told to place it by hand.
+    expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(before);
+    expect(logged).toContainEqual({
+      kind: "action", gmOnly: true,
+      text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
+    });
+  });
+
+  it("shoves for real down the same path when the map did NOT change - the control for the guard above", async () => {
+    const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
+    const { operations, store, logged } = await operationsFor(built);
+
+    await operations.actionResolve({ kind: "gm", sessionId: IDS.gmSession }, {
+      commandId: randomUUID(), actorId: IDS.hero, actionId: "item-warhammer", targetIds: [IDS.foe], attackNatural: 18
+    });
+
+    expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(5, 2));
+    expect(logged).toContainEqual({ kind: "action", gmOnly: true, text: "Rules note: Foe is pushed 10 ft straight away from Borin." });
+  });
+
+  it("says nothing on a PREVIEW - the sentence lands once, on the answer that spends the reaction", async () => {
+    const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
+    const reactionId = parkOpportunityAttack(built);
+    const { operations, logged } = await operationsFor(built);
+
+    await operations.reactionAnswer({ kind: "gm", sessionId: IDS.gmSession }, {
+      commandId: randomUUID(), reactionId, use: true, actionId: "item-pike", commit: false, attackNatural: 18
+    });
+    expect(logged.filter((line) => line.text.startsWith("Rules note:"))).toEqual([]);
   });
 });
 

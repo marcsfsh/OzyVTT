@@ -260,7 +260,7 @@ const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES)
  * `weapon-mastery.ts` - a slug is in it because a handler answers to it - so implementing a mastery
  * is registering one, and no unit has to remember to edit a literal in this file. That module is the
  * one exception to this file's no-server-imports rule and it earns it by having no runtime imports of
- * its own (its header explains why that has to stay true); the six slugs still owed are listed there,
+ * its own (its header explains why that has to stay true); the slugs still owed are listed there,
  * beside the registry a new one joins.
  */
 export const masteryReaches = (mastery: string): boolean => IMPLEMENTED_MASTERIES.has(mastery);

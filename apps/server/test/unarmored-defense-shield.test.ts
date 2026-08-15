@@ -90,6 +90,35 @@ const monkInput = (level = 1): MutableInput => ({
   ] as Row[]
 });
 
+/**
+ * A Halfling Draconic Sorcerer at level 3 - the SRD's THIRD author of this rider, and the one that
+ * prints no Shield sentence at all. Dex 14 / Cha 17: bare-handed 10 + 2 + 3 = 15, the same number the
+ * other two reach, so once again the shield is the only variable. Level 3 because Draconic Resilience
+ * is a level-3 subclass feature and there is no earlier level at which this can be measured.
+ */
+const sorcererInput = (): MutableInput => ({
+  name: "Vaeryn", speciesId: "halfling", backgroundId: "acolyte", classId: "sorcerer", subclassId: "draconic-sorcery", level: 3,
+  abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 12, wis: 10, cha: 15 },
+  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "int", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "sorcerer", kind: "skill", id: "arcana" },
+    { level: 1, classId: "sorcerer", kind: "skill", id: "persuasion" },
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    // Metamagic is a level-2 Sorcerer feature that refuses to build without its two picks. Neither
+    // touches Armor Class; they are the price of reaching level 3, where Draconic Resilience lands.
+    { level: 2, classId: "sorcerer", kind: "metamagic", id: "careful-spell" },
+    { level: 2, classId: "sorcerer", kind: "metamagic", id: "distant-spell" },
+    { level: 1, kind: "equipment", id: "sorcerer-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ] as Row[]
+});
+
 /** A Halfling Fighter: the NEGATIVE CONTROL for the whole unit - no Unarmored Defense to read. */
 const fighterInput = (): MutableInput => ({
   name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level: 1,
@@ -179,14 +208,68 @@ describe("Unarmored Defense and a shield (U28)", () => {
    * either flag the test above would still pass in one direction, so the content is asserted too -
    * this is the row that names WHY the Barbarian and the Monk differ.
    */
-  it("reads the flag the two SRD class records actually print", () => {
-    const flagFor = (classId: string) => {
-      const feature = view.classRecord(classId)?.features.find((entry) => entry.id === "unarmored-defense");
-      const modifier = feature?.modifiers.find((entry) => entry.type === "unarmored-defense");
-      return modifier?.type === "unarmored-defense" ? modifier.allowShield : undefined;
+  it("reads the flag the three SRD records actually print", () => {
+    const flagIn = (features: readonly { id: string; modifiers: readonly { type: string }[] }[] | undefined) => {
+      const modifier = features?.find((entry) => entry.id === "unarmored-defense" || entry.id === "draconic-resilience")
+        ?.modifiers.find((entry) => entry.type === "unarmored-defense");
+      return modifier?.type === "unarmored-defense" ? (modifier as { allowShield?: boolean }).allowShield : undefined;
     };
-    expect(flagFor("barbarian")).toBe(true);
-    expect(flagFor("monk")).toBe(false);
+    expect(flagIn(view.classRecord("barbarian")?.features)).toBe(true);
+    expect(flagIn(view.classRecord("monk")?.features)).toBe(false);
+    // The THIRD author, and the one whose silence used to be read as the Monk's answer. Its printing
+    // restricts only wearing armor (`classes.md:8637`), so the record now says so out loud.
+    expect(flagIn(view.subclassRecord("draconic-sorcery")?.features)).toBe(true);
+  });
+
+  /**
+   * THE THIRD AUTHOR AT THE TABLE. Same four-number shape as the Barbarian's row, on the subclass
+   * whose printed sentence names only armor: 15 bare-handed, 17 with a Shield. Before the content
+   * flag this read 15 / 14 - the Sorcerer got strictly worse for picking a shield up, which is U28's
+   * own bug on the one author U28 did not fix.
+   *
+   * A NAMED LIMIT this number does not model: "You gain the Armor Class benefit of a Shield only if
+   * you have training with it" (equipment.md:596), and a Sorcerer has none. The engine has no armor-
+   * training gate at all - the Fighter row below relies on that same absence - so 17 is what it
+   * derives for anyone. That gate is one rule for every class and every item, not this unit's; 14 is
+   * wrong under either reading, and only the flag stops the decrease.
+   */
+  it("adds a shield on top of the Draconic Sorcerer's Charisma", () => {
+    const sorcerer = onTheTable(sorcererInput());
+    expect(sorcerer.definition.armorClass).toBe(15); // 10 + 2 Dex + 3 Cha
+    expect(sorcerer.hero.armorClass).toBe(15);
+    expect(equip(sorcerer, "shield")).toBe(17);
+  });
+
+  /**
+   * THE STALE SNAPSHOT, and it is the reason `unarmoredDefenseOf` reads the CONTENT before the bag.
+   *
+   * The extension key is a build-time copy of the authored rider. This batch corrected the rider -
+   * `draconic-resilience` gained `allowShield: true` - so every Sorcerer written BEFORE it carries
+   * `false` in its own bag. Reading the bag first would hand exactly those sheets the defect the
+   * content fix repairs, which is the "the fix never reaches existing data" shape U28 was reopened
+   * for once already. Here the sheet is built, its bag is rewritten to the pre-fix value, and the
+   * whole definition is JSON round-tripped the way `GameStore` reloads persisted state.
+   */
+  it("prefers the corrected content over a pre-fix snapshot stored on the sheet", () => {
+    const built = buildCharacterDefinition(sorcererInput() as CharacterCreateRequestInput, view, POLICY);
+    const bag = (built.extensions as Record<string, { unarmoredDefense?: { ability: string; allowShield: boolean } }>)["open5e.srd-2024"];
+    expect(bag?.unarmoredDefense, "the builder still writes the fast-path key").toMatchObject({ ability: "cha", allowShield: true });
+
+    // The sheet as a pre-fix build wrote it: same feature claimed, the stale flag beside it.
+    const stale = JSON.parse(JSON.stringify({
+      ...built,
+      extensions: { ...built.extensions, "open5e.srd-2024": { ...bag, unarmoredDefense: { ability: "cha", allowShield: false } } }
+    })) as ActorDefinition;
+    expect(stale.character?.features?.some((held) => held.id === "draconic-resilience"), "the stale sheet still names the feature").toBe(true);
+
+    const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
+    importActorDefinition(state, stale, IDS.hero, "public", catalog);
+    const hero = state.actors.find((actor) => actor.id === IDS.hero)!;
+    expect(hero.armorClass).toBe(15);
+    setInventoryItem(state, IDS.hero, equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    // 17, not the 14 the stale flag would have produced: the live rider won.
+    expect(hero.armorClass, "a sheet saved before the content fix must still gain the shield").toBe(17);
   });
 
   /**
@@ -226,19 +309,71 @@ describe("Unarmored Defense and a shield (U28)", () => {
   });
 
   /**
-   * The reader is FAIL-OPEN by construction, and this is the shape that proves it: a definition
-   * whose extension bag was written by something older (or by a PDF import, which writes none) still
-   * derives an AC rather than a NaN. `IDS.other` keeps it off the hero's id so nothing is shared.
+   * The reader is FAIL-OPEN by construction, and this is the shape that proves it: a definition that
+   * CLAIMS NO FEATURE - a bundled monster, a D&D Beyond PDF import, any hand-written sheet, none of
+   * which writes `character` at all - still derives an AC rather than a NaN, and gets the arithmetic
+   * that always applied. Deriving Unarmored Defense here from a class name would be inventing a
+   * number for a sheet that never said it had the feature. `IDS.other` keeps it off the hero's id.
    */
-  it("derives an ordinary shield AC for a definition carrying no unarmored-defense extension", () => {
+  it("derives an ordinary shield AC for a definition that claims no feature at all", () => {
     const { definition } = onTheTable(barbarianInput());
-    const legacy = { ...definition, extensions: {} } as ActorDefinition;
+    const { character: _dropped, ...stripped } = definition;
+    const anonymous = { ...stripped, extensions: {} } as ActorDefinition;
     const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
-    importActorDefinition(state, legacy, IDS.other, "public", catalog);
+    importActorDefinition(state, anonymous, IDS.other, "public", catalog);
     const actor = state.actors.find((entry) => entry.id === IDS.other)!;
     expect(actor.armorClass).toBe(15); // the stored total still stands while nothing is equipped
     setInventoryItem(state, IDS.other, equippedFromCatalog("shield"),
       (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
     expect(actor.armorClass).toBe(14); // 10 + 2 + 2 - no feature is claimed, so none is granted
+  });
+
+  /**
+   * THE SHEET THAT WAS ALREADY ON THE TABLE - the population U28's first cut could not reach, and the
+   * exact character the bug report described.
+   *
+   * The fixture is the pre-U28 SAVE shape, built by deleting only the `unarmoredDefense` sub-key and
+   * leaving `traits` behind: byte-for-byte the bag `186e4cf`'s builder wrote. It is JSON round-tripped
+   * because that is how `GameStore` reloads state, so nothing survives here that would not survive
+   * SQLite. The sheet never forgot WHICH feature it holds - `character.features` still names
+   * `unarmored-defense` and its class - so the reader resolves the authored rider through the catalog
+   * it is already handed, and the fix arrives with no backfill and no rebuild. Before that fallback
+   * this row read 14: the actor contradicting its own definition, on a save from yesterday.
+   */
+  it("reaches a Barbarian saved before the extension key existed, with no rebuild", () => {
+    const { definition } = onTheTable(barbarianInput());
+    const bag = { ...(definition.extensions!["open5e.srd-2024"] as Record<string, unknown>) };
+    delete bag.unarmoredDefense;
+    const legacy = JSON.parse(JSON.stringify({ ...definition, extensions: { "open5e.srd-2024": bag } })) as ActorDefinition;
+    expect(Object.keys(legacy.extensions!["open5e.srd-2024"] as object)).toEqual(["traits"]);
+    expect(legacy.character!.features!.some((entry) => entry.id === "unarmored-defense")).toBe(true);
+
+    const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
+    importActorDefinition(state, legacy, IDS.other, "public", catalog);
+    const actor = state.actors.find((entry) => entry.id === IDS.other)!;
+    expect(actor.armorClass).toBe(15); // bare-handed, unchanged
+    setInventoryItem(state, IDS.other, equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    expect(actor.armorClass).toBe(17); // +2 ON TOP OF Constitution - the stored sheet's own feature, read at last
+  });
+
+  /**
+   * The same legacy shape for the MONK, because a fallback that granted the benefit unconditionally
+   * would also read 17 here and the row above could not tell the two apart. 14 is the Monk's correct
+   * answer - Unarmored Defense lost to the Shield - and it is the same number the anonymous sheet
+   * two rows up reads for an entirely different reason, so both are pinned.
+   */
+  it("reads the Monk's authored refusal from a sheet saved before the key existed", () => {
+    const { definition } = onTheTable(monkInput());
+    const bag = { ...(definition.extensions!["open5e.srd-2024"] as Record<string, unknown>) };
+    delete bag.unarmoredDefense;
+    const legacy = JSON.parse(JSON.stringify({ ...definition, extensions: { "open5e.srd-2024": bag } })) as ActorDefinition;
+    const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
+    importActorDefinition(state, legacy, IDS.other, "public", catalog);
+    const actor = state.actors.find((entry) => entry.id === IDS.other)!;
+    expect(actor.armorClass).toBe(15);
+    setInventoryItem(state, IDS.other, equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    expect(actor.armorClass).toBe(14); // 10 + 2 + 2 - the Monk's printing refuses the Shield
   });
 });

@@ -81,6 +81,8 @@ export type RiderModifier = Readonly<{
   amount?: number;
   ability?: RiderAbility;
   whileArmored?: boolean;
+  /** `unarmored-defense`'s own sub-field, beside `armor-class`'s `whileArmored`: does the benefit survive a Shield? */
+  allowShield?: boolean;
   count?: number;
   feet?: number;
   formula?: string;

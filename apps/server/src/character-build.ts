@@ -1642,13 +1642,14 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // Unarmored Defense is handed DOWN into that first step rather than waiting for the `??` below,
   // because a SHIELD ALONE makes the equipment branch answer - and answering 10 + DEX + shield is how
   // a Barbarian used to LOSE Constitution by picking a shield up (U28). `allowShield` is the authored
-  // half of that decision and this is its one reader: the Barbarian prints true, the Monk false.
+  // half of that decision and this is its one reader.
   //
-  // The SRD's third author, Draconic Resilience, prints neither - "while you aren't wearing armor"
-  // and no sentence about a Shield - so it takes the schema default (false) and a shield replaces it.
-  // That is exactly what the engine did before this change, so no number moves; whether the silence
-  // should read as the Barbarian's answer instead is a CONTENT question, owned by
-  // `scripts/class-mechanics/sorcerer.ts` and settled by a bundle rebuild, not by this reader.
+  // All THREE SRD authors now print the flag, and the reader takes each at its word: Barbarian true
+  // ("You can use a Shield and still gain this benefit"), Monk false ("while you aren't wearing armor
+  // or wielding a Shield"), Draconic Resilience true - its printing restricts only wearing armor, and
+  // the SRD keeps that apart from wielding a Shield. Which answer a SILENT record gets is a content
+  // question, not this reader's: it is settled where the record is authored (`scripts/class-mechanics/`)
+  // and the schema default stays false for back-compat with every record written before the flag.
   const unarmoredDefense = interpreted.unarmoredDefense
     ? { bonus: abilityModifier(finalScores[interpreted.unarmoredDefense.ability]), allowShield: interpreted.unarmoredDefense.allowShield }
     : null;
@@ -1685,12 +1686,18 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     //
     // `unarmoredDefense` rides the same open bag as `armorClassBonus`, and for the same reason: THREE
     // other places re-derive AC from the live loadout (`instantiate`, `rebuildActorDefinition`, and
-    // every inventory write through `reconcileEquipment`), none of them has the class content in
-    // hand, and `ActorDefinition` models only the AC TOTAL. Without this the fix above would hold
-    // until the character picked a shield up AT THE TABLE and then be undone by the reconciliation -
-    // the definition saying 17 while the actor said 14. The ABILITY is stored rather than the
-    // modifier so the reader re-derives from the definition's own scores and the two cannot drift;
-    // `unarmoredDefenseOf` in actor-roster.ts is that reader.
+    // every inventory write through `reconcileEquipment`) and `ActorDefinition` models only the AC
+    // TOTAL, so without a channel the fix above would hold until the character picked a shield up AT
+    // THE TABLE and then be undone by the reconciliation - the definition saying 17 while the actor
+    // said 14. The ABILITY is stored rather than the modifier so the reader re-derives from the
+    // definition's own scores and the two cannot drift; `unarmoredDefenseOf` in actor-roster.ts is
+    // that reader.
+    //
+    // It is the FAST path, not the only one. Those three sites do have the class content in hand -
+    // each is handed the catalog - so `unarmoredDefenseOf` falls back to the authored rider named by
+    // `character.features` below when this key is absent. That fallback is what reaches a sheet
+    // stored before the key existed; writing the key keeps the common read a lookup rather than a
+    // catalog walk, and answers the one caller (`resolvePendingImport`) that passes no catalog.
     extensions: {
       "open5e.srd-2024": {
         traits: interpreted.traits,

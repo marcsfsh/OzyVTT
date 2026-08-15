@@ -418,8 +418,17 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     { key: "count", label: "Extra dice", kind: "number", min: 1, max: 4, visibleWhen: hasType("critical-bonus-dice"), help: "The weapon's own die, rolled again. For a typed extra like 1d6 fire, use Extra damage on a critical hit instead." },
     { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("darkvision"), note: "Display only." },
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
-    // No `note`: U28 landed the reader, and a stale honesty note is a lie in the opposite direction.
-    { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"), help: "On is the Barbarian's rule, off the Monk's — off, a shield replaces this defence with the ordinary 10 + Dexterity." },
+    /* No `note` on a FEATURE or a feat: U28 landed the reader there, and a stale honesty note is a
+       lie in the opposite direction. On an ITEM the note stays, because there the whole rider is
+       still unread — `unarmored-defense` is in `BUILDER_BAKED_MODIFIER_TYPES`, folded into the sheet
+       at build time from a feature or a feat, and `deriveEquipment` sums no such rider off an
+       inventory row. The type is offered here because `EquipmentReferenceSchema` accepts it (only
+       `ITEM_REFUSED` above is withdrawn), so an item carrying it publishes and then moves nothing —
+       in either switch position. Naming that beats an affirmative sentence about a mechanism this
+       carrier does not have. */
+    { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"),
+      help: "On is the Barbarian's rule, off the Monk's — off, a shield replaces this defence with the ordinary 10 + Dexterity.",
+      ...(scope === "item" ? { note: "Not read on an item — this defence only reaches a sheet from a feature or a feat." } : {}) },
     { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage"), help: "Dice. Leave it empty to add only an ability modifier." },
     { key: "abilityModifier", label: "Plus an ability modifier", kind: "select", options: ABILITIES, emptyValue: "omit", visibleWhen: hasType("extra-damage"), help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”." },
     /* `3d`, site 7 of 9 — the mace's "+1d6 lightning". Left EMPTY on purpose is a real authored

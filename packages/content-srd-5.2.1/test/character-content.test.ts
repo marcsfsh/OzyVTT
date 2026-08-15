@@ -808,7 +808,9 @@ describe("the subclass authoring surface, and the tables the parser used to thro
     // SUBCLASS_MECHANICS there was no way for this rider to exist at all. Champion / Evoker / Life
     // Domain are NOT the proof - their class is hand-authored and the whole record is copied through.
     const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
-    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: false, when: [] }]);
+    // `allowShield` is authored `true` here, against the schema default - the printed sentence
+    // restricts only wearing armor. `scripts/class-mechanics/sorcerer.ts` carries the argument.
+    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {

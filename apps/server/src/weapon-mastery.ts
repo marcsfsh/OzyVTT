@@ -11,8 +11,8 @@ import type { AbilityId, ActionResolutionAttack, EffectInstance } from "@vtt/dom
  * the dangerous resolution of that merge drops a branch while leaving the slug in the implemented
  * set - a mastery that advertises itself and does nothing, which is the exact failure this area has
  * already shipped three times. This module is that region, moved: one registry keyed by slug, one
- * hook per moment, and the implemented set DERIVED from the registry's own keys so registering a
- * handler IS joining the set and no unit edits a shared literal.
+ * hook per moment, and the implemented set DERIVED from the registry's own HOOKS so registering a
+ * behaviour IS joining the set and no unit edits a shared literal.
  *
  * THIS MODULE HAS NO RUNTIME IMPORTS, AND THAT IS LOAD-BEARING - not tidiness. `equipment-derivation.ts`
  * imports `IMPLEMENTED_MASTERIES` from here, and that module is the leaf `character-build.ts` and the
@@ -148,13 +148,27 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
    * THE SIZE GATE IS THE SRD'S, so its value lives here with the rule - but the COMPARISON is the
    * caller's `sizeAtMost`, the same ladder a declared on-hit rider's `maxTargetSize` runs through.
    * Copying a size order into this module to answer "is Huge bigger than Large" would be a second
-   * table free to drift from the first. A too-large target is narrated, not silently skipped: the
-   * table should hear why the ogre stayed put.
+   * table free to drift from the first. A too-large target is narrated rather than silently skipped,
+   * so the GM learns why the ogre stayed put - every sentence a push produces is a GM rules note
+   * today, the shared feed included, which is its own open question and not this handler's to answer.
    *
-   * "Up to 10 feet" and "you can" are both the attacker's choice in print, and the engine takes the
-   * full distance automatically - the same reading Graze's "you can deal damage" already gets here.
-   * A push is trivially undone by dragging the token back, which is the cheapest correction on the
-   * whole map; an engine that asked first would nag on every hit.
+   * NAMED ABSENCE - THE ATTACKER'S CHOICE. The SRD prints "you CAN push the creature UP TO 10 feet";
+   * the engine takes the full distance on every hit, the same reading Graze's "you can deal damage"
+   * already gets here. That divergence is not free, and it is not the same trade the other two make.
+   * Graze only PROPOSES a number (applying damage is its own confirm step) and Topple's prompt is
+   * dismissible with its own ✕, but a push is an immediate state write - and the one write the player
+   * who caused it cannot reverse, because a player may move only their own claimed token
+   * (`game-operations.ts`, `tokenMove`). All three melee weapons that carry Push reach 5 or 10 feet,
+   * so taking the full shove can put the target outside the attacker's OWN reach before the second
+   * swing of one Attack action, which is precisely why the SRD made it optional.
+   *
+   * WHAT IT WOULD TAKE: one optional boolean the attacker declares on the resolve payload
+   * (`ResolveInput`), plus the control on the action runner that offers it - the server still deriving
+   * direction and distance, since declining can only make the effect smaller and there is still
+   * nothing about geometry for a client to assert. The two halves have to land together: a wire field
+   * with no control is the "built but unwired" state this module exists to end, and a control that
+   * asked on every hit without one would nag. Until then the rider is automatic and this paragraph is
+   * the record of what that costs.
    */
   push: {
     onHitPush: (swing) => [{
@@ -230,8 +244,10 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
    * reads "DC 13 CON vs Topple (Borin)", which names the rule the creature is resisting rather than
    * the object that caused it; and the prompt's dedupe key is (target, actionName, source), so a
    * mastery save can never displace - or be displaced by - a save the ACTION itself declares.
-   * The cost of that key is the engine's standing convention: two Topple hits on one target in one
-   * turn leave one owed save, not two. That is the same trade every re-cast makes here.
+   * It does not displace ITSELF either: Topple fires on every hit and the SRD sets no per-turn limit
+   * (contrast Nick's explicit "only once per turn"), so Extra Attack's two hits owe two saves and the
+   * caller parks this one with `replaceExisting: false`. The replace-by-key convention stays for the
+   * saves an ACTION declares, where a re-cast is a second spend the player chose.
    *
    * "You can force" is applied automatically, exactly as Graze's "you can deal damage" is. An
    * engine-side prompt for every optional rider would out-nag the table; the GM dismisses the save
@@ -270,7 +286,17 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
  *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target
  *            scoping, so there is nowhere to hang "against this one foe" today.
  */
-export const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(Object.keys(MASTERY_HANDLERS));
+export const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(
+  Object.entries(MASTERY_HANDLERS)
+    // A KEY IS NOT A BEHAVIOUR, and the sentence above is only true because of this line. Every hook
+    // on `MasteryHandler` is optional and this registry's value type admits `undefined`, so `cleave: {}`
+    // typechecks - and a slug that joined the set by being written down would advertise a mastery that
+    // does nothing, which is the one thing this set exists to prevent. Joining takes a hook. The test
+    // is over the VALUES rather than a list of the four channel names, so a fifth channel needs no
+    // second edit here and an unrecognised shape fails toward absence rather than toward a lie.
+    .filter(([, handler]) => Object.values(handler ?? {}).some((hook) => typeof hook === "function"))
+    .map(([slug]) => slug)
+);
 
 /**
  * THE ON-MISS HOOK. The bonus-damage lines this swing's mastery adds when the attack missed.

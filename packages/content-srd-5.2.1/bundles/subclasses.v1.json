@@ -392,7 +392,8 @@
     "modifiers": [
      {
       "type": "unarmored-defense",
-      "ability": "cha"
+      "ability": "cha",
+      "allowShield": true
      }
     ]
    },

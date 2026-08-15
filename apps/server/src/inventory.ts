@@ -44,10 +44,12 @@ export type InventoryDeps = Readonly<{
 export function reconcileEquipment(actor: Actor, definition: ActorDefinition | undefined, deps: InventoryDeps = {}): void {
   if (!definition) return;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
-  // Unarmored Defense travels with the definition (`unarmoredDefenseOf`) because THIS is the write a
+  // Unarmored Defense is read from the definition (`unarmoredDefenseOf`) because THIS is the write a
   // shield actually arrives on: equipping one used to replace a Barbarian's Constitution AC with a
-  // flat 10 + Dex + 2 and leave them worse off than bare-handed (U28).
-  const derived = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(actor.inventory, deps.catalog), unarmoredDefenseOf(definition));
+  // flat 10 + Dex + 2 and leave them worse off than bare-handed (U28). The catalog goes with it so a
+  // sheet stored before that fix - which carries no such extension key - resolves its own authored
+  // feature here instead of silently landing back on the pre-U28 arithmetic.
+  const derived = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(actor.inventory, deps.catalog), unarmoredDefenseOf(definition, deps.catalog));
   // The builder's flat non-equipment rider (the Defense fighting style) still rides on top; the item
   // riders join it. Both are re-applied from scratch, so neither can be dropped by the other.
   actor.armorClass = (derived === null ? definition.armorClass : derived + armorClassRiderOf(definition)) + derivation.armorClass;
