@@ -234,3 +234,76 @@ server suites at once** — the server suite binds a live port.
 vex grants advantage against *everyone*, which is a rules bug that looks exactly like the feature
 working). `nick` stays blocked on U35a, whose scope ruling is owed. U38 (the homebrew `mastery`
 control) is gated on **all eight** slugs reaching, and after this batch four will.
+
+---
+
+## 7. The next batch — U18, `slow`, and the table's own line
+
+**Added 2026-08-15 against HEAD `8ca2a6b`**, after the flourishes starter landed (graze, sap, topple,
+push — 4 of 8 slugs). Every `file:line` below was opened at that HEAD.
+
+### U18 — `speed` as a runtime EFFECT modifier · **M** · serial, blocks `slow`
+
+**Half-shipped, and the shipped half is the trap.** The BUILD-TIME form works: `type: "speed"` is a
+`FeatureModifierSchema` variant, summed into the definition's `speedFeet` by the builder. The RUNTIME
+form is two things missing, not one:
+
+1. `EffectModifierSchema` (`packages/schemas/src/index.ts`) has no `speed` member; and
+2. `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts:44-50`) reads `actor.speedFeet`,
+   exhaustion, `SPEED_ZERO_CONDITIONS` and the `dashing` tag — and **never touches
+   `actor.effects[].modifiers` at all.**
+
+**Shipping the schema member and the control WITHOUT the read is this repo's signature failure:**
+authored, validated, stored, projected, and read by nothing. The sweep is part of the unit.
+
+**Order of operations inside `effectiveSpeedFeet`, so `slow` and Dash compose the way the SRD reads:**
+base − 5×exhaustion → **+ the summed effect modifiers** → floor at 0 → Speed-0 conditions → ×2 while
+Dashing. A Dashing, slowed creature is the case that distinguishes it. **Note the shape being
+edited:** the Speed-0 check is an EARLY RETURN at `:46`, ahead of the exhaustion maths at `:47`, so
+this restructures the function rather than inserting a line.
+
+**Architectural constraint.** `condition-rules.ts` opens with *"kept dependency-free so any engine
+module can import it without cycles."* It may read `actor.effects` (they are on the actor) but must
+**not** import `deriveEquipment`. The effect half lands here; an item half needs a different home.
+
+- **control** — `EFFECT_MODIFIER_TYPES` / `effectModifiersField` (`RiderEditor.tsx:825`), NOT
+  `modifiersField`, which already carries the build-time `speed` with its own ±30/60 row. Mounting
+  the wrong one offers an effect eighteen variants it cannot hold.
+- **far end** — `apps/server/src/movement-rules.ts:76` refuses with *"…has N ft of movement left
+  (this move needs M ft)"*. Assert **the number in that message** moves when the effect applies and
+  **returns when it ends**. Not "the modifier is present".
+- **also measured, and worth closing or labelling:** `EquipmentDerivation.speed` is summed and
+  consumed by **nothing in production** — Boots of Striding are as dead as the effect path was.
+
+### M2 — `slow` (club, javelin, light crossbow, longbow, musket, sling, whip) · **M**
+
+> On a hit, the target's Speed is reduced by 10 feet until the start of your next turn.
+
+A handler applying an effect to the **target** carrying U18's runtime `speed` modifier at **−10**,
+`duration: { type: "until-source-next-turn" }` — the duration Sap already uses
+(`apps/server/src/weapon-mastery.ts:213`) — consumed by `effectiveSpeedFeet`.
+**It must not write `actor.speedFeet` directly**: the base is the sheet's, and an effect that ends
+must restore it. Key the effect per attacker (Sap's key shape) so two attackers each apply their own;
+whether two −10s stack is the SRD's problem, not this unit's — do not invent a cap.
+
+**far end** — the foe's movement budget on ITS OWN turn is 10 feet smaller, read where the engine
+enforces it (`movement-rules.ts` calls `effectiveSpeedFeet`), and the effect **expires** at the start
+of the attacker's next turn. End at a refused or narrated over-budget move, never at the modifier.
+
+### The table's own line — the shared-feed gap this batch's ledger recorded
+
+Push and Topple narrate **only** through `resolution.warnings`, which the operation layer writes as
+GM-only log lines. The table watches a token jump ten feet with nothing explaining why, and a
+Constitution save appears with no line naming what forced it. Give the accomplished push (and
+Topple's save) a line the table sees, the way `narrateTokenMove` already narrates the GM's own drag.
+**Do not change a wire type without regenerating docs** — and check first whether one is needed at
+all: `ActionResolution` appears in neither `docs/api-reference.md` nor `packages/api-contract`.
+
+### Still blocked after this batch
+
+`vex` waits on **U22** (target-scoped effects — a field naming the creature an effect applies
+against, stripped from the player projection; a degraded vex grants advantage against *everyone*,
+which is a rules bug that looks exactly like the feature working). `nick` waits on **U35a**, whose
+scope ruling is **still owed**. `cleave` (U36) is unblocked but unstarted — it relaxes two one-target
+gates and carries an authorization defect worth its own dedicated agent. **U38** (the homebrew
+mastery control) is gated on all eight.
