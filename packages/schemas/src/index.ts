@@ -283,6 +283,28 @@ export const EffectModifierSchema = z.discriminatedUnion("type", [
   /** The bearer's saving throws have advantage; absent ability = all saves (Dodge grants Dex only). */
   z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
   z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
+  /**
+   * THE RUNTIME HALF OF SPEED (U18). `FeatureModifierSchema` has carried a `speed` rider since the
+   * beginning, but that one is BAKED: the builder folds it into `ActorDefinition.speedFeet`, which is
+   * the sheet's permanent number. An effect that ends has to give the feet back, so a runtime change
+   * cannot be written there - `actor.speedFeet` is the base and overwriting it is destructive.
+   *
+   * Signed, so one member covers both directions: Longstrider is `+10` and the `slow` weapon mastery
+   * is `-10`. The bounds match the build-time rider exactly (-30..60), because the same GM authors
+   * both and a number the store then refuses is worse than a narrower control.
+   *
+   * ITS READER IS `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts`), which sums this
+   * member across `actor.effects[].modifiers` and hands the total to the movement budget - so the far
+   * end is the refusal `movement-rules.ts` prints, not the modifier surviving into a struct.
+   *
+   * NAMED ABSENCE - an ITEM's effect does NOT reach that reader. `takeEffects`
+   * (`apps/server/src/equipment-derivation.ts`) turns an item's effect modifiers into standing
+   * RIDERS rather than live `actor.effects`, and `asRiderModifiers` passes this one through to
+   * `EquipmentDerivation.speed`, which nothing in production reads. The row is offered on an item
+   * with that caveat printed beside it (`RiderEditor.tsx`, `effectModifiersField`); the unit that
+   * would close it is the one that gives `EquipmentDerivation.speed` a reader.
+   */
+  z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60) }).strict(),
   AttackBonusVariantSchema,
   ExtraDamageVariantSchema,
   RollModeVariantSchema

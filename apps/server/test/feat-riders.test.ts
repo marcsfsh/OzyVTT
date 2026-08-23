@@ -11,6 +11,7 @@ import { criticalThreshold, effectiveActions } from "../src/effective-actions.js
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { startEncounter } from "../src/encounter.js";
 import { setInventoryItem } from "../src/inventory.js";
+import { applyMovementRules } from "../src/movement-rules.js";
 import { saveRiderBonus, saveRollSources } from "../src/saving-throws.js";
 
 /**
@@ -75,7 +76,7 @@ const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
 // Harness: a REAL ContentLibrary with one GM-authored homebrew feat (and optionally one item) in it.
 // -------------------------------------------------------------------------------------------------
 
-type Homebrew = Readonly<{ modifiers?: readonly unknown[]; actions?: readonly unknown[]; grantsItem?: boolean }>;
+type Homebrew = Readonly<{ modifiers?: readonly unknown[]; actions?: readonly unknown[]; effects?: readonly unknown[]; grantsItem?: boolean }>;
 
 function libraryWith(brew: Homebrew): ContentLibrary {
   const feat = FeatReferenceSchema.parse({
@@ -83,7 +84,7 @@ function libraryWith(brew: Homebrew): ContentLibrary {
     summary: "A homebrew origin feat.",
     feature: {
       id: "hb-warcaller", name: "Warcaller", description: "A homebrew origin feat.",
-      modifiers: brew.modifiers ?? [], actions: brew.actions ?? []
+      modifiers: brew.modifiers ?? [], actions: brew.actions ?? [], effects: brew.effects ?? []
     }
   });
   const equipment = brew.grantsItem
@@ -415,6 +416,43 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     expect(built.hero.initiative).toBe(3);
     expect(built.definition.armorClass).toBe(18);                // chain mail 16 + Defense 1 + rider 1
     expect(built.hero.armorClass).toBe(18);
+  });
+
+  /**
+   * U18 - THE OTHER `speed`, and the pair above is exactly why it had to exist. That rider is BAKED:
+   * it is inside `definition.speedFeet` forever, so an effect that ends could never give the feet
+   * back. This one is authored on the feat's EFFECT (`EffectGrant.modifiers`, the same shape the
+   * homebrew form's effect-modifier row writes), reaches `actor.effects` through the activation the
+   * builder synthesises, and is summed by `effectiveSpeedFeet` on every read.
+   *
+   * The assertion is the sentence a player reads when the server refuses the move, feet and all -
+   * not the modifier's presence in a struct, which the baked rider already managed while moving
+   * nothing at runtime.
+   */
+  it("a feat's EFFECT carrying a runtime `speed` modifier reaches the movement refusal (U18)", () => {
+    const built = fight(build({
+      effects: [{ name: "Striding", tags: ["striding"], duration: { type: "encounter" }, modifiers: [{ type: "speed", amount: 10 }] }]
+    }));
+    const feet = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(b.x - a.x, b.y - a.y);
+    const moveTo = (x: number) => applyMovementRules(built.state, {
+      actorId: IDS.hero, from: { x: 0, y: 0 }, to: { x, y: 0 }, distance: feet, override: null,
+      resolveDefinition: () => built.definition, catalog: built.catalog,
+      newPromptId: () => "70000000-0000-4000-8000-000000000001", now: () => 0,
+      commandId: "50000000-0000-4000-8000-000000000030"
+    });
+
+    expect(built.hero.speedFeet).toBe(30);                       // the sheet's own number, untouched
+    expect(() => moveTo(35)).toThrow("Borin has 30 ft of movement left (this move needs 35 ft).");
+
+    // Use the synthesised activation - the builder mints one for a feature that has an effect and no
+    // action of its own, and that action's `grants` IS the authored effect.
+    const action = actionOf(built, "hb-warcaller");
+    expect(action.grants?.modifiers).toEqual([{ type: "speed", amount: 10 }]);
+    resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000031" }, deps(built, []));
+
+    expect(built.hero.speedFeet).toBe(30);                       // still the sheet's - nothing overwrote it
+    expect(() => moveTo(45)).toThrow("Borin has 40 ft of movement left (this move needs 45 ft).");
+    expect(moveTo(35).warning).toBeNull();                       // the move the effect made possible
   });
 
   it("does not grant an item-granted feat the character ALREADY took", () => {

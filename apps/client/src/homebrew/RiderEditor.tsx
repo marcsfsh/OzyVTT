@@ -407,7 +407,14 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     // Every amount is SIGNED, which is the whole of curses and debuffs: a −2 armour class
     // rider is a Cloak of Weakness and needs no vocabulary of its own. Said once, here.
     { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -5, max: 5, help: "Negative for a curse.", visibleWhen: hasType("ability-score", "hit-points-per-level", "armor-class", "spell-save-dc", "spell-attack-bonus") },
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -30, max: 60, unit: "ft", help: "Negative for a curse.", visibleWhen: hasType("speed") },
+    /* The ITEM note, measured at U18 and the same shape `allowShield` below carries. On a FEATURE or
+       a feat the builder bakes this into the sheet's `speedFeet` and it is read on every move. On an
+       ITEM `deriveEquipment` sums it into `EquipmentDerivation.speed`, which nothing in production
+       reads — zero bundled items author one, and the item-mechanics overlay refuses to author one for
+       exactly this reason. The named absence at that summation site names the unit that closes it.
+       Until then the honest thing is to say so where the GM types the number. */
+    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -30, max: 60, unit: "ft", help: "Negative for a curse.", visibleWhen: hasType("speed"),
+      ...(scope === "item" ? { note: "Not read on an item — a worn item's speed bonus reaches no rule yet. Say it on a feature or a feat instead." } : {}) },
     { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -5, max: 10, help: "Negative for a curse.", visibleWhen: hasType("initiative") },
     { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -10, max: 10, help: "Negative for a curse.", visibleWhen: hasType("attack-bonus", "damage-bonus", "save-bonus", "check-bonus") },
     { key: "amount", label: "Extra slots", kind: "number", allowNegative: true, min: -4, max: 4, visibleWhen: hasType("spell-slot") },
@@ -793,12 +800,17 @@ const tagsField = (label: string): FieldDef => ({ key: "tags", label, kind: "tag
  *
  * `EffectGrant.modifiers` is `EffectModifierSchema`, and that is **not** the union
  * `modifiersField` above authors. `FeatureModifierSchema` is 21 variants; `EffectModifierSchema` is
- * 12, and they overlap by exactly three (`attack-bonus`, `extra-damage`, `roll-mode`, declared once
+ * 13, and they overlap by exactly three (`attack-bonus`, `extra-damage`, `roll-mode`, declared once
  * in `@vtt/schemas` and spread into both). Mounting `modifiersField` here would have offered
- * eighteen variants an effect cannot hold and hidden nine it can — Reckless Attack's own pair among
+ * seventeen variants an effect cannot hold and hidden nine it can — Reckless Attack's own pair among
  * them — so this is its own list.
  *
- * **Four of the twelve are offered, and each omission is a ruling:**
+ * **`speed` is a fourth name in both unions and the count above still says three, on purpose.** They
+ * are two DIFFERENT schemas wearing one discriminator: the feature's carries `when`/`scope` and is
+ * BAKED into the sheet's `speedFeet` at build time, the effect's carries neither and is summed live
+ * on every read. Borrowing the row from above would have borrowed the gate with it.
+ *
+ * **Five of the thirteen are offered, and each omission is a ruling:**
  *
  *  - **`roll-mode` is the general form**, so `attack-disadvantage`, `incoming-attack-disadvantage`,
  *    `save-advantage` and `save-disadvantage` are not offered beside it: the actor side normalises
@@ -816,6 +828,21 @@ const tagsField = (label: string): FieldDef => ({ key: "tags", label, kind: "tag
  *  - `damage-vulnerability`, and `attack-bonus`/`extra-damage` **inside** an effect, have zero SRD
  *    authors and the last two already have a control one level up. Each ships the day a record
  *    authors it, not by default.
+ *  - **`speed` is the fifth, added by U18, and it is the one whose reader had to land first.** The
+ *    row is a runtime change to how far the bearer moves: `effectiveSpeedFeet`
+ *    (`apps/server/src/condition-rules.ts`) sums it off the bearer's live effects on every read, so
+ *    the feet in the movement refusal move when the effect starts and come back when it ends. It is
+ *    NOT the `speed` in `modifiersField` above — that one is baked into the sheet's `speedFeet` at
+ *    build time and an effect that ends could never give it back. Same bounds (−30..60 ft) and the
+ *    same units, because the same GM authors both.
+ *
+ * **On an ITEM the row carries a caveat, and the caveat is the deliverable.** An item's effect never
+ * becomes a live `actor.effects` entry: `takeEffects` (`equipment-derivation.ts`) turns its modifiers
+ * into standing RIDERS, and `asRiderModifiers` hands `speed` through to `EquipmentDerivation.speed`,
+ * which nothing in production reads. So the row publishes on an item and moves no feet. It is
+ * offered-with-a-note rather than withheld, the same shape `unarmored-defense`'s `allowShield` takes
+ * one level up: the store accepts the record, and a GM who is told why beats a control that
+ * silently vanished. The named absence at that summation site names the unit that closes it.
  *
  * **No `when` list here, deliberately.** The two carriers disagree about it: `attackRollSources`
  * reads a live effect's modifiers straight through `toRollModes` and never evaluates a gate, while
@@ -826,7 +853,8 @@ const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = [
   ROLLS("roll-mode", "Advantage or disadvantage"),
   ROLLS("attack-advantage", "Advantage on your attacks, on your turn"),
   ROLLS("incoming-attack-advantage", "Attacks against you have advantage"),
-  HARM("damage-resistance", "Resistance to damage")
+  HARM("damage-resistance", "Resistance to damage"),
+  SELF("speed", "Speed")
 ];
 
 /** Same rule as `blankModifier`: the union is `.strict()`, so switching variant REPLACES the row. */
@@ -834,11 +862,12 @@ function blankEffectModifier(type: string): Draft {
   switch (type) {
     case "roll-mode": return { type, roll: "attack", mode: "advantage" };
     case "damage-resistance": return { type, damageTypes: [] };
+    case "speed": return { type, amount: 10 };
     default: return { type };
   }
 }
 
-const effectModifiersField = (): FieldDef => ({
+const effectModifiersField = (scope: RiderScope): FieldDef => ({
   key: "modifiers",
   label: "What it does",
   kind: "rows",
@@ -854,6 +883,9 @@ const effectModifiersField = (): FieldDef => ({
     const modifier = row as Record<string, unknown>;
     const name = EFFECT_MODIFIER_TYPES.find((entry) => entry.value === modifier.type)?.label ?? "Modifier";
     if (modifier.type === "roll-mode") return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
+    // Feet, and only for the one member measured in them - `damage-bonus` and `attack-bonus` are in
+    // this union too (unoffered, but a stored record may carry one) and "+2 ft" would be a lie.
+    if (modifier.type === "speed" && typeof modifier.amount === "number") return `${name} ${signed(modifier.amount)} ft`;
     const types = Array.isArray(modifier.damageTypes) ? modifier.damageTypes.map(String) : [];
     return types.length > 0 ? `${name} — ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
   },
@@ -867,6 +899,14 @@ const effectModifiersField = (): FieldDef => ({
     },
     { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
     { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a curse bites." },
+    /* The same ±30/60 ft the build-time `speed` row above declares, because it is the same authored
+       number said at a different time — a control whose bounds differ from the store's is a refusal
+       that arrives after the GM moved on. Signed, so Longstrider and the `slow` mastery are one row.
+       The ITEM note is the named absence made visible: on an item this effect becomes a standing
+       rider and `EquipmentDerivation.speed` has no reader, so the feet never move. */
+    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -30, max: 60, unit: "ft", visibleWhen: hasType("speed"),
+      help: "Negative for a curse. The bearer's Speed while this effect lasts, given back when it ends.",
+      ...(scope === "item" ? { note: "Not read on an item — an item's effect becomes a standing rider, and no rule reads a rider's speed. Say it on a feature or a feat instead." } : {}) },
     // `3d`, site 10 of 9 — the count in `vocabularies.test.ts` moves with this list rather than
     // being restated. Half damage of every type named here, and the SRD's own carrier (Superior
     // Defense) names twelve of the thirteen at once.
@@ -923,7 +963,7 @@ const effectsField = (scope: RiderScope): FieldDef => ({
     // A `rows` field inside a `rows` field, which is the depth `whenField` inside `modifiersField`
     // has always rendered at — `RowEditor` is nesting-safe by construction and `FieldRenderer`'s
     // `rows` case recurses through itself, so this needs no new primitive.
-    effectModifiersField()
+    effectModifiersField(scope)
   ]
 });
 

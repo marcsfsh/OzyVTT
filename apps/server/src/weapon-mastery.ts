@@ -280,7 +280,11 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
  *
  * NOT implemented, and therefore deliberately inert rather than half-wired. Each needs engine surface
  * that does not exist yet, sized in the Stage 5 report:
- *   slow   - -10 Speed until the attacker's next turn; the effect vocabulary has no speed modifier.
+ *   slow   - -10 Speed until the attacker's next turn. THE BLOCKER IS GONE: U18 gave the effect
+ *            vocabulary its `speed` member and `effectiveSpeedFeet` the read, so an on-hit handler
+ *            applying `{type: "speed", amount: -10}` for `until-source-next-turn` (Sap's duration,
+ *            keyed per attacker) now reaches the target's movement budget. What is missing is only
+ *            the handler itself, which is M2's.
  *   cleave - a second attack roll against a different creature inside one resolution.
  *   nick   - moves the Light property's extra attack out of the bonus action; a turn-economy change.
  *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target

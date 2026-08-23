@@ -62,7 +62,13 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
     // controls in the editor's Magic section (the template pair), so the open set again does not move
     // - the census's first red run on this key is what forced the controls to land in the same
     // commit, which is the guard doing the exact job ruling 10 bought it for.
-    expect(stats).toEqual({ objectSchemas: 164, declaredKeys: 718 });
+    //
+    // **164 → 165 / 718 → 720, 2026-08-23 (U18).** The RUNTIME `speed` effect modifier landed:
+    // `EffectModifierSchema` grew a thirteenth variant ({type, amount}), and its reader landed in the
+    // same commit — `effectiveSpeedFeet` sums it off `actor.effects`, so the feet in the movement
+    // refusal move with it. Both key NAMES already exist on sibling variants with live controls, and
+    // the row itself is mounted in `effectModifiersField`, so the walk grows and the open set does not.
+    expect(stats).toEqual({ objectSchemas: 165, declaredKeys: 720 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,

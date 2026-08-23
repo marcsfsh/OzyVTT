@@ -5266,6 +5266,7 @@ One of the following, discriminated by `type`:
 - `HomebrewEffectIncomingAttackDisadvantage`
 - `HomebrewEffectSaveAdvantage`
 - `HomebrewEffectSaveDisadvantage`
+- `HomebrewEffectSpeed`
 - `HomebrewRiderAttackBonus`
 - `HomebrewRiderExtraDamage`
 - `HomebrewRiderRollMode`
@@ -5297,6 +5298,15 @@ The bearer's saving throws have disadvantage; omit `ability` for all saves.
 | --- | --- | --- | --- |
 | `type` | const `"save-disadvantage"` | yes |  |
 | `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
+
+### `HomebrewEffectSpeed`
+
+The bearer's Speed while the effect lasts, in feet - signed, so Longstrider is +10 and the `slow` weapon mastery is -10. THE RUNTIME half of speed, and distinct from HomebrewFeatureModifier's `speed`: that one is BAKED into the sheet's own speedFeet at build time, which an effect that ends could never give back. This one is summed off the bearer's live effects on every read of the movement budget, so the feet return the moment the effect does. Same bounds as the build-time rider (-30..60) because the same GM authors both. NOTE the one carrier it does not reach: an ITEM's effect is read as a standing rider rather than as a live effect, and a rider's speed has no consumer, so this modifier moves no feet when an equipment record carries it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"speed"` | yes |  |
+| `amount` | integer (-30–60) | yes |  |
 
 ### `HomebrewEquipmentArmor`
 

@@ -4,7 +4,7 @@ import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { adjustableActor, type ActorScope } from "./hit-points.js";
 import { applyExhaustionDeath, endConcentrationSustainedBy, releaseGrapplesHeldBy, type EffectNarration } from "./effects.js";
-import { conditionLabel, effectiveSpeedFeet, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
+import { conditionLabel, currentSpeedFeet, effectiveSpeedFeet, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, rememberOverride } from "./rules-families.js";
 
 /**
@@ -25,16 +25,23 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
     const standingUp = conditionId === "prone" && actor.conditions.some((condition) => condition.id === "prone");
     // Standing up spends MOVEMENT, so it follows the movement family, not the table-wide dial.
     if (standingUp && state.combat.active && state.combat.turnActorId === actor.id && familyModeFor(state.combat, "movement") !== "freeform" && actor.speedFeet !== undefined) {
-      const cost = Math.floor(actor.speedFeet / 2);
+      // HALF YOUR SPEED, not half the number printed on the sheet - so a slowed creature pays less to
+      // stand and an exhausted one pays less too. `currentSpeedFeet` and not `effectiveSpeedFeet`: Dash
+      // grants extra movement rather than raising your Speed, and charging a Dashing creature double to
+      // stand up would be a wrong number at the table dressed as a rule.
+      const cost = Math.floor((currentSpeedFeet(actor) ?? 0) / 2);
       const effective = effectiveSpeedFeet(actor) ?? 0;
       const budgetLeft = effective - state.combat.turn.movementUsedFeet;
-      if (cost > budgetLeft && !options?.override && effectiveModeFor(state.combat, "movement.stand-up-cost") === "strict" && !overrideCovers(state.combat.turn, "movement.stand-up-cost")) {
+      // Speed 0 is its own refusal and must stay one: with the cost now derived from the SAME zeroed
+      // Speed, `cost > budgetLeft` is `0 > 0` for a grappled creature and would have waved it through.
+      const blocked = effective === 0 || cost > budgetLeft;
+      if (blocked && !options?.override && effectiveModeFor(state.combat, "movement.stand-up-cost") === "strict" && !overrideCovers(state.combat.turn, "movement.stand-up-cost")) {
         throw new RulesBlockedError("movement.stand-up-cost", effective === 0
           ? `${actor.name} can't stand up - its Speed is 0.`
           : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`);
       }
       // A GM Allow here covers the movement family for the rest of the turn, exactly as it does on the map.
-      if (cost > budgetLeft && options?.override) rememberOverride(state, "movement.stand-up-cost");
+      if (blocked && options?.override) rememberOverride(state, "movement.stand-up-cost");
       state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: state.combat.turn.movementUsedFeet + cost } };
       events.push({ kind: "condition", text: `${actor.name} stood up (${cost} ft of movement).`, actorId: actor.id });
     }

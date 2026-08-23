@@ -757,6 +757,29 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     armorProficiencies, weaponProficiencies, featIds,
     armorClass: sumRiders(standing, "armor-class"),
     initiative: sumRiders(standing, "initiative"),
+    /**
+     * NAMED ABSENCE - THIS SUM HAS NO READER. Measured again at U18: `derivation.speed` is written
+     * here and read by nothing in production. The only references in the tree are
+     * `apps/server/test/feat-riders.test.ts` and `apps/server/test/feature-riders.test.ts`, each
+     * asserting it is `0` to prove a FEAT's speed rider was baked into `speedFeet` instead of
+     * collected twice. So Boots of Striding parse, equip, attune, sum - and change no foot of
+     * movement. The item mechanics scripts refuse to author a `speed` rider on an item for exactly
+     * this reason (`scripts/item-mechanics/overlay.ts`), and zero bundled items carry one.
+     *
+     * U18 closed the EFFECT half instead: `EffectModifierSchema` now has a `speed` member and
+     * `effectiveSpeedFeet` (`condition-rules.ts`) sums it off `actor.effects`, which is what the
+     * `slow` mastery needs. It deliberately did NOT close this one. Two things stand in the way and
+     * neither is a line of code here: `condition-rules.ts` is dependency-free by contract and cannot
+     * import this module, so the number would have to be pushed in from every caller of
+     * `effectiveSpeedFeet` (`movement-rules.ts` and `actor-conditions.ts`) - and a caller with no
+     * catalog would then under-count, which is a wrong number at the table rather than an absent one.
+     *
+     * THE UNIT THAT CLOSES IT: an "item speed reader" unit that (1) threads the derived bonus into
+     * both `effectiveSpeedFeet` call sites, (2) proves it at the same far end U18 used - the feet in
+     * `movement-rules.ts`'s refusal - and (3) lifts the authoring refusal in
+     * `scripts/item-mechanics/overlay.ts` so Boots of Striding can be authored, regenerating the
+     * bundle. Until all three land, this field is inert and is documented as inert.
+     */
     speed: sumRiders(standing, "speed"),
     saveBonus: sumRiders(standing, "save-bonus"),
     checkBonus: sumRiders(standing, "check-bonus"),
