@@ -224,6 +224,70 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   },
 
   /**
+   * SLOW. "If you hit a creature with this weapon, the target's Speed is reduced by 10 feet until the
+   * start of your next turn."
+   *
+   * A real effect on the TARGET carrying the RUNTIME `speed` modifier at −10, which `currentSpeedFeet`
+   * (`condition-rules.ts`) sums on every read - so the foe's own movement budget is 10 ft smaller on
+   * its own turn (`movement-rules.ts`) and standing up out of Prone costs half of the reduced number.
+   * The duration is Sap's: `until-source-next-turn` is what "until the start of your next turn" means
+   * for Reckless Attack, Dodge and Sap, and `expireEffectsAtTurnStart` gives the feet back there.
+   *
+   * IT MUST NOT WRITE `actor.speedFeet`, and that is the whole reason U18 exists. That field is the
+   * SHEET's Speed; an effect that ends has to give the feet back, and a mastery that decremented the
+   * base would leave a creature permanently slower every time an expiry was missed - the kind of wrong
+   * number a table only notices three fights later.
+   *
+   * NO condition is linked, for Sap's reason: `slow` is not a named SRD condition, and putting one on
+   * the row would make the token render a status the creature does not have.
+   *
+   * WHAT KEEPS TWO OF THESE APART IS SAP'S KEY, AND IT IS TWO MECHANISMS, NOT ONE. The `id` carries
+   * the `commandId`, so a RETRIED command re-adds nothing (`addEffect` is idempotent by id); the
+   * `sourceActionId` carries the attacker and the weapon action, so a SECOND hit from that same weapon
+   * REFRESHES the first rather than piling a second −10 on it - the same replace-in-place a re-declared
+   * Rage gets. Two different attackers hold two different `sourceActorId`s, so they each apply their
+   * own and the two sum; `currentSpeedFeet` floors that sum at 0, so a crowd can slow a creature to a
+   * standstill but never past it. No cap is invented here beyond the one the effect lifecycle already
+   * had.
+   *
+   * KNOWN APPROXIMATION, stated rather than hidden: that refresh is per WEAPON ACTION, so one attacker
+   * who throws a javelin and then swings a club in the same turn lands two −10s and takes 20 feet,
+   * while two javelin hits take 10. The SRD prints the rider per hit and neither grants the stack
+   * explicitly nor forbids it (contrast Nick's printed "only once per turn"), so nothing here decides
+   * it; the inconsistency is between the two paths, and closing it needs an effect key that says "one
+   * per source creature" rather than one per source action. Sap carries the identical key and the
+   * identical split - it simply costs nothing there, because a second Disadvantage adds nothing to the
+   * first while a second −10 adds ten feet.
+   */
+  slow: {
+    onHit: (swing) => [{
+      targetId: swing.attack.targetId,
+      targetName: swing.attack.targetName,
+      effect: {
+        id: `${swing.commandId}:mastery:slow:${swing.attack.targetId}`,
+        name: `Slowed by ${swing.attacker.name}`,
+        tags: ["slow"],
+        sourceActorId: swing.attacker.id,
+        sourceName: swing.attacker.name,
+        sourceActionId: `${swing.actionId}:slow`,
+        startedRound: swing.round,
+        duration: { type: "until-source-next-turn" },
+        endsWhenSourceDefeated: true,
+        // FALSE, and the opposite of Dodge's reading: this is a PENALTY the target carries, so voiding
+        // it while the target is incapacitated would hand the feet back to a creature that just fell
+        // unconscious. `voidWhileIncapacitated` lapses benefits, never debts.
+        voidWhileIncapacitated: false,
+        concentration: false,
+        modifiers: [{ type: "speed", amount: -10 }],
+        linkedConditionIds: [],
+        escapeDc: null,
+        onEnd: [],
+        endsWithTag: null
+      }
+    }]
+  },
+
+  /**
    * TOPPLE. "If you hit a creature with this weapon, you can force the creature to make a
    * Constitution saving throw (DC 8 plus the ability modifier used to make the attack roll and your
    * Proficiency Bonus). On a failed save, the creature has the Prone condition."
@@ -280,11 +344,6 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
  *
  * NOT implemented, and therefore deliberately inert rather than half-wired. Each needs engine surface
  * that does not exist yet, sized in the Stage 5 report:
- *   slow   - -10 Speed until the attacker's next turn. THE BLOCKER IS GONE: U18 gave the effect
- *            vocabulary its `speed` member and `effectiveSpeedFeet` the read, so an on-hit handler
- *            applying `{type: "speed", amount: -10}` for `until-source-next-turn` (Sap's duration,
- *            keyed per attacker) now reaches the target's movement budget. What is missing is only
- *            the handler itself, which is M2's.
  *   cleave - a second attack roll against a different creature inside one resolution.
  *   nick   - moves the Light property's extra attack out of the bonus action; a turn-economy change.
  *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target

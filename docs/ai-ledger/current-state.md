@@ -20,10 +20,10 @@ fight (`scenes.ts`). Every map tool reaches the GM through **one collapsible too
 **5e rules engine** (ADR-0020, server-owned). Action resolution, typed damage, persistent effects and
 conditions, saves, reactions and opportunity attacks, concentration, spell and pact slots, hit dice,
 rests, legendary actions, death saves (`apps/server/src/action-resolution.ts` and its neighbours).
-**Weapon masteries dispatch through one registry** (`weapon-mastery.ts`, 4 of 8 slugs, the Set derived
-from its handlers): graze, sap, **topple** (a real CON save applying prone) and **push** (the token
-moves 10 ft, snapped, `forced-movement.ts`). How
-strictly it polices is a **standing table policy** (`GameState.rulesPolicy`, set in Settings → The
+**Weapon masteries dispatch through one registry** (`weapon-mastery.ts`, 5 of 8 slugs, the Set derived
+from its handlers): graze, sap, **topple** (a real CON save applying prone), **push** (the token moves 10 ft,
+snapped, `forced-movement.ts`) and **slow** (a runtime `speed` effect the foe's own movement budget reads, −10 ft
+until the attacker's next turn). How strictly it polices is a **standing table policy** (`GameState.rulesPolicy`, set in Settings → The
 table) each fight inherits at `encounter.start`, plus per-family exceptions (`combat.ruleExceptions`,
 `effectiveModeFor` in `rules-families.ts`) so "don't police movement" doesn't also switch off the
 action economy. A GM override is one tap, remembered per family for the turn. `rules.ask` parks the

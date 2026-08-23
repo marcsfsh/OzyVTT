@@ -13,8 +13,9 @@ import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf, masteryReaches } from "../src/equipment-derivation.js";
 import { createGameOperations, type GameOperationsContext } from "../src/game-operations.js";
-import { GameStore } from "../src/game-store.js";
-import { startEncounter } from "../src/encounter.js";
+import { GameStore, RulesBlockedError } from "../src/game-store.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { applyMovementRules } from "../src/movement-rules.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { pushTokenAway } from "../src/forced-movement.js";
 import { mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
@@ -29,13 +30,14 @@ import { moveEncounterToken, setActorSize, type TokenMapGeometry } from "../src/
  * EXACTLY the failure this area has already shipped three times: it typechecks, it reviews as done,
  * and nothing at the table changes. So the data assertion below is the small half of this file, and
  * the rest is behaviour proved where a player would see it - a damage number on a MISS, a die the foe
- * actually rolls twice and keeps the worse of, a condition the foe's own save put on it, and a token
- * standing two squares further away than it did.
+ * actually rolls twice and keeps the worse of, a condition the foe's own save put on it, a token
+ * standing two squares further away than it did, and the foe's own move refused with ten fewer feet
+ * in the sentence.
  *
- * FOUR of the eight are implemented (graze, push, sap, topple). The other four are deliberately inert
- * and the derivation REFUSES TO ADVERTISE THEM (`masteryReaches`), which is the difference between
- * "not built yet" and "built and silently doing nothing". The last test in this file is the one that
- * holds that line honest: it fails the day a slug is added to the implemented set without a
+ * FIVE of the eight are implemented (graze, push, sap, slow, topple). The other three are deliberately
+ * inert and the derivation REFUSES TO ADVERTISE THEM (`masteryReaches`), which is the difference
+ * between "not built yet" and "built and silently doing nothing". The last test in this file is the
+ * one that holds that line honest: it fails the day a slug is added to the implemented set without a
  * behaviour, and it fails the day a behaviour lands without being added.
  */
 
@@ -231,11 +233,15 @@ describe("a mastery reaches a swing only when the character unlocked THAT weapon
   });
 
   it("omits a mastery the engine does not implement, rather than advertising a no-op", () => {
-    // The longbow's mastery is Slow, the rapier's is Vex and the club's is Slow again - NONE of them
-    // is built. (The maul that used to stand here was Topple, which now is, so keeping it would have
-    // made this a test about an unequipped weapon rather than an unimplemented mastery.) Each pick is
-    // legal and the sheet records it; the derivation simply does not claim a working mastery.
-    const built = table(["longbow", "rapier", "club"]);
+    // The SHORTBOW is the load-bearing pick: `soldier-a` puts one in Borin's hands, so the weapon is
+    // equipped, the pick is legal, the sheet records it - and the ONLY reason no mastery arms the
+    // swing is that its Vex is not built. (The maul that used to stand here was Topple and the longbow
+    // that replaced it was Slow; both are built now, so either would have quietly turned this into a
+    // test about an unequipped weapon instead of an unimplemented mastery.) The greataxe and the
+    // scimitar are the unheld halves of Cleave and Nick, there to say the picks are unrestricted.
+    const built = table(["shortbow", "greataxe", "scimitar"]);
+    // The bow really is in his hands - without this the assertion below would pass on an empty rack.
+    expect(effectiveActions(built.definition, built.hero, catalog).some((action) => action.id === "item-shortbow")).toBe(true);
     const derivation = deriveEquipment(built.hero, built.definition, catalog);
     expect(derivation.masteryByActionId).toEqual({});
   });
@@ -434,8 +440,8 @@ const GRID = {
 /** Cell (column, row) → its centre in image pixels, so the fixtures read as squares rather than pixels. */
 const cell = (column: number, row: number) => ({ x: (column + 0.5) * 50, y: (row + 0.5) * 50 });
 
-function battlefield(masteries: readonly string[], extraWeaponIds: readonly string[], hero: { x: number; y: number }, foe: { x: number; y: number }): Built {
-  const built = table(masteries, extraWeaponIds, GRID);
+function battlefield(masteries: readonly string[], extraWeaponIds: readonly string[], hero: { x: number; y: number }, foe: { x: number; y: number }, level: 3 | 5 = 3): Built {
+  const built = table(masteries, extraWeaponIds, GRID, level);
   moveEncounterToken(built.state, IDS.hero, hero, GRID);
   moveEncounterToken(built.state, IDS.foe, foe, GRID);
   return built;
@@ -608,6 +614,151 @@ describe("Push moves the target's token 10 feet straight away", () => {
 });
 
 // -------------------------------------------------------------------------------------------------
+// SLOW - the one whose far end is on the FOE'S OWN TURN, ten feet later.
+//
+// It sits below Push rather than beside Sap because it needs the same calibrated battlemap: the
+// budget it shrinks is measured in feet off the grid, so `GRID`, `cell` and `battlefield` all have to
+// be in scope for the numbers here to be countable in squares.
+// -------------------------------------------------------------------------------------------------
+
+let slowPrompt = 0;
+
+/**
+ * The foe's own move, `cells` squares straight along its row - measured with `mapDistance` over the
+ * live geometry and policed by `applyMovementRules`, which is verbatim what the `token.move` mutation
+ * does (`game-operations.ts`). The refusal it throws is the sentence the player reads, so that string
+ * is the far end and not a stand-in for one.
+ */
+const foeMoves = (built: Built, cells: number) => {
+  const from = positionOf(built, IDS.foe)!;
+  return applyMovementRules(built.state, {
+    actorId: IDS.foe, from, to: { x: from.x + cells * 50, y: from.y }, override: null,
+    distance: (a, b) => mapDistance(GRID, a, b)?.value ?? null,
+    resolveDefinition: (definitionId: string) => built.state.definitions.find((entry) => entry.id === definitionId)?.definition,
+    newPromptId: () => `70000000-0000-4000-8000-${String(++slowPrompt).padStart(12, "0")}`,
+    now: () => 0, commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+  });
+};
+
+describe("Slow takes 10 feet off the target's Speed until the attacker's next turn", () => {
+  it("shrinks the foe's OWN movement budget by 10 ft, and the attacker's next turn gives them back", () => {
+    // The javelin is a Slow weapon straight out of `fighter-a`, so this needs no minted row at all.
+    // Str 17 (+3) + proficiency 2 = +5 to hit; a natural 15 is 20 against AC 13.
+    const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
+    const hit = swing(built, "item-javelin", [15, 4]);
+    expect(hit.attack?.outcome).toBe("hit");
+    expect(hit.effectsApplied).toEqual([{ targetId: IDS.foe, targetName: "Foe", name: "Slowed by Borin", conditionIds: [] }]);
+
+    const slowed = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(slowed.effects.map((effect) => effect.name)).toEqual(["Slowed by Borin"]);
+    expect(slowed.effects[0].modifiers).toEqual([{ type: "speed", amount: -10 }]);
+    // Slow is not a CONDITION - nothing should render a status badge the creature does not have - and
+    // the SHEET's Speed is untouched. An effect that ends has to give the feet back, so the 30 on the
+    // stat block stays 30 while the creature moves like a 20.
+    expect(slowed.conditions).toEqual([]);
+    expect(slowed.speedFeet).toBe(30);
+
+    // THE FAR END, on the foe's own turn: 25 ft sat inside a 30 ft Speed and is now refused BY NAME.
+    nextInitiativeTurn(built.state);
+    expect(built.state.combat.turnActorId).toBe(IDS.foe);
+    try {
+      foeMoves(built, 5);
+      expect.unreachable();
+    } catch (error) {
+      // A refusal, not a rules note: strict mode throws and the whole draft is discarded.
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("movement.exceeds-speed");
+      expect((error as RulesBlockedError).message).toBe("Foe has 20 ft of movement left (this move needs 25 ft).");
+    }
+    // ...and 20 ft still walks, so this is a smaller budget rather than a broken one.
+    expect(foeMoves(built, 4).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(20);
+
+    // The ATTACKER's next turn begins and the effect ends there - `until-source-next-turn` is what the
+    // printed "until the start of your next turn" means, and nothing else hands the feet back.
+    nextInitiativeTurn(built.state);
+    expect(built.state.combat.turnActorId).toBe(IDS.hero);
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+    nextInitiativeTurn(built.state);
+    expect(foeMoves(built, 5).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(25);
+  });
+
+  it("leaves the foe its whole 30 ft when the Fighter did not pick the javelin - same weapon, same hit", () => {
+    // The negative control, and the only difference between the two sheets is the three picks. Graze
+    // is on the greatsword he is not swinging, so nothing else can account for the feet.
+    const built = battlefield(["greatsword", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
+    const hit = swing(built, "item-javelin", [15, 4]);
+    expect(hit.attack?.outcome).toBe("hit");
+    expect(hit.effectsApplied).toBeUndefined();
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+
+    nextInitiativeTurn(built.state);
+    expect(foeMoves(built, 5).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(25);
+  });
+
+  it("applies nothing on a MISS - Slow is an on-hit rider", () => {
+    const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
+    const miss = swing(built, "item-javelin", [2]);
+    expect(miss.attack?.outcome).toBe("miss");
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+
+    nextInitiativeTurn(built.state);
+    expect(foeMoves(built, 5).warning).toBeNull();
+  });
+
+  it("REFRESHES on a second hit of the same weapon - Extra Attack costs 10 feet, not 20", () => {
+    // Level 5: one Attack action is two swings, so this is a real turn rather than a contrivance.
+    // Both hits carry `sourceActionId: "item-javelin:slow"`, and `addEffect` replaces a grant from the
+    // same source actor + source action in place - the refresh a re-declared Rage gets. Sap's key
+    // shape is what buys that; nothing here caps anything.
+    const built = battlefield(["javelin", "longbow", "rapier", "flail"], [], cell(2, 2), cell(3, 2), 5);
+    // Str 19 (+4) + proficiency 3 = +7 to hit at this level; a natural 15 is 22 against AC 13.
+    expect(effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-javelin")!.attack?.count).toBe(2);
+    expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
+    expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
+    const slowed = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(slowed.effects.map((effect) => effect.name)).toEqual(["Slowed by Borin"]);
+
+    // THE FAR END, and it is the number that tells the two readings apart: 30 − 10 = 20. A second
+    // −10 would print 10 here, so this assertion is what would catch the stack if the key ever moved.
+    nextInitiativeTurn(built.state);
+    expect(() => foeMoves(built, 5)).toThrow("Foe has 20 ft of movement left (this move needs 25 ft).");
+    nextInitiativeTurn(built.state);
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+    nextInitiativeTurn(built.state);
+    expect(foeMoves(built, 5).warning).toBeNull();
+  });
+
+  it("sums two -10s from two different sources, and the floor at 0 is the only cap", () => {
+    // The other half of the key, and the reason it is per source rather than per target: a javelin and
+    // a club are two different weapon actions, so their effects do NOT refresh each other and the foe
+    // carries both. Level 5 again, because Extra Attack is what lets one turn hold two swings - and
+    // the SRD lets the second one be a different weapon, which is the whole case. Two separate
+    // ATTACKERS work the same way through `sourceActorId` - proven on hand-built effects, each
+    // expiring with its own source's turn, in `combat-rules-regression.test.ts`. This is also the
+    // approximation the handler's docblock names out loud: two hits of ONE weapon take 10 feet and
+    // two hits of two weapons take 20.
+    const built = battlefield(["javelin", "club", "rapier", "flail"], ["club"], cell(2, 2), cell(3, 2), 5);
+    expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
+    expect(swing(built, "item-club", [15, 4]).attack?.outcome).toBe("hit");
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects.map((effect) => effect.sourceActionId))
+      .toEqual(["item-javelin:slow", "item-club:slow"]);
+
+    // THE FAR END: 30 − 10 − 10 = 10 ft, read off the refusal the foe's player is shown.
+    nextInitiativeTurn(built.state);
+    expect(() => foeMoves(built, 5)).toThrow("Foe has 10 ft of movement left (this move needs 25 ft).");
+    // Both are sustained by the same attacker's turn, so both end together and the whole 30 returns.
+    nextInitiativeTurn(built.state);
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+    nextInitiativeTurn(built.state);
+    expect(foeMoves(built, 6).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(30);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
 // THE OFF-TURN SWING - where a mastery's named absence has to be SPOKEN, not merely produced.
 // -------------------------------------------------------------------------------------------------
 
@@ -745,13 +896,13 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
 // -------------------------------------------------------------------------------------------------
 
 describe("the engine claims exactly the masteries it implements", () => {
-  it("names four as built and four as not, so neither half can drift silently", () => {
+  it("names five as built and three as not, so neither half can drift silently", () => {
     // This is the test that stops Stage 5 from LOOKING finished. `masteryReaches` is the single
     // registry the derivation consults, and these are its two halves stated out loud. Implementing
     // Cleave means changing this list in the same commit as the behaviour and its far-end proof - and
     // adding a slug here without one turns every test above this line into a liar.
-    const built = ["graze", "push", "sap", "topple"];
-    const notYet = ["cleave", "nick", "slow", "vex"];
+    const built = ["graze", "push", "sap", "slow", "topple"];
+    const notYet = ["cleave", "nick", "vex"];
     expect(built.filter(masteryReaches)).toEqual(built);
     expect(notYet.filter(masteryReaches)).toEqual([]);
     // ...and the two halves really are the whole SRD set, so nothing can be quietly forgotten.
