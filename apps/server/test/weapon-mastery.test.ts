@@ -1020,7 +1020,7 @@ async function liveTable(built: Built) {
     gm.disconnect(); player.disconnect(); server.close();
     await rm(directory, { recursive: true, force: true });
   });
-  return { server, gm, heard, gmHeard };
+  return { server, gm, player, heard, gmHeard };
 }
 
 const swingAt = (gm: Socket, actionId: string, targetId: string) =>
@@ -1084,6 +1084,97 @@ describe("the table's own line reaches a player, not just the GM", () => {
     const playerHeard = JSON.stringify(heard);
     expect(playerHeard).not.toContain("Unseen Stalker");
     expect(playerHeard).not.toContain("pushed");
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// THE TWO GATES on the same sentence - the resolver's stamp, and the ack that carries it back.
+// -------------------------------------------------------------------------------------------------
+
+/** The same swing the file's `swing` helper makes, aimed anywhere - the hidden combatant included. */
+const swingTarget = (built: Built, actionId: string, targetId: string, faces: number[]) =>
+  resolveDefinitionAction(
+    built.state,
+    effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === actionId)!,
+    { actorId: IDS.hero, targetIds: [targetId], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
+    deps(built, built.definition, faces)
+  );
+
+describe("the resolver stamps its own verdict on the table's line, and the ack respects it", () => {
+  it("marks the line gmOnly when the swing names a combatant the GM has not revealed", () => {
+    // THE READ THAT WAS ONLY EVER ASSERTED: `namesAHiddenCombatant` decides this field, and until now
+    // nothing checked that its true branch fires. A Topple against the stalker is the case.
+    const built = hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]);
+    expect(swingTarget(built, "item-quarterstaff", LURKER, [15, 3]).tableNarration).toEqual([{
+      kind: "save",
+      text: "Borin's Topple forces Unseen Stalker to make a CON save or have the Prone condition.",
+      actorIds: [IDS.hero, LURKER],
+      gmOnly: true
+    }]);
+  });
+
+  it("leaves it UNSTAMPED when the same swing names only public combatants - the control", () => {
+    // A fresh table, because the action slot is spent once per turn and the point here is the swing,
+    // not the economy. Without this the assertion above passes just as happily against a field
+    // hardcoded to true - and an unstamped line is what hands the decision to the feed's own
+    // re-derivation instead of pre-empting it.
+    const built = hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]);
+    expect(swingTarget(built, "item-quarterstaff", IDS.foe, [15, 3]).tableNarration).toEqual([{
+      kind: "save",
+      text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
+      actorIds: [IDS.hero, IDS.foe]
+    }]);
+  });
+
+  /**
+   * THE REACHABLE SHAPE for the ack gate: the GM hides a player's own character (the scout who
+   * slipped ahead), and that player then swings at a public foe. `canInitiateForActor`
+   * (`authorization.ts`) never looks at the ACTING combatant's visibility, so the resolve is allowed
+   * - and its table line names a hidden combatant, so the resolver stamps it GM-only and the feed
+   * withholds it. Identical inputs on both sides below; the ONLY difference is which principal sent
+   * the command.
+   */
+  async function hiddenSwinger(built: Built) {
+    const table = await liveTable(built);
+    expect(await emitCommand(table.player, "character:claim", { commandId: randomUUID(), actorId: IDS.hero })).toMatchObject({ ok: true });
+    expect(await emitCommand(table.gm, "actor:set-visibility", { commandId: randomUUID(), actorId: IDS.hero, visibility: "gm-only" })).toMatchObject({ ok: true });
+    return table;
+  }
+  const topple = (socket: Socket) => emitCommand(socket, "action:resolve", { commandId: randomUUID(), actorId: IDS.hero, actionId: "item-quarterstaff", targetIds: [IDS.foe], attackNatural: 18 }) as Promise<{ ok: boolean; resolution?: { tableNarration?: ReadonlyArray<{ text: string; gmOnly?: boolean }> } }>;
+
+  it("strips the gmOnly line off the ACK a player receives, feed and ack agreeing", async () => {
+    const { gm, player, heard, server } = await hiddenSwinger(hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]));
+
+    const ack = await topple(player);
+    expect(ack).toMatchObject({ ok: true });
+    // THE SWING REALLY HAPPENED: a resolution came back and a real save is parked in the tracker, so
+    // this is the case where the sentence WOULD be a leak, not one where there was nothing to say.
+    expect(ack.resolution).toBeDefined();
+    expect(server.store.snapshot.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.foe, actionName: "Topple" }]);
+
+    // THE FAR END: the sentence naming the hidden swinger is not in the player's copy of the payload.
+    expect(ack.resolution?.tableNarration).toBeUndefined();
+    expect(JSON.stringify(ack)).not.toContain("Topple forces");
+
+    // ...and the feed agrees with the ack - a sentinel row down the same socket marks the wait's end.
+    await emitCommand(gm, "initiative:next", { commandId: randomUUID() });
+    await heardLine(heard, (text) => text.includes("turn."), "the turn line that marks the end of the wait");
+    expect(JSON.stringify(heard)).not.toContain("Topple forces");
+  });
+
+  it("keeps that same line on the GM's ack - the console this gate must not break", async () => {
+    const { gm, server } = await hiddenSwinger(hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]));
+
+    const ack = await topple(gm);
+    expect(ack).toMatchObject({ ok: true });
+    expect(server.store.snapshot.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.foe, actionName: "Topple" }]);
+    // Same command, same combatants, same stamp - and the GM reads every word of it.
+    expect(ack.resolution?.tableNarration).toEqual([{
+      kind: "save",
+      text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
+      actorIds: [IDS.hero, IDS.foe],
+      gmOnly: true
+    }]);
   });
 });
 

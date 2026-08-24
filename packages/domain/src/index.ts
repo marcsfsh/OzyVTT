@@ -979,6 +979,12 @@ export type ActionRollMode = Readonly<{ mode: "advantage" | "disadvantage" | "no
  * TWO INDEPENDENT GATES, deliberately: `gmOnly` is the resolver's own structural verdict, read off
  * the actors' visibility while it still has the state in hand, and `actorIds` lets the feed decide
  * again from live state. Either one alone would hold; a leak needs both to fail.
+ *
+ * THAT FIRST CLAUSE HAD TO BE MADE TRUE - it was written before it was. The feed's read asked
+ * `visibility === "gm-only"`, which answers "not hidden" for a combatant the roster no longer holds,
+ * so the ids-only gate failed OPEN on exactly the input the resolver's `!== "public"` failed CLOSED
+ * on. Both now read `!== "public"` (`appendLog` in `apps/server/src/server.ts`), so each one alone
+ * really does withhold the row, and "a leak needs both to fail" is a property rather than a hope.
  */
 export type ActionTableNarration = Readonly<{
   /** The feed row's kind - the same vocabulary `CombatLogEntry` already renders (`log-movement`, `log-save`). */

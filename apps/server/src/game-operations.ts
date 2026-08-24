@@ -194,6 +194,36 @@ export type GameMutationResult = { revision: number; duplicate: boolean } & Reco
 
 export type GameOperations = ReturnType<typeof createGameOperations>;
 
+/**
+ * THE ACK'S OWN GATE on the table's lines, and the reason it exists even though nothing gets through
+ * it today.
+ *
+ * A resolution goes two places: into the feed through `appendTableNarration`, which hands each row's
+ * `actorIds` to `appendLog`'s live re-derivation, and STRAIGHT BACK to whoever sent the command as
+ * the socket acknowledgement. The feed half has a gate. The ack half had none - the whole
+ * `resolution` was returned verbatim, `gmOnly: true` rows included, to a player principal.
+ *
+ * It is not exploitable today, and that is precisely the argument for the gate rather than against
+ * it: the reason is that TWO OTHER checks happen to make a player's own resolve name only public
+ * combatants (`canPlayerTarget` forces a player's resolved targets public, `canInitiateForActor`
+ * forces the attacker to be their own claimed character). Both live in a different concern; either
+ * could be relaxed for a good reason by someone who never reads this line, and the day one is, the
+ * ack starts shipping rows the feed refuses. `appendLog` does not trust the resolver's verdict
+ * either - it re-derives. This is that same second read, on the other door.
+ *
+ * GM-GRADE IS UNTOUCHED, deliberately: the GM console legitimately shows every line, and an
+ * integration is the GM's own automation (ADR-0016). Absent-when-empty matches how the resolver
+ * builds the field, so a filtered-to-nothing list reads as "no lines", not "an empty list".
+ */
+function withoutGmOnlyNarration<T extends Readonly<{ tableNarration?: readonly ActionTableNarration[] }>>(principal: GamePrincipal, resolution: T): T {
+  const lines = resolution.tableNarration;
+  if (isGmGrade(principal) || lines === undefined) return resolution;
+  const readable = lines.filter((line) => line.gmOnly !== true);
+  if (readable.length === lines.length) return resolution;
+  const { tableNarration: _withheld, ...rest } = resolution;
+  return (readable.length > 0 ? { ...rest, tableNarration: readable } : rest) as T;
+}
+
 export function createGameOperations(context: GameOperationsContext) {
   const { store, contentLibrary } = context;
   const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
@@ -1352,7 +1382,9 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         }
       }
-      return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) };
+      // The ack carries the resolution back to whoever sent the command - through the gate a
+      // non-GM principal's copy owes (see `withoutGmOnlyNarration`), never verbatim.
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution: withoutGmOnlyNarration(principal, resolution) } : {}) };
     },
 
     async saveAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1454,7 +1486,9 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         publishNarrations(outcome.events);
       }
-      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: outcome.resolution } : {}), ...(outcome.parts ? { parts: outcome.parts } : {}), ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) } } : {}) };
+      // Same gate as `actionResolve`'s ack: the off-turn swing runs the SAME resolver, so it carries
+      // the same table lines and owes a non-GM principal the same filter.
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: withoutGmOnlyNarration(principal, outcome.resolution) } : {}), ...(outcome.parts ? { parts: outcome.parts } : {}), ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) } } : {}) };
     },
 
     async reactionDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {

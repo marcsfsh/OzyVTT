@@ -62,6 +62,42 @@ export function projectPlayerAnnotations(state: GameState, playerSessionId: stri
     .map((annotation) => safeAnnotation(annotation, playerSessionId));
 }
 
+/**
+ * THE ONE MASK a hidden source's identity collapses to. A constant rather than five string literals
+ * because it is now written into more than one FIELD of more than one projection, and two of them
+ * sit side by side on the same chip - a drift between them would read as two different creatures.
+ */
+const HIDDEN_SOURCE = "A hidden threat";
+
+/**
+ * SCRUB A HIDDEN SOURCE'S REAL NAME OUT OF A FREE-FORM DISPLAY STRING.
+ *
+ * `sourceName` is a field and can simply be replaced. `name` cannot: it is the chip's own label
+ * ("Slowed by Vashkar", "Grappled by Vashkar", "Restrained by Vashkar (Bite)"), so blanking it
+ * leaves the player an empty chip - a worse bug than the leak. Four separate authoring sites build
+ * that label by interpolating the attacker's name (`weapon-mastery.ts` slow/sap,
+ * `action-resolution.ts` on-hit riders and the unarmed Grapple), and a fifth WILL be written: `slow`
+ * re-introduced exactly what `sap` had already done. So the substitution happens HERE, at the
+ * security boundary, and covers every present and future site that follows the "<Something> by
+ * <sourceName>" convention rather than an allow-list that a new site is not on.
+ *
+ * WORD-BOUNDARY, NOT `replaceAll`. A two-letter creature called "Al" would otherwise turn "Alarmed"
+ * into gibberish in an unrelated sentence, so the match must not be flanked by a letter or a digit -
+ * which also makes a short name safe rather than special-cased. An empty or whitespace-only
+ * `sourceName` names nobody and is left alone: there is nothing to find and a zero-width pattern
+ * would rewrite the whole string.
+ *
+ * It is a MASK, not an escape hatch: what it cannot see (a nickname, a title the label spelled a
+ * different way) it cannot remove, which is why the resolver must never put anything on a
+ * player-facing string that is not already the source's own `sourceName`.
+ */
+function withoutSourceName(text: string, sourceName: string | null): string {
+  const needle = sourceName?.trim() ?? "";
+  if (needle.length === 0) return text;
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "giu"), HIDDEN_SOURCE);
+}
+
 export function projectPlayerCombat(state: GameState, playerSessionId?: string, now = Date.now()): PlayerCombatView {
   const initiative = projectPublicInitiative(state);
   const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
@@ -108,13 +144,24 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // crosses the wire, and a hidden source's name is masked so gm-only attackers stay unnarrated.
     pendingSaves: state.combat.pendingSaves
       .filter((entry) => { const target = state.actors.find((actor) => actor.id === entry.targetActorId); return target !== undefined && target.ownerSessionId !== null && target.ownerSessionId === playerSessionId; })
-      .map(({ sourceActorId, endsEffects: _endsEffects, ...entry }) => ({
-        ...entry,
-        sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName,
-        // The on-fail effect's source ids never cross the wire either (same masking as effects);
-        // concentration effect references (endsEffects) are server bookkeeping and are stripped.
-        ...(entry.onFailEffect ? { onFailEffect: { ...entry.onFailEffect, sourceActorId: null, sourceName: entry.onFailEffect.sourceActorId !== null && !publicActorIds.has(entry.onFailEffect.sourceActorId) ? "A hidden threat" : entry.onFailEffect.sourceName } } : {})
-      })),
+      .map(({ sourceActorId, endsEffects: _endsEffects, ...entry }) => {
+        // The on-fail effect's source ids never cross the wire either (same masking as effects), and
+        // its `name` is the SAME free-form "Grappled by <attacker>" label an effect carries - the
+        // unarmed Grapple writes it here first and `saving-throws.ts` copies it onto the real effect
+        // on a failure - so it is scrubbed the same way. Concentration effect references
+        // (endsEffects) are server bookkeeping and are stripped.
+        const onFail = entry.onFailEffect;
+        const onFailHidden = onFail !== undefined && onFail.sourceActorId !== null && !publicActorIds.has(onFail.sourceActorId);
+        return {
+          ...entry,
+          sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? HIDDEN_SOURCE : entry.sourceName,
+          ...(onFail
+            ? { onFailEffect: onFailHidden
+              ? { ...onFail, sourceActorId: null, name: withoutSourceName(onFail.name, onFail.sourceName), sourceName: HIDDEN_SOURCE }
+              : { ...onFail, sourceActorId: null } }
+            : {})
+        };
+      }),
     // ASK THE GM (D8), same boundary as saves and reaction prompts: a player sees ONLY their own
     // claimed character's parked asks - never another player's question, and never the GM's
     // deliberation about it. The parked `command` is dropped entirely: its payload can name target ids
@@ -126,17 +173,25 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // with the source actor id stripped and a hidden source's name masked.
     pendingReactions: state.combat.pendingReactions
       .filter((entry) => { const reactor = state.actors.find((actor) => actor.id === entry.actorId); return reactor !== undefined && reactor.ownerSessionId !== null && reactor.ownerSessionId === playerSessionId; })
-      .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName }))
+      .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? HIDDEN_SOURCE : entry.sourceName }))
   };
 }
 
 /**
  * An effect as players see it (viewer safety): source ids never cross the wire, and a hidden
- * source's name is masked - a player learns "Grappled by A hidden threat", never who.
+ * source's name is masked in BOTH the fields that carry it - a player learns "Grappled by A hidden
+ * threat", never who.
+ *
+ * BOTH, because for a long time it was only one. `sourceName` was replaced and `name` was not, and
+ * `name` is the string the chip actually prints (`EncounterPanel.tsx` `EffectChips`), so the masked
+ * source sat in the tooltip beside the attacker's real name in the label - the leak this docblock
+ * had already claimed did not exist. See `withoutSourceName` for why the label is scrubbed rather
+ * than blanked, and why the scrub belongs here rather than at the sites that write the label.
  */
 function playerEffect(effect: GameState["actors"][number]["effects"][number], publicActorIds: ReadonlySet<string>): PlayerEffect {
   const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
-  return { ...visible, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : effect.sourceName };
+  if (sourceActorId === null || publicActorIds.has(sourceActorId)) return visible;
+  return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
 
 /**

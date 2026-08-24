@@ -354,9 +354,13 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {/* The table's own lines (an accomplished push, the save a Topple forced). NOT warnings: these
           are things that HAPPENED, and every one of them is also a row in the feed the whole table
           reads - so the card and the log say the same sentence rather than the card saying it alone.
-          Safe to render whole here: this payload is the ack to the attacker's own resolve, and a
-          line only ever names the attacker (whom the caller is acting as) and the single target the
-          server already cleared them to act on (`canPlayerTarget`, `game-operations.ts`). */}
+          Rendered whole, INCLUDING `gmOnly` rows, and the reason is neither `canPlayerTarget` nor
+          anything else about targeting: this component takes a `GmView` and is mounted only in the
+          GM console (`EncounterPanel.tsx`). A player's runner is `PlayerActionRunner`, which renders
+          neither `warnings` nor these lines at all. Reuse this component for a player and that
+          reason is gone - the guard that survives the move is server-side, where
+          `withoutGmOnlyNarration` (`game-operations.ts`) strips gmOnly rows off any ack bound for a
+          non-GM principal. Read both before moving it, and add the client-side check here if you do. */}
       {result.tableNarration?.map((line) => <p key={line.text} className="action-narration">{line.text}</p>)}
       {result.save && (() => {
         // Reflect the LIVE count of unanswered saves for this action (matched by attacker + action),

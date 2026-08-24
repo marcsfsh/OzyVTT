@@ -300,3 +300,44 @@ describe("the feed over the API", () => {
     expect(server.store.snapshot.rolls.filter((record) => record.commandId === commandId).length).toBe(1);
   });
 });
+
+/**
+ * THE INPUT NONE OF THE THREE GATES CAN SEE: a row naming a combatant the roster no longer holds.
+ *
+ * The feed's live re-derivation (`appendLog`, `server.ts`) used to ask `visibility === "gm-only"`,
+ * and `undefined === "gm-only"` is false - so a missing combatant read as "not hidden" and its row
+ * went to every player. Its two siblings answer the same input the other way: `broadcastTableEvent`
+ * requires every named combatant to BE public, and the resolver's `namesAHiddenCombatant`
+ * (`action-resolution.ts`) reads `?.visibility !== "public"`. One question, three reads, and the one
+ * that writes the durable row was the one that failed OPEN.
+ *
+ * The state is written straight into the store because no COMMAND produces it - `removeActor`
+ * refuses to drop a combatant who is in an active encounter, which is exactly why the hole survived:
+ * it is unreachable until the day something makes it reachable, and by then the gate is either right
+ * or it is a leak. The same technique the mastery suite uses to commit a scene switch mid-resolve.
+ */
+describe("a feed row naming a combatant the roster no longer holds", () => {
+  it("stays in the GM's feed alone, the way a hidden combatant's row does", async () => {
+    const { base, server, gmToken, mapAssetId } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    expect((await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: HERO, score: 20 }, { actorId: OTHER, score: 10 }] })).status).toBe(200);
+
+    // THE CONTROL, taken BEFORE anything vanishes: the turn line for a public combatant does reach
+    // this player, so "absent" below is a decision and not an empty feed.
+    expect((await feed(base, playerToken)).map((entry) => entry.text)).toContain("Round 1 - Public Hero's turn.");
+
+    await server.store.execute({ id: randomUUID(), type: "test.roster-drop" }, (state) => {
+      state.actors = state.actors.filter((actor) => actor.id !== OTHER);
+    });
+    expect((await post(base, GAME_PATHS.turnEnd, gmToken, { commandId: randomUUID() })).status).toBe(200);
+    expect(server.store.snapshot.combat.turnActorId).toBe(OTHER);
+
+    // THE FAR END: the row exists, the GM reads it, and the player's own feed does not carry it.
+    const gmRows = (await feed(base, gmToken)).map((entry) => entry.text);
+    const playerRows = (await feed(base, playerToken)).map((entry) => entry.text);
+    expect(gmRows).toContain("Round 1 - A combatant's turn.");
+    expect(playerRows).not.toContain("Round 1 - A combatant's turn.");
+    // ...and the row the player DID get is still there, so nothing swept the feed clean.
+    expect(playerRows).toContain("Round 1 - Public Hero's turn.");
+  });
+});
