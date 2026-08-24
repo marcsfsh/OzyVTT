@@ -364,6 +364,39 @@ export const EffectInstanceSchema = z.object({
   concentration: z.boolean().default(false),
   /** Cascade: this effect ends when the actor no longer has any other effect carrying this tag (Frenzy's marker ends with the Rage). */
   endsWithTag: z.string().regex(/^[a-z0-9-]+$/).max(40).nullable().default(null),
+  /**
+   * THE IDENTITY OF THE GAME EFFECT, for SRD 5.2.1's "Combining Game Effects": *"The effects of the
+   * same name don't combine... the most potent effect applies."* Two instances that share a key are
+   * ONE game effect however many creatures, weapons or swings produced them, so a reader takes the
+   * single most potent contribution across the group rather than summing it - two attackers' Slows
+   * are one -10, not -20. Each instance still keeps its OWN duration; only the READ collapses.
+   *
+   * Absent (the default) means "this is its own effect" and sums as it always did, so nothing that
+   * predates the field changes behaviour. DIFFERENT keys are different effects and also sum: a Slow
+   * plus a Longstrider is -10 +10, not one of them.
+   *
+   * IT IS GENERIC VOCABULARY AND CARRIES NO MASTERY KNOWLEDGE. `currentSpeedFeet`
+   * (`apps/server/src/condition-rules.ts`) groups `speed` modifiers by this string and never asks
+   * what wrote it; `mastery:slow` is simply the name the Slow property happens to put here. Its one
+   * reader today is that grouping, so a key on an effect whose modifiers nobody groups yet is inert
+   * rather than wrong - it states an identity and waits for a reader that cares.
+   */
+  stackKey: z.string().regex(/^[a-z0-9:-]+$/).max(60).optional(),
+  /**
+   * EXTRA MOVEMENT this effect granted for the current turn, in feet, FIXED AT THE MOMENT IT WAS
+   * GRANTED - the Dash action's *"extra movement for the current turn equal to your Speed after
+   * modifiers"*. It is a QUANTITY, not a multiplier, and that is the whole point: a Slow landing
+   * mid-turn lowers the Speed from that point on, and must not retroactively rewrite feet the Dash
+   * already granted and the creature already spent. Re-deriving `2 x Speed` on every read did exactly
+   * that, and charged a Dashing creature 20 feet for an opportunity attack it had already survived.
+   *
+   * Its reader is `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts`), which adds every
+   * stored grant to the live Speed. ABSENT means "this effect grants no extra movement" - and, on an
+   * effect carrying the `dashing` tag, ALSO means "granted by a build that predates this field", for
+   * which that reader falls back to the old doubling so a fight persisted mid-turn keeps its Dash
+   * instead of silently losing it.
+   */
+  movementGrantFeet: z.number().int().min(0).max(999).optional(),
   modifiers: z.array(EffectModifierSchema).max(8).default([]),
   /** Conditions this effect applied to the SAME actor; removed automatically when the effect ends. */
   linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),

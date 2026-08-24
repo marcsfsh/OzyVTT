@@ -35,15 +35,28 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
       // Speed 0 is its own refusal and must stay one: with the cost now derived from the SAME zeroed
       // Speed, `cost > budgetLeft` is `0 > 0` for a grappled creature and would have waved it through.
       const blocked = effective === 0 || cost > budgetLeft;
+      // ONE sentence for the violation, read by both exits below - strict throws it, assisted narrates
+      // it. Two copies of this string is how the refusal and the rules note drift apart.
+      const violation = effective === 0
+        ? `${actor.name} can't stand up - its Speed is 0.`
+        : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`;
       if (blocked && !options?.override && effectiveModeFor(state.combat, "movement.stand-up-cost") === "strict" && !overrideCovers(state.combat.turn, "movement.stand-up-cost")) {
-        throw new RulesBlockedError("movement.stand-up-cost", effective === 0
-          ? `${actor.name} can't stand up - its Speed is 0.`
-          : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`);
+        throw new RulesBlockedError("movement.stand-up-cost", violation);
       }
       // A GM Allow here covers the movement family for the rest of the turn, exactly as it does on the map.
       if (blocked && options?.override) rememberOverride(state, "movement.stand-up-cost");
       state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: state.combat.turn.movementUsedFeet + cost } };
       events.push({ kind: "condition", text: `${actor.name} stood up (${cost} ft of movement).`, actorId: actor.id });
+      // ASSISTED MODE WARNS; IT DOES NOT WAVE THROUGH IN SILENCE. This is the movement family's own
+      // convention, verbatim: `applyMovementRules` returns the identical refusal sentence as a warning
+      // when the mode is not strict, the move still happens, and the operation layer logs it with this
+      // exact "Rules note:" label. Without it a grappled creature's stand-up narrated as
+      // "stood up (0 ft of movement)" and nothing else - an illegal action reading as a clean legal
+      // event, which is worse than either refusing it or explaining it. The same line covers the
+      // strict-mode turn where an earlier GM Allow already spent the argument (`overrideCovers`), which
+      // is the other branch that falls past the throw; a GM's explicit `override` on THIS command is
+      // audited by the caller instead and stays silent here.
+      if (blocked && !options?.override) events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
     }
     actor.conditions = remaining;
     return events;

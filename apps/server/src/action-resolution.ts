@@ -9,7 +9,7 @@ import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememb
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
-import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
+import { conditionLabel, currentSpeedFeet, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { masteryHitEffects, masteryHitPushes, masteryHitSaves, masteryMissDamage, type MasterySwing } from "./weapon-mastery.js";
 
@@ -1264,6 +1264,16 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const readyNote = input.builtin && action.id === "ready" && input.note ? `Readied: ${input.note.slice(0, 100)}` : null;
     // A concentration grant may end the granter's previous concentration; surface that as a warning line.
     const replaced: { kind: "effect" | "condition"; text: string; actorId: string }[] = [];
+    // DASH GRANTS A QUANTITY, NOT A MULTIPLIER. "Extra movement for the current turn equal to your
+    // Speed after modifiers" is measured HERE, once, at the moment the action is taken - so a Slow
+    // landing later in the same turn lowers the Speed from that point on without retroactively
+    // rewriting feet the grant already handed over and the creature already spent. `effectiveSpeedFeet`
+    // adds the stored number; it no longer doubles a live one (see its docblock for the 15-vs-5 case).
+    // The `dashing` TAG is the vocabulary, not the builtin's id: a homebrew action that grants the same
+    // tag is the same rule and gets the same measurement. An unknown Speed records 0 rather than
+    // nothing, because ABSENT is reserved for effects granted before this field existed - and a
+    // creature with no Speed has no budget for the movement rules to read anyway.
+    const grantedMovement = grant.tags.includes("dashing") ? { movementGrantFeet: currentSpeedFeet(recipient) ?? 0 } : {};
     const effect = addEffect(state, recipient.id, {
       id: `${input.commandId}:grant`,
       name: readyNote ?? grant.name ?? action.name,
@@ -1280,7 +1290,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       escapeDc: null,
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
-      concentration: grant.concentration
+      concentration: grant.concentration,
+      ...grantedMovement
     }, replaced);
     warnings.push(...replaced.map((event) => event.text));
     if (grant.target === "target") effectsApplied.push({ targetId: recipient.id, targetName: recipient.name, name: effect.name, conditionIds: [] });

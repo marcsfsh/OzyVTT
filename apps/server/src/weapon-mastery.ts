@@ -195,6 +195,17 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
    * also "the next attack roll" in the SRD), so it follows the engine's existing convention rather
    * than inventing a second one. A one-shot duration is the fix, and it fixes both together.
    *
+   * `endsWhenSourceDefeated` IS FALSE, and Slow's docblock below carries the argument for both: the
+   * printed duration is "before the start of your next turn", and dropping to 0 HP does not delete a
+   * turn the dying creature still owns. The two masteries answer this the same way on purpose.
+   *
+   * `stackKey` COSTS NOTHING HERE AND IS SET ANYWAY - the claim, and then the proof. Nothing sums
+   * `attack-disadvantage`: `aggregateRollMode` reads it as a presence, so two Sapped effects and one
+   * produce the identical 2d20-keep-the-lower. The key therefore moves no number this mastery can
+   * print; it is here so "a mastery's effect names the game effect it is" is a convention rather than
+   * a thing Slow does alone, and so a future reader that groups something else finds the identity
+   * already stated instead of inferring one from a tag.
+   *
    * NO condition is linked: Sap is not a named condition, and putting one on the row would make the
    * token render a status it does not have.
    */
@@ -211,9 +222,10 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
         sourceActionId: `${swing.actionId}:sap`,
         startedRound: swing.round,
         duration: { type: "until-source-next-turn" },
-        endsWhenSourceDefeated: true,
+        endsWhenSourceDefeated: false,
         voidWhileIncapacitated: false,
         concentration: false,
+        stackKey: "mastery:sap",
         modifiers: [{ type: "attack-disadvantage" }],
         linkedConditionIds: [],
         escapeDc: null,
@@ -241,23 +253,41 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
    * NO condition is linked, for Sap's reason: `slow` is not a named SRD condition, and putting one on
    * the row would make the token render a status the creature does not have.
    *
-   * WHAT KEEPS TWO OF THESE APART IS SAP'S KEY, AND IT IS TWO MECHANISMS, NOT ONE. The `id` carries
-   * the `commandId`, so a RETRIED command re-adds nothing (`addEffect` is idempotent by id); the
-   * `sourceActionId` carries the attacker and the weapon action, so a SECOND hit from that same weapon
-   * REFRESHES the first rather than piling a second −10 on it - the same replace-in-place a re-declared
-   * Rage gets. Two different attackers hold two different `sourceActorId`s, so they each apply their
-   * own and the two sum; `currentSpeedFeet` floors that sum at 0, so a crowd can slow a creature to a
-   * standstill but never past it. No cap is invented here beyond the one the effect lifecycle already
-   * had.
+   * SLOW DOES NOT STACK WITH SLOW, FROM ANY ATTACKER OR ANY WEAPON - SRD 5.2.1 rules glossary,
+   * "Combining Game Effects": *"The effects of the same name don't combine... the most potent effect
+   * applies."* Two applications of the Slow mastery property ARE the same game effect, so `stackKey`
+   * names it (`mastery:slow`) and `currentSpeedFeet` takes the single most potent −10 across the
+   * group instead of adding them up. Two crocodiles biting the same creature take 10 feet off it, and
+   * so does one attacker who throws a javelin and then swings a club in the same turn. A DIFFERENT
+   * effect still sums normally: a Slow plus a homebrew curse, or a Slow plus Longstrider's +10, is the
+   * arithmetic it always was.
    *
-   * KNOWN APPROXIMATION, stated rather than hidden: that refresh is per WEAPON ACTION, so one attacker
-   * who throws a javelin and then swings a club in the same turn lands two −10s and takes 20 feet,
-   * while two javelin hits take 10. The SRD prints the rider per hit and neither grants the stack
-   * explicitly nor forbids it (contrast Nick's printed "only once per turn"), so nothing here decides
-   * it; the inconsistency is between the two paths, and closing it needs an effect key that says "one
-   * per source creature" rather than one per source action. Sap carries the identical key and the
-   * identical split - it simply costs nothing there, because a second Disadvantage adds nothing to the
-   * first while a second −10 adds ten feet.
+   * THIS RESOLVES THE APPROXIMATION THIS DOCBLOCK USED TO NAME. It said a javelin and then a club cost
+   * 20 feet while two javelins cost 10, called the inconsistency the SRD's problem, and asked for a key
+   * that meant "one per source creature". The key that was actually needed says "one per game EFFECT",
+   * which is stronger: it settles the two-attacker case the old text also got wrong, and it is the
+   * glossary's own rule rather than a cap invented here.
+   *
+   * EACH INSTANCE KEEPS ITS OWN DURATION, and that is why these are still separate rows. The reduction
+   * is live while ANY instance is: the first crocodile's turn begins, its own row expires, and the
+   * creature is still slowed by the second one's - the read simply stops having two contributions to
+   * choose between. Only the last expiry hands the feet back.
+   *
+   * THREE MECHANISMS KEEP THE ROWS STRAIGHT, and they answer three different questions. The `id`
+   * carries the `commandId`, so a RETRIED command re-adds nothing (`addEffect` is idempotent by id).
+   * The `sourceActionId` carries the attacker and the weapon action, so a SECOND hit from that same
+   * weapon REFRESHES the first in place - the duration renewal a re-declared Rage gets, and the reason
+   * Extra Attack's two javelin hits are one row. And `stackKey` decides how the rows that DO exist are
+   * READ, which is not the same question as which rows exist; it is generic vocabulary in
+   * `@vtt/schemas`, and `condition-rules.ts` groups by it knowing nothing about masteries at all.
+   *
+   * `endsWhenSourceDefeated` IS FALSE, and the printed duration is why. Slow lasts "until the start of
+   * your next turn"; an attacker who drops to 0 HP still HAS a next turn - `nextInitiativeTurn` skips
+   * nobody, so `expireEffectsAtTurnStart` still fires there and still hands the feet back. A true flag
+   * lifted the penalty the instant the attacker fell, which is a shorter duration than the SRD prints
+   * and a wrong number at the table. Nothing strands the effect either: a combatant cannot be removed
+   * from a live fight (`actor-roster.ts` refuses it), and ending the encounter ends every effect on
+   * every combatant in it (`endEncounterEffects`). Sap answers this the same way for the same reason.
    */
   slow: {
     onHit: (swing) => [{
@@ -272,12 +302,15 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
         sourceActionId: `${swing.actionId}:slow`,
         startedRound: swing.round,
         duration: { type: "until-source-next-turn" },
-        endsWhenSourceDefeated: true,
+        endsWhenSourceDefeated: false,
         // FALSE, and the opposite of Dodge's reading: this is a PENALTY the target carries, so voiding
         // it while the target is incapacitated would hand the feet back to a creature that just fell
         // unconscious. `voidWhileIncapacitated` lapses benefits, never debts.
         voidWhileIncapacitated: false,
         concentration: false,
+        // The name of the GAME EFFECT, not of the weapon or the attacker: every Slow shares it, which
+        // is what makes two of them one reduction rather than two (SRD "Combining Game Effects").
+        stackKey: "mastery:slow",
         modifiers: [{ type: "speed", amount: -10 }],
         linkedConditionIds: [],
         escapeDc: null,

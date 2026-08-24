@@ -6,7 +6,7 @@ import { io as connect, type Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type CombatLogEntry, type GameState, type MutationResult } from "@vtt/domain";
 import { loadWeapons } from "@vtt/content-srd-5.2.1";
-import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
+import { EffectInstanceSchema, InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
@@ -19,6 +19,8 @@ import { addCombatant, nextInitiativeTurn, startEncounter } from "../src/encount
 import { MapAssetStore } from "../src/map-assets.js";
 import { createServer } from "../src/server.js";
 import { applyMovementRules } from "../src/movement-rules.js";
+import { addEffect } from "../src/effects.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { pushTokenAway } from "../src/forced-movement.js";
 import { mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
@@ -741,30 +743,77 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     expect(foeMoves(built, 5).warning).toBeNull();
   });
 
-  it("sums two -10s from two different sources, and the floor at 0 is the only cap", () => {
-    // The other half of the key, and the reason it is per source rather than per target: a javelin and
-    // a club are two different weapon actions, so their effects do NOT refresh each other and the foe
-    // carries both. Level 5 again, because Extra Attack is what lets one turn hold two swings - and
-    // the SRD lets the second one be a different weapon, which is the whole case. Two separate
-    // ATTACKERS work the same way through `sourceActorId` - proven on hand-built effects, each
-    // expiring with its own source's turn, in `combat-rules-regression.test.ts`. This is also the
-    // approximation the handler's docblock names out loud: two hits of ONE weapon take 10 feet and
-    // two hits of two weapons take 20.
+  it("a javelin AND a club from one attacker are still ONE reduction - Slow does not stack with Slow", () => {
+    // THE RULING THIS TEST REPLACED ITS OWN ARITHMETIC FOR. SRD 5.2.1 rules glossary, "Combining Game
+    // Effects": effects with the same name don't combine, and the most potent applies. Two hits of the
+    // Slow property are the same game effect however many weapons or attackers produced them, so this
+    // used to assert 10 ft left (30 − 10 − 10) and now asserts 20 (30 − 10). Level 5, because Extra
+    // Attack is what lets one turn hold two swings, and the SRD lets the second be a different weapon.
     const built = battlefield(["javelin", "club", "rapier", "flail"], ["club"], cell(2, 2), cell(3, 2), 5);
     expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
     expect(swing(built, "item-club", [15, 4]).attack?.outcome).toBe("hit");
-    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects.map((effect) => effect.sourceActionId))
-      .toEqual(["item-javelin:slow", "item-club:slow"]);
-
-    // THE FAR END: 30 − 10 − 10 = 10 ft, read off the refusal the foe's player is shown.
+    // THE FAR END, first, because it is the only thing that changed: 20 ft, not 10, in the sentence
+    // the foe's player is shown.
     nextInitiativeTurn(built.state);
-    expect(() => foeMoves(built, 5)).toThrow("Foe has 10 ft of movement left (this move needs 25 ft).");
+    expect(() => foeMoves(built, 5)).toThrow("Foe has 20 ft of movement left (this move needs 25 ft).");
+    // TWO ROWS, ONE EFFECT, and the distinction is the whole mechanism: the rows stay separate because
+    // each carries its own duration, and the READ collapses them because they name the same effect.
+    const slowed = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(slowed.effects.map((effect) => effect.sourceActionId)).toEqual(["item-javelin:slow", "item-club:slow"]);
+    expect(slowed.effects.map((effect) => effect.stackKey)).toEqual(["mastery:slow", "mastery:slow"]);
+    // ...and 20 really walks, so this is one smaller budget rather than a sentence that lost a number.
+    expect(foeMoves(built, 4).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(20);
     // Both are sustained by the same attacker's turn, so both end together and the whole 30 returns.
     nextInitiativeTurn(built.state);
     expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
     nextInitiativeTurn(built.state);
     expect(foeMoves(built, 6).warning).toBeNull();
     expect(built.state.combat.turn.movementUsedFeet).toBe(30);
+  });
+
+  it("a DIFFERENT game effect still stacks with the Slow - the −15 that proves the grouping is by NAME", () => {
+    // The control for the test above. A homebrew curse is not a Slow, so it carries its own key and
+    // the two sum exactly as they always did: 30 − 10 − 5 = 15. A rule that simply capped speed
+    // penalties at one would print 20 here and be wrong for the opposite reason.
+    const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
+    expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
+    addEffect(built.state, IDS.foe, EffectInstanceSchema.parse({
+      id: "curse-1", name: "Clinging Tar", tags: [], sourceActorId: null, sourceName: null, sourceActionId: "tar",
+      startedRound: 1, duration: { type: "encounter" }, stackKey: "homebrew:tar",
+      modifiers: [{ type: "speed", amount: -5 }]
+    }));
+
+    nextInitiativeTurn(built.state);
+    expect(() => foeMoves(built, 4)).toThrow("Foe has 15 ft of movement left (this move needs 20 ft).");
+    expect(foeMoves(built, 3).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(15);
+  });
+
+  it("the Slow outlives the attacker's own death - the printed duration runs to a turn a dying creature still has", () => {
+    // `endsWhenSourceDefeated` was true, so a killed attacker handed the feet back the instant it fell.
+    // The SRD prints "until the start of your next turn" and a creature at 0 HP still HAS a next turn:
+    // `nextInitiativeTurn` skips nobody, so the expiry still fires there and nothing is stranded.
+    const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
+    expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
+    applyDamageDetailed(built.state, IDS.hero, { amount: 999 }, { role: "gm" });
+    expect(built.state.actors.find((actor) => actor.id === IDS.hero)!.hp.current).toBe(0);
+
+    // THE FAR END: the foe's own turn, and the refusal still names the reduced number. With the flag
+    // set, the effect was gone the instant the attacker fell and this printed 30 ft.
+    nextInitiativeTurn(built.state);
+    expect(built.state.combat.turnActorId).toBe(IDS.foe);
+    expect(() => foeMoves(built, 5)).toThrow("Foe has 20 ft of movement left (this move needs 25 ft).");
+    // ...and the row behind that sentence is still there, still naming who it came from.
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects.map((effect) => effect.name)).toEqual(["Slowed by Borin"]);
+
+    // ...and the DYING attacker's turn begins anyway, which is where the feet come back.
+    nextInitiativeTurn(built.state);
+    expect(built.state.combat.turnActorId).toBe(IDS.hero);
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+    nextInitiativeTurn(built.state);
+    expect(foeMoves(built, 5).warning).toBeNull();
+    expect(built.state.combat.turn.movementUsedFeet).toBe(25);
   });
 });
 
