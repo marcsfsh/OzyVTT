@@ -963,6 +963,32 @@ export type ContentSheetResult = { ok: boolean; message?: string; definition?: i
 export type ActionResolutionAttack = Readonly<{ targetId: string; targetName: string; total: number; naturalRoll: number; targetAc: number | null; outcome: "crit" | "hit" | "miss" | "fumble" | "unknown"; /** Cover's AC bonus folded into targetAc (SRD Cover: +2 half, +5 three-quarters). */ coverBonus?: number }>;
 /** Why an attack rolled with advantage/disadvantage - every contributing source, so the table can see the math (ADR-0020 explainability). */
 export type ActionRollMode = Readonly<{ mode: "advantage" | "disadvantage" | "normal"; advantage: readonly string[]; disadvantage: readonly string[] }>;
+/**
+ * THE TABLE'S OWN LINE. One feed row a resolve produced for the whole table to read - the shape
+ * `narrateTokenMove` already gives the GM's own drag (`apps/server/src/movement-narration.ts`),
+ * carried on the resolution because only the resolver knows a rider happened and how it turned out.
+ *
+ * IT IS NOT `warnings`, AND THE SPLIT IS THE POINT. A warning is a GM rules note - the operation
+ * layer writes every one of them `gmOnly: true` - so a rider that CHANGED THE BOARD narrated only to
+ * the GM and the table watched a token jump ten feet with nothing explaining why. A line here is a
+ * table event instead: the operation layer appends it with `actorIds`, and the feed's own gate
+ * (`appendLog` in `apps/server/src/server.ts`) re-derives whether a player may read it from those
+ * ids. Anything a player must NOT read - a save DC that is the attacker's secret, an instruction to
+ * the GM to place a token by hand - stays in `warnings`, which is why both channels exist.
+ *
+ * TWO INDEPENDENT GATES, deliberately: `gmOnly` is the resolver's own structural verdict, read off
+ * the actors' visibility while it still has the state in hand, and `actorIds` lets the feed decide
+ * again from live state. Either one alone would hold; a leak needs both to fail.
+ */
+export type ActionTableNarration = Readonly<{
+  /** The feed row's kind - the same vocabulary `CombatLogEntry` already renders (`log-movement`, `log-save`). */
+  kind: "movement" | "save";
+  text: string;
+  /** Everyone the line names. The feed keeps it from players when any of them is a hidden combatant. */
+  actorIds: readonly string[];
+  /** The resolver already knows this line names a hidden combatant; true forces the GM-only read. */
+  gmOnly?: boolean;
+}>;
 export type ActionResolution = Readonly<{
   actionName: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
@@ -983,6 +1009,8 @@ export type ActionResolution = Readonly<{
   componentsRemaining?: Readonly<Record<string, number>> | null;
   /** Assisted-mode rule conflicts that were allowed through (also logged). */
   warnings?: readonly string[];
+  /** Lines this resolve produced for the whole table to read (an accomplished push, the save a Topple forced) - see `ActionTableNarration`. */
+  tableNarration?: readonly ActionTableNarration[];
   /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
   overridden?: Readonly<{ rule: string; reason: string }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */

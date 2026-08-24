@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { io as connect, type Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
-import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
+import { BuilderPolicySchema, GameStateSchema, type Actor, type CombatLogEntry, type GameState, type MutationResult } from "@vtt/domain";
 import { loadWeapons } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
@@ -14,7 +15,9 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf, masteryReaches } from "../src/equipment-derivation.js";
 import { createGameOperations, type GameOperationsContext } from "../src/game-operations.js";
 import { GameStore, RulesBlockedError } from "../src/game-store.js";
-import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { addCombatant, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { MapAssetStore } from "../src/map-assets.js";
+import { createServer } from "../src/server.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { pushTokenAway } from "../src/forced-movement.js";
@@ -359,8 +362,11 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
       targetActorId: IDS.foe, ability: "con", dc: 13, conditionId: "prone",
       proposedDamage: 0, halfOnSuccess: false, actionName: "Topple", sourceName: "Borin"
     }]);
-    // The roll card says so too, naming the DC the GM is about to read out.
-    expect(hit.warnings).toContain("Topple: Foe must make a DC 13 CON save or have the Prone condition - the prompt is in the turn order.");
+    // TWO sentences, split by what may cross. The GM's keeps the DC it is about to read out; the
+    // table's names what forced the save and carries no number, because the DC is the ATTACKER's.
+    expect(hit.warnings).toContain("Topple: Foe's save is DC 13 - the prompt is in the turn order.");
+    expect(hit.tableNarration).toEqual([{ kind: "save", text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(JSON.stringify(hit.tableNarration)).not.toContain("13");
 
     // THE FAR END. The foe rolls its own Constitution save (CON 14 -> +2) and 5 + 2 = 7 is under 13.
     const outcome = answer(built, [5]).outcome;
@@ -388,7 +394,8 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     const first = swing(built, "item-quarterstaff", [15, 3]);
     const second = swing(built, "item-quarterstaff", [15, 3]);
     expect([first.attack?.outcome, second.attack?.outcome]).toEqual(["hit", "hit"]);
-    expect(second.warnings).toContain("Topple: Foe must make a DC 15 CON save or have the Prone condition - the prompt is in the turn order.");
+    expect(second.warnings).toContain("Topple: Foe's save is DC 15 - the prompt is in the turn order.");
+    expect(second.tableNarration).toEqual([{ kind: "save", text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.", actorIds: [IDS.hero, IDS.foe] }]);
     // TWO rows in the tracker, both live: the second hit parks BESIDE the first instead of evicting it.
     expect(built.state.combat.pendingSaves).toMatchObject([
       { targetActorId: IDS.foe, ability: "con", dc: 15, conditionId: "prone", actionName: "Topple" },
@@ -491,7 +498,8 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(after.x).toBeGreaterThan(before.x);
     expect(reachBefore).toEqual({ value: 5, unit: "ft" });
     expect(tokenCreatureDistance(built.state, GRID, IDS.hero, IDS.foe)).toEqual({ value: 15, unit: "ft" });
-    expect(hit.warnings).toContain("Foe is pushed 10 ft straight away from Borin.");
+    expect(hit.tableNarration).toEqual([{ kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.warnings).toBeUndefined();
   });
 
   it("SNAPS the landing square when the line between the two is not a clean one", () => {
@@ -510,7 +518,8 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(after).toEqual(cell(7, 4));
     // And the snap did not cost the push its distance: still exactly 10 ft by the table's measure.
     expect(mapDistance(GRID, before, after)).toEqual({ value: 10, unit: "ft" });
-    expect(hit.warnings).toContain("Foe is pushed 10 ft straight away from Borin.");
+    expect(hit.tableNarration).toEqual([{ kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.warnings).toBeUndefined();
   });
 
   it("measures the same 10 feet in PIXELS on a gridless map with a saved scale", () => {
@@ -527,7 +536,8 @@ describe("Push moves the target's token 10 feet straight away", () => {
     // THE FAR END: 24 px further along the line, which is what 10 ft costs at 5 ft per 12 px.
     expect(positionOf(built, IDS.foe)).toEqual({ x: 354, y: 300 });
     expect(mapDistance(SCALED, before, positionOf(built, IDS.foe)!)).toEqual({ value: 10, unit: "ft" });
-    expect(hit.warnings).toContain("Foe is pushed 10 ft straight away from Borin.");
+    expect(hit.tableNarration).toEqual([{ kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.warnings).toBeUndefined();
   });
 
   it("moves nothing when the Fighter did not pick the warhammer - same weapon, same hit", () => {
@@ -765,7 +775,7 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
 
-type FeedLine = Readonly<{ kind: string; text: string; gmOnly?: boolean }>;
+type FeedLine = Readonly<{ kind: string; text: string; gmOnly?: boolean; actorIds?: readonly string[] }>;
 
 /**
  * The OPERATION layer, because "the resolution carries the sentence" is not narration - a rules note
@@ -791,7 +801,10 @@ async function operationsFor(built: Built, duringGeometryFetch?: (live: GameStor
     publishGameState: async () => {},
     presentSceneMap: async () => {},
     broadcastTableEvent: (event: FeedLine) => { broadcast.push({ kind: event.kind, text: event.text, gmOnly: event.gmOnly }); },
-    appendLog: (entry: FeedLine) => { logged.push({ kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly }); },
+    // `actorIds` is captured because it is HALF THE VIEWER GATE: the real `appendLog` (`server.ts`)
+    // turns a row GM-only when any combatant it names is hidden, so a test that dropped the ids could
+    // not tell a line the feed would gate from one it would hand every player.
+    appendLog: (entry: FeedLine) => { logged.push({ kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly, actorIds: entry.actorIds }); },
     logTurnBegin: () => {}, logTimelineOutcome: () => {}, scheduleAnnotationExpiry: () => {},
     gmView: unused, playerView: unused,
     // Every die the swing still rolls after `attackNatural` pins the d20 - the pike's damage.
@@ -833,7 +846,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
 
     // THE FAR END: a row in the feed, GM-only, naming the push the engine could not perform.
     expect(logged).toContainEqual({
-      kind: "action", gmOnly: true,
+      kind: "action", gmOnly: true, actorIds: [IDS.hero],
       text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
     });
     // ...and the swing itself is untouched: it still hit, still narrated, and the token really did NOT
@@ -862,7 +875,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     // THE FAR END: the foe stands exactly where it stood, and the GM is told to place it by hand.
     expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(before);
     expect(logged).toContainEqual({
-      kind: "action", gmOnly: true,
+      kind: "action", gmOnly: true, actorIds: [IDS.hero],
       text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
     });
   });
@@ -876,7 +889,12 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     });
 
     expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(5, 2));
-    expect(logged).toContainEqual({ kind: "action", gmOnly: true, text: "Rules note: Foe is pushed 10 ft straight away from Borin." });
+    // ...and the sentence is no longer a GM rules note. It is a `movement` row naming both combatants
+    // and carrying NO gmOnly of its own, which is what hands it to the feed's gate to decide - the
+    // shape `tokenMove` gives `narrateTokenMove`'s public half.
+    expect(logged).toContainEqual({ kind: "movement", gmOnly: undefined, actorIds: [IDS.hero, IDS.foe], text: "Foe is pushed 10 ft straight away from Borin." });
+    // One moment, one row (D11): it did not ALSO print as a rules note.
+    expect(logged.filter((line) => line.text.includes("pushed 10 ft"))).toHaveLength(1);
   });
 
   it("says nothing on a PREVIEW - the sentence lands once, on the answer that spends the reaction", async () => {
@@ -888,6 +906,184 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
       commandId: randomUUID(), reactionId, use: true, actionId: "item-pike", commit: false, attackNatural: 18
     });
     expect(logged.filter((line) => line.text.startsWith("Rules note:"))).toEqual([]);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// THE TABLE'S OWN LINE - the far end, and it is a PLAYER'S SOCKET.
+//
+// Everything above this point ends at the resolution or at the operation layer's capture arrays, and
+// neither is a person at the table: "the operation called appendLog" is not "a player read it". The
+// decision that actually hands a row to a player lives in `server.ts` - `appendLog` re-derives
+// GM-only-ness from the named combatants and `projectFeedRow` runs per recipient - so these tests
+// boot the real service, join a real PLAYER session over a real socket, and assert on the `log:entry`
+// payloads that session receives. Nothing is stubbed between the swing and the sentence.
+// -------------------------------------------------------------------------------------------------
+
+const LURKER = "10000000-0000-4000-8000-000000000003";
+
+/** A 900x600 PNG header, which is all `inspectMapImage` reads - the same fixture `encounter-realtime` uses. */
+function png(width: number, height: number) {
+  const buffer = Buffer.alloc(24);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
+  buffer.writeUInt32BE(13, 8); buffer.write("IHDR", 12, "ascii"); buffer.writeUInt32BE(width, 16); buffer.writeUInt32BE(height, 20);
+  return buffer;
+}
+
+async function joinSocket(base: string, token: string) {
+  const socket = connect(base, { auth: { token }, transports: ["websocket"], reconnection: false, forceNew: true });
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Socket connection timed out.")), 5_000);
+    socket.once("connect", () => { clearTimeout(timeout); resolve(); });
+    socket.once("connect_error", (error) => { clearTimeout(timeout); reject(error); });
+  });
+  const joined = await new Promise<{ ok: boolean; message?: string }>((resolve) => socket.emit("session:join", { token }, resolve));
+  if (!joined.ok) throw new Error(joined.message ?? "Session join failed.");
+  return socket;
+}
+
+const emitCommand = (socket: Socket, event: string, payload: unknown) =>
+  new Promise<MutationResult>((resolve) => (socket.emit as (...args: unknown[]) => void)(event, payload, resolve));
+
+/** Wait for the player's socket to actually receive a matching row; a timeout is a failure, not a skip. */
+async function heardLine(heard: readonly CombatLogEntry[], matches: (text: string) => boolean, what: string) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const found = heard.find((entry) => matches(entry.text));
+    if (found) return found;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`The player socket never received ${what}. It heard: ${JSON.stringify(heard.map((entry) => entry.text))}`);
+}
+
+/**
+ * The fixture battlefield, plus a combatant the GM has NOT revealed. The stalker is here in every one
+ * of these tests, not just the one that pushes it: a feed row that leaked its name would then fail the
+ * push and the topple tests too, rather than only the case someone remembered to write.
+ */
+function hiddenAmongThem(masteries: readonly string[], extraWeaponIds: readonly string[]): Built {
+  const built = battlefield(masteries, extraWeaponIds, cell(2, 2), cell(3, 2));
+  importActorDefinition(built.state, { ...FOE_DEFINITION, name: "Unseen Stalker" } as ActorDefinition, LURKER, "gm-only", catalog);
+  addCombatant(built.state, LURKER, 5, () => 1, GRID);
+  // Diagonally adjacent to Borin (5 ft by the Chebyshev measure the engine uses), so a real swing
+  // reaches it AND a 10 ft shove has two clear cells to travel into - a push clamped by the map edge
+  // would prove nothing about who reads the sentence.
+  moveEncounterToken(built.state, LURKER, cell(3, 3), GRID);
+  return built;
+}
+
+/**
+ * The real service, on a real port, with a GM socket and a bystander PLAYER socket listening to the
+ * feed. The player claims nobody: they are the rest of the table, which is exactly the reader this
+ * whole unit exists for.
+ */
+async function liveTable(built: Built) {
+  const directory = await mkdtemp(join(tmpdir(), "vtt-mastery-live-"));
+  const mapAssetsPath = join(directory, "map-assets");
+  // THE MAP EXISTS BEFORE THE STATE THAT NAMES IT. An asset id is derived from the image's sha-256,
+  // so the fixture's encounter is repointed at the real battlemap rather than the map being invented
+  // to match the fixture - which is what makes the server's own `tokenGeometryFor` (a file read plus
+  // the catalog's calibration) the source of the geometry these pushes are measured on.
+  const assets = new MapAssetStore(mapAssetsPath);
+  await assets.initialize();
+  const imported = await assets.import(png(GRID.width, GRID.height), "arena.png");
+  built.state.combat = { ...built.state.combat, mapAssetId: imported.metadata.id };
+
+  const server = createServer({
+    authPath: join(directory, "auth.json"),
+    databasePath: join(directory, "vtt.sqlite"),
+    integrationCredentialsPath: join(directory, "integrations.sqlite"),
+    mapAssetsPath,
+    webDist: join(directory, "dist"),
+    useDevelopmentClient: true,
+    developmentClientPort: 5173,
+    initialGameState: built.state
+  });
+  await server.initialize();
+  server.mapCatalog.register(imported.metadata.id, "Arena", "battlemap");
+  server.mapCatalog.saveCalibration(imported.metadata.id, { calibration: GRID.calibration, verifiedAt: null, verificationPoint: null, verificationErrorPx: null });
+  await server.auth.bootstrap("a sufficiently long GM password");
+  const gmToken = (await server.auth.login("a sufficiently long GM password"))!;
+  const playerToken = server.auth.issuePlayerSession();
+  await new Promise<void>((resolve) => server.httpServer.listen(0, "127.0.0.1", resolve));
+  const address = server.httpServer.address();
+  if (!address || typeof address === "string") throw new Error("The live server did not bind.");
+  const base = `http://127.0.0.1:${address.port}`;
+  const gm = await joinSocket(base, gmToken);
+  const player = await joinSocket(base, playerToken);
+  const heard: CombatLogEntry[] = [];
+  const gmHeard: CombatLogEntry[] = [];
+  player.on("log:entry", (entry: CombatLogEntry) => { heard.push(entry); });
+  // The GM's own feed, captured on the same terms - the DC has to be proved PRESENT for the GM and
+  // absent for the player, or "it does not cross" is indistinguishable from "it was never written".
+  gm.on("log:entry", (entry: CombatLogEntry) => { gmHeard.push(entry); });
+  cleanups.push(async () => {
+    gm.disconnect(); player.disconnect(); server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  return { server, gm, heard, gmHeard };
+}
+
+const swingAt = (gm: Socket, actionId: string, targetId: string) =>
+  emitCommand(gm, "action:resolve", { commandId: randomUUID(), actorId: IDS.hero, actionId, targetIds: [targetId], attackNatural: 18 });
+
+describe("the table's own line reaches a player, not just the GM", () => {
+  it("hands a bystanding player the sentence for the push that really moved the token", async () => {
+    const built = hiddenAmongThem(["warhammer", "quarterstaff", "rapier"], ["warhammer", "quarterstaff"]);
+    const { server, gm, heard } = await liveTable(built);
+
+    const resolved = await swingAt(gm, "item-warhammer", IDS.foe);
+    expect(resolved).toMatchObject({ ok: true });
+
+    // THE FAR END (a): a payload a PLAYER's own socket received, carrying the literal sentence.
+    const line = await heardLine(heard, (text) => text.includes("pushed"), "the push narration");
+    expect(line.text).toBe("Foe is pushed 10 ft straight away from Borin.");
+    expect(line.gmOnly).toBe(false);
+    // ...and the board really did change under it: the sentence reports a move, it does not stand in
+    // for one. Two cells further along the row Borin shoved it down.
+    expect(server.store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(5, 2));
+  });
+
+  it("gives the table the line that names the save, and keeps Topple's DC in the GM's feed alone", async () => {
+    const built = hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]);
+    const { server, gm, heard, gmHeard } = await liveTable(built);
+
+    const resolved = await swingAt(gm, "item-quarterstaff", IDS.foe);
+    expect(resolved).toMatchObject({ ok: true });
+
+    // THE FAR END (a): the line that names WHAT FORCED the Constitution save now in front of the table.
+    const line = await heardLine(heard, (text) => text.includes("Topple"), "the topple narration");
+    expect(line.text).toBe("Borin's Topple forces Foe to make a CON save or have the Prone condition.");
+    expect(line.gmOnly).toBe(false);
+
+    // THE FAR END (b): the DC is the ATTACKER's number and does NOT cross. It is a real save with a
+    // real DC in the tracker, and the GM's own feed carries it - the player's simply never does.
+    expect(server.store.snapshot.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.foe, ability: "con", dc: 13, actionName: "Topple" }]);
+    const playerHeard = JSON.stringify(heard);
+    expect(playerHeard).not.toContain("DC 13");
+    expect(playerHeard).not.toContain("Rules note");
+    expect(playerHeard).not.toContain("the prompt is in the turn order");
+    await heardLine(gmHeard, (text) => text.startsWith("Rules note:"), "the GM's own rules note");
+    expect(gmHeard.map((entry) => entry.text)).toContain("Rules note: Topple: Foe's save is DC 13 - the prompt is in the turn order.");
+  });
+
+  it("says nothing to the table when the shoved creature is one the GM has not revealed", async () => {
+    const built = hiddenAmongThem(["warhammer", "quarterstaff", "rapier"], ["warhammer"]);
+    const { server, gm, heard } = await liveTable(built);
+
+    const resolved = await swingAt(gm, "item-warhammer", LURKER);
+    expect(resolved).toMatchObject({ ok: true });
+    // The shove really happened - this is the case where the narration WOULD be a leak, not a case
+    // where there was nothing to narrate.
+    expect(server.store.snapshot.combat.tokens.find((token) => token.actorId === LURKER)!.position).toEqual(cell(5, 5));
+
+    // A SENTINEL, because "nothing arrived" needs a moment it is measured at: a later, definitely
+    // public row down the same socket. Feed rows reach one connection in the order they were written,
+    // so once this one is in hand the push line is not still in flight - it was never sent.
+    await emitCommand(gm, "initiative:next", { commandId: randomUUID() });
+    await heardLine(heard, (text) => text.includes("turn."), "the turn line that marks the end of the wait");
+    const playerHeard = JSON.stringify(heard);
+    expect(playerHeard).not.toContain("Unseen Stalker");
+    expect(playerHeard).not.toContain("pushed");
   });
 });
 

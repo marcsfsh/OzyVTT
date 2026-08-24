@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
+import type { ActionTableNarration, AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
 import { ABILITY_ROLL_FORMULA, parseDiceFormula, resolveDice, rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { generateCharacterRequest } from "./character-generate.js";
@@ -198,6 +198,38 @@ export function createGameOperations(context: GameOperationsContext) {
   const { store, contentLibrary } = context;
   const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
   const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
+
+  /**
+   * THE TABLE'S OWN LINE, drained into the feed - the ONE place a resolution's `tableNarration` is
+   * written, so both resolve paths (`actionResolve` and the off-turn `reactionAnswer`) narrate a
+   * rider the same way and neither can quietly stop.
+   *
+   * This is verbatim how `tokenMove` appends `narrateTokenMove`'s public half: `appendLog` with the
+   * named combatants and NO `gmOnly` of our own, which lets the feed's own gate decide from live
+   * state whether a player may read it. The resolver's structural verdict rides as `line.gmOnly` and
+   * is a strict OR on top of that gate (`appendLog` in `server.ts`), never a replacement for it - two
+   * independent reads of the same question, because this is the row that crosses to players.
+   *
+   * `appendLog` rather than `broadcastTableEvent` for the same reason a drag narrates that way: these
+   * are feed rows, and a toast for every shove would out-shout the damage numbers beside it.
+   *
+   * NAMED ABSENCE - THE PUBLIC SECOND SCREEN STILL SAYS NOTHING. `appendLog` reaches GM and player
+   * sockets only; the shared viewer holds no game socket at all (`viewer-coordinator.ts` drives it
+   * over SSE with `ViewerPresentationProjection`), so a table watching the big screen still sees the
+   * token jump ten feet unexplained. This is not a line that can be forwarded: that projection has no
+   * narration field, and adding one is a viewer-safety change with its own surface - the viewer would
+   * need a bounded, self-expiring caption strip, because a feed there is a permanent record on a
+   * screen a room full of non-players can read. THE UNIT THAT WOULD CLOSE IT: a `caption` on
+   * `ViewerPresentationProjection` (`viewer-presentation.ts`), fed from the same lines below through
+   * `viewer-coordinator.ts`, plus the strip that renders it in `ViewerApp.tsx` - and its own entry in
+   * the pinned invariant list in `docs/ai-context/viewer-mode.md`. Half of that (a field with no
+   * renderer, or a renderer fed by nothing) is worse than this absence.
+   */
+  const appendTableNarration = (resolution: Readonly<{ tableNarration?: readonly ActionTableNarration[] }>) => {
+    for (const line of resolution.tableNarration ?? []) {
+      context.appendLog({ kind: line.kind, text: line.text, actorIds: line.actorIds, ...(line.gmOnly === true ? { gmOnly: true } : {}) });
+    }
+  };
 
   /**
    * Which merged catalog this principal may READ. GM-grade covers the GM's own session and the GM's
@@ -1286,6 +1318,7 @@ export function createGameOperations(context: GameOperationsContext) {
         // applied rider effects and granted self effects reach the whole table.
         if (resolution.overridden) context.appendLog({ kind: "override", text: `OVERRIDE (${resolution.overridden.rule}): ${actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`, actorIds: [actorId] });
         for (const warning of resolution.warnings ?? []) context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
+        appendTableNarration(resolution);
         for (const applied of resolution.effectsApplied ?? []) {
           context.broadcastTableEvent({ kind: "effect", text: `${applied.targetName} is ${applied.name}.`, actorIds: [applied.targetId], gmOnly: hidden });
         }
@@ -1406,6 +1439,11 @@ export function createGameOperations(context: GameOperationsContext) {
             for (const warning of outcome.resolution.warnings ?? []) {
               context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [outcome.actorId], gmOnly: true });
             }
+            // The table's own lines drain here for the same reason the rules notes do: the off-turn
+            // swing runs the SAME resolver, so a quarterstaff that Topples on an opportunity attack
+            // owes the table the sentence naming what forced that Constitution save. (Push produces
+            // none here - `reactions.ts` resolves without the geometry callback, so no token moves.)
+            appendTableNarration(outcome.resolution);
           }
         } else if (outcome.used) {
           const text = `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`;

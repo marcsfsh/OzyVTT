@@ -1404,6 +1404,10 @@
 .action-overridden { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; }
 .action-effect-granted, .action-effect-applied { margin: .2rem 0; color: var(--cyan-hi); font-size: var(--fs-sm); }
 .action-warning { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* The table's own line on the roll card - what HAPPENED, so it carries no warning glyph. Same
+   metrics as the warning above it: a plain wrapping paragraph, which is what keeps a long sentence
+   ("Borin's Topple forces Foe to make a CON save or have the Prone condition.") readable at 375px. */
+.action-narration { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* The shared builtin catalog as one wrapped chip cluster — never 16 full rows. */
 .builtin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: .4rem; }

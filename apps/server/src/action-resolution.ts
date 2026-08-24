@@ -735,6 +735,17 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   const warnings: string[] = [];
+  /**
+   * THE TABLE'S OWN LINE (see `ActionTableNarration` in `@vtt/domain`). `warnings` is the GM's
+   * channel - the operation layer writes every one of them `gmOnly: true` - so a rider that CHANGED
+   * THE BOARD had no way to reach the players watching it happen. These do, through the same feed
+   * `narrateTokenMove` narrates the GM's own drag into.
+   *
+   * ONE MOMENT, ONE ROW (D11). A sentence belongs to exactly one of the two arrays: the accomplished
+   * push moved here and left `warnings`, and Topple's warning was cut back to the half - the DC - that
+   * must not cross. Writing a sentence to both would print it twice in the GM's feed.
+   */
+  const tableNarration: Array<{ kind: "movement" | "save"; text: string; actorIds: readonly string[]; gmOnly?: boolean }> = [];
   // The attacker's whole equipment contribution, recomputed from (definition, inventory, catalog).
   // `siblings` is the EFFECTIVE action list - the economy's pool limits and multiattack composition
   // must see an item's derived actions and its raised `uses.limit`, or a charged item never recharges
@@ -1128,6 +1139,20 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   /**
+   * THE RESOLVER'S OWN HALF OF THE VIEWER GATE, for the table lines below. `appendLog`
+   * (`server.ts`) already re-derives a row's GM-only-ness from its `actorIds` against live state, so
+   * this is the SECOND, independent gate - the same belt-and-braces `tokenMove` runs, where
+   * `narrateTokenMove` decides structurally that a hidden mover has no public line AND the caller
+   * still passes the mover's id for the feed to check again.
+   *
+   * `!== "public"` rather than `=== "gm-only"`: an unknown actor and any visibility that is not
+   * public both fail toward hiding the line, so a third visibility added later cannot leak through a
+   * comparison written before it existed.
+   */
+  const namesAHiddenCombatant = (...actorIds: readonly string[]) =>
+    actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility !== "public");
+
+  /**
    * WEAPON MASTERY, third call site: the ON-HIT SAVE (Topple today). The handler computed the DC and
    * named the condition; this parks a real prompt through the SAME door every other save uses, so
    * answering it rolls the target's own Constitution save and applies Prone through `setCondition`.
@@ -1135,8 +1160,16 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
    * The prompt is NOT mirrored into this resolution's `save` field. That field means "this action
    * calls for a save", and the runner's note beneath it counts prompts by `actionName` - which for a
    * mastery is the mastery's, not the weapon's, so mirroring it there would print "All saving throws
-   * for Quarterstaff resolved" over a Topple save that is still owed. A warning line says the true
+   * for Quarterstaff resolved" over a Topple save that is still owed. Two narration lines say the true
    * thing instead, and the tracker row is where it is answered either way.
+   *
+   * THE TWO LINES ARE SPLIT BY WHAT MAY CROSS, not by convenience. The table's line names WHAT FORCED
+   * THE SAVE - a Constitution save appearing in front of a player with nothing explaining it is the
+   * gap this closes - and the GM's keeps the DC. The DC is the ATTACKER's number (8 + the modifier
+   * that made the attack roll + their Proficiency Bonus), so printing it to the table would hand every
+   * player a reading off a monster's stat block the moment a monster carries a topple weapon. The
+   * target's OWN player still learns it, through the pending-save projection that has always carried
+   * `dc` because you cannot roll against a number you were not told (`projections.ts`).
    */
   for (const forced of masteryHitSaves(masterySwing)) {
     createPendingSaves(state, {
@@ -1156,7 +1189,14 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    warnings.push(`${forced.actionName}: ${forced.targetName} must make a DC ${forced.dc} ${forced.ability.toUpperCase()} save${forced.conditionId === null ? "" : ` or have the ${conditionLabel(forced.conditionId)} condition`} - the prompt is in the turn order.`);
+    const orTheCondition = forced.conditionId === null ? "" : ` or have the ${conditionLabel(forced.conditionId)} condition`;
+    tableNarration.push({
+      kind: "save",
+      text: `${attacker.name}'s ${forced.actionName} forces ${forced.targetName} to make a ${forced.ability.toUpperCase()} save${orTheCondition}.`,
+      actorIds: [attacker.id, forced.targetId],
+      ...(namesAHiddenCombatant(attacker.id, forced.targetId) ? { gmOnly: true } : {})
+    });
+    warnings.push(`${forced.actionName}: ${forced.targetName}'s save is DC ${forced.dc} - the prompt is in the turn order.`);
   }
 
   /**
@@ -1172,6 +1212,13 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
    * and unscaled map, a resolver with no callback, a map the fight has already left. A swing that hit
    * must not be undone because the map could not answer a geometry question, so the line tells the GM
    * to move the token - the builtin Shove's own shape.
+   *
+   * ONLY THE ACCOMPLISHED PUSH IS THE TABLE'S. A token that really moved is something every player
+   * watched happen, so its sentence goes to the feed the whole table reads and leaves `warnings`
+   * entirely - one moment, one row. The other three sentences stay GM-only and are not the same kind
+   * of thing: two of them ("move the token", "the map has nowhere to put it") are INSTRUCTIONS to the
+   * one person who can place a token, and the size gate reports a rule that stopped the board
+   * changing at all. Sending an instruction to players would have them read it as an event.
    */
   for (const forced of masteryHitPushes(masterySwing)) {
     if (!sizeAtMost(targets[0].size, forced.maxTargetSize)) {
@@ -1192,9 +1239,19 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       continue;
     }
     const travelled = Math.round(moved.value * 10) / 10;
-    warnings.push(travelled > 0
-      ? `${forced.targetName} is pushed ${travelled} ${moved.unit} straight away from ${attacker.name}.`
-      : `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`);
+    if (travelled > 0) {
+      // Every word here is already a player's to read: two public combatants' names, and a distance
+      // between two token positions the player projection ships anyway (`projections.ts` filters the
+      // token list to public actors, so a player could measure this move off their own screen).
+      tableNarration.push({
+        kind: "movement",
+        text: `${forced.targetName} is pushed ${travelled} ${moved.unit} straight away from ${attacker.name}.`,
+        actorIds: [attacker.id, forced.targetId],
+        ...(namesAHiddenCombatant(attacker.id, forced.targetId) ? { gmOnly: true } : {})
+      });
+      continue;
+    }
+    warnings.push(`${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`);
   }
 
   // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,
@@ -1394,6 +1451,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       ? state.combat.turn.actionInstance.components
       : null,
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(tableNarration.length > 0 ? { tableNarration } : {}),
     overridden,
     ...(reactionPrompts.length > 0 ? { reactionPrompts } : {}),
     ...(check ? { check } : {}),

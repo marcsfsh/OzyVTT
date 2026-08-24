@@ -351,6 +351,13 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             </span>;
       })()}
       {result.warnings?.map((warning) => <p key={warning} className="action-warning">⚠ {warning}</p>)}
+      {/* The table's own lines (an accomplished push, the save a Topple forced). NOT warnings: these
+          are things that HAPPENED, and every one of them is also a row in the feed the whole table
+          reads - so the card and the log say the same sentence rather than the card saying it alone.
+          Safe to render whole here: this payload is the ack to the attacker's own resolve, and a
+          line only ever names the attacker (whom the caller is acting as) and the single target the
+          server already cleared them to act on (`canPlayerTarget`, `game-operations.ts`). */}
+      {result.tableNarration?.map((line) => <p key={line.text} className="action-narration">{line.text}</p>)}
       {result.save && (() => {
         // Reflect the LIVE count of unanswered saves for this action (matched by attacker + action),
         // not the frozen resolve-time count - so the note clears as each save is answered in the tracker.
