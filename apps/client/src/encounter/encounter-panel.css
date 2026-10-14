@@ -1,77 +1,33 @@
-/* ============ THE PHONE'S TABBED SHEET (C1/B2) ============
-   Below the 980 rung the dock is not a column, so it cannot be an accordion: the map is a fixed band
-   and this is the sheet under it (design-language.md:401 — "three stacked panels cannot share 844px
-   with a map"). `DockAccordion.tsx` renders the same three choices as one `Tabs` bar over one body.
-   The row this stands in is `.table-sheet` in styles.css (`flex: 1 1 auto; min-height: 0`); everything
-   here is what goes INSIDE it.
-
-   Each panel then either FILLS the body or FLOWS in it, and which one is a measurement, not a taste:
-   - The tracker and the log FILL it, so their own feed is the scroller. That is what keeps the combat
-     log pinned to the newest line: `CombatLog.tsx` writes `scrollTop = scrollHeight` to
-     `.combat-log-list`, so that element has to be the thing that scrolls or the log opens at the top.
-   - Encounter setup and the dice FLOW, and the body scrolls them, because their chrome does not fit.
-     Measured at 390x844: the dice panel's heading, roll-input preference, six quick dice, advantage
-     row, two disclosures and feedback line still come to 398px against a 412px body AFTER the trims
-     below, so pinning them would leave the roll list single digits tall. Flowing gives the feed its
-     full height and puts its first card — the newest roll — at y=830 in an 844px window, on screen.
-     GM setup measures the same way out of combat: 723px of panel in a 348px body. */
+/* Phone tabbed sheet (below 980px): the dock sits under the map band as one `Tabs` bar over one body
+   (`DockAccordion.tsx`), inside `.table-sheet` (styles.css).
+   The tracker and the log fill the body so their own list scrolls; the log must be the scroller to
+   stay pinned to its newest line. Setup and dice flow and the body scrolls them, because their
+   chrome does not fit a phone body. */
 .dock-tabs { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-/* RULING 6 — the bar and the log's door share one row. Two tabs, then a door that OPENS THE DRAWER
-   rather than switching the body under it, which is why it is a button beside the bar and not a
-   third tab. The bar takes the line and the door keeps its natural width; both meet the 44px floor
-   by paint, because on a phone this row sits directly under a `touch-action: none` map band and an
-   invisible hit extension there would eat map drags (the note on `Tabs` below). */
+/* The tab bar and the log's door share one row. Both meet the 44px floor by paint: this row sits
+   right under the `touch-action: none` map band, where an invisible hit extension would eat drags. */
 .dock-tabs-head { display: flex; align-items: stretch; gap: var(--space-1); flex: none; min-width: 0; }
 .dock-tabs-head > .dock-tabs-bar { flex: 1 1 auto; min-width: 0; }
 .dock-log-door { flex: none; min-height: var(--tap-min); padding-inline: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
 .dock-log-door:hover { border-color: var(--line-strong); color: var(--text); }
 .dock-tabs-bar { flex: none; }
 .dock-tabs-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
-/* Inside the sheet these are the body's contents, not cards standing in a column: they drop the
-   standalone card's outer margin, and the two that can fill hand their scrolling to the list that grows. */
+/* Inside the sheet these are the body's contents: no card margin, and the panels that fill hand
+   scrolling to the list that grows. */
 .dock-tabs-body > .encounter-panel, .dock-tabs-body > .dice-proof, .dock-tabs-body > .combat-log { margin-top: 0; }
 .dock-tabs-body > .encounter-panel.combat-active, .dock-tabs-body > .combat-log { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .dock-tabs-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
-/* THE TRACKER'S FLOOR. `flex: 1; min-height: 0` alone lets the body starve the panel to nothing, and
-   what is left standing is the panel's own pinned head (round chip + the player's Initiative/My sheet
-   pair), because that head is not shrinkable and `.encounter-region` is. Measured at HEAD on a GM in
-   combat: a 136px body at 320x568 left the region 48px, and an 88px body in landscape (844x390 and
-   667x375 with the frame's sheet floor) left it 0 against 2040px of turn order — 0 rows readable
-   mid-fight. 11rem is arithmetic, not taste: 32px of the panel's own padding + the GM's 56px head
-   + the region's own 5.5rem floor below = 176. Whatever the pane cannot pay lands on `.dock-tabs-body`,
-   which is a DECLARED scroller (`DockAccordion.tsx` puts `.scroll-y` on it), so a deficit becomes a
-   short scroll instead of a collapsed region — and the panel's own tinted box grows with it rather
-   than having the turn order paint outside it (measured: 86.6px outside the card without this rule).
-   The `.dock-tabs >` step is not decoration: the sheet row carries BOTH `table-sidebar` and
-   `table-sheet` (main.tsx), so `.table-sidebar .encounter-panel.combat-active` further down this
-   file matches here too, at the same specificity and later — it re-zeroed this floor when the rule
-   was written with one class fewer (measured: the floor silently did nothing). */
+/* The tracker's floor: without it the body starves the panel down to its unshrinkable head and the
+   turn order gets 0px. 11rem = 32px panel padding + 56px GM head + the region's 5.5rem floor; any
+   deficit becomes a scroll of `.dock-tabs-body` (a declared scroller). The `.dock-tabs >` step is
+   needed to beat `.table-sidebar .encounter-panel.combat-active` below, since the sheet row also
+   carries `table-sidebar`. */
 .dock-tabs > .dock-tabs-body > .encounter-panel.combat-active { min-height: 11rem; }
-/* THE TURN ROW IS PINNED TO THE SHEET'S SCROLLER, NOT PARKED SOMEWHERE INSIDE IT.
-   "Next turn" is the everything-else-follows control and on a landscape phone it was reachable at
-   neither end of the dock's scroll. Measured 2026-08-07, GM in combat at 844x390: on arrival
-   `.dock-tabs-body` sat at `scrollTop: 93` of 103 with the row at y=282 against a scroller whose own
-   client top is 326 — 44px ABOVE its top edge, `elementFromPoint` at the button's centre returning
-   `DIV.nh-tabs.dock-tabs-bar`. Forced to `scrollTop: 0` it was no better: the row landed at 375-419
-   in a 390px window, centre off-screen, `elementFromPoint` -> null. 667x375 measured identically.
-   Reachable only in a ~40px band of scroll offsets, which is not a control.
-   `position: sticky` takes it out of the scroll equation: pinned to the scroller's client top at
-   EVERY offset. `order: -1` is the other half and is why this is not the one-liner it looks like —
-   sticky only pins from the moment the element would leave the top, so with the "N of M tokens
-   placed" nudge above it the row still started 49px down the 78px body and hung out of the window at
-   rest. As the flex column's first item it starts pinned. (The player's topbar is already first, so
-   `order` is a no-op there; both trackers get the pin, because a player's turn is the case that
-   matters — ruling 36.)
-   The plate is not decoration either: the list scrolls UNDER a pinned row, so the row needs a ground.
-   `--material-plate` is the panel's own, the one `.encounter-round` inside this bar already wears.
-   The margin goes because a sticky box is pinned by its MARGIN edge — .6rem of it would leave a strip
-   of scrolling list showing above the bar. z-index 2 clears the rows and stays under
-   `.row-tools-popover`'s 41, so a row's tools card still opens over the bar rather than behind it.
-   The other half of the same failure was that this body ran PAST the window (to y=428 in a 375px
-   one), which no amount of pinning inside it can reach. That is the landscape band's arithmetic and
-   it is fixed where it lives, in `scene/encounter-map.css` — see the ceiling on
-   `.encounter-map-stage` there. The two are independent: the pin answers "where in the scroll", the
-   ceiling answers "is the scroller on screen at all", and the measurements needed both. */
+/* Pin the turn row (Next turn) to the sheet's scroller so it is reachable at every scroll offset on
+   a landscape phone. `order: -1` makes it the first flex item so it starts pinned; the plate gives
+   it a ground over the list scrolling beneath; no margin, since sticky pins by the margin edge.
+   z-index 2 clears the rows but stays under `.row-tools-popover` (41). Keeping the scroller itself
+   on screen is handled by the ceiling on `.encounter-map-stage` in `scene/encounter-map.css`. */
 .dock-tabs-body > .encounter-panel.combat-active > .encounter-topbar {
   order: -1;
   position: sticky;
@@ -80,51 +36,23 @@
   margin-top: 0;
   background: var(--material-plate);
 }
-/* Dice keeps no card chrome here — the tab bar is the frame — but it keeps the SIDE gutter: zeroing
-   the horizontal padding too put "Who sees it?", Digital/Manual and the d4-d20 row flush against x=0
-   and x=width while Turn kept 17.6px and Log 16px. .5rem is what the quick-dice row can afford (see
-   the row's own rule below). The feed keeps the shared 19rem cap it wears everywhere else: without a
-   cap the roll list stood at its full 2498px and the BODY scrolled 2431-2896px, so the dice form
-   scrolled away above the feed and rolling again meant scrolling back up. Capped, the feed scrolls
-   itself (304px of box over 2194px of rolls) and the body's scroll drops to 290px at 390x844, 487 at
-   375x667, 649 at 320x568 and 561 in landscape — a scroller inside a scroller, deliberately, because
-   the alternative was measured: pinning the feed to the body's leftover (the >=980 accordion's
-   shape) leaves it 67px at 390x844 and 0px at 320x568 and in landscape, which is the trade the dice
-   panel's own note at the top of this file describes. */
+/* No card chrome for dice in the sheet (the tab bar frames it), but keep a side gutter. The feed
+   keeps its 19rem cap and scrolls itself; uncapped, the dice form scrolled away above it. */
 .dock-tabs-body > .dice-proof { padding: .1rem var(--space-2) 0; border: 0; background: transparent; }
-/* THE SIX QUICK DICE FIT BY SHARING THE ROW, not by being handed their text's width. Left to their
-   intrinsic widths they spend 331.3px on six buttons plus 40px of gaps = 371.3, which fits a 375px
-   tab body with 3.7px to spare and does not fit 320 at all (measured at HEAD: two rows there, one
-   row at 375 and 390) — so any side gutter at all wrapped 375 as well. As equal shares of the row
-   with the 44px tap floor as their basis they fit every width: measured 46.67px each at 320, 55.84
-   at 375, 58.34 at 390, all six on one row, and the row now fits the 320 floor it never did. The
-   tighter gap is the slack that buys the floor: 6x44 + 5x4.8 = 288 inside the 304px content box a
-   320px phone has, and inside the 294px a 320px DESKTOP window has — that one is 10px narrower
-   because a classic scrollbar takes its width from `.dock-tabs-body`'s content box where a phone's
-   overlay one takes none, and at .4rem it was the one width that still wrapped. 4.8px between two
-   44px targets is this file's own phone spacing (the dock-choice chips, below). `padding-inline`
-   comes down with them or a 44px-wide button has 10px left for "d20" after its 1rem-a-side padding. */
+/* The six quick dice share the row equally with the 44px floor as their basis, so all six fit on
+   one row down to 320px (including a desktop window whose classic scrollbar narrows the body).
+   The smaller gap and inline padding are what make the arithmetic fit. */
 .dock-tabs-body > .dice-proof .dice-quick { gap: .3rem; }
 .dock-tabs-body > .dice-proof .dice-quick > button { flex: 1 1 0; min-width: var(--tap-min); padding-inline: var(--space-1); }
-/* Tighten the gaps BETWEEN the dice controls (not the controls, which are all at the 44px floor):
-   these four margins take the roll list's first card from 25px below the fold to above it, which is
-   the difference between "you rolled and nothing changed" and seeing your result. */
+/* Tighter gaps between the dice controls bring the newest roll above the fold on a phone. */
 .dock-tabs-body > .dice-proof .dice-quick,
 .dock-tabs-body > .dice-proof .dice-custom,
 .dock-tabs-body > .dice-proof .roll-list-head { margin-top: var(--space-2); }
 .dock-tabs-body > .dice-proof .dice-feedback { margin-top: .4rem; }
-/* The count of questions waiting on the GM, on the header that is still on screen when the body that
-   would have shown them is unmounted (known-bugs.md). Caution, not danger: nothing has gone wrong —
-   a move is simply not allowed yet, and someone is waiting on a call (§2). */
-/* DE-PILLED (ruling 24). This is the count the ruling names by name — "one silhouette from the
-   largest button to the smallest count badge" — and measured on the live tree it was the ONLY one
-   of this panel's six `--radius-pill` rules that still computed to 999px (see the note below the
-   `.economy-slot` block for the other five). It is a count, not a dot: it holds a number and grows
-   with its digits, so nothing about it is protected.
-   The cut rides a backing layer for the reason Badge.css gives at this size — the count sits
-   inside a tab header, which IS a tap target, and a `clip-path` that arrives on a child of one
-   clips hit-testing silently. `inset: 0` and no border on either box: this badge has no rim to
-   preserve, so the layer covers the padding box exactly and the count keeps its measured size. */
+/* Count of questions waiting on the GM, on the header that stays on screen while the body that
+   would show them is unmounted. Caution tone: someone is waiting on a call.
+   Chamfered, not a pill. The cut rides a backing layer because the count sits inside a tab header
+   (a tap target), and `clip-path` on a child clips hit-testing. */
 .dock-waiting-count {
   position: relative;
   isolation: isolate;
@@ -153,106 +81,45 @@
 
 .encounter-panel { margin-top: var(--space-10); padding: var(--space-4) 1.1rem; border: 1px solid transparent; }
 .encounter-panel.compact { padding-block: 1.1rem; }
-/* ══ LIVE-COMBAT HUE SHIFT (§6.10) — AN EDGE, NOT A FIELD ════════════════════════════════════
-   "a quiet magenta tint while an encounter runs" used to be written as two CUSTOM PROPERTIES:
-
-     --material-plate: <the plate, 10% magenta>       --rim-color: <the rim, 35% magenta>
-
-   Custom properties INHERIT, and both of these are read by every descendant of this panel —
-   `--material-fill: var(--material-plate)` on the action rows, the results, the prompts, the
-   round pill, the sheet vitals and all 40-odd hand-rolled controls, and `--rim-color` on every
-   one of their backing layers. So a tint written once for the panel's own ground was actually
-   painted onto every surface and every edge inside it. Measured 2026-08-06 at 1280x900, night:
-   **76.7% of the panel's pixels sat in the magenta hue band**, 60.6% of the turn order's — the
-   panel's resting ground itself measured rgb(50,24,62), hue 281. That is the "all-magenta look"
-   the client rejected, and it was there BEFORE and AFTER the tray-language pass, because
-   flattening the nesting never touched the two lines that painted the field.
-
-   The signal is worth keeping — "a fight is running" is real state — so it moves to where the
-   tray puts its colour: the EDGE. The panel's own backing layer takes the tint directly, which
-   cannot inherit, so nothing inside it changes hue. Same fact, ~1% of the pixels.
-   Ruling 47's "hairline rules, no fill" applied to the panel instead of only to its rows. */
+/* Live combat is signalled on the panel's own edge only. Setting the tint through inherited custom
+   properties (`--material-plate`, `--rim-color`) would repaint every surface inside the panel. */
 .encounter-panel.combat-active::before { border-color: color-mix(in srgb, var(--rim-color) 60%, var(--magenta)); }
 .encounter-panel h2 { margin: .2rem 0 0; }
 .encounter-panel > p { color: var(--text-dim); }
 .encounter-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .encounter-heading h2 { font-size: var(--fs-h2); line-height: var(--lh-tight); font-family: var(--font-display); }
-/* "Round 3" is a COUNT, not a state and not an action, so it reads like the tray's secondary line
-   (`.staging-tray-title span`, muted) rather than in the accent. It was `--magenta-hi`, which put
-   the brightest ink in the panel on the one thing nobody acts on. */
 .encounter-round { flex: none; padding: .4rem .7rem; background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* Dock picker sits on its own compact row so it never competes with the title for width. */
 .encounter-dock-picker { display: flex; align-items: center; gap: .3rem; margin-top: .7rem; }
 .encounter-dock-label { margin-right: .1rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
-/* Route 1 (design-language §4). The three sit 4.8px apart in one row, and a `.tap-target` on a 28px
-   square overhangs 8px a side — the later chip would take the earlier one's taps. There is no room to
-   buy with a bigger gap either, so the paint grows. */
+/* The chips sit 4.8px apart, so a `.tap-target` overhang would steal a neighbour's taps; the paint
+   itself grows to 44px instead. */
 .encounter-dock-choice { display: grid; place-items: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
 .encounter-dock-choice:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
-/* §8.1 gives this region ONE glowing element at rest, and it belongs to whoever's turn it is —
-   not to a layout preference. The on-state keeps its accent edge (ruling 4's `state-on` hue in
-   night) and loses the glow; the active row's tick below is the thing that carries it. */
 .encounter-dock-choice[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); }
-/* Setup is the quick-start door now (D1): map line, staging tray, the two Add buttons, Recent and
-   Start, all from `scenes/ScenePrepPanel`. The checkbox roster it replaced lived here — and so did
-   the scroll trap, because its internal scroll region only existed above 980px. Every list in the
-   new panel caps and scrolls itself at EVERY width, so the buttons below them are always on screen. */
+/* Setup is the quick-start panel (`scenes/ScenePrepPanel`); its lists cap and scroll themselves at
+   every width, so the buttons below stay on screen. */
 @media (min-width: 980px) {
-  /* The panel takes its share of the sidebar's height and scrolls inside it. It used to wear a
-     `max-height: var(--setup-h, ...)` fed by a ResizeObserver measuring the map panel across the grid;
-     that whole apparatus existed because neither column had a real height. The frame gives them one.
-     The scroller is marked in the markup with `.scroll-y`, which is what check (h) accepts — a bare
-     `overflow-y` here would be an undeclared region. */
+  /* The panel takes its share of the sidebar's height; its scroller is marked `.scroll-y` in the markup. */
   .table-sidebar .encounter-panel.setup { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 }
-/* In combat the tracker is the sidebar's main event, so it takes the column's leftover height and
-   scrolls its turn order inside itself. Every width, not just ≥980: a short laptop window is where
-   this bites hardest. */
+/* In combat the tracker takes the column's leftover height and scrolls its turn order inside, at
+   every width. */
 .table-sidebar .encounter-panel.combat-active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-/* The region the tracker scrolls. overscroll-behavior because the page behind it is locked and
-   rubber-banding a dead page reads as breakage; scroll-padding so an auto-scrolled row does not land
-   flush against the pinned header above it.
-   `min-height: 0` was the whole floor, and a floor of zero is what let the head above it take the
-   region's last pixel: two rows is the least a turn order can be and still answer "whose turn is
-   it", so 5.5rem is stated here rather than assumed from whatever is left. It is a floor, not a
-   size — everywhere there is room (147px at 375x667, 324 at 390x844, 565 at 1280x900) it is inert,
-   and the panel's own floor above is sized to hold it. Where the pinned header grows past what that
-   floor budgeted (a roll prompt, a parked question) this one still holds and the panel's box is what
-   gives, into a scroller: it is better to reach the turn order past a card edge than not at all. */
+/* The tracker's scroll region. overscroll-behavior: the page behind is locked. scroll-padding keeps
+   an auto-scrolled row off the pinned header. The 5.5rem floor guarantees two rows; where the
+   pinned header outgrows the panel's budget, the panel box gives instead, into a scroller. */
 .encounter-region { flex: 1; min-height: 5.5rem; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
 .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
-/* Why Start is unavailable, said where the button is rather than as a disabled mystery. */
 .encounter-start-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }
 .encounter-primary, .turn-controls button { padding: .7rem var(--space-4); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; }
 .encounter-primary, .turn-controls .encounter-primary { background: var(--primary); color: var(--text-on-neon); border-color: transparent; }
 .encounter-primary:hover:not(:disabled), .turn-controls .encounter-primary:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .encounter-primary:disabled, .turn-controls button:disabled { opacity: .45; cursor: not-allowed; }
 .initiative-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
-/* Row rules target DIRECT children only (`> li`): the acting console now nests inside the active row,
-   so a plain `.initiative-list li` would bleed this flex/border/padding onto the console's own <li>s
-   (action summaries etc.). Keep every row selector scoped to the top-level combatant rows. */
+/* Row rules target direct children (`> li`) only: the acting console nests <li>s inside the active row. */
 .initiative-list > li { display: flex; justify-content: space-between; gap: var(--space-4); padding: .8rem var(--space-4); border-top: 1px solid var(--line); }
-/* ══ RULING 47 ON THE LIVE TRACKER — HAIRLINE RULES, NO FILL, TICK ON THE SELECTED ROW ═════════
-   The client compared this panel with the scene-prep staging tray and asked for the tray's
-   language here: "rows read as rows". They were not the same shape at all. A prep row is a
-   hairline (`scenes/staging-tray.css`), and its chosen state is ruling 7's leading tick plus a
-   tinted rule; the live active row was a ROUNDED FILLED CONTAINER holding a second filled
-   container (`.acting-console`) holding a third (`.turn-economy`) — the "boxes inside boxes
-   inside boxes" in the report.
-   So the active row keeps every distinction it had and spends none of it on fill: the tick says
-   WHICH row, and two magenta-tinted hairlines BRACKET the acting block so it still reads as one
-   thing when it runs tall. That leaves the action rows as the only boxes in the column, which is
-   where the affordance is actually load-bearing (report #6 — a rollable action must look
-   tappable). Ruling 36's "the row lights" survives as the tick and the rules.
-
-   AND §8.1'S ONE GLOWING ELEMENT IS NOW SPENT HERE, which is the second half of this pass. The
-   note above used to end "…is untouched, because nothing here ever glowed" — that was true and it
-   was the problem: with the panel's whole ground washed magenta (see the combat-active note at the
-   top of this file) the active row's mark had no contrast to spend, and the only glow in the region
-   sat on the DOCK LAYOUT PICKER, which says nothing about the fight. Restraint on the ground buys
-   the mark its budget: a small saturated tick with a glow, against a quiet plate, is easier to find
-   than a large tinted field, because the field lowers the contrast of everything inside it.
-   One glowing element is not the same as one magenta field. */
+/* Active row: hairline rules and a leading tick instead of a filled box. Two tinted hairlines
+   bracket the acting block so it reads as one unit; the tick carries the region's one glow. */
 .initiative-list > li.active {
   border-radius: 0;
   background: transparent;
@@ -260,25 +127,13 @@
   border-top-color: color-mix(in srgb, var(--magenta) 55%, var(--line));
   border-bottom: 1px solid color-mix(in srgb, var(--magenta) 55%, var(--line));
 }
-/* The tick rides the ROW LINE and not the `<li>`: the row is the LINE, while the `<li>` grows to
-   hold the console, prompts and the tools popover — a mark centred on that box would drift down the
-   block as it fills. Same construction as the tray's `.staging-row.is-placed`.
-
-   ══ THE PLAYER'S ROW IS A DIFFERENT ELEMENT, AND THAT WAS A REAL BUG ═════════════════════════
-   Both halves of this selector used to say `.initiative-row-main`. The GM's row is built from that
-   div (`GmEncounterPanel`), but the PLAYER's row is `<InitiativeRow>` — a `.init-row`, shared with
-   the shared screen (`InitiativeList.tsx:40`). So on a player's phone the tick never rendered at
-   all, while the rule three blocks below hid `.init-row-caret`, the `▶` the tick was supposed to
-   replace. Measured 2026-08-06 at 390x844, all three themes: the player's active row carried NO
-   mark — only an indent for a tick that was not there, and the bracketing rules. The one thing a
-   player has to find on a phone mid-fight was the one thing the surface had stopped saying.
-   `.init-row` is now named alongside `.initiative-row-main` everywhere the mark is drawn. */
+/* The tick rides the row line, not the `<li>`, which grows to hold the console, prompts and popover.
+   The GM's row line is `.initiative-row-main`; the player's is the shared `.init-row`, so both are
+   named wherever the mark is drawn. */
 .initiative-list.gm > li.active .initiative-row-main,
 .initiative-list.player > li.active > .init-row { position: relative; padding-inline-start: .85rem; }
-/* The tray's tick at the tray's size (--cue-w/--cue-h, 7.2 x 14.4px) is a CHOSEN mark on a list a
-   GM reads at leisure; this one answers "whose turn is it" on a phone mid-fight, so it is drawn a
-   little taller and given the region's one glow. Both still fit the .85rem (13.6px) gutter the row
-   indents by, so nothing reflows and the mark stays out of the text column. */
+/* Slightly taller than the staging tray's tick, with the region's one glow; both fit the .85rem
+   gutter the row indents by, so nothing reflows. */
 .initiative-list.gm > li.active .initiative-row-main::before,
 .initiative-list.player > li.active > .init-row::before {
   content: "";
@@ -294,11 +149,8 @@
   pointer-events: none;
   animation: init-tick-arrive .5s var(--ease-settle, ease-out) 1;
 }
-/* RULING 36 — THE ROW LIGHTS WHEN THE TURN ARRIVES, ONCE — restored to the mark that replaced the
-   caret. The flare used to live on `.init-row-caret` (InitiativeList.css), which this file hides;
-   the shared screen still runs that one. It runs exactly once with no state to track for the same
-   reason the caret's did: the `::before` only EXISTS while the `<li>` matches `.active`, so it
-   begins on the turn change and cannot become a repeating alarm. */
+/* The tick's arrival flare. The `::before` exists only while the row is `.active`, so it runs once
+   per turn change. */
 @keyframes init-tick-arrive {
   0%   { opacity: 0; transform: translateY(-50%) translateX(-.4rem) scaleY(.55); }
   45%  { opacity: 1; transform: translateY(-50%) translateX(0) scaleY(1.3); }
@@ -308,23 +160,14 @@
   .initiative-list.gm > li.active .initiative-row-main::before,
   .initiative-list.player > li.active > .init-row::before { animation: none; }
 }
-/* Everything nested under the active row indents to the row's own text column, so the tick is the
-   only thing in the leading gutter and the block reads as one hanging indent.
-   `.85rem` is the tick's gutter and `.3rem` is `.initiative-expand`'s own padding, so the console
-   starts on the same vertical as the row's avatar and name rather than 5px left of them
-   (measured: avatar 890, console 885, before this term). The player's `.init-row` has no inner
-   padding of its own, so its siblings indent by the gutter alone — and `.init-row` must be excluded
-   or the row that CARRIES the tick would be pushed off it. */
+/* Everything nested under the active row indents to the row's text column, leaving the tick alone in
+   the gutter. `.85rem` is the gutter and `.3rem` is `.initiative-expand`'s padding. The player's
+   `.init-row` carries the tick, so it is excluded. */
 .initiative-list.gm > li.active > :not(.initiative-row-main) { margin-inline-start: calc(.85rem + .3rem); }
 .initiative-list.player > li.active > :not(.init-row) { margin-inline-start: .85rem; }
-/* The row's `▶` text caret is what the tick REPLACES. Two marks for one fact, three characters
-   apart, is the redundancy ruling 47 removes — and the tick is the app-wide mark, so it is the one
-   that stays. (`InitiativeRow` still draws its own caret for the shared screen, which has no
-   tick.) */
+/* The tick replaces the row's `▶` caret here; the shared screen keeps its caret. */
 .initiative-list.gm > li.active .initiative-caret,
 .initiative-list.player > li.active .init-row-caret { display: none; }
-/* The player's own row: a cyan leading rule, for the same reason the active row lost its fill —
-   a second tinted plate in a list of hairlines is the nesting this pass removes. */
 .initiative-list > li.you { background: transparent; border-top-color: color-mix(in srgb, var(--cyan) 55%, var(--line)); }
 .initiative-list > li.you.active { background: transparent; box-shadow: none; }
 .initiative-list > li > span { display: flex; align-items: center; }
@@ -337,38 +180,26 @@
 .initiative-name { display: flex; align-items: center; gap: .45rem; min-width: 0; }
 .initiative-name > span:not(.initiative-caret):not(.initiative-tag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .initiative-caret { flex: none; color: var(--text-dim); font-size: var(--fs-xs); }
-/* `.initiative-tag` WAS HERE and it was a `--radius-pill` rule for markup that does not exist:
-   searched 2026-08-06 across `apps/client/src`, `packages/ui/src` and the server, the class is
-   written nowhere but in the `:not()` above and in this file's own rule, and the live DOM renders
-   zero of them. Dead CSS, deleted rather than de-pilled — de-pilling a rule nothing matches ships
-   no pixels and leaves the trap for whoever adds the markup back. The `:not()` on the line above
-   is left alone deliberately: it costs nothing and it is the one place the intended class name
-   still reads as intended. */
 .initiative-score-value { flex: none; min-width: 1.9rem; padding: .2rem .15rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-dim); font-weight: 800; font-size: var(--fs-sm); text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .initiative-score-value:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .initiative-score-value:disabled { opacity: .7; cursor: default; }
 .initiative-score-edit { flex: none; width: 4.2rem; margin: 0; padding: .45rem; border: 1px solid var(--cyan); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-body); text-align: center; font-family: var(--font-mono); }
 .turn-controls { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: var(--space-4); }
-/* End encounter is destructive, so it sits apart on its own row and stays visually quiet. */
 .encounter-end { width: 100%; margin-top: .6rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .encounter-end:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 .encounter-end:disabled { opacity: .45; cursor: not-allowed; }
-/* Hidden actor's turn = GM-ONLY information, so it is violet — and now says so with the violet
-   token rather than borrowing --caution, which D21 moved to warm orange. Violet is reserved for
-   GM-only (invariant 8); this row is exactly that, so the hue is right and only the token was wrong. */
+/* A hidden actor's turn is GM-only information, so it uses the violet GM-only token. */
 .hidden-turn { padding: .7rem; border-left: 4px solid var(--violet); background: var(--surface-2); color: var(--violet-hi) !important; }
 .encounter-feedback { min-height: 1.3rem; color: var(--text-dim) !important; }
-/* HP tracking: GM rows carry an exact chip that expands an inline editor; players see bands. */
 .initiative-list.gm > li { flex-direction: column; align-items: stretch; }
 .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .initiative-row-side { display: flex; align-items: center; gap: .4rem; flex: none; }
-/* Per-row reaction chip: reactions are off-turn resources, so every combatant gets a quick toggle. */
 .initiative-reaction { flex: none; width: 1.6rem; padding: .26rem 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 800; text-align: center; cursor: pointer; }
 .initiative-reaction:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .initiative-reaction[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); text-decoration: line-through; }
 .initiative-list.gm > li.down .initiative-name { opacity: .55; text-decoration: line-through; }
-/* Dense one-line rows: [initiative | name + badges | R | HP]. The name button opens a FLOATING
-   tools card over the list (see .row-tools-popover) so rows never shift while the GM works. */
+/* Dense one-line rows: [initiative | name + badges | R | HP]. The name button opens a floating
+   tools card (.row-tools-popover) so rows never shift. */
 .initiative-expand { display: flex; align-items: center; gap: .4rem; min-width: 0; flex: 1 1 auto; padding: .2rem .3rem; margin: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
 .initiative-expand:hover, .initiative-expand[aria-expanded="true"] { background: var(--surface-2); }
 .initiative-name-text { color: var(--text); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
@@ -376,96 +207,53 @@
 .initiative-expand .condition-chips { margin-left: 0; flex: 0 1 auto; overflow: hidden; flex-wrap: nowrap; }
 .initiative-row-tools { display: flex; justify-content: flex-end; gap: .4rem; }
 .initiative-row-tools .secondary { padding: .3rem .7rem; font-size: var(--fs-xs); }
-/* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
-/* `minmax(0, 1fr)`, not the default `auto` column, which grows to its widest item's MAX-CONTENT and
-   overflows a grid container that has a perfectly definite width. Measured at 375px: the popover was
-   313px wide and its `.hp-editor` row 419.8px, so `Temp` was clipped by the screen edge and `Set` sat
-   entirely beyond it (x 405.7-470.6) with nothing able to scroll to it. Pre-existing — it is what
-   `.hp-editor`'s five `flex: 1` buttons have always summed to — and fixed here because D7's chooser
-   sits in that row and inherits the same overflow. `1fr` is `minmax(auto, 1fr)`, whose auto MINIMUM
-   is the same trap; the `0` is the whole point. Measured after: the row is 291.9px and the five
-   buttons settle at 35.4-45.8px wide, which is what five buttons and a number field cost when they
-   are all required to be ON the screen. Their 38.9px HEIGHT is unchanged, and height is the dimension
-   that was already under the 44px floor, so `scripts/tap-audit.mjs` does not move. */
+/* `minmax(0, 1fr)`, not `auto` or `1fr` (whose auto minimum is max-content): otherwise the HP editor
+   row overflows the popover at 375px and pushes buttons off screen. */
 .row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .45rem; padding: .6rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
-/* The active row carries the acting console inline, so open its HP/tools popover in-flow ABOVE the
-   console (not floating below the whole row), so editing HP shows those controls above the actions. */
+/* On the active row the tools popover opens in flow above the acting console. */
 .initiative-list.gm > li.active .row-tools-popover { position: relative; z-index: 41; top: auto; margin-top: .4rem; }
-/* Compact control bar: turn navigation + the ⋯ options menu. */
-/* One control bar, one control height: the round pill, ‹, Next, +, and ⋯ all line up as equal-height
-   pills with their glyph/text centered, so nothing reads as an odd shape (report #1). */
-/* Kept deliberately compact - turn nav is frequent but shouldn't dominate the panel (feedback #3.3). */
-/* One token, one row: `--control-h` is the height of every control on this bar, so the 44px floor is a
-   single edit here rather than five. It was 2rem, which put the round pill, ‹, Next turn, + and ⋯ all
-   at 32px — the busiest bar in a running fight, all of it under the floor. */
+/* Compact control bar: turn navigation + the ⋯ menu. `--control-h` sets every control's height on
+   the bar (the 44px floor) in one place. */
 .encounter-topbar { --control-h: var(--tap-min); position: relative; display: flex; align-items: center; gap: .35rem; margin-top: .6rem; }
 .encounter-topbar > .encounter-round { display: inline-flex; align-items: center; height: var(--control-h); margin: 0; padding: 0 .7rem; }
 .encounter-topbar .turn-controls { flex: 1 1 auto; margin-top: 0; display: grid; grid-template-columns: var(--control-h) 1fr; gap: .35rem; }
 .encounter-topbar .turn-controls button { height: var(--control-h); padding: 0 .6rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: var(--fs-sm); }
 .encounter-topbar .turn-controls button:first-child { padding: 0; font-size: 1.05rem; } /* the ‹ chevron is a centered square */
-/* Report #2 asked that the topbar read as ONE turn cluster rather than a bright button pasted onto a
-   muted panel, and the answer taken then was to fill ‹ and Next turn with a 28% magenta plate and ring
-   both in full `--magenta` — two filled accent boxes, side by side, above a list whose active row is
-   also magenta. The cluster now reads as one because every control on the bar wears the SAME material
-   as the rest of the panel (`background: none` hands the paint to the shared backing layer below), and
-   `Next turn` alone keeps the accent EDGE that `.encounter-primary` wears everywhere else on this
-   surface. `‹` is a correction, not the primary action, so it takes the neutral rim like `+` and `⋯`;
-   it keeps its own hit area, label and position untouched. */
+/* Every control on the bar wears the panel's shared material (`background: none` hands paint to the
+   backing layer); only `Next turn` keeps the accent edge. */
 .encounter-topbar .turn-controls button, .encounter-topbar .turn-controls .encounter-primary { background: none; border: 1px solid transparent; color: var(--text); font-weight: 700; }
-/* Interaction comes from the material like every other control in the panel (ruling 40: the rim
-   brightens and the cue wedge appears, on press as well as hover). Without this the bar inherited
-   `.turn-controls .encounter-primary:hover` above — a solid `--magenta-hi` fill plus `--glow-magenta`
-   — which would have put the region's glow back on a button every time a pointer crossed it. */
+/* Hover comes from the material (rim brightens, cue wedge appears), not the generic
+   `.turn-controls .encounter-primary:hover` fill and glow. */
 .encounter-topbar .turn-controls button:hover:not(:disabled) { background: none; box-shadow: none; color: var(--text); }
-/* The resume state stays cyan and stays on the edge, at a specificity that beats the shared
-   `.encounter-primary::before` rim below regardless of source order. */
+/* The resume state stays cyan, at a specificity that beats the shared `.encounter-primary::before` rim. */
 .encounter-topbar .turn-controls .encounter-primary.resume::before { border-color: var(--cyan); }
-/* padding:0 so the base button's 1.3rem padding can't blow the fixed 2rem square out past the
-   ‹/Next-turn buttons (feedback #7). */
+/* padding: 0 so the base button padding cannot stretch the square. */
 .encounter-menu-toggle { flex: none; width: var(--control-h); height: var(--control-h); padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: 1rem; font-weight: 800; line-height: 1; cursor: pointer; }
 .encounter-menu-toggle:hover, .encounter-menu-toggle[aria-expanded="true"] { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
-/* The options menu is a centered viewport overlay (not a dropdown anchored inside the panel), so the
-   docked tracker's own scroll container can never clip it: it scrolls on its own instead of forcing
-   the whole initiative list to scroll to reach the bottom / Add-to-the-fight (report). */
-/* Transparent full-screen layer that just catches an outside click/tap to close - no dim, so the
-   menu reads as a popover, not a modal. Above the enlarged map (z-40); the menu sits above it. */
+/* The options menu is a fixed viewport overlay rather than a dropdown inside the panel, so the
+   tracker's scroller can never clip it. This transparent layer catches outside clicks (no dim, so it
+   reads as a popover); it sits above the enlarged map (z-40) and below the menu. */
 .encounter-menu-backdrop { position: fixed; inset: 0; z-index: 41; }
-/* Anchored under the ⋯ button via inline top/left/width/max-height computed from the button rect. */
-/* THE FRAME AND THE SCROLLER ARE TWO BOXES NOW (`4g`). This one is the frame and it does not scroll;
-   `.encounter-menu-body` below carries `.scroll-y` in EncounterPanel's markup (check (h)).
-   THE SPLIT IS THE FIX. `.encounter-menu::before` (:1538) is the plate, the rim and the chamfer, and
-   it is `position: absolute; inset: -1px` — an absolutely-positioned child of a SCROLL CONTAINER is
-   sized to the scrollport and rides the scroll, which is the same fact `.scene-prep-picklist`
-   (scene-prep.css:15-19) already states in the other direction, keeping its edge as a real border
-   because of it. While this element was itself the scroller the frame scrolled away from its own
-   contents: measured as GM at 1280x900 with 25 roster actors, 674px of menu over 787px of overflow,
-   and at full scroll the plate sat at -569..105 against a menu box at 218..892 — nothing behind any
-   visible row, so every one of them painted straight onto the turn order's action cards. That is
-   the reported screenshot, and no amount of z-index or fill would have fixed it: the box was in the
-   wrong place, not the wrong colour.
-   The 85vh cap stays: this is a fixed overlay layer, which is the one place §7 rule 2 keeps the idiom.
-   Ruling 52: a menu takes the panel material with a BRIGHTER rim, so a floating surface reads as
-   one step in front of the panel it opened from. */
+/* Positioned from the ⋯ button's rect via inline top/left/width/max-height. This box is the frame
+   and does not scroll; `.encounter-menu-body` does. `.encounter-menu::before` (plate, rim, chamfer)
+   is `position: absolute; inset: -1px`, which in a scroll container would be sized to the
+   scrollport and scroll away from the content. The 85vh cap is allowed on a fixed overlay. A menu
+   takes a brighter rim than the panel it opened from. */
 .encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); display: flex; flex-direction: column; padding: .7rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
-/* The grid and the gap were the menu's; they belong to whatever holds the rows. `min-height: 0` is
-   what lets it shrink inside the capped column instead of pushing the frame past its own cap. */
+/* `min-height: 0` lets the body shrink inside the capped column instead of pushing the frame past it. */
 .encounter-menu-body { display: grid; gap: .6rem; min-height: 0; }
-/* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
 .encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
 .encounter-menu .rules-mode-control select { width: 100%; }
 .encounter-menu .environment-control { margin: 0; }
 .menu-section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid var(--line); }
 .menu-section-title { margin: 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-/* No nested scroll here: the menu's body scrolls, so the add list flows as part of that single
-   scroll region (was a second scrollbar-in-a-scrollbar the GM had to fight). What bounds the list
-   instead is `RECENT_COUNT` and the disclosure below — a cap, not a viewport. */
+/* No nested scroll: the list flows inside the menu body's single scroll region, bounded by
+   `RECENT_COUNT` and the disclosure. */
 .menu-add-list { display: grid; gap: .3rem; }
 .menu-empty-note { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
-/* `Recent`, pre-collapsed, ten monsters deep (D3). The same disclosure scene prep opens onto the same
-   `lastUsedAt` order, so the two doors into a fight agree; the shape is `.scene-prep-recent`'s
-   (scene-prep.css:33-40) — a bordered 44px row with the caret at the far edge, because `display: flex`
-   on a <summary> suppresses the native marker and a bare bold label reads as a heading, not a control. */
+/* `Recent`, collapsed, ten monsters deep, matching `.scene-prep-recent`: a bordered 44px row with the
+   caret at the far edge (`display: flex` on a <summary> suppresses the native marker). */
 .menu-add-recent > summary { min-height: var(--tap-min); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: .3rem var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; list-style: none; }
 .menu-add-recent > summary::-webkit-details-marker { display: none; }
 .menu-add-recent > summary::after { content: "▾"; color: var(--text-muted); font-weight: 400; letter-spacing: 0; }
@@ -479,39 +267,18 @@
 .menu-add-row button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-menu .encounter-add-monsters { margin: 0; }
 .encounter-menu .encounter-end { margin-top: 0; }
-/* `.initiative-hp` lived here and is GONE: the row renders `.initiative-hp-text` (a span, below with
-   the Foundry-style row) and nothing has emitted the bare class since. Verified 2026-08-05 by
-   searching the whole tree outside node_modules/dist - the only hits were this stylesheet's own six
-   declarations plus two compound selectors it shared with the live `.initiative-score-value`. */
-/* `flex-wrap` so D7's damage-type chooser can take a whole line of its own under the five buttons
-   (`flex-basis: 100%`, below). The buttons never wrap and are not meant to: `flex: 1` is
-   `flex-basis: 0`, so all five have a hypothetical size of 0 and always share one line.
-   `> input` / `> button` RATHER THAN DESCENDANTS, here and at `.sheet-hp-controls`,
-   `.token-context-hp` and every entry these four have in the material blocks below. The chooser is a
-   shared `Combobox`, and its own box is an `<input>` while each of its thirteen listbox rows is a
-   `<button>` — so the loose selectors were restyling a primitive's internals from outside it.
-   Measured: `.hp-editor input` sized the chooser to the number field's 4.2rem, and
-   `.token-context-hp button`'s `min-height: 2.6rem` shrank every option row to 41.6px, one tap floor
-   short, while the plate `::before` drew a bordered box around each one. Child combinators cost no
-   specificity, so nothing else in these files reorders. */
+/* `flex-wrap` lets the damage-type chooser take its own line (`flex-basis: 100%`); the five buttons
+   are `flex: 1` (basis 0) and always share one line. Child combinators (`> input`, `> button`) here
+   and in `.sheet-hp-controls` / `.token-context-hp` keep these rules out of the shared Combobox's own
+   `<input>` and option `<button>`s. */
 .hp-editor { display: flex; flex-wrap: wrap; gap: .35rem; }
 .hp-editor > input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
 .hp-editor .damage-type-field { flex: 1 0 100%; }
 .hp-editor > button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .hp-editor > button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-/* `.health-chip` AND ITS TWO TONES WERE HERE — another `--radius-pill` rule for markup that does
-   not exist. Same search as `.initiative-tag` above, same result: `health-chip`, `health-bloodied`
-   and `health-down` appear in no `.tsx` anywhere in the repo, and the live DOM renders zero. The
-   fact a player reads off them — bloodied / down — is carried by `.token-health-bloodied` over the
-   map (encounter-map.css) and by `.init-row-health.hp-bloodied` in the row (InitiativeList.css);
-   nothing regressed when these went, because nothing was drawing them. Deleted rather than
-   de-pilled, for the reason given above. */
-/* Conditions: tracked reference state — chips everywhere (violet-coded), a compact picker where editable. */
-/* --space-3 is the minimum gap a row of pressable chips can use: each carries a 44px hit area
-   around 2rem of paint (Chip.css), so anything tighter and neighbouring chips steal taps. */
+/* Pressable chips each carry a 44px hit area around 2rem of paint (Chip.css), so --space-3 is the
+   minimum gap that keeps neighbours from stealing taps. */
 .condition-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-left: .45rem; vertical-align: middle; }
-/* Condition pills are the shared Chip (icon + tone) now; only the row container + the dashed add
-   toggle keep bespoke rules below. */
 .condition-add { min-width: 1.5rem; text-align: center; background: transparent; color: var(--text-muted); border-style: dashed; }
 .condition-editor { margin-top: .35rem; }
 .initiative-list.gm .condition-editor { margin-top: .3rem; }
@@ -520,67 +287,41 @@
 .actor-card-conditions { margin: -.4rem 0 .8rem; }
 .actor-card-conditions .condition-chips { margin-left: 0; }
 .you-are-playing .condition-editor { margin-top: .4rem; }
-/* Turn economy: pressed = spent. A bare strip since the tray-language pass — no rim, no plate,
-   no padding of its own; the pills sit on the row they belong to. */
 .turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: 0; border: 0; }
 .turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
-/* Route 1: the slots wrap in a .3rem-gap row, which is 4.8px against the 4.85px a side a `.tap-target`
-   would overhang at their measured 34.3px — the pills would steal each other's taps. */
-/* THE THREE DEAD `--radius-pill` DECLARATIONS ARE GONE FROM THIS FILE, and they were dead rather
-   than merely unfashionable — measured on the live tree with `getComputedStyle`, not read off the
-   source: `.encounter-round`, `.economy-slot` and `.turn-end` all computed `border-radius: 0px`
-   already, because the material blocks near the bottom of this file re-declare all three at the
-   same single-class specificity and win on source order. Keeping a `--radius-pill` line that the
-   same stylesheet overrides 1100 lines later is how a reader concludes the panel still has
-   bubbles, which is exactly the question that started this pass. `.dock-waiting-count` (top of
-   file) was the one that genuinely still rendered round; `.initiative-tag` and `.health-chip`
-   rendered nothing at all. */
+/* The slots grow their paint to 44px: in a .3rem-gap row a `.tap-target` overhang would steal the
+   neighbour's taps. Their radius is set by the material block near the end of this file. */
 .economy-slot { min-height: var(--tap-min); padding: .24rem .55rem; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .economy-slot:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .economy-slot[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); text-decoration: line-through; }
-/* Same shape + size as the Action/Bonus/Reaction slots, keeping the primary magenta fill. */
 .turn-end { margin-left: auto; padding: .24rem .8rem; font-size: var(--fs-sm); font-weight: 700; }
 .economy-feedback { width: 100%; color: var(--text-dim); font-size: var(--fs-sm); }
-/* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
 .action-runner { margin-top: .6rem; display: flex; flex-direction: column; }
-/* Every resolution card (attack preview, damage, save DC, apply-damage) sits directly under the
-   creature's name like the attack roll does, instead of dropping below the action list once the
-   targeting session clears on commit. */
+/* Resolution cards sit directly under the creature's name, rather than dropping below the action
+   list once targeting clears on commit. */
 .action-runner > .action-result { order: -1; }
 .action-runner-status { color: var(--text-muted); font-size: var(--fs-sm); margin: .4rem 0; }
-/* Read-only player attack reference (#5.2): the GM's action rows without the interactivity. */
 .player-actions { margin-top: .45rem; }
 .player-actions-label { margin: 0 0 .3rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .player-actions-label span { color: var(--text-muted); font-weight: 700; text-transform: none; letter-spacing: normal; }
 .action-row.action-row-readonly, .action-row.action-row-readonly:hover { cursor: default; border-left-color: var(--magenta); }
 .action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
-/* Rollable stat-block actions read as real buttons (report #6): a border + raised fill + magenta left
-   accent so it's obvious they're tappable. The name sits on its own line with the mechanics stacked as
-   bullets beneath it, so nothing is crammed onto one truncated line (owner feedback). */
-/* Route 1 is not a choice here: this is a stacked list, and design-language §4 forbids route 2 in one —
-   overlapping invisible `::after` boxes in a vertical list steal their neighbours' taps. The rollable
-   rows are already well past the floor; it is the flat reference rows below that were 39.9px. */
-/* Ruling 39's shape on the fight surface's most-read control: the magenta stays a LEADING RULE and
-   the words sit on a neutral ground. The leading bar is a real border rather than paint, because
-   the backing layer paints above the element's own border and would bury it. */
+/* Rollable actions read as buttons: name on its own line, mechanics as bullets beneath. Paint grows
+   to the 44px floor, since overlapping `::after` hit boxes in a stacked list steal taps. The magenta
+   is a leading rule on a neutral ground; it is a real border because the backing layer paints above
+   the element's own border. */
 .action-row { width: 100%; min-height: var(--tap-min); display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid transparent; border-left: 2px solid var(--magenta); border-radius: 0; color: var(--text); text-align: left; cursor: pointer; }
 .action-row:hover:not(:disabled) { border-left-color: var(--magenta-hi); }
 .action-row:hover:not(:disabled)::before, .action-row:focus-visible::before, .action-row:active:not(:disabled)::before { border-color: var(--rim-color-hi); }
 .action-row-name { font-size: var(--fs-body); font-weight: 800; color: var(--text); }
 .action-row-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: .18rem; }
-/* Bullet as a flex item (not absolute) so it always sits BEFORE the text with a real gap - an
-   absolute "•" overlapped a leading "+7 to hit" at some widths. */
+/* The bullet is a flex item, not absolute, so it never overlaps leading text like "+7 to hit". */
 .action-row-summary li { display: flex; align-items: baseline; gap: .35rem; color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.35; }
-/* The bullet is punctuation — neither interactive nor stateful — so it is muted ink, not accent.
-   Ruling 39 already spends this row's colour on the 2px leading rule; six magenta dots per card
-   spent it a second time, on the one thing in the card that carries no meaning. */
 .action-row-summary li::before { content: "•"; flex: none; color: var(--text-muted); font-weight: 800; }
 .action-row-summary-note { color: var(--text-muted); font-size: var(--fs-xs); font-style: italic; }
 .action-row .action-hint { display: block; margin-top: .05rem; font-size: var(--fs-xs); }
-/* Reference-only actions (no structured attack/save/damage): flat, quiet, and single-line so the
-   button-styled rollable actions above stand out. Tap to reveal the rules text. */
-/* `align-items: center`, not baseline: the row carries the 44px floor now, and a baseline in a box
-   taller than its one line of text parks the text at the top with the rest of the target empty below. */
+/* Reference-only actions: flat, quiet, single-line, so the rollable rows stand out; tap reveals the
+   rules text. `align-items: center` because the row is taller than its one line of text. */
 .action-row-static { flex-direction: row; align-items: center; gap: var(--space-2); border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; --material-fill: transparent; --rim-color: transparent; }
 .action-row-static:hover:not(:disabled) { border-color: transparent; border-left-color: var(--line-strong); --material-fill: var(--material-plate); }
 .action-row-static[aria-expanded="true"] { opacity: 1; --material-fill: var(--material-plate); }
@@ -589,9 +330,6 @@
 .action-reference-text { margin: .35rem 0 .1rem; padding: var(--space-2) .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid transparent; }
 .action-targeting-head { margin: 0 0 .45rem; font-size: var(--fs-sm); color: var(--text-dim); }
-/* The scroll is declared in the MARKUP (`.scroll-y`, both call sites — ActionRunner and the player's
-   own runner in EncounterPanel): check (h) reads that class, and a bare `overflow-y` here would be a
-   region no reader of either component can see. */
 .action-target-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); max-height: 11rem; }
 .action-target { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); cursor: pointer; }
 .action-target input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--magenta); }
@@ -600,7 +338,6 @@
 .action-result { margin-top: .4rem; padding: .6rem .7rem; border: 1px solid transparent; }
 .action-result-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .action-result-actions { display: flex; align-items: center; gap: .4rem; flex: none; }
-/* Multiattack / Extra Attack: roll the same action again without dismissing the result first. */
 .action-again { flex: none; padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; white-space: nowrap; }
 .action-again:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .action-result-close { flex: none; width: 1.8rem; height: 1.8rem; padding: 0; display: grid; place-items: center; border-radius: var(--radius-sm); }
@@ -613,39 +350,28 @@
 .outcome-unknown { color: var(--text-dim); }
 .action-damage { margin: .35rem 0 0; font-size: var(--fs-sm); color: var(--danger-hi); }
 .action-damage strong { font-size: 1rem; color: var(--danger-hi); }
-/* Attack preview: reuses the saving-throw widget's button row + manual field for a recognizable roll. */
 .action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem var(--space-2); border: 1px solid transparent; }
 .roll-zone { display: flex; flex-direction: column; gap: .35rem; }
 .roll-zone-caption { align-self: center; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-/* A centered "or" flanked by a solid divider line, separating the auto-roll and manual-entry zones. */
 .roll-or { display: flex; align-items: center; gap: .55rem; margin: .05rem 0; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .roll-or::before, .roll-or::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line-strong); }
-/* Stack the manual roll: a full-width number field on its own row, then the action button(s) on a
-   right-aligned row beneath it. "Use roll" - and the Confirm/Re-roll it becomes once a die is entered -
-   stay flush-right, reading as the manual counterpart to the auto-roll's Confirm/Re-roll above.
-   flex:none resets the generic .save-prompt-manual's 12rem basis, which in this column context was
-   read as a ~12rem *height* and left a tall empty gap around the field. Heights use box-sizing so the
-   padding doesn't grow them. */
+/* Manual roll: a full-width number field, then a right-aligned button row ("Use roll", later
+   Confirm/Re-roll). `flex: none` resets `.save-prompt-manual`'s 12rem basis, which in this column
+   would act as a height. */
 .action-preview .save-prompt-manual { flex: none; display: flex; flex-direction: column; gap: .3rem; }
 .action-preview .manual-actions { flex: none; align-self: flex-end; display: inline-flex; gap: .3rem; }
 .action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
-/* Route 1 on both. The fixed 1.9rem put the typed-d20 field and its raw <button>s at 30.4px tall -
-   measured 2026-08-05 at 390px, driving Dagger -> target -> Roll with the dice preference on Manual.
-   Route 2 does not fit: (44-30.4)/2 = 6.8px a side, against 5.6px of column gap above the field (the
-   "manual entry" caption) and 4.8px below it (the button row), so its ::after would steal from both.
-   The `Re-roll` beside them is an `nh-btn`, whose own min-height already beat this height and left the
-   pair mismatched at 44 vs 30.4 - one floor for the row fixes the theft and the mismatch together. */
+/* Field and buttons grow their paint to 44px: a `::after` overhang would steal from the caption above
+   and the button row below. One floor also matches the neighbouring `nh-btn` Re-roll. */
 .action-preview .save-prompt-manual input { width: 100%; min-width: 0; min-height: var(--tap-min); margin: 0; padding: 0 .6rem; box-sizing: border-box; }
 .action-preview .save-prompt-manual button { flex: none; min-height: var(--tap-min); margin: 0; padding: 0 var(--space-4); box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
-/* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
-   be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
-/* Label = hit area, so the 44px floor is real paint on the row. */
+/* "Final total" mode: a compact Natural 20 checkbox under the total field, since a crit cannot be read
+   off a hand-computed total. The label is the hit area, so the 44px floor is real paint. */
 .action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; min-height: var(--tap-min); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-preview .manual-nat20 input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; padding: 0; accent-color: var(--magenta); }
 .action-apply-group { display: flex; gap: .4rem; margin-top: var(--space-2); align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
-/* .65rem, not .55rem: the pair measured 42.1px, 1.9px under the floor, and they sit in a stretch row
-   so the field and the button have to grow together or they stop matching. */
+/* .65rem padding keeps the field and the button (a stretch row) together at the 44px floor. */
 .action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .65rem var(--space-2); border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
 .action-apply { width: 100%; margin-top: var(--space-2); padding: .65rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 78%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; cursor: pointer; }
 .action-apply:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
@@ -655,16 +381,11 @@
 .action-save-buttons { display: inline-flex; gap: .3rem; }
 .action-save-buttons button { padding: .35rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-save-buttons button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-/* Saving-throw prompts inside the target's initiative row (auto-apply on answer). */
 .save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem var(--space-2); border: 1px solid transparent; }
 .save-prompt-label { font-size: var(--fs-sm); color: var(--text-dim); }
 .save-prompt-label strong { color: var(--text); }
-/* Issue `4b`'s amend field: its OWN row inside the prompt's column, deliberately not inside
-   .save-prompt-actions. That row already wraps two controls plus a dismiss at 375px, and a third
-   flex item in it put the damage field and the d20 field side by side reading as one pair. A label
-   is the hit area, so the 44px floor is real paint (the .manual-nat20 route above), and the field
-   keeps .action-damage-edit's danger tint - the same control the attack path and the pending-damage
-   proposal already use for "the number about to come off somebody's hit points". */
+/* The save's damage amend field, on its own row so it is not read as a pair with the d20 field. The
+   label is the hit area (44px floor), and the field shares `.action-damage-edit`'s danger tint. */
 .save-damage-amend { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: var(--tap-min); font-size: var(--fs-xs); font-weight: 700; color: var(--text-dim); cursor: pointer; }
 .save-damage-amend > span { flex: 1 1 auto; min-width: 0; }
 .save-damage-amend .action-damage-edit { flex: 0 0 4rem; min-height: var(--tap-min); box-sizing: border-box; }
@@ -672,32 +393,21 @@
 .save-prompt-roll { flex: 0 0 auto; }
 .save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; flex: 1 1 12rem; }
 .save-prompt-actions input { flex: 1 1 auto; min-width: 7rem; width: auto; margin: 0; padding: .4rem .6rem; text-align: left; }
-/* Route 1 across the owed-answer widget: it is a wrapping .4rem-gap row, so 4.85px of `::after` a side
-   from each of two neighbours (9.7px) would not fit the 6.4px between them. */
+/* Paint grows to 44px: in a wrapping .4rem-gap row, overhangs from two neighbours would collide. */
 .save-prompt-actions button, .save-prompt-confirm button { min-height: var(--tap-min); padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-/* Route 1, and it costs nothing: the control is transparent, so growing the PAINT from 28.8px to the
-   floor grows an invisible box. A `.tap-target` here would overhang 7.6px a side into a wrapping
-   .4rem-gap row of prompt buttons — nine of these were measured under the floor in one running fight. */
+/* The dismiss is transparent, so growing its paint to 44px costs nothing visually; an overhang would
+   collide with the neighbouring prompt buttons. */
 .save-prompt-dismiss { flex: none; margin-left: auto; min-width: var(--tap-min); min-height: var(--tap-min); display: grid !important; place-items: center; padding: 0 !important; line-height: 1; background: transparent !important; color: var(--text-muted) !important; }
 .save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .economy-movement { font-size: var(--fs-xs); color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
-/* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */
 .reaction-prompt { border-color: var(--indigo); background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo)); }
-/* Player-hit damage proposals (proposal mode): a faint magenta combat tint so the GM spots what needs applying, distinct from the indigo reaction prompt. */
 .pending-damage { border-color: color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
-/* "Roll for initiative" prompt on the player's own row: a cyan "your move" accent, distinct from the magenta damage prompt. */
-/* Now a top-of-panel call-to-action (not a per-row detail): a cyan-tinted banner, a touch more padding,
-   and bottom margin so it sits clearly above the turn order / sheet in either view. */
 .initiative-prompt { margin: 0 0 .6rem; padding: .55rem .7rem; border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan)); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); }
-/* GM encounter-setup opt-in for player-rolled initiative. */
-/* GM "waiting on players to roll initiative" banner above the initiative list, with the roll-for-the-rest action. */
 .initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: var(--space-2); padding: var(--space-2) .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
 .initiative-gathering span { flex: 1 1 12rem; }
 .reaction-prompt .save-prompt-label { color: var(--cyan-hi); }
 .reaction-prompt .save-prompt-label strong { color: var(--text); }
-/* Adv/disadv re-roll buttons on a rolled save (and, later, other d20 prompts): a cool accent, pressed
-   when that mode produced the shown roll. */
 .save-die-mode { padding: .35rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .save-die-mode:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .save-die-mode.active { background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); border-color: var(--cyan); color: var(--text); }
@@ -708,72 +418,39 @@
 .save-prompt-outcome, .action-save-note { margin: .3rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .action-save-note.resolved { color: var(--cyan-hi); }
 .own-save-prompts { margin-top: .4rem; }
-/* Player initiative rows stack the name/score row above any owed-save prompts. */
 .initiative-list:not(.gm) > li { flex-direction: column; align-items: stretch; }
 .initiative-list:not(.gm) .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .initiative-list:not(.gm) .initiative-row-main > span { display: flex; align-items: center; }
 .initiative-list:not(.gm) .initiative-row-main > strong { color: var(--text); font-family: var(--font-mono); }
-/* Character sheet: live state over the immutable stat block. Track, never build. */
 .initiative-sheet-link { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted transparent; }
 .initiative-sheet-link:hover { color: var(--cyan-hi); text-decoration-color: var(--cyan); }
-/* Character sheet renders in the shared Modal (box, head, close, scroll handled there). */
 .sheet-typeline { margin: -.2rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); font-style: italic; }
-/* Vitals (v3 #2.3, v5 #8): compact stat chips, all with the SAME internal layout - a centred label above
-   a centred value, tight padding, a thin border, no dead space. HP is the same chip, just wide enough to
-   also hold its Dmg/Heal/Temp controls (#2.4). */
 .sheet-vitals { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: .9rem; align-items: stretch; }
-/* RULING 45's constraint lives here: these are the numbers a player reads mid-fight, so the chip
-   takes the rim and the cut and a FLAT plate — never the scanline. */
+/* Read mid-fight, so the chip takes a flat plate, never the scanline. */
 .sheet-vital { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem; padding: .35rem .55rem; border: 1px solid transparent; min-width: 3.2rem; text-align: center; }
 .sheet-vital span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
 .sheet-vital strong { font: 700 1.15rem/1 var(--font-mono); color: var(--text); }
-/* HP: same chip, wide enough for the controls; label+value stay centred over the buttons. */
 .sheet-vital-hp { flex: 1 1 15rem; align-items: stretch; }
 .sheet-vital-top { display: flex; flex-direction: column; align-items: center; gap: .12rem; }
 .sheet-vital-top strong { font-size: 1.3rem; }
-/* At-a-glance health band (design language §6) under the HP readout; number stays the primary display. */
 .sheet-hp-meter { margin: .3rem 0 .1rem; }
 .sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
-/* Same rule as `.hp-editor`'s: D7's chooser takes a whole line so the number and its four buttons keep
-   the row they were measured on. This one already wrapped, so only the basis is new. */
 .sheet-hp-controls .damage-type-field { flex: 1 0 100%; }
 .sheet-hp-controls > input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
-/* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
 .sheet-hp-controls > input:disabled { opacity: .5; cursor: default; }
-/* GIVING THE CHOOSER A LINE WAS ONLY HALF OF IT: its open list has to escape the chip too, and
-   `7541dbf` shipped without that half.
-   `.sheet-vital` carries `isolation: isolate` (ruling 45's flat plate, far below) so its `::before`
-   backing layer at `z-index: -1` stays inside it. That isolate is a stacking context, and it TRAPS
-   `.nh-combobox-list`'s `z-index: 40` inside ONE vital — so everything positioned that paints after
-   it covers the list, and positioned is nearly everything (`.nh-btn` and `.nh-chip` both take
-   `position: relative; isolation: isolate` for backing layers of their own). The other two D7 doors
-   never had this: in `.row-tools-popover` the list sits DIRECTLY inside the isolate, so its 40 wins.
-   Measured at 375px on 2026-08-10, GM, on each of the three seeded sheets: all 13 rows rendered at
-   222.2x44 and only 10 answered `elementFromPoint` at their own centre. `Acid` resolved to the AC
-   chip's `<strong>` (Playwright: `<div class="sheet-vital">` intercepts pointer events), `Thunder`
-   to `Long rest` in `.sheet-rest-block`, `Cold` to a condition chip on the sheet that had three; a
-   real `.tap()` on any of them timed out at 6 s and left the chooser empty. Which rows are
-   unreachable varies with what is rendered below the chip, which makes it harder to notice.
-   The isolate is NOT removed — without it the plate escapes upward, the failure `Button.css`
-   documents at length. The chip is LIFTED instead, and only while a list is open, exactly as
-   `.scene-gallery-hub .nh-card:has(details[open])` lifts a card whose ⋯ menu is open. `3` and not
-   `1` because `.sheet-float-resize` is the one explicit z-index inside a sheet and it is `2`.
-   After: 13 of 13 own their centre on all three sheets, and Acid/Thunder/Cold each tap through. */
+/* `.sheet-vital` is `isolation: isolate` (it keeps its `z-index: -1` backing layer inside), which
+   traps the open combobox list's z-index inside the chip, so later positioned elements cover it and
+   steal taps. The chip is lifted while a list is open instead; 3 clears `.sheet-float-resize` (2). */
 .sheet-vital:has(.nh-combobox-list) { z-index: 3; }
-/* Dmg/Heal/Temp/Set now render as <Button size="sm"> (Dmg destructive). */
-/* Conditions section (v3 #2.5): a labelled section instead of a bare "+ Add". */
 .sheet-conditions { margin-top: .85rem; }
 .sheet-section-label { display: block; color: var(--text-muted); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .35rem; }
 .sheet-conditions .condition-editor { margin-top: 0; }
-/* Rest controls (v5 #5): Hit-Dice spend + short/long rest, taken from the sheet. */
 .sheet-rest-block { margin-top: .85rem; }
 .sheet-rest { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .7rem; }
 .sheet-rest-dice { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
 .sheet-rest-pool { color: var(--text-dim); font: 700 var(--fs-sm) var(--font-mono); }
 .sheet-rest-pool.empty { color: var(--text-muted); font-weight: 600; }
 .sheet-rest-buttons { display: flex; gap: .4rem; }
-/* Roll & heal / Short rest / Long rest now render as <Button size="sm">. */
-/* Rolls bar: label + migrated SegmentedControls (roll-input / bonus-mode now use @vtt/ui). */
 .sheet-settings-label { color: var(--text-muted); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
 .sheet-abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: .4rem; margin-top: .9rem; }
 .sheet-ability { padding: .45rem var(--space-1); border-radius: var(--radius-md); background: var(--surface-3); text-align: center; }
@@ -804,107 +481,70 @@
 .sheet-rollable:disabled { cursor: default; opacity: .75; }
 .sheet-roll-row { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .4rem 0 0; }
 .sheet-roll-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-/* THE DENSITY DECISION (C1/B2). 28 of these were under the floor — 18 in the skill list at 24.6px, the
-   rest on the saves/checks rows at 25.9px — and they are the single biggest population of sub-44px
-   controls in the app. Route 2 is not available: in the skill list the rows sit ~9px apart and a
-   `.tap-target` on a 24.6px chip overhangs 9.7px a SIDE, so every chip would take its neighbour's taps
-   — the exact failure design-language §4 forbids in a stacked list. So the paint grows, and the cost is
-   paid back where it is cheapest: the skill row's own padding drops from .28rem to .14rem, which turns
-   a +19.4px-per-row change into +15px. Measured at 390x844, one column of 18: 603.6px -> 872.4px in a
-   pane that already scrolls. That is the honest trade — these are the sheet's primary play controls on
-   a phone, and a 24.6px roll chip is not one you can hit while holding the phone in one hand. */
+/* Roll chips grow their paint to 44px: in the skill list rows sit ~9px apart, so a `.tap-target`
+   overhang would steal neighbours' taps. The skill row's padding shrinks to pay part of the height. */
 .sheet-roll-chip { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .22rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
 .sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
 .sheet-roll-chip:disabled { cursor: default; opacity: .6; }
 .sheet-entry p { margin: 0 0 .3rem; }
-/* inventory qty now renders as <Stepper> (.nh-stepper); the .sheet-inv-qty hook only places it in the row. */
 .sheet-prepare { padding: .18rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
 .sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prepare:disabled { opacity: .6; cursor: default; }
 .sheet-item-edit li { flex-wrap: wrap; gap: .35rem var(--space-2); }
 .sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-/* .sheet-remove / .sheet-close now render as <IconButton> (visuals from .nh-iconbtn); the classes remain
-   only as layout hooks (grid placement / header flex). */
-/* Attunement count now renders as a <Badge> (neutral, or danger over the limit of 3). */
 .sheet-attunement { margin: .55rem 0 0; }
-/* Inventory table (v3 #2.9.2): aligned columns with headers; display:contents lets each row's cells
-   share the grid's column tracks. */
 .sheet-inv { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; column-gap: .6rem; margin-top: .3rem; }
-/* v4 #6: real row elements via subgrid (not display:contents) so a hovered row highlights end-to-end,
-   making it obvious which Equip/Attune/× belongs to which item. */
+/* Rows use subgrid (not display: contents) so a hovered row highlights end to end, making it clear
+   which Equip/Attune/× belongs to which item. */
 .sheet-inv-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding: .3rem .35rem; border-radius: var(--radius-sm); }
 .sheet-inv-row:not(.sheet-inv-head):hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
 .sheet-inv-head span { color: var(--text-muted); font: 800 .54rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .sheet-inv-head .sheet-item-name { text-align: left; }
 .sheet-inv-row .sheet-inv-qty, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
-/* PHONE: the five-column row cannot hold a name AND four controls. Measured at 375px in Chromium
-   1194: the stepper, Equip, Attune, × and their gaps take 331 of the row's 355px, leaving the name
-   column ~24px — "Wand of the War Mage, +1" wrapped to one word per line and its text was invisible.
-   That was true of any long name before the SRD's magic items landed; 268 of them is what made it
-   impossible to miss. Below 30rem the row is two lines: the item, then its controls. */
+/* Phone: the five-column row cannot hold a long name and four controls, so below 30rem each row is
+   two lines: the item, then its controls. */
 @media (max-width: 30rem) {
   .sheet-inv { display: block; }
   .sheet-inv-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; padding: .45rem .35rem; border-bottom: 1px solid var(--line); }
-  /* The column headings label columns that no longer exist here, and they wrapped to two lines
-     saying so. Written with both classes so it beats the rule above whatever the source order. */
+  /* The column headings label columns that no longer exist here. Both classes so it beats the rule
+     above regardless of order. */
   .sheet-inv-row.sheet-inv-head { display: none; }
   .sheet-inv-row .sheet-item-name { flex-basis: 100%; }
-  /* Pushes Equip / Attune / × to the right edge, so the second line reads qty ......... controls. */
   .sheet-inv-row .sheet-inv-qty { margin-right: auto; }
 }
-/* Route 1: inventory rows are a stacked list 9.6px apart, and 11.2px of `::after` a side would have
-   each row's Equip/Attune reaching into the row above and below it. */
+/* Paint grows to 44px: rows are 9.6px apart, so an overhang would reach into the rows above and below. */
 .sheet-toggle-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
 .sheet-toggle-btn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-toggle-btn.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
 .sheet-toggle-btn:disabled { opacity: .55; cursor: default; }
-/* Grouped actions (v3 #2.9.3): weapon/other, then spell actions by level. */
 .sheet-action-group + .sheet-action-group { margin-top: .9rem; }
 .sheet-action-head { margin: .1rem 0 var(--space-2); padding-bottom: var(--space-1); border-bottom: 1px solid var(--line); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--cyan-hi); }
 .sheet-action-subgroup { margin-top: .55rem; }
 .sheet-action-subhead { margin: 0 0 .35rem; font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
-/* v6 #5: a derived-from-equipment weapon action - a quiet meta line marking it as one, not a stat-block action. */
 .sheet-weapon-meta { color: var(--text-muted); font-size: var(--fs-xs); font-style: normal; }
 .sheet-add-item { display: flex; gap: .4rem; margin: .55rem 0 0; }
 .sheet-add-item input { flex: 1; min-width: 0; min-height: var(--tap-min); padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
-/* Add / Browse SRD gear / Save coins now render as <Button size="sm">. */
-/* Inventory rows now carry the catalog category as a subtle badge after the name. */
 .sheet-item-name { display: inline-flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
 .sheet-item-cat { color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
-/* The row's own text — a magic item's rarity and attunement requirement live at the head of it.
-   Two lines maximum: an SRD entry runs to 2000 characters and the row has controls beside it. */
+/* The row's own text, where rarity and attunement appear. Two lines max: SRD entries are long. */
 .sheet-item-desc { flex-basis: 100%; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
-/* Browse-and-add-from-catalog picker (Modal body). */
 .sheet-picker-controls { display: grid; gap: var(--space-2); margin-bottom: .6rem; }
-/* 34.3px tall before this — the tenth of the picker's sub-floor controls, and the one a GM types
-   into first now that the list it filters is 400 rows long. */
 .sheet-picker-search { width: 100%; min-height: var(--tap-min); padding: .4rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
 .sheet-picker-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
-/* ROUTE 1 (paint the floor), not route 2, and the wrap is the reason: these chips sit in a
-   `flex-wrap` row .3rem apart, so an `::after` overhang would reach into the chip beside AND the
-   chip above and steal both. They were 19px tall — nine of the audit's sub-floor controls at 375px
-   — and this unit adds three more of them, which is not a thing to do to a control that misses the
-   floor. `align-items: center` keeps the label optically where it already was. */
+/* Paint grows to 44px: these chips wrap .3rem apart, so an overhang would steal from neighbours
+   beside and above. */
 .sheet-picker-chip { display: inline-flex; align-items: center; min-height: var(--tap-min); padding: .22rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
 .sheet-picker-chip.is-active { color: var(--text); background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
-/* `.scroll-y` rides this in equipment.tsx's markup — check (h): a scroller the stylesheet declares on
-   its own is a scroller no reader of the component can see. The 52vh cap stays: it bounds a MODAL
-   layer, which §7 rule 2 allows and the (g) allowlist already reasons about. */
+/* `.scroll-y` is in equipment.tsx's markup. The 52vh cap bounds a modal layer, which is allowed. */
 .sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; }
-/* v3 #2.9.1: comfortable row padding so names/buttons aren't jammed against the edges. */
-/* `min-width: 0` so the flex item may shrink below its content width — without it a long single word
-   in the row's own text widens the whole list at 375px. */
+/* `min-width: 0` lets the item shrink, so a long word cannot widen the list at 375px. */
 .sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: var(--space-2) .4rem; border-bottom: 1px solid var(--line); min-width: 0; }
 .sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .sheet-picker-name { color: var(--text); font-size: var(--fs-sm); font-weight: 600; display: flex; align-items: baseline; gap: .4rem; }
 .sheet-picker-owned { color: var(--cyan); font: 700 var(--fs-2xs)/1 var(--font-mono); }
 .sheet-picker-meta { color: var(--text-muted); font-size: var(--fs-xs); }
-/* One line only. A magic item's rarity and attunement requirement are at the head of its text, and
-   that is the whole reason this line exists — the rest of a 2000-character entry is not browse data.
-   CLAMPED, NOT `white-space: nowrap`, and the difference is measurable: nowrap sizes the flex item to
-   the full 2000 characters, and at 375px `.sheet-picker-list` reported scrollWidth 9086 against
-   clientWidth 303 — a list a GM could swipe sideways off the end of. A line clamp wraps and truncates
-   inside the box instead, and never widens it. */
+/* One clamped line (where rarity and attunement are). A line clamp, not `white-space: nowrap`, which
+   sizes the flex item to the whole entry and makes the list scroll sideways. */
 .sheet-picker-desc { min-width: 0; color: var(--text-muted); font-size: var(--fs-2xs); line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; overflow-wrap: anywhere; }
 .sheet-picker-add { flex-shrink: 0; padding: .28rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .sheet-picker-add:disabled { opacity: .6; cursor: default; }
@@ -914,10 +554,8 @@
 .sheet-coins label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; }
 .sheet-coins input { width: 4rem; padding: var(--space-1) .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
 .sheet-identity-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-1) 0 0; }
-/* Section Edit/Done + identity Edit now render as <Button variant="ghost" size="sm">. */
 .sheet-editor { margin: var(--space-2) 0 0; padding: .6rem; border: 1px solid transparent; }
-/* v6 #6: the editor skill list lays out fully (no clipped inner scroll-in-a-scroll) and scrolls with the
-   sheet body. Two columns of uniform rows. */
+/* The editor skill list lays out fully and scrolls with the sheet body (no nested scroll). */
 .sheet-editor .sheet-skill-list { margin-top: var(--space-2); }
 .sheet-editor-hint { margin: 0 0 var(--space-2); color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
 .sheet-editor-hint strong { color: var(--text-dim); }
@@ -925,36 +563,26 @@
 .sheet-id-editor label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .sheet-id-editor input { padding: .28rem .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); }
 .sheet-id-editor input[type=number] { width: 4rem; }
-/* identity Save now renders as <Button size="sm">. */
 .sheet-empty-note { color: var(--text-muted); font-size: var(--fs-sm); font-style: italic; margin: .3rem 0 0; }
 
-/* --- sheet v2: readability + tap targets --- */
 .sheet-ability { display: flex; flex-direction: column; align-items: center; gap: .1rem; }
-/* `align-self: stretch` so the pair spans the ability cell rather than hugging its own text — that is
-   where the width half of the floor comes from; `flex-wrap` so a cell too narrow for two 44px buttons
-   stacks them instead of overflowing. */
+/* `align-self: stretch` spans the pair across the ability cell; `flex-wrap` stacks them when the cell
+   is too narrow for two 44px buttons. */
 .sheet-ability-rolls { display: flex; flex-wrap: wrap; align-self: stretch; gap: var(--space-1); margin-top: .2rem; }
-/* The smallest controls in the app — 12 of them at 18.5px tall. Route 1: they sit 4px apart in a pair
-   inside a 6.4px-gap grid, and a `.tap-target` on an 18.5x27.6 chip overhangs 12.75px vertically and
-   8.2px horizontally, so each one would swallow its partner and the ability cell above it. */
+/* Paint grows to 44px: these sit 4px apart in a tight grid, so an overhang would swallow the partner
+   and the cell above. */
 .sheet-ability-rolls button { display: inline-flex; align-items: center; justify-content: center; flex: 1 1 auto; min-width: var(--tap-min); min-height: var(--tap-min); padding: .12rem .38rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
 .sheet-ability-rolls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .sheet-ability-rolls button.prof { color: var(--magenta); }
 .sheet-ability-rolls button.prof em { font-style: normal; font-size: .62em; opacity: .8; margin-left: .1em; vertical-align: super; }
 .sheet-ability-rolls button:disabled { opacity: .55; cursor: default; }
 
-/* dense skill grid: [bonus] [dot] [name] - value hugs the name, two columns on desktop */
-/* Skills (v3 #2.7): CSS multi-column fills top->bottom then left->right (A-I | J-R), not across-then-down;
-   roomier rows; a lettered P/E bubble; the roll chip is the read-first value. */
+/* Skills: CSS columns fill top-to-bottom then left-to-right; the roll chip is the read-first value. */
 .sheet-skill-cols { display: block; columns: 15rem 2; column-gap: var(--space-6); }
 .sheet-editor .sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-/* .14rem, not .28rem: the roll chip carries the 44px floor as real paint now (see .sheet-roll-chip),
-   so the row's own padding is where the density is bought back. The chip's border is what separates
-   one row from the next, which a 9px gutter was doing before it. */
+/* Small row padding: the roll chip's border separates rows now that it carries the 44px floor. */
 .sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: var(--space-2); break-inside: avoid; -webkit-column-break-inside: avoid; padding: .14rem 0; }
 .sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem var(--space-2); font-size: var(--fs-sm); }
-/* v6 #6: editor rows are name (fills) + a fixed-width toggle pinned to the right, so every skill's toggle
-   lines up in a column instead of drifting with the skill-name length. */
 .sheet-skill-edit li { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: .2rem 0; }
 .sheet-skill-edit li > span { justify-self: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sheet-skill-edit li > .sheet-prepare { justify-self: end; min-width: 5.6rem; text-align: center; }
@@ -964,34 +592,21 @@
 .sheet-prof-dot.proficient { background: var(--cyan); border-color: var(--cyan); color: var(--text-on-neon); }
 .sheet-prof-dot.expertise { background: var(--magenta); border-color: var(--magenta); color: var(--text-on-neon); }
 .sheet-roll-chip.is-proficient { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-/* Saving throws (v3 #2.7.4): larger, easier to hit than the skill chips. */
 .sheet-roll-row .sheet-roll-chip { padding: .34rem .68rem; font-size: var(--fs-sm); }
 .sheet-roll-row .sheet-roll-label { font-size: var(--fs-xs); }
 
-/* spells grouped by level + clickable slot pips */
-/* Prominent spellcasting header fields (v3 #2.8.5). */
 .sheet-spellcast-fields { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 .7rem; }
-/* v4 #4: bordered fields with centred label + value. */
 .sheet-spellcast-field { display: flex; flex-direction: column; align-items: center; padding: .32rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 4.5rem; }
 .sheet-spellcast-field span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .sheet-spellcast-field strong { margin-top: .1rem; font: 700 1rem/1 var(--font-mono); color: var(--text); }
 .sheet-spell-group { margin-top: var(--space-3); }
-/* A subtle dashed divider between spell-level groups (v3 #2.8.4) - distinct from the solid section rules. */
 .sheet-spell-group + .sheet-spell-group { margin-top: .9rem; padding-top: .8rem; border-top: 1px dashed color-mix(in srgb, var(--line-strong) 55%, transparent); }
 .sheet-spell-group-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .1rem; }
 .sheet-spell-group-head h4 { margin: 0; font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
-/* Spell-slot pips (v6 #3): clean capsule "charges" - filled = available, hollow = spent - instead of the
-   old flat MS-paint circles. Same click target (spend/restore a slot). */
 .sheet-slot-pips { display: inline-flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
-/* Route 1 (design-language §4), and route 2 is arithmetically impossible here: the pips sit .3rem
-   (4.8px) apart, so a `.tap-target` on an 18.4x9.3 capsule would overhang 12.8px a side horizontally
-   and each pip would swallow both its neighbours' taps. So the BUTTON BOX carries the floor and the
-   capsule is painted by ::before - the charge bar reads the same, the hit area is real, and nothing
-   overlaps. Measured 2026-08-05 at 9.3x18.4 with ten pips on one sheet.
-   It is grown rather than excepted because none of §4's accepted-exception rationales fit: a pip's
-   size is chrome, not game state (unlike `.encounter-token`), it is not force-laid (unlike
-   `.codex-graph-node`), and there is NO other route to the same action - tapping a pip is the only
-   way to spend or restore a slot by hand, which is what a table does after a long rest. */
+/* The pips sit .3rem apart, so a `.tap-target` overhang would swallow both neighbours. The button
+   box carries the 44px floor and `::before` paints the capsule. Tapping a pip is the only way to
+   spend or restore a slot by hand, so it is not exempt from the floor. */
 .sheet-pip { display: grid; align-items: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: 0 .2rem; border: 0; background: none; cursor: pointer; }
 .sheet-pip::before { content: ""; display: block; height: .58rem; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface-2); transition: background var(--dur-hover) ease, border-color var(--dur-hover) ease, box-shadow var(--dur-hover) ease; }
 .sheet-pip.filled::before { border-color: var(--cyan); background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 88%, var(--cyan-hi)), var(--cyan)); box-shadow: 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent); }
@@ -999,23 +614,12 @@
 .sheet-pip:disabled { cursor: default; opacity: .7; }
 .sheet-slot-count { color: var(--text-muted); font: 700 var(--fs-2xs) var(--font-mono); }
 .sheet-spell-list { grid-template-columns: 1fr; }
-/* GM viewing a monster's spells: no cast controls, so just prep-tag + name. */
 .sheet-spell-list li { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: center; gap: var(--space-2); padding: .18rem .35rem; border-radius: var(--radius-sm); }
-/* A player's own castable list flattens the "cast at" controls into the SAME row grid (v5 #2): the effect
-   helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
-   so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
-/* TWO LINES BY DEFAULT, one line only where the row demonstrably fits (below). The single five-track
-   row was 80 + 59.2 + 108.8 + 60.8 wide plus four .5rem gaps = 340.8px, which is EXACTLY the row's own
-   content width at 320px and 390px - so `minmax(0, 1fr)`, the spell NAME, resolved to 0px and the name
-   button overflowed its empty cell UNDER the effect chip painted beside it: measured 2026-08-05,
-   `elementFromPoint` at the name's centre returned the chip and reach was 0 on six of seven rows. The
-   row also overflowed its 320px container by 32px.
-   Stacked is the DEFAULT rather than a `max-width` query because the worst container is not the
-   narrowest viewport: the player's own sheet rides the dock (`.table-layout`'s
-   `minmax(var(--dock-w), 27rem)` in styles.css), which is 352-432px wide at ANY viewport - at a 980px
-   viewport it sits at exactly its 22rem floor. A viewport query cannot see that, and defaulting the
-   other way would leave the one sheet a player actually plays from as the one sheet still broken.
-   The name track floors at `--tap-min` so it can never be crushed below the tap floor it now carries. */
+/* A player's castable list puts the effect helper, the slot dropdown (or "At will") and Cast in fixed
+   columns so they align across rows. Two lines by default: as one line the name track resolves to
+   0px at common widths and the name sits under the effect chip. The default is stacked (not a
+   max-width query) because the player's sheet often lives in the 352-432px dock at any viewport.
+   The name track floors at `--tap-min`. */
 .sheet-spell-list.castable li {
   grid-template-columns: 5rem minmax(var(--tap-min), 1fr) 3.8rem;
   grid-template-areas: "prep name name" "effect slot cast";
@@ -1027,10 +631,8 @@
 .sheet-spell-list.castable li > .sheet-cast-select,
 .sheet-spell-list.castable li > .sheet-cast-slot { grid-area: slot; }
 .sheet-spell-list.castable li > .sheet-cast-btn { grid-area: cast; }
-/* One line for the two mounts whose container IS the page - the `/characters/:id` page and the modal
-   (`CharacterSheet.tsx:907`/`:921`; the third mount, `.sheet-embedded`, is the dock) - above the 760
-   rung, where the five tracks' 396px min-content fits with room. This is the v5 #2 alignment: the
-   helper, the dropdown and Cast sit on identical vertical lines across every row, cantrips included. */
+/* One line where the container is the page (`/characters/:id` and the modal) above 760px, where the
+   five tracks fit. */
 @media (min-width: 761px) {
   :is(.sheet-standalone, .character-sheet) .sheet-spell-list.castable li {
     grid-template-columns: 5rem minmax(var(--tap-min), 1fr) 3.7rem 6.8rem 3.8rem;
@@ -1038,33 +640,17 @@
   }
   :is(.sheet-standalone, .character-sheet) .sheet-spell-list.castable li > * { grid-area: auto; }
 }
-/* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
 .sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
-/* v6 #2: names hug the left of their column (like the equipment list), not centred in a wide sheet -
-   justify-self:start shrinks the item to content at the cell start regardless of any inherited text-align.
-   Route 1 for the floor: `.sheet-spell-link` is a BUTTON (it opens the spell's rules card) and measured
-   19.5px tall at 1280px on all seven rows, 2026-08-05. Route 2 would overhang (44-19.5)/2 = 12.25px a
-   side into a .3rem-gap stacked list - five times the 2.4px each row may claim - so the paint grows and
-   the text stays centred in it. The WIDTH needs the floor too, because `justify-self: start` shrinks the
-   box to its text and a short name misses it - "Shield" measured 37.1px and "Fireball" 42.7px. Growing
-   it steals nothing: the name's own grid track is 112px at 320px and 878px at 1280px, so `min-width`
-   only claims empty space inside the track the name already owns. */
+/* Names hug the start of their column. The name is a button (opens the rules card), and its paint
+   grows to 44px in both directions: an overhang would reach into neighbouring rows, and
+   `justify-self: start` would otherwise shrink a short name below the floor. */
 .sheet-spell-name { justify-self: start; display: flex; align-items: center; min-width: var(--tap-min); min-height: var(--tap-min); text-align: left; color: var(--text); font-size: var(--fs-sm); }
-/* Clickable spell name opens its SRD rules card (v3 #2.8.2); dashed underline signals it's clickable (v4 #5.2). */
 .sheet-spell-link { border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: var(--text); font-size: var(--fs-sm); cursor: pointer; text-decoration: underline; text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--text-muted) 65%, transparent); text-underline-offset: 3px; }
 .sheet-spell-link:hover { color: var(--cyan-hi); text-decoration-style: solid; text-decoration-color: currentColor; }
-/* "Cast at" controls (v3 #2.8 / v4 #5.1 / v5 #2, the recurring one): the damage helper, the slot dropdown
-   (or the cantrip "At will" tag), and the Cast button share ONE geometry so they read as a matched set -
-   identical box-sizing, height, radius, 1px border, and vertical centring. Only the fill/border TINT
-   varies by role. The old version left the helper unbordered with a smaller radius, and the native
-   <select> kept its taller UA min-height, so the three sat at different heights and shapes; here every
-   cell is border-box `--tap-min` with the same radius, and the select is `appearance:none` (custom caret)
-   so its height is fully CSS-controlled and lines up with the chips exactly. Verified in a headless render.
-   ROUTE 1 (design-language §4): the shared height was a fixed 1.9rem, which put `.sheet-cast-btn` (x7)
-   and `.sheet-cast-select` (x6) at 30.4px tall on every castable row - measured 2026-08-05 at 320px,
-   390px and 1280px. Route 2 is unavailable: these are rows in a stacked list gapped .3rem (4.8px), and a
-   `.tap-target` overhangs (44-30.4)/2 = 6.8px a side, so each row's ::after would reach 4.4px into both
-   neighbours. The whole matched set takes the floor together, spans included, or the set stops matching. */
+/* "Cast at" controls (effect helper, slot dropdown or "At will", Cast button) share one geometry:
+   box-sizing, `--tap-min` height, radius, 1px border and centring, so they read as a matched set;
+   only the tint varies by role. The select is `appearance: none` so its height is fully controlled.
+   The whole set takes the 44px floor as paint because rows are 4.8px apart. */
 .sheet-cast-effect,
 .sheet-cast-select,
 .sheet-cast-slot,
@@ -1075,69 +661,44 @@
   background: var(--surface-2); color: var(--text); font: 700 var(--fs-2xs)/1 var(--font-mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* Damage helper: violet-tinted, bordered like the rest. v5 #1: a spell with no die leaves it empty -
-   the border/fill drop so no stray chip artifact shows. */
 .sheet-cast-effect { border-color: color-mix(in srgb, var(--violet) 38%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 13%, var(--surface-2)); }
 .sheet-cast-effect:empty { border-color: transparent; background: transparent; }
-/* Slot dropdown: neutral surface + a custom caret (appearance:none) so its height matches the chips. */
 .sheet-cast-select { appearance: none; -webkit-appearance: none; padding: 0 1.3rem 0 var(--space-2); text-align: center; text-align-last: center; cursor: pointer;
-  /* Caret as two token-driven gradient halves: a data-URI stroke can't hold a var(), and the matched-set
-     grid geometry rules out a masked pseudo-element, so draw the chevron from --text-dim (theme-aware). */
+  /* The caret is two gradient halves in --text-dim, since a data-URI stroke cannot use a var(). */
   background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
   background-repeat: no-repeat; background-position: calc(100% - .8rem) center, calc(100% - .55rem) center; background-size: .28rem .28rem, .28rem .28rem; }
-/* the cantrip "At will" tag (and the "no slots" note) fill the same column as the dropdown so cantrip
-   rows align with leveled rows (v5 #9). */
 .sheet-cast-slot { color: var(--text-dim); border-style: dashed; font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .03em; }
 .sheet-cast-slot.at-will { border-style: solid; border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); color: var(--text); }
-/* Cast: the action - a slightly stronger violet fill + border and uppercase, still in the same family. */
 .sheet-cast-btn { border-color: color-mix(in srgb, var(--violet) 55%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 20%, var(--surface-2)); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
 .sheet-cast-btn:hover:not(:disabled) { border-color: var(--violet); background: color-mix(in srgb, var(--violet) 30%, var(--surface-2)); }
 .sheet-cast-btn:disabled { opacity: .5; cursor: default; }
-/* Route 1 again, and it is applied to the whole tag family rather than just `.toggle`: the tag is one
-   column across every spell row, so growing only the pressable variant would leave "Prepared" at 44px
-   beside "Always"/"Cantrip" at 19.8px in the same column. Measured 2026-08-05: `.sheet-prep-tag.toggle`
-   is a button at 19.8x80 on six rows, and the same .3rem row gap that rules route 2 out for the cast
-   set rules it out here. The spans cost nothing - they were already stretched by the grid. */
+/* The whole tag column grows to 44px, not only the pressable `.toggle`, so tags in one column match. */
 .sheet-prep-tag { display: flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
-/* v6 #1: "Always" (always-prepared, permanent, not toggleable) reads distinctly from the cyan toggleable
-   "Prepared" - a violet fill + accent so the two are never confused. Cantrip gets its own dim treatment. */
 .sheet-prep-tag.always { color: var(--text); border-color: color-mix(in srgb, var(--violet) 55%, transparent); background: color-mix(in srgb, var(--violet) 20%, var(--surface-3)); }
 .sheet-prep-tag.cantrip { color: var(--text-dim); border-style: dashed; }
 .sheet-prep-tag.toggle { cursor: pointer; }
 .sheet-prep-tag.toggle:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .sheet-prep-tag.toggle:disabled { opacity: .6; cursor: default; }
 
-/* inventory: cap the name column so controls hug it instead of drifting to the far edge */
 .sheet-item-edit li { display: grid; grid-template-columns: minmax(0, 12rem) 1fr; align-items: center; gap: .35rem .6rem; }
 @media (max-width: 560px) { .sheet-item-edit li { grid-template-columns: 1fr; } }
 .sheet-attribution { margin: var(--space-4) 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
 .sheet-feedback { min-height: 1.1rem; margin: var(--space-2) 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
-/* ---- Sheet workspace (feedback #9 + v3): unified header, pinned rolls bar, two scrolling columns ---- */
-/* Direct-child selectors ONLY: the equipment picker and spell-rules card render inside the sheet's own
-   dialog, so a descendant selector here would zero their padding and break their layout (v5 #3 root cause). */
+/* Sheet workspace: unified header, pinned rolls bar, scrolling pane.
+   Direct-child selectors only: the equipment picker and spell-rules card render inside the sheet's
+   own dialog, and descendant selectors would zero their padding. */
 .character-sheet > .nh-modal-surface { max-height: min(94vh, 56rem); }
 .character-sheet > .nh-modal-surface > .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
-/* The sheet keeps the same width with or without the dice log (the log swaps in, not beside), so
-   .has-log inherits the lg modal width — no bespoke widening. */
 .sheet-workspace { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
-/* Header (v3 #2.1/2.2/#4): name + prominent identity on the left; log-dock · Pop out · New tab · × on the right. */
-/* ══ RULING 45 — THE HERO HEADER, AND IT COSTS ZERO HEIGHT ═══════════════════════════════════
-   The name/class block is the sheet's hero surface: it takes the full landing door — the scanline
-   over the plate, a 2px rim on its bottom edge, and the rest glow on that edge alone. Everything
-   below stays structural (rims and rules, no texture), because ruling 45's constraint is that
-   nothing textured sits behind a number a player reads mid-fight.
-
-   EVERY PIECE OF IT IS PAINT. The `padding`, the `gap` and the font sizes are untouched; the
-   treatment rides a backing layer at `inset: 0` whose bottom border REPLACES the 1px `--line`
-   rule that was already there (the element keeps a 1px transparent border so its box does not
-   move, and the layer's 2px rim overlaps the header's own bottom padding rather than adding to
-   it). Measured before and after at 1280/390/320 — the header is the same height in all three.
-   The glow is a `filter` on the LAYER, never a `box-shadow` on the element: it follows the cut,
-   and it cannot make the header a containing block for the modal's fixed children. */
+/* Header: name and identity on the left; log toggle, Pop out, New tab and × on the right.
+   The hero treatment (scanline, 2px bottom rim, glow) is pure paint on a backing layer at `inset: 0`
+   whose bottom border replaces the old 1px rule, so the header's height does not change. The glow is
+   a `filter` on the layer, never a `box-shadow` on the element: it follows the cut and does not make
+   the header a containing block for the modal's fixed children. */
 .sheet-header { position: relative; isolation: isolate; display: flex; align-items: flex-start; gap: .8rem; padding: .7rem var(--space-5); border: 0; border-bottom: 1px solid transparent; }
 .sheet-header::before {
   content: "";
@@ -1159,32 +720,23 @@
 .sheet-header-sub { display: flex; align-items: baseline; gap: var(--space-2); margin-top: .2rem; flex-wrap: wrap; }
 .sheet-idline { color: var(--cyan-hi); font: 700 var(--fs-sm)/1.2 var(--font-mono); }
 .sheet-header-controls { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-/* The Sheet/Dice toggle (a SegmentedControl) shows on every viewport now — it's how you reach the
-   shared dice log, which no longer docks beside the sheet. Pop out / New tab render as ghost Buttons. */
 .sheet-close { flex: none; }
 
-/* Rolls bar (v3 #2.6): narrow, pinned under the header, always visible while the sheet scrolls. */
 .sheet-rollbar { display: flex; align-items: center; gap: var(--space-2); padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }
 
-/* One pane at a time: the sheet fills the workspace; when a shared dice log is available it swaps in
-   behind the Sheet/Dice toggle instead of docking beside the sheet, so the sheet keeps its clean full
-   width whichever way it's opened (map right-click / "View sheet" / initiative toggle all match). */
 .sheet-workspace-cols { display: flex; flex: 1; min-height: 0; }
-/* The scroll is declared in the MARKUP (`.scroll-y`, @vtt/ui) — check (h): a bare `overflow-y` here
-   would be an undeclared region, and the utility carries the quiet scrollbar with it. */
 .sheet-workspace-pane { min-width: 0; }
 .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
 .log-pane { flex: 1 1 auto; padding: var(--space-4); }
 .sheet-workspace.has-log.show-sheet .log-pane { display: none; }
 .sheet-workspace.has-log.show-log .sheet-pane { display: none; }
-/* The shared DicePanel blends into the pane (no nested card chrome). */
 .log-pane .dice-proof { margin: 0; padding: 0; border: 0; background: transparent; }
 .log-pane .dice-quick, .log-pane .dice-adv-row { gap: .4rem; margin-top: .7rem; }
 .log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: var(--space-2) .7rem; }
 .log-pane .roll-list { max-height: none; }
 
-/* Pinned "last roll" line (undocked): the most recent roll made from this sheet, so a tap-to-roll shows
-   its result without leaving the Sheet pane. Hidden on the Dice pane and when the log is docked (visible). */
+/* Pinned "last roll" line, so a tap-to-roll shows its result without leaving the sheet pane. Hidden
+   on the Dice pane and when the log is docked. */
 .sheet-last-roll { display: flex; align-items: baseline; gap: var(--space-2); width: 100%; padding: .3rem var(--space-5); border: 0; border-bottom: 1px solid var(--line); background: var(--surface-1); color: var(--text-dim); text-align: left; cursor: pointer; }
 .sheet-last-roll:hover { background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1)); }
 .sheet-last-roll-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 700 var(--fs-2xs)/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
@@ -1196,11 +748,8 @@
 .sheet-last-roll-total { color: var(--cyan-hi); font-size: var(--fs-body); }
 .sheet-workspace.show-log .sheet-last-roll { display: none; }
 
-/* Optional dice dock (opt-in, desktop only): pin the log beside the sheet as a fixed side panel so rolls
-   stay visible while you act. Off by default (the toggle collapses it); a phone has no room — stays toggle. */
-/* The 650/651 rung, not 681/680 (§ the one breakpoint ladder). The pair MUST move together — one is
-   the exact complement of the other, and a gap or an overlap between them is a width where the dock
-   toggle is both offered and impossible. */
+/* Optional desktop dice dock beside the sheet. The 650/651 pair must move together: a gap or overlap
+   would be a width where the dock toggle is both offered and impossible. */
 @media (min-width: 651px) {
   .character-sheet.has-log.docked { max-width: min(100vw - 2rem, 68rem); }
   .sheet-workspace.has-log.docked .sheet-workspace-cols { flex-direction: row; }
@@ -1211,43 +760,24 @@
   .sheet-workspace.has-log.docked .sheet-pane-toggle { display: none; }
   .sheet-workspace.has-log.docked .sheet-last-roll { display: none; }
 }
-/* No room to dock two panes on a phone — hide the control there (it stays the Sheet/Dice toggle). */
 @media (max-width: 650px) { .sheet-dock-btn { display: none; } }
 
-/* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
-   unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
-/* `overflow: hidden` would clip a backing layer at `inset: -1px`, and this panel is dragged around
-   the viewport, so the rim stays a REAL border here at the material's own weight and colour.
-   Square, per ruling 24's one silhouette; the cut is the one piece the clip costs. */
+/* Popout: a movable, resizable in-tab panel (fixed, no scrim). The header is the drag handle.
+   `overflow: hidden` would clip a backing layer at `inset: -1px`, so the rim is a real border here. */
 .sheet-float { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; border: var(--rim-w) solid var(--rim-color); border-radius: 0; background: var(--surface-2); box-shadow: var(--shadow-2); }
 .sheet-float-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }
 
-/* Embedded inline in a panel (v4 #8): fills its container, panel chrome, no modal. */
-/* The `max-height: 78vh` here was a frame missing its parent's height contract, not a cap anyone
-   wanted: the box was already a `min-height: 0` flex column that clips, so all the viewport fraction
-   did was guess at a height its container was not giving it. The container gives it one now — the
-   region it stands in becomes a flex column while the sheet is showing (`.encounter-region.is-sheet`),
-   and this fills it. Where the region has no definite height of its own (the tracker docked into the
-   map), it sizes to content and that dock scrolls, which is the honest answer rather than a fraction
-   of a viewport nobody measured. */
-/* Same clip constraint as `.sheet-float` above: `overflow: hidden` is load-bearing here (it is what
-   makes the embedded sheet clip rather than grow), so the rim is a real border at the material's
-   weight rather than a backing layer that would be cut off at the box. */
+/* Embedded in a panel: fills its container, panel chrome, no modal. The containing region becomes a
+   flex column while the sheet shows (`.encounter-region.is-sheet`). `overflow: hidden` makes it clip
+   rather than grow, so the rim is a real border rather than a backing layer. */
 .sheet-embedded { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; border: var(--rim-w) solid var(--rim-color); border-radius: 0; background: var(--surface-2); overflow: hidden; }
-/* While the player's own sheet is the tracker's content it IS the region — one child, taking all of it. */
 .encounter-region.is-sheet { display: flex; flex-direction: column; }
 .sheet-embedded .sheet-workspace { flex: 1; min-height: 0; }
-/* Inside the tracker on a phone the sheet is a PANE, not a document, and its modal header is a title
-   block written for one. Measured at 390x844 once the region gave it a real height: header 170.5 +
-   rollbar 81.4 + last roll 44.2 = 296px of a 312px region, leaving the sheet itself 40px. The name is
-   already on the row above (`.you-are-playing`) and the sub-line repeats the sheet's own identity
-   block, so here the header is a row: one line of name, the controls, and the way back. */
+/* Inside the tracker on a phone the sheet is a pane, not a document: the header collapses to one
+   row (name, controls, way back) so the sheet body keeps usable height. */
 @media (max-width: 979px) {
-  /* The name is the sheet's subject and it was losing to the tool row. `.sheet-header-id` is
-     `min-width: 0`, so at 390 it shrank below a single word: the modal rendered "M" on one line with
-     the rest of "Mirena Dawnbright" running under Sheet/Dice · Pop out · New tab · ✕. Give the name
-     its own line below the rung and let the tools have theirs. The embedded presentation opts out
-     just below — there the name is one small line and the row is the point. */
+  /* `.sheet-header-id` is `min-width: 0`, so the name could shrink below one word next to the tool
+     row; below the breakpoint the name gets its own line. The embedded presentation opts out below. */
   .sheet-header { flex-wrap: wrap; }
   .sheet-header-id { flex: 1 1 100%; }
   .sheet-embedded .sheet-header { flex-wrap: nowrap; }
@@ -1259,37 +789,21 @@
   .sheet-embedded .sheet-last-roll { padding-inline: var(--space-3); }
   .sheet-embedded .sheet-pane { padding: var(--space-3); }
 }
-/* Player map view: Initiative / My sheet toggle (v4 #8). */
-/* D10 — the Initiative / My-sheet toggle retired: there is ONE "My sheet" now, a plain button in the
-   topbar, and the sheet's own close is the way back. What is left is the button's flex behaviour. */
 .player-sheet-door { flex: 0 0 auto; }
-/* Its own browser tab: the workspace fills the window; no modal chrome. */
 .sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
-/* The same presentation inside the SPA's `/characters/:id` layer fills the PANE, not the window —
-   the frame rows above it are real (`.sheet-page` is the pane's child). `sheet.html` has no
-   `.sheet-page`, so its 100dvh column is untouched: same rule as the wizard layer's. */
+/* Inside the SPA's `/characters/:id` layer it fills the pane, not the window. `sheet.html` has no
+   `.sheet-page`, so its 100dvh column is unaffected. */
 .sheet-page > .sheet-standalone { flex: 1; min-height: 0; height: auto; }
-/* The page-level doors: a frame row pinned under the sheet, above the home bar. Only the SPA passes
-   any (CharacterSheet's `standaloneActions`), so this row does not exist in the standalone tab. */
 .sheet-standalone-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface-1); }
 .sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: var(--space-8); color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
 
-/* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab.
-   (The surface's 72rem width cap moved onto its two frame rows in styles.css when the roster took
-   the pane: the section itself is full-bleed now, because it paints the scene behind them.) */
 .party-heading h2 { margin: .2rem 0 .3rem; }
 .party-heading p { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 1.1rem; }
-/* Character card thumb: a centred identity monogram on the card's surface (characters have no map image). */
 .party-card-thumb { display: grid; place-items: center; aspect-ratio: 16 / 10; background: linear-gradient(150deg, color-mix(in srgb, var(--violet) 22%, var(--surface-3)), var(--surface-3)); }
 .party-card.is-archived { opacity: .62; }
-/* A character card carries a VARIABLE action set — two buttons, or three once someone has claimed
-   the character ("View sheet · Archive · Force release claim") — and the shared gallery row divides
-   its width equally (`.nh-card-actions > button { flex: 1 1 0; min-width: 0 }`), which at a 13rem
-   card cut every label to a few characters and pushed the third button past the card's edge at
-   1280. Here the row wraps and each button keeps its own label's width: three actions become two
-   lines on a narrow card instead of one unreadable one. A character card also earns a wider cell
-   than a scene thumbnail needs (15rem, not the shared 13rem), so the two actions every card
-   carries share one line and only the third wraps. */
+/* Character cards have two or three actions, and the shared gallery row splits width equally, which
+   truncates labels. Here the row wraps and buttons keep their label width; cells are 15rem (not
+   13rem) so the two common actions share a line. */
 .nh-gallery.party-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
 .party-gallery .nh-card-actions { flex-wrap: wrap; }
 .party-gallery .nh-card-actions > button { flex: 1 1 auto; min-width: max-content; }
@@ -1302,44 +816,22 @@
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
 .encounter-add-monsters { width: 100%; min-height: var(--tap-min); margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); color: var(--text); }
-/* Monster browser renders in the shared Modal, sized for a scrollable list.
-   THE DIALOG IS THE FRAME (§7), and until now it was not. `.nh-modal-body` is `display: block`
-   (Modal.css:92), so the list's `flex: 1 1 auto` below had no flex parent and had never done
-   anything: the list rendered its full height — measured 20,538px for 330 SRD monsters at
-   1920x1080 — the BODY did the scrolling, and the `role="status"` confirmation line under the list
-   went with it, to y = 20,891 in a 1080px window. A GM added a monster and nothing visible happened.
-   The body becomes the column and the list becomes the region, so the search, the target line, the
-   confirmation and the attribution are all pinned and the list scrolls inside the height the modal
-   surface already caps (`max-height: min(88vh, 48rem)`, Modal.css:26). NO new cap and no new
-   `overflow`: a `max-height` here would be a number re-tuned per viewport and would fight the
-   surface's own contract, and `.scroll-y` is already on the <ol> in the markup, which is what
-   check (h) requires and why it stays there. Precedent: `.codex-preview-modal .nh-modal-body`,
-   codex.css:1114. */
+/* Monster browser in the shared Modal. `.nh-modal-body` is `display: block`, so it is made the flex
+   column here: the list (`.scroll-y` in the markup) scrolls within the surface's own max-height, and
+   the search, target line, confirmation and attribution stay pinned. No extra cap needed. */
 .monster-browser .nh-modal-body { display: flex; flex-direction: column; }
 .monster-browser-controls { display: flex; flex-direction: column; gap: var(--space-2); margin-top: .2rem; }
 .monster-browser-controls input[type="search"] { margin-top: 0; padding: .6rem .8rem; }
-/* Where an add lands and what it will be — read-only here; the staging tray owns the decision. */
 .monster-browser-target { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .monster-browser-target strong { color: var(--text); }
-/* `.scroll-y` rides this in MonsterBrowser's markup (check (h)); the modal's own height contract is
-   what gives the region something to fill. */
 .monster-browser-list { flex: 1 1 auto; min-height: 0; list-style: none; margin: .8rem 0 0; padding: 0 var(--space-1) 0 0; border-top: 1px solid var(--line); }
 .monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
 .monster-browser-name { min-width: 0; }
 .monster-browser-name strong { display: block; }
 .monster-browser-name small { display: block; margin-top: .15rem; color: var(--text-muted); }
-/* The row's own answer to "did my first click work?" — the confirmation line says WHICH monster
-   landed, this says WHICH ROWS have. Quiet by construction: it must not read as a second Add. */
 .monster-browser-added { margin-inline-start: var(--space-2); color: var(--cyan); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-/* Reserve the wider of the two labels so the button does not slide. Measured 2026-08-06 in Chromium
-   at 1920x1080: "Add" 59.7px, "Adding…" 90.4px — the left edge moved 30.8px out and back on every
-   add, which is most of what read as "a glitch". 5.65rem = 90.4px at the 16px root, and rem rather
-   than px so it tracks the label when the root size does.
-   `StableSwap` (packages/ui/src/primitives/StableSwap.tsx) is the right primitive for this and
-   argues against exactly this hand-tuned min-width — but it is not exported from `@vtt/ui`, and
-   exporting it trips the styleguide-completeness ratchet ("exported but not demoed: 0") and needs a
-   StyleGuide demo. A shared-package change for one button width is out of proportion; when
-   StableSwap is exported, this site should collect. */
+/* Reserves the wider label ("Adding…") so the button does not shift. `StableSwap` would be the right
+   tool but is not exported from `@vtt/ui`. */
 .monster-browser-add { flex: none; min-width: 5.65rem; padding: var(--space-2) .95rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: center; cursor: pointer; }
 .monster-browser-add:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .monster-browser-none { color: var(--text-muted); }
@@ -1351,17 +843,12 @@
 .scene-switch { display: flex; align-items: center; gap: var(--space-2); margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
 .scene-switch select { width: auto; margin-top: 0; flex: 1 1 auto; text-transform: none; letter-spacing: normal; font-size: var(--fs-body); color: var(--text); }
 
-/* (The `.encounter-add-combatant` disclosure and its `.add-combatant-list` were deleted: the markup
-   became `.menu-add-list` / `.menu-add-row` inside the ⋯ menu, and the only surviving mention of the
-   old name is the COMMAND `"encounter:add-combatant"`, which is a wire word, not a class.) */
-
 .encounter-heading-tools { display: flex; align-items: center; gap: var(--space-2); flex: none; }
 .encounter-scenes-toggle { flex: none; padding: .45rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; white-space: nowrap; }
 .encounter-scenes-toggle:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-scenes-toggle[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
 .encounter-scenes-panel .scene-panel { margin-top: var(--space-4); }
 
-/* Turn time-travel (#12): the review banner, the confirm bar, and the player's paused notice. */
 .turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 0; border-left: 2px solid var(--caution); border-radius: 0; background: var(--surface-2); display: grid; gap: var(--space-1); }
 .turn-review.dirty { border-left-color: var(--danger); }
 .turn-review strong { color: var(--text); font-size: var(--fs-body); }
@@ -1373,14 +860,10 @@
 .turn-confirm-actions button { flex: 0 0 auto; padding: .4rem .9rem; }
 .table-rewound { margin: .4rem 0 0; padding: var(--space-2) .7rem; border-left: 2px solid var(--line-strong); border-radius: 0; background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 
-/* Rules engine (ADR-0020): effect chips, the dying tracker, the rules-mode control, and the
-   action runner's availability hints / blocked-override bar. */
 .effect-chips { display: inline-flex; flex-wrap: wrap; gap: .3rem; margin: .3rem 0 0; }
-/* Effect pills are the shared Chip (info tone); only the trailing duration/DC note needs a quieter weight. */
 .effect-chips .nh-chip small { color: var(--text-muted); font-weight: 400; }
 .own-effect-row { margin-top: var(--space-1); }
 .dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: .35rem 0 0; padding: .35rem .55rem; border: 0; border-left: 2px solid var(--danger); border-radius: 0; background: var(--surface-2); }
-/* The shared roll widget sits after the pips and wraps to its own line on a phone. */
 .dying-tracker .save-prompt-actions, .dying-tracker .save-prompt-confirm { flex: 1 1 12rem; }
 .dying-label { color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .dying-label.dead { color: var(--danger); }
@@ -1404,28 +887,18 @@
 .action-overridden { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; }
 .action-effect-granted, .action-effect-applied { margin: .2rem 0; color: var(--cyan-hi); font-size: var(--fs-sm); }
 .action-warning { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); }
-/* The table's own line on the roll card - what HAPPENED, so it carries no warning glyph. Same
-   metrics as the warning above it: a plain wrapping paragraph, which is what keeps a long sentence
-   ("Borin's Topple forces Foe to make a CON save or have the Prone condition.") readable at 375px. */
 .action-narration { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
-/* The shared builtin catalog as one wrapped chip cluster — never 16 full rows. */
 .builtin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: .4rem; }
 .builtin-actions-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-right: .15rem; }
-/* Route 1: the cluster wraps at a .25rem gap (4px), and 6.35px a side of `::after` from two adjacent
-   chips needs 12.7px. The precedent that gets away with route 2 — the condition-chip row — buys its
-   overhang with a `var(--space-3)` gap; there is no equivalent room in a six-chip common-actions row. */
+/* Paint grows to 44px: the cluster wraps at a 4px gap, too small for neighbouring overhangs. */
 .builtin-chip { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: .16rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .builtin-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .builtin-chip.hinted { opacity: .55; }
 
-/* Collapsed prose reference under the rollable actions. */
-/* Spellcasting: always-open reference block above the collapsed traits (report #10). */
 .action-spellcasting { margin-top: .45rem; padding: .1rem .1rem .2rem; border-top: 1px solid var(--line); }
 .action-spellcasting-head { display: flex; align-items: center; gap: .35rem; margin: .35rem 0 .1rem; color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 800; }
 .action-spellcasting-head span { color: var(--violet-hi); }
-/* Spellcasting prose: each line its own paragraph with breathing room; recognized spell names are
-   buttons that open the spell's SRD rules in an in-tab card (owner feedback). */
 .spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem var(--space-3); border-left: 2px solid var(--violet); border-radius: 0; background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .spellcasting-line { margin: 0; }
 .spellcasting-line + .spellcasting-line { margin-top: .55rem; }
@@ -1433,7 +906,6 @@
 .spellcasting-line strong { color: var(--violet-hi); }
 .spell-link { display: inline; width: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--violet-hi); font: inherit; text-decoration: underline dotted var(--violet); text-underline-offset: 2px; cursor: pointer; }
 .spell-link:hover { color: var(--text); text-decoration-style: solid; border-color: transparent; }
-/* Spell rules card renders in the shared Modal (accent="violet" keeps its violet identity). */
 .spell-card-type { margin: -.2rem 0 0; color: var(--violet-hi); font-size: var(--fs-sm); font-style: italic; }
 .spell-card-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; margin: .9rem 0 0; }
 .spell-card-meta div { padding: var(--space-2) .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
@@ -1444,8 +916,6 @@
 .spell-card-higher strong { color: var(--violet-hi); }
 .spell-card-attribution { margin: var(--space-4) 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
 @media (max-width: 560px) { .spell-card-meta { grid-template-columns: 1fr; } }
-/* Shared RichText blocks (spell cards + trait "click to read"): spaced paragraphs, bullets, and the
-   flattened pipe tables a few spells carry (report #6). Callers wrap RichText in a block element. */
 .rt-line { margin: 0; }
 .rt-line + .rt-line, .rt-line + .rt-table-wrap, .rt-table-wrap + .rt-line, .rt-table-wrap + .rt-table-wrap { margin-top: var(--space-2); }
 .rt-bullet { padding-left: .4rem; }
@@ -1456,50 +926,32 @@
 .rt-table th, .rt-table td { border: 1px solid var(--line); padding: .22rem .55rem; text-align: left; vertical-align: top; }
 .rt-table th { background: var(--surface-3); color: var(--text-dim); white-space: nowrap; }
 .action-reference-group { margin-top: .35rem; }
-/* Route 1 — design-language §4 names disclosure summaries explicitly, and it is a stacked row besides. */
+/* Disclosure summaries in a stacked list grow their paint to 44px. */
 .action-reference-group > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: var(--space-1) .2rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-reference-group > summary:hover { color: var(--text-dim); }
 .action-reference-group .action-list { margin-top: var(--space-1); }
 
-/* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
-   stays a pure list. One quiet container with the active magenta accent; contents are flat. */
-/* The acting console is the one region on this surface that may keep a tint: it is WHOSE TURN IT
-   IS, §8.1's single glowing thing, and it holds no numbers of its own — the vitals and the action
-   rows sit outside it. Ruling 39 still moves the severity onto the 2px leading rule. */
-/* FLATTENED (the tray-language pass). It was a tinted card with its own 2px magenta bar, sitting
-   inside the active row's tint — two fills and two magenta accents for one fact. The active row
-   above already says whose turn it is with the tick and the bracketing rules, so the console is
-   now a continuation of that row rather than a container: a hairline separates it from the row
-   line, and it keeps NOTHING of its own but spacing. Every control that was in it is still in it. */
+/* The acting creature's console, a continuation of the active row: a hairline above, spacing, and no
+   fill or accent of its own (the row's tick and rules already say whose turn it is). */
 .acting-console { margin-top: .45rem; padding: .5rem 0 .2rem; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
-/* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
-   the audited override), with its death saves / down note lifted above it. */
 .acting-console.down { opacity: .5; border-top-color: color-mix(in srgb, var(--danger) 55%, var(--line)); }
 .acting-down-note { margin: var(--space-2) 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
-/* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
 .acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: var(--space-2); }
 .acting-console-head strong { color: var(--text); font-size: var(--fs-sm); }
 .acting-console-title { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
 .acting-console-name { min-width: 0; line-height: 1.25; }
 .acting-console-sub { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
 .acting-console-economy-row { display: flex; align-items: center; gap: .3rem; }
-/* Movement rides the name row, right-aligned; read it a touch brighter than the muted default. */
 .acting-console-title .economy-movement { flex: none; margin: 0; padding: 0; align-self: baseline; font-size: var(--fs-sm); font-weight: 700; color: var(--text-dim); white-space: nowrap; }
 .acting-console-title .legendary-pill { flex: none; }
 .acting-console .turn-economy { margin-top: 0; }
 .acting-console .action-runner { margin-top: .45rem; }
-/* Ruling 55: solid. A dashed edge on a real control reads as a placeholder, and this one is the
-   door onto the rest of the built-in actions — the quieter ink is what says "secondary", not the
-   broken line. (The dashed chips further up this file are different: on `.sheet-cast-slot` and
-   `.sheet-prep-tag.cantrip` the broken line is a STATE — at-will vs prepared — which R2 requires to
-   have a second channel beside colour. Those keep it.) */
+/* Solid border: dashed edges mean a state (at will vs prepared) elsewhere in this file, not a
+   secondary control. */
 .builtin-more { color: var(--text-muted); }
 
-/* Legendary actions (SRD): a one-tap console switch per off-turn legendary creature, and the
-   off-turn console variant showing the per-round pool instead of the turn actor's economy. Violet = special. */
 .legendary-strip { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
-/* Route 1: a .35rem-gap wrapping strip leaves 5.6px, against 6.8px a side of overhang at 30.4px. */
-/* Ruling 55's no-dashed-boxes rule reaches this too: an offer is a door, not a placeholder. */
+/* Paint grows to 44px: the strip's gap is smaller than an overhang would need. Solid, not dashed. */
 .legendary-offer { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .28rem .6rem; border: 1px solid var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .legendary-offer:hover:not(:disabled) { border-color: var(--violet-hi); }
 .legendary-offer:disabled { color: var(--text-muted); border-color: var(--line); cursor: default; }
@@ -1510,17 +962,13 @@
 .save-legendary { padding: .3rem .6rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-3) 78%, var(--violet)); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .save-legendary:hover:not(:disabled) { border-color: var(--violet); }
 
-/* Row hover keeps the plain score/HP tappable-looking without permanent chrome. */
 .initiative-score-value:hover:not(:disabled) { background: var(--surface-2); }
-/* Minimal per-row markers: condition dots + a dim R only when the reaction is SPENT. */
 .condition-dots { display: inline-flex; align-items: center; gap: .2rem; margin-left: .1rem; }
 .condition-dot { width: .44rem; height: .44rem; border-radius: var(--radius-pill); background: var(--violet-hi); box-shadow: 0 0 0 1px var(--surface-3); }
 .condition-dot-more { color: var(--violet-hi); font-size: var(--fs-2xs); font-weight: 800; }
 .reaction-spent-dot { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-decoration: line-through; }
 .encounter-topbar .encounter-round { align-self: center; font-size: var(--fs-xs); padding: .3rem .55rem; }
 
-/* Player tracker: identical dense language to the GM list — one 30px line per combatant, the
-   player's own details grouped under their row, economy in its own quiet card below the list. */
 .initiative-list.player { margin-top: .6rem; }
 .initiative-list.player > li { flex-direction: column; align-items: stretch; gap: .1rem; padding: .18rem .2rem; }
 .initiative-list.player .initiative-row-main { gap: var(--space-2); }
@@ -1532,10 +980,9 @@
 .encounter-topbar.player { align-items: center; flex-wrap: wrap; }
 .your-turn-flag { color: var(--cyan-hi); font-size: var(--fs-sm); font-weight: 800; }
 .encounter-quiet-note { color: var(--text-muted); font-size: var(--fs-xs); }
-/* The player's economy now rides their own initiative row (feedback #3): quiet card, tight top gap. */
 .initiative-list.player .turn-economy { margin-top: .3rem; }
 
-/* Touch devices: the dense desktop metrics gain back tap height without changing the layout. */
+/* Touch devices: dense rows gain back tap height without changing the layout. */
 @media (pointer: coarse) {
   .initiative-list.gm > li, .initiative-list.player > li { padding-top: .42rem; padding-bottom: .42rem; }
   .initiative-expand { padding-top: .4rem; padding-bottom: .4rem; }
@@ -1544,8 +991,6 @@
   .action-row { padding-top: .6rem; padding-bottom: .6rem; }
 }
 
-/* Foundry-style rows: [avatar | name + HP bar | initiative]. Team coding (§6.6): allies cyan,
-   enemies magenta, neutrals indigo — subtle so the token art stays clear. */
 .initiative-avatar { flex: none; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text); font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .02em; }
 .initiative-avatar.monster { background: color-mix(in srgb, var(--surface-3) 55%, var(--magenta)); color: var(--text); }
 .initiative-avatar.npc { background: color-mix(in srgb, var(--surface-3) 58%, var(--indigo)); color: var(--text); }
@@ -1564,10 +1009,8 @@
 .initiative-hpbar-fill.hp-down { background: var(--danger); }
 .initiative-avatar.player-known { background: color-mix(in srgb, var(--surface-3) 55%, var(--cyan)); color: var(--text); }
 
-/* ============ ASKING THE GM (B1) ============
-   Three shapes of the same conversation: the player's refusal-and-ask, the player's waiting question,
-   and the GM's queue. Caution rather than danger throughout — nothing has gone wrong, a move is simply
-   not allowed yet, and the palette reserves the rose for actual loss (§2). */
+/* Asking the GM: the player's refusal-and-ask, the player's waiting question, and the GM's queue.
+   Caution, not danger: nothing is lost, a move is just not allowed yet. */
 .rule-ask { padding: .6rem var(--space-3); border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); background: var(--surface-2); }
 .rule-ask + .rule-ask { margin-top: .4rem; }
 .rule-ask-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
@@ -1575,27 +1018,12 @@
 .rule-ask-who { margin: 0 0 .2rem; color: var(--text-dim); font-size: var(--fs-xs); }
 .rule-ask-meta { margin: .3rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .rule-ask-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: var(--space-2); }
-/* The GM's queue is the one that is asking something OF you, so it leads with the brand's attention
-   colour rather than caution — it is a request, not a warning. */
 .rule-ask-question { border-left-color: var(--magenta); }
 
-/* ══ THE MATERIAL (ruling 2), ON THE FIGHT SURFACE ═══════════════════════════════════════════
-   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
-   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
-   because `clip-path` clips hit-testing and this is the surface where a lost tap costs a turn.
-   `inset: -1px` spans the border box, so the rim lands exactly where the 1px border used to and
-   NOTHING in this file changes size. Every value is a shared token, so ruling 29's daybreak
-   translation arrives for free.
-
-   RULING 45 IS THE SCOPING RULE HERE, and it is stricter than ruling 28 alone. Only two things
-   carry the scanline: `.encounter-panel`, the tracker's own outermost frame, and `.sheet-header`
-   (above), which is the sheet's hero block. EVERYTHING ELSE TAKES A FLAT PLATE — the vitals, the
-   ability chips, the action rows, the save prompts, the targeting and result blocks — because
-   ruling 45 forbids texture behind a number a player reads mid-fight, and every one of those is
-   a number a player reads mid-fight.
-
-   NO REST GLOW below the header. The tracker is the densest region in the app and §8.1 gives it
-   one glowing element: whoever's turn it is. A glowing panel edge would compete with that. */
+/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
+   `inset: -1px` spans the border box, so nothing changes size. Only `.encounter-panel` and
+   `.sheet-header` carry the scanline; everything a player reads a number from gets a flat plate.
+   No rest glow: the active turn is the region's one glowing element. */
 .encounter-panel,
 .encounter-round,
 .condition-picker,
@@ -1644,13 +1072,7 @@
   outline-offset: calc(-1 * var(--bezel-inset));
   transition: border-color var(--dur-hover), background var(--dur-hover);
 }
-/* The one textured surface on the tracker: its own outermost frame (ruling 28). */
 .encounter-panel { --material-fill: var(--material-scanline), var(--material-plate); }
-/* Everything a player reads a number off of: rim, bezel, cut — and a flat plate (ruling 45).
-   `.turn-economy` LEFT this list in the tray-language pass: the action economy is three pills on
-   a line, and giving the line that holds them a rim, a bezel and a plate made a box whose only
-   contents were other boxes. The pills keep their own edges; the strip that carries them does
-   not. Nothing was removed from it — Action, Bonus, Reaction and End turn are all still there. */
 .encounter-round,
 .condition-picker,
 .action-row,
@@ -1662,21 +1084,14 @@
 .sheet-vital,
 .sheet-ability,
 .sheet-slot { --material-fill: var(--material-plate); }
-/* Ruling 52: a floating surface reads one step in front of the panel it opened from — same
-   material, brighter rim. Both of these already carried `--shadow-2` for the same reason. */
 .encounter-menu,
 .row-tools-popover { --material-fill: var(--material-plate); --rim-color: var(--rim-color-hi); }
-/* AND THEIR OWN POSITIONING IS RESTORED, because the shared rule above sets `position: relative`
-   for the backing layer's containing block and these two do not need it — they already establish
-   one. MEASURED, not foreseen: with `relative` applied, the ⋯ fight menu stopped being `fixed`,
-   flowed in the document at its inline `top: 242px` and opened at y=1142 in a 900px viewport —
-   entirely below the fold. Any future member of the list above that positions itself belongs here. */
+/* The shared rule above sets `position: relative`; restore these two, or the ⋯ menu stops being
+   fixed and opens below the fold. Any self-positioned member of that list belongs here. */
 .encounter-menu { position: fixed; }
 .row-tools-popover { position: absolute; }
-/* The chamfer is sized for a panel, not for a 5rem stat chip: at the default .6rem cut a 3.2rem
-   chip loses a visible wedge of its own corner, and `--bezel-inset` must stay at or above half the
-   cut or the bezel's corner falls outside it and is clipped to a notch. Both are re-stated as one
-   pair, which is exactly what `Badge.css` does at the same scale and for the same reason. */
+/* Small chips need a smaller cut, and `--bezel-inset` must stay at least half the cut or the bezel
+   corner is clipped to a notch (as in Badge.css). */
 .encounter-round,
 .sheet-vital,
 .sheet-ability,
@@ -1686,27 +1101,12 @@
   --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
   --bezel-inset: calc(var(--rim-w) + 1px);
 }
-/* `.encounter-round` is a pill in the markup's own words ("Round 3") and the cut is the product's
-   de-pilling silhouette (ruling 24) — one shape from the largest panel to the smallest count. */
 .encounter-round { border-radius: 0; }
 
-/* ══ THE HAND-ROLLED CONTROLS (rulings 24, 31, 49) ═══════════════════════════════════════════
-   Wave 2 gave every `.nh-btn`, `Chip`, `Badge` and form control the cut corner by editing four
-   primitives. THIS FILE'S CONTROLS ARE NOT PRIMITIVES — they are bare `<button>`s and `<input>`s
-   written into the fight surface before the primitives existed, and after the panel work above
-   they were the loudest remaining tell: a chamfered panel full of rounded buttons is exactly the
-   "designed at different times" read this round exists to close. Measured after the panel pass:
-   33 of the 37 rules in this lane's files still carrying a radius were in here, and every one of
-   them is a control rather than a panel.
-
-   They take the material at BUTTON scale — the smaller cut `Button.css` and `Badge.css` use, the
-   shared rim, a flat plate, and the cue wedge on hover / focus / press (ruling 40: press carries
-   what hover carries, because half this table has no hover). Never the scanline: ruling 45 keeps
-   texture off anything a player reads a number from, and half of these ARE the numbers.
-
-   THE CUT IS ON A BACKING LAYER, NEVER THE ELEMENT. `clip-path` clips hit-testing, and these are
-   the controls a GM taps mid-fight. `inset: -1px` spans the border box, so every one of them keeps
-   the exact size it had — re-run `scripts/tap-audit.mjs 375` after touching this block. */
+/* Hand-rolled controls (bare buttons and inputs predating the primitives) take the material at button
+   scale: smaller cut, shared rim, flat plate, cue wedge on hover/focus/press. Never the scanline.
+   The cut rides a backing layer, never the element (`clip-path` clips hit-testing), and
+   `inset: -1px` keeps every control's size; re-run `scripts/tap-audit.mjs 375` after editing. */
 .dock-log-door,
 .encounter-dock-choice,
 .encounter-primary, .turn-controls button,
@@ -1796,8 +1196,8 @@
   background-clip: border-box;
   transition: border-color var(--dur-hover), background var(--dur-hover);
 }
-/* Interaction, once, for all of them (ruling 40). The rim brightens and the cue wedge appears; the
-   `:active` half is not optional, because hover does not exist on half this table's devices. */
+/* Interaction for all of them: the rim brightens and the cue wedge appears. `:active` matters
+   because touch devices have no hover. */
 .dock-log-door:hover:not(:disabled)::before, .dock-log-door:focus-visible::before, .dock-log-door:active:not(:disabled)::before,
 .encounter-dock-choice:hover:not(:disabled)::before, .encounter-dock-choice:focus-visible::before, .encounter-dock-choice:active:not(:disabled)::before,
 .encounter-primary:hover:not(:disabled)::before, .encounter-primary:focus-visible::before, .encounter-primary:active:not(:disabled)::before,
@@ -1822,18 +1222,14 @@
   border-color: var(--rim-color-hi);
   background: var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h), var(--material-fill);
 }
-/* The three that carry their own meaning-bearing edge keep it on the layer, where it follows the
-   cut: the primary action is magenta (act), the reaction prompt is cyan, legendary is violet.
-   `.turn-prev` (the ‹ chevron) is excluded: it shares `.encounter-primary` with Next turn for its
-   metrics, not for its emphasis, and a bar with two accent edges on it has no primary action. It
-   takes the neutral rim the rest of the bar wears. */
+/* Meaning-bearing edges stay on the layer: primary action magenta, reaction prompt cyan, legendary
+   violet. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics and keeps the neutral rim. */
 .encounter-primary:not(.turn-prev)::before { border-color: var(--magenta); }
 .encounter-primary { color: var(--text); }
 .initiative-reaction::before { border-color: color-mix(in srgb, var(--cyan) 55%, var(--rim-color)); }
 .legendary-offer::before { border-color: var(--violet); }
 .legendary-offer:hover:not(:disabled)::before { border-color: var(--violet-hi); }
 .legendary-offer { border-radius: 0; }
-/* Inert reads as a material state, not only as reduced opacity (ruling 40). */
 .dock-log-door:disabled::before, .encounter-primary:disabled::before, .turn-controls button:disabled::before,
 .hp-editor > button:disabled::before, .sheet-prepare:disabled::before, .builtin-chip:disabled::before,
 .legendary-offer:disabled::before, .monster-browser-add:disabled::before {

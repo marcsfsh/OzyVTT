@@ -16,9 +16,9 @@ const conditionIcon = (id: string) => {
 const conditionTone = (id: string): ChipTone => (id === "invisible" ? "magical" : "harmful");
 
 /**
- * One shared fetch of the 15 SRD condition names/texts. Failures are never cached - a
- * transient miss (e.g. an ack racing the join) retries on the next mount or picker open,
- * and a late success propagates to every mounted chip/editor via the listener set.
+ * One shared fetch of the 15 SRD condition names and texts. Failures are never cached, so a
+ * transient miss retries on the next mount or picker open; a late success reaches every mounted
+ * chip/editor via the listener set.
  */
 let referenceCache: readonly ContentConditionSummary[] | null = null;
 let referenceInFlight: Promise<void> | null = null;

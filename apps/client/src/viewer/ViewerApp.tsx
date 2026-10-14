@@ -58,14 +58,11 @@ function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
 export function Initiative({ presentation, onResize }: Readonly<{ presentation: Presentation; onResize?: (width: number) => void }>) {
   const asideRef = useRef<HTMLElement | null>(null);
   if (!presentation.initiative.visible) return null;
-  // Identical to the player's list (feedback #5): active combatant on top, the rest in turn order, the
-  // compact Round-pill header - no HP bars, no controls (the viewer has no claimed character). Scaled up
-  // for the room via the viewer's font sizing, but structurally the same as a player with no active turn.
+  // Same shape as the player's list: active combatant on top, then turn order; no HP bars or controls.
   const { entries, round, hiddenTurn } = presentation.initiative;
   const activeIndex = entries.findIndex((entry) => entry.active);
   const ordered = activeIndex > 0 ? [...entries.slice(activeIndex), ...entries.slice(0, activeIndex)] : entries;
-  // Drag the left edge to widen/narrow the column (persisted by the caller). Dragging left grows it,
-  // since it's the right-hand column; clamp to a legible minimum and 60% of the screen.
+  // Dragging the left edge resizes the column; left grows it. Clamped to a legible minimum and 60% of the screen.
   const startResize = (event: React.PointerEvent) => {
     if (!onResize) return;
     event.preventDefault();
@@ -78,8 +75,7 @@ export function Initiative({ presentation, onResize }: Readonly<{ presentation: 
   };
   return <aside ref={asideRef} className="viewer-initiative frame-col" aria-label={`Initiative, round ${round}`}>
     {onResize && <div className="viewer-initiative-resize" role="separator" aria-orientation="vertical" aria-label="Drag to resize the initiative panel" onPointerDown={startResize} />}
-    {/* The one declared scroll region on this screen (§7), at BOTH aspects: the panel is the frame,
-        this is its canvas. Portrait caps the frame at 32vh; this box takes what is left and scrolls. */}
+    {/* The screen's one scroll region, at both aspects; portrait caps the panel at 32vh. */}
     <div className="viewer-initiative-scroll frame-fill scroll-y">
       <div className="viewer-initiative-head"><strong className="viewer-initiative-round">Round {round}</strong></div>
       {hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
@@ -96,10 +92,9 @@ const LOCAL_MIN_ZOOM = 0.5;
 const LOCAL_MAX_ZOOM = 8;
 
 /**
- * This screen's own zoom/pan, layered on top of whatever the GM presents. It is purely local -
- * nothing here is sent back to the server - so each paired display (or the GM's in-tab preview of
- * it) can be framed independently without affecting what anyone else sees. Resets to follow the
- * GM's camera again whenever the presented map changes, or when "Follow GM view" is pressed.
+ * This screen's own zoom/pan over what the GM presents. Purely local (nothing is sent to the server),
+ * so each display can be framed independently. Follows the GM's camera again when the presented map
+ * changes or "Follow GM view" is pressed.
  */
 export function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
   const [size, setSize] = useState({ width: 16, height: 9 });
@@ -128,7 +123,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
     const width2 = size.width / nextZoom, height2 = size.height / nextZoom;
     setLocalCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
   };
-  // Wheel-to-zoom needs preventDefault, which React's synthetic onWheel cannot reliably guarantee (passive by default).
+  // React's onWheel is passive, so wheel-to-zoom needs a native listener to preventDefault.
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -138,8 +133,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, size]);
   const beginPan = (event: React.PointerEvent<HTMLElement>) => {
-    // The zoom / "Follow GM view" buttons are absolutely-positioned children of the stage; let their
-    // own onClick run instead of starting a pan (which captures the pointer and swallows the click).
+    // Let the zoom buttons' onClick run; starting a pan would capture the pointer and swallow the click.
     if ((event.target as Element).closest("button")) return;
     const svg = svgRef.current; if (!svg) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -184,7 +178,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>
         <circle r={Math.max(8, Math.min(size.width, size.height) / 40)} /><circle r={Math.max(3, Math.min(size.width, size.height) / 100)} />
       </g>)}
-      {/* Fog covers everything on the shared screen - the audience sees only what the GM revealed. */}
+      {/* The audience sees only what the GM revealed. */}
       {onActiveMap && presentation.encounter.fog && <FogOverlay width={size.width} height={size.height} fog={presentation.encounter.fog} variant="player" />}
     </svg>
     {presentation.measurement && <output className="viewer-distance">{presentation.measurement.distanceLabel}</output>}
@@ -203,8 +197,7 @@ export function ViewerApp() {
   const [presentation, setPresentation] = useState<Presentation | null>(null);
   const [message, setMessage] = useState("");
   const sourceRef = useRef<EventSource | null>(null);
-  // The initiative column is drag-resizable (persisted), like the GM's docked tracker - so a room can
-  // widen it until long names fit instead of ellipsizing.
+  // The initiative column is drag-resizable (persisted) so long names can fit.
   const [initiativeWidth, setInitiativeWidth] = useState<number | null>(() => {
     const stored = Number(localStorage.getItem("vtt.viewer-initiative-width"));
     return Number.isFinite(stored) && stored >= 240 ? stored : null;

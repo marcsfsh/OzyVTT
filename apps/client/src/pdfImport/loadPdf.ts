@@ -9,6 +9,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
  * `knownSpellIds` (from the cached SRD `content:spells`) lets unmatched/homebrew spells be flagged. */
 export async function extractCharacterFromFile(file: File, knownSpellIds?: ReadonlySet<string>): Promise<ImportResult> {
   const data = new Uint8Array(await file.arrayBuffer());
-  // verbosity 0 = errors only (the standard-font warning is irrelevant — values come from form fields).
+  // verbosity 0 = errors only (the standard-font warning is irrelevant: values come from form fields).
   return importCharacterPdf(pdfjs.getDocument as unknown as GetDocument, data, { docOptions: { verbosity: 0 }, knownSpellIds });
 }

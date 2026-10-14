@@ -15,11 +15,10 @@ export function probeImageDimensions(url: string): Promise<{ width: number; heig
 }
 
 /**
- * Fetches an authorized map image as a revocable blob URL and probes its natural pixel
- * dimensions. Shared by every renderer that needs a bearer-authorized map (the encounter
- * canvas and the GM's map/viewer-tool previews). The shared-screen viewer does not use this -
- * it embeds the content URL directly (cookie-authorized, no bearer header available inside
- * an SVG `<image>`), but still uses `probeImageDimensions` for its own dimension probe.
+ * Fetches an authorized map image as a revocable blob URL and probes its natural pixel dimensions,
+ * for renderers with a bearer token (the encounter canvas, the GM's map/viewer previews). The
+ * shared-screen viewer embeds the content URL directly (cookie auth; an SVG `<image>` cannot send a
+ * bearer header) but still uses `probeImageDimensions`.
  */
 export function useAuthorizedMapImage(assetId: string | null, token: string | null | undefined): MapImageState {
   const [state, setState] = useState<MapImageState>({ status: "loading" });
@@ -45,10 +44,9 @@ export function useAuthorizedMapImage(assetId: string | null, token: string | nu
 }
 
 /**
- * Session-lifetime thumbnail cache: one authorized fetch per map asset, shared by every chip that
- * shows the same map (the scene switcher), object URLs deliberately never revoked (bounded by the
- * ≤20-scene library). Distinct from `useAuthorizedMapImage`, which is per-mount and revocable -
- * a strip of chips re-rendering on every state broadcast must not refetch or churn URLs.
+ * Session-lifetime thumbnail cache: one authorized fetch per map asset, shared by every chip showing
+ * that map. Object URLs are never revoked (bounded by the scene library). Unlike
+ * `useAuthorizedMapImage`, so chips re-rendering on every broadcast do not refetch or churn URLs.
  */
 const thumbnailCache = new Map<string, Promise<string>>();
 export function useCachedMapThumbnail(assetId: string | null, token: string | null | undefined): string | null {
@@ -64,7 +62,7 @@ export function useCachedMapThumbnail(assetId: string | null, token: string | nu
           return URL.createObjectURL(await response.blob());
         });
       thumbnailCache.set(assetId, promise);
-      // A failed fetch must not poison the cache - the next mount retries.
+      // A failed fetch must not poison the cache; the next mount retries.
       promise.catch(() => thumbnailCache.delete(assetId));
     }
     promise.then((objectUrl) => { if (!cancelled) setUrl(objectUrl); }).catch(() => { if (!cancelled) setUrl(null); });
@@ -74,11 +72,8 @@ export function useCachedMapThumbnail(assetId: string | null, token: string | nu
 }
 
 /**
- * Converts a pointer/mouse event's client coordinates into image-pixel coordinates using the
- * SVG element's own screen transform. This is robust to `preserveAspectRatio`, panning, and
- * zooming, unlike a manual `getBoundingClientRect` + linear-scale calculation (which silently
- * breaks the moment the image is letterboxed or a camera transform is introduced). Replaces the
- * three previously separate, hand-rolled pixel<->image conversions.
+ * Converts a pointer event's client coordinates into image-pixel coordinates using the SVG's own
+ * screen transform, so it stays correct under `preserveAspectRatio` letterboxing, panning and zoom.
  */
 export function imagePointFromClient(svg: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } | null {
   const matrix = svg.getScreenCTM();
@@ -113,10 +108,9 @@ export type TokenGlyphProps = Readonly<{
 }>;
 
 /**
- * The visual content of a map token (turn ring, body, portrait-or-initials, name) shared by the
- * interactive encounter canvas and the read-only shared-screen viewer. Each caller supplies its own
- * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs -
- * this component owns only the repeated drawing, not the per-app interaction semantics.
+ * The drawing of a map token (turn ring, body, portrait-or-initials, name), shared by the encounter
+ * canvas and the shared-screen viewer. Callers supply class names and sizing and wrap it in their own
+ * `<g>` with whatever interaction they need.
  */
 export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
   const clipId = useId();
@@ -128,8 +122,8 @@ export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, body
     {active && <circle className={turnClassName} r={sizePx * 0.64} />}
     <circle className={bodyClassName} r={radius} />
     {showImage
-      // The portrait fills the body circle (cover-cropped) with the body ring redrawn on top so the
-      // border stays crisp; a broken/forbidden image falls back to the initials via onError.
+      // The portrait fills the body circle (cover-cropped) with the ring redrawn on top so the border stays
+      // crisp; a broken or forbidden image falls back to initials via onError.
       ? <>
           <clipPath id={clipId}><circle r={radius} /></clipPath>
           <image href={imageUrl ?? undefined} x={-radius} y={-radius} width={sizePx} height={sizePx} clipPath={`url(#${clipId})`} preserveAspectRatio="xMidYMid slice" onError={() => setFailed(true)} />
@@ -141,9 +135,8 @@ export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, body
 }
 
 /**
- * Original minimal glyphs (16×16 box) for the SRD conditions, so a token reads "poisoned, prone"
- * at a glance instead of "P, P". Unknown ids fall back to the initial letter. Shared by the table
- * client and the viewer; drawn as single filled paths (fill-rule evenodd carves the cutouts).
+ * Original 16×16 glyphs for the SRD conditions, so a token reads "poisoned, prone" rather than
+ * "P, P". Unknown ids fall back to the initial letter. Single filled paths (evenodd carves cutouts).
  */
 export const CONDITION_GLYPHS: Record<string, string> = {
   blinded: "M8 4.6C4.9 4.6 2.6 8 2.6 8s2.3 3.4 5.4 3.4S13.4 8 13.4 8 11.1 4.6 8 4.6zm0 1.9A1.5 1.5 0 1 1 8 9.5 1.5 1.5 0 0 1 8 6.5zM3.9 2.8l9.3 9.3-1.1 1.1L2.8 3.9z",
@@ -165,23 +158,20 @@ export const CONDITION_GLYPHS: Record<string, string> = {
 
 export type TokenConditionBadge = Readonly<{ id: string | null; label: string }>;
 
-/** Coarse band -> a fill fraction, matching the initiative HP bar (healthy full, bloodied ~half, down a sliver). The single source the bar/ring, the viewer, and the initiative bar all read. */
+/** Coarse band -> fill fraction (healthy full, bloodied ~half, down a sliver); the single source for token bars/rings, the viewer and the initiative bar. */
 export function bandFraction(band: "healthy" | "bloodied" | "down"): number {
   return band === "healthy" ? 1 : band === "bloodied" ? 0.45 : 0.06;
 }
 
-/** Fill fraction for a token health bar/ring: exact when the audience holds exact hit points (the GM, or a player's own character), else the coarse band fraction - so nobody else's exact HP is ever implied. Lives here (React-only, viewer-safe) so the viewer can share it without the socket. */
+/** Fill fraction for a token health bar/ring: exact when the audience holds exact HP (the GM, or a player's own character), else the coarse band fraction, so nobody else's exact HP is implied. React-only, so the viewer can share it without the socket. */
 export function hpFillFraction(hp: { current: number; maximum: number; temporary: number } | { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: "healthy" | "bloodied" | "down" }): number {
   if ("kind" in hp && hp.kind === "band") return bandFraction(hp.band);
   const exact = hp as { current: number; maximum: number };
   return exact.maximum > 0 ? Math.max(0, Math.min(1, exact.current / exact.maximum)) : 0;
 }
 
-/** Health fraction -> a themed palette fill: cyan healthy (>50%), magenta bloodied (25-50%), danger
- * critical (<25%), matching the HP-bar bands in §6.7 and the initiative row's hp-* text classes.
- * Fixed hexes (not CSS custom properties) because SVG presentation attributes don't resolve var(). */
-/** Band class for token health fill/stroke/stop-color. A CSS class (not a baked hex) so the
-    color resolves the themed --cyan/--magenta/--danger token and follows dark/dusk/light. */
+/** Band class for token health fill/stroke/stop-color: cyan healthy (>50%), magenta bloodied
+    (25-50%), danger below. A class rather than a hex so it follows the theme tokens. */
 export function healthFillClass(fraction: number): string {
   const clamped = Math.max(0, Math.min(1, fraction));
   if (clamped > 0.5) return "hp-fill-healthy"; // --cyan
@@ -190,16 +180,15 @@ export function healthFillClass(fraction: number): string {
 }
 
 /**
- * A soft cyan->magenta->danger glow colored by the health fraction, hugging the token's edge and fading outward.
- * Rendered UNDER the token (before TokenGlyph) so the body AND the active-turn ring paint over it -
- * a glow around the token, not a wash across it, with no gap at the token edge. Image-pixel/SVG space.
+ * A soft glow coloured by the health fraction, hugging the token's edge and fading outward. Rendered
+ * under the token (before TokenGlyph), so the body and active-turn ring paint over it. SVG space.
  */
 export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number; fraction: number }>) {
   const gradientId = useId();
   const clamped = Math.max(0, Math.min(1, fraction));
   const bandClass = healthFillClass(clamped);
-  // Thin band hugging the body edge (0.5) out to 0.86 - ~35% thinner than before, and the peak sits
-  // right at the edge so it reads as attached. The inner half is hidden behind the opaque body.
+  // A thin band from the body edge (0.5) out to 0.86, peaking at the edge; the inner half is hidden
+  // behind the opaque body.
   const outer = sizePx * 0.86;
   const edge = Math.round(((sizePx * 0.5) / outer) * 100);
   return <g className="token-health-aura">
@@ -216,11 +205,10 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
 }
 
 /**
- * A richer token-health indicator shown in place of the coarse band dot when the GM opts into it:
- * a thin HP bar pinned under the token, or a cyan->magenta->danger ring around its body (the aura style renders
- * separately, behind the token - see TokenHealthAura). The fill fraction is always audience-safe (the
- * server only sends this style when it may show, and exact HP never reaches non-owners - the fraction
- * is band-derived for them). Image-pixel/SVG space like the body.
+ * A token health indicator shown instead of the band dot when the GM opts in: a thin HP bar under
+ * the token, or a ring around it (the aura renders separately, behind the token). The fraction is
+ * always audience-safe: the server only sends this style when allowed, and non-owners get a
+ * band-derived fraction.
  */
 function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring"; fraction: number }>) {
   const clamped = Math.max(0, Math.min(1, fraction));
@@ -230,7 +218,7 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
     const r = sizePx * 0.5 + Math.max(2, sizePx * 0.06);
     const circumference = 2 * Math.PI * r;
     const strokeWidth = Math.max(2, sizePx * 0.09);
-    // rotate -90 so the arc grows from the top of the token clockwise.
+    // rotate -90 so the arc grows clockwise from the top of the token.
     return <g className="token-health-ring" transform="rotate(-90)">
       <title>{title}</title>
       <circle className="token-health-ring-track" r={r} fill="none" strokeWidth={strokeWidth} />
@@ -248,9 +236,9 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
 }
 
 /**
- * Health/condition badges layered over a token: a bloodied/down dot at the top-right (or, when the
- * GM opts in via `healthBar`, an HP bar / green->red ring instead) and up to three condition glyphs
- * beneath the body (with a +N overflow). Shared by the table client and the viewer.
+ * Health/condition badges over a token: a bloodied/down dot at the top-right (or the GM's opted-in
+ * bar or ring instead) and up to three condition glyphs beneath the body (+N overflow). Shared by the
+ * table client and the viewer.
  */
 export function TokenStatusBadges({ sizePx, health, conditions, healthBar }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[]; healthBar?: Readonly<{ style: "bar" | "ring"; fraction: number }> }>) {
   const radius = Math.max(4, sizePx * 0.11);
@@ -285,11 +273,10 @@ export function TokenStatusBadges({ sizePx, health, conditions, healthBar }: Rea
 }
 
 /**
- * Manual fog-of-war mask: one SVG `<mask>` - a white base (fog everywhere), then each stroke in
- * order paints black (reveal: the fog is cut away there) or white (hide: re-covered). The GM sees
- * the fog dimmed below tokens (everything stays visible); players and the shared screen get it
- * solid and above everything - anything inside fog is visually covered even where public data
- * crossed the wire. Shared by the table client and the viewer.
+ * Manual fog-of-war mask: one SVG `<mask>` with a white base (fog everywhere); each stroke in order
+ * paints black (reveal) or white (hide). The GM sees fog dimmed below tokens; players and the shared
+ * screen get it solid above everything, so anything inside fog is covered even where public data
+ * crossed the wire.
  */
 export function FogOverlay({ width, height, fog, variant }: Readonly<{
   width: number; height: number;
@@ -298,10 +285,9 @@ export function FogOverlay({ width, height, fog, variant }: Readonly<{
 }>) {
   const base = useId();
   if (!fog.enabled) return null;
-  // Chromium caches an SVG <mask>'s raster keyed on the element and does NOT re-evaluate it when
-  // only the mask's child <rect>s change (e.g. Hide-all removes every reveal) - the stale holes stay
-  // until an unrelated repaint (a pan/zoom). Suffix the mask id with a hash of the fog so any change
-  // yields a new id → a new url() reference → a guaranteed re-resolve. (Bug: hide-all didn't render.)
+  // Chromium caches an SVG <mask>'s raster and does not re-evaluate it when only its child <rect>s
+  // change (stale holes remain after Hide all until a repaint). Suffixing the mask id with a hash of the
+  // fog makes any change a new url() reference, forcing a re-resolve.
   const signature = `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`;
   const maskId = `${base}${signature}`;
   return <>
@@ -317,7 +303,7 @@ export function FogOverlay({ width, height, fog, variant }: Readonly<{
 
 export type GridCalibration = Readonly<{ origin: { x: number; y: number }; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
 
-/** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret - the client already receives grid-derived token sizing. */
+/** Fetches the active map's grid calibration (null on a gridless map) for preview maths. Not secret: grid-derived token sizing already reaches the client. */
 export function useMapCalibration(assetId: string | null, token: string | null | undefined): Readonly<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }> {
   const [state, setState] = useState<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }>({ status: "loading", calibration: null });
   useEffect(() => {
@@ -337,10 +323,9 @@ export function useMapCalibration(assetId: string | null, token: string | null |
 }
 
 /**
- * Preview-only grid math mirroring the server's authoritative snapping (`grid-calibration.ts`,
- * `map-measurement.ts`). Used only to show a live number/snap while the pointer is still moving -
- * the server always re-derives and persists the real geometry when a drag ends (`annotation:add`/
- * `annotation:move`), so any drift here affects only what's shown for a moment, never what's saved.
+ * Preview-only grid maths mirroring the server's snapping (`grid-calibration.ts`,
+ * `map-measurement.ts`), for live feedback while the pointer moves. The server re-derives and
+ * persists the real geometry when a drag ends, so drift here is only momentary.
  */
 export function imageToGridPreview(calibration: GridCalibration, point: { x: number; y: number }) {
   const dx = point.x - calibration.origin.x;
@@ -357,18 +342,18 @@ export function gridToImagePreview(calibration: GridCalibration, point: { column
   return { x: calibration.origin.x + cosine * localX - sine * localY, y: calibration.origin.y + sine * localX + cosine * localY };
 }
 export function snapCellCenterPreview(calibration: GridCalibration, point: { x: number; y: number }, sizeCells = 1) {
-  // Mirrors the server: odd footprints center on a cell, even ones on a grid intersection.
+  // As on the server: odd footprints centre on a cell, even ones on a grid intersection.
   const centerOffset = sizeCells % 2 === 0 ? 0 : 0.5;
   const grid = imageToGridPreview(calibration, point);
   return gridToImagePreview(calibration, { column: Math.floor(grid.column) + centerOffset, row: Math.floor(grid.row) + centerOffset });
 }
-/** Whole-cell Chebyshev distance in feet between two image points - every cell (including diagonals) costs one step, matching the server's default measurement rule. */
+/** Whole-cell Chebyshev distance in feet between two image points (diagonals cost one step), the server's default measurement rule. */
 export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: number; y: number }, b: { x: number; y: number }) {
   const gridA = imageToGridPreview(calibration, a);
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
 }
-/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection - mirrors the server). Preview-only. */
+/** The `"col,row"` cells a token's footprint covers, given its snapped position and sizeCells (odd footprints centre on a cell, even on an intersection, as on the server). Preview-only. */
 export function footprintCells(calibration: GridCalibration, position: { x: number; y: number }, sizeCells = 1): Set<string> {
   const grid = imageToGridPreview(calibration, position);
   const odd = sizeCells % 2 === 1;
@@ -379,10 +364,9 @@ export function footprintCells(calibration: GridCalibration, position: { x: numb
   return cells;
 }
 /**
- * Every grid cell the straight segment (grid-space) from `a` to `b` passes through, via an
- * Amanatides–Woo voxel/DDA traversal. Unlike a Chebyshev "diagonal-first" walk, this visits exactly
- * the cells the drawn line crosses, so the occupied-cell count matches what the ruler visibly passes
- * over. At an exact lattice corner it steps diagonally (skips the two side cells) - the standard choice.
+ * Every grid cell the straight segment from `a` to `b` crosses (Amanatides–Woo traversal), so the
+ * occupied-cell count matches what the ruler visibly passes over. At an exact lattice corner it steps
+ * diagonally.
  */
 function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): string[] {
   let column = Math.floor(ax), row = Math.floor(ay);
@@ -404,19 +388,18 @@ function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): str
 }
 
 /**
- * 5e movement-through-occupied-cells cost, display-only. Base distance is the whole-cell Chebyshev
- * count (diagonals cost one). The penalty is every cell the straight path crosses - excluding the
- * start and destination cells - that another token occupies, each adding one cell (+distancePerCell).
- * Preview-only - the client only ever has the tokens it may see, so nothing hidden leaks into the count.
+ * 5e movement cost through occupied cells, display-only: base is the whole-cell Chebyshev count, plus
+ * one cell for every cell the straight path crosses (excluding start and destination) that another
+ * token occupies. The client only has the tokens it may see, so nothing hidden leaks into the count.
  */
 export function occupiedPathCost(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }, occupied: ReadonlySet<string>): { baseFeet: number; penaltyFeet: number } {
   const from = imageToGridPreview(calibration, origin);
   const to = imageToGridPreview(calibration, target);
   const originCell = `${Math.floor(from.column)},${Math.floor(from.row)}`;
   const destCell = `${Math.floor(to.column)},${Math.floor(to.row)}`;
-  // Chebyshev distance from the raw center-to-center grid delta (matches chebyshevFeetPreview). Using
-  // floor-differences here is unstable for even footprints (Large/Huge/Gargantuan center on integer
-  // grid intersections, where floating-point noise flips the floor) - that caused the 10→20 ft skips.
+  // Chebyshev distance from the raw centre-to-centre delta, as in chebyshevFeetPreview. Floor
+  // differences are unstable for even footprints (centred on intersections, where float noise flips
+  // the floor).
   const steps = Math.round(Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row)));
   let penaltyCells = 0;
   for (const cell of cellsOnGridSegment(from.column, from.row, to.column, to.row)) {
@@ -429,8 +412,7 @@ export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; targe
 
 /**
  * Client mirrors of the server's `measurementGeometry`/`squareGeometry`/`radialGeometry`
- * (`apps/server/src/annotations.ts`) so the live drag preview snaps to the grid exactly as the saved
- * result will - the server still re-derives and persists the authoritative geometry on release.
+ * (`apps/server/src/annotations.ts`), so the drag preview snaps exactly as the saved result will.
  */
 export function snapMeasurementPreview(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }): SnappedGeometry {
   const from = snapCellCenterPreview(calibration, origin);
@@ -446,7 +428,7 @@ export function snapShapePreview(calibration: GridCalibration, shape: "circle" |
     const end = { column: startSnapped.column + (raw.column < start.column ? -1 : 1) * side, row: startSnapped.row + (raw.row < start.row ? -1 : 1) * side };
     return { origin: gridToImagePreview(calibration, startSnapped), target: gridToImagePreview(calibration, end), feet: side * calibration.distancePerCell };
   }
-  // Cone/line: both ends snap to cell centers so the shape can point in any direction (free rotation).
+  // Cone/line: both ends snap to cell centres, so the shape can point in any direction.
   if (shape === "cone" || shape === "line") {
     const from = snapCellCenterPreview(calibration, origin);
     let to = snapCellCenterPreview(calibration, target);
@@ -468,7 +450,7 @@ export function snapShapePreview(calibration: GridCalibration, shape: "circle" |
 
 export type OverlayLine = Readonly<{ axis: "column" | "row"; index: number; start: { x: number; y: number }; end: { x: number; y: number }; major: boolean }>;
 
-/** Renders a set of calibration/grid overlay line segments. Shared so overlay styling stays one implementation. */
+/** Renders calibration/grid overlay line segments; one implementation for all overlays. */
 export function GridOverlay({ lines }: Readonly<{ lines: readonly OverlayLine[] }>) {
   return <>{lines.map((line) => <line key={`${line.axis}-${line.index}`} className={line.major ? "major" : ""} x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} />)}</>;
 }

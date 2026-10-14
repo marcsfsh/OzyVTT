@@ -12,21 +12,14 @@ import { setAutoArrange, useAutoArrange } from "./preferences";
 import "./settings.css";
 
 /**
- * **Settings — one tab, three groups, one page (D24).**
- *
- * Every knob that used to be somewhere else is here, and the two that had nowhere at all finally have a
- * home: the rules dial was buried in a mid-fight overflow menu (so the standing campaign setting could
- * only be reached during a fight), and `builderPolicy` — stored, projected, enforced server-side — had
- * no client control whatsoever. `/setup` folds in as the *Access & integrations* subsection (§B9.4):
- * nothing it held is lost.
- *
- * **Who sees what is structural, not a filter.** `SETTINGS_GROUPS` declares each group's audience and
- * the page renders only the groups a role may see, so a player's Settings page contains one group and
- * the GM-only controls are never mounted at all. The GM groups also take `state` as a `GmView`, which a
- * player projection is not — the type says the same thing the audience does.
+ * Settings: one page, three groups. Includes the rules dial, `builderPolicy`, and access &
+ * integrations.
+ * Who sees what is structural, not a filter: `SETTINGS_GROUPS` declares each group's audience and
+ * only allowed groups render, so GM-only controls are never mounted for a player. The GM groups take
+ * `state` as a `GmView`, which a player projection is not.
  */
 
-/** The page's shape as DATA, so a test can pin it without scraping the DOM (plan-3 §2.4). */
+/** The page's shape as data, so a test can pin it without scraping the DOM. */
 export const SETTINGS_GROUPS: ReadonlyArray<Readonly<{ id: "mine" | "table" | "players"; label: string; audience: "everyone" | "gm" }>> = [
   { id: "mine", label: "Mine", audience: "everyone" },
   { id: "table", label: "The table", audience: "gm" },
@@ -38,9 +31,8 @@ export function groupsFor(role: "gm" | "player"): typeof SETTINGS_GROUPS {
 }
 
 /**
- * D6 — the dial's user-facing words. The WIRE stays `strict | assisted | freeform`: renaming an enum
- * that three schemas, the archive documents and the public API all speak would be a breaking change to
- * fix a copy problem. Copy is copy; this map is the whole of it.
+ * The dial's user-facing words. The wire stays `strict | assisted | freeform`: three schemas, the
+ * archive documents and the public API speak it, so renaming it would be a breaking change.
  */
 const DIAL_COPY: ReadonlyArray<Readonly<{ value: RuleMode; label: string; help: string }>> = [
   { value: "strict", label: "Enforce", help: "blocks illegal moves; you can allow them" },
@@ -50,9 +42,8 @@ const DIAL_COPY: ReadonlyArray<Readonly<{ value: RuleMode; label: string; help: 
 const dialLabel = (mode: RuleMode) => DIAL_COPY.find((entry) => entry.value === mode)?.label ?? mode;
 
 /**
- * One toggle per SERVER rule family, never finer. The engine classifies every rule into these five
- * (`apps/server/src/rules-families.ts`, pinned by a totality test); a sixth switch here would promise a
- * split the engine cannot make.
+ * One toggle per server rule family, never finer: the engine classifies every rule into these five
+ * (`apps/server/src/rules-families.ts`).
  */
 const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>> = [
   { family: "movement", label: "Don't police movement" },
@@ -70,17 +61,10 @@ const ABILITY_METHODS: ReadonlyArray<Readonly<{ id: BuilderAbilityMethod; label:
 ];
 
 /**
- * Rulings 5/8/19 — how much a player sees of ANOTHER player's character. **These four words are the
- * client's ruling and the GM's whole mental model of the feature**; the wire says
- * `off | name-and-class | full-sheet | sheet-and-resources` and `apps/server/src/projections.ts` is
- * the only thing that enforces them. Nothing here filters anything — a withheld field never arrives.
- * (One clarification, because the two are easy to confuse: `PartyStrip` consults the tier to decide
- * whether to MOUNT at all, which is a rendering decision about a surface, not a filter over data.
- * Which FIELDS reach a player is still the projection's alone, and always will be — see rule 3 in
- * `projections.ts`'s field table.)
- *
- * A `Select`, not a `SegmentedControl`: four labels this long are unreadable in a segment at 320px,
- * and the health-display row beside it already sets the precedent for a picker with many options.
+ * How much a player sees of another player's character. The wire values are
+ * `off | name-and-class | full-sheet | sheet-and-resources`; only `apps/server/src/projections.ts`
+ * enforces them, and nothing here filters (`PartyStrip` only uses the tier to decide whether to
+ * mount). A `Select`: four labels this long are unreadable as a segmented control at 320px.
  */
 const PARTY_VISIBILITY_OPTIONS = [
   { value: "off", label: "Off" },
@@ -90,11 +74,9 @@ const PARTY_VISIBILITY_OPTIONS = [
 ] as const;
 
 /**
- * These four strings are the PROMISE the GM reads before choosing, so they are held to what the tier
- * actually does rather than to what it sounds like. `off` used to end "and nothing else — no party
- * list": the second half is true (the party strip is gone at this tier), the first half was not —
- * a character at `off` is still named in the turn order, and their token still carries a health band
- * and condition dots. What `off` removes is the SHEET. Say that.
+ * The promise the GM reads before choosing, so it must match what the tier does: at `off` a
+ * character is still named in the turn order and their token still shows health and conditions;
+ * what `off` removes is the party list and the sheet.
  */
 const PARTY_VISIBILITY_HELP: Readonly<Record<PartyVisibility, string>> = {
   off: "Players see each other's tokens and turn order — no party list, and no sheet to open.",
@@ -113,29 +95,11 @@ const HEALTH_STYLES = [
 type Ack = Readonly<{ ok: boolean; message?: string }>;
 
 /**
- * One settings group. The `--{id}` modifier is what the ≥1280 two-column rule places by name
- * (The table on the left, Mine + Players on the right — settings.css).
- *
- * **`.surface-glass` is gone from here, and revised ruling 23 is why it went now rather than
- * earlier.** That ruling keeps the class *until the material replaces it* — and on this surface the
- * material has: `settings.css` paints ruling 2's rim, bezel and scanline fill on `.settings-group`
- * and switches `backdrop-filter` off in the same block, so the class was computing `none` and doing
- * nothing but reserving the name. It still does real work on the shared screen's two control columns
- * (`viewer-controls.css`, a live `blur(8px) saturate(1.15)`), which ruling 34 gave *more* identity,
- * so it stays there. Removing it from a surface the material has taken over is the ruling; removing
- * it from one the material has not reached would be the thing the ruling was written to stop.
- *
- * `gmOnly` takes the violet role rim (§9). It says something the GM cannot otherwise see on this
- * page: THESE are the groups a player is never handed — *Mine* renders for both roles, the other
- * two do not render at all without a GM token.
- *
- * A RIM IS NEVER THE ONLY SIGNAL, and the words come from this ONE place rather than each call
- * site, so the edge and the sentence cannot drift apart: `gmOnly` paints the rim and appends
- * "GM only" to the Eyebrow in the same breath. It shipped without the words first — the two
- * Eyebrows read "The table" and "Players", so the violet edge was the only thing separating the
- * GM-only groups from *Mine*, which is exactly the claim §9 makes and the markup did not have.
- * "GM only" unhyphenated is the reveal vocabulary's spelling (play-vocabulary.test.ts). The
- * Eyebrow is the section's accessible name, so a screen reader reaches it.
+ * One settings group. The `--{id}` modifier is what the 1280px two-column layout places by name
+ * (settings.css).
+ * `gmOnly` adds the violet GM rim and appends "GM only" to the Eyebrow (the section's accessible
+ * name), so the edge is never the only signal. *Mine* renders for both roles; the GM groups do not
+ * render at all without a GM token.
  */
 function Group({ id, label, gmOnly = false, children }: Readonly<{ id: string; label: string; gmOnly?: boolean; children: React.ReactNode }>) {
   return <section className={`settings-group settings-group--${id}${gmOnly ? " rim-gm" : ""}`} aria-labelledby={`settings-${id}`}>
@@ -155,7 +119,7 @@ function Row({ title, help, children, stacked = false }: Readonly<{ title: strin
   </div>;
 }
 
-// ───────────────────────────────── Mine (every role) ─────────────────────────────────
+// Mine (every role)
 
 function MineGroup() {
   const { rollInput, setRollInput } = useRollPreference();
@@ -174,7 +138,7 @@ function MineGroup() {
   </Group>;
 }
 
-// ───────────────────────────────── The table (GM only) ─────────────────────────────────
+// The table (GM only)
 
 function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
   state: GmView;
@@ -189,7 +153,7 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
   const builder = state.builderPolicy;
   const [formula, setFormula] = useState(builder.customFormula ?? "");
 
-  /** Every write on this page is the same shape: emit, and say so only when it fails. */
+  /** Every write here is the same shape: emit, and say so only when it fails. */
   const send = (event: string, payload: Record<string, unknown>, failure: string) => {
     (socket.emit as (event: string, payload: unknown, ack: (result: Ack) => void) => void)(
       event, { commandId: newId(), ...payload }, (result) => { if (!result.ok) toast(result.message ?? failure, { tone: "error" }); }
@@ -198,9 +162,8 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
 
   const setDial = (dial: RuleMode) => send("rules:set-policy", { dial, exceptions: policy.exceptions }, "The rules setting was rejected.");
   /**
-   * A toggle ON pins that family Off whatever the dial says; OFF removes the key, which is what "follow
-   * the dial" IS on the wire (an absent key). Exception beats dial, server-side — this control is a 1:1
-   * map onto `rulesPolicy.exceptions`, never a second policy the client keeps.
+   * ON pins that family Off whatever the dial says; OFF removes the key, which on the wire means
+   * "follow the dial". A 1:1 map onto `rulesPolicy.exceptions`.
    */
   const setException = (family: RuleFamily, off: boolean) => {
     const next: RuleExceptions = { ...policy.exceptions };
@@ -219,7 +182,7 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
 
   const toggleMethod = (id: BuilderAbilityMethod, on: boolean) => {
     const next = on ? [...builder.allowedAbilityMethods, id] : builder.allowedAbilityMethods.filter((method) => method !== id);
-    // The server requires at least one method; refusing here says why instead of bouncing a rejection.
+    // The server requires at least one method; refusing here explains why.
     if (next.length === 0) { toast("Leave the players at least one way to set ability scores.", { tone: "error" }); return; }
     setBuilderPolicy({ allowedAbilityMethods: next });
   };
@@ -241,8 +204,7 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
           const stored = policy.exceptions[family];
           return <div key={family} className="settings-exception">
             <Switch checked={stored === "freeform"} onChange={(next) => setException(family, next)} label={label} />
-            {/* A family the GM (or the shipped default) parked at Advise while the dial says Enforce is
-                neither on nor off. Saying which it is beats a switch that looks the same either way. */}
+            {/* A family parked at Advise while the dial says Enforce is neither on nor off, so say which. */}
             {stored && stored !== "freeform" && stored !== policy.dial && <Badge tone="info">{dialLabel(stored)}</Badge>}
           </div>;
         })}
@@ -348,26 +310,21 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
   </Group>;
 }
 
-// ───────────────────────────────── Players (GM only) ─────────────────────────────────
+// Players (GM only)
 
 /**
- * **Projection guard.** Every row is built from claim + presence the GM view already carries
- * (`GmActor.ownerSessionId`, `GmActor.presence`) — no session id, token, address or any other
- * player-identifying value exists in the projection, and none is added for this surface. A player who
- * has connected but claimed nobody is, by construction, not visible to the GM as a row: the table's
- * model of "a player" IS a claimed character.
+ * Projection guard: rows are built only from claim and presence the GM view already carries
+ * (`ownerSessionId`, `presence`). No session id, token, address or other player-identifying value is
+ * in the projection or added here. A connected player who has claimed nobody is not a row.
  */
 function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: GmView; gmToken: string; onPreviewPlayers: () => void }>) {
   const { toast } = useToast();
   const builder = state.builderPolicy;
   /**
-   * `playerRandom` is a PLAYERS setting, not a builder one, which is why it is here rather than
-   * beside "Players can build & level their own characters" in *The table*. The question it asks is
-   * about the people at this table — may they help themselves to a character — and the answer is no
-   * until the GM says otherwise (issue `2d`). The GM's own door is never gated by it.
-   *
-   * The other four `builderPolicy` fields ride along on every write because `builder.set-policy`
-   * requires `allowedAbilityMethods` and treats the rest as "omitted keeps the stored value".
+   * `playerRandom` is a Players setting: whether the people at this table may roll their own random
+   * character (closed by default). The GM's own door is never gated by it. The other `builderPolicy`
+   * fields ride along because `builder.set-policy` requires `allowedAbilityMethods` and keeps omitted
+   * keys.
    */
   const setPlayerRandom = (open: boolean) => {
     socket.emit("builder:set-policy", {
@@ -427,24 +384,13 @@ function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: Gm
   </Group>;
 }
 
-// ───────────────────────────────── The page ─────────────────────────────────
+// The page
 
 /**
- * **A GM token is not yet a GM view.** `main.tsx` names this race where the table's scenes row
- * guards it: "the first state after login can still be player-projected ... until the session join
- * lands". On a COLD DEEP LINK to `/settings` that window is the first paint — the address
- * authenticates, a state arrives, and the join that upgrades the projection has not happened yet.
- * `PlayerView` carries `builderPolicy` verbatim but no `rulesPolicy`, no `stagingDefaults` and no
- * `combat.healthDisplay`, so `TableGroup` read `state.rulesPolicy.dial` on undefined and took the
- * whole page into the error boundary: "Cannot read properties of undefined (reading 'dial')",
- * reproduced 8/8 at 375x667 and 1280x900 (in-SPA navigation never hit it — by then the join has
- * landed).
- *
- * So guard the FIELDS, not the role, exactly as the scenes row guards `combat.scenes` with
- * `Array.isArray`: a state that does not carry the GM's own policy is not a `GmView` yet, whatever
- * the token says. The cost is one frame of a page with only *Mine* on it; the next state has the
- * fields and the GM groups mount. The three checked here are exactly the GM-only fields `TableGroup`
- * dereferences — a projection either carries all of them or is not the GM's.
+ * A GM token is not yet a GM view: on a cold deep link to `/settings` the first state can still be
+ * player-projected (no `rulesPolicy`, `stagingDefaults` or `combat.healthDisplay`) until the session
+ * join lands. So check the GM-only fields `TableGroup` reads, not the role; the GM groups mount on
+ * the next state.
  */
 function gmViewOrNull(state: GmView | PlayerView | null): GmView | null {
   const view = state as GmView | null;
@@ -456,7 +402,7 @@ function gmViewOrNull(state: GmView | PlayerView | null): GmView | null {
 export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut, onRevokeAll, busy = false }: Readonly<{
   role: "gm" | "player";
   state: GmView | PlayerView | null;
-  /** Present exactly when `role === "gm"` — the GM groups need it for the integrations and token doors. */
+  /** Present exactly when `role === "gm"`; the GM groups need it for the integrations and token doors. */
   gmToken?: string | null;
   onPreviewPlayers?: () => void;
   onSignOut?: () => void;
@@ -464,9 +410,7 @@ export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut
   busy?: boolean;
 }>) {
   const gm = role === "gm" && gmToken ? gmViewOrNull(state) : null;
-  /* THE FRAME (§7): the heading never moves, and the groups are the one region that scrolls.
-     Settings no longer rides the shell's staged pane — it owns its column, its sky, and its
-     scroller. */
+  /* The heading stays fixed; the groups are the one scroll region. */
   return <div className="settings-page pane-frame pane-scene scanlines frame-col anim-view">
     <div className="pane-sky" aria-hidden="true" />
     <header className="settings-head neon-beam">

@@ -8,28 +8,17 @@ import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
 /**
- * **Choose your character (B4.2)** — what a player sees at the table before they have claimed anyone.
- *
- * This is the half of the old shell roster that was legitimately load-bearing: removing the roster from
- * every screen must not strand a player who has not claimed yet. So it moves here, onto the table, and
- * only for the pre-claim state — once you are playing someone, the table is your character's, not a
- * picker's.
- *
- * **Projection honesty.** A player's projection carries no definition for a character they do not own
- * (`projections.ts` — `PlayerActor.definition` is owner-only), so a card shows portrait, name and claim
- * state and nothing else. Class · level would be a guess, and a guess about someone else's sheet is
- * exactly the sort of thing the projection boundary exists to refuse.
+ * The table view for a player who has not claimed a character yet.
+ * A player's projection carries no definition for characters they do not own, so a card shows only
+ * portrait, name and claim state.
  */
 export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
   const [claiming, setClaiming] = useState<string | null>(null);
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
-  // Archived characters never reach a player projection at all, so this is every character the table
-  // has — minus a launched replay's clones (`rosterActors`, D3). A clone is unowned by design ("claims
-  // do not resurrect"), which is precisely what an available character looks like, so without this the
-  // picker offered a second copy of everyone in the recording. The server refuses such a claim anyway
-  // (`character-claims.ts`); this is the surface agreeing with the rule, not the rule.
+  // Excludes a launched replay's clones: they are unowned and would look claimable. The server
+  // refuses such a claim anyway (character-claims.ts).
   const characters = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
 
   const claim = async (actorId: string, name: string) => {
@@ -42,9 +31,7 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
     });
   };
 
-  /* A REGION, not a row (§7): 539px of cards at 390x844. `.scroll-y` declares it at every width —
-     above the rung it stops the picker shoving the map down its own column, and below the rung it is
-     the sheet's whole body (decision Q3), with the map band still live above it. */
+  /* A scroll region at every width, so the picker never pushes the map down its column. */
   return <section className="claim-view scroll-y" aria-labelledby="claim-heading">
     <div className="claim-heading">
       <h2 id="claim-heading">Choose your character</h2>

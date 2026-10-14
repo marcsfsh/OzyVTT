@@ -10,16 +10,9 @@ import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
 /**
- * **The Roster tab — the management home for characters (D15–D17).**
- *
- * Every character on the table in one gallery: create, import, approve, archive, restore, delete. It
- * is the ONLY roster surface now. The app shell used to paint a second, full-size roster above every
- * tab — including this one, so the Roster tab showed two rosters — and the pieces that lived only in
- * that shell copy (the PDF approval queue, JSON import, "Create a character") would have been orphaned
- * by deleting it. They are here instead.
- *
- * Archived characters are hidden from players by projection; the per-character reveal switch is the one
- * exception D16 allows — a read-only keepsake sheet, off by default.
+ * The GM's Roster tab: create, import, approve, archive, restore and delete characters.
+ * Archived characters are hidden from players by projection, except through the per-character
+ * read-only reveal switch (off by default).
  */
 export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: GmView; onCreateCharacter?: () => void }>) {
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
@@ -30,17 +23,14 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
-  // The campaign's characters. `rosterActors` (D3) drops a launched replay's clones - this tab manages
-  // people who belong to the table, and a clone is a prop the server deletes when the replay ends.
+  // `rosterActors` drops a launched replay's clones, which the server deletes when the replay ends.
   const pcs = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
   const active = pcs.filter((actor) => !actor.archived);
   const archived = pcs.filter((actor) => actor.archived);
   const sheetActor = sheetActorId ? pcs.find((actor) => actor.id === sheetActorId) ?? null : null;
   /**
-   * Read defensively. The FIRST `state:updated` a signing-in GM receives can still be the
-   * player-shaped projection — the socket pushes state before `session:join` lands — and that shape
-   * carries neither `pendingImports` nor `definitions`. main.tsx guards its scene strip on the field
-   * for exactly this reason; the crash it prevents is a whole-app error boundary, not a blank panel.
+   * Read defensively: the first `state:updated` a signing-in GM receives can still be the
+   * player-shaped projection (state is pushed before `session:join` lands), which lacks these fields.
    */
   const pendingImports = state.pendingImports ?? [];
   const definitions = state.definitions ?? [];
@@ -69,7 +59,7 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
     });
   };
 
-  /** Triad Delete: permanent, confirmed, and it says so. Archive is the reversible verb next to it. */
+  /** Permanent and confirmed; Archive is the reversible alternative. */
   const remove = async (actor: GmActor) => {
     const ok = await confirm({
       title: `Delete ${actor.name}?`,
@@ -131,20 +121,13 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
     </li>;
   };
 
-  /* THE FRAME (§7): the heading and its actions never move; the queue, the gallery and the
-     archived drawer share one declared region below them. The surface stands on the scene
-     sky (§9) — it is a browse-and-pick page, not the table. */
+  /* Heading and actions stay fixed; the queue, gallery and archived drawer share one region below. */
   return <section className="party-roster pane-frame pane-scene scanlines frame-col anim-view">
     <div className="pane-sky" aria-hidden="true" />
     <div className="party-heading neon-beam">
-      {/* "Roster" is the settled word (main.tsx's tab table, the address, the party strip); the old
-          "The party" heading was the drift. The helper under it listed the four buttons directly
-          below it, so it narrated the UI instead of describing the tab, and is gone. */}
       <h2>Roster</h2>
       <div className="party-heading-actions">
         {onCreateCharacter && <Button variant="primary" onClick={onCreateCharacter}>Create a character</Button>}
-        {/* Beside Create, not inside it: rolling one up is a different intention from building one,
-            and a GM filling a table with NPCs-as-characters reaches for it far more often. */}
         <Button onClick={() => setRandomOpen(true)}>Roll a random character</Button>
         <Button onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
         <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
@@ -153,7 +136,6 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
     </div>
 
     <div className="party-roster-body scroll-y frame-fill">
-    {/* The approval queue (B6.3). It lived inside the shell roster and nowhere else; this is its home. */}
     {pendingImports.length > 0 && <div className="party-queue">
       <h3 className="party-section-head">Waiting for approval</h3>
       <ul className="party-queue-list">{pendingImports.map((pending) => <li key={pending.id} className="party-queue-row">
@@ -168,8 +150,6 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
     </div>}
 
     {pcs.length === 0
-      /* An empty roster is a scene moment (§9): one line, one door. The import routes are still
-         one tap away in the heading row above — this is the first thing to do, not the only one. */
       ? <div className="scene-empty">
           <p>Nobody is on the table yet.</p>
           {onCreateCharacter && <Button variant="primary" arrow onClick={onCreateCharacter}>Create a character</Button>}
@@ -206,10 +186,7 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 
-/**
- * A read-only look at what a player actually sent, before the GM decides. Read off the submitted
- * definition rather than a live actor, because there is no actor yet — approving is what creates one.
- */
+/** Read-only preview of a submitted definition; no actor exists until the GM approves it. */
 function ImportPreview({ definition }: Readonly<{ definition: ActorDefinition }>) {
   return <dl className="import-preview">
     <div><dt>Class &amp; level</dt><dd>{classLine(definition) ?? "—"}</dd></div>

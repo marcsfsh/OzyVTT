@@ -6,10 +6,9 @@ import { registerContentCache } from "../content/invalidate";
 import { RichText } from "./RichText";
 
 /**
- * One shared fetch of the SRD spell reference (rules text + header fields), cached for the session so
- * every spellcasting block links against the same list. Failures are never cached - a transient miss
- * retries on the next mount - mirroring the condition reference fetch. The list powers two things: an
- * in-tab spell-rules card, and the name matcher that turns spell mentions into buttons that open it.
+ * One shared, session-cached fetch of the spell reference (rules text and header fields). Failures
+ * are never cached. Powers the in-tab spell-rules card and the matcher that turns spell names into
+ * buttons opening it.
  */
 let spellCache: readonly ContentSpellSummary[] | null = null;
 let spellInFlight: Promise<void> | null = null;
@@ -28,15 +27,13 @@ export function requestSpellReference(force = false) {
   });
 }
 
-// A homebrew spell can be published mid-session, so this list is not fixed for the
-// session any more. Nothing happens for a cold cache. See `content/invalidate.ts`.
+// A homebrew spell can be published mid-session; a cold cache does nothing (see `content/invalidate.ts`).
 registerContentCache(() => { if (spellCache) requestSpellReference(true); });
 
 export function useSpellReference(): readonly ContentSpellSummary[] {
   const [spells, setSpells] = useState<readonly ContentSpellSummary[]>(spellCache ?? []);
   useEffect(() => {
-    // Subscribe unconditionally: a consumer mounting with a warm cache still has to hear
-    // about the swap when a publish invalidates it.
+    // Subscribe even with a warm cache, so a later invalidation still reaches this consumer.
     if (spellCache) setSpells(spellCache);
     spellListeners.add(setSpells);
     requestSpellReference();
@@ -89,8 +86,8 @@ function boldSplit(text: string): ReadonlyArray<{ bold: boolean; text: string }>
 }
 
 /**
- * The stat block's Spellcasting prose, rendered with room to breathe (each line its own paragraph) and
- * every recognized spell name turned into a button that opens the spell's SRD rules in an in-tab card.
+ * A stat block's Spellcasting prose, one paragraph per line, with every recognized spell name a
+ * button that opens its SRD rules card.
  */
 export function SpellcastingText({ text }: Readonly<{ text: string }>) {
   const spells = useSpellReference();

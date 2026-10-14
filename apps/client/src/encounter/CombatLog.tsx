@@ -5,11 +5,10 @@ import { socket } from "../socket";
 import "./combat-log.css";
 
 /**
- * The persistent combat log (#12): a durable, scrollable record of what happened this fight - damage,
- * saves, actions, conditions, turn transitions, encounter/scene changes, and GM history rewinds. Fed
- * by the server's role-filtered `log:entry` broadcast (a player never receives a GM-only line) plus a
- * `log:read` backfill on every (re)connect, so a late joiner or a GM who just logged in sees the story
- * so far. A module store - like the map toasts - so a single subscription survives component remounts.
+ * The persistent combat log: damage, saves, actions, conditions, turns, encounter/scene changes and
+ * GM rewinds. Fed by the server's role-filtered `log:entry` broadcast (players never receive GM-only
+ * lines) plus a `log:read` backfill on every (re)connect. A module store, so one subscription
+ * survives remounts.
  */
 let entries: readonly CombatLogEntry[] = [];
 const listeners = new Set<() => void>();
@@ -36,15 +35,9 @@ if (socket.connected) load();
 function useCombatLog() { return useSyncExternalStore(subscribe, () => entries, () => entries); }
 
 /**
- * THE LIST, AND THE PIN-TO-NEWEST TRAP IT CARRIES.
- *
- * `scrollTop = scrollHeight` is how this log stays on its newest line, and **a hidden element
- * measures 0**, so that write lands on nothing and the log reopens scrolled to the TOP — the wrong
- * end of the thing you opened it to read. `DockAccordion.tsx` documents the same trap and solves it
- * the same way: the list is UNMOUNTED while it is not being read, so the effect re-runs on mount and
- * the pin is computed against a box that has a height. Ruling 6 named this cost when it chose the
- * drawer, because a `Drawer` stays mounted while closed (translated off-screen, `visibility: hidden`,
- * `inert`) — mounting the LIST on open is what pays it.
+ * The list pins itself to the newest line with `scrollTop = scrollHeight`, and a hidden element
+ * measures 0, so the list must be unmounted while closed and re-pinned on mount (a `Drawer` stays
+ * mounted while closed). `DockAccordion.tsx` handles the same trap the same way.
  */
 function CombatLogList() {
   const log = useCombatLog();
@@ -56,7 +49,7 @@ function CombatLogList() {
   </ol>;
 }
 
-/** The panel presentation — its own heading over the list. Used where the log has a column to stand in. */
+/** The panel presentation: its own heading over the list, where the log has a column. */
 export function CombatLogPanel() {
   return <section className="combat-log" aria-labelledby="combat-log-heading">
     <div className="combat-log-heading"><span className="eyebrow">LOG</span><h2 id="combat-log-heading">Combat log</h2></div>
@@ -65,14 +58,8 @@ export function CombatLogPanel() {
 }
 
 /**
- * RULING 6 — the log as a DRAWER FROM THE RIGHT.
- *
- * `Drawer` is non-modal by design (no scrim, no focus trap, no scroll lock), so the table stays live
- * behind it, which is the whole requirement: you read the log while the fight goes on. It takes an
- * edge rather than floating, so it covers the dock instead of the map.
- *
- * **The list is mounted only while open** — see `CombatLogList` above. That is not an optimisation;
- * it is the fix for the named cost this ruling accepted.
+ * The log as a non-modal drawer from the right (no scrim, focus trap or scroll lock), so the table
+ * stays live behind it. The list mounts only while open; see `CombatLogList`.
  */
 export function CombatLogDrawer({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   return <Drawer open={open} onClose={onClose} side="right" title="Combat log" className="combat-log-drawer">

@@ -19,7 +19,7 @@ export function annotationCenter(data: AnnotationGlyphData): Point {
   return { x: (data.origin.x + data.target.x) / 2, y: (data.origin.y + data.target.y) / 2 };
 }
 
-/** The outline geometry for a shape - shared by the encounter map's live preview and confirmed shapes. */
+/** The outline geometry for a shape, shared by the encounter map's live preview and confirmed shapes. */
 export function ShapeOutline({ shape, origin, target, className, style }: Readonly<{ shape: Exclude<GlyphShape, null>; origin: Point; target: Point; className: string; style?: React.CSSProperties }>) {
   if (shape === "circle") return <circle className={className} style={style} cx={origin.x} cy={origin.y} r={Math.max(1, Math.hypot(target.x - origin.x, target.y - origin.y))} />;
   if (shape === "square") {
@@ -27,7 +27,7 @@ export function ShapeOutline({ shape, origin, target, className, style }: Readon
     return <rect className={className} style={style} x={Math.min(origin.x, target.x)} y={Math.min(origin.y, target.y)} width={size} height={size} />;
   }
   if (shape === "line") return <line className={className} style={style} x1={origin.x} y1={origin.y} x2={target.x} y2={target.y} />;
-  // Cone: apex at origin, opening toward target; 5e RAW cones have equal length and width (half-angle = atan(0.5)).
+  // Cone: apex at origin, opening toward target; 5e cones are as wide as they are long (half-angle = atan(0.5)).
   const length = Math.max(1, Math.hypot(target.x - origin.x, target.y - origin.y));
   const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
   const halfAngle = Math.atan2(0.5, 1);
@@ -36,7 +36,7 @@ export function ShapeOutline({ shape, origin, target, className, style }: Readon
   return <polygon className={className} style={style} points={`${origin.x},${origin.y} ${left.x},${left.y} ${right.x},${right.y}`} />;
 }
 
-/** A transient "look here" ping: an expanding ring, a center dot, and the sender's name. Shared by the encounter map and the shared-screen viewer. */
+/** A transient "look here" ping: an expanding ring, a centre dot and the sender's name. */
 export function PingGlyph({ point, color, label, size }: Readonly<{ point: Point; color: string; label: string | null; size: number }>) {
   return <g className="annotation-ping" style={{ color }}>
     <circle className="annotation-ping-ring" cx={point.x} cy={point.y} r={size} />
@@ -45,7 +45,7 @@ export function PingGlyph({ point, color, label, size }: Readonly<{ point: Point
   </g>;
 }
 
-/** Filled triangle at `target`, pointing from `origin` toward `target` - the measurement arrowhead. */
+/** Filled triangle at `target`, pointing from `origin` toward `target`: the measurement arrowhead. */
 function arrowPoints(origin: Point, target: Point, size: number) {
   const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
   const back = angle + Math.PI;
@@ -56,9 +56,9 @@ function arrowPoints(origin: Point, target: Point, size: number) {
 }
 
 /**
- * Renders a measurement (line + arrowhead + centered "{feet} ft") or a shape (outline + centered
- * "{feet}ft {Shape}"). Shared by the encounter map and the shared-screen viewer so both look
- * identical. `arrowSize` scales the arrowhead to the map's grid so it reads at any zoom.
+ * Renders a measurement (line + arrowhead + centred "{feet} ft") or a shape (outline + centred
+ * "{feet}ft {Shape}"), shared by the encounter map and the shared-screen viewer. `arrowSize` scales
+ * the arrowhead to the grid so it reads at any zoom.
  */
 export function AnnotationGlyph({ data, arrowSize = 14, labelSize = 16, color = "#58c3ff", expiring = false, labelPoint }: Readonly<{ data: AnnotationGlyphData; arrowSize?: number; labelSize?: number; color?: string; expiring?: boolean; labelPoint?: Point }>) {
   const center = labelPoint ?? annotationCenter(data);

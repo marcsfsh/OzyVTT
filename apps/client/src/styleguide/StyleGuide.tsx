@@ -88,17 +88,16 @@ import {
   Wordmark
 } from "@vtt/ui";
 
-/** Living style guide for the OzyVTT design system. Dev-only reference
-    (its own Vite entry, styleguide.html); renders every token, type role, and
-    primitive with its states, and switches themes live. Keep it current: a new
-    primitive isn't done until it appears here. */
+/** Living style guide for the OzyVTT design system (dev-only, its own Vite entry styleguide.html):
+    every token, type role and primitive with its states, with live theme switching. A new primitive
+    is not done until it appears here. */
 
 const SURFACES = ["--void", "--bg", "--surface-1", "--surface-2", "--surface-3", "--overlay"];
 const LINES = ["--line", "--line-strong"];
 const NEON = ["--magenta", "--magenta-hi", "--cyan", "--cyan-hi", "--violet", "--violet-hi", "--indigo"];
 const SEMANTIC = ["--primary", "--success", "--caution", "--danger", "--danger-hi", "--info"];
 const TEXTS = ["--text", "--text-dim", "--text-muted", "--text-on-neon"];
-/** D21 — the atlas pin palette. Eight hues a GM assigns by MEANING, so they are a set, not a ramp. */
+/** The atlas pin palette: eight hues a GM assigns by meaning, a set rather than a ramp. */
 const PINS = ["--pin-1", "--pin-2", "--pin-3", "--pin-4", "--pin-5", "--pin-6", "--pin-7", "--pin-8"];
 
 function Section({ id, title, blurb, children }: { id: string; title: string; blurb?: string; children: ReactNode }) {
@@ -133,7 +132,7 @@ function ToastDemo() {
   );
 }
 
-// ----- Codex recut demos (D25): the primitives the overhaul promoted out of feature code -----
+// Codex primitives
 
 const PICKER_OPTIONS = [
   { id: "p1", label: "Strahd von Zarovich", meta: "Character" },
@@ -165,8 +164,8 @@ function ComboboxDemo() {
 }
 
 /**
- * The preview renderer is the CALLER's, deliberately — the primitive renders no markdown itself. This
- * one is four lines of nothing so the styleguide does not quietly ship a second markdown implementation.
+ * The preview renderer belongs to the caller (the primitive renders no markdown), and this one is
+ * deliberately trivial so the styleguide does not ship a second markdown implementation.
  */
 function tinyPreview(markdown: string): ReactNode {
   return (
@@ -207,7 +206,7 @@ function MarkdownEditorDemo() {
   );
 }
 
-/** D20: the palette is a COMPOSITION — Modal align='top' + an input + a list. Not a new primitive. */
+/** The command palette is a composition (Modal align='top' + an input + a list), not a primitive. */
 function CommandPaletteDemo() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -239,9 +238,8 @@ const DEMO_TABS: TabItem[] = [
   { id: "setup", label: "VTT Setup" }
 ];
 
-/* The real GM bar, which is what made the scroll fix necessary: eight labels are about
-   810px of content, so at 375px the last two sit outside a scrollport with a hidden
-   scrollbar. Shrink the window to watch the fade appear and the active tab scroll in. */
+/* The real GM tab bar: at 375px the last labels sit outside a scrollport with a hidden scrollbar.
+   Narrow the window to see the fade appear and the active tab scroll into view. */
 const OVERFLOW_TABS: TabItem[] = [
   { id: "encounter", label: "Encounter" },
   { id: "maps", label: "Map Setup" },
@@ -270,18 +268,13 @@ const ICONS = [
   { name: "IconCopy", glyph: <IconCopy />, use: "duplicate an existing one" },
   { name: "IconEye", glyph: <IconEye />, use: "shown to players" },
   { name: "IconEyeOff", glyph: <IconEyeOff />, use: "GM only" },
-  // Both added by the Codex recut, and both for the same reason the set exists at all: they were being
-  // typed as characters. The close control was a literal "×" in five components (Manrope has no U+00D7
-  // at the right weight, so it substituted), and the run/activate control was a "▶".
+  // Close and run controls were once typed as characters ("×", "▶"); these replace them.
   { name: "IconX", glyph: <IconX />, use: "close / clear a chosen value" },
   { name: "IconPlay", glyph: <IconPlay />, use: "make live / run" },
-  // The forward arrow was held back for years on an all-or-none argument, and the sweep that replaces
-  // every text glyph is the pass that finally pays for it — the landing hero, the roster and the sheet
-  // take it together. Rotate it for ← ↑ ↓; it is centred on the 24-box for exactly that.
+  // Rotate the arrow for ← ↑ ↓; it is centred on the 24-box for that.
   { name: "IconArrow", glyph: <IconArrow />, use: "this takes you there" },
   { name: "IconDownload", glyph: <IconDownload />, use: "keep a copy / export" },
-  // The map toolbar's tools, which were emoji until this set grew them: emoji take no token colour,
-  // draw differently per platform, and read as decoration in a row of controls that are not.
+  // The map toolbar's tools: icons take token colour and render the same on every platform, unlike emoji.
   { name: "IconSelect", glyph: <IconSelect />, use: "select / move — the resting tool" },
   { name: "IconPing", glyph: <IconPing />, use: "ping: look here" },
   { name: "IconMeasure", glyph: <IconMeasure />, use: "distance" },
@@ -295,8 +288,7 @@ const ICONS = [
 
 const SAVE_STATUSES: SaveStatus[] = ["idle", "dirty", "saving", "saved", "conflict", "error"];
 
-/** All six autosave states side by side — the point of the component is that you can
-    tell them apart with the colour thrown away, so they are shown together. */
+/** All six autosave states side by side: the point is that they can be told apart without colour. */
 function SaveStateDemo() {
   const [status, setStatus] = useState<SaveStatus>("dirty");
   return (
@@ -323,9 +315,8 @@ function SaveStateDemo() {
   );
 }
 
-/** The editable and the read-only checklist SIDE BY SIDE, because the split is the
-    component: the same items render as the GM's editor and as the player's status, and
-    the player's copy has to be visibly (and, in a screen reader, audibly) not-a-control. */
+/** The editable and read-only checklist side by side: the same items render as the GM's editor and
+    as the player's status, which must not read (or announce) as a control. */
 function ChecklistDemo() {
   const [objectives, setObjectives] = useState<readonly ChecklistItem[]>([
     { text: "Find the missing ledger in the counting house", done: true },
@@ -336,8 +327,7 @@ function ChecklistDemo() {
   return (
     <div className="sg-stack">
       <h3 className="sg-h3">Editable — the GM console (onChange present)</h3>
-      {/* Distinct names on purpose: two lists on one page called "Quest objectives" are
-          two identical stops in a screen reader's landmark/list rota. */}
+      {/* Distinct names so screen readers can tell the two lists apart. */}
       <Checklist
         ariaLabel="Quest objectives (editable)"
         items={objectives}
@@ -353,8 +343,8 @@ function ChecklistDemo() {
   );
 }
 
-/* Stands in for the app's `newId()`. The whole point of RowEditor's `rowKey` is that
-   this id is minted once, with the row, and never derived from the array position. */
+/* Stands in for the app's `newId()`: a RowEditor `rowKey` is minted once with the row, never derived
+   from its array position. */
 let demoSeq = 0;
 const newDemoId = () => `demo-${++demoSeq}`;
 
@@ -498,8 +488,8 @@ function TagInputDemo() {
   );
 }
 
-/* ---- Character-builder demo data (presentation only — the real content comes from
-   the SRD bundles and the real math from @vtt/rules-5e). ---- */
+/* Character-builder demo data (presentation only; real content comes from the SRD bundles and real
+   maths from @vtt/rules-5e). */
 
 const WIZARD_STEPS = [
   { label: "Species" }, { label: "Class" }, { label: "Background" },
@@ -532,7 +522,7 @@ const ABILITIES = [
 const SPECIES_BONUS: Record<string, number> = { dex: 2, con: 1 };
 const POINT_COST: Record<number, number> = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
-/* Demo-only: the shipping wizard takes these from @vtt/rules-5e. */
+/* Demo-only: the real wizard uses @vtt/rules-5e. */
 const modifierOf = (score: number) => Math.floor((score - 10) / 2);
 
 const CLASS_FEATURES = [
@@ -544,8 +534,8 @@ const CLASS_FEATURES = [
   { id: "cinder-mark", title: "Cinder Mark", meta: "Level 3", badge: <Badge tone="primary">Homebrew</Badge>, body: <p>Brand a creature you hit. Your next attack against it before the end of your next turn deals an extra 1d6 fire damage.</p> }
 ];
 
-/** The wizard frame driving a real step: species picking, live validation gating,
-    a preview pane, and the persistent attribution footnote. */
+/** The wizard frame driving a real step: species picking, live validation gating, a preview pane,
+    and the persistent attribution footnote. */
 function WizardDemo() {
   const [step, setStep] = useState(0);
   const [species, setSpecies] = useState<string | null>(null);
@@ -736,8 +726,7 @@ function ChoiceGridDemo() {
   );
 }
 
-/** The same grid in choose-N mode — the shape every content offer with `choose > 1`
-    takes (three Weapon Masteries, six prepared spells, two Magic Initiate cantrips). */
+/** The same grid in choose-N mode, the shape of every content offer with `choose > 1`. */
 function ChoiceGridMultiDemo() {
   const [picked, setPicked] = useState<readonly string[]>(["elf"]);
   const max = 2;
@@ -892,8 +881,8 @@ export function StyleGuide() {
             <div className="sg-row">
               <Button variant="primary" size="sm">Small primary</Button>
               <Button variant="secondary" size="sm">Small secondary</Button>
-              {/* Never an emoji or a symbol character, including here: the styleguide is the one place a
-                  bad example is most likely to be copied. These were 📍 / 📏 / 🌫 and are now real glyphs. */}
+              {/* Never an emoji or symbol character, especially here: the styleguide is where examples get
+                  copied from. */}
               <IconButton label="Ping"><IconEye /></IconButton>
               <IconButton label="Measure"><IconDrag /></IconButton>
               <IconButton label="Fog" aria-pressed><IconEyeOff /></IconButton>
@@ -963,8 +952,8 @@ export function StyleGuide() {
               <em> reserves</em> it with <code>banded</code> and leaves the cell above the track empty, which is
               the right answer — the track belongs level with the wells, not with the labels. Sight down the tops.
             </p>
-            {/* `.sg-align-row` is the selector `scripts/primitive-align-check.mjs` measures — it compares
-                the control tops inside this row at 390px and 1280px. Rename it there in the same edit. */}
+            {/* `.sg-align-row` is measured by `scripts/primitive-align-check.mjs` (control tops at 390px and
+                1280px). Rename it there in the same edit. */}
             <FieldGrid className="sg-align-row" min="12rem">
               <Field label="Display name" htmlFor="sg-align-name"><Input id="sg-align-name" placeholder="Frost Warden" /></Field>
               <Field label="Rarity" htmlFor="sg-align-rarity">
@@ -1280,7 +1269,7 @@ export function StyleGuide() {
             <div style={{ marginTop: "var(--space-5)" }}>
               <Steps current={3} ariaLabel="Character builder progress" onStepSelect={() => {}} steps={WIZARD_STEPS} />
             </div>
-            {/* All four states at once — the only place they can be compared side by side. */}
+            {/* All four states at once, the only place they can be compared. */}
             <div style={{ marginTop: "var(--space-5)" }}>
               <Steps
                 current={3}
@@ -1490,11 +1479,7 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          {/* Owed since wave 2 and assigned to wave 5A. The material shipped as five utilities with
-              no reference entry anywhere, which is precisely how a utility gets re-invented per
-              surface — the failure ruling 64 measured (five of the six landing-door pieces had zero
-              call sites outside the landing). Everything below is real: the styleguide loads
-              design-tokens.css, where these live, so unlike the sky demo further down this one paints. */}
+          {/* The material utilities live in design-tokens.css, which this page loads, so this demo paints. */}
           <Section id="material" title="The material — the landing door, carried inward (ruling 2)" blurb="Four composable utilities and a numeric face, expressing the one shape the app is made of: a 2px neon rim, a quieter bezel just inside it, a corner cut, a cue triangle that appears on interaction, and a scanline-over-gradient fill. Compose them; there is no single .door class, because a tab bar wants a rim without a corner and a badge wants a corner without a bezel. RULING 2 SPLITS THE GLOW: hero surfaces — Roster, Scenes, empty states, not-found, the builder gate — add .rim-lit for the rest glow; every other surface takes the material WITHOUT it, which is what keeps the restraint rule ('at most one glowing element per region at rest') meaningful on the surfaces where several controls share one region.">
             <h3 className="sg-h3">The pieces</h3>
             <div className="sg-material-grid">
@@ -1538,14 +1523,10 @@ export function StyleGuide() {
 
           <Section id="scene" title="The scene — sky, rims, beam, sign" blurb="Reversal, 2026-08-04 (decision log; design-language.md §9): the scene tier used to be one quiet wash and now it is a literal sky — a starfield, a sun cresting a lit horizon, a receding grid floor — off one --sky-* token set, so the theme toggle changes the HOUR. Three rules make it a work screen rather than a title screen. The horizon is a FIXED INSET from the pane's bottom (--sky-horizon-inset), never a percentage, so it cannot drift up into content as the pane grows. The sun is a CREST, not a disc, and the crown is exactly HALF the diameter so what stands above the line is a hemisphere: --sky-sun-d is derived from --sky-sun-crown rather than typed, because the first cut set them independently and the mask's cap flattened into a 394x54px slab. And the bright band is RESERVED — row-scanned over every pixel of the bare sky, the band that fails AA for --text-muted is at most 157px at 1920x1080 and 130px at 390x844 in all three hours, against a 176px / 144px reserve, so a scene surface's scroll region pads --sky-horizon-inset + --sky-sun-crown at the bottom and no row can rest in it. Legibility is a structure, not an opacity dial — with one named caveat: the scan sets point features aside, because a 1px star can land anywhere and no bottom reserve can bound it. REVERSED IN PART, 2026-08-06 (ruling 22): the table used to get no sky at all, and it now gets the horizon behind its chrome — the dock, the sheet and the margins — while the map STAGE stays a clean dark plate. The original reason survives as the scoping rule rather than as the ban: a horizon behind a battle map competes with the map, so nothing paints behind the map. The table's sky is painted as background layers rather than as a .pane-sky child, because .table-layout has position:fixed descendants and therefore may never take the perspective the grid floor needs — so it is the horizon without the floor mesh.">
             <h3 className="sg-h3">The sky — switch the theme above to change the hour</h3>
-            {/* The box below is INERT on this page and the note says so rather than letting a reader
-                conclude the sky is broken. `.pane-scene` / `.pane-sky` live in the client's own
-                styles.css, which styleguide.html deliberately does not load (it carries the shell
-                lock, and a reference document has to scroll). Every other §9 utility — .chamfer,
-                .rim-*, .neon-beam, .sign, .surface-glass — is in design-tokens.css and demos fine;
-                the scene tier is the outlier. Moving it there is the fix and it is not free: the
-                reserve rule `.pane-scene > .scroll-y` currently wins over `.pane-frame > .scroll-y`
-                on SOURCE ORDER, and crossing the package boundary reverses that. */}
+            {/* Inert here, and the note says so: `.pane-scene` / `.pane-sky` live in the client's styles.css,
+                which styleguide.html does not load (it carries the shell lock, and this page must scroll).
+                Moving them to design-tokens.css would reverse the source-order win of
+                `.pane-scene > .scroll-y` over `.pane-frame > .scroll-y`. */}
             <p className="sg-muted">The markup below is the real composition, but this page cannot paint it: the scene tier lives in the client&rsquo;s <code>styles.css</code>, which the styleguide does not load. See it live on Settings, the Roster, Scenes, Replays or any unanswered address.</p>
             <div className="sg-sky pane-scene scanlines">
               <div className="pane-sky" aria-hidden="true" />

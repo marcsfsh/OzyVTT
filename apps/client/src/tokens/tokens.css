@@ -1,5 +1,4 @@
-/* Token library renders in the shared Modal (box, head, close, scroll handled there); the Done/Remove
-   buttons live in the Modal footer. Below are the token-library body + grid rules only. */
+/* Body and grid rules only; the shared Modal provides the box, head, close and footer. */
 
 .token-library-filters { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: var(--space-4); }
 .token-library-filters > * { flex: 1 1 10rem; margin-top: 0; }
@@ -9,17 +8,16 @@
 
 .token-library-section { margin-top: 1.2rem; }
 .token-library-section h3 { margin: 0 0 .6rem; font: 700 .8rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
-/* Ruling 55: no dashed boxes. The empty library gets one designed frame, not a placeholder. */
 .token-library-empty { margin: .8rem 0 0; padding: 1.4rem; border: 1px solid transparent; text-align: center; color: var(--text-dim); font-size: .9rem; }
 
-/* ≤390px: two columns, tiles well over the 44px touch floor, upload tile first (D18's mobile note). */
+/* Two columns at 390px and below, tiles well over the 44px touch floor. */
 .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: .7rem; }
 .token-tile { display: flex; flex-direction: column; gap: .35rem; }
 .token-thumb { position: relative; display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: .6rem .4rem; border: 1px solid transparent; min-height: 44px; }
 .token-tile.selected .token-thumb, .token-thumb.selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .token-thumb-image { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 50%; overflow: hidden; background: var(--surface-3); border: 1px solid var(--line-strong); }
 .token-thumb-image img { width: 100%; height: 100%; object-fit: cover; }
-/* The empty-art mark and the upload mark are DRAWN, never a glyph: a dashed disc, and a plus. */
+/* The empty-art and upload marks are drawn, never a glyph. */
 .token-thumb-placeholder { width: 1.4rem; height: 1.4rem; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); }
 .token-thumb-upload .token-thumb-image { border-style: dashed; background: var(--surface-2); }
 .token-upload-mark { position: relative; width: 1.3rem; height: 1.3rem; }
@@ -34,15 +32,9 @@
 
 @media (max-width: 560px) { .token-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .token-library-filters > * { flex: 1 1 100%; } }
 
-/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
-   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
-   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
-   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
-   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
-   daybreak translation arrives for free.
-   RULING 28: a thumb is a tile in a grid, not an outermost panel, so it takes the plate without
-   the texture — twenty textured tiles in one grid is the interference case the ruling names.
-   The empty state IS the outermost panel of an empty library and takes the full fill. */
+/* The panel material on a `::before` backing layer, as `.nh-panel::before` does: `clip-path` clips
+   hit-testing, so it must not be on the element. `inset: -1px` puts the rim where the border was.
+   Thumbs are tiles in a grid, so no texture (many textured tiles cause interference). */
 .token-library-empty,
 .token-thumb {
   position: relative;

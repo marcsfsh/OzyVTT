@@ -1,12 +1,11 @@
 import { type ReactNode } from "react";
 
 /**
- * Renders the markdown subset the SRD reference text uses - ***bold-italic***, **bold**, *italic*,
- * paragraph breaks, "- "/"* " bullets, and the flattened pipe tables a few spells carry (Control
- * Weather) - as block-safe JSX. Display only: it never executes or trusts the content, it just formats
- * the bundled reference prose that would otherwise show raw "**" markers or a wall of pipes.
+ * Renders the markdown subset the SRD reference text uses (***bold-italic***, **bold**, *italic*,
+ * paragraph breaks, "- "/"* " bullets, and flattened pipe tables) as JSX. Display only; never
+ * executes the content.
  *
- * Because it can emit <p> and <table>, callers must wrap it in a block element (a <div>), never a <p>.
+ * It can emit <p> and <table>, so wrap it in a block element (a <div>), never a <p>.
  */
 
 /** Inline emphasis: ***both*** > **bold** > *italic*. Everything else passes through as text. */
@@ -67,8 +66,7 @@ function ProseBlock({ text, keyBase }: Readonly<{ text: string; keyBase: string 
 }
 
 export function RichText({ text }: Readonly<{ text: string }>) {
-  // Normalize em-dashes to " - " at render so bundled SRD prose never shows one in the UI, without
-  // mutating the licensed content in storage (house style: no em-dashes anywhere on screen).
+  // Em-dashes become " - " at render (house style: none on screen); stored content is untouched.
   const normalized = text.replace(/\s*—\s*/g, " - ");
   const blocks = parseBlocks(normalized);
   return <>{blocks.map((block, blockIndex) => block.kind === "table"

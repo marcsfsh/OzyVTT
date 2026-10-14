@@ -98,9 +98,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!map || !map.previewUrl || busy || !svgRef.current) return;
-    // The click surface is the preview BOX, which is larger than the map once the map is
-    // letterboxed inside it. Only a click on the map itself is a point: without this a tap on the
-    // surround would be silently clamped onto the nearest edge.
+    // The preview box is larger than the letterboxed map; ignore clicks outside the map rather than
+    // clamping them onto the nearest edge.
     if (!(event.target instanceof Node) || !svgRef.current.contains(event.target)) return;
     const raw = imagePointFromClient(svgRef.current, event.clientX, event.clientY);
     if (!raw) return;
@@ -125,16 +124,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     catch { setMessage("Copy was blocked by the browser. Select and copy the value manually."); }
   };
 
-  /* THE FRAME (§7, refresh B3). The heading never moves; the body below it is the region row, and
-     at the 1280 rung it spends the width on TWO columns instead of one long scroll — the map you
-     are driving on the left, the screen you are driving it to on the right.
-
-     THE PREVIEW IS PINNED VISIBLE, which is the whole point of the recompose. Measured before it:
-     at 1920x1080 the preview's top sat at 650px inside a 1036px pane while its X/Y fields sat at
-     1220 and the paired-display list at 1421 — so you could not see the map and type a coordinate
-     for it at the same time. It is now the tools column's flex-fill canvas, and the `54vh` cap
-     that stood in for one is gone. Click-to-place is untouched: `imagePointFromClient` reads the
-     svg's own `getScreenCTM`, so a resized, letterboxed svg maps clicks correctly for free. */
+  /* At 1280px+ the body becomes two columns: the map preview (the tools column's flex-fill canvas, so
+     it stays visible beside its coordinate fields) and the access column. */
   return <section className="viewer-controls pane-frame pane-scene scanlines frame-col anim-view" aria-labelledby="viewer-controls-title">
     <div className="pane-sky" aria-hidden="true" />
     <header className="viewer-controls-heading neon-beam">
@@ -162,9 +153,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
             onChange={(value) => setTool(value as typeof tool)}
             options={[{ value: "focus", label: "Focus view" }, { value: "ping", label: "Ping point" }, { value: "measure", label: "Measure line" }]}
           />
-          {/* The preview box IS the click surface — the `.viewer-tool-image` wrapper that used to sit
-              between it and the svg is gone, because an auto-height intermediate breaks the
-              percentage chain that lets the svg bound itself to the pinned canvas. */}
+          {/* The preview box is the click surface; no wrapper in between, since an auto-height intermediate
+              breaks the percentage chain that bounds the svg to the canvas. */}
           {map.previewUrl && <div className="viewer-tool-preview" onClick={choosePoint} aria-label="Viewer presentation map. Click to choose a point; coordinate fields below are the keyboard alternative.">
             <svg ref={svgRef} viewBox={`0 0 ${map.width} ${map.height}`} width={map.width} height={map.height} preserveAspectRatio="xMidYMid meet">
               <image href={map.previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
@@ -181,9 +171,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
         </>}
       </section>
 
-      {/* The access column: where the screen is, how it pairs, and who is paired. It IS the declared
-          region at the two-column rung, so a long list of paired displays scrolls itself rather than
-          the surface; below the rung it rides the body's one scroller and this is inert. */}
+      {/* At the two-column width this column is its own scroll region; below it, it is inert. */}
       <div className="viewer-col viewer-col-access surface-glass scroll-y">
           <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <Select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</Select> : <code>{viewerUrl}</code>}<Button variant="secondary" onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</Button></div>
           <div className="viewer-control-actions">

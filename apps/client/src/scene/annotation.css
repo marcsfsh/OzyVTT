@@ -1,7 +1,5 @@
-/* Shared visual styling for measurement/shape annotations, used by both the encounter map
-   (EncounterMap) and the shared-screen viewer (ViewerApp). Class-scoped only — no page reset. */
-/* A dark halo keeps the neon line legible over bright or busy battlemap art (the same legibility
-   tool token bodies use), so annotations never wash out against the map. */
+/* Measurement/shape annotation styling shared by the encounter map and the shared-screen viewer;
+   class-scoped only. A dark halo keeps neon lines legible over busy map art. */
 .annotation-measurement { filter: drop-shadow(0 0 2px rgb(0 0 0 / .85)); }
 .annotation-measurement line { stroke: var(--magenta); stroke-width: 3.5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 .annotation-measurement circle { fill: var(--magenta); }
@@ -19,7 +17,7 @@
 
 @keyframes annotation-fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
-/* Pings: an expanding, pulsing ring + core dot + the sender's name. `color` is set inline per sender. */
+/* Pings: an expanding ring, core dot and sender's name. `color` is set inline per sender. */
 .annotation-ping { color: var(--magenta); pointer-events: none; filter: drop-shadow(0 0 2px rgb(0 0 0 / .85)); }
 .annotation-ping-ring { fill: none; stroke: currentcolor; stroke-width: 4; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: annotation-ping-pulse 1.3s ease-out infinite; }
 .annotation-ping-core { fill: currentcolor; }

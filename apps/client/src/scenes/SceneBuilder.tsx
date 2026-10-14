@@ -5,27 +5,19 @@ import { socket } from "../socket";
 import { useMapCatalog } from "../maps/map-catalog";
 import { ScenePrepPanel } from "./ScenePrepPanel";
 import "./scene-panel.css";
-// The frame rules for this panel live beside the room they wrap, not in scene-panel.css: that file
-// is the two prep surfaces' chrome, and `.scene-builder-body` IS the prep room's region.
+// This panel's frame rules live with the prep room they wrap (scene-prep.css), not scene-panel.css.
 import "./scene-prep.css";
 import { usePrompt } from "../components/feedback";
 
 /**
- * The full prep door (D1): the workspace panel beside the privately staged map. Same parts as the
- * table's quick-start panel — map line, staging tray, the two Add buttons, Recent — because they are
- * literally the same component (`ScenePrepPanel`); only what an add COMMITS to differs. Here every
- * change edits this scene's own combatant list (`scene:set-combatants`), never the live table, and
- * the tokens it creates sit unplaced in the tray until the GM drags them onto the staged map.
+ * The full prep workspace beside the privately staged map. It shares `ScenePrepPanel` with the
+ * table's quick-start panel; here every change edits this scene's own combatant list
+ * (`scene:set-combatants`), never the live table, and new tokens wait in the tray until dragged onto
+ * the staged map. Going live is the map cluster's button.
  *
- * Making the scene live is the map cluster's button, not a second copy here — one action, one place.
- *
- * THE PANEL IS A FRAME (§7), and that is what lets it sit in the phone table's sheet row. It is the
- * row's one child, so it takes the row's height (`frame-col frame-fill`, the @vtt/ui utilities): the
- * head is a fixed row, the prep room below it is the ONE region — `.scroll-y` in the MARKUP, the
- * blessed marker — and the feedback line is the bottom row, so an error is never scrolled away from.
- * Before this it rendered at natural height (84 + 540 = 681px inside a 413px row at 390x844) and the
- * sheet ROW carried a `.scroll-y` bridge to keep the overflow reachable; the bridge is gone with it,
- * and every arm of that row is a frame column again.
+ * The panel is a frame (`frame-col frame-fill`) so it fits the phone sheet row: the head is fixed,
+ * the prep room is the one `.scroll-y` region, and the feedback line is the bottom row, so errors are
+ * never scrolled away.
  */
 export function SceneBuilder({ scene, actors, revision, stagingDefaults }: Readonly<{
   scene: Scene;
@@ -50,8 +42,7 @@ export function SceneBuilder({ scene, actors, revision, stagingDefaults }: Reado
     });
   };
   // Adds carry no expectedRevision: an add from the browser has just bumped the revision itself, and
-  // this is solo private staging, so the optimistic-concurrency guard would only reject the GM's own
-  // immediate follow-up.
+  // in solo private staging the guard would only reject the GM's own follow-up.
   const stageAdd = (actorId: string) => {
     if (staged.includes(actorId)) return;
     setBusy(true); setMessage("");
@@ -85,8 +76,8 @@ export function SceneBuilder({ scene, actors, revision, stagingDefaults }: Reado
         onAdd={stageAdd}
         onRemove={(actorId) => setCombatants(staged.filter((id) => id !== actorId))}
         mapName={mapName}
-        // A scene owns its map for life: there is no command to swap it, and its staged token positions
-        // are in that map's pixels. Prepare another scene to use another map.
+        // A scene owns its map for life: there is no command to swap it, and its token positions are in that
+        // map's pixels. Prepare another scene to use another map.
         mapLocked
         selectedMapId={scene.mapAssetId}
         stagingRevealed={(stagingDefaults?.visibility ?? "public") !== "gm-only"}

@@ -1,39 +1,12 @@
-/* THE MAPS LIBRARY + GRID CALIBRATION, AS A FRAME (§7/§8, refresh C2).
-   The surface used to be a `.card` riding a staged scroll region: heading, a four-field upload
-   grid, the map list, then a single calibration column that ran mode → instruction → crosshair
-   controls → canvas → point summary → a `<details>` of coordinates → the wizard → a `<details>`
-   of fine-tune controls. Measured at 1280x720 in a 676px pane that column was 1592-1793px tall,
-   and the canvas had 0px on screen on landing, 5px with a map selected, and 215 of its 666px once
-   the fine-tune fields were scrolled to — the GM was nudging a 3x3 block that was above the fold.
-   At 390x844 `.map-calibration` started at y=1215.
+/* The maps library and grid calibration, as a frame: `back · heading · upload row` over a
+   `rail | calibration pane` body. The pane's canvas is its one flex-filling child, never unmounted.
+   In the one-column pane the canvas is `flex: 1 1 0` and the step body `flex: 0 1 auto`, so the step
+   body (a scroll region) absorbs any height deficit; a short wide pane would starve it entirely,
+   which is why the pane goes two-column from 561px.
+   No sky: a horizon would compete with the map canvas.
+   Breakpoints: 560/561 (one column vs canvas | steps), 849/850 (rail or pane vs both), 1280. */
 
-   Now the frame is `back · heading · upload row` and the body is `rail | calibration pane`. The
-   pane is a four-step layout whose CANVAS IS THE ONE FLEX-FILLING CHILD: mounted once, never
-   inside a step panel, never conditionally unmounted, and never scrolled away from.
-
-   THE ORDER OF YIELDING, and it was inverted until the fix stage. In the one-column pane the
-   canvas is `flex: 1 1 0` and the step body `flex: 0 1 auto`, so a SHRINK is distributed by
-   `shrink × flex-basis` — the canvas's basis is 0, so it contributes nothing, and the step body
-   absorbs 100% of any deficit down to its floor. That is right for a phone (the canvas is the
-   thing; the step body is a declared `.scroll-y` region and scrolling it costs nothing) and it
-   was catastrophic for a SHORT WIDE pane, where the deficit is bigger than the whole step body:
-   measured on the fields step at 850x640 the body was 0px with 355px of content and the action
-   row sat 64px BELOW THE FOLD, with the page itself scrolling — the exact failure this redesign
-   exists to prevent, relocated. A floor on the step body cannot fix that (measured: it takes
-   850x640 from 64px of overflow to 192px), because the deficit is structural: the pane's chrome
-   is 243px and its canvas floor 176px against a 355px pane. The fix is the COMPOSITION — the
-   two-column pane below now starts at 561 instead of 1280, so a short pane stacks half as much.
-
-   NO SKY HERE (director's C2 decision Q1), for the same reason the table has none: a horizon
-   competes with a map canvas, and this surface's whole point is the canvas.
-
-   Ladder: 560/561 (phone density; one column vs canvas | steps), 849/850 (rail XOR pane vs
-   rail + pane), 1280 (the rail stops flexing). The old `max-width: 850px` is gone — it
-   double-fired against three `min-width: 850px` queries at exactly 850px. */
-
-/* ─────────────────────────────── the frame ─────────────────────────────── */
-/* `.scenes-maps-view` lives on THIS element now (it used to be the staging wrapper's in
-   main.tsx). Both audit scripts use it as the /scenes/maps ready selector — keep it. */
+/* `.scenes-maps-view` is the /scenes/maps ready selector in both audit scripts; keep it. */
 .scenes-maps-view { gap: var(--space-3); }
 .map-manager-head { display: flex; flex-direction: column; gap: var(--space-2); }
 .map-manager-back { align-self: flex-start; }
@@ -41,47 +14,36 @@
 .map-manager-title h2 { margin: .2rem 0 0; font: 400 var(--fs-h1) var(--font-display); }
 .map-manager-title p { max-width: 26rem; margin: 0; color: var(--text-dim); font-size: var(--fs-sm); text-align: right; }
 
-/* THE UPLOAD ROW. One primary "Add map…" (a real file input, hidden the way the embedded picker
-   hides its own) plus an inline reveal of name/type/folder. Below the 560 rung the reveal waits
-   for a file: the old four-field grid was a 376px block of chrome above the map list on a phone,
-   and collapsing it to one ~56px row is what turns 203px of usable body into ~600px. */
+/* Upload row: one "Add map…" button (the real file input is hidden) plus an inline reveal of
+   name/type/folder, which waits for a file below 560px. */
 .map-upload { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); }
 .map-upload-details { display: contents; }
 .map-upload label { display: flex; flex-direction: column; flex: 1 1 9rem; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
 .map-upload-optional { color: var(--text-muted); }
 .map-upload-file { flex: 0 1 auto; max-width: 100%; gap: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The real input stays in the DOM (the button clicks it) but never takes layout or focus order.
-   `width`/`height: 1px` is NOT enough on its own for `type="file"`: Chromium gives the input an
-   intrinsic size from its shadow "Choose File" button, so the border box measured 27.59px while
-   `clip-path` and `position` from this same rule applied normally — the tap audit saw a 27.6px
-   control with reach 0 and could not tell it from a real one. `min-*: 0` plus zeroed padding and
-   border collapse the intrinsic contribution, so the box is the 1px this rule always claimed. */
+/* The real input stays in the DOM (the button clicks it) but takes no layout or focus order. 1px
+   width/height is not enough for `type="file"`: Chromium sizes it from its shadow "Choose File"
+   button, so `min-*`, padding and border are zeroed too. */
 .map-upload-input { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; clip-path: inset(50%); }
 
-/* ─────────────────────────────── the body ─────────────────────────────── */
-/* One row, one or two columns. Below the 850 rung the rail and the pane share the single column
-   and one of them is showing — which is what kills the 1215px scroll-to-reach on a phone. */
+/* One row, one or two columns. Below 850px the rail and the pane share one column and one shows. */
 .map-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); min-width: 0; min-height: 0; }
 
 .map-rail { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
 .map-rail-filters { display: flex; flex-direction: column; gap: var(--space-2); }
-/* Folders up front (D5): one scrolling chip row above the picture grid. */
 .map-folder-chips { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
 .map-folder-chips > * { flex: none; }
-/* THE REGION IS THE WRAPPER, NEVER THE `<ul>` (scene-gallery.css:31-38): a grid with a definite
-   block size stops sizing its auto rows from its cards. `.scroll-y` is on this element in the
-   markup; the shared picker's own 21rem cap is neutralised below so only one thing scrolls. */
+/* The scroll region is the wrapper (`.scroll-y` in the markup), never the `<ul>`: a grid with a
+   definite block size stops sizing its auto rows from its cards. The picker's 21rem cap is lifted
+   so only one thing scrolls. */
 .map-rail-list { min-height: 0; padding-right: var(--space-1); }
 .map-rail .map-picker-grid { max-height: none; }
-/* Ruling 55 — NO DASHED BOXES. Both of these were a dashed placeholder rectangle saying nothing
-   is here yet; an empty surface gets one designed frame and the single next thing to do. The
-   frame is the material (below); the copy is the component's. */
+/* Empty states get one designed frame (the material below), not a dashed placeholder. */
 .map-list-empty { margin: var(--space-2) 0 0; padding: var(--space-4); border: 1px solid transparent; text-align: center; color: var(--text-dim); font-size: var(--fs-sm); }
 .map-empty { margin: 0; padding: var(--space-8); border: 1px solid transparent; text-align: center; color: var(--text-dim); }
 .map-pane-empty { display: grid; place-items: center; }
 
-/* ───────────────────────── the calibration pane ───────────────────────── */
-/* A column of chrome rows around ONE flex-filling canvas and ONE bounded, scrolling step body. */
+/* Calibration pane: chrome rows around one flex-filling canvas and one bounded, scrolling step body. */
 .map-pane { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
 .map-pane > * { flex: none; }
 .map-pane-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
@@ -93,29 +55,20 @@
 .map-folder-move select { width: auto; }
 
 .map-steps { flex: none; }
-/* ONE per-step instruction line, and the surface's only live region. */
+/* The per-step instruction line, and the surface's only live region. */
 .map-step-note { margin: 0; padding: .55rem var(--space-3); border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
 
-/* THE CANVAS COLUMN — the pane's one flex-filling child. `flex-basis: 0` so it takes the leftover
-   height rather than its content's, and a min-height floor so it survives even when the flex
-   algorithm is shrinking rather than growing. This pair is the measured guarantee: >0px of canvas
-   on screen in every step, at every rung.
-   THE FLOOR MUST NEVER BE BELOW THE COLUMN'S OWN MINIMUM CONTENT — preview 7rem + the gap + a
-   44px tools row = 164px. A floor under that does not shrink the column, it makes the tools row
-   paint OUTSIDE it, over `.map-step-body`, which is later in DOM order and therefore wins the
-   hit test: at 375x667 the `−`/`+` buttons had 15 of 44px reachable, and a real tap on "Zoom out"
-   6px above its own bottom edge hit whatever the step body was showing there — the mode choice on
-   step 0, which flips the calibration type and discards a placed area.
-   11rem clears 164 here; the ≤560 rung states the same floor arithmetically. */
+/* The canvas column: `flex-basis: 0` takes the leftover height, and the min-height floor keeps it on
+   screen even while the column shrinks. The floor must not be below the column's own content
+   (7rem preview + gap + 44px tools row), or the tools row paints outside the column, over the step
+   body, which then wins the hit test. */
 .map-canvas-col { display: flex; flex-direction: column; gap: var(--space-2); flex: 1 1 0; min-height: 11rem; }
 .map-canvas-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .map-zoom-level { color: var(--text-muted); font-size: var(--fs-xs); }
 
-/* The drag surface. `touch-action: none` is UNCONDITIONAL: this element is a pointer-capture drag
-   target and never a scroller, and the old modifier-class route (`.grid-area-mode` etc.) silently
-   left it computing `auto` the moment a wizard existed — measured. The explicit single grid track
-   is deliberate, not `place-items` alone: a percentage max-height against a content-sized row is
-   circular, and the svg would size the row that is meant to bound it (the ViewerControls lesson). */
+/* The drag surface. `touch-action: none` is unconditional: it is a pointer-capture target, never a
+   scroller. The explicit single grid track avoids a circular percentage max-height against a
+   content-sized row. */
 .map-preview {
   position: relative;
   display: grid;
@@ -137,10 +90,10 @@
 .map-preview:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .map-preview:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
 .map-preview p { line-height: 1.5; }
-/* Intrinsic size from the svg's width/height attributes, bounded by the canvas — so the box IS
-   the image and every click lands on it, with no letterbox gutter to click into. */
+/* Sized from the svg's own attributes and bounded by the canvas, so the box is the image and every
+   click lands on it. */
 .map-preview svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; user-select: none; }
-/* Calibration grid preview: cyan minor lines, magenta major lines (fixed hexes — SVG attributes don't resolve var()). */
+/* Calibration grid preview lines: fixed colours, since SVG presentation attributes cannot use var(). */
 .map-preview line { stroke: rgb(45 226 255 / 0.6); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .map-preview line.major { stroke: rgb(255 46 154 / 0.85); stroke-width: 1.5; }
 .map-preview .grid-area-preview rect { fill: rgb(255 46 154 / 0.18); stroke: #7CEFFF; stroke-width: 2.5; stroke-dasharray: 8 5; vector-effect: non-scaling-stroke; }
@@ -151,14 +104,9 @@
 .grid-crosshair line { stroke-width: 2.25; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 90%)); }
 .grid-area-handle { fill: #7CEFFF; stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; }
 
-/* THE STEP BODY. Bounded, and that bound is the thesis: without it the fields step grows until
-   the canvas it is adjusting is off-screen, which is exactly what the old column did. `.scroll-y`
-   is on this element in the markup — the blessed region marker, so this file still declares no
-   bare overflow of its own.
-   It carries NO floor on purpose. In the one-column pane it is the row that yields (see the
-   header's order-of-yielding note): a floor here does not buy the GM a taller body, it pushes the
-   action row off the bottom edge, because in every cell where the body is starved the pane is
-   already shorter than canvas-floor + chrome. Its content stays reachable because it scrolls. */
+/* The step body is bounded so it cannot push the canvas off screen. `.scroll-y` is in the markup.
+   No floor: in the one-column pane it is the row that yields, and a floor would push the action
+   row off the bottom instead. */
 .map-step-body { flex: 0 1 auto; min-height: 0; max-height: 40%; }
 .map-step-panel { display: flex; flex-direction: column; gap: var(--space-3); }
 .map-step-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
@@ -167,25 +115,17 @@
 .map-step-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-1); }
 .map-step-actions .nh-btn { flex: 1 1 10rem; justify-content: center; }
 
-/* Mode step — `ChoiceCard`s, which carry aria-checked and a real 44px paint, in place of the
-   hand-rolled aria-pressed buttons that only approximated both. */
 .map-mode-choice { gap: var(--space-2); }
 
-/* Fields step.
-   EVERY GRID HERE SIZES FROM ITS OWN WIDTH, not the viewport's. Above the 560 rung the step body
-   is a COLUMN beside the canvas, 224-646px wide depending on the pane — so a viewport-keyed
-   `@media` cannot tell it how many columns fit, and the fixed `1.6fr 1fr 1fr` it used to carry
-   squeezed "− Smaller" to 36.7px at 1280 and to 18px once the two-column pane reached 850.
-   `auto-fit` + a real minimum is the honest expression: 1 column in a phone-width pane column,
-   2 at a laptop's, 3 at 1080p — and it needs no rung at all. */
+/* Fields step. Grids size from their own width (`auto-fit` with a real minimum), not the viewport:
+   above 560px the step body is a column of varying width beside the canvas. */
 .grid-detected { margin: 0; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--cyan-hi); font-weight: 700; }
 .point-editor { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
 .point-editor fieldset { display: flex; flex: 1 1 11rem; gap: .45rem; min-width: 0; margin: 0; padding: var(--space-2); border: 1px solid transparent; }
 .point-editor legend { color: var(--text-muted); font-size: .7rem; font-weight: 800; }
 .point-editor label { display: flex; flex: 1 1 4rem; flex-direction: column; gap: var(--space-1); min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
 .point-editor input { width: 100%; min-width: 0; }
-/* `.nh-btn` is `white-space: nowrap` by design, which is right for a verb and wrong for this
-   sentence: at 320 it overflowed the step body by 21.5px before the column existed at all. */
+/* `.nh-btn` is `white-space: nowrap`; this one holds a sentence and must wrap. */
 .point-editor > .nh-btn { flex: 1 1 100%; white-space: normal; }
 .adjustment-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: .55rem; }
 .adjustment-groups fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; min-width: 0; margin: 0; padding: .55rem; border: 1px solid transparent; }
@@ -194,7 +134,6 @@
 .wizard-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; }
 .wizard-fields label { display: flex; flex-direction: column; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
 
-/* Verify / review step. */
 .verification-card { display: flex; flex-direction: column; align-items: start; gap: .4rem; padding: .8rem; border: 1px solid transparent; }
 .verification-card strong { font: 400 .95rem var(--font-display); }
 .verification-card p { margin: 0 0 .3rem; color: var(--text-dim); font-size: var(--fs-sm); }
@@ -206,15 +145,12 @@
 .map-review dt { color: var(--text-muted); font-size: var(--fs-xs); }
 .map-review dd { margin: 0; color: var(--text); font-family: var(--font-mono); font-size: var(--fs-sm); }
 
-/* The one recoverable failure: the server's 30-minute wizard TTL. An explicit state with one way
-   back to the canvas step, mode preserved — not a silent re-measure and not a dead end. */
+/* The one recoverable failure: the server's 30-minute wizard TTL, with one way back to the canvas. */
 .map-expired { display: flex; flex-direction: column; gap: .35rem; padding: .8rem; border-left: 4px solid var(--caution); border-radius: var(--radius-sm); background: var(--surface-2); }
 .map-expired p { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 
-/* Alignment crosshair controls — beside the canvas step, which is where the crosshair is drawn.
-   EVERY control here is at the 44px floor by PAINT (route 1), not by a `.tap-target` overhang:
-   the swatches sit 4px apart in a row, so a centred 44px ::after on a 24px swatch would reach
-   ~10px into each neighbour and steal its taps, and the row sits under a drag surface besides. */
+/* Crosshair controls reach the 44px floor by paint: the swatches sit 4px apart, so an overhang would
+   steal neighbours' taps, and the row sits under a drag surface. */
 .crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: .4rem .6rem; border: 1px solid transparent; color: var(--text-dim); font-size: var(--fs-xs); }
 .crosshair-label { color: var(--magenta-hi); font-weight: 700; }
 .crosshair-swatches { display: flex; gap: var(--space-1); }
@@ -228,13 +164,10 @@
 .map-point-summary { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .map-point-summary strong { color: var(--text); font-family: var(--font-mono); }
 
-/* ─────────────────────────────── the rungs ─────────────────────────────── */
-/* Four, in ascending order: 560/561 is the pane's own composition, 849/850 is the rail's, and
-   1280 is where the rail stops flexing. Nothing inside the step body has a rung any more — it
-   is a COLUMN above 560 and sizes its grids from its own width (see "Fields step" above). */
+/* Breakpoints: 560/561 is the pane's composition, 849/850 the rail's, 1280 where the rail stops
+   flexing. Nothing inside the step body has its own breakpoint. */
 
-/* 560 — phone density, and the ONE-COLUMN pane. The upload reveal waits for a file and the
-   heading stacks. */
+/* Phone density and the one-column pane: the upload reveal waits for a file and the heading stacks. */
 @media (max-width: 560px) {
   .map-manager-title { display: block; }
   .map-manager-title p { margin-top: var(--space-2); text-align: left; }
@@ -244,38 +177,17 @@
   .point-editor fieldset { flex: 1 1 100%; }
   .map-folder-move { flex: 1 1 100%; }
   .map-folder-move select { width: 100%; }
-  /* Every pixel the chrome gives up here goes to the canvas, which is the point of the redesign —
-     but NOT below the canvas column's own minimum content. 8rem (128px) used to sit 36px under
-     it, and a flex column does not shrink to a floor it cannot hold: the tools row painted
-     OUTSIDE the column, over the step body, and lost 29 of its 44 tappable pixels to it. Stated
-     as the arithmetic it is, so it stays true if the preview floor or the tap floor moves. */
+  /* The canvas floor stated as its own minimum content, so it stays right if either term changes. */
   .map-canvas-col { min-height: calc(7rem + var(--space-2) + var(--tap-min)); }
   .map-pane-title { flex: 1 1 8rem; }
   .map-step-note { padding: .45rem .6rem; }
 }
 
-/* 561 — THE PANE ITSELF BECOMES TWO COLUMNS: canvas | step column. The canvas takes the whole
-   height of the left column and the step column owns its own scroller, so the 40% cap stands
-   down and the fields have as much room as the canvas does.
-
-   THIS USED TO START AT 1280, AND THAT WAS THE 850-1279 BUG. A pane is wide enough to afford two
-   columns long before it is wide enough to afford a tall stack of chrome, and it is SHORTNESS,
-   not narrowness, that starves the step body: the one-column pane spends 243px on
-   `pane head · steps · note · actions · gaps`, so a 355px pane at 850x640 had 112px left for a
-   canvas whose own floor is 176. Measured on the fields step, one column → two:
-     850x640   canvas 176x586 → 238x334, body 0 → 50,  action row 64px below the fold → on it
-     1024x667  canvas 176     → 265,     body 0 → 77,  19px below the fold → on it
-     667x375   canvas 176     → 214,     body 0 → 26,  70px below the fold → on it
-   and the 849→850 cliff (the head un-hiding halves the canvas) goes from 411→176 to 623→398.
-   The step column's minimum is 14rem, not the 20rem it carried at 1280: 20rem was never the
-   binding constraint there (the 1.45:1 ratio is, at every width above ~1150), and at 850 it
-   would have pushed the canvas below the width of the rail beside it. */
+/* From 561px the pane is two columns, canvas | steps: the step column scrolls itself, so the 40% cap
+   is lifted. Short panes, not narrow ones, are what starve a one-column pane, so this starts well
+   below laptop widths. The step column's minimum is 14rem. */
 @media (min-width: 561px) {
-  /* `:not(.map-pane-empty)` because the empty pane is a one-child message box with no step rows —
-     it must not inherit a five-row, two-column template it has nothing to put in. It shared this
-     selector at 1280, where the template won on source order and stretched the message into the
-     first cell; scoping it out keeps the empty pane on its base rule at every width instead of
-     spreading that to every laptop. */
+  /* The empty pane is a one-child message box and must not get the two-column template. */
   .map-pane:not(.map-pane-empty) {
     display: grid;
     grid-template-columns: minmax(0, 1.45fr) minmax(14rem, 1fr);
@@ -284,15 +196,8 @@
     align-items: stretch;
   }
   .map-pane-head { grid-area: 1 / 1 / 2 / 3; }
-  /* THE RAIL SPANS BOTH COLUMNS, and this is not decoration. `Steps` never wraps by design (a
-     seven-step builder would blob into rows at 375px) and it hides its own scrollbar, so a rail
-     wider than its box is a SILENTLY truncated one. Sat in the step column it measured 234-451px
-     against a 659px rail, and `li.nh-step--current` was fully off-view at every width from 761 to
-     1440 — including at 1280, where this composition already shipped: the current step overhung
-     by 120.1px there and 54.8px at 1440. Spanning gives the rail exactly the width it has in the
-     one-column pane (586 at 850, 956 at 1280), so the current step is on screen at every width,
-     scrollable 0 above 850. It costs the canvas 56px of height, which is the right trade for the
-     one row whose whole job is saying where you are — and for the rail-jump door C-3 restored. */
+  /* The step rail spans both columns: `Steps` never wraps and hides its scrollbar, so in the narrow
+     step column the current step was cut off silently. */
   .map-steps { grid-area: 2 / 1 / 3 / 3; }
   .map-canvas-col { grid-area: 3 / 1 / 6 / 2; }
   .map-step-note { grid-area: 3 / 2 / 4 / 3; }
@@ -300,51 +205,30 @@
   .map-step-actions { grid-area: 5 / 2 / 6 / 3; }
 }
 
-/* 849 — the rail and the pane ARE the same column, so exactly one of them shows: tapping a map
-   swaps the region to the pane, and the pane's own "All maps" row swaps it back. This is what
-   removes the phone's scroll-to-reach, where `.map-calibration` began at y=1215 under a heading,
-   a 376px upload form and the whole list. 849, not 850: the `min-width: 850px` query in this
-   file used to double-fire against a `max-width: 850px` at exactly 850px. */
+/* Below 850px the rail and the pane are the same column: tapping a map shows the pane, and its
+   "All maps" row returns. 849 so it never double-fires with `min-width: 850px`. */
 @media (max-width: 849px) {
   .map-body[data-view="pane"] > .map-rail { display: none; }
   .map-body[data-view="rail"] > .map-pane { display: none; }
-  /* AND THE FRAME'S OWN ROWS STAND DOWN while the pane has the column. They belong to the
-     library — a back door to Scenes, the surface's name, "Add map…" — and none of them is part
-     of calibrating the map in front of you. Measured at 390x844: leaving them up left the pane
-     ~400px, of which 274 was chrome, and the action row was pushed off the bottom edge. "All
-     maps" brings them all back in one tap, so nothing is lost, only deferred.
-     IT STAYS INSIDE THIS QUERY, and the last clause is why. Above the rung the rail is beside the
-     pane, so `.map-pane-back` is hidden — there is no "All maps" to bring the head back with, and
-     hoisting this rule would take "Add map…" and the door to Scenes away for the rest of the
-     session the first time a map is tapped. The 212.7px it would free is bought two rules up
-     instead, by halving the pane's chrome stack rather than deleting the library's only doors. */
+  /* The library's head rows (back to Scenes, title, "Add map…") hide while the pane has the column,
+     giving the calibration room; "All maps" brings them back. Only inside this query: above it there
+     is no "All maps" to restore them. */
   .map-manager:has(.map-body[data-view="pane"]) > .map-manager-head { display: none; }
 }
 
-/* 850 — the rail and the pane stop sharing a column. */
 @media (min-width: 850px) {
   .map-body { grid-template-columns: minmax(12rem, var(--rail-w)) minmax(0, 1fr); }
   .map-pane-back { display: none; }
 }
 
-/* 1280 — spend a 1080p width: the rail stops flexing and takes its full §7 cap, so every pixel
-   the window gains from here goes to the canvas. */
+/* At 1280px the rail stops flexing, so extra width goes to the canvas. */
 @media (min-width: 1280px) {
   .map-body { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
 }
 
-/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
-   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
-   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
-   because `clip-path` clips hit-testing and the crosshair row is five adjacent 44px targets.
-   `inset: -1px` spans the border box, so the rim lands where the 1px border used to and nothing
-   reflows. All values are shared tokens, so ruling 29's daybreak translation arrives for free.
-
-   RULING 28: nothing here takes the scanline. Every one of these is a panel nested inside the
-   calibration pane or the rail — the surface's own outermost frame is the pane itself, which
-   deliberately has no fill so the canvas reads as the content (this file's header, and the same
-   reason it has no sky). A texture behind fine-tune fields sitting beside a map is the moiré case
-   the ruling names. No rest glow either: this is a workbench, not a hero surface. */
+/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing (the
+   crosshair row is five adjacent 44px targets). No scanline: these panels are nested, and the pane
+   itself has no fill so the canvas reads as the content. */
 .map-list-empty,
 .map-empty,
 .point-editor fieldset,
@@ -378,8 +262,6 @@
   outline-offset: calc(-1 * var(--bezel-inset));
   transition: border-color var(--dur-hover), background var(--dur-hover);
 }
-/* Ruling 39's shape, applied to the two notice strips this surface owns: severity on a 2px
-   leading rule, text on a neutral ground, so neither survives on colour-over-tint in daybreak.
-   Both already had the bar; what goes is the rounded corner and the tinted fill behind the words. */
+/* Severity as a 2px leading rule on a neutral ground. */
 .map-step-note { border-left-width: 2px; border-radius: 0; background: var(--surface-2); }
 .map-expired { border-left-width: 2px; border-radius: 0; background: var(--surface-2); }

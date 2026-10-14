@@ -10,9 +10,7 @@
 .api-reference-group { margin-top: var(--space-5); }
 .api-reference-group h3 { margin: 0 0 var(--space-2); font-size: 1rem; color: var(--text); }
 .api-endpoint-list { display: grid; gap: 0.55rem; }
-/* Ruling 47: forty endpoints are the longest list on this surface. A hairline rule between rows,
-   no per-row fill and no per-row card — the disclosure's own open border is what separates a row
-   from its body. The list's `gap` is what separates one row from the next. */
+/* Endpoint rows: a hairline between rows, no per-row fill or card. */
 .api-endpoint { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .api-endpoint > summary { list-style: none; cursor: pointer; padding: 0.55rem 0.7rem; display: grid; gap: var(--space-1); }
 .api-endpoint > summary::-webkit-details-marker { display: none; }
@@ -59,38 +57,20 @@
 .api-response p { margin: 0 0 0.3rem; font-size: 0.82rem; }
 .api-response-code { font-weight: 800; color: var(--text); }
 .api-response-schema { color: var(--text-dim); font-style: normal; }
-/* The ladder's 760 rung (§3), one block for the whole file: below it nothing in this panel keeps a
-   right-hand column — the auth chips, the export button and the type column all give up their gutter. */
+/* Below 760px nothing in this panel keeps a right-hand column. */
 @media (max-width: 760px) { .api-auth { margin-left: 0; width: 100%; } .api-field-table td:nth-child(2) { white-space: normal; } .api-export-spec { margin-left: 0; } }
 
-/* ── RULING 61: the reference at its own address (`/settings/api`), full window width ──
-   The page IS the surface, so it takes the pane's whole width rather than the 72rem reading
-   measure Settings gives its groups: this is a reference to scan, not prose to read, and the
-   endpoint rows and the command table are the widest things in the app.
-   `.api-reference-body`'s own left/right padding is dropped here — the frame's gutter
-   (`.pane-frame`) already supplies it, and paying twice inset the content by 40px a side. */
+/* The reference at its own address (`/settings/api`): full pane width, not the settings reading
+   measure. `.api-reference-body`'s side padding is dropped because `.pane-frame` supplies the gutter. */
 .api-reference-page-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); }
 .api-reference-page-head h2 { margin: 0; }
 .api-reference-page-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
 .api-reference-page-body > .api-reference-body { padding-inline: 0; }
 .api-reference-page-body .api-reference-toolbar { margin-top: var(--space-2); }
 
-/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
-   One panel on this surface — the reference itself, a `<details>` standing on the settings page.
-   Same construction as `.nh-panel::before` (packages/ui Panel.css): the cut, the rim and the fill
-   ride a BACKING LAYER, never the element, because `clip-path` clips hit-testing and the summary
-   row is the control that opens it. `inset: -1px` spans the border box, so the rim lands where the
-   1px border used to and nothing reflows. No rest glow — not a hero surface.
-
-   RULING 28 — RIM AND BEZEL, NO SCANLINE, because this panel is NESTED and not outermost. It reads
-   as standalone in this file and is not: on `/settings` it renders inside `.settings-group--table`,
-   whose own `::before` already computes the repeating gradient, and two scanline fields at the same
-   period stacked one inside the other is exactly the moiré ruling 28 exists to remove. Measured on
-   `/settings` at 1280x900 before this changed: `.api-reference.closest(".settings-group")` returned
-   `settings-group settings-group--table` and BOTH `::before`s computed `repeating-linear-gradient`.
-   `.api-reference` has exactly one call site — the `<details>` on `/settings` (`ApiReference`); the
-   standalone address (`/settings/api`, ruling 61) renders `ApiReferenceBody` on a `.pane-frame` and
-   never takes this class — so there is no route on which this panel is the outermost one. */
+/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing and
+   the summary is the control. Rim and bezel but no scanline: `.api-reference` only renders inside
+   `.settings-group--table`, which already has one, and nested scanlines cause moiré. */
 .api-reference {
   position: relative;
   isolation: isolate;

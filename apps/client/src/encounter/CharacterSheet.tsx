@@ -18,26 +18,22 @@ import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { registerContentCache } from "../content/invalidate";
 
-/** One fetch per stat block per session.
-    NOT immutable any more: homebrew definitions can be republished while the sheet is
-    open, so this is cleared on `homebrew:changed` (`content/invalidate.ts`). A stale
-    entry here is already a known failure mode — see the note at the save path below. */
+/** One fetch per stat block per session. Cleared on `homebrew:changed` (`content/invalidate.ts`),
+    since homebrew definitions can be republished while the sheet is open. */
 const sheetCache = new Map<string, ActorDefinition>();
 registerContentCache(() => sheetCache.clear());
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 
-/** The required keys of an `ActorAction`, so a derived action can be handed to the targeting session
-    carrying the SERVER's id and nothing invented. Every number on it is display; the resolver reads
-    the id and computes the rest, riders included. */
+/** The required keys of an `ActorAction`, so a derived action can be handed to targeting with the
+    server's id and nothing invented. The numbers are display only; the resolver reads the id. */
 const EMPTY_ACTION = {
   id: "", name: "", activation: "action" as const, description: "", damage: [] as Array<{ formula: string; type: string }>
 };
 
-/** One row of `actor:available-actions`. The display half is additive-optional on the wire
-    (ADR-0007), so every field is read defensively — an older server simply yields an action
-    with no numbers, which renders as a name and routes correctly anyway. */
+/** One row of `actor:available-actions`. The display fields are additive-optional on the wire
+    (ADR-0007), so every one is read defensively. */
 type AvailabilityRow = Readonly<{
   id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other";
   available: boolean; usesRemaining: number | null; builtin?: boolean;
@@ -66,11 +62,11 @@ const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
 const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
-/** Best-effort per-browser preference storage for the sheet's roll settings (private-mode safe). */
+/** Per-browser storage for the sheet's roll settings (private-mode safe). */
 const readSetting = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeSetting = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable; setting stays in-session */ } };
 const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
-/** One skill row on the sheet: which ability governs its check comes from the catalog, never code. */
+/** One skill row: the ability governing its check comes from the catalog. */
 type SheetSkill = Readonly<{ id: string; name: string; ability: (typeof ABILITIES)[number] | null }>;
 
 type SrdExtension = Partial<{
@@ -84,26 +80,15 @@ type SrdExtension = Partial<{
 
 /**
  * Compact HP tracker inside the sheet; the server enforces scope (GM anyone, player self).
- *
- * **Exported for `damage-type.test.tsx`, and that export is the fix to a real hole.** D7 gave three
- * doors one payload builder and only the token menu was joined to it by a test: a hostile review on
- * 2026-08-10 replaced this component's `manualDamageType(...)` with `undefined` and the whole client
- * suite stayed green at 65 files / 917 tests. Rendering the sheet WHOLE to reach these five controls
- * would need a definition fetch, a skill catalog and a targeting context, none of which are the thing
- * under test — so the door is exported at the same grain `SavePrompt` is.
+ * Exported so `damage-type.test.tsx` can test the damage-type payload without rendering the whole
+ * sheet.
  */
 export function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: string; allowSet: boolean; onFeedback: (text: string) => void }>) {
   const [amount, setAmount] = useState("");
   /**
-   * D7's type, on the one damage door a PLAYER can also reach.
-   *
-   * The decision says "the GM's damage entry", and this component renders for both roles - only the
-   * extra `Set` button is GM-gated. It gets the field anyway, because the server already accepts
-   * `damageType` from a player scope (`actorApplyDamage` has no GM grade; `adjustableActor` restricts
-   * WHICH character, not what may be said about the damage), and because the alternative is a `Dmg`
-   * button that quietly means something different depending on who taps it. A player typing "12 fire"
-   * on their own sheet gets their own resistance applied, which is the correct answer and the one they
-   * would otherwise have to ask the GM for.
+   * The damage type is offered to players too (only `Set` is GM-gated): the server accepts
+   * `damageType` from a player on their own character, and "12 fire" on your own sheet should apply
+   * your own resistance.
    */
   const [damageType, setDamageType] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -112,7 +97,7 @@ export function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ ac
     const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { onFeedback(`Enter a whole number (${minimum}-1000).`); return; }
     setBusy(true);
-    // Only Dmg carries the type; Heal, Temp and Set share the row and none of them has one.
+    // Only Dmg carries a type; Heal, Temp and Set share the row and have none.
     const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
     const payload = event === "actor:set-hp" ? { commandId: newId(), actorId, current: value }
       : event === "actor:apply-damage" ? manualDamagePayload({ commandId: newId(), actorId, amount: value, damageType: typed })
@@ -134,10 +119,9 @@ export function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ ac
 }
 
 /**
- * Rest controls (v5 #5): the player takes a short or long rest on their own character straight from the
- * sheet (the GM may rest anyone whose sheet they open). Short rest also exposes the Hit-Point-Dice spend
- * (each die heals its roll + Con mod); the long rest restores HP, hit dice, spell slots, prepared spells,
- * and limited uses. The server refuses either while the character is in a running encounter.
+ * Short and long rest on this character (players on their own, the GM on anyone). A short rest can
+ * spend Hit Dice (each heals its roll + Con mod); a long rest restores HP, hit dice, slots, prepared
+ * spells and limited uses. The server refuses either during a running encounter.
  */
 function SheetRest({ actorId, hitDice, onFeedback }: Readonly<{ actorId: string; hitDice?: Readonly<{ die: string; maximum: number; remaining: number }> | null; onFeedback: (text: string) => void }>) {
   const [count, setCount] = useState(1);
@@ -174,11 +158,10 @@ function SheetRest({ actorId, hitDice, onFeedback }: Readonly<{ actorId: string;
 }
 
 /**
- * The damage a spell deals when cast at `level` - the ONE place both the displayed effect helper and the
- * rolled formula come from, so they can never diverge (v6 #8). Uses the SRD upcast row for that slot if
- * there is one, else the base damage. For target-scaling (N darts/rays), the roll `formula` repeats the
- * die `targetCount` times so casting rolls the FULL amount - the old code only put "×N" in the label and
- * rolled a single instance, which is why an upcast rolled the non-upcast damage.
+ * The damage a spell deals when cast at `level`: the single source for both the displayed effect
+ * and the rolled formula. Uses the SRD upcast row for that slot if any, else the base damage. For
+ * target scaling (N darts/rays) the formula repeats the die `targetCount` times so the full amount
+ * is rolled.
  */
 function spellEffectAt(content: ContentSpellSummary | undefined, baseLevel: number, level: number): { label: string | null; formula: string | null } {
   const upcast = level > baseLevel ? content?.castingOptions.find((option) => option.level === level) : undefined;
@@ -191,11 +174,9 @@ function spellEffectAt(content: ContentSpellSummary | undefined, baseLevel: numb
 }
 
 /**
- * Per-spell "Cast at" control: a slot-level dropdown (each level shows remaining/total; empty levels
- * disabled) plus a Cast button. Casting spends the chosen slot and, for a damaging spell, auto-applies
- * the SRD upcast scaling for that level (referenced from the vendored spell data) - the parent owns the
- * two-step emit so this stays a small stateful shell. Only offered for leveled spells (cantrips use no
- * slot); returns null when the character has no slot at or above the spell's level.
+ * Per-spell "Cast at" control: a slot-level dropdown (remaining/total per level; empty levels
+ * disabled) and a Cast button. The parent owns the slot-spend and roll emits. Leveled spells only;
+ * returns null when no slot at or above the spell's level exists.
  */
 function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRemaining, busy, onCastSlot, onCastCantrip }: Readonly<{
   spell: Readonly<{ id: string; name: string; level: number }>;
@@ -212,9 +193,8 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
   const [castLevel, setCastLevel] = useState(options[0] ?? spell.level);
   const level = options.includes(castLevel) ? castLevel : (options[0] ?? spell.level);
   const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
-  // The effect at the selected level (base or SRD-upscaled), from the same helper the Cast button rolls,
-  // so the shown "N× die"/"4d6" and the rolled damage are always the same value (v6 #8). Three uniform
-  // grid cells (helper · slot · Cast) that align across every row (v5 #1/#2/#9).
+  // The effect at the selected level, from the same helper the Cast button rolls. Three grid cells
+  // (helper · slot · Cast) that align across rows.
   const { label: effect } = spellEffectAt(content, spell.level, level);
   const canCast = isCantrip || (options.length > 0 && remainingAt(level) > 0);
   return <>
@@ -231,25 +211,20 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
 }
 
 /**
- * Read/track sheet: live actor state (hp, conditions) over the immutable stat block.
- * Track, never build - no editing of scores or actions here. The GM opens any combatant;
- * a player only ever receives their own actor (and no monster definition fetch succeeds
- * for them server-side).
+ * Read/track sheet: live actor state (hp, conditions) over the immutable stat block; no editing of
+ * scores or actions. The GM opens any combatant; a player only ever receives their own actor.
  */
-export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, combat, onJumpToInitiative, standaloneActions, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; /** Combat context for the player's OWN sheet, enabling structured attacks from the Actions section on their turn. */ combat?: { revision: number; active: boolean; myTurn: boolean; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }; /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void; /** Page-level doors for the STANDALONE presentation, rendered as the frame's bottom row (§7). Only the SPA's `/characters/:id` passes any: they navigate to app addresses, which `sheet.html` — a page with no router — cannot honour, so that entry passes nothing and renders no row. */ standaloneActions?: React.ReactNode; onClose: () => void }>) {
+export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, combat, onJumpToInitiative, standaloneActions, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; /** Combat context for the player's OWN sheet, enabling structured attacks from the Actions section on their turn. */ combat?: { revision: number; active: boolean; myTurn: boolean; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }; /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void; /** Page-level doors for the standalone presentation, shown as the frame's bottom row. Only the SPA's `/characters/:id` passes any; `sheet.html` has no router. */ standaloneActions?: React.ReactNode; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
-  // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
-  // live actor prop (`ownDefinition`) and must WIN so that identity/proficiency edits reflect at once
-  // (bugfix: a useState seeded from ownDefinition went stale after an edit).
+  // The GM fetches bundled definitions into `fetched`; a player's own definition comes on the live
+  // actor (`ownDefinition`) and must win, so identity/proficiency edits show at once.
   const [fetched, setFetched] = useState<ActorDefinition | null>(definitionId ? sheetCache.get(definitionId) ?? null : null);
   const definition = ownDefinition ?? fetched;
-  // On the player's own turn in an active fight, their stat-block actions that target a creature (weapon &
-  // spell attacks, save/damage spells) resolve through the shared structured flow (pick target -> roll ->
-  // resolve) rather than loose dice. The live combat context is the explicit `combat` prop when the sheet is
-  // embedded in the initiative panel (which can also jump there and back), otherwise it's derived from the
-  // player's own view `state` so this works from ANY sheet surface - the standalone tab, the roster, the map
-  // - not only the panel. Player-only; the GM acts through their own runner.
+  // On the player's own turn, targeted stat-block actions resolve through the shared structured flow
+  // (pick target -> roll -> resolve). Combat context is the `combat` prop when embedded in the
+  // initiative panel, else derived from the player's `state`, so it works from any sheet surface.
+  // Player-only; the GM uses their own runner.
   const liveCombat = combat ?? (role === "player" && state
     ? (() => { const pv = state as PlayerView; return { revision: pv.revision, active: pv.combat.active, myTurn: pv.combat.turnActorId === actor.id, playerDamageMode: pv.combat.playerDamageMode, targets: pv.combat.initiative.map((entry) => ({ actorId: entry.actorId, name: entry.name })) }; })()
     : undefined);
@@ -260,44 +235,35 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
   const [newItem, setNewItem] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
-  // C9: which unbound template row (a pre-C9 magic weapon/armor) has its chooser open, and the
-  // catalog the row detail resolves its template against. The shared fetch is session-cached.
+  // Which unbound template row (a magic weapon/armor with no base picked) has its chooser open, and
+  // the catalog its detail resolves against.
   const [bindingRowId, setBindingRowId] = useState<string | null>(null);
   const { catalog: equipmentCatalog } = useEquipmentReference();
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
-  // One draft row per class the character HAS (multiclass is decision #2 of the builder packet), not
-  // just the first. `id` is sticky: a row loaded from the sheet keeps its stored class id even when
-  // the name is retyped, so fixing a typo edits that class instead of minting a second one; a row the
-  // user adds here has no id yet and gets one slugified from its name on save. `hitDie` rides along
-  // untouched (nothing on this sheet edits it) so the multiclass Hit-Dice pool survives an identity edit.
+  // One draft row per class the character has. `id` is sticky: retyping a loaded row's name edits
+  // that class rather than minting another; a new row gets an id slugified from its name on save.
+  // `hitDie` is carried untouched so the multiclass Hit Dice pool survives an identity edit.
   type ClassDraft = { key: string; id: string | null; name: string; subclass: string; level: number; hitDie?: "d4" | "d6" | "d8" | "d10" | "d12" };
   const blankClassDraft = (): ClassDraft => ({ key: newId(), id: null, name: "", subclass: "", level: 1 });
   const [idDraft, setIdDraft] = useState<{ classes: ClassDraft[]; race: string; background: string }>({ classes: [], race: "", background: "" });
   const editClassDraft = (key: string, patch: Partial<ClassDraft>) => setIdDraft((draft) => ({ ...draft, classes: draft.classes.map((row) => row.key === key ? { ...row, ...patch } : row) }));
-  // Roll-entry settings (feedback #8), remembered per browser: "digital" click-to-roll vs "manual" (you
-  // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
-  // The one per-browser dice-input preference, shared with every other roll surface (saves, attacks, the
-  // initiative runner, the dice panel) so the sheet's toggle and those surfaces always agree.
+  // The shared per-browser dice-input preference: digital vs manual entry, and whether a typed d20
+  // gets its bonus added.
   const { rollInput, bonusMode, sheetAttackMode, rollMode, setRollInput: chooseRollInput, setBonusMode: chooseBonusMode, setSheetAttackMode: chooseSheetAttackMode } = useRollPreference();
-  // Only the embedded panel can hop to the initiative view and back; every other surface renders the picker
-  // inline on the sheet, so the stored jump/inline preference only applies when a jump target actually exists.
+  // Only the embedded panel can jump to the initiative view and back, so elsewhere the picker is
+  // always inline.
   const effectiveAttackMode = onJumpToInitiative ? sheetAttackMode : "inline";
-  // The shared dice log rides behind the header's Sheet/Dice toggle — one pane at a time on every
-  // viewport — so the sheet stays clean and full-width whichever way it's opened. Default to the sheet;
-  // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).
+  // The dice log sits behind the header's Sheet/Dice toggle, one pane at a time. Defaults to the sheet.
   const hasLog = state !== undefined;
   const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
-  // Optional dock (opt-in, desktop only): pin the dice log beside the sheet so rolls are always visible
-  // while you act, instead of behind the toggle. Off by default (clean sheet); remembered per browser.
+  // Optional desktop dock: pin the dice log beside the sheet. Off by default; remembered per browser.
   const [docked, setDocked] = useState<boolean>(() => readSetting("vtt.sheet.docked") === "1");
   const chooseDocked = (value: boolean) => { setDocked(value); writeSetting("vtt.sheet.docked", value ? "1" : "0"); };
-  // The most recent roll made from this character, surfaced inline under the rolls bar so a tap-to-roll
-  // shows its result without leaving the sheet (the pinned line hides when the log is docked/visible).
+  // The latest roll from this character, shown under the rolls bar (hidden when the log is visible).
   const latestRoll = state ? [...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null : null;
-  // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
-  // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
+  // "modal" is the docked main panel; "floating" detaches it into a movable, resizable in-tab panel.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
   const [rect, setRect] = useState({ x: 48, y: 48, width: 760, height: 620 });
   const [drag, setDrag] = useState<null | { mode: "move" | "resize"; grabX: number; grabY: number; start: typeof rect }>(null);
@@ -314,34 +280,28 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   };
   const endDrag = () => setDrag(null);
   const { prompt, dialog } = usePrompt();
-  // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
+  // SRD spell reference (session-cached): base and upcast damage for the "Cast at" control.
   const spellRef = useSpellReference();
-  // The skills the sheet lists, and the ability each check uses, come from the CATALOG (session-cached
-  // like the spell reference). This replaces the hardcoded 18-skill SKILL_ABILITY table, which meant a
-  // homebrew skill needed a code edit to be rollable - the named anti-pattern in architecture
-  // principle 3. Ordering is by name from the data; a row whose ability the bundle never set shows no
-  // bonus rather than a wrong one.
+  // Skills and the ability each check uses come from the catalog, ordered by name. A row whose
+  // ability the bundle never set shows no bonus rather than a wrong one.
   const skillCatalog = useSkillCatalog();
   const sheetSkills: readonly SheetSkill[] = [...skillCatalog.items]
     .map((skill) => ({ id: skill.id, name: skill.name, ability: (ABILITIES as readonly string[]).includes(skill.ability ?? "") ? skill.ability as SheetSkill["ability"] : null }))
     .sort((left, right) => left.name.localeCompare(right.name));
   const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
-  // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
-  // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
-  // the GM still applies damage (players never mutate another creature's HP).
+  // Tap-to-roll into the shared dice history; the server allows a player to roll for their own
+  // claimed actor. Players never apply damage to another creature; the GM does.
   const emitRollFormula = (formula: string, purpose: "check" | "save" | "attack" | "damage", label: string) => {
     setRolling(true);
-    // Send the specific label ("Athletics check", "DEX save", "Fireball at 3rd") so the dice log can show
-    // the roll's kind, not just the coarse purpose (v6 #4). Capped to the record's 80-char limit.
+    // The specific label ("Athletics check", "Fireball at 3rd") lets the log show the roll's kind.
+    // Capped to the record's 80-char limit.
     socket.emit("dice:roll", { commandId: newId(), formula, purpose, visibility: "public", label: label.slice(0, 80), actorId: actor.id }, (result: { ok: boolean; message?: string }) => {
       setRolling(false);
       setFeedback(result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : result.message ?? "The roll was rejected.");
     });
   };
-  // Manual roll entry (feedback #8): in "manual" input mode the player types a physical die result and
-  // the sheet records it as a flat roll (the dice grammar accepts constants), so it lands in the shared
-  // log exactly like a rolled one. `bonusMode` decides whether a typed d20 result gets the bonus added
-  // ("auto": type 15 with a +7 → sends "15 + 7") or is already the final total ("total": type 22 → "22").
+  // Manual entry: the typed die result is recorded as a flat roll (constants are valid dice), so it
+  // lands in the log like any roll. `bonusMode` "auto" adds the bonus ("15 + 7"); "total" sends it as is.
   const manualValue = async (title: string, body: string, placeholder: string): Promise<number | null> => {
     const entered = await prompt({ title, body, placeholder, confirmLabel: "Record" });
     if (entered === null) return null;
@@ -350,7 +310,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     return value;
   };
   const combineBonus = (die: number, bonus: number) => bonus === 0 ? String(die) : `${die} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
-  /** A d20 roll (check/save/attack) with a known bonus: digital rolls 1d20+bonus; manual prompts for the die/total. */
+  /** A d20 roll with a known bonus: digital rolls 1d20+bonus; manual prompts for the die or total. */
   const rollD20 = async (bonus: number, purpose: "check" | "save" | "attack", label: string) => {
     if (rollInput === "digital") { emitRollFormula(d20(bonus), purpose, label); return; }
     const value = await manualValue(`Record ${label}`,
@@ -359,38 +319,25 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     if (value === null) return;
     emitRollFormula(bonusMode === "auto" ? combineBonus(value, bonus) : String(value), purpose, `${label} (manual)`);
   };
-  /** A flat roll (damage): no separate bonus, so manual mode simply records the typed total. */
+  /** A flat roll (damage): manual mode records the typed total. */
   const rollFlat = async (formula: string, purpose: "damage", label: string) => {
     if (rollInput === "digital") { emitRollFormula(formula, purpose, label); return; }
     const value = await manualValue(`Record ${label}`, `Enter your rolled total for ${formula}.`, "rolled total");
     if (value === null) return;
     emitRollFormula(String(value), purpose, `${label} (manual)`);
   };
-  // Hand a stat-block action off to the shared structured flow (pick target -> roll -> resolve) instead of a
-  // loose die. This is the ONE place the sheet's attack chips, equipped-weapon chips, and attack/save spells
-  // all route through, so every "attack from the sheet" on your turn prompts for a creature (the user's ask).
-  // "jump" hops to the initiative view (and back on commit); "inline" drives the runner in the Actions section.
+  // Hands a stat-block action to the structured flow (pick target -> roll -> resolve). Every attack
+  // from the sheet routes through here. "jump" goes to the initiative view and back on commit;
+  // "inline" drives the runner in the Actions section.
   const routeAttack = (action: ActorDefinition["actions"][number]) => {
     setTargetingResult(null);
     beginTargeting(summaryOfOwnAction(action), actor.id);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
-  // The player's OWN action that an equipped weapon (matched by name) or a spell (matched by its linked
-  // actionId) resolves as - but only when it's actually server-resolvable (has an attack, a save, or
-  // damage). null falls back to the loose quick-roll.
-  //
-  // `definition.actions` IS NOT THE WHOLE LIST any more. The server derives an action per equipped
-  // weapon, per charged item and per item-cast spell, keyed `item-<inventory id>`, and folds the
-  // standing riders into its numbers - a +1 sword's to-hit is +1 higher THERE and nowhere else. Looking
-  // only in the definition returned null for exactly those items, and the caller fell back to
-  // `rollD20(wa.toHit)`, which recomputes a to-hit on the CLIENT from base weapon stats with no rider
-  // term. The magic sword then rolled as a mundane one and nothing on screen looked wrong. That is a
-  // server-authority violation by omission (CLAUDE.md rule 2), reached through a fallback that was
-  // correct before items could carry riders.
-  //
-  // So the server's own list is consulted too (`serverActions`, below). Only its ID travels - the whole
-  // resolution, including every rider, happens server-side - so the shape handed to the targeting
-  // session carries the item's printed numbers for the preview line and the SERVER's action id.
+  // The player's own server-resolvable action (has an attack, a save or damage) for an equipped
+  // weapon (by name) or a spell (by linked actionId); null falls back to the quick roll.
+  // Item-derived actions (`item-<inventory id>`) exist only in the server's list (`serverActions`),
+  // with riders folded into their numbers, so that list is consulted too. Only the id is sent.
   const structuredActionFor = (opts: { actionId?: string; name?: string }): ActorDefinition["actions"][number] | null => {
     if (!definition) return null;
     const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -398,18 +345,16 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       ?? (opts.name ? definition.actions.find((candidate) => norm(candidate.name) === norm(opts.name!)) : undefined);
     return match && (match.attack || match.save || match.damage.length > 0) ? match : null;
   };
-  /** The SERVER's own action for this weapon, if it derived one. Name-matched, because an inventory
-      row and its derived action share a name and nothing else the client can see. */
+  /** The server's own derived action for this weapon, matched by name (the only key an inventory
+      row and its derived action share). */
   const serverActionFor = (name: string): ContentActionSummary | null => {
     const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const found = serverActions.find((candidate) => norm(candidate.name) === norm(name));
-    // A definition action is already reachable through `structuredActionFor`; this is only for the
-    // derived ones, which no other client path can find.
+    // Only the derived ones; definition actions are found by `structuredActionFor`.
     return found && !definition?.actions.some((candidate) => candidate.id === found.id) ? found : null;
   };
-  // In "inline" mode the picker + result render in the runner mounted in the Actions section; when an attack is
-  // tapped from another part of the sheet (an equipped weapon, a spell) bring that runner into view so the
-  // prompt isn't left off-screen below.
+  // In "inline" mode the picker and result render in the Actions-section runner; an attack tapped
+  // elsewhere on the sheet scrolls that runner into view.
   const runnerRef = useRef<HTMLDivElement | null>(null);
   const targetingSession = useTargeting();
   useEffect(() => {
@@ -417,27 +362,15 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   }, [effectiveAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
 
   /**
-   * The actor's EFFECTIVE action list, from the server, refreshed whenever the loadout could have
-   * moved. Read-only and already role-scoped (`actor:available-actions` lets the GM ask about anyone
-   * and a player only about their own claimed actor), so it adds no surface.
-   *
-   * This list is the ONLY place an item-derived action exists: `effectiveActions` synthesises one per
-   * equipped weapon, charged item and item-cast spell, and `definition.actions` - the immutable base -
-   * contains none of them. An Amulet of Message's cast is not a thing the sheet can find any other
-   * way. Its numbers already carry the standing riders of what is equipped and attuned, because the
-   * server read them off that same effective list.
-   *
-   * They are DISPLAY values. Every roll below sends the `id` and lets the server recompute
-   * (CLAUDE.md rule 2), so what is previewed and what is rolled are two reads of one function.
+   * The actor's effective action list from the server, refreshed whenever the loadout could change.
+   * Role-scoped server-side (players may only ask about their own actor). The only place
+   * item-derived actions exist (equipped weapons, charged items, item-cast spells), with standing
+   * riders folded in. Display values: rolls send the `id` and the server recomputes.
    */
   const [serverActions, setServerActions] = useState<readonly ContentActionSummary[]>([]);
   /**
-   * THE SHEET'S NUMBERS, from the server. Every chip below reads this instead of recomputing.
-   *
-   * It has to be re-asked on more than the loadout: `deriveEquipment` reads `actor.effects`,
-   * `actor.conditions` and `actor.hp` too (a "while raging" or "while bloodied" rider), so keying
-   * the refetch on inventory alone would serve a stale bonus the moment a condition changed - the
-   * same stale-cache trap `deriveEquipment`'s own comment refuses to fall into.
+   * The sheet's numbers, from the server; chips read this instead of recomputing. Refetched on
+   * effects, conditions and HP as well as inventory, since riders can depend on them.
    */
   const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
   const loadoutSignature = [
@@ -450,11 +383,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     if (!definitionId) { setServerActions([]); setDerived(null); return; }
     let live = true;
     socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: readonly AvailabilityRow[]; derived?: ActorDerivedSheet }) => {
-      // A failure is silent on purpose: every caller below already has a working fallback, and an
-      // error banner for a lookup the GM did not ask for would be noise.
+      // Failures are silent: every caller has a fallback, and the user did not ask for this lookup.
       if (!live || !result.ok) return;
       if (result.actions) setServerActions(result.actions.filter((row) => !row.builtin).map(summaryOfAvailability));
-      // Absent only when talking to an older server; the pre-answer fallback covers that.
+      // Absent only from an older server; the fallback covers that.
       if (result.derived) setDerived(result.derived);
     });
     return () => { live = false; };
@@ -484,10 +416,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const preparedIds = new Set<string>(actor.preparedSpellIds ?? []);
   const liveSlotRemaining = new Map<number, number>((actor.spellSlots ?? []).map((slot) => [slot.level, slot.remaining]));
   const pact = actor.pactSlots ?? null;
-  // Caster numbers go through `resolveSpellcasting` - THE documented resolution order (per-class
-  // entry by classId, then the lone-entry shortcut, then the top-level fields). Reading
-  // `spellcasting.ability` directly, as this did, showed a Paladin/Wizard ONE save DC for both
-  // spell lists. One row per casting class; a single-class or legacy sheet still renders one.
+  // `resolveSpellcasting` applies the resolution order (per-class entry by classId, the lone-entry
+  // shortcut, then top-level fields), so a multiclass caster gets one row per casting class.
   const casterEntries = spellcasting?.classes ?? [];
   const casterRows = (definition && spellcasting
     ? (casterEntries.length > 0 ? casterEntries.map((entry) => entry.classId) : [undefined])
@@ -500,41 +430,37 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     const name = classId ? character?.classes?.find((entry) => entry.id === classId)?.name ?? titleCase(classId) : null;
     return [{ key: classId ?? "primary", name, ability: resolved.ability, dc, attack }];
   });
-  // "Cast at" support: index the SRD spell data by id, and the character's slot pools by level.
+  // "Cast at" support: SRD spells by id, and the character's slot pools by level.
   const spellIndex = new Map(spellRef.map((entry) => [entry.id, entry]));
   const slotMaxByLevel = new Map<number, number>((spellcasting?.slots ?? []).map((slot) => [slot.level, slot.max]));
   const slotLevels = [...slotMaxByLevel.entries()].filter(([, max]) => max > 0).map(([level]) => level).sort((a, b) => a - b);
-  // Cast a leveled spell at a chosen slot level: spend that slot, then (for a damaging spell) auto-roll
-  // the SRD upcast scaling for that level - one composable slot-spend + one dice roll, both server-checked.
+  // Cast a leveled spell at a chosen level: spend the slot, then roll the SRD upcast damage for a
+  // damaging spell. Both are server-checked.
   const castSpell = (spell: Readonly<{ id: string; name: string; level: number; actionId?: string | null }>, level: number) => {
     const max = slotMaxByLevel.get(level) ?? 0;
     const rem = liveSlotRemaining.get(level) ?? max;
     if (max <= 0 || rem <= 0) { setFeedback(`No ${ordinal(level)}-level slots remain.`); return; }
     const content = spellIndex.get(spell.id);
-    // Same helper the row displays, so the rolled damage equals the shown effect (v6 #8): for target
-    // scaling the formula is the die repeated N times, so an upcast rolls the full upscaled amount.
+    // Same helper as the displayed effect, so the roll matches what is shown.
     const { formula } = spellEffectAt(content, spell.level, level);
     const types = content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : "";
     setBusy(true);
     socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
       if (!result.ok) { setFeedback(result.message ?? "The slot could not be spent."); return; }
-      // The slot is spent; on your turn a spell that targets a creature (an attack roll, a saving throw, or
-      // direct damage) hands off to the structured flow to pick the target(s) and resolve, instead of a bare
-      // damage roll. Only a utility spell with no combat action stays a plain note. (An upcast leveled spell
-      // resolves at its base dice here - the GM can adjust the parked damage; the loose path kept full upcast.)
+      // The slot is spent; on your turn a spell that targets a creature goes through the structured flow.
+      // A utility spell stays a plain note. Known limitation: an upcast spell resolves at its base dice
+      // here; the GM can adjust the parked damage.
       const structured = structuredAttacks ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name }) : null;
       if (structured) { routeAttack(structured); return; }
-      // Digital rolls the (upscaled) damage; manual mode prompts for the physical total - both land in the log.
+      // Digital rolls the damage; manual prompts for the physical total.
       if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
       else setFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
     });
   };
-  // Cantrips (v5 #9) cost no slot: cast just rolls the damage die for a damaging cantrip (Toll the Dead,
-  // Sacred Flame), or notes the cast for a utility cantrip. Same helper so display == rolled.
+  // Cantrips cost no slot: roll a damaging cantrip's die, or note a utility cast.
   const castCantrip = (spell: Readonly<{ id: string; name: string; level: number; actionId?: string | null }>) => {
-    // A cantrip that targets a creature (attack, save, or direct damage) routes through the structured flow
-    // (pick target -> roll -> resolve) on your turn; a pure-utility cantrip keeps its quick note.
+    // A cantrip that targets a creature routes through the structured flow on your turn.
     const structured = structuredAttacks ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name }) : null;
     if (structured) { routeAttack(structured); return; }
     const content = spellIndex.get(spell.id);
@@ -545,44 +471,31 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
-  // Equipped weapons become rollable attack actions on the sheet (v6 #5): to-hit = ability mod + PB,
-  // damage = the weapon die + ability mod. Client-derived + tap-to-roll like the other sheet actions;
-  // the server-authoritative attack flow is unchanged.
-  //
-  // The ability comes from `weaponAbilityModifierFrom`, the same function the server derives its
-  // authoritative attack with, because a preview that computes its own number is a preview that can
-  // disagree with the roll it is previewing. This read `rangeFeet != null ? dex : str` under a note
-  // that finesse "isn't vendored in the SRD weapon table" - accurate when written, and falsified the
-  // moment the `properties` column reached the inventory row. It was then wrong twice over: it
-  // missed finesse (a Rapier previewed off Strength) and it called every thrown weapon ranged (a
-  // Javelin previewed off Dexterity, when throwing one is a Strength attack).
+  // Equipped weapons become rollable attacks on the sheet: to-hit = ability mod + PB, damage = weapon
+  // die + ability mod. The ability comes from `weaponAbilityModifierFrom`, the server's own function
+  // (finesse, and thrown weapons using Strength), so the preview matches the roll.
   const equippedWeaponActions = (actor.kind === "player-character" && definition)
     ? inventory.filter((item) => item.equipped && item.weapon && item.quantity > 0).map((item) => {
         const weapon = item.weapon!;
         const abilityMod = weaponAbilityModifierFrom(weapon.properties ?? [], weapon.rangeFeet, modifierOf(definition.abilityScores.str), modifierOf(definition.abilityScores.dex));
         const toHit = abilityMod + definition.proficiencyBonus;
         const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
-        // ACTIVE, not merely magical: riders apply while equipped, and while ATTUNED as well when the
-        // item asks for it. An unattuned magic weapon still swings - it just swings mundane - so its
-        // printed numbers are exactly right and must not be second-guessed. Same distinction the
-        // server draws; drawing a different one here is how the two get to disagree.
+        // Riders apply only while active: equipped, and attuned when the item requires it. An unattuned
+        // magic weapon swings as mundane. Same rule as the server.
         const active = item.magic?.isMagic === true && (item.magic.attunementRequired !== true || item.attuned === true);
         return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet, active };
       })
     : [];
-  /** Everything the loadout added that the stat block does not have — a wand's charge, an amulet's
-      cast, a magic weapon's swing. An action a player cannot see is an action they cannot use. */
+  /** Actions the loadout adds beyond the stat block (a wand's charge, an amulet's cast). */
   const derivedActions = serverActions.filter((row) => !definition?.actions.some((candidate) => candidate.id === row.id));
-  /** The derived rows that are NOT one of the equipped-weapon entries above — a wand's charge, an
-      amulet's cast, an item-granted Uncanny Dodge. Matched out by name, the same key the weapon rows
-      are matched on, so one action is never drawn twice. */
+  /** Derived rows that are not equipped-weapon entries, matched out by name so no action is drawn
+      twice. */
   const itemActions = derivedActions.filter((row) => {
     const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     return !equippedWeaponActions.some((wa) => norm(wa.name) === norm(row.name));
   });
-  // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
-  // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
-  // and carries the catalog's category/weight/description so the sheet can group and describe it.
+  // The server upserts by id, so adding to an existing stack resends the whole item with quantity+1
+  // (keeping equipped/attuned); a new pick starts at 1 with the catalog's category, weight and text.
   const ownedCounts = new Map(inventory.map((item) => [item.id, item.quantity]));
   const addFromCatalog = (item: ContentEquipmentSummary, baseId?: string) => {
     const existing = inventory.find((entry) => entry.id === item.id);
@@ -590,29 +503,23 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: {
       id: item.id, name: item.name, quantity: (existing?.quantity ?? 0) + 1, category: item.category,
       ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
-      // C9: the pick made in the chooser, or the pick an owned template row already carries - a
-      // re-add must not unbind the stack. The SERVER validates the pick and copies the base's
-      // stats onto the row; this client only ever names the choice.
+      // The template pick from the chooser, or the one the owned row already has (a re-add must not
+      // unbind it). The server validates the pick and copies the base's stats.
       ...(baseId ? { baseId } : existing?.baseId ? { baseId: existing.baseId } : {}),
       ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
       ...(item.description ? { description: item.description } : {}),
-      // Carry the mechanical stats so equipping has effect (v6 #5): weapon → a rollable attack; armor → AC.
-      // The weapon block is NARROWED, not spread: the browse summary carries a browse-only `mastery`
-      // the strict wire schema refuses. See `inventoryWeaponFrom`.
+      // Carry the weapon/armor stats so equipping matters. The weapon block is narrowed, not spread: the
+      // browse summary's `mastery` is refused by the strict wire schema (see `inventoryWeaponFrom`).
       ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
       ...(item.armor ? { armor: item.armor } : {})
     } }, ack);
   };
-  // Keep the coin editor in sync with the authoritative purse (re-syncs after each accepted change).
+  // Keep the coin editor in sync with the authoritative purse.
   useEffect(() => { setCoins({ cp: currency?.cp ?? 0, sp: currency?.sp ?? 0, ep: currency?.ep ?? 0, gp: currency?.gp ?? 0, pp: currency?.pp ?? 0 }); }, [currency?.cp, currency?.sp, currency?.ep, currency?.gp, currency?.pp]);
-  // Light hand-edit (owner + GM, server-enforced): edit the per-PC imported definition's identity /
-  // proficiency selections; guided creation stays in the future builder.
+  // Light hand-edit of identity/proficiencies (owner and GM, server-enforced).
   const openProfEditor = () => { setProfDraft({ saves: proficiencies?.saves ? [...proficiencies.saves] : [], skills: Object.fromEntries((proficiencies?.skills ?? []).map((skill) => [skill.id, skill.proficiency])) }); setEditMode("prof"); };
-  // Auto-save proficiency edits like the rest of the sheet (slots, Prepare, equip all emit on each tap), so
-  // there's no separate Save button to forget and no draft to lose on Done (v6 #6). Also keep the GM's
-  // cached definition in step: the GM renders from `fetched`/sheetCache, which nothing else refreshes after
-  // an edit, so a persisted change would otherwise not show (the player path already refreshes via
-  // ownDefinition). That stale cache - not the wire - was why "Save" looked like it did nothing.
+  // Proficiency edits auto-save like the rest of the sheet. Also update the GM's cached definition:
+  // the GM renders from `fetched`/sheetCache, which nothing else refreshes after an edit.
   const persistProficiencies = (draft: { saves: string[]; skills: Record<string, "proficient" | "expertise"> }) => {
     const proficiencies = { saves: draft.saves as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">, skills: Object.entries(draft.skills).map(([id, proficiency]) => ({ id, proficiency })) };
     if (definitionId && definition) { const next = { ...definition, proficiencies }; sheetCache.set(definitionId, next); setFetched(next); }
@@ -632,29 +539,26 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       ...(row.subclass.trim() ? { subclass: { id: slugify(row.subclass), name: row.subclass.trim() } } : {}),
       level: row.level,
       ...(row.hitDie ? { hitDie: row.hitDie } : {})
-    // Class id is the key the server merges rows on, so two rows that resolve to the same id (an
-    // added row retyped to match an existing class) must not both ship - the first one wins.
+    // The server merges rows by class id, so of two rows resolving to the same id only the first ships.
     })).filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index);
     const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
-    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as
-    // proficiencies). Spread over the STORED identity, not a bare replacement, so the optimistic copy
-    // mirrors the server's carry-forward merge (the builder's `choices` ledger stays put locally too).
+    // Update the GM's cached definition so the edit shows immediately. Spread over the stored
+    // identity to mirror the server's carry-forward merge (the `choices` ledger stays).
     if (definitionId && definition) { const nextDef = { ...definition, character: { ...character, ...next } }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
     setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
-  // The sheet's own scrolling content (one column of the workspace below). Identity + roll settings now
-  // live in the fixed header/rollbar; only the identity EDIT FORM stays inline in the scroll.
+  // The sheet's scrolling content. Identity and roll settings live in the fixed header and rollbar;
+  // only the identity edit form scrolls.
   const sheetScroll = (<div className="sheet-scroll">
       {editMode === "identity" && <div className="sheet-editor sheet-id-editor">
-          {/* Every class the character has gets its own Class/Subclass/Level trio - a multiclass sheet
-              is edited whole, so saving can never delete the classes this form didn't render. The
-              labels wrap in the existing flex row, so extra classes stay usable on a phone. */}
+          {/* Every class gets its own Class/Subclass/Level trio, so saving never drops a class the form
+              did not render. */}
           {idDraft.classes.map((row, index) => { const n = idDraft.classes.length > 1 ? ` ${index + 1}` : ""; return <Fragment key={row.key}>
             <label>Class{n}<input type="text" value={row.name} maxLength={60} onChange={(event) => editClassDraft(row.key, { name: event.target.value })} /></label>
             <label>Subclass{n}<input type="text" value={row.subclass} maxLength={60} onChange={(event) => editClassDraft(row.key, { subclass: event.target.value })} /></label>
             <label>Level{n}<input type="number" min="1" max="20" value={row.level} onChange={(event) => editClassDraft(row.key, { level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) })} /></label>
           </Fragment>; })}
-          {/* The schema allows up to four classes; dropping one is a respec, which the builder owns. */}
+          {/* The schema allows up to four classes; removing one is a respec, which the builder owns. */}
           {idDraft.classes.length < 4 && <Button size="sm" variant="ghost" onClick={() => setIdDraft((draft) => ({ ...draft, classes: [...draft.classes, blankClassDraft()] }))}>Add a class</Button>}
           <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
           <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
@@ -782,16 +686,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
               <span>Qty</span><span>Equip</span><span>Attune</span><span></span>
             </div>
             {inventory.map((item) => <div key={item.id} className="sheet-inv-row">
-              {/* The description was already being COPIED onto every added row and then never shown.
-                  That was invisible while the catalog was mundane gear; with the SRD's 268 magic
-                  items in it, the row's own text is the only place a rarity or an attunement
-                  requirement appears on this sheet - `ItemMagicMarkerSchema` carries neither and
-                  the browse summary has no `rarity` key at all. Clamped to two lines so a
-                  reference-length entry cannot push the Equip/Attune controls off a phone. */}
-              {/* C9: a bound template names its base right in the row - "Dwarven Thrower (Warhammer)"
-                  - straight off the recorded pick (titleised slug, no catalog lookup to go stale).
-                  An UNBOUND template gets the one sheet-side chooser: pre-C9 rows predate the pick
-                  and must not lose the item, so the row keeps everything and offers the choice. */}
+              {/* The row's own description is the only place rarity or attunement requirements appear on
+                  the sheet. Clamped to two lines so long entries cannot push the controls off a phone. */}
+              {/* A bound template names its base in the row ("Dwarven Thrower (Warhammer)"), from the
+                  recorded pick. An unbound template row keeps the item and offers the base chooser. */}
               <span className="sheet-item-name">{item.name}{item.baseId ? <span className="sheet-item-cat">({item.baseId.split("-").map(titleCase).join(" ")})</span> : null}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}
                 {(() => {
                   const summary = equipmentCatalog.find((entry) => entry.id === item.id);
@@ -813,8 +711,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             const rowItem = inventory.find((entry) => entry.id === bindingRowId);
             const summary = equipmentCatalog.find((entry) => entry.id === bindingRowId);
             if (!rowItem || !summary) return null;
-            // Binding a legacy row RESENDS the row it already is, plus the pick - the server
-            // validates the pick, copies the base's stats, and the attack appears on the next read.
+            // Binding resends the existing row plus the pick; the server validates and copies the base's stats.
             return <BindItemModal template={summary} busy={busy} onClose={() => setBindingRowId(null)} onPick={(baseId) => {
               setBusy(true);
               socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...rowItem, baseId } }, ack);
@@ -839,29 +736,22 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                 {action.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${action.name} damage`)}>{part.formula}</button>)}
               </div>}
             </div>; };
-            // Group actions (v3 #2.9.3): weapon/other first, then spell actions grouped by the linked spell's level.
+            // Weapon/other actions first, then spell actions grouped by the linked spell's level.
             const spellLevelByActionId = new Map<string, number>((spellcasting?.spells ?? []).filter((spell) => spell.actionId).map((spell) => [spell.actionId!, spell.level]));
             const weaponActions = definition.actions.filter((action) => !spellLevelByActionId.has(action.id));
             const spellGroups = new Map<number, ActionT[]>();
             for (const action of definition.actions) { const level = spellLevelByActionId.get(action.id); if (level !== undefined) { const list = spellGroups.get(level) ?? []; list.push(action); spellGroups.set(level, list); } }
             const hasSpellActions = spellGroups.size > 0;
-            // On the player's turn with the "keep picker on the sheet" preference, the interactive runner
-            // (its own action list + inline target picker + result) OWNS the server-resolvable stat-block
-            // actions here; the loose weapon/spell chips below are hidden so an action isn't offered twice.
+            // With the inline-picker preference on the player's turn, the runner owns the server-resolvable
+            // actions here, so the loose chips below are hidden to avoid offering an action twice.
             const inlineRunner = structuredAttacks && effectiveAttackMode === "inline";
             return <>
               {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} extraActions={derivedActions} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
               {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
                 {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
                 {equippedWeaponActions.map((wa) => {
-                  /* THE SERVER'S numbers, not ours, whenever it has them.
-                     `equippedWeaponActions` recomputes a to-hit on the CLIENT from base weapon stats
-                     and an ability modifier, with no rider term anywhere in it — so a +1 sword read
-                     +5 and rolled +5 while the server resolved +6, and nothing on screen looked
-                     wrong. The derived row carries the folded riders in both `attackBonus` and
-                     `damage[]`, so displaying it fixes the number AND the roll at once. The client
-                     falls back to its own arithmetic only when the server derived nothing (no
-                     definition, an unresolvable id), where the printed stats are all that exists. */
+                  /* Prefer the server's derived numbers, which include item riders in `attackBonus` and
+                     `damage[]`. The client's own arithmetic is only a fallback when the server derived nothing. */
                   const srv = serverActionFor(wa.name);
                   const toHit = srv?.attackBonus ?? wa.toHit;
                   const damage = srv && srv.damage.length > 0 ? srv.damage : [{ formula: wa.damageFormula, type: wa.damageType }];
@@ -871,7 +761,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                       <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => {
                         const structured = structuredAttacks ? structuredActionFor({ name: wa.name }) : null;
                         if (structured) { routeAttack(structured); return; }
-                        // Only the ID travels; the roll, every rider and the damage are resolved server-side.
+                        // Only the id travels; the roll, riders and damage are resolved server-side.
                         if (srv) { routeAttack({ ...EMPTY_ACTION, id: srv.id, name: srv.name, attack: { bonus: toHit }, damage: [...damage] }); return; }
                         void rollD20(toHit, "attack", `${wa.name} to hit`);
                       }}>{signed(toHit)} to hit</button>
@@ -881,9 +771,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                 })}
                 {!inlineRunner && weaponActions.map(renderAction)}
               </div>}
-              {/* Actions an EQUIPPED ITEM added. They exist nowhere in the stat block, so without
-                  this the amulet a player attuned casts nothing they can reach. The runner owns them
-                  on the player's own turn (`inlineRunner`); this is every other moment. */}
+              {/* Actions an equipped item added, which exist nowhere in the stat block. On the player's own
+                  turn the runner owns them (`inlineRunner`). */}
               {!inlineRunner && itemActions.length > 0 && <div className="sheet-action-group">
                 <h4 className="sheet-action-head">From your items</h4>
                 {itemActions.map((row) => <div key={row.id} className="sheet-entry">
@@ -913,15 +802,13 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       <p className="sheet-feedback" role="status">{feedback}</p>
   </div>);
 
-  // The prominent identity line (feedback #4): class/level/race for a PC, or the size/CR typeline for a
-  // monster stat block. Sits right under the name in the header instead of reading like a footnote.
+  // Identity line under the name: class/level/race for a PC, size/CR typeline for a monster.
   const identityLine = identity ?? (definition
     ? `${titleCase(definition.size)} ${extension.type ?? "being"}${extension.alignment ? `, ${extension.alignment}` : ""}${extension.challengeRating !== undefined ? ` · CR ${formatChallenge(extension.challengeRating)}` : ""}`
     : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`);
 
-  // One header row for every presentation (feedback #2.1/2.2): name + prominent identity on the left;
-  // on the right, the log-side toggle, Pop out / New tab, and the × close (rightmost). In the floating
-  // panel this same row is the drag handle (buttons opt out via beginDrag's closest("button") guard).
+  // One header row for every presentation: name and identity on the left; the log toggle, Pop out /
+  // New tab and × on the right. In the floating panel it is the drag handle (buttons opt out).
   const header = (draggable: boolean) => (<div className={`sheet-header${draggable ? " sheet-header--drag" : ""}`} onPointerDown={draggable ? beginDrag("move") : undefined}>
     <div className="sheet-header-id">
       <strong className="sheet-name">{actor.name}</strong>
@@ -939,19 +826,18 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     </div>
   </div>);
 
-  // The roll-input settings (feedback #2.6): a narrow bar pinned under the header, always visible.
+  // Roll-input settings: a narrow bar pinned under the header.
   const rollbar = definition ? (<div className="sheet-rollbar" role="group" aria-label="Roll entry settings">
     <span className="sheet-settings-label">Rolls</span>
     <SegmentedControl size="sm" ariaLabel="Roll input mode" value={rollInput} onChange={(mode) => chooseRollInput(mode as "digital" | "manual")} options={[{ value: "digital", label: "Digital" }, { value: "manual", label: "Manual" }]} />
     {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => chooseBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
-    {/* Only meaningful mid-fight: where an attack tapped here resolves - inline on the sheet, or over on the initiative view (which then hops back once you confirm). */}
+    {/* Mid-fight only: whether an attack tapped here resolves inline or on the initiative view. */}
     {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && <><span className="sheet-settings-label">Attacks</span>
       <SegmentedControl size="sm" ariaLabel="Where attacks tapped on the sheet resolve" value={sheetAttackMode} onChange={(mode) => chooseSheetAttackMode(mode as "jump" | "inline")} options={[{ value: "inline", label: "On sheet" }, { value: "jump", label: "In initiative" }]} /></>}
   </div>) : null;
 
-  // Workspace: the sheet fills the panel; when a shared dice log is available it swaps in behind the
-  // Sheet/Dice toggle (one pane at a time on every viewport), so the sheet keeps its clean full width.
-  // Header + rollbar stay pinned; the active pane scrolls.
+  // The sheet fills the panel; the dice log swaps in behind the Sheet/Dice toggle. Header and
+  // rollbar stay pinned; the active pane scrolls.
   const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}${docked ? " docked" : ""}`}>
     {header(draggable)}
     {rollbar}
@@ -965,20 +851,19 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       </span>
     </button>}
     <div className="sheet-workspace-cols">
-      {/* `.scroll-y` is the declared-region marker (§7): the sheet's pane is where this surface
-          scrolls, in every one of its four presentations. */}
+      {/* The sheet's pane is the declared scroll region in all four presentations. */}
       <div className="sheet-workspace-pane sheet-pane scroll-y">{sheetScroll}</div>
       {hasLog && state && <div className="sheet-workspace-pane log-pane scroll-y"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
     </div>
     {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
   </div>);
 
-  // Embedded inline (v4 #8): fills its container (e.g. the player's initiative panel), no modal chrome;
-  // the header × returns to the initiative view. The caller omits state, so there's no dice log.
+  // Embedded (e.g. the player's initiative panel): fills its container, no modal chrome, and × goes
+  // back to the initiative view. No state is passed, so no dice log.
   if (embedded) return <><div className="sheet-embedded">{buildWorkspace(false)}</div>{dialog}</>;
 
-  // Its own browser tab (feedback #9.3) or the SPA's `/characters/:id` layer: fills its box, header
-  // × ends the tab / returns. Page-level doors ride the frame's bottom row when the caller has any.
+  // Its own browser tab, or the SPA's `/characters/:id` layer: fills its box, and × closes or goes
+  // back. Page-level doors use the frame's bottom row when supplied.
   if (standalone) return <><div className="sheet-standalone">
     {buildWorkspace(false)}
     {standaloneActions && <div className="sheet-standalone-actions">{standaloneActions}</div>}

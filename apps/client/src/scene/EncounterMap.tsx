@@ -18,35 +18,32 @@ type Actor = GmActor | PlayerActor;
 type Point = EncounterTokenPosition;
 type AnyAnnotation = Annotation | PlayerAnnotation;
 type Camera = Readonly<{ center: Point; zoom: number }>;
-/** The pointer mode. Owned by the toolbar, which is the only thing that sets it. */
+/** The pointer mode, owned and set only by the toolbar. */
 type Tool = MapTool;
 type Gesture =
-  /** `pressClient` is where the pointer went DOWN, in CLIENT pixels (`origin`/`point` are map space);
-      with `fromTray` it is what tells a tap on a staging chip from a drag out of the tray. */
+  /** `pressClient` is where the pointer went down, in client pixels (`origin`/`point` are map space);
+      with `fromTray` it distinguishes a tap on a staging chip from a drag out of the tray. */
   | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null; pressClient: Readonly<{ x: number; y: number }>; fromTray: boolean }>
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
-  /** `4f` — two fingers. EVERY field is read at the moment the pinch begins and never updated, so the
-      zoom is ABSOLUTE (a ratio against `startDist`) rather than a product of per-move factors: a
-      dropped or coalesced move loses nothing, and a pinch returned to its starting span returns the
-      map to its starting zoom. `startFocus` is where the fingers' midpoint sat in the SVG's own box
-      (0..1 on each axis), which with `startCenter`/`startZoom` names the image point that was between
-      them — that point is what stays between them, so the map scales under the fingers rather than
-      about the screen's middle, and moving both fingers together pans it. */
+  /** Two fingers. Every field is read when the pinch begins and never updated, so zoom is absolute
+      (a ratio against `startDist`): dropped moves lose nothing, and returning to the starting span
+      returns to the starting zoom. `startFocus` is the fingers' midpoint in the SVG box (0..1 per
+      axis); with `startCenter`/`startZoom` it names the image point that stays between the fingers,
+      so the map scales under them and moving both fingers pans. */
   | Readonly<{ kind: "pinch"; startDist: number; startZoom: number; startCenter: Point; startFocus: Readonly<{ x: number; y: number }> }>;
 
 type FogState = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
-/** How far a pointer may travel and still be a tap. The same 8px `continueGesture` already uses to
-    decide a touch has moved far enough to cancel a long press. */
+/** How far a pointer may travel and still be a tap; the same 8px that cancels a long press. */
 const TAP_SLOP = 8;
 
-/** The reveal words (D28) in their short form, for the per-shape editor's read-only line. */
+/** The short reveal words, for the per-shape editor's read-only line. */
 const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = { public: "Shown to players", "gm-only": "GM only", "owner-only": "Only me", "owner-gm": "Only me and the GM", "gm-actor": "GM and one character" };
 
 function emitMove(payload: Parameters<ClientToServerEvents["token:move"]>[0]) {
@@ -86,9 +83,8 @@ function emitFogReset(payload: Parameters<ClientToServerEvents["fog:reset"]>[0])
   return new Promise<MutationResult>((resolve) => socket.emit("fog:reset", payload, resolve));
 }
 
-// Brand-ramp annotation swatches (cyan -> indigo -> violet -> magenta -> rose -> pinks -> white); the
-// banned green/orange/yellow/amber hues are dropped so pings stay on-palette. Concrete hexes (not theme
-// vars) because the chosen color travels over the wire and must read the same on every screen.
+// On-brand annotation swatches. Concrete hexes, not theme vars: the colour travels over the wire and
+// must read the same on every screen.
 const PLAYER_COLORS = ["#2de2ff", "#5b6ef5", "#a45cff", "#ff2e9a", "#ff2d5e", "#ff8cc6", "#7cefff", "#ffffff"];
 
 function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
@@ -113,23 +109,22 @@ export function EncounterMap({
   dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
   /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene, not the live encounter. */
   moveSceneId?: string;
-  /** GM scene-prep entry (map button) - opens the scene picker. */
+  /** GM scene-prep entry (map button): opens the scene picker. */
   onScenePrep?: () => void;
   /**
-   * RULING 12 — the gallery's ONE door. The top-left scenes row is deleted (56px back to the map) and
-   * its function is an entry in this menu. Absent ⇒ the map button stays the single-action button it
-   * was, which is what a player and a staging view get.
+   * Adds "View all scenes" to the map's Scenes menu. Absent: the map button stays a single action (for
+   * players and staging views).
    */
   onViewAllScenes?: () => void;
-  /** Which scene is live, said in the menu rather than on a row over the map — the fact the deleted row carried. */
+  /** Which scene is live, shown in the Scenes menu. */
   activeSceneName?: string;
-  /** RULING 13 — the "Preview what players see" trigger, now a map-toolbar tool beside Draw / Fog / View. */
+  /** The "Preview what players see" toolbar tool. */
   viewerPreview?: Readonly<{ on: boolean; onToggle: () => void }>;
-  /** Present while staging a prepared scene privately - adds "back to live" / "make live" controls to the map. */
+  /** Present while staging a prepared scene privately: adds "back to live" / "make live" controls. */
   staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
-  /** Table-wide health-display default (read only for the GM view; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style server-side, so this is unused for them. */
+  /** Table-wide health-display default (GM view only; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style from the server. */
   healthDisplay?: HealthDisplay;
-  /** Full view, threaded to a token's character sheet so its dice log (Sheet/Dice toggle) works when opened from the map. */
+  /** Full view, passed to a token's character sheet so its dice log works when opened from the map. */
   state?: GmView | PlayerView;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
@@ -142,11 +137,11 @@ export function EncounterMap({
   const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
   const [rulerWhileMoving, setRulerWhileMoving] = useState(false);
-  // GM-controlled: whether measure-while-moving adds the +5 ft-per-occupied-cell penalty. Persisted.
+  // GM-controlled: whether measure-while-moving adds the +5 ft per occupied cell penalty. Persisted.
   const [showOccupied, setShowOccupied] = useState(() => localStorage.getItem("vtt.show-occupied") !== "0");
   useEffect(() => { localStorage.setItem("vtt.show-occupied", showOccupied ? "1" : "0"); }, [showOccupied]);
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
-  // Click-to-target: only the GM resolves actions, so the shared targeting session is inert for players.
+  // Click-to-target: only the GM resolves actions here, so the targeting session is inert for players.
   const targetingSession = useTargeting();
   const targetingBusy = useTargetingBusy();
   const activeTargeting = role === "gm" ? targetingSession : null;
@@ -154,24 +149,21 @@ export function EncounterMap({
   const longPressRef = useRef<{ startX: number; startY: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
-   * `4f` — THE LIVE TOUCH POINTS, keyed by `pointerId`. Every other gesture on this surface is
-   * single-pointer and `setPointerCapture` is what makes it one, so without this map a second finger
-   * is invisible: it either lands on a control or does nothing. Same shape and same job as the Codex
-   * atlas surface's (`codex/MapSurface.tsx`), which is the reference implementation for this.
-   *
-   * A MOUSE IS NEVER TRACKED. One mouse cannot pinch, so tracking it buys nothing — and an untracked
-   * pointer can never be mistaken for the second finger of a pinch that isn't happening.
+   * Live touch points by `pointerId`. Every other gesture is single-pointer via `setPointerCapture`,
+   * so without this a second finger is invisible. Mirrors the Codex atlas (`codex/MapSurface.tsx`).
+   * Mouse pointers are never tracked: a mouse cannot pinch, and an untracked pointer can never be
+   * mistaken for a pinch's second finger.
    */
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-  /** Which pointer holds capture, so a pinch can release a capture it did not take (the aborted
-      gesture's, whose id is not the id of the finger that aborted it). */
+  /** Which pointer holds capture, so a pinch can release a capture taken by a different pointer (the
+      aborted gesture's). */
   const capturedPointerRef = useRef<number | null>(null);
   const [enlarged, setEnlarged] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fogBusy, setFogBusy] = useState(false);
-  /** Measured height of the floating token tray, so the toolbar can clear it (0 when it is absent). */
+  /** Measured height of the floating token tray, so the toolbar can clear it (0 when absent). */
   const [trayHeight, setTrayHeight] = useState(0);
   // "GM ink": new drawings land GM-only, and only GM-only drawings are interactive while it is on.
   const [gmLayer, setGmLayer] = useState(false);
@@ -188,17 +180,15 @@ export function EncounterMap({
   const calibration = grid.calibration;
   const handleRadius = Math.max(9, calibration ? calibration.cellSizePx * 0.16 : 9);
   const arrowSize = calibration ? calibration.cellSizePx * 0.35 : 12;
-  // Labels are drawn in image-pixel units, so scale them to the grid cell (else they read tiny on large maps).
+  // Labels are drawn in image pixels, so scale them to the grid cell or they read tiny on large maps.
   const labelSize = calibration ? Math.max(16, calibration.cellSizePx * 0.42) : 16;
   const pingSize = calibration ? calibration.cellSizePx * 0.6 : 26;
 
   useEffect(() => { setGesture(null); setSelectedId(null); pointers.current.clear(); }, [assetId, token]);
   /**
-   * A finger lifted OFF the map — over the browser's own chrome, past the edge of the window — raises
-   * no `pointerup` this component's handlers can hear, and a tracked pointer that never goes away
-   * would make the NEXT single touch look like the second finger of a pinch. The window hears all of
-   * them. It runs after the React handlers (they are bound at the app root, which is inside it), so
-   * `finishGesture` still sees a pointer it is about to remove itself; this only catches the strays.
+   * A finger lifted off the map (over browser chrome, past the window edge) raises no `pointerup`
+   * here, and a stale tracked pointer would make the next touch look like a pinch. The window hears
+   * all of them; it runs after the React handlers, so this only catches strays.
    */
   useEffect(() => {
     const forget = (event: PointerEvent) => { pointers.current.delete(event.pointerId); };
@@ -229,14 +219,14 @@ export function EncounterMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, tool, annotations]);
 
-  // Wheel-to-zoom needs preventDefault, which React's synthetic onWheel cannot reliably guarantee (passive by default).
+  // Wheel-to-zoom needs preventDefault, which React's passive synthetic onWheel cannot guarantee.
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const onWheel = (event: WheelEvent) => {
       if (!svgRef.current || !size) return;
-      // Wheeling over an overlaid panel (a docked initiative tracker, an open menu, the shape editor)
-      // must scroll that panel, not zoom the map behind it - mirror the pointer-down guard below.
+      // Wheeling over an overlaid panel (docked tracker, open menu, shape editor) scrolls that panel
+      // instead of zooming the map, mirroring the pointer-down guard below.
       if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-target-bar")) return;
       event.preventDefault();
       zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
@@ -246,9 +236,8 @@ export function EncounterMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, camera]);
 
-  /* ZOOM-TO-A-POINT, IN THREE PIECES — the wheel and the pinch are the same three steps and must not
-     drift apart, so they are written once. `zoomAt` below is the wheel's arithmetic unchanged; the
-     pinch differs only in reading its anchor from the camera the pinch STARTED in. */
+  /* Zoom-to-a-point in three pieces shared by wheel and pinch, so they cannot drift. The pinch reads
+     its anchor from the camera it started in. */
   const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
   /** Where a client point sits in the SVG's own box, as a 0..1 fraction on each axis. */
   const boxFraction = (clientX: number, clientY: number) => {
@@ -276,10 +265,9 @@ export function EncounterMap({
   };
   const resetView = () => {
     if (!size) return;
-    // Frame the whole map in the area the dock leaves visible: treat the dock's inner edge as the new
-    // edge of the canvas, fit the map into that rectangle, and center it there. `baseScale` is the
-    // zoom-1 meet-scale (image px -> screen px), read from the SVG's actual box so letterboxing and
-    // the stage's max-height are accounted for - the earlier stage-width ratio got this wrong.
+    // Frame the whole map in the area the dock leaves visible: the dock's inner edge becomes the canvas
+    // edge. `baseScale` is the zoom-1 meet-scale read from the SVG's actual box, so letterboxing and the
+    // stage's max-height are accounted for.
     const svgRect = svgRef.current?.getBoundingClientRect();
     const dockRect = stageRef.current?.querySelector<HTMLElement>(".encounter-map-dock")?.getBoundingClientRect();
     let center = { x: size.width / 2, y: size.height / 2 };
@@ -301,8 +289,8 @@ export function EncounterMap({
   const zoomCenter = (factor: number) => { const svg = svgRef.current; if (!svg || !size) return; const rect = svg.getBoundingClientRect(); zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor); };
   const toggleFullscreen = () => { const el = stageRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else { setEnlarged(false); void el.requestFullscreen?.(); } };
   const toggleEnlarged = () => setEnlarged((current) => { if (!current && fullscreen) void document.exitFullscreen?.(); return !current; });
-  // Drag the docked panel's inner-edge strip to resize its width. Pointer-capture keeps the drag
-  // alive off the strip; width is clamped to [16rem, 60% of the stage] and persisted by the parent.
+  // Drag the docked panel's inner-edge strip to resize it. Pointer capture keeps the drag alive off the
+  // strip; width is clamped to [16rem, 60% of the stage] and persisted by the parent.
   const beginDockResize = (event: React.PointerEvent) => {
     if (!dock) return;
     event.preventDefault();
@@ -389,8 +377,8 @@ export function EncounterMap({
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
     longPressRef.current = null;
   };
-  /** Take capture AND record who holds it — the pinch abort has to release a capture taken by a
-      different pointer than the one triggering it, and only this ref knows which. */
+  /** Takes capture and records who holds it: the pinch abort must release a capture taken by a
+      different pointer than the one triggering it. */
   const capturePointer = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     capturedPointerRef.current = event.pointerId;
@@ -409,7 +397,7 @@ export function EncounterMap({
     setSelectedId(null);
     setContextMenu({ actorId, x, y });
   };
-  // Mouse right-click opens the token menu; touch uses a long-press started in beginGesture.
+  // Mouse right-click opens the token menu; touch uses a long press started in beginGesture.
   const onContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     const actorId = (event.target as Element).closest<HTMLElement>("[data-token-id]")?.dataset.tokenId;
     if (!actorId || !tokensById.has(actorId)) return; // let the browser's default menu show off-token
@@ -420,20 +408,15 @@ export function EncounterMap({
 
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
-    // A secondary (right/middle) press opens the context menu via onContextMenu - it must not start a
-    // token/pan gesture, which flashed the tray on every right-click (report #5).
+    // A secondary (right/middle) press opens the context menu via onContextMenu and must not start a
+    // token or pan gesture.
     if (event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize, .encounter-target-bar")) return;
-    /* `4f` — PINCH ENTRY, AND THE ABORT THAT MAKES IT SAFE.
-       A second finger on the map is ALWAYS a pinch, whatever was in flight. The gesture underneath is
-       ABANDONED, never finished: capture is dropped, the long-press timer is cleared, and `gesture`
-       goes to null — which is also what discards the preview, because every preview on this surface
-       (the dragged token's snapped ghost, the fog rectangle, the ruler, the shape being drawn or
-       resized) is DERIVED from `gesture` rather than stored beside it. Nothing is submitted, so the
-       token is exactly where the server last put it and the half-drawn shape never existed.
-       This sits ABOVE every tool branch on purpose: below the ping branch a second finger would fire
-       a second ping, and below the token branch it would start a second drag. */
+    /* A second finger on the map always starts a pinch. The gesture underneath is abandoned, never
+       finished: capture dropped, long-press timer cleared, `gesture` set to null, which also discards its
+       preview (every preview is derived from `gesture`). Nothing is submitted. This sits above every
+       tool branch so a second finger cannot fire a second ping or start a second drag. */
     if (event.pointerType !== "mouse") pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.current.size >= 2) {
       event.preventDefault();
@@ -441,8 +424,7 @@ export function EncounterMap({
       dropCapture(event.currentTarget, event.pointerId);
       const [first, second] = [...pointers.current.values()];
       const startFocus = boxFraction((first.x + second.x) / 2, (first.y + second.y) / 2);
-      // The SELECTION is deliberately left alone: it is not a preview and it commits nothing, so a
-      // GM who selected a shape and then pinched to look closer still has it selected afterwards.
+      // The selection is kept: it is not a preview and commits nothing.
       setGesture(startFocus ? { kind: "pinch", startDist: Math.hypot(first.x - second.x, first.y - second.y), startZoom: camera.zoom, startCenter: camera.center, startFocus } : null);
       return;
     }
@@ -451,8 +433,8 @@ export function EncounterMap({
       event.preventDefault(); void submitPing(point);
       return;
     }
-    // Placing an area template takes over the drag (GM only): draw the template's shape anywhere,
-    // even starting on a token - the server computes who is caught.
+    // Placing an area template takes over the drag (GM only), even starting on a token; the server
+    // computes who is caught.
     if (activeTargeting?.mode === "template" && activeTargeting.template && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); capturePointer(event);
@@ -476,8 +458,8 @@ export function EncounterMap({
       }
     }
     const tokenId = target.closest<HTMLElement>("[data-token-id]")?.dataset.tokenId;
-    // Click-to-target intercepts token pointer-downs while a targeting session is live (GM only):
-    // selecting a target must never start a drag. The attacker itself stays draggable.
+    // While a targeting session is live (GM only), token presses select targets and never start a drag.
+    // The attacker itself stays draggable.
     if (activeTargeting && tokenId && tokensById.has(tokenId) && tokenId !== activeTargeting.attackerId) {
       event.preventDefault();
       toggleTarget(tokenId);
@@ -525,11 +507,8 @@ export function EncounterMap({
   };
   const continueGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    /* `4f` — the pinch branch runs BEFORE the capture guard below, and has to. A pinch holds no
-       capture at all (it released the aborted gesture's), and the second finger never had one, so the
-       guard would drop every move a pinch is made of. Reading `pointers` rather than the event means
-       either finger's move recomputes the whole gesture, which is why one finger held still and the
-       other moved still zooms. */
+    /* The pinch branch must run before the capture guard: a pinch holds no capture, so the guard would
+       drop all its moves. Reading `pointers` lets either finger's move recompute the whole gesture. */
     if (gesture?.kind === "pinch") {
       event.preventDefault();
       const [first, second] = [...pointers.current.values()];
@@ -568,10 +547,8 @@ export function EncounterMap({
   const finishGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     pointers.current.delete(event.pointerId);
     clearLongPress();
-    /* `4f` — A PINCH COMMITS NOTHING, and this is the second half of the guarantee the abort makes:
-       whatever gesture the second finger interrupted is already gone, and the pinch itself has no
-       preview to submit. Lifting one of two fingers ENDS the pinch rather than promoting the finger
-       left behind into a pan the GM never started (same rule as the Codex atlas surface). */
+    /* A pinch commits nothing. Lifting one of two fingers ends the pinch rather than turning the
+       remaining finger into a pan (as on the Codex atlas). */
     if (gesture?.kind === "pinch") {
       event.preventDefault();
       dropCapture(event.currentTarget, event.pointerId);
@@ -587,22 +564,11 @@ export function EncounterMap({
       const mapPoint = gesture.point;
       const trayBounds = trayRef.current?.getBoundingClientRect();
       const overTray = Boolean(trayBounds && event.clientX >= trayBounds.left && event.clientX <= trayBounds.right && event.clientY >= trayBounds.top && event.clientY <= trayBounds.bottom);
-      /* TAP-TO-PLACE, RESOLVED HERE BECAUSE THE CHIP'S OWN CLICK NEVER ARRIVES.
-         The staging tray lives INSIDE `.encounter-map-interaction`, the pointer-gesture root, and its
-         chips carry `data-token-id` because a chip is also the handle you drag a token out by. So a
-         press on a chip takes the token-drag branch above, which calls `setPointerCapture` on the
-         WRAPPER — and pointer capture retargets the resulting `click` to the capture element, so
-         `.tray-token`'s `onClick` never runs. Measured 2026-08-07, GM at 1280x900: mouse click on a
-         chip left the tray at 8 of 8 with the click's target reported as
-         `DIV.encounter-map-interaction`; `touchscreen.tap` at 844x390 left it at 7 of 7. Only the
-         keyboard worked (8 -> 7), because a focused <button> dispatches its click directly. The tray's
-         own copy has promised the tap since it was written, and on a phone there is no keyboard, so
-         the tray had no working tap route at all.
-         The handler was never the problem — `placeAtCenter` is what the keyboard path proves works —
-         so this fixes the POINTER path and nothing else. Guarding `beginGesture` against the tray was
-         the other candidate and it disarms the feature next door: dragging a chip onto the map is that
-         same branch, measured working at HEAD (7 -> 6 on mouse), and an early return kills it. A press
-         that never moved is a tap; a press that travelled is a drag; everything else is untouched. */
+      /* Tap-to-place is resolved here because the chip's own click never arrives for a pointer: tray chips
+         carry `data-token-id` (they are drag handles too), so a press takes the token-drag branch, which
+         captures the pointer on the wrapper, and capture retargets the `click` to the wrapper. A press that
+         never moved is a tap; one that travelled is a drag. Keyboard activation still uses the chip's
+         `onClick`. */
       const tapped = gesture.fromTray && Math.hypot(event.clientX - gesture.pressClient.x, event.clientY - gesture.pressClient.y) <= TAP_SLOP;
       setGesture(null);
       const originalToken = tokensById.get(actorId);
@@ -618,8 +584,8 @@ export function EncounterMap({
     if (gesture.kind === "annotation-move") { setGesture(null); void submitAnnotationMove(gesture.id, gesture.geometry.origin, gesture.geometry.target); return; }
     if (gesture.kind === "fog") { const { op, origin, current } = gesture; setGesture(null); submitFogPaint(op, origin, current); return; }
     if (gesture.kind === "measure") { setGesture(null); void submitAnnotationAdd("measurement", undefined, gesture.origin, gesture.current); return; }
-    // A shape drawn while placing an area template is stored on the targeting session, not added as a
-    // standalone annotation - the server draws the real blast when the action resolves.
+    // A shape drawn while placing an area template goes on the targeting session, not into annotations;
+    // the server draws the real blast when the action resolves.
     if (activeTargeting?.mode === "template") { const { origin, current } = gesture; setGesture(null); setTemplatePlacement(origin, current); return; }
     setGesture(null); void submitAnnotationAdd("shape", gesture.kind, gesture.origin, gesture.current);
   };
@@ -627,8 +593,8 @@ export function EncounterMap({
     pointers.current.delete(event.pointerId);
     clearLongPress();
     dropCapture(event.currentTarget, event.pointerId);
-    // A cancelled PINCH says nothing: "Cancelled." belongs to an edit that was abandoned, and a pinch
-    // never had one. It would otherwise fire on the ordinary case of two fingers landing a frame apart.
+    // A cancelled pinch says nothing: "Cancelled." is for an abandoned edit, and two fingers landing a
+    // frame apart is ordinary.
     if (gesture?.kind === "pinch") { if (pointers.current.size < 2) setGesture(null); return; }
     setGesture(null); setMessage("Cancelled.");
   };
@@ -652,10 +618,8 @@ export function EncounterMap({
   const unplaced = tokens.filter((encounterToken) => encounterToken.position === null && canMove(encounterToken.actorId));
   const dragging = gesture?.kind === "token" ? gesture : null;
   const trayShown = unplaced.length > 0 || dragging !== null;
-  // The token tray floats over the stage's top edge whenever a token is unplaced, and it used to
-  // land ON the tool cluster (I-01 §A3 clutter row: "the tray additionally overlays the map top
-  // edge"). Publish its measured height so the toolbar starts below it instead — measured, not
-  // guessed, because the tray reflows to a column at 650px and grows a row per unplaced token.
+  // The tray floats over the stage's top edge while tokens are unplaced; publish its measured height
+  // so the toolbar starts below it (the tray reflows at 650px and grows per token).
   useEffect(() => {
     const tray = trayRef.current;
     if (!trayShown || !tray) { setTrayHeight(0); return; }
@@ -675,7 +639,7 @@ export function EncounterMap({
     const width = size.width / camera.zoom, height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   })() : "0 0 1 1";
-  // Cells occupied by every OTHER visible token (players never receive hidden tokens, so no leak).
+  // Cells occupied by every other visible token (players never receive hidden tokens, so no leak).
   const occupiedByOthers = rulerWhileMoving && showOccupied && calibration && dragging
     ? new Set<string>(tokens.flatMap((encounterToken) => encounterToken.actorId !== dragging.actorId && encounterToken.position ? [...footprintCells(calibration, encounterToken.position, encounterToken.sizeCells)] : []))
     : null;
@@ -683,7 +647,7 @@ export function EncounterMap({
     ? occupiedPathCost(calibration, dragging.origin, dragSnappedPoint, occupiedByOthers)
     : null;
 
-  // Live, grid-snapped preview for the in-progress measure/shape/move/resize gesture (WYSIWYG with the saved result).
+  // Live, grid-snapped preview of the in-progress gesture, matching the saved result.
   const preview: { data: AnnotationGlyphData; snap: SnappedGeometry } | null = (() => {
     if (!calibration || !gesture) return null;
     if (gesture.kind === "measure") { const snap = snapMeasurementPreview(calibration, gesture.origin, gesture.current); return { snap, data: { kind: "measurement", shape: null, origin: snap.origin, target: snap.target, sizeFeet: snap.feet } }; }
@@ -697,20 +661,16 @@ export function EncounterMap({
   const visibilityOptions = drawingAudienceOptions(role);
 
   return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onContextMenu={onContextMenu}>
-    {/* No permanent tutorial captions (ux-principles: if it needs a banner, redesign it) - the tray
-        appears only while it has tokens to place or a drag could drop one back in. */}
-    {/* The staging tray, map side (D2/D3): the same list the prep panel shows, as the things you can
-        actually grab. Everything added lands here first and is explicitly NOT on the map until it is
-        dragged out — or tapped, which drops it at the centre, which is the touch and keyboard route. */}
+    {/* The tray appears only while it has tokens to place or a drag could drop one back in. */}
+    {/* The staging tray, map side: everything added lands here and is not on the map until dragged
+        out, or tapped (dropped at the centre: the touch and keyboard route). */}
     {trayShown && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Staging tray">
       <div><strong>Staging tray</strong><span>{unplaced.length ? "Drag one onto the map, or tap it to drop it at the centre." : "Drag a token here to take it off the map."}</span></div>
       <div className="encounter-token-tray-list">{unplaced.map((encounterToken) => {
         const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
         const gmOnly = actor.visibility === "gm-only";
-        /* `onClick` is the KEYBOARD route: a focused <button> dispatches its click directly, so this
-           fires for Enter/Space and never for a pointer — the wrapper's pointer capture retargets a
-           real click away from the chip. The pointer's tap lands in `finishGesture`, which explains
-           the split; both end in `placeAtCenter`. */
+        /* `onClick` is the keyboard route only (Enter/Space); pointer taps are handled in `finishGesture`
+           because pointer capture retargets the click. Both end in `placeAtCenter`. */
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${gmOnly ? " hidden" : ""}`} disabled={busyActorId !== null}
           title={gmOnly ? `${actor.name} · GM only` : `${actor.name} · Shown to players`}
           onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
@@ -758,7 +718,7 @@ export function EncounterMap({
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive tokens are layered above this map.`}>
           <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
 
-          {/* Shapes render below tokens; measurements render above tokens (further down) so they read over the pieces. */}
+          {/* Shapes render below tokens; measurements render above them (further down). */}
           {annotations.map((annotation) => {
             if (annotation.kind !== "shape") return null;
             const beingDragged = (gesture?.kind === "annotation-move" || gesture?.kind === "annotation-resize") && gesture.id === annotation.id;
@@ -779,7 +739,7 @@ export function EncounterMap({
             return <g className="annotation-shape live"><AnnotationGlyph data={{ kind: "shape", shape: activeTargeting.template.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet }} arrowSize={arrowSize} labelSize={labelSize} color="#ff2e9a" /></g>;
           })()}
 
-          {/* GM fog: dimmed, above the map and shapes but below tokens - the GM always sees everything. */}
+          {/* GM fog: dimmed, above the map and shapes but below tokens; the GM always sees everything. */}
           {fog && role === "gm" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="gm" />}
 
           {visibleTokens.map((encounterToken) => {
@@ -789,12 +749,12 @@ export function EncounterMap({
             const targetable = activeTargeting !== null && activeTargeting.mode !== "template" && actor.id !== activeTargeting.attackerId;
             const targeted = targetable && activeTargeting.selected.includes(actor.id);
             const band = healthBandFor(actor.hp);
-            // GM resolves the effective style (token override, else the table default); a player gets
-            // only the server-resolved style, present when the GM aimed a bar/ring at everyone.
+            // The GM resolves the effective style (token override, else table default); a player gets only the
+            // server-resolved style, present when the GM aimed a bar/ring at everyone.
             const healthStyle = role === "gm" ? (actor.healthDisplay?.style ?? healthDisplay?.style ?? "band") : actor.healthDisplay?.style;
             const healthFraction = hpFillFraction(actor.hp);
             const healthBar: { style: "bar" | "ring"; fraction: number } | undefined = healthStyle === "bar" || healthStyle === "ring" ? { style: healthStyle, fraction: healthFraction } : undefined;
-            // The aura paints UNDER the token so the body + active-turn ring stay crisp on top of it.
+            // The aura paints under the token so the body and active-turn ring stay crisp.
             const auraFraction = healthStyle === "aura" ? healthFraction : undefined;
             return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
@@ -803,7 +763,7 @@ export function EncounterMap({
               <TokenStatusBadges sizePx={encounterToken.sizePx} health={band} conditions={actor.conditions.map((condition) => ({ id: condition.id, label: conditionBadgeLabel(condition) }))} healthBar={healthBar} />
             </g>;
           })}
-          {/* Measurements and pings render above the token layer so they're never hidden behind a piece. */}
+          {/* Measurements and pings render above the token layer so they are never hidden behind a piece. */}
           {annotations.map((annotation) => annotation.kind === "measurement"
             ? <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} color={annotation.color} expiring />
             : null)}
@@ -819,7 +779,7 @@ export function EncounterMap({
           {gesture?.kind === "fog" && <rect className={`fog-stroke-preview fog-stroke-${gesture.op}`}
             x={Math.min(gesture.origin.x, gesture.current.x)} y={Math.min(gesture.origin.y, gesture.current.y)}
             width={Math.abs(gesture.origin.x - gesture.current.x)} height={Math.abs(gesture.origin.y - gesture.current.y)} />}
-          {/* Player fog: solid and above EVERYTHING - whatever sits in fog is visually covered. */}
+          {/* Player fog: solid and above everything, so whatever is in fog is covered. */}
           {fog && role === "player" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="player" />}
         </svg>
 
@@ -840,10 +800,8 @@ export function EncounterMap({
         })()}
 
         {dock?.node && <>
-          {/* NO `.scroll-y` HERE (`4c`). The dock is a frame, not a scroller: it holds the tracker as a
-              bounded flex column (encounter-map.css:359) and the tracker's own `.encounter-region`
-              takes the scroll, which is where `.scroll-y` lives. Declaring it in both places is what
-              made the docked panel two nested ports, the inner one with zero extent. */}
+          {/* No `.scroll-y` here: the dock holds the tracker as a bounded flex column, and the tracker's own
+              `.encounter-region` scrolls. Declaring both makes two nested scrollports. */}
           <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>
           <div className={`encounter-map-dock-resize dock-resize-${dock.position}`} role="separator" aria-label="Drag to resize the docked tracker" title="Drag to resize" onPointerDown={beginDockResize} />
         </>}
@@ -856,7 +814,7 @@ export function EncounterMap({
             : names.length ? null : activeTargeting.mode === "single" ? " - click a token to target it" : " - click tokens to target them";
           const ready = isTemplate ? Boolean(activeTargeting.template?.placed) : activeTargeting.selected.length > 0;
           return <div className="encounter-target-bar" role="group" aria-label={`Targets for ${activeTargeting.action.name}`}>
-            {/* "{Action} → {targets}" — the arrow is the icon, never the character (design-language §icons). */}
+            {/* The arrow is an icon, never a character. */}
             <span><strong>{activeTargeting.action.name}</strong>{label ?? <> <span className="encounter-target-arrow" aria-hidden="true"><IconArrow /></span> {names.join(", ")}</>}</span>
             <span className="encounter-target-bar-buttons">
               <Button variant="secondary" disabled={targetingBusy} onClick={() => clearTargeting()}>Cancel</Button>
@@ -865,9 +823,8 @@ export function EncounterMap({
           </div>;
         })()}
 
-        {/* The scene cluster is all that floats in the bottom corner now: zoom, dock, enlarge and
-            fullscreen moved into the toolbar's View group (D4), so nothing here can wrap. While
-            arranging a scene it swaps for the two staging buttons (plan §B2.4, kept verbatim). */}
+        {/* The scene cluster in the bottom corner; while arranging a scene it swaps for the two staging
+            buttons. */}
         {(staging || onScenePrep) && <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Scene controls">
           {staging
             ? <span className="encounter-map-scene-live" role="group" aria-label="Staged scene controls">
@@ -875,9 +832,7 @@ export function EncounterMap({
                 <Button variant="primary" size="sm" onClick={staging.onMakeLive} title="Make this the scene players see"><span className="map-button-icon" aria-hidden="true"><IconPlay /></span>Make live</Button>
               </span>
             : onScenePrep && (onViewAllScenes
-              /* RULING 12 — ONE DOOR. The top-left scenes row is gone; the map's own Scenes button
-                 became the menu that holds both errands, and the live scene's name rides the menu
-                 rather than a row over the map, so the fact survives and the 56px does not come back. */
+              /* The map's Scenes button is a menu holding both errands, and it names the live scene. */
               ? <Menu
                   className="encounter-map-scene-menu"
                   triggerClassName="encounter-map-scene-trigger"

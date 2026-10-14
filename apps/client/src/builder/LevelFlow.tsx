@@ -8,23 +8,14 @@ import { choicesAbove, draftFromLedger, hpRollGap, identityOf, ledgerOf } from "
 import "./character-builder.css";
 
 /**
- * **Level up and level down (`/characters/<id>/level`, D13/D14).**
+ * Level up and level down (`/characters/<id>/level`): a level rail, then the wizard seeded from this
+ * character's own ledger. Every decision at or below a level survives a rebuild at that level, so
+ * levelling back up restores earlier choices and HP rolls exactly.
  *
- * A level rail with the character's current level marked, and below it the wizard — seeded from this
- * character's own ledger — showing the steps the change needs. Both directions, because a preview
- * round-trip is the whole reason level-down exists: "your level-{N} choices and HP roll are kept —
- * leveling back up restores them exactly" is a promise the ledger makes good on, since every decision
- * at or below a level survives a rebuild at that level.
- *
- * Three honest gates, none of them guesses:
- *  - **no ledger** (a PDF import, a pre-wizard sheet): this flow cannot reconstruct what was never
- *    recorded, and says so rather than assembling a plausible character;
- *  - **the cap** (D13): up stops at the table's max party level, down is always allowed to 1;
- *  - **missing HP rolls**: named by level range, average used, said out loud.
- *
- * Authorization is the server's: `character.rebuild` runs `canInitiateForActor` (own claimed character
- * for a player, anyone for the GM) and re-checks the cap and the builder policy inside the
- * transaction. This surface renders the same rules so a player is not walked into a rejection.
+ * Gates: no ledger (a PDF import or pre-wizard sheet) cannot be rebuilt; up stops at the table's max
+ * level, down always reaches 1; missing HP rolls use the average and say so.
+ * The server authorizes `character.rebuild` (`canInitiateForActor`) and re-checks cap and policy;
+ * this surface mirrors those rules so a player is not walked into a rejection.
  */
 
 type LevelState = GmView | PlayerView;
@@ -44,9 +35,8 @@ export function LevelFlow({ state, role, actorId, sessionKey, connection = "onli
 
   const actor = state.actors.find((entry) => entry.id === actorId) ?? null;
   /**
-   * The stored sheet. A GM reads it out of the table's definition library; a player only ever has
-   * their OWN claimed character's definition, which rides their projection — so a player who reaches
-   * this address for anyone else finds nothing here, which is the same answer the server would give.
+   * The stored sheet. A GM reads the definition library; a player has only their own claimed
+   * character's definition, so for anyone else this finds nothing, as the server would.
    */
   const definition: ActorDefinition | null = useMemo(() => {
     if (!actor) return null;
@@ -105,8 +95,7 @@ export function LevelFlow({ state, role, actorId, sessionKey, connection = "onli
       <p>Level {current}{cap < 20 ? ` · the table's cap is ${cap}` : ""}</p>
     </header>
 
-    {/* The rail: every level this table builds to, with the current one marked. Buttons, not a bar —
-        at 390px a scrubber for twenty stops is a control nobody can land on. */}
+    {/* Buttons, not a slider: a 20-stop scrubber is unusable at 390px. */}
     <ol className="cb-level-rail" aria-label="Levels">
       {Array.from({ length: cap }, (_, index) => index + 1).map((level) => <li
         key={level}

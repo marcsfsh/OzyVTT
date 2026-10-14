@@ -10,19 +10,13 @@ import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { registerContentCache } from "../content/invalidate";
 
-/** Per-definition cache: one lookup per stat block per session.
-    NOT immutable any more — a GM can publish a homebrew creature edit mid-session, so the
-    cache is dropped on `homebrew:changed` (`content/invalidate.ts`) and the next resolve
-    refetches. Actions and typed defences are late-bound at every use, which is exactly
-    why a stale entry here would show the wrong attack on a creature already on the table. */
+/** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
+    can republish a creature mid-session and a stale entry would show the wrong attack. */
 const actionCache = new Map<string, readonly ContentActionSummary[]>();
 registerContentCache(() => actionCache.clear());
 
-/* A LIMITED USE is itself the mechanic (`action-resolution.ts` resolveDefinitionAction: "limited uses
-   are themselves a structured effect"). Action Surge, Indomitable, Arcane Recovery, Relentless
-   Endurance and the tiefling legacy tiers have nothing to roll - they have a counter - so without
-   this they listed as static reference rows the table could read but never spend. Both predicates
-   mirror the server's, or the sheet and the resolver disagree about what is usable. */
+/* A limited use is itself the mechanic (`resolveDefinitionAction`): Action Surge, Indomitable and
+   similar have a counter and nothing to roll. Both predicates must mirror the server's. */
 const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true;
 /** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
 const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
@@ -43,9 +37,8 @@ const summaryParts = (action: ContentActionSummary, all: readonly ContentActionS
 };
 
 /**
- * Client-side availability HINT (ADR-0020): the server is the authority - rows stay tappable and a
- * strict-mode rejection opens the audited override - but the obvious cases annotate up front so the
- * legal action is visibly the easiest path.
+ * Client-side availability hint (ADR-0020). The server decides: rows stay tappable and a
+ * strict-mode rejection opens the audited override.
  */
 function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSummary): string | null {
   if (action.requiresEffectTag && !actor.effects.some((effect) => effect.tags.includes(action.requiresEffectTag!))) return `Needs ${tagLabel(action.requiresEffectTag)}`;
@@ -76,37 +69,35 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
 }
 
 /**
- * The GM's action runner for the current stat-block combatant: pick an action, pick targets (in the
- * list here or by clicking tokens on the map - both drive the shared targeting store), resolve on the
- * server, then apply the proposed typed damage with explicit taps. Strict-mode rejections come back
- * as a one-tap override confirmation, never a dead end (ADR-0020).
+ * The GM's action runner for the current stat-block combatant: pick an action, pick targets (here
+ * or on the map, via the shared targeting store), resolve on the server, then apply the proposed
+ * typed damage with explicit taps. Strict-mode rejections offer a one-tap override (ADR-0020).
  */
-/** The handful of generic actions a table actually reaches for mid-fight; the rest sit behind "More". */
+/** The generic actions a table reaches for mid-fight; the rest sit behind "More". */
 const PRIMARY_BUILTINS = ["dodge", "dash", "disengage", "help", "hide"] as const;
 
 export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmView; actor: GmActor; onFeedback: (text: string) => void }>) {
   const [actions, setActions] = useState<readonly ContentActionSummary[] | null>(actionCache.get(actor.definitionId ?? "") ?? null);
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
-  // A typed damage override (manual roll mode, or a GM adjustment): when it differs from the rolled
-  // total the manual number is applied straight (no defense math), matching the save prompt's manual path.
+  // A typed damage override (manual roll mode, or a GM adjustment).
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
-  // A typed d20 for the attack preview (the manual-entry path, or a physical die).
+  // A typed d20 for the attack preview (manual entry or a physical die).
   const [attackDieEdit, setAttackDieEdit] = useState("");
-  // Whether that typed d20 has been submitted to the preview - drives "Use roll" → Confirm/Re-roll.
+  // Whether that typed d20 has been submitted: drives "Use roll" → Confirm/Re-roll.
   const [manualSubmitted, setManualSubmitted] = useState(false);
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
   const { prompt, dialog } = usePrompt();
-  // Manual-vs-auto follows the one per-browser dice-input preference every surface reads.
+  // Manual vs auto follows the shared per-browser dice-input preference.
   const { rollMode } = useRollPreference();
-  // A strict-mode rejection awaiting the GM's call - store state, so a resolve rolled from the
-  // map's confirm bar surfaces the same override dialog here (ADR-0020).
+  // A strict-mode rejection awaiting the GM's call. Store state, so a resolve from the map's confirm
+  // bar shows the same override dialog here (ADR-0020).
   const blockedPrompt = useTargetingBlocked();
   const session = useTargeting();
   const result = useTargetingResult();
   const resolveBusy = useTargetingBusy();
-  // Targeting/result in the store belong to this runner only when they're for this attacker.
+  // Targeting and result in the store belong to this runner only when they are for this attacker.
   const picking = session && session.attackerId === actor.id ? session : null;
 
   const definitionId = actor.definitionId;
@@ -123,11 +114,10 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   }, [definitionId, actor.id, onFeedback]);
   // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
   useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
-  // Fresh result (from this runner's Roll or the map confirm bar) clears prior apply bookkeeping.
+  // A fresh result (from this runner or the map confirm bar) clears prior apply bookkeeping.
   useEffect(() => { setApplied(new Set()); setDamageEdit(null); }, [result]);
-  // The manual d20 field resets only when a NEW attack preview first appears - not on every preview
-  // change (Adv/Disadv/Use roll each produce a fresh result), so a submitted manual roll persists
-  // instead of the field clearing itself the instant it's used.
+  // Reset the manual d20 field only when a new attack preview first appears. Adv/Disadv/Use roll
+  // each produce a fresh result, and the submitted roll must persist through them.
   const previewShownRef = useRef(false);
   useEffect(() => {
     const showing = Boolean(result?.preview);
@@ -138,8 +128,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => { const target = state.actors.find((item) => item.id === entry.actorId); return target ? [target] : []; });
 
-  // A blocked resolve keeps its session and surfaces the override dialog via the store; only
-  // genuine failures (revision conflicts, network) need a feedback line here.
+  // A blocked resolve keeps its session and shows the override dialog via the store; only genuine
+  // failures (revision conflicts, network) need a feedback line.
   const onOutcome = (ok: boolean, message?: string) => { if (!ok && message) onFeedback(message); };
   const resolve = () => resolveTargeting(state.revision, onOutcome);
   const useDirect = (action: ContentActionSummary) => resolveActionDirect(actor.id, action.id, state.revision, onOutcome);
@@ -147,11 +137,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
     if (!result || (overrideAmount ?? result.damageTotal) <= 0) { setApplied((current) => new Set([...current, key])); return; }
     setBusy(true);
-    // The typed parts (weapon dice + rage-style bonus lines) ALWAYS travel with the apply, amended or
-    // not. An override used to drop them and send a bare total, which put the number on the
-    // defence-free path - so a GM correcting 17 to 12 handed a fire-resistant target all 12. It now
-    // rides as `damageOverride` and the SERVER re-weights the same types to it (rule 2: that maths is
-    // a game decision, not a client one).
+    // The typed parts always travel with the apply, amended or not: an override is sent as
+    // `damageOverride` and the server re-weights the same types to it, so resistances still apply.
     const parts = [
       ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
       ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
@@ -173,7 +160,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
 
   const instance = state.combat.turn.actionInstance?.actorId === actor.id ? state.combat.turn.actionInstance.components : null;
   const attacksLeft = instance ? Object.values(instance).reduce((sum, remaining) => sum + remaining, 0) : 0;
-  // Name what's left ("1× Tail") so the GM picks the next attack instead of re-tapping the last one.
+  // Name what is left ("1× Tail") so the GM picks the next attack instead of re-tapping the last.
   const componentLabel = (components: Record<string, number>) => Object.entries(components)
     .filter(([, remaining]) => remaining > 0)
     .map(([id, remaining]) => `${remaining}× ${id === "attack" ? "any attack" : actions?.find((candidate) => candidate.id === id)?.name ?? id}`)
@@ -190,15 +177,12 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
     </div>}
     {attacksLeft > 0 && !picking && instance && <p className="action-instance-note" role="status">Remaining in this action: {componentLabel(instance)}.</p>}
     {actions && !picking && (() => {
-      // Three tiers of prominence: the stat block's own rollable actions are the working surface
-      // (full rows); the shared builtin catalog (Dodge, Dash, Unarmed Strike, ...) is one wrapped
-      // cluster of small chips - the same 16 actions on every creature don't earn 16 rows; prose
-      // traits collapse behind one line (the sheet always has the full text).
+      // Three tiers: the stat block's own rollable actions get full rows; shared builtins (Dodge, Dash,
+      // Unarmed Strike...) are one cluster of small chips; prose traits collapse behind one line.
       const own = actions.filter((action) => isResolvable(action) && action.builtin !== true);
       const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
       const reference = actions.filter((action) => !isResolvable(action));
-      // Spellcasting is the reference entry the GM actually reads mid-fight - hoist it out of the
-      // collapsed "Traits & reference" group and show it open by default (report #10).
+      // Spellcasting is the reference entry read mid-fight, so it is hoisted out and shown open.
       const spellcasting = reference.find((action) => action.id === "spellcasting" || /spellcasting/i.test(action.name));
       const otherReference = reference.filter((action) => action !== spellcasting);
       return <>
@@ -282,15 +266,14 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
         {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} - {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "no AC on record" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
       </p>}
-      {/* Attack PREVIEW: the same roll experience as a saving throw - Adv/Disadv re-roll the d20, a typed
-          d20 is the manual path, and Confirm resolves the hit for real (damage, riders, economy). */}
+      {/* Attack preview: Adv/Disadv re-roll the d20, a typed d20 is the manual path, and Confirm
+          resolves the hit for real (damage, riders, economy). */}
       {result.preview && result.attack && (() => {
         const previewResolve = (opts: ResolveOptions) => resolveTargeting(state.revision, onOutcome, opts);
         // Any auto control (Adv/Disadv/Re-roll) abandons a pending manual entry.
         const autoPreview = (opts: ResolveOptions) => { setManualSubmitted(false); previewResolve(opts); };
         const mode = result.rollMode?.mode;
-        // Roll mode drives the layout: auto shows just the roll controls; manual adds a labeled
-        // "type the d20" zone under an "or" divider so the two paths read distinctly (feedback #1).
+        // Manual mode adds a "type the d20" zone under an "or" divider below the roll controls.
         const manualEntry = rollMode === "manual";
         const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setManualSubmitted(true); previewResolve({ commit: false, attackNatural: value }); };
         return <div className="action-preview">
@@ -309,7 +292,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
               <span className="roll-zone-caption">manual entry</span>
               <span className="save-prompt-manual">
                 <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} disabled={manualSubmitted} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDieEdit.trim() !== "") submitDie(); }} />
-                {/* "Use roll" sits on its own right-aligned row under the full-width field; once used it becomes Confirm/Re-roll. */}
+                {/* "Use roll" sits on its own row under the field; once used it becomes Confirm/Re-roll. */}
                 <span className="manual-actions">{manualSubmitted
                   ? <><button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={resolveBusy} title="Enter a different d20" onClick={() => { setAttackDieEdit(""); setManualSubmitted(false); }}>Re-roll</Button></>
                   : <button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
@@ -322,8 +305,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.effectGranted && <p className="action-effect-granted">{actor.name} gains <strong>{result.effectGranted.name}</strong>.</p>}
       {result.effectsApplied?.map((appliedEffect) => <p key={`${appliedEffect.targetId}-${appliedEffect.name}`} className="action-effect-applied">{appliedEffect.targetName} is <strong>{appliedEffect.name}</strong>.</p>)}
       {result.damage.length > 0 && (() => {
-        // When the GM has typed a manual amount in the apply field, the headline reflects THAT number
-        // (what will be applied), not the stale rolled total - the rolled value is kept for reference.
+        // With a typed amount in the apply field, the headline shows that number; the rolled one stays
+        // for reference.
         const typed = damageEdit !== null && damageEdit.trim() !== "" ? Number(damageEdit) : null;
         const overriding = typed !== null && Number.isFinite(typed) && typed >= 0 && typed !== result.damageTotal;
         const breakdown = [
@@ -333,8 +316,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         return <p className="action-damage">Damage: <strong>{overriding ? typed : result.damageTotal}</strong>{overriding ? ` (manual - rolled ${result.damageTotal})` : ` (${breakdown})`}{!overriding && result.crit ? " - crit dice doubled" : ""}</p>;
       })()}
       {result.attack && (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
-        // A reaction window (Uncanny Dodge) parked this damage on a prompt: the answer applies it
-        // server-side, so the apply button never shows for this target - that would double-apply.
+        // A reaction window (Uncanny Dodge) parked this damage on a prompt whose answer applies it
+        // server-side, so no apply button here (it would double-apply).
         const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
         if (prompt) {
           const waiting = state.combat.pendingReactions.some((reaction) => reaction.actorId === result.attack!.targetId && reaction.sourceActorId === actor.id);
@@ -351,20 +334,13 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             </span>;
       })()}
       {result.warnings?.map((warning) => <p key={warning} className="action-warning">⚠ {warning}</p>)}
-      {/* The table's own lines (an accomplished push, the save a Topple forced). NOT warnings: these
-          are things that HAPPENED, and every one of them is also a row in the feed the whole table
-          reads - so the card and the log say the same sentence rather than the card saying it alone.
-          Rendered whole, INCLUDING `gmOnly` rows, and the reason is neither `canPlayerTarget` nor
-          anything else about targeting: this component takes a `GmView` and is mounted only in the
-          GM console (`EncounterPanel.tsx`). A player's runner is `PlayerActionRunner`, which renders
-          neither `warnings` nor these lines at all. Reuse this component for a player and that
-          reason is gone - the guard that survives the move is server-side, where
-          `withoutGmOnlyNarration` (`game-operations.ts`) strips gmOnly rows off any ack bound for a
-          non-GM principal. Read both before moving it, and add the client-side check here if you do. */}
+      {/* Narration of what happened (a push, a forced save), matching the feed. Includes `gmOnly`
+          rows because this component takes a `GmView` and is mounted only in the GM console. Reusing
+          it for a player would need a client-side filter here; the server also strips gmOnly rows
+          from non-GM acks (`withoutGmOnlyNarration`, game-operations.ts). */}
       {result.tableNarration?.map((line) => <p key={line.text} className="action-narration">{line.text}</p>)}
       {result.save && (() => {
-        // Reflect the LIVE count of unanswered saves for this action (matched by attacker + action),
-        // not the frozen resolve-time count - so the note clears as each save is answered in the tracker.
+        // The live count of unanswered saves for this action, so the note clears as each is answered.
         const waiting = state.combat.pendingSaves.filter((save) => save.sourceActorId === actor.id && save.actionName === result.actionName).length;
         return waiting > 0
           ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then confirm to apply.</p>

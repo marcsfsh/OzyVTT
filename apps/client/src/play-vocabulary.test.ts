@@ -1,44 +1,8 @@
 /**
- * D28 — THE PLAY VOCABULARY LOCK. One product, one set of words, enforced as a test failure.
- *
- * The Codex learned this lesson first (`codex/vocabulary.test.ts`): a *page* was a "note", an
- * "entity" and a "page" on three surfaces, and nothing broke — the product just got harder to
- * learn. The table had the same disease and worse, because more people wrote it: the thing you
- * put on the map was an "actor", a "combatant" and a "creature"; one roll audience had FIVE
- * names in a single `<select>`; the same fight was an "encounter" in the tab bar, a place in
- * one sentence and an event in the next; a character was "Unclaimed" on the GM's roster and
- * "Taken" on the player's.
- *
- * So there is one glossary now, and this is where it is kept honest.
- *
- * **Scope: everything under `apps/client/src` MINUS a pinned exclusion list**, plus
- * `packages/ui/src/primitives` (the shared controls carry the shared words). An exclusion list
- * rather than an include list, deliberately: a new play directory must be born scanned. The
- * previous engagement added `settings/`, `builder/`, `replay/` and `scenes/` — under an include
- * list every one of them would have arrived unlocked, and "we'll add it to the list" is how a
- * lock becomes decoration. The exclusions are `codex/` (its own lock, and a genuinely different
- * glossary — it retires "reveal", which fog legitimately keeps) and `styleguide/` (a developer
- * reference must be able to name a retired word in order to say it is retired). Both are pinned
- * in `design-conventions-shape.ts` with their reasons, and a third entry is a reviewed diff.
- *
- * **The scanner is `copy-scan.ts` — the Codex's, moved out so there is exactly one.** It reads
- * JSX text, label-ish props in both spellings, and the calls that put a sentence on screen. It
- * does NOT read identifiers, wire values or comments: `visibility === "gm-only"` is protocol,
- * `label="GM only"` is copy, and telling those apart is the whole job. Comments are stripped
- * before scanning here (they are not user-facing, and a comment that names a retired word to
- * say it is retired must not fail the rule).
- *
- * **Two things this file deliberately cannot do, stated rather than implied:**
- *  1. *Interpolated copy.* A literal inside a JSX expression — `{claimed ? "Claimed" :
- *     "Unclaimed"}`, `{actor.kind}` — is invisible, because widening the scan to every string
- *     literal would flag every wire value in the tree and the lock would be off within a week.
- *     Those sites are fixed at the source and held by the pins below where they are structured
- *     (the claim words and the roll-visibility words are pinned at their one definition, which
- *     is stronger than any scan).
- *  2. *Meaning.* A regex matches tokens, not senses. "Save" the throw and "Save" the persist
- *     verb are one token; so are "Initiative" the score and "Initiative" the list. Those are
- *     separated by scoping a rule to files where one sense lives, and by review everywhere
- *     else — see LEGITIMATE below, which pins the domain terms this lock must never eat.
+ * The play vocabulary lock: one set of words for the product, enforced as test failures. Scans
+ * `apps/client/src` minus `PLAY_EXCLUDED`, plus the `packages/ui` primitives, with `copy-scan.ts`.
+ * A regex matches tokens, not senses, so some rules are scoped to files and LEGITIMATE pins the
+ * domain words that must survive.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -50,55 +14,40 @@ import { CONVENTION_SHAPE, assertRoots, playCopySources, stripComments } from ".
 assertRoots();
 
 /**
- * The glossary, as rules. Each row is a retired pattern plus the word that replaced it, so a
- * failure tells the next person what to type instead of only what not to.
- *
- * `where` scopes a rule to the files where exactly one sense of the word lives. Two rows need
- * it, and both are the same shape of problem: "archive" is the verb-triad WINNER on the roster
- * and in homebrew ("Archive / Restore", reversible, kept) and a retired NOUN in the replay
- * surface, where a finished fight's record is a **Replay**.
+ * Retired patterns, each with the word that replaced it so a failure says what to write. `where`
+ * scopes a rule to files where only one sense of the word lives.
  */
 const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string; where?: RegExp }>> = [
-  // ── the playable entity ──
+  // The playable entity
   { pattern: /\bactors?\b/i, use: "“character” / “monster” / “NPC” — the specific kind, or “character or monster” for the generic slot" },
   { pattern: /\bcombatants?\b/i, use: "“character” / “monster”; the list they are in is “Turn order”" },
   { pattern: /\bcreatures?\b/i, use: "the specific kind, or “it”/“its” — “on its own turn”, not “on this creature's turn”" },
-  // ── visibility: one decision, one pair of words (the RevealSwitch family's) ──
+  // Visibility: one decision, one pair of words (the RevealSwitch family's)
   { pattern: /\b(gm|shared) layer\b/i, use: "“Shown to players” / “Hidden from players” — a layer is an implementation detail, not a thing a GM decides about" },
   { pattern: /\bGM-only\b/, use: "“GM only”, unhyphenated — the spelling `GmOnlyTag` renders" },
   { pattern: /\bpublicly\b|\bpublic\b/i, use: "“Shown to players”" },
-  // The five dice phrasings. `^Everyone$` and not `\bEveryone\b`: a string that is exactly one
-  // word is a label, and a label for an audience must be one of the reveal words; "Everyone on
-  // the roster is already in this fight" is a sentence and stays English.
+  // The dice phrasings. `^Everyone$`, not `\bEveryone\b`: a one-word string is a label and must use
+  // the reveal words, while a sentence containing "Everyone" is just English.
   { pattern: /^Everyone$/, use: "“Shown to players” — the roll audience uses the same words as every other reveal (dice/DicePanel.tsx's ROLL_VISIBILITY_WORD)" },
   { pattern: /\bJust me\b|\bJust the GM\b/i, use: "“GM only” / “Hidden from players” — see ROLL_VISIBILITY_WORD in dice/DicePanel.tsx" },
-  // ── claim states ──
+  // Claim states
   { pattern: /\bunclaimed\b/i, use: "“Available” (actors/actor-display.ts's CLAIM_WORD)" },
   { pattern: /\btaken\b/i, use: "“Claimed” (actors/actor-display.ts's CLAIM_WORD)" },
-  // ── the rules assistant (D6) ──
+  // The rules assistant
   { pattern: /\b(strict|assisted|freeform)\b/i, use: "“Enforce” / “Advise” / “Off” — the wire values keep their names, the dial does not" },
-  // ── the fight, and the place it happens ──
+  // The fight, and the place it happens
   { pattern: /\bencounters?\b/i, use: "“fight” for the event (“Start the fight”, “Add to this fight”) and “Table” for the place — D28 demotes “encounter” to a wire name" },
   { pattern: /\bbattlemaps?\b/i, use: "“battle map”, two words — the Codex's spelling wins" },
   { pattern: /\bscene prep\b/i, use: "“Staging” — one name for the GM-private setup state, not three" },
-  // ── a finished fight's record ──
+  // A finished fight's record
   { pattern: /\brecordings?\b/i, use: "“replay”" },
   { pattern: /\barchives?\b/i, where: /\/replay\//, use: "“replay” — “Archive” stays the reversible verb elsewhere, but a finished fight's record is a Replay" },
-  // ── the verb triad ──
+  // The verb triad
   { pattern: /remove from pickers/i, use: "“Archive” — the act is reversible, so it is the Archive verb" },
   { pattern: /^Removed$/, use: "“Archived” — the state a reversible Archive leaves behind" }
 ];
 
-/**
- * Exemptions, as (file, string) PAIRS rather than the Codex's whole-string set.
- *
- * The difference is the point: a word that is domain-correct in one file must not be excused
- * everywhere. "Creature type" is SRD's own name for a monster's type line and belongs in the
- * homebrew authoring form; the same word in a token picker was drift, and was fixed rather than
- * added here.
- *
- * Every entry must rescue something — see the dead-exemption check at the bottom.
- */
+/** (file, string) exemptions, so a word is excused only where it is correct; each must rescue something. */
 const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
   [
     "apps/client/src/homebrew/RiderEditor.tsx",
@@ -116,15 +65,7 @@ const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]>
   ]
 ];
 
-/**
- * The domain terms this lock must never eat, pinned as strings that MUST still be there.
- *
- * A vocabulary lock's real risk is not that it misses drift; it is that an over-broad rule, or
- * an over-eager copy pass, quietly deletes a word the game needs. D28 keeps all six of these on
- * purpose, and each is asserted present at its home rather than merely left un-ruled: fog
- * reveals and hides (in-fight verbs), the shared screen presents, Initiative is the SCORE (only
- * the list is "Turn order"), Save is the THROW, and a character is Claimed and Released.
- */
+/** Domain terms the lock must never eat, asserted present at their home. */
 const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
   ["apps/client/src/scene/MapToolbar.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs D28 keeps"],
   ["apps/client/src/scene/MapToolbar.tsx", "Hide the whole map again", "fog: the Hide half"],
@@ -134,7 +75,7 @@ const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: strin
   ["apps/client/src/actors/MyCharacter.tsx", "Release", "the table's release verb — never “Leave”"]
 ];
 
-// ───────────────────────────── the corpus ─────────────────────────────
+// The corpus
 
 const strings: readonly CopyString[] = scanCopy(playCopySources()).filter((entry) => !looksLikeCode(entry.text));
 /** What the word rules read: the sentence a person sees, with the `${…}` holes blanked. */
@@ -143,16 +84,13 @@ const at = (file: string, text: string) => strings.some((entry) => entry.file ==
 
 describe("The play glossary (D28)", () => {
   it("reads enough of the play surfaces to be worth trusting", () => {
-    // The tripwire on the tripwire. A scan that silently matched nothing would pass forever, and
-    // every rule below would be decoration — so the floors fail before the rules can lie.
+    // Floors first: a scan that matched nothing would pass every rule below.
     expect(playCopySources().length).toBeGreaterThan(CONVENTION_SHAPE.playSourceFloor);
     expect(strings.length).toBeGreaterThan(CONVENTION_SHAPE.playCorpusFloor);
   });
 
   it("covers every play directory, not a list someone remembered to update", () => {
-    // The anti-refragmentation assertion. `settings/`, `builder/` and `replay/` are the newest
-    // surfaces in the tree; naming them here means a scan that stops walking one fails by NAME
-    // rather than by a count that a busy week could talk itself past.
+    // Named directories, so a scan that stops walking one fails by name rather than by a count.
     const dirs = new Set(playCopySources().map((source) => source.file.replace("apps/client/src/", "").split("/")[0]));
     for (const dir of ["actors", "builder", "dice", "encounter", "homebrew", "maps", "replay", "scene", "scenes", "settings", "tokens", "viewer"]) {
       expect(dirs.has(dir), `apps/client/src/${dir}/ is not in the scan`).toBe(true);
@@ -162,9 +100,8 @@ describe("The play glossary (D28)", () => {
   });
 
   it("sees the copy shapes a naive scanner is blind to", () => {
-    // Named strings, not a count, so a future narrowing of the scanner fails HERE by name instead
-    // of quietly measuring less. One of each class the `prop="…"`-only scanner used to miss:
-    // an object-literal confirm title, an object-literal confirm body, and a template literal.
+    // Named strings, so a narrowed scanner fails by name: an object-literal confirm title, an
+    // object-literal confirm body, and a template literal.
     expect(at("apps/client/src/replay/ReplayPanel.tsx", "Delete this replay?"), "object-literal confirm title").toBe(true);
     expect(
       at("apps/client/src/encounter/EncounterPanel.tsx", "Turn order stays saved for reference, but the shared screen will hide it."),
@@ -187,8 +124,8 @@ describe("The play glossary (D28)", () => {
   }
 
   it("has no exemption that rescues nothing — a dead exemption is a comment pretending to be a rule", () => {
-    // The rule that keeps the exemption list from becoming the glossary. When copy is fixed at an
-    // exempted site, this fails until the row is deleted, so the list can only ever shrink.
+    // When copy is fixed at an exempted site this fails until the row is deleted, so the list can
+    // only shrink.
     for (const [file, text, why] of ALLOWED) {
       const rescued = strings.filter(
         (entry) => entry.file === file && visible(entry) === text && RETIRED.some(({ pattern, where }) => (!where || where.test(file)) && pattern.test(text))
@@ -200,9 +137,7 @@ describe("The play glossary (D28)", () => {
   });
 
   it("keeps the domain words D28 deliberately kept", () => {
-    // The other direction, and the one a negative-only lock gets wrong: fog still Reveals, the
-    // score is still Initiative, the throw is still a Save, and a character is Claimed and
-    // Released. If a future rule is written too wide, or a copy pass too eagerly, this fails.
+    // The other direction: a rule written too wide, or an over-eager copy pass, must not remove these.
     for (const [file, text, why] of LEGITIMATE) {
       expect(at(file, text), `${file} no longer says ${JSON.stringify(text)} — ${why}`).toBe(true);
     }
@@ -210,25 +145,17 @@ describe("The play glossary (D28)", () => {
 });
 
 describe("The structured copy, pinned at its one definition (D28)", () => {
-  /**
-   * The classes the corpus cannot see, held where they are declared instead. A ternary label and
-   * an `<option>`'s interpolated text are invisible to any prop/JSX-text scan; the tables they
-   * come from are not, and pinning the TABLE is strictly stronger than pinning a rendering of it.
-   */
+  /** Words the corpus cannot see are pinned at the table they come from. */
   it("names the three claim states in D28's words", () => {
     expect(CLAIM_WORD).toEqual({ mine: "Your character", claimed: "Claimed", available: "Available" });
   });
 
   it("names the four roll audiences in the reveal words", () => {
-    // Read as source rather than imported: `dice/DicePanel.tsx` pulls in the socket module, and a
-    // vocabulary lock has no business opening a socket. Reading the file is also the tripwire —
-    // a rename makes this throw, which is what it is for.
-    // Comments stripped: the component's own header quotes all five retired phrasings in order to
-    // say they are retired, exactly as the styleguide exclusion does at directory scope.
+    // Read as source rather than imported: `dice/DicePanel.tsx` pulls in the socket module. A rename
+    // makes this throw, which is intended. Comments are stripped so only rendered copy is checked.
     const source = stripComments(readFileSync(`${process.cwd()}/src/dice/DicePanel.tsx`, "utf8"));
-    // The four audiences, pinned at their EXACT strings. self-only and blind carry plan-1 §C's
-    // clarifier suffixes (restored 2026-08-04): the head of each is still the reveal phrase, and
-    // the suffix is the fact a player most needs ("the GM sees it" / "you won't see the result").
+    // The four audiences at their exact strings. self-only and blind carry clarifier suffixes ("the GM
+    // sees it" / "you won't see the result") after the reveal phrase.
     for (const phrase of [
       "Shown to players",
       "GM only",
@@ -249,8 +176,8 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
   });
 
   it("names the rules dial Enforce / Advise / Off, and the settings groups D24's three", () => {
-    // The dial's own labels are `SettingsPage.tsx`'s DIAL_COPY; the wire values stay
-    // strict/assisted/freeform, which is exactly why the RETIRED row above is about copy only.
+    // The dial's labels are `SettingsPage.tsx`'s DIAL_COPY; the wire values stay strict/assisted/freeform,
+    // which is why the RETIRED row above is about copy only.
     const source = readFileSync(`${process.cwd()}/src/settings/SettingsPage.tsx`, "utf8");
     expect(source).toMatch(/value: "strict", label: "Enforce"/);
     expect(source).toMatch(/value: "assisted", label: "Advise"/);
@@ -259,10 +186,8 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
   });
 
   it("calls the place the Table and never the Encounter", () => {
-    // D28's "Encounter = a fight, not a place", enforced at the one place it is structural. The
-    // tab table lives in `main.tsx`, which calls `createRoot` at import and so cannot be imported
-    // by a test — but its rows are `label: "…"`, which the corpus reads, so the labels are pinned
-    // through the scan. Weaker than importing the array, and said so: the ORDER is not pinned here.
+    // "Encounter" is a fight, not a place. `main.tsx` calls `createRoot` at import, so its tab table is
+    // checked through the scan (its rows are `label: "…"`); the order is not pinned here.
     for (const label of ["Table", "Scenes", "Roster", "Codex", "Homebrew", "Settings"]) {
       expect(at("apps/client/src/main.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(true);
     }
@@ -271,11 +196,7 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
 });
 
 describe("The verb triad, pinned per dialog (D28)", () => {
-  /**
-   * Delete is permanent and says so; Archive is reversible; Remove takes something out of a list
-   * and the thing survives. The words drifted hardest in confirm dialogs, because a confirm is
-   * written once and never re-read — so each destructive confirm's own copy is pinned by name.
-   */
+  /** Delete is permanent and says so; Archive is reversible; Remove takes something out of a list. */
   it("says “cannot be undone” on every Delete, and only on a Delete", () => {
     const undoable = strings.filter((entry) => /this cannot be undone/i.test(visible(entry)));
     expect(undoable.length, "no confirm says “This cannot be undone.” — the Delete dialogs have lost their warning").toBeGreaterThan(2);

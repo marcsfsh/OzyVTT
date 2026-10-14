@@ -1,18 +1,12 @@
-/* The two prep surfaces that wrap the shared panel: "Prepare a scene" (the create form) and the
-   staging workspace beside the private map. Everything inside them - map line, tray, adds, Recent -
-   is `scene-prep.css` and `staging-tray.css`; these rules are only the frame.
-
-   The combatant-checklist rules that used to live here are gone with the checklist itself (D2). One of
-   them, `.scene-create button { background: var(--primary) }`, was why the map picker's tiles rendered
-   as solid magenta blocks the first time this panel showed them: a descendant selector written when the
-   form held exactly one button. Buttons are styled by the primitive; the form styles the form. */
+/* The frames of the two prep surfaces ("Prepare a scene" and the staging workspace); their contents
+   are styled in `scene-prep.css` and `staging-tray.css`. */
 .scene-panel { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid transparent; }
 .scene-panel-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-8); }
 .scene-panel-heading h2 { font-size: var(--fs-h1); font-family: var(--font-display); }
 .scene-panel-heading p { max-width: 26rem; margin: 0; font-size: .9rem; text-align: right; }
 
-/* `min-width: 0` throughout: these panels are rendered inside a Modal at 390px, where a grid item's
-   default `auto` minimum lets a long map name push the whole form wider than the dialog. */
+/* `min-width: 0` throughout: inside a 390px Modal a grid item's `auto` minimum lets a long map name
+   widen the form past the dialog. */
 .scene-create { display: grid; gap: .8rem; min-width: 0; margin-top: 1.3rem; padding: var(--space-4); border: 1px solid transparent; }
 .scene-create > * { min-width: 0; }
 .scene-create label { display: block; color: var(--text-dim); font-size: .8rem; }
@@ -27,7 +21,6 @@
   .scene-create { padding: .7rem; }
 }
 
-/* Staging workspace = GM-private (violet). */
 .scene-builder { min-width: 0; margin-top: 0; padding: 1.3rem; border: 1px solid transparent; }
 .scene-builder-head h2 { font-size: var(--fs-h1); font-family: var(--font-display); margin: .15rem 0 .3rem; }
 .scene-builder-head p { margin: 0 0 .8rem; font-size: .85rem; }
@@ -35,18 +28,10 @@
 .scene-rename { margin-left: .45rem; padding: .1rem .4rem; border: 1px solid transparent; border-radius: 0; background: transparent; color: var(--text-muted); font-size: .78rem; cursor: pointer; vertical-align: middle; }
 .scene-rename:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
 
-/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
-   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
-   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
-   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
-   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
-   daybreak translation arrives for free.
-   RULING 28: `.scene-panel` and `.scene-builder` are the outermost panels of their surfaces and
-   take the scanline; `.scene-create` nests inside `.scene-panel` and takes rim + bezel over a
-   plain plate. THE STAGING WORKSPACE IS GM-PRIVATE, so `.scene-builder` keeps its violet edge —
-   moved onto the backing layer, where it follows the cut, because a negative-z-index pseudo
-   paints above its originator's own border and would otherwise bury it. Violet is this repo's
-   reservation for GM-only content and is the one hue the material must not repaint. */
+/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
+   The two outer panels take the scanline; `.scene-create` is nested and gets rim + bezel. The
+   staging workspace is GM-private, so `.scene-builder` keeps its violet edge, moved onto the layer
+   (a negative-z-index pseudo paints above its owner's border). */
 .scene-panel,
 .scene-create,
 .scene-builder {

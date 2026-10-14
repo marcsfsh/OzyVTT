@@ -6,26 +6,14 @@ import { applyDamageDetailed, damageAdjustmentDetail, isSrdDamageType } from "..
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
 
 /**
- * REGISTER D7's CLIENT HALF, PROVED AT THE FAR END: the type a GM picks beside a hand-entered number
- * comes off a different number of hit points.
- *
- * The server half shipped with `4a` and is tested in `apps/server/test/typed-damage.test.ts` against
- * payloads the tests write themselves. What nothing tested was the other side of the wire, because
- * there was nothing there: all three hand-entry doors sent a bare `{commandId, actorId, amount}`, so
- * `damageType` was reachable only by an HTTP caller and a GM watched a fire-resistant target lose all
- * ten of a fire bolt.
- *
- * This file drives the control's OWN value through the doors' OWN payload builder, through the
- * server's OWN `.strict()` schema (a misspelled key fails here, loudly - which is the whole reason the
- * payload is not retyped beside the test), into the server's OWN `applyDamageDetailed`, and asserts
- * spent hit points and the rendered adjustment line. A `.mirror.test.ts` because only the node project
- * may import the server's modules.
- *
- * The outcomes, in the order they would break:
- *   1. the picked type reaches the maths at all - 10 fire on a fire-resistant target is 5;
- *   2. the table is TOLD why, which is the difference between this and a silent reduction;
- *   3. an untouched control is byte-identical to the path that shipped before it;
- *   4. a homebrew word travels intact, because the vocabulary is open and the client must not gate it.
+ * The damage type picked beside a hand-entered number changes the hit points lost. Drives the
+ * control's value through the doors' payload builder, the server's `.strict()` schema (so a
+ * misspelled key fails) and `applyDamageDetailed`, asserting HP lost and the adjustment line:
+ *   1. the type reaches the maths (10 fire on a fire-resistant target is 5);
+ *   2. the table is told why;
+ *   3. an untouched control sends the same payload as no control;
+ *   4. a homebrew word travels intact (the vocabulary is open).
+ * A `.mirror.test.ts` because only the node project may import server modules.
  */
 
 const IDS = {
@@ -50,11 +38,9 @@ function tableWith(resistances: readonly string[]) {
 }
 
 /**
- * One GM gesture, end to end: what the chooser holds and what the number field holds, through the
- * module all three doors emit from, through the command schema, into the engine.
- *
- * `chosen` is exactly what `DamageTypeField` hands back - `null` when untouched, an SRD slug when
- * picked from the list, raw words when typed by hand.
+ * One GM gesture end to end: chooser value and number, through the doors' shared builder and the
+ * command schema, into the engine. `chosen` is what `DamageTypeField` returns: `null` untouched,
+ * an SRD slug when picked, raw words when typed.
  */
 function applyFromTheDoor(table: ReturnType<typeof tableWith>, amount: number, chosen: string | null) {
   const payload = manualDamagePayload({ commandId: IDS.command, actorId: IDS.hero, amount, damageType: manualDamageType(chosen) });
@@ -69,8 +55,7 @@ describe("the manual damage entry's type chooser", () => {
   it("takes 5 off a fire-resistant target when the GM picks Fire and types 10", () => {
     const table = tableWith(["fire"]);
     const result = applyFromTheDoor(table, 10, "fire");
-    // The far end FIRST, so that changing the chooser's value fails on hit points rather than on a
-    // payload guard that would have told us less.
+    // Hit points first, so a wrong value fails here rather than at a payload guard.
     expect(result.hpLost).toBe(5);
     expect(result.outcome.application.totalApplied).toBe(5);
     expect(result.payload.damageType, "the door sent no type").toBe("fire");
@@ -78,8 +63,8 @@ describe("the manual damage entry's type chooser", () => {
 
   it("says WHY the ten became five, on the line the table reads", () => {
     const table = tableWith(["fire"]);
-    // The feed row `actorApplyDamage` broadcasts is `${attribution} ${totalApplied} damage${detail}.`
-    // - so this is literally "Aria took 5 damage (10 fire → 5, resistance)." at the table.
+    // The feed row is `${attribution} ${totalApplied} damage${detail}.`, i.e. "Aria took 5 damage
+    // (10 fire → 5, resistance)."
     expect(applyFromTheDoor(table, 10, "fire").detail).toBe(" (10 fire → 5, resistance)");
   });
 
@@ -102,12 +87,11 @@ describe("the manual damage entry's type chooser", () => {
 
   it("carries a homebrew type through to a homebrew defence - the list is a suggestion, not a gate", () => {
     expect(isSrdDamageType("ooze"), "the premise: this word is not one of the SRD thirteen").toBe(false);
-    // Typed as two words, because that is how a GM writes it and the slug is what the defence stores.
+    // Typed as two words, as a GM writes it; the defence stores the slug.
     const resistant = applyFromTheDoor(tableWith(["primordial-ooze"]), 10, "Primordial Ooze");
     expect(resistant.payload.damageType).toBe("primordial-ooze");
     expect(resistant.hpLost).toBe(5);
-    // And the same word against a target with no such defence still lands whole, rather than being
-    // quietly dropped for not being on the list.
+    // The same word against a target without that defence lands whole rather than being dropped.
     expect(applyFromTheDoor(tableWith(["fire"]), 10, "Primordial Ooze").hpLost).toBe(10);
   });
 

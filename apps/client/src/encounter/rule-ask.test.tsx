@@ -10,19 +10,10 @@ import { AskTheGmPrompt } from "./RuleAsk";
 import { beginTargeting, clearTargeting, resolveTargeting, toggleTarget } from "./targeting";
 
 /**
- * WHAT THIS PINS, and why it is a test rather than a comment.
- *
- * Ask-the-GM was driven end to end for the first time on 2026-08-05, and the drive found that a
- * single-target ATTACK could never be allowed. The runner sends an attack as a PREVIEW
- * (`commit: false`), which the server defines as "the attack roll only - no damage/riders/economy",
- * and the blocked payload was parked verbatim. So the GM's Allow replayed a preview on the GM's own
- * socket: a d20 landed in the log, no damage applied, neither side was told, and the player's next
- * attempt was refused identically - a loop with no way out. A save or template action was already
- * sent committing, which is exactly why those worked and attacks did not.
- *
- * The fix is one expression in `targeting.ts`: the parked command always commits. These two tests
- * are the memory of it - the first that the runner still previews (so the fix did not change what a
- * player rolls), the second that what gets PARKED commits.
+ * An attack is sent as a preview (`commit: false`: attack roll only), but the command parked for the
+ * GM must commit, or Allow replays a preview: a d20 lands, no damage applies, and the player is
+ * refused again. The first test checks the runner still previews; the second that the parked
+ * command commits (`targeting.ts`).
  */
 
 const ATTACK: ContentActionSummary = {
@@ -41,9 +32,9 @@ type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: 
 const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
 
 /**
- * Roll the attack, then have the server refuse it the way Enforce does, and return what the runner
- * actually sent. The acknowledgement is ALWAYS delivered: the store's `busy` flag is module state and
- * an un-acked resolve would make the next test's `resolveTargeting` a no-op.
+ * Rolls the attack, has the server refuse it as Enforce does, and returns what the runner sent. The
+ * ack is always delivered: the store's `busy` flag is module state, and an un-acked resolve would
+ * make the next test's `resolveTargeting` a no-op.
  */
 function refuseTheAttack(): Record<string, unknown> {
   beginTargeting(ATTACK, ATTACKER);
@@ -65,7 +56,7 @@ describe("asking the GM about a refused move", () => {
   it("parks a COMMITTING command, because an allowed preview would change nothing", async () => {
     refuseTheAttack();
     render(<AskTheGmPrompt onFeedback={() => {}} />);
-    // The refusal is stated where it happened - on the action path this is the only place it appears.
+    // On the action path this is the only place the refusal appears.
     expect(screen.getByText(BLOCK.blocked.message)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Ask the GM" }));

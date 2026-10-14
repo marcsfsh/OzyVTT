@@ -3,10 +3,8 @@ import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { choicesAbove, hpRollGap, hpRolls, identityOf, ledgerOf, methodFor } from "./level-ledger";
 
 /**
- * The level flow's honesty, pinned. Every one of these answers is a sentence the player is shown, and
- * the failure mode they guard against is the same one: a rebuild that quietly loses something and says
- * nothing. Hit points are the sharp case — the server rebuilds on the AVERAGE when a roll is missing,
- * so a client that assumed rolls were kept would walk a character into losing maximum HP silently.
+ * The level flow must never let a rebuild silently lose something. Hit points are the sharp case:
+ * the server rebuilds on the average when a roll is missing.
  */
 
 const definition = (over: Partial<ActorDefinition> = {}): ActorDefinition => ({
@@ -39,8 +37,8 @@ const withCharacter = (choices: readonly CharacterChoice[] | undefined) => defin
 
 describe("Reading a character back into the wizard", () => {
   it("tells a sheet with NO ledger apart from one that recorded zero decisions", () => {
-    // The distinction is the whole gate: absent means "this was never built here" (a PDF import), and
-    // empty means "the wizard ran and asked nothing". One earns the honest refusal; the other does not.
+    // Absent means "never built here" (a PDF import) and is refused; empty means the wizard ran and
+    // asked nothing.
     expect(ledgerOf(withCharacter(undefined))).toBeNull();
     expect(ledgerOf(withCharacter([]))).toEqual([]);
     expect(ledgerOf(definition())).toBeNull();

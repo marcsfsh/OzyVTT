@@ -1,22 +1,12 @@
 /**
- * D3 — real URLs for the whole app.
- *
- * A hand-rolled history layer rather than react-router, recorded as a Lane C design call. `apps/client`
- * had zero router dependencies; the app is four separate Vite HTML entries of which only `index.html`
- * needs addresses; the address space is small and fully enumerable; and react-router's data-router
- * idioms (loaders, actions) fight this app's socket-push + ping-and-refetch model. "Everything needed
- * and nothing unnecessary" (CLAUDE.md) makes this ~200 lines instead of a dependency.
- *
- * **The SPA fallback already ships** (`server.ts`: `express.static` then `sendFile("index.html")` for
- * every non-API GET in production, a path-preserving 307 to Vite in dev), so a cold deep link resolves.
- * `GET /viewer` is reserved by the server as a redirect to the standalone TV viewer, which is why the
- * GM's Viewer tab is addressed `/viewer-controls` — see `pathForGmTab`.
+ * Real URLs via a small hand-rolled history layer (no react-router: one entry point, a small address
+ * space, and a socket-push data model). The server serves `index.html` for every non-API GET;
+ * `GET /viewer` is the TV viewer, hence the GM tab's `/viewer-controls`.
  */
 
 import { useSyncExternalStore } from "react";
-// The Codex owns its own address space (`codex/routes.ts`); this module asks it rather than keeping a
-// second copy of the rules. The cycle back through `withQuery` is import-time-safe: nothing in either
-// module calls across the boundary while the modules are still evaluating.
+// The Codex owns its address space (`codex/routes.ts`) and this module asks it. The import cycle via
+// `withQuery` is safe: neither module calls across it during evaluation.
 import { codexSectionOf } from "./codex/routes";
 
 export type Route = Readonly<{
@@ -29,13 +19,7 @@ export type Route = Readonly<{
 
 const listeners = new Set<() => void>();
 let snapshot: Route = readLocation();
-/**
- * The address the router believes it is at, kept in step with `snapshot`.
- *
- * Only the popstate handler reads it, and only for one job: a Back the guards veto has already moved the
- * browser's cursor by the time we hear about it, so undoing the veto means pushing *this* address back
- * on top of the one we were moved to.
- */
+/** The address the router believes it is at; popstate pushes it back to undo a vetoed Back. */
 let currentEntry: string = `${window.location.pathname}${window.location.search}`;
 
 function readLocation(): Route {
@@ -50,17 +34,14 @@ function publish(): void {
   for (const listener of [...listeners]) listener();
 }
 
-// ----- Navigation guards (D6: an editor with autosave OFF and unsaved changes) -----
+// Navigation guards (an editor with autosave off and unsaved changes)
 
 type Guard = () => boolean | Promise<boolean>;
 const guards = new Set<Guard>();
 
 /**
- * Register a veto on leaving the current view. Returning `false` blocks the navigation.
- *
- * Used by `useCodexAutosave` when autosave is off and the draft is dirty; the same hook installs a
- * `beforeunload` handler for the tab-close case, which the browser owns and we cannot style. Returns
- * its own unregister function, so an effect cleanup is the whole teardown.
+ * Registers a veto on leaving the current view (`false` blocks). Used by `useCodexAutosave` for a
+ * dirty draft with autosave off. Returns its unregister function.
  */
 export function registerNavigationGuard(guard: Guard): () => void {
   guards.add(guard);
@@ -75,15 +56,11 @@ async function mayLeave(): Promise<boolean> {
   return true;
 }
 
-// ----- Transient history entries (the phone nav drawer, and only that) -----
+// Transient history entries (the phone nav drawer only)
 
 /**
- * Push a same-path history entry whose only job is to be popped.
- *
- * The Android back gesture closing an open sidebar drawer — instead of leaving the section entirely —
- * is the single worst phone back-trap this app would otherwise have. Dialogs and modals deliberately
- * stay OUT of history (Esc and the scrim close them); if user testing later shows back-closes-dialog is
- * expected, this generalizes.
+ * Pushes a same-path entry whose only job is to be popped, so Android back closes the phone nav
+ * drawer instead of leaving the section. Dialogs stay out of history.
  */
 const transients = new Map<string, () => void>();
 
@@ -96,23 +73,15 @@ export function pushTransient(key: string, onPop: () => void): void {
 export function popTransient(key: string): void {
   if (!transients.has(key)) return;
   transients.delete(key);
-  // `back()` pops the entry we pushed. The popstate handler below sees no registered key and re-routes,
-  // which lands on the same path — a no-op render, which is exactly right.
+  // `back()` pops our entry; the popstate handler sees no registered key and re-routes to the same
+  // path, a no-op render.
   window.history.back();
 }
 
 /**
- * Forget a transient entry WITHOUT going back — for the case where the caller is about to navigate.
- *
- * `popTransient` cannot serve that case, and the bug it caused is worth recording. Choosing a
- * destination from the phone nav drawer ran `closeDrawer()` (→ `history.back()`) and then `navigate()`.
- * `back()` is queued as a task while `navigate`'s guard check resolves on a MICROTASK, so the order was
- * always: push the destination, then go back off it. **Every tap in the phone nav drawer navigated
- * nowhere** — the drawer closed, the address never moved, and on a laptop (no transient registered,
- * `popTransient` a no-op) it worked perfectly, which is why it survived to a browser pass.
- *
- * Returns whether an entry is now stranded, so the caller can `navigate(path, { replace: true })` and
- * overwrite it rather than leaving a duplicate the GM has to press back through twice.
+ * Forgets a transient entry without going back, for a caller about to navigate (`back()` is a task and
+ * `navigate` a microtask, so the destination would be popped). Returns whether an entry is stranded,
+ * so the caller can navigate with `replace: true`.
  */
 export function discardTransient(key: string): boolean {
   if (!transients.has(key)) return false;
@@ -121,13 +90,8 @@ export function discardTransient(key: string): boolean {
 }
 
 /**
- * Hand back an entry `discardTransient` released for a navigation that was then VETOED.
- *
- * The drawer's entry is still on the stack and nothing is registered to absorb its pop any more, so the
- * GM's next Back would be spent closing an already-closed drawer — it would appear to do nothing, which
- * is exactly the trap the transient mechanism exists to prevent. Popping it here costs no prompt: the
- * entry sits at the address we are already on, and a pop that does not move the address is not a
- * departure (see the popstate handler).
+ * Pops an entry `discardTransient` released when the navigation was then vetoed, so the next Back is
+ * not spent on a closed drawer. Same address, so no guard prompt.
  */
 export function releaseStrandedEntry(): void {
   window.history.back();
@@ -135,8 +99,8 @@ export function releaseStrandedEntry(): void {
 
 window.addEventListener("popstate", (event) => {
   const key = (event.state as { transient?: string } | null)?.transient;
-  // Popping FORWARD onto a transient entry is not a thing we ever want to honour; only the disappearance
-  // of the entry matters. So: if any transient is registered, the pop closes it and the route stands.
+  // Popping forward onto a transient entry is never honoured; only its disappearance matters. With a
+  // transient registered, the pop closes it and the route stands.
   if (transients.size > 0) {
     const [openKey, onPop] = [...transients.entries()][transients.size - 1];
     transients.delete(openKey);
@@ -144,21 +108,8 @@ window.addEventListener("popstate", (event) => {
     if (key === undefined) return;
   }
   /**
-   * **Back is a navigation, and on a phone it is THE navigation.** The guards were wired into
-   * `navigate()` only, so with autosave off the browser Back button and the Android back gesture walked
-   * straight out of a dirty editor and the draft was gone with no prompt — the one way to lose work in
-   * this app.
-   *
-   * The browser has already moved the cursor by the time popstate fires, so a veto cannot be a "don't":
-   * it has to be an undo. Pushing the address we were on back on top of the one we were moved to is the
-   * standard shape, and it costs nothing — the entry we were popped past is overwritten, so history
-   * length is unchanged and a second Back reaches the same place a first one would have.
-   *
-   * Two fast paths, both load-bearing. With no editor open there are no guards, and the pop must
-   * publish synchronously so a plain Back is not a frame slower than it was. And **a pop that does not
-   * move the address is not a departure** — `popTransient` and `releaseStrandedEntry` both go back onto
-   * an entry at the address we are already on, and asking the GM to confirm leaving a page they are
-   * staying on would be a prompt with no true answer.
+   * Back is a navigation too, so guards apply; the browser has already moved, so a veto pushes the
+   * previous address back. With no guards, or a pop that keeps the address, it just publishes.
    */
   if (guards.size === 0 || currentHref() === currentEntry) { publish(); return; }
   const from = currentEntry;
@@ -169,12 +120,8 @@ window.addEventListener("popstate", (event) => {
 });
 
 /**
- * Go to an address. Guards run first; a vetoed navigation leaves the URL alone.
- *
- * Deliberately fire-and-forget at almost every call site (`onClick={() => navigate(path)}`) — the
- * promise exists so a guard may prompt, not so callers can await it. It resolves to **whether the
- * navigation happened**, which the phone nav drawer does need: it released its own history entry on the
- * assumption this was about to overwrite it, and has to take that back if the GM chose to stay.
+ * Goes to an address after the guards; a veto leaves the URL alone. Resolves to whether it navigated
+ * (the nav drawer uses that to take back its released entry).
  */
 export function navigate(path: string, opts: Readonly<{ replace?: boolean }> = {}): Promise<boolean> {
   if (path === currentHref()) return Promise.resolve(false);
@@ -192,11 +139,7 @@ export function currentHref(): string {
   return `${window.location.pathname}${window.location.search}`;
 }
 
-/**
- * Rewrite the query of the current address WITHOUT a history entry — how a view clears the
- * prepared-destination parameter it has just landed on (`?entry=`, `?pin=`, `?focus=`), mirroring the
- * old `onOpenedTarget` handshake exactly. Never use this for a real navigation.
- */
+/** Rewrites the query without a history entry, to clear a landing parameter. Not for navigation. */
 export function replaceQuery(mutate: (query: URLSearchParams) => void): void {
   const query = new URLSearchParams(window.location.search);
   mutate(query);
@@ -205,7 +148,7 @@ export function replaceQuery(mutate: (query: URLSearchParams) => void): void {
   publish();
 }
 
-/** Build an address with query parameters, dropping the empty ones so a URL never carries `?tag=`. */
+/** Builds an address with query parameters, dropping empty ones so a URL never carries `?tag=`. */
 export function withQuery(path: string, params: Readonly<Record<string, string | number | null | undefined>>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -224,19 +167,11 @@ export function useRoute(): Route {
   );
 }
 
-// ----- The app shell's address table (D3) -----
+// The app shell's address table
 
 export type GmTab = "scenes" | "table" | "roster" | "codex" | "homebrew" | "viewer" | "replay" | "settings";
 
-/**
- * One address per GM tab. **`/viewer-controls`, not `/viewer`** — the server reserves `GET /viewer` as a
- * 307 to the standalone TV viewer in both prod and dev, so the SPA can never receive that address; and
- * "viewer controls" is what the tab actually is (the controls for the shared screen).
- *
- * D28/D29: the table's address is `/table` for BOTH roles — one address, the projection decides what
- * renders. `/encounter` (three names for one tab: id `table`, label "Encounter", path `/encounter`) and
- * `/setup` (now Settings) are retired, and `RETIRED_PATHS` redirects them so old bookmarks still land.
- */
+/** One address per GM tab; the server reserves `GET /viewer`, hence `/viewer-controls`. */
 const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
   table: "/table",
   scenes: "/scenes",
@@ -250,11 +185,7 @@ const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
 
 export function pathForGmTab(tab: GmTab): string { return GM_TAB_PATHS[tab]; }
 
-/**
- * Addresses that used to mean something and now mean somewhere else. A redirect rather than a
- * not-found: a GM who bookmarked `/encounter` in the last build must land on the table, not on a card
- * telling them nothing lives there.
- */
+/** Retired addresses, redirected so old bookmarks land. */
 const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
 
 /** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too. */
@@ -270,14 +201,7 @@ export function gmTabForPath(path: string): GmTab | null {
   return found ? found[0] : null;
 }
 
-/**
- * Which tab LIGHTS for an address (A2 "tab lighting for layer addresses").
- *
- * A layer address belongs to a tab even though it is not that tab's own address: a character sheet and
- * the builder are the Roster's kind of thing, so the Roster arm stays lit while one is open. Without
- * this, `/characters/<id>` fell through `gmTabForPath` to null and the shell lit Table — the lit-tab lie
- * D1 exists to kill.
- */
+/** Which tab lights for an address; a layer lights its owning tab (a sheet lights the Roster). */
 export function litGmTab(path: string): GmTab | null {
   const head = path.split("/").filter(Boolean)[0] ?? "";
   if (head === "characters" || head === "builder") return "roster";
@@ -285,51 +209,27 @@ export function litGmTab(path: string): GmTab | null {
 }
 
 /**
- * Addresses only the GM may reach. A player asking for one gets the not-found view (never a 403-alike).
- *
- * D29 shrinks this list: `/table`, `/settings`, `/replays`, `/replays/<id>`, `/characters/*` and
- * `/builder` are player-reachable **as addresses**. Whether a player may see the thing AT that address
- * is a data guard (their claim, the GM's share, the builder policy) that renders not-found on failure —
- * the same indistinguishable answer, decided one level in where the data is.
+ * Addresses only the GM may reach; a player gets not-found. Shared addresses whose content a player
+ * may not see are guarded by the data, which also renders not-found.
  */
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
   if (segments[0] === "codex") return ["audit", "backup", "settings"].includes(segments[1] ?? "");
-  /**
-   * Ruling 61 — `/settings/api` is the API reference as a real address, and it is the GM's alone.
-   * Settings itself is shared (a player gets the Mine group), so the head cannot decide this: the
-   * SECOND segment does. A player asking for it gets the not-found view, indistinguishable from an
-   * address that means nothing, which is the same answer `/roster` gives them.
-   */
+  // `/settings` is shared but `/settings/api` is GM-only.
   if (segments[0] === "settings") return segments[1] === "api";
   const tab = gmTabForPath(path);
   if (tab === null) return false;
   return tab !== "codex" && tab !== "table" && tab !== "settings" && tab !== "replay";
 }
 
-/**
- * The mirror of `isGmOnlyPath`: an address only a PLAYER may reach.
- *
- * There is exactly one — `/me`, the My Character tab (D9) — and it is not a symmetry for its own
- * sake. The tab is about the character you claimed, and the GM claims nobody; a GM who follows the
- * address gets the same not-found card a player gets at `/roster`. Kept out of `isGmOnlyPath`'s
- * negation because "not GM-only" means "shared", which is what every other address is.
- */
+/** The one player-only address, `/me`; "not GM-only" means shared, so this is its own check. */
 export function isPlayerOnlyPath(path: string): boolean {
   return path.split("/").filter(Boolean)[0] === "me";
 }
 
 /**
- * Every address the app answers, for the not-found decision. Anything else renders "nothing lives here".
- *
- * The codex half asks `codexSectionOf` rather than re-deciding: two implementations of one address space
- * disagreed on `/codex/tags` and `/codex/journal/j1`, and a disagreement between "does this exist" and
- * "what does it render" puts a not-found card on top of a working surface. `router.test.ts` asserts the
- * two answers stay locked together over the whole table.
- *
- * The id-bearing heads (`/characters/<id>`, `/scenes/<id>`, `/replays/<id>`) answer "yes" for any
- * well-shaped id: whether THAT id exists, is claimed, or was shared is data the router does not hold,
- * and the surface renders not-found when its own guard says no.
+ * Every address the app answers, for the not-found decision. The codex half asks `codexSectionOf`, so
+ * existence and rendering cannot disagree; id-bearing heads accept any well-shaped id.
  */
 export function isKnownPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
@@ -341,26 +241,16 @@ export function isKnownPath(path: string): boolean {
     return segments.length === 3 && segments[2] === "level";
   }
   if (segments[0] === "scenes") return segments.length === 1 || (segments.length === 2 && segments[1].length > 0);
-  // D9 — the player's own tab. One segment, no records under it.
+  // The player's own tab: one segment, nothing under it.
   if (segments[0] === "me") return segments.length === 1;
-  /**
-   * Ruling 61 — `/settings/api` is the ONE two-segment settings address. `gmTabForPath` already
-   * answered "settings" for it (it reads the head), so the tab lit and the not-found card painted on
-   * top: the surface existed and the router denied it. Everything else under `/settings` stays
-   * unknown, which is why this is a single named segment rather than a length check.
-   */
+  // `/settings/api` is the only two-segment settings address.
   if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
   if (segments[0] === "replays") return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
   return gmTabForPath(path) !== null && segments.length === 1;
 }
 
-/**
- * A LAYER open on top of a tab: the sheet, the builder, the level flow, a replay, a scene-prep
- * workspace, the maps library. Each used to be component state (`builderOpen`, `previewSceneId`,
- * `?archive=`, `?view=maps`, five sheet openers) — D29 gives each an address, and this is the one place
- * that reads one back out, so the shell branches on a value rather than on five parallel booleans.
- */
+/** A layer open over a tab (sheet, builder, level flow, replay, scene prep, maps), parsed in one place. */
 export type AddressLayer =
   | Readonly<{ kind: "sheet"; actorId: string }>
   | Readonly<{ kind: "level"; actorId: string }>
@@ -383,29 +273,21 @@ export function layerOf(path: string): AddressLayer | null {
   return null;
 }
 
-// ----- Resume-last-location (D2) -----
+// Resume last location
 
 const GM_LOCATION_KEY = "vtt.gm-last-location";
 const PLAYER_LOCATION_KEY = "vtt.player-last-location";
 
-/** The head segment an address belongs to — the tab, in the app shell's terms. `/` belongs to none. */
+/** The head segment an address belongs to (its tab). `/` belongs to none. */
 function headOf(path: string): string | null {
   return path.split("/").filter(Boolean)[0] ?? null;
 }
 
-/** The same try/catch discipline every `codex-*` key already uses: private mode throws on read AND write. */
+/** Storage access is wrapped in try/catch: private mode throws on read and write. */
 export function rememberLocation(role: "gm" | "player", href: string): void {
   try {
     localStorage.setItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY, href);
-    /**
-     * D2 also remembers PER TAB, which is what makes the decision worth anything in the dominant case.
-     *
-     * "The Codex reopens exactly where the GM last was" was implemented only for a cold sign-in landing
-     * on `/`. Every in-app return — the GM tab bar, the player's Table/Codex switcher — navigated to the
-     * bare section head, so a GM editing a page who tapped Encounter to check initiative and tapped
-     * Codex again landed on the dashboard with nothing selected. Intake 04 named that exact round trip
-     * as the cost of having no router; after the recut it cost the same two taps.
-     */
+    // Also remembered per tab, so returning to a tab reopens the record that was open there.
     const head = headOf(href.split("?")[0] ?? "");
     if (head) localStorage.setItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`, href);
   } catch { /* private mode - fine */ }
@@ -416,11 +298,8 @@ export function lastLocation(role: "gm" | "player"): string | null {
 }
 
 /**
- * Where this role last was INSIDE a tab, or null to fall back to the tab's own address.
- *
- * Validated exactly as `resumeTarget` validates its stored address, and for the same reasons: a stored
- * `/codex/pages/<deleted>` must not strand anyone, and a player must never be sent to a GM-only address
- * by a mechanism they cannot see.
+ * Where this role last was inside a tab, or null for the tab's own address. Validated like
+ * `resumeTarget`: never a dead record or, for a player, a GM-only address.
  */
 export function lastLocationForTab(role: "gm" | "player", head: string): string | null {
   let stored: string | null = null;
@@ -433,18 +312,14 @@ export function lastLocationForTab(role: "gm" | "player", head: string): string 
   return stored;
 }
 
-/**
- * D2: where a freshly authenticated session lands. A deep link ALWAYS wins — the login screen renders
- * *at* the requested path, so after auth the requested view is what appears. Only a bare `/` resumes.
- */
+/** Where a fresh session lands: a deep link always wins; only a bare `/` resumes. */
 export function resumeTarget(role: "gm" | "player", currentPath: string): string | null {
   if (currentPath !== "/") return null;
   const stored = lastLocation(role);
-  // D29: one address for the table, both roles. There is no second front door any more.
+  // One address for the table, both roles.
   const fallback = "/table";
-  // A player is never resumed onto a GM-only address. The not-found view would catch it, but being
-  // *sent* there on sign-in is a worse shape than deep-linking there deliberately: the app would be
-  // volunteering the address rather than declining to answer it.
+  // A player is never resumed onto a GM-only address: the not-found view would catch it, but sending
+  // them there would volunteer the address.
   const path = stored?.split("?")[0] ?? "";
   const usable = stored && isKnownPath(path) && !(role === "player" && isGmOnlyPath(path));
   const target = usable ? stored : fallback;

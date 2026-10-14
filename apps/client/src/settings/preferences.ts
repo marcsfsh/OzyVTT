@@ -1,17 +1,9 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Device-local settings — the ones that are genuinely about THIS browser rather than about the table.
- *
- * Two rules keep this file honest. (1) A preference lives here only if it has no server home and needs
- * none: theme and the dice-input preference already have their own stores (`@vtt/ui`'s theme,
- * `dice/roll-preference.ts`), and everything about how the table PLAYS is server state reached by a
- * command. (2) Nothing dead: `sheetAttack` is deliberately absent — D10 made acting from the sheet the
- * one behavior, so the knob retired rather than being re-homed here (plan-1 §B9.1, §H item 6).
- *
- * `autoArrange` grounds a promise the shell has been making in a comment for two builds ("a future
- * auto-staging personal setting on the VTT Settings tab will gate this"): a freshly created scene opens
- * for arranging, and a GM who does not want that can now say so.
+ * Device-local settings: preferences about this browser rather than the table. Only preferences with
+ * no server home live here (theme and the dice-input preference have their own stores; how the table
+ * plays is server state). `autoArrange`: whether a newly created scene opens for arranging.
  */
 
 const AUTO_ARRANGE_KEY = "vtt.auto-arrange";
@@ -30,7 +22,7 @@ export function setAutoArrange(next: boolean): void {
   for (const listener of [...listeners]) listener();
 }
 
-/** Reactive read, so the shell and the Settings switch never disagree about the current answer. */
+/** Reactive read, so the shell and the Settings switch always agree. */
 export function useAutoArrange(): boolean {
   return useSyncExternalStore(subscribe, () => autoArrange, () => autoArrange);
 }

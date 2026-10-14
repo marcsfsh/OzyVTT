@@ -13,13 +13,11 @@ import { socket } from "../socket";
 import "./replay.css";
 
 /**
- * **Replays (A8 / D25–D27).** Every finished fight is kept, and reachable by both roles.
- *
- * The GM gets the list (with the per-replay reveal control, hidden by default), the viewer, and
- * *Launch from here*. A player gets exactly the replays the GM shared, rendered from the **player
- * replay projection** the server computes (`apps/server/src/replay-projection.ts`): the client never
- * receives the GM archive, so hidden combatants and GM-only narration are absent from the document
- * rather than filtered out of it here. One URL serves both — the server decides which document you get.
+ * Replays: every finished fight is kept. The GM gets the list (with a per-replay reveal control,
+ * hidden by default), the viewer, and "Launch from here". A player gets only the replays the GM
+ * shared, rendered from the server's player replay projection (`apps/server/src/replay-projection.ts`):
+ * the client never receives the GM archive, so hidden combatants and GM-only narration are absent,
+ * not filtered here. One URL serves both; the server decides which document you get.
  */
 
 type ArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number; playerVisible: boolean }>;
@@ -51,7 +49,7 @@ function durationOf(startedAt: string | null, endedAt: string): string | null {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-/** Save an archive document as JSON — the same machine-readable record the API serves. */
+/** Saves an archive document as JSON, the same record the API serves. */
 function exportDocument(id: number, endedAt: string, document: unknown) {
   const stamp = endedAt.slice(0, 16).replace("T", "-").replaceAll(":", "");
   const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
@@ -63,9 +61,9 @@ function exportDocument(id: number, endedAt: string, document: unknown) {
 }
 
 /**
- * A replay step is one recorded boundary: its state is the table AT that moment, and its log slice is
- * what happened between it and the next. Version-1 archives (no finalState) end on the last boundary;
- * later ones add an "aftermath" step showing the fight's last live picture.
+ * A replay step is one recorded boundary: its state is the table at that moment, and its log slice
+ * is what happened before the next. Version-1 archives (no finalState) end on the last boundary;
+ * later ones add an "aftermath" step with the fight's last live picture.
  */
 function stepsOf(document: ArchiveDocument): readonly Step[] {
   const steps: Step[] = document.turns.map((turn, index) => ({
@@ -83,23 +81,22 @@ function stepsOf(document: ArchiveDocument): readonly Step[] {
   return steps;
 }
 
-// ───────────────────────────────── the stage ─────────────────────────────────
+// The stage
 
 function Stage({ mapAssetId, bearer, tokens, label, actorFor }: Readonly<{
   mapAssetId: string | null;
   bearer: string;
   tokens: ReadonlyArray<{ actorId: string; position: { x: number; y: number } | null; sizePx: number }>;
   label: string;
-  /** Everything the stage needs about one token's creature — already role-appropriate. */
+  /** Everything the stage needs about one token's creature, already role-appropriate. */
   actorFor: (actorId: string) => Readonly<{ name: string; tokenAssetId: string | null; hidden: boolean; band: "healthy" | "bloodied" | "down"; conditions: readonly string[]; active: boolean }> | null;
 }>) {
   const image = useAuthorizedMapImage(mapAssetId, bearer);
   const placed = tokens.filter((token) => token.position !== null);
   if (image.status === "error") return <div className="replay-stage replay-stage-missing"><strong>Map unavailable</strong><span>{image.message} The turn data beside this still applies.</span></div>;
   if (image.status !== "ready") return <div className="replay-stage replay-stage-missing"><span>Loading the battlefield…</span></div>;
-  /* The stage is the shared-screen viewer's shape (`.viewer-stage`, viewer.css): the svg fills the
-     box it was given and `preserveAspectRatio` letterboxes inside it, so the frame decides the
-     height and nothing here has to guess a fraction of the window. */
+  /* Like the shared-screen viewer's stage (`.viewer-stage`): the svg fills its box and
+     `preserveAspectRatio` letterboxes, so the frame decides the height. */
   return <div className="replay-stage">
     <svg viewBox={`0 0 ${image.width} ${image.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
       <image href={image.url} width={image.width} height={image.height} />
@@ -115,7 +112,7 @@ function Stage({ mapAssetId, bearer, tokens, label, actorFor }: Readonly<{
   </div>;
 }
 
-/** Prev / play / next / scrubber — one control group, shared by both viewers. */
+/** Prev / play / next / scrubber: one control group, shared by both viewers. */
 function Transport({ index, count, playing, onMove, onPlay, onSeek }: Readonly<{
   index: number; count: number; playing: boolean;
   onMove: (delta: number) => void; onPlay: () => void; onSeek: (index: number) => void;
@@ -130,14 +127,10 @@ function Transport({ index, count, playing, onMove, onPlay, onSeek }: Readonly<{
 }
 
 /**
- * THE FRAME (§7), worn by both viewers. Header, transport and step label are chrome rows that
- * never move; the layout row beneath them takes the leftover height, and the only thing that
- * scrolls is the side lists' own region.
- *
- * THE ARROW KEYS LIVE HERE, on the column that does not scroll — stepping through a fight must
- * never turn into a scroll gesture. A focused `input`/`select`/`textarea` is handed the key
- * instead of being overridden: the transport's range steps itself to exactly the same place, and
- * a control that owns its arrows should keep them.
+ * The frame both viewers wear: header, transport and step label are fixed rows; the layout row
+ * below takes the leftover height, and only the side lists scroll.
+ * Arrow keys are handled on this non-scrolling column so stepping never becomes scrolling. A
+ * focused input/select/textarea keeps its own arrow keys.
  */
 function ReplayFrame({ loaded, onMove, children }: Readonly<{ loaded: unknown; onMove: (delta: number) => void; children: ReactNode }>) {
   const frameRef = useRef<HTMLElement | null>(null);
@@ -156,17 +149,15 @@ function ReplayFrame({ loaded, onMove, children }: Readonly<{ loaded: unknown; o
   >{children}</section>;
 }
 
-/** Loading and error both wear the frame too, so the surface never changes shape underneath you. */
+/** Loading and error wear the frame too, so the surface never changes shape. */
 function ReplayNotice({ children }: Readonly<{ children: ReactNode }>) {
   return <section className="replay-panel replay-viewer replay-notice pane-frame frame-col anim-view"><h2>Replay</h2>{children}</section>;
 }
 
 /**
- * The side lists — ONE declared region at every width (§7 rule 1: never two sibling scrollers
- * guessing), holding the turn order and the turn's log. Below the 850 rung the two become TABS
- * inside that one region, the dock accordion's bargain in its smallest form (`DockAccordion.tsx`):
- * every choice stays visible, exactly one body holds the space. A phone has already spent a band
- * on the map and cannot also show a turn order and a log end to end.
+ * The side lists: one declared scroll region at every width, holding the turn order and the turn's
+ * log. Below 850px the two become tabs inside that region (as in `DockAccordion.tsx`), since a
+ * phone cannot show both end to end under the map band.
  */
 function ReplaySide({ order, log }: Readonly<{ order: ReactNode; log: ReactNode }>) {
   const [pane, setPane] = useState<"order" | "log">("order");
@@ -186,7 +177,7 @@ function ReplaySide({ order, log }: Readonly<{ order: ReactNode; log: ReactNode 
   </aside>;
 }
 
-// ───────────────────────────────── the GM viewer ─────────────────────────────────
+// The GM viewer
 
 function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken: string; archiveId: number; onBack: () => void; onLaunched: () => void }>) {
   const [document, setDocument] = useState<ArchiveDocument | null>(null);
@@ -194,7 +185,7 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [launching, setLaunching] = useState(false);
-  /** A refusal STAYS on screen (an Alert, not a Toast) - it is a state with a next step, not a result. */
+  /** A refusal stays on screen (an Alert, not a toast): it is a state with a next step. */
   const [refused, setRefused] = useState<{ kind: LaunchRefusal; message: string } | null>(null);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
@@ -223,8 +214,8 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
   const move = (delta: number) => { setPlaying(false); setIndex((current) => Math.max(0, Math.min(steps.length - 1, current + delta))); };
 
   /**
-   * D25 launch-from-here, and R3's whole point: this is ONE table. The confirm says the live scene is
-   * *parked* — the same motion as switching scenes — never that a second table is opening somewhere.
+   * Launch from here. The confirm says the live scene is parked, as when switching scenes; there is
+   * only ever one table.
    */
   const launch = async () => {
     const ok = await confirm({
@@ -240,8 +231,7 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
       if (!result.ok) {
         const message = result.message ?? "That moment could not be launched.";
         const kind = launchRefusalOf(result.message);
-        // A refusal with somewhere to go stays on screen with the door attached; anything else is an
-        // ordinary failure and keeps the transient toast it always had.
+        // A refusal with somewhere to go stays on screen with its door; anything else is a toast.
         if (kind === "other") { toast(message, { tone: "error" }); return; }
         setRefused({ kind, message });
         return;
@@ -263,10 +253,9 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
         <Button variant="secondary" onClick={() => exportDocument(archiveId, document.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks."><IconDownload /> Download JSON</Button>
       </div>
     </div>
-    {/* The refusal and its way out, in the row under the action that raised it. `scene-room` sends the
-        GM to the scene gallery, which is the only place a prepared scene can be removed; `history-review`
-        has no route worth offering (the rewind is unwound on the table, from the banner that shows it),
-        so it says where to go rather than pretending to take them there. */}
+    {/* The refusal and its way out. `scene-room` links to the scene gallery, the only place a
+        prepared scene can be removed; `history-review` says where to go (the rewind banner on the
+        table) rather than offering a route. */}
     {refused && <Alert tone="warning" className="replay-refusal" title="That moment could not be launched">
       <p>{refused.message}</p>
       <div className="replay-refusal-actions">
@@ -321,7 +310,7 @@ function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken
   </ReplayFrame>;
 }
 
-// ───────────────────────────────── the player viewer ─────────────────────────────────
+// The player viewer
 
 function PlayerViewer({ token, archiveId, onBack }: Readonly<{ token: string; archiveId: number; onBack: () => void }>) {
   const [document, setDocument] = useState<PlayerReplayDocument | null>(null);
@@ -394,7 +383,7 @@ function PlayerViewer({ token, archiveId, onBack }: Readonly<{ token: string; ar
   </ReplayFrame>;
 }
 
-/** One URL, two documents. The role decides which reader runs; the server decides what it may read. */
+/** One URL, two documents: the role picks the reader; the server decides what it may read. */
 export function ReplayViewer({ role, token, archiveId, onBack, onLaunched }: Readonly<{
   role: "gm" | "player"; token: string; archiveId: number; onBack: () => void; onLaunched?: () => void;
 }>) {
@@ -403,12 +392,11 @@ export function ReplayViewer({ role, token, archiveId, onBack, onLaunched }: Rea
     : <PlayerViewer token={token} archiveId={archiveId} onBack={onBack} />;
 }
 
-// ───────────────────────────────── the list ─────────────────────────────────
+// The list
 
 /**
- * A hook rather than a component, because the same fetch feeds the full list and the player's shelf.
- * A player's listing is server-filtered to shared replays, so an empty answer here is the truth about
- * what the GM has shared — never a client-side filter over a longer list.
+ * A hook because the same fetch feeds the full list and the player's shelf. A player's listing is
+ * server-filtered to shared replays, so an empty answer is the truth.
  */
 export function useReplays(token: string | null): Readonly<{ archives: readonly ArchiveSummary[] | null; error: string | null; refresh: () => void }> {
   const [archives, setArchives] = useState<readonly ArchiveSummary[] | null>(null);
@@ -426,8 +414,7 @@ export function useReplays(token: string | null): Readonly<{ archives: readonly 
 }
 
 export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm" | "player"; token: string; onOpen: (archiveId: number) => void;
-  /** The player reaches this list at its own address, so its way back to the table is a frame row
-      here rather than a button stranded above the surface (D27). */
+  /** A player reaches this list at its own address, so its way back to the table is a frame row. */
   onBack?: () => void }>) {
   const { archives, error, refresh } = useReplays(token);
   const { confirm, dialog } = useConfirm();
@@ -450,7 +437,7 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
     finally { setBusy(null); }
   };
 
-  /** Triad Delete: permanent, confirmed, and the confirm says so in those words. */
+  /** Permanent and confirmed, and the confirm says so. */
   const remove = async (archive: ArchiveSummary) => {
     const ok = await confirm({
       title: "Delete this replay?",
@@ -465,28 +452,20 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
     finally { setBusy(null); }
   };
 
-  /* THE FRAME (§7): the heading (and the player's way back) never move; the rows are the one
-     region. Not a `.card` any more — the list IS the surface, so it stands on the scene sky.
-     RULING 47 finishes the thought: the rows are not cards on it either. They were `.nh-card`s,
-     which put a fill and a full four-sided rim on a backing layer behind each row — seven boxes
-     where the ruling (which names replays) asks for one list with a 1px rule between its rows.
-     They are plain `<li>`s now and `replay.css` draws the rules. The counter-argument — that a
-     list standing on a scene may legitimately make its rows the cards — is recorded there and
-     flagged for the client in `docs/product/refresh-round-2-fixes.md` §5; it is not settled by
-     reverting this. */
+  /* Heading (and the player's way back) stay fixed; the rows are the one scroll region. Rows are
+     plain `<li>`s with rules drawn in `replay.css`, not cards. */
   return <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
     <div className="pane-sky" aria-hidden="true" />
     <header className="replay-list-head neon-beam">
       {onBack && <Button variant="ghost" className="replay-list-back" onClick={onBack}><IconChevronLeft /> Back to the table</Button>}
       <h2>Replays</h2>
-      {/* The player's line only. A GM knows what their own replay list is; a player needs to know
-          why theirs may be short, and that is the one fact this row is worth its height for. */}
+      {/* Player only: why their list may be short. */}
       {role === "player" && <p>The fights your GM has shared with the party.</p>}
       {error && <p className="replay-error">{error}</p>}
     </header>
     <div className="replay-list-body scroll-y frame-fill">
     {archives === null && <p>Loading replays…</p>}
-    {/* A scene moment (§9), and one with no door: this list fills itself when a fight ends. */}
+    {/* No door: the list fills itself when a fight ends. */}
     {archives !== null && archives.length === 0 && !error && <div className="scene-empty">
       <p>{role === "gm" ? "No replays yet. Every fight that ends is kept here." : "Your GM hasn’t shared a fight yet."}</p>
     </div>}
@@ -520,8 +499,8 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
 }
 
 /**
- * The player's shelf (§B4.4): the same shared replays, as a quiet section under their sheet. Renders
- * nothing at all when the GM has shared none — an empty shelf is not a thing to look at.
+ * The player's shelf: the shared replays as a quiet section under their sheet. Renders nothing when
+ * the GM has shared none.
  */
 export function ReplayShelf({ token, onOpen }: Readonly<{ token: string; onOpen: (archiveId: number) => void }>) {
   const { archives } = useReplays(token);

@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import { TokenGlyph, type TokenGlyphProps } from "../scene/mapImage";
 
 /**
- * Session-scoped cache of token-asset blob URLs keyed by asset id. Many tokens can share one image
- * (a room full of goblins), so we fetch each asset once and hand every token the same blob URL. The
- * cache is intentionally never revoked - a LAN table holds a handful of token images per session and
- * the blobs die with the tab; a failed fetch is dropped so a later mount can retry. `resolved` mirrors
- * the settled URLs so an already-loaded image shows immediately (no initials flash on remount).
+ * Token-asset blob URLs by asset id, fetched once and shared by every token using the asset. Never
+ * revoked (a handful per session, gone with the tab); a failed fetch is dropped so a later mount can
+ * retry. `resolved` holds settled URLs so a remount shows the image without an initials flash.
  */
 const pendingCache = new Map<string, Promise<string>>();
 const resolved = new Map<string, string>();
@@ -27,9 +25,8 @@ function loadTokenBlob(assetId: string, token: string): Promise<string> {
 }
 
 /**
- * Resolves a token asset to a bearer-authorized blob URL (shared across tokens using the same asset).
- * Returns null while loading or on error so callers fall back to initials. The shared-screen viewer
- * does not use this - it embeds the cookie-authorized `/content` URL directly in the `<image>`.
+ * Resolves a token asset to a bearer-authorized blob URL; null while loading or on error, so callers
+ * fall back to initials. The shared-screen viewer uses the cookie-authorized `/content` URL instead.
  */
 export function useTokenImageUrl(assetId: string | null | undefined, token: string | null | undefined): string | null {
   const [url, setUrl] = useState<string | null>(() => (assetId ? resolved.get(assetId) ?? null : null));
@@ -45,11 +42,7 @@ export function useTokenImageUrl(assetId: string | null | undefined, token: stri
   return url;
 }
 
-/**
- * A `TokenGlyph` that resolves `assetId` to an authorized image URL for the interactive client. Used
- * per-token so the image hook runs once per token (hooks can't loop). The viewer passes `imageUrl`
- * to `TokenGlyph` directly instead, since its `/content` URL is cookie-authorized.
- */
+/** A `TokenGlyph` with an authorized image, one per token since the hook cannot run in a loop. */
 export function AuthorizedTokenGlyph({ assetId, token, ...glyph }: Omit<TokenGlyphProps, "imageUrl"> & Readonly<{ assetId: string | null | undefined; token: string | null | undefined }>) {
   const imageUrl = useTokenImageUrl(assetId, token);
   return <TokenGlyph {...glyph} imageUrl={imageUrl} />;

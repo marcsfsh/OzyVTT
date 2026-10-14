@@ -3,22 +3,16 @@ import type { MapSelection } from "./MapManager";
 import { socket } from "../socket";
 
 /**
- * The map catalog, fetched once per consumer and shared as a type: id, name, kind, folder, geometry
- * and whether its grid is set. Every prep surface needs the same three facts about a map — what it is
- * called, which folder it is in, and whether tokens will snap on it — and each of them used to get
- * those from a different place (the shell's `mapLibrary`, which has no folders; `MapManager`'s own
- * fetch; nothing at all in the staging sidebar, which could not even name the map it was arranging).
+ * The map catalog shared by every prep surface: id, name, kind, folder, geometry, and whether its
+ * grid is set (i.e. whether tokens will snap).
  */
 
 export type PickerMap = MapSelection & Readonly<{ folder: string | null }>;
 
 /**
- * The session's bearer token for the map endpoints.
- *
- * The GM's token lives in React state in the shell (deliberately — a refresh must pass back through
- * the login screen), and the shell also hands it to the socket on sign-in. A component the shell has
- * not been rewired to feed therefore reads the SAME credential its live connection is already using,
- * rather than shipping without pictures. An explicit token argument always wins; this is the fallback.
+ * The session's bearer token for the map endpoints. The GM's token lives in shell state and is also
+ * handed to the socket on sign-in, so a component not passed a token reads the credential its live
+ * connection already uses. An explicit token argument always wins.
  */
 export function sessionToken(): string | null {
   const auth = socket.auth as { token?: string } | undefined;
@@ -32,7 +26,7 @@ async function readBody(response: Response) {
 }
 
 export type MapCatalog = Readonly<{
-  /** `null` until the first fetch settles — "not known yet", distinct from "no maps". */
+  /** `null` until the first fetch settles ("not known yet", distinct from "no maps"). */
   maps: readonly PickerMap[] | null;
   /** Refetch; resolves with the asset named by `preferId` once it is in the new list. */
   reload: (preferId?: string) => Promise<PickerMap | undefined>;

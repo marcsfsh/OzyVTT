@@ -1,21 +1,8 @@
 /**
- * "A new primitive isn't done until it appears in `/styleguide`"
- * (`docs/ai-context/design-language.md:36-40`), enforced.
- *
- * That sentence has been the rule since the design system existed and has never had a check
- * behind it. The failure mode it exists to kill is quiet and cheap: a primitive ships, the
- * styleguide never hears about it, and the next person hand-rolls the control it already
- * built — which is the whole fragmentation problem, one component at a time.
- *
- * **The mechanism.** Parse `packages/ui/src/index.ts` for exported VALUE identifiers, keep the
- * capitalized ones (JSX components are capitalized; `cx`, `slugify`, `useToast` and the rest of
- * the lowercase utilities are already outside that set), drop SCREAMING_CASE constants
- * mechanically, then require each survivor to appear as `<Name` somewhere in the styleguide.
- *
- * **The honest boundary, stated here rather than discovered later: this proves PRESENCE, not
- * demo quality.** A one-line `<Foo />` in a corner satisfies it. Whether the demo shows the
- * states a person needs to see is a review question and stays one. Presence is still the right
- * check, because "shipped, never demoed" is the failure that actually happens.
+ * "A new primitive isn't done until it appears in `/styleguide`", enforced. Parses
+ * `packages/ui/src/index.ts` for exported value identifiers, keeps the capitalized ones (components),
+ * drops SCREAMING_CASE constants, and requires each to appear as `<Name` in the styleguide.
+ * This proves presence, not demo quality; that remains a review question.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -24,29 +11,16 @@ import { CONVENTION_SHAPE, UI_SRC, walk } from "../design-conventions-shape";
 const STYLEGUIDE_DIR = `${process.cwd()}/src/styleguide`;
 
 /**
- * Components exported from `@vtt/ui` that legitimately cannot be demoed, each with the reason.
- *
- * **Measured 2026-08-03: EMPTY, and that is the finding.** All 78 candidates already appear as
- * JSX in `StyleGuide.tsx` — `<ToastProvider>` included, the icons grid renders one literal
- * element per icon. There was nothing to excuse, so nothing is excused.
- *
- * The dead-entry tripwire below is stated against the CANDIDATE set, not against "anything in
- * this array": an entry must be a real capitalized non-const export AND genuinely absent from
- * the styleguide. That is what stops a lowercase name or a typo from padding the list into
- * looking like reviewed policy — the `ALLOWED`-set discipline from
- * `codex/vocabulary.test.ts:177-185`.
+ * Components exported from `@vtt/ui` that legitimately cannot be demoed, each with its reason. An
+ * entry must be a real candidate export and genuinely absent from the styleguide (checked below), so
+ * the list cannot be padded.
  */
 const NON_VISUAL: ReadonlyArray<readonly [name: string, why: string]> = [];
 
 /**
- * Value exports, from the barrel's `export { … } from "…"` blocks. `type X` members are
- * dropped (a type cannot be rendered).
- *
- * `X as Y` yields **Y**, the name the app imports and the styleguide therefore has to render.
- * Taking the local name instead is a silent hole rather than a wrong label: an aliased export
- * would be checked under a name that is already demoed and would pass forever. Caught by
- * appending `export { Meter as UndemoedThing }` to the barrel and watching this file stay
- * green — the barrel uses no alias today, so nothing here would have exercised it.
+ * Value exports from the barrel's `export { … } from "…"` blocks; `type X` members are dropped.
+ * `X as Y` yields Y, the name the app imports and the styleguide must render; taking the local name
+ * would check an alias under an already-demoed name.
  */
 function valueExports(barrel: string): string[] {
   const names = new Set<string>();
@@ -65,12 +39,10 @@ function valueExports(barrel: string): string[] {
 describe("every primitive is demoed in /styleguide", () => {
   const barrel = readFileSync(`${UI_SRC}/index.ts`, "utf8");
   const values = valueExports(barrel);
-  // Capitalized minus SCREAMING_CASE. The second filter is mechanical rather than a list, so
-  // a new `THEME_*` constant needs no maintenance here — and cannot be mistaken for a component.
+  // Capitalized minus SCREAMING_CASE, mechanically, so new constants need no maintenance here.
   const candidates = values.filter((name) => /^[A-Z]/.test(name) && !/^[A-Z_0-9]+$/.test(name));
 
-  // The styleguide's own files, pinned. Today it is `StyleGuide.tsx` + `styleguide.css`; if the
-  // demo ever splits across several files, this list is the reviewed diff that says so.
+  // The styleguide's own files, pinned; if the demo splits across files, this list changes with it.
   const files = walk(STYLEGUIDE_DIR, (n) => !n.includes(".test."));
   const demoed = files.filter((n) => n.endsWith(".tsx")).map((n) => readFileSync(`${STYLEGUIDE_DIR}/${n}`, "utf8")).join("\n");
 

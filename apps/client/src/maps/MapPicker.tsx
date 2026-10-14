@@ -8,25 +8,16 @@ import "./map-picker.css";
 export type { PickerMap } from "./map-catalog";
 
 /**
- * The one map collection, embedded (D5). Both prep doors show THIS picker — the quick-start panel on
- * the table and the scene-prep workspace — so "choose a battle map" is one habit and one look.
- *
- * Three things it fixes, all from Appendix A2:
- *  1. **Picture first.** A battle map is an image; a single-column list of filenames made the GM open
- *     each one to find out which is which. Tiles carry the real art (`useCachedMapThumbnail`, the same
- *     cache the scene cards use, so a map already seen costs no second fetch).
- *  2. **Folders up front.** One chip row, horizontally scrollable, before the grid — not a Select
- *     buried under the tiles.
- *  3. **Upload without abandoning the flow.** The first tile IS the upload. The old escape hatch closed
- *     the new-scene modal and navigated to the Maps tab, so the scene you were half-way through
- *     creating was gone. Here the POST lands, the library refreshes and the new map is selected in
- *     place — you never leave the panel you were in.
+ * The map collection, embedded in both prep doors (the table's quick-start panel and the scene-prep
+ * workspace). Tiles show the real art (`useCachedMapThumbnail`, shared with scene cards); folders
+ * are a chip row before the grid; and the first tile is an upload that refreshes the library and
+ * selects the new map in place, without leaving the panel.
  */
 
 const KIND_LABEL: Record<MapSelection["kind"], string> = { battlemap: "Battle map", regional: "Regional map", world: "World map" };
 
-/** One tile: the map's own art, its name, and what still has to happen to it before tokens snap.
-    Exported because the Maps library renders the SAME tile — one collection, one look (D5). */
+/** One tile: the map's art, its name, and what it still needs before tokens snap. Exported because
+    the Maps library renders the same tile. */
 export function MapTile({ map, token, selected, onSelect, meta }: Readonly<{ map: PickerMap; token: string | null; selected: boolean; onSelect: () => void; meta?: string }>) {
   const url = useCachedMapThumbnail(map.id, token);
   const [failed, setFailed] = useState(false);
@@ -51,11 +42,11 @@ export function MapPicker({ token, kind = "battlemap", selectedId, onSelect, fal
       readable) while still closing it on an ordinary tile tap. */
   onSelect: (map: PickerMap, meta?: { fromUpload: boolean }) => void;
   /** Maps the caller already has (the shell's library). Used until the picker's own fetch lands, and as
-      the whole list when there is no token to fetch with — names without art beats an empty panel. */
+      the whole list when there is no token to fetch with. */
   fallback?: readonly MapSelection[];
   /** Offered as a quiet line after an upload; omitted when the caller has nowhere to send them. */
   onSetGrid?: (mapId: string) => void;
-  /** The library changed (an upload landed) — the shell can refresh its own copy. */
+  /** The library changed (an upload landed); the shell can refresh its own copy. */
   onUploaded?: (map: PickerMap) => void;
 }>) {
   const { maps, reload, token: bearer, error } = useMapCatalog(token);
@@ -97,9 +88,8 @@ export function MapPicker({ token, kind = "battlemap", selectedId, onSelect, fal
       {folders.map((name) => <Chip key={name} pressed={folder === name} onClick={() => setFolder(name)}>{name}</Chip>)}
     </div>
     <Input type="search" className="map-picker-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search maps" aria-label="Search maps" />
-    {/* The grid caps itself at 21rem and scrolls (map-picker.css) — declared here, in the markup,
-        because that is the marker check (h) reads. The maps rail lifts the cap and scrolls its own
-        wrapper instead, so this class is inert there. */}
+    {/* The grid caps itself at 21rem and scrolls (map-picker.css). The maps rail lifts the cap and
+        scrolls its own wrapper instead. */}
     <ul className="map-picker-grid scroll-y">
       <li>
         <button type="button" className="map-tile map-tile--upload" disabled={busy} onClick={() => fileRef.current?.click()}>

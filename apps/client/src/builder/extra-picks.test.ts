@@ -7,20 +7,12 @@ import type { BuilderCatalogs } from "../content/catalogs";
 import { buildCreatePayload, computeOffers, emptyDraft, prunePicks, type BuilderDraft } from "./build-payload";
 
 /**
- * `extraPicks` - a feature (or a chosen inline OPTION) that RAISES a pick budget.
- *
- * THE FAR END IS THE OFFER'S CAPACITY AND THE PAYLOAD IT PRODUCES, never "the field survived".
- * Every assertion below is a number the player can act on: how many cards the wizard will let them
- * fill, and how many rows the create payload then carries. A rider that parses, is stored, is
- * collected at exactly the right moment and adds zero is indistinguishable from a working one, and
- * that is the failure this whole vocabulary exists to end - so the tests are written to fail when
- * the composition is removed rather than when the plumbing is.
- *
- * Deliberately a SEPARATE FILE from `character-builder.test.tsx`: that one mounts the wizard and
- * asserts rendering, this one is pure offer arithmetic with no DOM at all.
+ * `extraPicks`: a feature (or a chosen inline option) that raises a pick budget. Assertions are on
+ * offer capacity and the resulting payload rows, so they fail if the composition is removed, not
+ * just the plumbing. Pure offer arithmetic, no DOM.
  */
 
-// ── fixtures ────────────────────────────────────────────────────────────────────────────────────
+// Fixtures
 
 const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">): ContentFeatureSummary => ({
   level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
@@ -46,9 +38,8 @@ const skills: readonly ContentSkillSummary[] = SKILL_IDS.map((id) => ({
 }));
 
 /**
- * Divine Order, as the SRD prints it and as the bundle now authors it: one pick between two roles,
- * where only Thaumaturge raises the cantrip budget. Protector is the negative control that lives in
- * the same choice, so "the +1 landed" and "every Cleric got a +1" cannot be confused.
+ * Divine Order as the SRD prints it: only Thaumaturge raises the cantrip budget. Protector is the
+ * negative control in the same choice.
  */
 const divineOrder = feature({
   id: "divine-order", name: "Divine Order", level: 1, grantedAtLevels: [1],
@@ -96,8 +87,7 @@ const catalogsWith = (classRecord: ContentClassSummary, species: ContentSpeciesS
 });
 
 const draftWith = (picks: Record<string, readonly string[]> = {}): BuilderDraft => ({
-  // `point-buy` so `baseScoresOf` reads `spendScores` (already filled by `emptyDraft`) rather than a
-  // pool assignment these tests have no reason to make - the payload half needs six real scores.
+  // `point-buy` so `baseScoresOf` reads the prefilled `spendScores`; the payload needs six scores.
   ...emptyDraft(), abilityMethod: "point-buy", speciesId: "human", backgroundId: "acolyte",
   classId: "cleric", level: 1, name: "Sister Ael", picks
 });
@@ -105,28 +95,26 @@ const draftWith = (picks: Record<string, readonly string[]> = {}): BuilderDraft 
 const capacityOf = (offers: ReturnType<typeof computeOffers>, key: string) =>
   offers.find((offer) => offer.key === key)?.capacity;
 
-// ── the reported bug ────────────────────────────────────────────────────────────────────────────
+// Divine Order -> Thaumaturge
 
 describe("a chosen OPTION raises the class cantrip budget (Divine Order -> Thaumaturge)", () => {
   const catalogs = catalogsWith(clericWith([divineOrder]));
 
   it("offers FOUR cantrips once Thaumaturge is the chosen role", () => {
-    // The reported bug, at the far end: the wizard capped cantrip picks at the printed 3, so the
-    // fourth cantrip Thaumaturge's own text promises could not be selected at all.
+    // Thaumaturge's text promises a fourth cantrip beyond the printed 3.
     const offers = computeOffers(draftWith({ "feature:divine-order": ["thaumaturge"] }), catalogs);
     expect(capacityOf(offers, "class-cantrips")).toBe(4);
   });
 
   it("offers THREE for Protector, and three before any role is chosen", () => {
-    // The negative control. Without it, a composition that added +1 to every Cleric would pass the
-    // test above and be just as wrong.
+    // Negative control: a composition adding +1 to every Cleric would pass the test above.
     expect(capacityOf(computeOffers(draftWith({ "feature:divine-order": ["protector"] }), catalogs), "class-cantrips")).toBe(3);
     expect(capacityOf(computeOffers(draftWith(), catalogs), "class-cantrips")).toBe(3);
   });
 
   it("lets the payload actually carry the fourth cantrip, and drops it again when the role changes", () => {
-    // Capacity is only half the promise: the fourth pick has to survive into the create payload as a
-    // real untagged class-cantrip row, which is what the server charges against its own budget.
+    // The fourth pick must also reach the payload as an untagged class-cantrip row, which the server
+    // charges against its own budget.
     const picks = {
       "feature:divine-order": ["thaumaturge"],
       "class-cantrips": ["guidance", "light", "mending", "resistance"],
@@ -137,10 +125,8 @@ describe("a chosen OPTION raises the class cantrip budget (Divine Order -> Thaum
     const cantripRows = chosen.choices.filter((row) => row.kind === "cantrip" && !row.payload?.featureId);
     expect(cantripRows.map((row) => row.id)).toEqual(["guidance", "light", "mending", "resistance"]);
 
-    // The composed capacity is also what `prunePicks` caps to, so switching to Protector takes the
-    // budget back to 3 and drops the now-illegal fourth pick from the draft - the parked-draft path,
-    // where a pick that is no longer offerable must not be silently submitted for the server to
-    // refuse. The whole point of both sides agreeing is that this never reaches the wire.
+    // `prunePicks` caps to the composed capacity, so switching to Protector drops the fourth pick
+    // from the draft before it can reach the server.
     const swappedDraft = draftWith({ ...picks, "feature:divine-order": ["protector"] });
     const swappedOffers = computeOffers(swappedDraft, catalogs);
     expect(capacityOf(swappedOffers, "class-cantrips")).toBe(3);
@@ -154,13 +140,11 @@ describe("a chosen OPTION raises the class cantrip budget (Divine Order -> Thaum
   });
 });
 
-// ── the general vocabulary ──────────────────────────────────────────────────────────────────────
+// The general vocabulary
 
 describe("extraPicks composes across carriers and budgets", () => {
   it("SUMS two features that each grant +1 to the same budget", () => {
-    // The composition requirement stated as arithmetic: nothing overwrites, so +1 and +1 is +2 and
-    // the printed 3 becomes 5. A "last grant wins" implementation passes every single-grant test in
-    // this file and fails only here.
+    // Grants sum: +1 and +1 turns the printed 3 into 5. A "last grant wins" bug fails only here.
     const blessing = feature({
       id: "extra-cantrip-blessing", name: "Blessing of Cantrips", level: 1, grantedAtLevels: [1],
       description: "You know one extra cantrip.", extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }]
@@ -173,9 +157,8 @@ describe("extraPicks composes across carriers and budgets", () => {
   });
 
   it("reads a grant off a feature that asks for NO pick of its own", () => {
-    // "You gain one additional skill from your class's list" has no card - only a bigger one on the
-    // class step. Collecting grants inside the offer-building branch would drop exactly these,
-    // because a feature with no `choice` never builds an offer.
+    // A budget raise with no card of its own: a feature with no `choice` never builds an offer, so
+    // grants must be collected outside that branch.
     const scholar = feature({
       id: "temple-scholar", name: "Temple Scholar", level: 1, grantedAtLevels: [1],
       description: "You gain proficiency in one additional Cleric skill.",
@@ -187,9 +170,8 @@ describe("extraPicks composes across carriers and budgets", () => {
   });
 
   it("raises a budget from a SPECIES trait, across the step boundary", () => {
-    // The ordering case: `class-skills` is built in step 3 and a species trait is collected in step 1,
-    // while `class-cantrips` is built in step 4 - after the trait. Applying grants as offers are
-    // pushed would raise one and miss the other; applying them once every offer exists gets both.
+    // Ordering: `class-skills` is built in step 3, the species trait collected in step 1, and
+    // `class-cantrips` built in step 4. Grants apply once every offer exists, so both are raised.
     const gifted = {
       ...human, id: "gifted", name: "Gifted",
       features: [feature({
@@ -220,8 +202,8 @@ describe("extraPicks composes across carriers and budgets", () => {
   });
 
   it("raises the PREPARED-SPELL budget, which no second choice could express", () => {
-    // There is no catalog slug meaning "your class's spell list at your slot level", so "you may
-    // prepare one more spell" is unsayable as a nested choice and is only sayable as a budget.
+    // No catalog slug means "your class's spell list at your slot level", so "prepare one more
+    // spell" can only be expressed as a budget.
     const zealot = feature({
       id: "zealous-study", name: "Zealous Study", level: 1, grantedAtLevels: [1],
       description: "You can prepare one additional Cleric spell.",
@@ -232,8 +214,7 @@ describe("extraPicks composes across carriers and budgets", () => {
   });
 
   it("ignores a grant naming a budget this build has no offer for", () => {
-    // The wizard cannot reject content - the server owns that authority and refuses the build at
-    // Create with an actionable message. What it must NOT do is crash, or move some other number.
+    // The server rejects bad content at Create; the wizard must just not crash or move other numbers.
     const confused = feature({
       id: "confused-gift", name: "Confused Gift", level: 1, grantedAtLevels: [1],
       description: "Grants a pick to a budget that does not exist here.",
@@ -246,15 +227,11 @@ describe("extraPicks composes across carriers and budgets", () => {
   });
 });
 
-// ── a chosen option's OWN pick, and a pick over the character's own answers ──────────────────────
+// A chosen option's own pick, and a pick over the character's own answers
 
 /**
- * Two things the wizard could not render, held at the far end of `computeOffers`: THE OFFER LIST.
- *
- * The first is an old gap and a bad one - the server has always turned a chosen inline option's own
- * `choice` into an offer (pass A2) and the wizard never did, so taking Blessed Warrior or Pact of
- * the Blade produced a build the server refused with "needs N pick(s)" and no card anywhere to
- * answer it. The second is ruling E: a pick whose options are the character's own prior answers.
+ * A chosen inline option's own `choice` becomes an offer (Blessed Warrior, Pact of the Blade), as
+ * on the server; and a pick whose options are the character's own prior answers.
  */
 const optionChoice = (over: Partial<NonNullable<ContentFeatureSummary["choice"]>>): NonNullable<ContentFeatureSummary["choice"]> =>
   ({ kind: "cantrip", choose: 1, from: [], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [], ...over });
@@ -327,20 +304,9 @@ describe("ruling E - `fromPicks` offers the character's own answers, narrowed by
 });
 
 /**
- * An ASI feature's levels stay SEPARATE decisions, whichever spelling holds its picks (U12).
- *
- * Each ASI level is its own decision — the player picks feat-or-scores separately at 4, 8, 12 — so
- * `computeOffers` must never hand two levels one key, or an answer at 4 satisfies the offer at 8.
- *
- * The singular spelling earns that with an ASI-specific `@<level>` suffix read off
- * `feature.choice.kind`, which was the only spelling a record could carry until `choices` became
- * authorable. A plural record has no `choice` at all, so that suffix stops applying — and the
- * levels stay separate anyway, because the multi-block path carries its own generic suffixes:
- * `/N` for the Nth choice block and `#N` for the Nth grant of the same feature.
- *
- * Written after chasing a suspected collision that turned out not to exist. It is kept because the
- * two spellings reach uniqueness by two different mechanisms, and only one of them is obvious from
- * reading the ASI code — a later change to either could merge the levels without touching the other.
+ * An ASI feature's levels stay separate decisions under either spelling. The singular `choice`
+ * gets an ASI-specific `@<level>` key suffix; a plural `choices` record has no `choice`, and stays
+ * unique through the generic `/N` (Nth choice block) and `#N` (Nth grant) suffixes instead.
  */
 describe("an ASI feature's levels stay separate decisions, under either spelling", () => {
   const asiBlock = {
@@ -363,8 +329,7 @@ describe("an ASI feature's levels stay separate decisions, under either spelling
   });
 
   it("keeps every grant distinct when the picks are stored PLURAL — the shape U12 made authorable", () => {
-    // Two blocks over two granted levels is four decisions, and all four must be addressable.
-    // `@<level>` is absent here by construction; uniqueness comes from `/2` and `#2` instead.
+    // Two blocks over two granted levels is four decisions, all addressable via `/2` and `#2`.
     const keys = keysFor([asiFeature({ choices: [asiBlock, { ...asiBlock, kind: "feat" }] as never })]);
     expect(keys).toHaveLength(4);
     expect(new Set(keys).size).toBe(4);

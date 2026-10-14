@@ -2,9 +2,9 @@ import { initialsOf } from "../scene/mapImage";
 import "./InitiativeList.css";
 
 /**
- * The audience-safe fields a shared initiative row needs. `score` is the initiative value (the viewer
- * surfaces it under the name `initiative`, mapped by its caller). Conditions arrive as parallel ids +
- * labels so the dots render without a rules-reference lookup - the shared screen has no socket.
+ * The audience-safe fields a shared initiative row needs. `score` is the initiative value.
+ * Conditions arrive as parallel ids + labels so the dots render without a rules lookup (the shared
+ * screen has no socket).
  */
 export type InitiativeRowEntry = Readonly<{
   actorId: string;
@@ -16,7 +16,7 @@ export type InitiativeRowEntry = Readonly<{
   conditions?: readonly string[];
 }>;
 
-/** Condition presence as plain dots (up to 4, then +N), fed from the entry's ids + labels - no socket. */
+/** Condition presence as plain dots (up to 4, then +N), from the entry's ids + labels. */
 function InitiativeConditionDots({ conditionIds, conditions }: Readonly<{ conditionIds?: readonly string[]; conditions?: readonly string[] }>) {
   const ids = conditionIds ?? [];
   const labels = conditions ?? [];
@@ -30,11 +30,10 @@ function InitiativeConditionDots({ conditionIds, conditions }: Readonly<{ condit
 }
 
 /**
- * One initiative row's shared visual content: avatar, active caret, name (+ optional "YOU" badge),
- * condition dots, a coarse-band health note, and the score. Rendered by BOTH the player panel and the
- * viewer so the two lists stay identical; the caller owns the surrounding <li> (its active/self
- * classes, an auto-scroll ref, and any own-turn sub-rows underneath). No HP bar - health reads as the
- * coarse Bloodied/Down text plus the token's own ring/aura on the map (feedback #5).
+ * One initiative row's shared content: avatar, active caret, name (+ optional "YOU" badge),
+ * condition dots, a coarse health note, and the score. Used by both the player panel and the
+ * viewer; the caller owns the surrounding <li>. No HP bar: health is the coarse Bloodied/Down text
+ * plus the token's ring on the map.
  */
 export function InitiativeRow({ entry, self = false }: Readonly<{ entry: InitiativeRowEntry; self?: boolean }>) {
   return <div className="init-row">

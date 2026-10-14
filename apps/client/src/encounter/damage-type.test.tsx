@@ -12,22 +12,9 @@ import { SheetHpControls } from "./CharacterSheet";
 import { ApplyDamageSchema } from "../../../server/src/game-commands";
 
 /**
- * REGISTER D7's CLIENT HALF, at the surface: a hand-entry door now has a damage-type chooser, and
- * what the GM picks in it reaches the wire.
- *
- * The far end - that the emitted type comes off a DIFFERENT number of hit points and that the table
- * is told why - is `damage-type.mirror.test.ts`, which drives the same payload builder into the
- * server's own `applyDamageDetailed`. This file is the other half of that join: it proves a real
- * COMPONENT calls the builder, so the mirror test is testing the app and not a module the app merely
- * ships beside.
- *
- * **ALL THREE DOORS, because for a day only one of them was joined here.** The token menu was the
- * door this file opened with - one door, chosen because it was the only one already exported whole.
- * A hostile review on 2026-08-10 then measured what that cost: replacing the type computation with
- * `undefined` in the OTHER two doors left `npm run check` at exit 0 and the client suite
- * byte-identical at 65 files / 917 tests. Two thirds of the register was protected by a browser
- * transcript nothing could re-run. So the popover and the sheet get their own joins below, and the
- * probe that found the hole is the probe that keeps them honest.
+ * Each hand-entry damage door (token menu, tracker popover, sheet HP box) sends the picked damage
+ * type through the shared payload builder. The hit-point outcome is tested in
+ * `damage-type.mirror.test.ts`.
  */
 
 const ACTOR = {
@@ -58,15 +45,13 @@ describe("the manual damage entry's type chooser", () => {
     const user = userEvent.setup();
     mount();
     const box = screen.getByRole("combobox", { name: "Damage type" }) as HTMLInputElement;
-    // Empty IS untyped - the placeholder says so rather than a fourteenth row a GM could pick.
+    // Empty is untyped; the placeholder says so.
     expect(box.value).toBe("");
     expect(box.placeholder).toBe("Untyped");
     await user.click(box);
-    // Scoped to this listbox: the menu's Size and Health `<select>`s carry eleven native options of
-    // their own, which is exactly the confusion an unscoped count would hide.
+    // Scoped to this listbox: the menu's Size and Health `<select>`s have native options of their own.
     const list = screen.getByRole("listbox", { name: "Damage type" });
-    // The WHOLE vocabulary, not the chooser's default page of eight: thirteen is a complete list and
-    // hiding five of them behind a search a GM has no reason to expect is the defect this replaces.
+    // The whole vocabulary, not the chooser's default page of eight.
     expect(within(list).getAllByRole("option")).toHaveLength(13);
     expect(within(list).getByRole("option", { name: "Bludgeoning" })).toBeTruthy();
   });
@@ -87,8 +72,7 @@ describe("the manual damage entry's type chooser", () => {
     mount();
     await user.type(screen.getByLabelText("Amount"), "10");
     await user.click(screen.getByRole("button", { name: "Dmg" }));
-    // Byte-identical to what shipped before this control existed: an untouched chooser must not
-    // widen the payload of every GM who never opens it.
+    // An untouched chooser must not add `damageType` to the payload.
     expect("damageType" in lastHpCall()[1]).toBe(false);
   });
 
@@ -107,8 +91,7 @@ describe("the manual damage entry's type chooser", () => {
     const user = userEvent.setup();
     mount();
     await user.type(screen.getByLabelText("Amount"), "10");
-    // Typed, not picked, and left by moving to the next control - the gesture that used to lose what
-    // was typed before `Combobox` learned to commit on blur.
+    // Typed, not picked, then left by moving to the next control: `Combobox` commits on blur.
     await user.type(screen.getByRole("combobox", { name: "Damage type" }), "Primordial Ooze");
     await user.click(screen.getByRole("button", { name: "Dmg" }));
     expect(lastHpCall()[1]).toMatchObject({ amount: 10, damageType: "primordial-ooze" });
@@ -116,16 +99,13 @@ describe("the manual damage entry's type chooser", () => {
 });
 
 /**
- * DOOR 3 - the character sheet's HP box, the one hand-entry door a PLAYER can also reach.
- *
- * `SheetHpControls` renders for both roles (only `Set` is GM-gated), so a type that fails to travel
- * from here is a player watching their own resistance not apply. Mounted alone rather than through
- * `CharacterSheet`, which would need a definition fetch and a skill catalog to reach five buttons.
+ * The sheet's HP box, which players can reach too (only `Set` is GM-gated). Mounted alone rather
+ * than through `CharacterSheet`, which needs a definition fetch and a skill catalog.
  */
 describe("the sheet's HP box carries the type too", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  /** `said` collects the confirmation line, which is this door's own far end. */
+  /** `said` collects the confirmation line. */
   const said: string[] = [];
   const mountSheetHp = () => {
     said.length = 0;
@@ -141,8 +121,7 @@ describe("the sheet's HP box carries the type too", () => {
     const [event, payload] = lastHpCall();
     expect(event).toBe("actor:apply-damage");
     expect(payload).toMatchObject({ actorId: ACTOR.id, amount: 10, damageType: "fire" });
-    // Whatever this door sends has to survive the server's own `.strict()` gate - the same schema
-    // `damage-type.mirror.test.ts` then drives into `applyDamageDetailed` for the hit-point far end.
+    // The payload must pass the server's `.strict()` schema.
     expect(ApplyDamageSchema.parse(payload).damageType).toBe("fire");
   });
 
@@ -171,25 +150,19 @@ describe("the sheet's HP box carries the type too", () => {
     await user.type(screen.getByLabelText("Amount"), "10");
     await chooseType(user, "Cold");
     await user.click(screen.getByRole("button", { name: "Dmg" }));
-    // The ack is the server's; drive it, because the feedback line is written from inside it.
+    // Drive the ack: the feedback line is written from inside it.
     lastHpCall()[2]({ ok: true });
     expect(said.at(-1)).toBe("Damaged 10 cold.");
   });
 });
 
 /**
- * DOOR 1 - the turn-order row's tools popover, driven through the REAL `EncounterPanel`.
- *
- * The whole GM panel is mounted rather than an extracted row, because the defect this guards against
- * is the panel's own `adjustHp` losing its type - and because `hpDamageType` is PANEL state,
- * deliberately kept when a row closes so a fireball is one type across four tokens. Nothing smaller
- * than the panel can prove that, which is why the fixture carries two combatants and not one.
+ * The turn-order row's tools popover, through the real `EncounterPanel`: `hpDamageType` is panel
+ * state kept when a row closes (one fireball, several tokens), so the fixture has two combatants.
  */
 const SECOND_ID = "10000000-0000-4000-8000-000000000002";
 const GM_STATE = ((): GmView => {
-  // Parsed through the real schema rather than cast from a literal: every field the tracker reads
-  // that this test does not care about arrives at its own default, so the fixture cannot drift out
-  // from under the panel the way a hand-rolled object does.
+  // Parsed through the real schema so unrelated fields get their defaults and cannot drift.
   const actor = (id: string, name: string) => ({ id, name, kind: "player-character", visibility: "public", hp: { current: 40, maximum: 40 } });
   const state = GameStateSchema.parse({
     schemaVersion: 1,
@@ -207,10 +180,9 @@ const GM_STATE = ((): GmView => {
 describe("the turn-order row's tools popover carries the type too", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  /** Open a combatant's tools card, which is where the HP editor and its chooser live. */
+  /** Opens a combatant's tools card, where the HP editor and its chooser live. */
   const openRowTools = async (user: ReturnType<typeof userEvent.setup>, name = "Aria") => {
-    // By `title`, not by accessible name: the row button's name is composed from the avatar, the
-    // name and the HP readout it contains, so it reads "AR Aria 40/40" and moves with the fixture.
+    // By `title`: the row button's accessible name includes the avatar and HP readout.
     await user.click(screen.getByTitle(new RegExp(`^Manage ${name}`)));
     return within(screen.getByRole("dialog", { name: `Tools for ${name}` }));
   };
@@ -225,11 +197,10 @@ describe("the turn-order row's tools popover carries the type too", () => {
     await user.type(tools.getByLabelText("Amount"), "10");
     await chooseType(user, "Fire");
     await user.click(tools.getByRole("button", { name: "Dmg" }));
-    // The ack is the server's; drive it, because the panel writes its line from inside the promise.
+    // Drive the ack: the panel writes its line from inside the promise.
     lastHpCall()[2]({ ok: true });
-    // The far end this door can reach on its own: the words the GM reads back. They are written from
-    // the same computed type the payload carries, so an untyped hit reads "took 10 damage" - and the
-    // assertion sits ABOVE the payload one so a wrong VALUE fails here rather than at a guard.
+    // The confirmation is built from the same computed type as the payload, and is asserted first so a
+    // wrong value fails here rather than at a payload guard.
     expect(await screen.findByText("Aria took 10 fire damage.")).toBeTruthy();
     const [event, payload] = lastHpCall();
     expect(event).toBe("actor:apply-damage");
@@ -256,8 +227,7 @@ describe("the turn-order row's tools popover carries the type too", () => {
   });
 
   it("keeps the type across a KO, which is damage with a different landing", async () => {
-    // `KO` is the same command with `nonlethal`, and it is the call site the spread is most likely
-    // to be rebuilt at by hand - so it gets its own join rather than riding on Dmg's.
+    // `KO` is the same command with `nonlethal`, so it gets its own check.
     const user = userEvent.setup();
     const tools = await openPanel(user);
     await user.type(tools.getByLabelText("Amount"), "10");
@@ -267,9 +237,7 @@ describe("the turn-order row's tools popover carries the type too", () => {
   });
 
   it("keeps the chosen type when the row closes and the next one opens", async () => {
-    // A fireball is one type across four tokens, so `hpDamageType` is panel state and survives the
-    // accordion - unlike `hpAmount`, which the row button clears on purpose. The number is retyped
-    // here and the type is NOT re-picked, which is the whole claim.
+    // The type survives the accordion (unlike `hpAmount`): the number is retyped, the type is not.
     const user = userEvent.setup();
     const first = await openPanel(user);
     await user.type(first.getByLabelText("Amount"), "10");

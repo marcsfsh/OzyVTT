@@ -6,19 +6,10 @@ import { useTokenImageUrl } from "./tokenImages";
 import "./tokens.css";
 
 /**
- * **The token picker (A11 / D18 / ruling R1).** One component, two roles.
- *
- * A player sets the token for their OWN claimed character: browse the shelf the GM offers, or upload an
- * image. There is **no approval step** — the GM curates the shelf, they do not vet the choice. A GM sets
- * anyone's, keeps the folder filter and the per-definition memory, and carries the reveal control on
- * every tile: that switch is R1's curation, deciding whether players are OFFERED that image, and it is
- * the only thing on this surface that is GM-only.
- *
- * Two guards are the server's, and this component leans on them rather than re-deciding:
- *  - the LISTING is filtered server-side (`token-catalog.ts` `list("player")`), so a hidden entry never
- *    reaches a player's browser to be filtered out here;
- *  - `actor.set-token-image` runs the same `canInitiateForActor` check every player-initiated command
- *    does, so "own claimed character only" has one definition and it is not in this file.
+ * The token picker, for both roles. A player sets the token for their own claimed character (shelf
+ * image or upload, no approval step); a GM sets anyone's and also controls which images are offered
+ * to players. The server filters the listing by role and checks actor ownership on
+ * `actor.set-token-image`; this component does not re-decide either.
  */
 
 type TokenAsset = Readonly<{
@@ -31,7 +22,7 @@ type TokenAsset = Readonly<{
   byteLength: number;
   importedAt: string;
   lastUsedAt: string | null;
-  /** GM-only curation flag (R1). A player's listing never carries a hidden entry at all. */
+  /** GM-only curation flag; a player's listing never carries a hidden entry. */
   hidden?: boolean;
 }>;
 
@@ -48,7 +39,7 @@ function TokenThumb({ asset, bearer, remembered, selected, onPick, reveal }: Rea
   remembered: boolean;
   selected: boolean;
   onPick: () => void;
-  /** GM only: R1 curation for this one entry. Absent for a player. */
+  /** GM only: show or hide this entry for players. Absent for a player. */
   reveal?: (shown: boolean) => void;
 }>) {
   const url = useTokenImageUrl(asset.id, bearer);
@@ -69,8 +60,7 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
   currentAssetId?: string | null;
   /** The caller's bearer: the GM session token, or the player's own session token. */
   token?: string;
-  /** @deprecated The picker is no longer GM-only; pass `token` + `role`. Kept so the token menu's
-      existing call site keeps working untouched — it is a GM surface either way. */
+  /** @deprecated Pass `token` + `role`. Kept for the token menu's existing GM call site. */
   gmToken?: string;
   role?: "gm" | "player";
   onClose: () => void;
@@ -113,7 +103,7 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
     });
   };
 
-  /** Upload lands, is assigned, and closes — one gesture, D18's "no approval step" taken literally. */
+  /** Upload, assign and close in one gesture. */
   const upload = async (file: File) => {
     setBusy(true); setMessage("");
     try {
@@ -126,7 +116,7 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
     } catch (error) { setBusy(false); setMessage((error as Error).message); }
   };
 
-  /** R1: curate one entry. GM only — the route refuses anyone else, and this control is not rendered. */
+  /** GM only: the route refuses anyone else, and the control is not rendered for players. */
   const setHidden = async (asset: TokenAsset, shown: boolean) => {
     setAssets((current) => current.map((entry) => entry.id === asset.id ? { ...entry, hidden: !shown } : entry));
     try { await api(`/api/v1/token-assets/${asset.id}`, bearer, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ hidden: !shown }) }); }
@@ -166,8 +156,7 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
     <section className="token-library-section">
       <h3>Library</h3>
       <div className="token-grid">
-        {/* Upload is the FIRST tile, not a form above the grid: picking a picture and making a picture
-            are the same decision, so they sit in the same row of choices (D5's shape, D18's surface). */}
+        {/* Upload is the first tile, in the same row as the choices. */}
         <button type="button" className="token-thumb token-thumb-upload lift" disabled={busy} onClick={() => fileRef.current?.click()}>
           <span className="token-thumb-image"><span className="token-upload-mark" aria-hidden="true" /></span>
           <span className="token-thumb-name">Upload an image</span>

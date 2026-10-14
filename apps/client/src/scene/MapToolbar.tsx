@@ -7,32 +7,17 @@ import {
 import type { DockPosition } from "../encounter/EncounterPanel";
 
 /**
- * THE ONE MAP TOOLBAR (D4).
+ * The map toolbar. Always visible: the constant tools (Select · Ping · Measure) and three labelled
+ * group buttons (Draw · Fog · View), on one row that never wraps; everything else is one tap deeper
+ * in the group's panel. At 560px and below it collapses to one `Tools` button at the bottom-left
+ * (thumb reach) that opens a vertical rail of the same content.
  *
- * What it replaces: three floating clusters that between them put ~13 icons over the battle map and
- * WRAPPED INTO ROWS as the viewport narrowed — the top-left tool row (`flex-wrap: wrap`), the
- * top-right notifications bell, and the bottom-right zoom/dock stack. Every one of those tools still
- * exists; none of them floats loose over the art any more.
- *
- * The shape, per plan §B2.4:
- *   · Always visible: the three constant tools (Select · Ping · Measure) + three LABELED group
- *     buttons (Draw · Fog · View). One row, never two, at every width above the phone collapse.
- *   · Everything else is exactly one tap deeper, inside the group panel that names it.
- *   · ≤560px the whole cluster collapses to a single `Tools` button at the bottom-left (thumb
- *     reach) which opens a vertical rail of the same content.
- *
- * Two rules this component exists to hold, both of which the old cluster broke:
- *   1. **A label is never hover-only.** Group buttons carry visible text at every width, and every
- *      row inside a panel or the phone rail is icon + words. Tooltips are supplementary; on a
- *      phone there is no hover, so anything that only exists in a `title` does not exist.
- *   2. **Nothing wraps over the map art.** The bar is `nowrap`; when a panel is open it is one
- *      bounded, scrollable surface rather than N more floating icons.
- *
- * It renders no map state of its own: every value is a prop and every change is a callback, so the
- * server-authoritative pieces (fog, annotations) still travel through `EncounterMap`'s emitters.
+ * Labels are never hover-only (a phone has no hover), and nothing wraps over the map art.
+ * It holds no map state: values are props and changes are callbacks, so fog and annotations still
+ * go through `EncounterMap`'s emitters.
  */
 
-/** The map's pointer mode. Lives here because the toolbar is what sets it. */
+/** The map's pointer mode; defined here because the toolbar sets it. */
 export type MapTool = "select" | "measure" | "ping" | "fog-reveal" | "fog-hide" | AnnotationShapeKind;
 
 export type ClearScope = "mine" | "players" | "all";
@@ -41,7 +26,7 @@ type GroupId = "draw" | "fog" | "view";
 
 const GROUP_LABEL: Record<GroupId, string> = { draw: "Draw", fog: "Fog", view: "View" };
 
-/** The uncalibrated-map reason, said once and reused — a disabled control always says why. */
+/** The uncalibrated-map reason, reused so a disabled control always says why. */
 const NEEDS_GRID = "Needs a calibrated grid — set one up on the Scenes tab, under Maps.";
 
 const CONSTANT_TOOLS: ReadonlyArray<{ id: MapTool; label: string; icon: React.ReactNode; needsGrid?: boolean }> = [
@@ -58,10 +43,8 @@ const SHAPE_TOOLS: ReadonlyArray<{ id: AnnotationShapeKind; label: string }> = [
 ];
 
 /**
- * Who a new drawing is for, in the product's words (D28): "Shown to players" is the one phrase for
- * public, "GM only" the one phrase for GM-secret. The owner-scoped options a player gets have no
- * D28 winner — they are about the person holding the phone, not about the players as an audience —
- * so they stay plain.
+ * Who a new drawing is for: "Shown to players" for public, "GM only" for GM-secret. The owner-scoped
+ * options a player gets are about the person holding the phone, so they stay plain.
  */
 export function drawingAudienceOptions(role: "gm" | "player"): ReadonlyArray<{ value: AnnotationVisibility; label: string }> {
   return role === "gm"
@@ -108,10 +91,8 @@ export interface MapToolbarProps {
   onHideAll: () => void;
 
   /**
-   * RULING 13 — the "Preview what players see" trigger, which used to be an anchor row under the map
-   * costing 53.6px of a phone's band. It is a TOOL, not a group: there is no panel behind it, because
-   * the payload is already a `position: fixed` draggable panel that never depended on the row that
-   * launched it. Absent ⇒ not offered (a player has nothing to preview).
+   * The "Preview what players see" tool. No panel behind it: the preview is already a fixed,
+   * draggable panel. Absent: not offered (players have nothing to preview).
    */
   viewerPreview?: Readonly<{ on: boolean; onToggle: () => void }>;
 
@@ -131,7 +112,7 @@ export interface MapToolbarProps {
   onNotificationsMutedChange: (muted: boolean) => void;
 }
 
-/** The phone collapse, on the shared ladder (design-language §breakpoints). */
+/** The phone collapse breakpoint. */
 const COMPACT_QUERY = "(max-width: 560px)";
 
 function useCompact(): boolean {
@@ -161,7 +142,7 @@ export function MapToolbar(props: MapToolbarProps) {
   // Leaving the compact band with the rail open would strand the state; reset both on the swap.
   useEffect(() => { setOpenGroup(null); setRailOpen(false); }, [compact]);
 
-  // Escape closes the open panel first, then the rail — the usual nesting.
+  // Escape closes the open panel first, then the rail.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -172,8 +153,8 @@ export function MapToolbar(props: MapToolbarProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [openGroup, railOpen]);
 
-  // A tap on the map closes what is open. Deferred one tick so the tap that OPENED a panel does not
-  // immediately shut it (the TokenContextMenu idiom).
+  // A tap on the map closes what is open, deferred one tick so the opening tap does not immediately
+  // close it (as in TokenContextMenu).
   useEffect(() => {
     if (!openGroup && !railOpen) return;
     const onPointer = (event: PointerEvent) => {
@@ -185,16 +166,15 @@ export function MapToolbar(props: MapToolbarProps) {
     return () => { window.clearTimeout(armed); document.removeEventListener("pointerdown", onPointer); };
   }, [openGroup, railOpen]);
 
-  // On a phone the rail is taller than the map (a 390px stage leaves ~210px), so it scrolls — and a
-  // section opened near the bottom would otherwise expand below the fold with no hint that it had.
-  // Measured on the real device profile before this existed: opening Draw left its whole body hidden.
+  // On a phone the rail is taller than the map and scrolls, so an opened section is scrolled into view
+  // rather than expanding below the fold.
   useEffect(() => {
     if (!compact || !openGroup || !railRef.current) return;
     railRef.current.querySelector(`#${CSS.escape(`${baseId}-${openGroup}`)}`)?.closest(".map-toolbar-rail-section")?.scrollIntoView({ block: "start" });
   }, [compact, openGroup, baseId]);
 
   const toggleGroup = (group: GroupId) => setOpenGroup((current) => (current === group ? null : group));
-  /** Picking a tool is the end of the errand: the panel gets out of the way of the map. */
+  /** Picking a tool ends the errand: the panel gets out of the way of the map. */
   const pickTool = (next: MapTool) => { onToolChange(next); setOpenGroup(null); setRailOpen(false); };
 
   const constantTools = CONSTANT_TOOLS.map((entry) => {
@@ -211,18 +191,15 @@ export function MapToolbar(props: MapToolbarProps) {
   const groupIcon = (group: GroupId) => (group === "draw" ? <IconDraw /> : group === "fog" ? <IconFog /> : <IconSearch />);
 
   /**
-   * RULING 13's trigger, in both trees. It carries no caret because there is no panel behind it, and
-   * `aria-pressed` rather than `aria-expanded` because it toggles a surface rather than disclosing
-   * one. The visible word is short enough for the bar; the full sentence is the accessible name, and
-   * ruling 58's eye is the app's one "what players can see" glyph.
+   * The preview toggle, in both trees. No caret (no panel), and `aria-pressed` rather than
+   * `aria-expanded` because it toggles a surface. The visible word is short; the accessible name is
+   * the full sentence.
    */
   const previewTitle = viewerPreview?.on ? "Hide the preview of what players see" : "Preview what players see";
 
   if (compact) {
-    // While the rail is OPEN it lifts above the floating token tray (z-index, see the stylesheet): a
-    // 390px stage is ~232px tall and the tray takes 136px of it, so a rail painted underneath showed
-    // one and a half rows. The RESTING toolbar never overlaps anything — only the open menu does,
-    // which is what a menu is for.
+    // While open, the rail lifts above the floating token tray (z-index in the stylesheet); on a small
+    // stage the tray would otherwise cover most of it. The resting toolbar overlaps nothing.
     return <div className={`encounter-map-overlay compact${railOpen ? " open" : ""}`} ref={rootRef}>
       {railOpen && <div className="map-toolbar-rail scroll-y" id={`${baseId}-rail`} ref={railRef} role="group" aria-label="Map tools">
         <div className="map-toolbar-rail-tools">
@@ -273,7 +250,7 @@ export function MapToolbar(props: MapToolbarProps) {
   </div>;
 }
 
-/* ─────────────────────────────── the three groups ─────────────────────────────── */
+// The three groups
 
 function DrawGroup({ role, tool, calibrated, audience, onAudienceChange, audienceActorId, onAudienceActorIdChange, characters, color, onColorChange, colors, gmInk, onGmInkChange, onClear, id, onPickTool }: MapToolbarProps & { id: string; onPickTool: (tool: MapTool) => void }) {
   const scopes: ReadonlyArray<{ scope: ClearScope; label: string }> = role === "gm"

@@ -4,10 +4,9 @@ import { useToast, type ToastTone } from "@vtt/ui";
 import { socket } from "../socket";
 
 /**
- * Transient battlemap notifications ("Goblin took 6 damage"), fed by the server's role-filtered
- * `table:event` broadcast. Routed through the shared toast surface (`useToast`) so combat feedback
- * looks and moves like every other notification - the durable record stays the combat log/roll
- * history. Mount once inside the ToastProvider; renders nothing itself.
+ * Transient battlemap notifications ("Goblin took 6 damage") from the server's role-filtered
+ * `table:event` broadcast, shown through the shared toast surface; the combat log is the durable
+ * record. Mount once inside the ToastProvider; renders nothing itself.
  */
 const TONE_FOR_KIND: Record<TableEvent["kind"], ToastTone> = {
   damage: "error",

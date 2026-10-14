@@ -11,9 +11,7 @@ import {
   type FeatureItem, type ReviewSection, type StepItem
 } from "@vtt/ui";
 import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
-/* The SAME spell card the fight uses (`encounter/spells.tsx`) — header, the four reference lines,
-   the full description and the upcast note, in a `Modal`. Reused rather than re-specified: a spell's
-   rules must not read one way while choosing it and another way while casting it. */
+// The fight's own spell card, so a spell reads the same while choosing it and while casting it.
 import { SpellCard } from "../encounter/spells";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -27,39 +25,29 @@ import { clearDraft, describeWhen, draftHasProgress, loadDraft, saveDraft, type 
 import "./character-builder.css";
 
 /**
- * The guided character-creation wizard - the first path by which a character can be made in the UI.
+ * The guided character-creation wizard: a full page on a laptop, a full-screen sheet on a phone.
  *
- * It is a FULL PAGE (builder decision 4): `WizardShell` owns the viewport on a laptop and becomes a
- * full-screen sheet on a phone. Deliberately not a modal - a seven-step flow inside a floating card
- * is a card you scroll inside a page you also scroll.
- *
- * What it does and does not decide: the wizard renders the picks the CONTENT asks for (resolving
- * every `fromCatalog` slug through `resolveCatalogChoice`, the same function the server validates
- * with), collects them, and submits ONE `character.create`. It computes no game outcome - hit
- * points, AC, slots, and every rider are assembled server-side from the choices, and a rejection
- * comes back as the server's own message, shown inline on the review step.
+ * It renders the picks the content asks for (resolving `fromCatalog` slugs with
+ * `resolveCatalogChoice`, the same function the server validates with) and submits one
+ * `character.create`. It computes no game outcome: HP, AC, slots and riders are assembled
+ * server-side, and a rejection comes back as the server's message on the review step.
  */
 
 type BuilderState = GmView | PlayerView;
 
 export type CharacterBuilderProps = Readonly<{
   state: BuilderState;
-  /** Scopes the saved draft. Phase 3 swaps localStorage for `GameState.characterDrafts[]`. */
+  /** Scopes the draft saved in localStorage. */
   sessionKey: string;
-  /** The table connection. A create is a command, so an offline table blocks the LAST step with a
-      reason - the mechanism the wizard already uses for "not finished yet" - rather than letting
+  /** The table connection. An offline table blocks the last step with a reason instead of letting
       Create be pressed into a socket that cannot answer. */
   connection?: "online" | "reconnecting" | "offline";
   onClose: () => void;
   onCreated: (name: string) => void;
   /**
-   * LEVEL / RESPEC mode (D13). The same wizard, aimed at a character that already exists: seeded from
-   * that character's own choice ledger, its identity locked (a level-up is not a chance to become a
-   * different person), and submitted as `character.rebuild` instead of `character.create`.
-   *
-   * Reusing the wizard rather than writing a second one is the point: the offers, the cap preview, the
-   * server-thrown dice and every blocked reason are the create flow's, so a level-up cannot drift from
-   * a build. Only the destination command and the title differ.
+   * Level-up / respec mode: the same wizard seeded from an existing character's choice ledger, with
+   * its identity locked, submitted as `character.rebuild` instead of `character.create`. Sharing the
+   * wizard keeps a level-up from drifting from a fresh build.
    */
   rebuild?: Readonly<{ actorId: string; name: string; seed: BuilderDraft; startStep?: StepId; notice?: ReactNode }>;
 }>;
@@ -68,19 +56,8 @@ export type CharacterBuilderProps = Readonly<{
 const CREATE_ACK_TIMEOUT_MS = 10_000;
 
 /**
- * How many options an offer has to carry before its grid earns a search box.
- *
- * This number used to do a second job — it also decided which answered offers folded away to chips
- * — and that second job was the reported defect, twice. Filed as `1` ("exhausted option lists hide
- * their unselected options"), it was first fixed only BELOW this line, so an Elf's three Keen Senses
- * skills stayed while a Wizard's 203 prepared spells still vanished the moment the 25th was picked.
- * The rule the client actually asked for has no threshold in it: whenever a player is choosing
- * several options, reaching the maximum greys the unchosen ones — it never hides them.
- *
- * So the fold is gone and the page height it was buying is bought by `ChoiceGrid bounded` instead:
- * the grid caps its own height and scrolls internally, which costs a scroll rather than the one
- * thing a player needs to see. Searching survives as the only job this constant has left, and it is
- * what makes the capped region navigable at 203 cards.
+ * How many options an offer needs before its grid gets a search box. Answered offers never fold
+ * away: at capacity the unchosen options grey out, and `ChoiceGrid bounded` caps the grid's height.
  */
 const SEARCH_THRESHOLD = 8;
 
@@ -93,19 +70,13 @@ const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
 
 const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 /**
- * Mark the EXCEPTION, not the rule. Every option the wizard ships today is SRD, so an "SRD" badge on
- * 16 of 16 species distinguished nothing while costing ~46px of a 293px card's title row — the badge
- * is `flex: none`, so that width came straight out of `.nh-choice-title`. Homebrew is the fact worth
- * a badge, because it is the one that is not always true. `ChoiceCard` guards `badge != null`, so
- * `undefined` collapses the slot rather than reserving an empty one.
+ * Badge only the exception: nearly every option is SRD, so only homebrew gets a badge. `ChoiceCard`
+ * collapses the slot when the badge is `undefined`.
  */
 const sourceBadge = (source: string | undefined) => source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : undefined;
 /**
- * One row per distinct trait NAME. Content lists a species' per-lineage variants as separate
- * features, so Dragonborn's ten ancestries printed 25 rows for 15 titles — "Breath Weapon (Fire)"
- * five times, byte-identical each time. Keeping the first is lossless (the repeats say the same
- * thing) and it is the de-dupe, not the `limit`, that decides what is dropped: the slice used to
- * spend its budget on copies.
+ * One row per distinct trait name. Content lists per-lineage variants as separate features
+ * (Dragonborn's "Breath Weapon (Fire)" etc.), and the repeats say the same thing.
  */
 const featureItems = (features: readonly ContentFeatureSummary[], limit = 40): FeatureItem[] => {
   const seen = new Set<string>();
@@ -118,10 +89,10 @@ const featureItems = (features: readonly ContentFeatureSummary[], limit = 40): F
   }));
 };
 
-/** Sentence-case a stored provenance phrase for a card's disabled reason. */
+/** Sentence-cases a stored provenance phrase for a card's disabled reason. */
 const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
 
-/** A feat's one-line summary, for the grids whose options ARE feats. All 19 SRD feats carry one. */
+/** A feat's one-line summary, for grids whose options are feats. */
 const featSummary = (catalogs: BuilderCatalogs, id: string) =>
   catalogs.choice.feats.find((entry) => entry.id === id)?.summary ?? undefined;
 
@@ -130,23 +101,12 @@ const spellLevelLine = (level: number | null | undefined) =>
   level == null ? undefined : level === 0 ? "Cantrip" : `Level ${level}`;
 
 /**
- * Provenance for an OFFER option, by id.
+ * Provenance for an offer option, by id. `resolveCatalogChoice` narrows options to
+ * `{ id, name, level? }`, so `source` is looked back up in the catalog the id came from.
  *
- * The three primary grids read `entry.source` straight off their catalog row. An offer's
- * options cannot: `resolveCatalogChoice` narrows every catalog row to
- * `CatalogChoiceOption` — `{ id, name, level? }` — so `source` is not merely unrendered
- * there, it is structurally absent. Widening that type is a change to the shared
- * client/server resolver contract in `packages/domain`, so instead the id is looked back
- * up in the catalog it came from, which is already loaded and already carries the field.
- *
- * Subclasses and feats only: those are the two offer families whose wire summaries carry
- * `source` at all. Spells, equipment and creatures do not (see `ContentSpellSummary`,
- * `ContentEquipmentSummary`, `ContentMonsterSummary`) — so a homebrew spell is still
- * unbadged, and inventing a badge from a guess would be worse than the gap.
- *
- * Nothing here reveals anything a player may not see: these catalogs are audience-merged
- * server-side, so an unpublished or GM-only record is not in them to be badged. The badge
- * says one word, `Homebrew`, and never says anything about visibility.
+ * Subclasses and feats only: spell, equipment and monster summaries carry no `source`, so a
+ * homebrew spell is still unbadged. These catalogs are audience-merged server-side, so nothing a
+ * player may not see can be badged.
  */
 const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined =>
   catalogs.choice.subclasses.find((entry) => entry.id === id)?.source
@@ -154,25 +114,19 @@ const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined 
 
 /**
  * One pick offered by the content: heading, count, and the grid that answers it.
- *
- * THE GRID NEVER LEAVES. An answered offer used to fold down to chips, which is how the wizard kept
- * a level-20 Wizard's fourth step from being twenty-four thousand pixels of declined options — and
- * it is also exactly the defect filed as `1`: at capacity the player could no longer see what they
- * had not chosen. The height is bought by the grid capping ITSELF now (`ChoiceGrid bounded`), so
- * every option stays mounted at every list length, greys when the offer is full, and a chosen card
- * stays tappable so the pick can be swapped. One rule, no threshold, every offer kind.
+ * The grid never folds away: every option stays mounted, unchosen ones grey at capacity, and a
+ * chosen card stays tappable so the pick can be swapped. `ChoiceGrid bounded` caps the height.
  */
 function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
   onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
 }>) {
   const picks = draft.picks[offer.key] ?? [];
-  /** Long enough to earn a search box. See `SEARCH_THRESHOLD`. */
+  /** See `SEARCH_THRESHOLD`. */
   const long = offer.options.length > SEARCH_THRESHOLD;
   /**
-   * The spell whose rules are open, or null. Client-side and free: `catalogs.choice.spells` is the
-   * same catalog the offer's options were resolved from, already loaded, so reading one costs no
-   * round trip and the server learns nothing about what is being read.
+   * The spell whose rules are open, or null. Read from the already-loaded spell catalog, so it costs
+   * no round trip and tells the server nothing.
    */
   const [reading, setReading] = useState<ContentSpellSummary | null>(null);
   const spells = SPELL_KINDS.has(offer.kind) ? catalogs.choice.spells : null;
@@ -188,27 +142,14 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   const isFeat = FEAT_KINDS.has(offer.kind);
   const options: ChoiceOption[] = offer.options.map((option) => ({
     value: option.id,
-    // The option's NAME is the title, for every kind. Equipment used to be titled "Option A" with the
-    // kit demoted to the description, which made the card's headline the one word carrying no
-    // information and pushed the contents into a 3-line clamp that cut "…and 8 GP" — the number you
-    // would compare against the other option's "50 GP". The review step already lists the real name
-    // (`pickedNames`), so this is also the two agreeing about what was chosen.
+    // The option's name is the title for every kind (equipment included), matching the review step.
     title: option.name,
-    // Every feat in the catalog carries a summary; showing it turns a grid of bare names
-    // ("Alert", "Savage Attacker") into a choice that can actually be made from the card.
-    //
-    // A spell's TYPE LINE — "Cantrip", "Level 3" — rides the same slot rather than `meta`, and that
-    // is the typography fix, not a rename. `meta` is the card's mono micro-label (`.tabular`,
-    // --fs-xs, Space Mono): right for the numbers it was built for — a hit die, "+2 STR" — and
-    // wrong for a word, which came out as 11px Space Mono under a 15px Manrope name, two sizes and
-    // two faces apart on a card carrying two labels. `description` is --fs-sm in the body face, one
-    // rung under the title: the same "name over a smaller grey line" the client asked for, in
-    // tokens the scale already has. Nothing else on an offer card ever set `meta`.
+    // Feats show their summary. A spell's type line ("Cantrip", "Level 3") also goes in `description`,
+    // not `meta`, which is the mono micro-label meant for numbers.
     description: isFeat ? featSummary(catalogs, option.id) : spellLevelLine(option.level),
     badge: sourceBadge(offerSource(catalogs, option.id)),
-    // A proficiency this build already holds stays IN the list and greys out, saying where it
-    // came from. Picked from a different source it would be merged away server-side, costing the
-    // player the pick and leaving them one proficiency short with nothing said.
+    // A proficiency the build already holds stays listed but disabled, saying where it came from;
+    // picked from another source it would be merged away server-side, silently costing a pick.
     ...(offer.unavailable?.[option.id]
       ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
       : {}),
@@ -218,19 +159,14 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   return <section className="cb-offer">
     <div className="cb-offer-head">
       <h3 className="cb-offer-title">{offer.label}</h3>
-      {/* NUMBERS ONLY. A choose-N offer has a running count nothing else on screen carries, so it is
-          said here. A choose-ONE offer had "Chosen" / "Choose one" in the same slot, and both were
-          already on screen twice over: "Chosen" restates the check disc and the cyan edge on the card
-          itself, and "Choose one" restates the radiogroup the cards ARE and the footer sentence that
-          names this very offer. The slot is a readout, not a seventh vocabulary. */}
+      {/* Only choose-N offers show a running count; for choose-one the selected card says it all. */}
       {many && <span className="cb-offer-count tabular" role="status">{picks.length} of {offer.capacity} chosen</span>}
     </div>
     {offer.help && <p className="cb-offer-help">{offer.help}</p>}
     <ChoiceGrid
       ariaLabel={offer.label}
       options={options}
-      /* THE HEIGHT FIX, and the reason nothing here unmounts. A capped, internally scrolling grid
-         keeps a twelve-offer step readable without taking a single option off the screen. */
+      /* Capped height with internal scroll, so a long step stays readable without unmounting options. */
       bounded
       searchable={long}
       searchPlaceholder="Search options…"
@@ -238,15 +174,11 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
       value={many ? null : picks[0] ?? null}
       onChange={(value) => onSet(offer, [value])}
       values={many ? picks : undefined}
-      /* `max` is what greys the unchosen cards at capacity, in `ChoiceGrid` — every kind, every
-         length, no threshold. It is set for every choose-N offer there is: skills, spells,
-         cantrips, feats, equipment, languages, tools, expertise. A choose-ONE offer is a
-         radiogroup and passes none: greying the alternatives there would leave a keyboard player
-         locked into their first answer with nowhere to arrow to. */
+      /* `max` greys the unchosen cards at capacity for every choose-N offer. A choose-one offer is a
+         radiogroup and passes none, so a keyboard user can still arrow between answers. */
       max={many ? offer.capacity : undefined}
       onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
-      /* Choosing six spells out of 203 names is not a choice; it is a lottery. The rules open
-         beside the list, in a modal, and answer nothing — `onInspect` never touches `picks`. */
+      /* Opens a spell's rules in a modal; `onInspect` never changes `picks`. */
       onInspect={spells ? (id) => setReading(spells.find((spell) => spell.id === id) ?? null) : undefined}
       inspectLabel={(option) => `Read the ${option.title} rules`}
     />
@@ -255,16 +187,14 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
 }
 
 /**
- * An Ability Score Improvement level: raise two points, or take a feat. Both routes write ONE
+ * An Ability Score Improvement level: raise two points, or take a feat. Both routes write one
  * `asi-or-feat` ledger row. The catalog's own "Ability Score Improvement" feat is filtered out of
- * the feat list on purpose - it is the same idea as the ability route, and the system shows one
- * idea one way. (The server accepts either; the wizard offers the simpler one.)
+ * the feat list since the ability route covers it (the server accepts either).
  */
 function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Readonly<{
   offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
-  /** This build's scores as they stand just BEFORE this improvement, or null while the ability step
-      has none yet. With it the row shows what each ability would reach and refuses the ones with no
-      room, so the 20 ceiling is met at the point of choice rather than at Create. */
+  /** This build's scores just before this improvement, or null while the ability step has none.
+      Lets each row show the result and refuse abilities with no room under the 20 cap. */
   capBefore: Readonly<Record<Ability, number>> | null;
   onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
   onIncreases: (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) => void;
@@ -280,23 +210,18 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
     }));
 
   /**
-   * Which shape of increase is being made. Derived from the draft when it holds an answer (an
-   * amount-1 entry can only come from the +1/+1 split), and only otherwise from the local pick.
-   *
-   * The split is a QUESTION, not an answer: choosing "Raise ability scores" used to write
-   * `+2 Strength` into the draft on the player's behalf, which is wrong for most classes and
-   * illegal at level 20 (five unasked-for +2s put Strength at 27). So the route is recorded, the
-   * abilities stay empty until chosen, and the step's own gate refuses to move on - `offerFilled`
-   * already requires the split to add to 2.
+   * Which shape of increase is being made: derived from the draft when it holds an answer (an
+   * amount-1 entry only comes from the +1/+1 split), otherwise from the local pick. Choosing the
+   * route writes no abilities; the step stays blocked until the split adds to 2 (`offerFilled`).
    */
   const [pickedSplit, setPickedSplit] = useState<"one" | "two" | null>(null);
   const split = increases.length > 0 ? (increases.some((entry) => entry.amount === 1) ? "two" : "one") : pickedSplit;
   const amount = split === "two" ? 1 : 2;
   const slotCount = split === "two" ? 2 : split === "one" ? 1 : 0;
-  /** The ability shown in each row. `""` is "not answered yet", which the draft cannot represent. */
+  /** The ability shown in each row; `""` is "not answered yet", which the draft cannot represent. */
   const slots: readonly string[] = Array.from({ length: slotCount }, (_, index) => increases[index]?.ability ?? "");
 
-  /** What raising `ability` by this row's amount would make it - null while there is nothing to cap. */
+  /** What raising `ability` by this row's amount would make it; null while there is nothing to cap. */
   const projected = (index: number, ability: Ability): number | null => {
     if (!capBefore) return null;
     const elsewhere = slots.reduce((total, entry, position) => position !== index && entry === ability ? total + amount : total, 0);
@@ -305,8 +230,7 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
 
   const changeSplit = (next: string) => {
     setPickedSplit(next as "one" | "two");
-    // Changing the split changes the question, so the old answer cannot simply carry: a +2 is not
-    // a +1. The first ability is kept when it still fits, and nothing is invented for the rest.
+    // A +2 answer cannot carry over as a +1: keep the first ability if it still fits, invent nothing else.
     const first = increases[0]?.ability;
     const keeps = first && (capBefore?.[first] ?? 0) + (next === "two" ? 1 : 2) <= ABILITY_SCORE_CAP;
     onIncreases(offer, keeps ? [{ ability: first, amount: next === "two" ? 1 : 2 }] : []);
@@ -345,8 +269,8 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
             {ABILITIES.map((ability) => {
               const total = projected(index, ability);
               const noRoom = total != null && total > ABILITY_SCORE_CAP;
-              // The current pick stays selectable even when it no longer fits, or the control would
-              // show an answer it refuses to let go of; the step's blocked reason says the rest.
+              // The current pick stays selectable even when it no longer fits, so the control can let go of it;
+              // the step's blocked reason explains the rest.
               return <option key={ability} value={ability} disabled={noRoom && ability !== chosen}>
                 {ABILITY_LABELS[ability]}{total == null ? "" : ` — ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
               </option>;
@@ -358,8 +282,7 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
     {route !== "asi" && <ChoiceGrid
       ariaLabel={`Level ${offer.level} feat`}
       options={featOptions}
-      /* Bounded for the same reason every other offer's grid is: five ASI levels on a level-20
-         build is five feat lists, and a step is not five lists long. */
+      /* Bounded like every other offer grid: a level-20 build can have five feat lists. */
       bounded
       searchable={featOptions.length > SEARCH_THRESHOLD}
       searchPlaceholder="Search feats…"
@@ -376,21 +299,16 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   const [draft, setDraft] = useState<BuilderDraft>(() => rebuild?.seed ?? emptyDraft());
   const [stepIndex, setStepIndex] = useState(0);
   /**
-   * The furthest step the player has actually REACHED. Position alone cannot tell a rail whether a
-   * step is finished: `stepBlockedReason("equipment", …)` is legitimately null before a class has
-   * been chosen (a build with no equipment offers owes no equipment pick), so a rail that checked
-   * off every step whose reason was null would show Equipment done on a blank wizard. Gating every
-   * ✓ and every jump on "have you been here" is what makes the rail true.
+   * The furthest step the player has reached. A null blocked reason alone does not mean done (e.g.
+   * equipment has no reason before a class is chosen), so ticks and jumps are gated on this.
    */
   const [furthest, setFurthest] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  /** The one thing that went wrong with a submit, said in the wizard's own words. A rejection and a
-      silent server are different messages but the SAME surface - one alert, in one place, found. */
+  /** The single submit-error surface, for both rejections and a silent server. */
   const [rejection, setRejection] = useState<{ title: string; text: string } | null>(null);
   const [resumable, setResumable] = useState<StoredDraft | null>(() => {
-    // A rebuild is not a draft: it starts from a character that already exists, so a half-built
-    // create draft must not be offered here (resuming it would silently retarget the rebuild).
+    // A rebuild starts from an existing character, so a parked create draft is never offered here.
     if (rebuild) return null;
     const stored = loadDraft(sessionKey);
     return stored && draftHasProgress(stored.draft) ? stored : null;
@@ -406,21 +324,13 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   const offers = useMemo(() => computeOffers(draft, catalogs), [draft, catalogs]);
   const context = useMemo(() => offerContext(draft, catalogs), [draft, catalogs]);
   const abilityCap = useMemo(() => abilityCapPreview(draft, catalogs, offers), [draft, catalogs, offers]);
-  // How full the table already is. GM-only by construction: `PlayerView` carries no sheet library,
-  // and its actor list is projected (hidden combatants stripped), so it could only under-count.
+  // GM-only: `PlayerView` has no sheet library, and its projected actor list could only under-count.
   const capacity = useMemo(() => "definitions" in state ? rosterCapacity(state.definitions.length, state.actors.length) : null, [state]);
 
   /**
-   * Keep the draft honest as the build changes shape: a Fighter's skills are not a Wizard's.
-   *
-   * `draft.picks` IS a dependency, and not an optional one. `prunePicks` also mirrors the chosen
-   * subclass onto `draft.subclassId`, and that id is what `computeOffers` reads to offer the
-   * subclass's OWN choices — so a pick is what makes the next question appear (choosing Evocation
-   * is what asks for its two Evocation Savant spells). While `catalogs` was rebuilt every render
-   * this effect ran constantly and happened to catch that; memoising the catalogs (correctly) took
-   * the accident away, and the subclass's offers stopped appearing. The reconciler runs when the
-   * draft's PICKS change, which is when the set of offers can change — and no longer when the
-   * player types a name, assigns a score, or opens the detail pane.
+   * Keeps the draft consistent as the build changes shape (a Fighter's skills are not a Wizard's).
+   * `draft.picks` is a required dependency: `prunePicks` mirrors the chosen subclass onto
+   * `draft.subclassId`, which `computeOffers` reads to offer the subclass's own choices.
    */
   useEffect(() => {
     setDraft((current) => {
@@ -429,21 +339,15 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     });
   }, [draft.classId, draft.speciesId, draft.backgroundId, draft.level, draft.subclassId, draft.picks, catalogs]);
 
-  // Park the draft on every change so a reload (or Save & close) never costs the player their work -
-  // EXCEPT while an unanswered resume offer is on screen. Saving then would overwrite the very draft
-  // the banner is advertising: one click on a different species and the unfinished character it just
-  // promised is gone on the next reload. So the offer owns the store until it is ANSWERED, and only
-  // Resume / Discard / Save & close answer it. That is also why the banner stays put rather than
-  // auto-dismissing on the first pick: a pending question that would destroy work has to keep being
-  // asked, and its copy says exactly which two answers release the store.
+  // Park the draft on every change, except while an unanswered resume offer is on screen: saving then
+  // would overwrite the draft the banner offers. Only Resume, Discard or Save & close answer it.
   useEffect(() => {
     if (resumable || rebuild) return;
     if (draftHasProgress(draft)) saveDraft(sessionKey, draft);
   }, [draft, sessionKey, resumable, rebuild]);
 
-  // Server-thrown rolls come back through the roll HISTORY (dice.roll acks with an id, not a total),
-  // which is exactly what makes them auditable: the number the wizard uses is the number the table
-  // can see was rolled.
+  // Server-thrown rolls arrive through the roll history (dice.roll acks with an id, not a total), so
+  // the number the wizard uses is the one the table can see was rolled.
   const pendingRolls = useRef(new Map<string, (total: number) => void>());
   useEffect(() => {
     if (pendingRolls.current.size === 0) return;
@@ -456,15 +360,14 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
 
   const rollOnServer = (formula: string, label: string, apply: (total: number) => void) => {
     setRolling(true);
-    // GM-only: a character being rolled up is the GM's business in phase 2, and it still lands in
-    // the roll history, so the roll stays server-thrown and auditable rather than client-invented.
+    // GM-only visibility, but still server-thrown and recorded in the roll history.
     socket.emit("dice:roll", { commandId: newId(), formula, purpose: "manual", visibility: "gm-only", label }, (result) => {
       if (!result.ok || !result.rollId) { setRolling(false); setRejection({ title: "That roll was rejected", text: result.message ?? "The table refused the roll." }); return; }
       pendingRolls.current.set(result.rollId, apply);
     });
   };
 
-  /** Every edit the PLAYER makes goes through here; the pruning effect does not, being bookkeeping. */
+  /** Every player edit goes through here; the pruning effect does not. */
   const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => setDraft(update);
   const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
   const setPicks = (offer: BuilderOffer, ids: readonly string[]) =>
@@ -472,41 +375,32 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   const setIncreases = (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) =>
     editDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
 
-  /**
-   * Every step's reason, computed ONCE per draft. The rail, the review sections, and the footer all
-   * ask the same seven questions; recomputing them per consumer meant seven `computeOffers` walks on
-   * every keystroke and on purely visual state (opening the detail pane, rolling a die).
-   */
+  /** Every step's blocked reason, computed once per draft for the rail, review and footer. */
   const stepReasons = useMemo(
     () => STEP_IDS.map((id) => catalogs.loaded ? stepBlockedReason(id, draft, catalogs, offers, policy) : "Loading the content catalogs…"),
     [draft, catalogs, offers, policy]
   );
   const stepReason = stepReasons[stepIndex];
-  /** How far a RESUMED draft had got: the first step it does not satisfy, so everything behind it
-      reads as done and stays clickable, and nothing ahead of it is claimed. */
+  /** How far a resumed draft got: its first unsatisfied step. Earlier steps read as done. */
   const reachedIn = (resumed: BuilderDraft) => {
     const resumedOffers = computeOffers(resumed, catalogs);
     const first = STEP_IDS.findIndex((id) => stepBlockedReason(id, resumed, catalogs, resumedOffers, policy) !== null);
     return first === -1 ? STEP_IDS.length - 1 : first;
   };
-  /** `.cb-page` is the scroll container (the shell's header and footer are sticky inside it), so a
-      step change that does not reset ITS scrollTop leaves the next step opened halfway down. */
+  /** `.cb-page` is the scroll container, so a step change must reset its scrollTop. */
   const pageRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => { if (pageRef.current) pageRef.current.scrollTop = 0; }, [stepIndex]);
-  // A full table is the LAST thing that can stop a create, so it blocks only once the character
-  // itself is finished - and it blocks rather than letting Create come back as a rejection. An
-  // offline table is the same shape of answer: the create cannot land, so the step says so.
+  // A full or offline table blocks only once the character itself is finished.
   const reviewBlock = step !== "review" ? null
     : connection !== "online" ? "The table is offline — reconnecting…"
       : capacity?.blockedReason ?? null;
   const blockedReason = stepReason ?? reviewBlock;
   /**
-   * The rail's state machine, in one place:
+   * The rail's state machine:
    *   done(i)       ⟺  i <= furthest AND reasons[i] === null AND i !== current
    *   incomplete(i) ⟺  i <= furthest AND reasons[i] !== null AND i !== current
    *   clickable(i)  ⟺  i <= furthest AND i !== current      (via `maxSelectable`)
-   * Beyond `furthest` no state is declared, so `Steps` falls back to its own position rule and the
-   * step reads as upcoming. Forward jumps past the frontier stay locked, deliberately.
+   * Beyond `furthest` `Steps` falls back to its position rule, so those read as upcoming and stay locked.
    */
   const stepsForShell: StepItem[] = STEP_IDS.map((id, index) => ({
     label: STEP_LABELS[id],
@@ -515,10 +409,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   }));
 
   /**
-   * ONE commandId per attempt. It is also the created actor's id AND the server's idempotency key,
-   * so pressing Create again after a dropped ack must resend the SAME id - minting a fresh one made
-   * one intention into two characters. A rejected command burns no receipt (`game-store.ts` writes
-   * it only inside the successful transaction), so the id stays good for the retry.
+   * One commandId per attempt. It is also the created actor's id and the server's idempotency key,
+   * so a retry after a dropped ack must resend the same id. A rejected command burns no receipt, so
+   * the id stays good for the retry.
    */
   const attemptId = useRef<string | null>(null);
   const ackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -540,9 +433,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     catch (error) { setSubmitting(false); setRejection({ title: "The character is not complete yet", text: error instanceof Error ? error.message : "Something is still missing." }); return; }
     attemptId.current ??= newId();
     const commandId = attemptId.current;
-    // A lost ack would otherwise leave Create spinning for ever, which is the ONE state the reused
-    // commandId cannot help with - there is no way to press it again. So the wait is bounded and the
-    // way out says why resending is safe.
+    // Bound the wait so a lost ack cannot leave Create spinning forever.
     if (ackTimer.current !== null) clearTimeout(ackTimer.current);
     ackTimer.current = setTimeout(() => {
       ackTimer.current = null;
@@ -550,8 +441,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       setRejection({ title: "The table has not answered", text: "Press Create character again. It resends the same request, so it cannot make a second character." });
     }, CREATE_ACK_TIMEOUT_MS);
     if (rebuild) {
-      // The rebuild keeps the live character's NAME (the server ignores any other), so the wizard
-      // sends the payload minus it; `onCreated` still announces the character it changed.
+      // A rebuild keeps the live character's name (the server ignores any other), so it is not sent.
       const { name: _typed, ...rest } = payload;
       socket.emit("character:rebuild", { commandId, actorId: rebuild.actorId, ...rest }, (result) => {
         if (ackTimer.current !== null) { clearTimeout(ackTimer.current); ackTimer.current = null; }
@@ -569,10 +459,8 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     });
   };
 
-  // The ack carries the actor id and no name, and the server RENAMES a clash (a second "Borin"
-  // lands as "Borin 2"), so the name announced is READ BACK from the state the server broadcast -
-  // emitted before the ack, so this normally resolves on the first pass. The timer is the belt for
-  // a broadcast that has not landed: a created character is never left unannounced.
+  // The ack carries no name and the server renames clashes ("Borin 2"), so the name is read back from
+  // the broadcast state, which normally lands before the ack. The timer covers a late broadcast.
   useEffect(() => {
     if (!pendingCreate) return;
     const created = (state.actors as ReadonlyArray<{ id: string; name: string }>).find((actor) => actor.id === pendingCreate.actorId);
@@ -582,50 +470,37 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   }, [pendingCreate, state.actors]);
 
   /**
-   * A rejection has to be SEEN. The Create button is sticky at the foot of a long review step, so
-   * the message it produces lands most of a screen above the eye and focus stays on the button that
-   * looked like it did nothing. So the banner takes focus (announcing itself to a screen reader,
-   * since it is also `role="alert"`) and is scrolled to the middle of the viewport. One message in
-   * one place - found, rather than restated somewhere else as well.
+   * Focus the rejection banner and scroll it to mid-viewport: Create sits at the foot of a long
+   * step, so the message would otherwise land out of view.
    */
   const rejectionRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const node = rejectionRef.current;
     if (!rejection || !node) return;
-    // Only one of the two steps mounts the alert at a time, so the ref always points at the live one.
+    // Only one step mounts the alert at a time, so the ref always points at the live one.
     node.focus({ preventScroll: true });
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     node.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
   }, [rejection]);
 
-  // Leaving IS an answer to a pending resume offer: the player has decided this build is the one
-  // worth keeping, so it takes the slot rather than being thrown away in favour of the older draft.
-  // "Save & close" claims to have saved something, and then the wizard vanishes: the receipt is the
-  // only evidence the claim was true, and it says where the work went.
+  // Leaving answers a pending resume offer: this build takes the draft slot. The toast says where
+  // the work went.
   const saveAndClose = () => {
     const saved = draftHasProgress(draft);
     if (saved) saveDraft(sessionKey, draft);
     onClose();
     if (saved) toast("Draft saved — resume it from Create a character.", { tone: "success" });
   };
-  // Escape leaves the way the header button does. This is a full page, not a Modal, so nothing
-  // else owns the key - and because the draft is parked on every change, leaving costs nothing.
+  // Escape saves and closes like the header button; this is a full page, not a Modal.
   const saveAndCloseRef = useRef(saveAndClose);
   saveAndCloseRef.current = saveAndClose;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       /**
-       * ...unless something is layered OVER the page, and now something is: the spell-rules card a
-       * player reads while choosing spells is a `Modal`, i.e. a `<dialog>` in the top layer.
-       *
-       * The two mechanisms do not see each other. `showModal()` makes the rest of the document
-       * inert, but Escape reaches this window listener as a plain `keydown` and the dialog answers
-       * it separately, as a `cancel` event — so `defaultPrevented` above is false and one press
-       * dismissed the card AND left the wizard underneath it. Measured, not reasoned: the builder
-       * was gone from the DOM after the first Escape in the 2c browser check.
-       *
-       * The keydown fires before the dialog closes, so the open dialog is still here to be found.
+       * Unless a `<dialog>` (the spell-rules Modal) is open: Escape reaches this listener as a plain
+       * keydown while the dialog handles it separately as `cancel`, so one press would close both.
+       * The keydown fires before the dialog closes, so it can still be found here.
        */
       if (document.querySelector("dialog[open]")) return;
       saveAndCloseRef.current();
@@ -634,27 +509,23 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ---- Ability scores ------------------------------------------------------------------------
+  // Ability scores
   const base = baseScoresOf(draft);
   const bonuses = abilityBonusesOf(draft, catalogs, offers);
   const allowedMethods = policy.allowedAbilityMethods.filter((method) => method !== "custom" || policy.customFormula);
   const method = allowedMethods.includes(draft.abilityMethod) ? draft.abilityMethod : allowedMethods[0] ?? "standard-array";
   const rollFormula = method === "custom" ? policy.customFormula ?? ABILITY_ROLL_FORMULA : ABILITY_ROLL_FORMULA;
   const assignMode = isAssignMethod(method);
-  // What a typed score may be. The server bound-checks every manual score against exactly this
-  // (`character-build.ts` validateBaseScores), so a `4d6kh3` table must not let 22 be typed and
-  // then invalidate seven steps at Create - the hit-point row below already derives its own bounds
-  // from the hit die, and this is the same idea for the same reason.
+  // The server bound-checks manual scores against this formula (`validateBaseScores`), so the input
+  // must not accept a value that would be rejected at Create.
   const rollBounds = useMemo(() => {
     const check = validateAbilityFormula(rollFormula);
     return check.ok ? { min: check.minimum, max: check.maximum } : { min: ABILITY_SCORE_MINIMUM, max: ABILITY_SCORE_MAXIMUM };
   }, [rollFormula]);
 
   /**
-   * Switching method clears only what the NEW method OWNS. Clearing everything meant a player who
-   * looked at standard array for a moment came back to a wiped 27-point spread, with no warning and
-   * no undo - so point buy no longer touches the pool, and an assign method no longer touches the
-   * spend spread. Roll -> standard array still replaces the pool: that pool IS the standard array.
+   * Switching method clears only what the new method owns: point buy leaves the pool alone and the
+   * assign methods leave the point-buy spread alone. Roll -> standard array replaces the pool.
    */
   const setMethod = (next: string) => {
     const chosen = next as BuilderAbilityMethod;
@@ -668,11 +539,8 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         : {})
     });
   };
-  // A parked draft can come back under a policy that no longer allows its method. The allocator
-  // already FELL BACK for display, but the draft kept the disallowed method, so the controls showed
-  // a legal method selected while the footer said the GM does not allow it. Write the fallback down.
-  // Keyed on the joined list, not the array: `policy.allowedAbilityMethods.filter(...)` mints a new
-  // array every render, which as a dependency would run this on every render instead of on change.
+  // A parked draft can come back under a policy that no longer allows its method; write the
+  // fallback into the draft. Keyed on the joined list because the filtered array is new every render.
   const allowedKey = allowedMethods.join(",");
   useEffect(() => {
     if (allowedMethods.length > 0 && !allowedMethods.includes(draft.abilityMethod)) setMethod(allowedMethods[0]);
@@ -704,7 +572,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     };
   });
 
-  // ---- Name suggestions ----------------------------------------------------------------------
+  // Name suggestions
   const suggestions = useMemo(() => {
     const bundle = catalogs.names.find((entry) => entry.speciesId === draft.speciesId);
     if (!bundle) return [];
@@ -712,24 +580,19 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     const givens = bundle.pools.filter((pool) => !/-(family|clan)$/.test(pool.id)).flatMap((pool) => pool.names);
     if (givens.length === 0) return [];
     const draw = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)];
-    // Distinct: a small pool can draw the same name twice, and the list keys on the name itself -
-    // a repeat is both a duplicate-key warning and a suggestion that suggests nothing.
+    // Distinct: a small pool can repeat a name, and the list keys on the name.
     const batch = new Set<string>();
     for (let attempt = 0; attempt < 40 && batch.size < 5; attempt += 1) {
       batch.add(surnames.length > 0 ? `${draw(givens)} ${draw(surnames)}` : String(draw(givens)));
     }
     return [...batch];
-    // nameSeed re-draws the batch when the shuffle button is pressed.
+    // `nameSeed` re-draws the batch when the shuffle button is pressed.
   }, [catalogs.names, draft.speciesId, nameSeed]);
 
-  // ---- Step bodies ---------------------------------------------------------------------------
+  // Step bodies
   /**
-   * Species, Background, and Class are the three PRIMARY picks, and they were the only decisions in
-   * the wizard rendered as a bare grid: no heading at all. That made "Species" carry less typographic
-   * weight than "Keen Senses" — a sub-choice of the thing it decides — and it left the step's first
-   * element unlabelled. Same `.cb-offer` shell as every other decision, so a player who has answered
-   * one has answered all of them. A heading, and nothing else: these are choose-one, and choose-one
-   * needs no count (see `OfferPicker` — the two must stay in step).
+   * Species, Background and Class get the same `.cb-offer` shell and heading as every other decision.
+   * Choose-one, so no count (keep in step with `OfferPicker`).
    */
   const primaryPick = (label: string, grid: ReactNode): ReactNode =>
     <section className="cb-offer">
@@ -740,18 +603,8 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     </section>;
 
   /**
-   * The class features step's missing question, named.
-   *
-   * Every SRD class carries `subclassLevel: 3` and the draft starts at level 1, so below that level
-   * there is no subclass offer on the step AT ALL — and the detail pane still said "Pick a cleric
-   * subclass to read about it here", inviting a pick that nothing on screen could answer. (It is
-   * only ever an invitation that fails, never the pick itself: verified in a browser at level 3,
-   * where tapping Life Domain fills the pane with the subclass's description and its features.)
-   *
-   * So the fact goes in the step BODY rather than the pane. The pane is hidden below 761px
-   * (`WizardShell.css`'s master-detail rung) and its only door there is gated on real content, so a
-   * sentence left in it is a sentence a phone cannot read — and a one-line fact is not worth leaving
-   * the step to go and find.
+   * Below the class's subclass level there is no subclass offer, so the step body (not the detail
+   * pane, which is hidden on narrow screens) says when the subclass arrives.
    */
   const subclassPending = context.classRecord && draft.level < context.classRecord.subclassLevel
     ? { label: context.classRecord.subclassLabel?.toLowerCase() ?? "subclass", level: context.classRecord.subclassLevel }
@@ -763,18 +616,14 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     : <OfferPicker key={offer.key} offer={offer} draft={draft} catalogs={catalogs} onSet={setPicks} />;
 
   /**
-   * The species feat pick the background's granted origin feat took away. A feat is something you
-   * HAVE, so the granted one is dropped from the species' own feat list - and a pick already made
-   * there is then pruned, silently, one step after the player made it. Naming it at the moment of
-   * cause is what makes that legible: the background step is where the collision happens.
+   * The species feat pick that the background's origin feat displaced. The granted feat is dropped
+   * from the species list and a pick already made there is pruned, so it is named here.
    */
   const displacedSpeciesFeat = context.originFeat
     ? stepOffers("species").find((offer) => FEAT_KINDS.has(offer.kind) && !offerFilled(offer, draft))
     : undefined;
 
-  /* No `facet`: `ChoiceGrid` only reads it when the caller also passes `facets`, and none of these
-     three do — one source means a "Source" filter with one live value. It was dead weight on every
-     option in every catalog. Add it back with the facet row, if a second source ever ships. */
+  /* No `facet`: `ChoiceGrid` only reads it alongside `facets`, and there is one source. */
   const speciesOptions: ChoiceOption[] = catalogs.choice.species.map((entry) => ({
     value: entry.id, title: entry.name, description: entry.summary ?? undefined,
     badge: sourceBadge(entry.source), meta: `${entry.speedFeet} ft.${entry.darkvisionFeet ? ` · darkvision ${entry.darkvisionFeet} ft.` : ""}`,
@@ -793,9 +642,8 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     keywords: entry.primaryAbilities.join(" ")
   }));
 
-  /* ONE failure surface, rendered on the two steps that can produce one: a rejected server roll
-     belongs to the ability step, a rejected create to the review step. Rendering it only on review
-     (as this did) meant a refused roll set a message the player was never on the step to see. */
+  /* One failure surface, shown on the two steps that can produce one: a refused roll on the ability
+     step, a refused create on the review step. */
   const problemAlert = rejection ? <div ref={rejectionRef} tabIndex={-1} className="cb-rejection">
     <Alert tone="danger" title={rejection.title}>{rejection.text}</Alert>
   </div> : null;
@@ -828,14 +676,13 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
               searchable={classOptions.length > 8} searchPlaceholder="Search classes…" />)}
           <section className="cb-offer">
             <div className="cb-offer-head">
-              {/* No readout: the `Stepper` below IS the readout, and it is the control as well. */}
+              {/* The Stepper below is the readout. */}
               <h3 className="cb-offer-title">Level</h3>
             </div>
             <p className="cb-offer-help">{policy.maxLevel < 20
               ? `Your GM has set the party's level cap to ${policy.maxLevel}.`
               : "Your GM grants the level; every choice it opens is yours to make."}</p>
-            {/* D13: the cap IS the control's maximum, so it cannot be typed past — and when the cap is
-                20 the helper above says nothing about it (nothing unnecessary). */}
+            {/* The cap is the control's maximum, so it cannot be typed past. */}
             <Stepper value={Math.min(draft.level, policy.maxLevel)} min={1} max={policy.maxLevel} aria-label="Character level" onChange={(level) => patch({ level, hpEntries: draft.hpEntries.slice(0, Math.max(0, level - 1)) })} />
             {draft.level >= policy.maxLevel && <p className="cb-note">At the table&rsquo;s level cap ({policy.maxLevel}).</p>}
           </section>
@@ -853,9 +700,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         const options = context.background?.abilityOptions ?? null;
         return <>
           {problemAlert}
-          {/* What this class actually wants from the six numbers about to be assigned. Every field
-              is already loaded - `primaryAbilities` was being used only as a hidden search keyword
-              on the class grid, one step where the decision is no longer being made. */}
+          {/* What this class wants from the six scores about to be assigned. */}
           {context.classRecord && <p className="cb-note tabular">
             {context.classRecord.name} · {context.classRecord.hitDie} · {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join("/")}
             {context.classRecord.primaryAbilities.length > 0 && ` · primary ${context.classRecord.primaryAbilities.map((ability) => ability.toUpperCase()).join(", ")}`}
@@ -896,8 +741,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
 
           {options && <section className="cb-offer">
             <div className="cb-offer-head">
-              {/* No readout: the `SegmentedControl` below shows the spread as its pressed option, and
-                  the two Selects under it name the abilities. */}
+              {/* The SegmentedControl and the Selects below are the readout. */}
               <h3 className="cb-offer-title">{context.background?.name} ability increases</h3>
             </div>
             <SegmentedControl
@@ -927,13 +771,10 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
           <section className="cb-offer">
             <div className="cb-offer-head">
               <h3 className="cb-offer-title">Hit points</h3>
-              {/* KEPT: two numbers that decide the hit points about to be rolled, and the only place
-                  in the wizard where the hit die and the CON modifier are said together. */}
+              {/* The hit die and CON modifier that decide the hit points about to be rolled. */}
               <span className="cb-offer-count tabular" role="status">{hitDie} · CON {base.con == null ? "—" : abilityModifier(base.con + bonuses.con) >= 0 ? `+${abilityModifier(base.con + bonuses.con)}` : abilityModifier(base.con + bonuses.con)}</span>
             </div>
-            {/* Said to the PLAYER, about their character. The rule is the same one `character-build.ts`
-                applies ("max-of-both"); the wizard just does not tell a player at a table that there
-                is a server, or make them reason about which machine keeps which number. */}
+            {/* The same "max-of-both" rule `character-build.ts` applies, said in table terms. */}
             <p className="cb-offer-help">Level 1 is always the full die. From level 2 up, take the average or roll — a roll below the average is topped up to it, so rolling can only help. Rolled HP is remembered — leveling down and back up restores it.</p>
             <SegmentedControl
               ariaLabel="How to gain hit points"
@@ -977,7 +818,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
             onShuffle={suggestions.length > 0 ? () => setNameSeed((seed) => seed + 1) : undefined}
             help={context.species ? `Suggestions come from the ${context.species.name} name bundle.` : undefined}
           />
-          {/* Not finished is caution, never danger: the table still has room, it is just filling up. */}
+          {/* Caution, not danger: the table still has room. */}
           {capacity?.warning && <Alert tone="warning" title="The table is filling up">{capacity.warning}</Alert>}
           {problemAlert}
           <ReviewSummary sections={reviewSections()} />
@@ -990,19 +831,14 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   function pickedNames(offer: BuilderOffer): string {
     const picks = draft.picks[offer.key] ?? [];
     if (picks.length === 0) return "—";
-    // The FULL ability name, so the review says "+2 Strength" in the same words as the "Strength /
-    // 17" row three tiles above it. The three-letter form belongs to the dense `.tabular` strips and
-    // the allocator's own column, not to a value read as a phrase.
+    // The full ability name, matching the "Strength / 17" row above.
     return picks.map((id) => id === ASI_SHORTHAND
       ? (draft.asiIncreases[offer.key] ?? []).map((entry) => `+${entry.amount} ${ABILITY_LABELS[entry.ability]}`).join(", ")
       : offer.options.find((option) => option.id === id)?.name ?? titleize(id)).join(", ");
   }
 
   function sectionFor(id: StepId, owner: BuilderOffer["step"] | null, items: ReviewSection["items"]): ReviewSection {
-    // Stamp the level exactly where the footer does. A level 6+ Fighter answers several "Ability
-    // Score Improvement" decisions, so the bare label names all of them and identifies none - and
-    // the review saying "Ability Score Improvement" twice while the footer says "level 4" and
-    // "level 6" would leave the two surfaces disagreeing about what one decision is called.
+    // Stamp the level as the footer does: several ASI decisions would otherwise share one label.
     const siblings = owner ? stepOffers(owner) : [];
     const extra = siblings.map((offer) => ({
       label: siblings.filter((other) => other.label === offer.label).length > 1 ? `${offer.label} (level ${offer.level})` : offer.label,
@@ -1022,8 +858,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       const modifier = total == null ? null : abilityModifier(total);
       return {
         label: ABILITY_LABELS[ability],
-        // The score is what the player assigned; the MODIFIER is what they will roll with all
-        // evening, and it was the one number the review did not show.
+        // The modifier is what the player rolls with, so show it beside the score.
         value: total == null ? "—"
           : `${total}${bonuses[ability] ? ` (${base[ability]} +${bonuses[ability]})` : ""} · ${modifier! >= 0 ? "+" : ""}${modifier}`,
         numeric: true
@@ -1040,11 +875,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         { label: "Level", value: String(draft.level), numeric: true },
         { label: "Hit die", value: context.hitDie ?? "—", numeric: true }
       ]),
-      /* No explicit subclass item: the subclass IS a feature offer, so `sectionFor` already emits it
-         from `stepOffers("features")` — and `subclassLabel` is byte-identical to the granting
-         feature's name in all three SRD classes, so the two printed the same `Fighter Subclass /
-         Champion` tile twice. The offer extra is the one kept: it is generated uniformly for every
-         feature offer, where this was a hand-written special case for one of them. */
+      /* No separate subclass item: the subclass is a feature offer, so `sectionFor` already emits it. */
       sectionFor("features", "features", []),
       sectionFor("abilities", null, [
         ...scoreItems,
@@ -1072,8 +903,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       return <>
         <p>{context.classRecord.description ?? context.classRecord.summary}</p>
         <p className="tabular">Hit die {context.classRecord.hitDie} · saves {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join(", ")}</p>
-        {/* "—" for absent, matching the line above and every review row and allocator cell: one mark
-            for "there is nothing here", not a word in one place and a dash in the next. */}
+        {/* "—" for absent, matching every review row and allocator cell. */}
         <p className="tabular">Armor: {context.classRecord.armorProficiencies.join(", ") || "—"} · weapons: {context.classRecord.weaponProficiencies.join(", ") || "—"}</p>
         <FeatureList items={featureItems(context.classRecord.features.filter((feature) => (feature.level ?? 1) <= draft.level))} allowExpandAll ariaLabel={`${context.classRecord.name} features`} />
       </>;
@@ -1087,16 +917,13 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     return null;
   };
 
-  /** What the reserved column says while it has nothing to show. One line per step, in that step's
-      own words — it is a held place, not a state to be fixed. */
+  /** What the reserved detail column says while it has nothing to show. */
   const DETAIL_PLACEHOLDER: Partial<Record<StepId, string>> = {
     species: "Pick a species to read its traits here.",
     background: "Pick a background to read about it here.",
     class: "Pick a class to read about it here.",
-    /* The features pane holds a place for a subclass, so it only holds it when there IS one to pick.
-       Below the class's subclass level the step body says so instead (`subclassPending`), and the
-       step keeps the whole width — there is nothing on it that can ever fill the column, so
-       reserving one would cost every spell grid two of its five tracks to hold a sentence. */
+    /* Reserve the features pane only when a subclass can be picked; below the subclass level the step
+       body says so and keeps the full width. */
     ...(subclassPending ? {} : {
       features: context.classRecord?.subclassLabel
         ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
@@ -1105,15 +932,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   };
 
   /**
-   * The detail COLUMN is reserved for the whole of any step that can fill it, so choosing a species
-   * or a subclass no longer re-lays the entire grid out under the finger that just tapped it.
-   * `WizardShell` splits the body on `detail != null`, so passing null until something was picked
-   * meant one tap both mounted a 472-element pane AND reflowed every card from five columns to
-   * three. That cost lands hardest exactly where the grid is biggest.
-   *
-   * The trade is deliberate and must not be "fixed" back: these steps are three columns from
-   * arrival rather than five. Five columns for the two taps before a pick is not worth a
-   * 183-to-397-card reflow on the tap itself.
+   * The detail column is reserved for the whole of any step that can fill it, so a pick does not
+   * reflow the grid from five columns to three under the finger. Do not pass null until a pick: the
+   * reflow on large grids is the cost this avoids.
    */
   const realDetail = detail();
   const placeholder = DETAIL_PLACEHOLDER[step];
@@ -1121,9 +942,8 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   const isLast = stepIndex === STEP_IDS.length - 1;
   const goTo = (index: number) => { setStepIndex(index); setDetailOpen(false); };
   /**
-   * A blocked reason may name a control on ANOTHER step: the 20 ceiling is broken by an improvement
-   * chosen on Class features and only becomes visible once these scores exist. Saying which step
-   * owns the fix and not offering the way there is a message that describes a journey.
+   * A blocked reason may name a control on another step (an improvement chosen on Class features
+   * can break the 20 cap), so offer the way there.
    */
   const breachOffer = step === "abilities" && stepReason === abilityCap.breach?.reason ? abilityCap.breach.offerKey : null;
   const reasonNode: ReactNode = blockedReason == null ? undefined : breachOffer
@@ -1142,13 +962,11 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       eyebrow="Character builder"
       steps={stepsForShell}
       current={stepIndex}
-      /* Every step already reached stays reachable, finished or not - going back to change a
-         species must not cost the walk forward again. Steps PAST the frontier stay locked. */
+      /* Every reached step stays reachable, finished or not; steps past the frontier stay locked. */
       onStepSelect={(index) => { if (index <= furthest && index !== stepIndex) goTo(index); }}
       maxSelectable={furthest}
       onBack={stepIndex > 0 ? () => goTo(stepIndex - 1) : undefined}
-      /* Once the end has been reached, an edit made from the review step is a DETOUR, not a
-         restart: one tap returns, instead of six presses of Next. */
+      /* After reaching the end, an edit from review is a detour: one tap returns. */
       footerSecondary={furthest === STEP_IDS.length - 1 && stepIndex < furthest
         ? <Button variant="secondary" onClick={() => goTo(STEP_IDS.length - 1)}>Back to review</Button>
         : undefined}
@@ -1156,30 +974,25 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       nextLabel={isLast ? (rebuild ? `Apply level ${draft.level}` : "Create character") : "Next"}
       blockedReason={reasonNode}
       busy={submitting}
-      /* The ONE way out. The draft is parked on every change, so a second "leave without saving"
-         exit would both lie (it is already saved) and, at 375px, overhang the last card in the step
-         with its 44px tap area. Discarding lives where it belongs: "Discard it" on the resume
-         banner, next to the draft it throws away. */
+      /* The one way out: the draft is already parked, so no "leave without saving" exit. Discarding
+         lives on the resume banner. */
       onSaveAndClose={saveAndClose}
       resume={resumable
         ? <Alert tone="info" title="Unfinished character found">
-            {/* Named, so the offer is a choice rather than a gamble. The stored record carries the
-                identity fields and a timestamp - and NO step, so none is promised. */}
+            {/* The stored record has identity fields and a timestamp but no step, so none is promised. */}
             {resumedNames.length > 0 ? <>You started <strong>{resumedNames.join(" · ")}</strong> on this device {describeWhen(resumable.updatedAt)}.</>
               : <>You started a character on this device {describeWhen(resumable.updatedAt)}.</>}{" "}
             It stays exactly as you left it until you answer — resume it, or discard it to save the
             one you build now.{" "}
             <Button variant="secondary" size="sm" onClick={() => { setDraft(resumable.draft); setFurthest(reachedIn(resumable.draft)); setResumable(null); }}>Resume it</Button>
-            {/* Discarding is the one action here that destroys work, so it takes the destructive
-                treatment rather than reading as the twin of the button beside it. */}
+            {/* The one action here that destroys work. */}
             <Button variant="destructive" size="sm" onClick={() => { clearDraft(sessionKey); setResumable(null); attemptId.current = null; }}>Discard it</Button>
           </Alert>
         : undefined}
       detail={detailNode}
       detailTitle={step === "species" ? context.species?.name : step === "background" ? context.background?.name : step === "class" ? context.classRecord?.name : context.subclass?.name}
       detailOpen={detailOpen}
-      /* Gated on REAL content, never the placeholder: below 760px this is a button that leaves the
-         step, and it must not lead to a sentence saying there is nothing here yet. */
+      /* Real content only: below 760px this button leaves the step. */
       onOpenDetail={realDetail ? () => setDetailOpen(true) : undefined}
       detailOpenLabel="Show details"
       onCloseDetail={realDetail ? () => setDetailOpen(false) : undefined}

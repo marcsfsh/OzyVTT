@@ -5,10 +5,9 @@ import { socket } from "../socket";
 import { registerContentCache } from "../content/invalidate";
 
 /**
- * One shared fetch of the SRD equipment catalog (the framework the browse-and-add picker and the
- * future homebrew update build on), cached for the session so every sheet browses the same list.
- * Transient misses are not cached - a retry runs on the next open - mirroring the spell/condition
- * reference fetches. The attribution line rides along so any surface showing the gear can display it.
+ * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.
+ * Transient misses are not cached (retried on the next open). The attribution line is kept for
+ * any surface showing the gear.
  */
 let catalogCache: readonly ContentEquipmentSummary[] | null = null;
 let attributionCache: string | null = null;
@@ -29,15 +28,13 @@ function requestEquipmentReference(force = false) {
   });
 }
 
-// A homebrew item can be published mid-session, so this catalog is not fixed for the
-// session any more. Nothing happens for a cold cache. See `content/invalidate.ts`.
+// A homebrew item can be published mid-session; a cold cache does nothing (see `content/invalidate.ts`).
 registerContentCache(() => { if (catalogCache) requestEquipmentReference(true); });
 
 export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEquipmentSummary[]; attribution: string | null }> {
   const [catalog, setCatalog] = useState<readonly ContentEquipmentSummary[]>(catalogCache ?? []);
   useEffect(() => {
-    // Subscribe unconditionally: a consumer mounting with a warm cache still has to hear
-    // about the swap when a publish invalidates it.
+    // Subscribe even with a warm cache, so a later invalidation still reaches this consumer.
     if (catalogCache) setCatalog(catalogCache);
     listeners.add(setCatalog);
     requestEquipmentReference();
@@ -47,21 +44,11 @@ export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEqu
 }
 
 /**
- * THE CATALOG'S WEAPON BLOCK, NARROWED TO WHAT AN INVENTORY ROW MAY CARRY.
- *
- * These are two different shapes and the difference is load-bearing. The browse summary is the
- * catalog record's own block, so it carries `mastery`; `ItemWeaponSchema` (`@vtt/schemas`) is
- * `.strict()` and has no such key, because a mastery is gated on the bearer having UNLOCKED that
- * weapon and resolves against the catalog by item id rather than travelling on the row. Spreading
- * the summary's block wholesale therefore made `character.set-inventory` refuse every SRD weapon
- * with *"Unrecognized key(s) in object: 'mastery'"* - the browse-and-add picker could not add a
- * sword.
- *
- * `properties` goes the other way and must be carried: `weaponPropertiesOf` reads it off the
- * INVENTORY row, and it is what makes a Rapier swing off Dexterity and a Glaive threaten at 10 feet.
- *
- * Exported so `catalog-add.mirror.test.ts` can drive the real SRD catalog through it and the
- * server's own schema, which is the seam where those two shapes have to agree.
+ * The catalog's weapon block, narrowed to what an inventory row may carry. `ItemWeaponSchema` is
+ * `.strict()` and has no `mastery` (masteries resolve by item id once unlocked), so spreading the
+ * browse summary's block makes `character.set-inventory` refuse every SRD weapon. `properties` must
+ * be carried: `weaponPropertiesOf` reads it off the inventory row (Finesse, Reach).
+ * Exported for `catalog-add.mirror.test.ts`.
  */
 export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary["weapon"]>) {
   return {
@@ -74,13 +61,7 @@ export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary[
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const categoryLabel = (category: string) => category.split("-").map(titleCase).join(" ");
 
-/**
- * The filter groups the picker offers, each folding one or more catalog categories.
- *
- * The last three arrived with the SRD's 268 magic items. Without them `wondrous-item`, `ring`,
- * `wand`, `staff` and `rod` were reachable only from "All" - a 400-row list on a phone - because
- * every existing chip names a category the mundane bundle already had.
- */
+/** The picker's filter groups, each folding one or more catalog categories. */
 const FILTERS: ReadonlyArray<{ id: string; label: string; categories: readonly string[] }> = [
   { id: "all", label: "All", categories: [] },
   { id: "weapon", label: "Weapons", categories: ["weapon"] },
@@ -96,7 +77,7 @@ const FILTERS: ReadonlyArray<{ id: string; label: string; categories: readonly s
   { id: "implement", label: "Wands & Rods", categories: ["wand", "staff", "rod"] }
 ];
 
-/** "2 gp" / "1 sp" / "5 cp" - render the smallest whole coin so sub-gp costs read naturally. */
+/** "2 gp" / "1 sp" / "5 cp": the smallest whole coin, so sub-gp costs read naturally. */
 function formatCost(costGp: number | null): string | null {
   if (costGp === null || costGp === 0) return null;
   if (costGp >= 1) return `${costGp} gp`;
@@ -120,12 +101,9 @@ function metaLine(item: ContentEquipmentSummary): string {
 }
 
 /**
- * C9: the eligible-base list for a TEMPLATE magic item ("Weapon (Any Simple or Martial)"), shared by
- * the picker's chooser step and the sheet's bind-a-legacy-row prompt so the two can never drift.
- * Each row shows the base's own numbers - the pick is a real decision (a greatsword and a dagger are
- * different weapons) and the player should not need a rulebook open to make it. Bases the catalog
- * cannot resolve (a homebrew base since deleted) are omitted rather than offered: the server would
- * refuse the bind anyway, and offering a dead option is worse than a shorter list.
+ * The eligible-base list for a template magic item ("Weapon (Any Simple or Martial)"), shared by the
+ * picker's chooser step and the sheet's bind prompt. Each row shows the base's own numbers. Bases the
+ * catalog cannot resolve (e.g. a deleted homebrew base) are omitted; the server would refuse them.
  */
 export function BaseOptionList({ template, catalog, busy, query, onPick }: Readonly<{
   template: ContentEquipmentSummary;
@@ -151,7 +129,7 @@ export function BaseOptionList({ template, catalog, busy, query, onPick }: Reado
   </ul>;
 }
 
-/** The sheet's one-off chooser for a pre-C9 row that predates the pick: same list, its own modal. */
+/** The sheet's chooser for an older template row that has no base picked: same list, own modal. */
 export function BindItemModal({ template, busy, onPick, onClose }: Readonly<{
   template: ContentEquipmentSummary;
   busy: boolean;
@@ -170,15 +148,13 @@ export function BindItemModal({ template, busy, onPick, onClose }: Readonly<{
 }
 
 /**
- * Browse-and-add-from-catalog picker for the sheet's Inventory. Presentational: it surfaces the SRD
- * catalog (searchable, category-filtered) and calls `onAdd` with the chosen entry; the sheet owns the
- * mutation so it can increment an existing stack instead of replacing it. Owner + GM only (the sheet
- * gates it), and the Modal renders full-screen on mobile.
+ * Browse-and-add picker for the sheet's Inventory. Presentational: it calls `onAdd` with the chosen
+ * entry and the sheet owns the mutation (so it can grow an existing stack). Owner + GM only (the
+ * sheet gates it).
  *
- * C9: a TEMPLATE item with a real choice ("Weapon, +1 - Any Simple or Martial") inserts ONE step:
- * the same window swaps to the eligible-base list and the add completes with the pick. A single-base
- * template (Dwarven Thrower is always a warhammer) never asks - the server auto-binds - and a
- * re-add of an owned template increments the stack keeping its existing pick, chooser skipped.
+ * A template item with a real choice inserts one step: the same window lists the eligible bases and
+ * the add completes with the pick. A single-base template never asks (the server auto-binds), and
+ * re-adding an owned template grows the stack, keeping its pick.
  */
 export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<{
   ownedCounts: ReadonlyMap<string, number>;
@@ -202,9 +178,8 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
 
   const startAdd = (item: ContentEquipmentSummary) => {
     const owned = (ownedCounts.get(item.id) ?? 0) > 0;
-    // The chooser opens only when there is a real choice to make AND the row is new - an owned
-    // template already made its pick (rows are keyed by item id, so a second differently-based
-    // copy cannot exist anyway) and re-adding just grows the stack.
+    // Only for a real choice on a new row: an owned template already has its pick (rows are keyed by
+    // item id), and re-adding just grows the stack.
     if (!owned && item.appliesTo && item.appliesTo.baseIds.length > 1) {
       setQuery("");
       setChoosing(item);
@@ -237,21 +212,16 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
         {results.map((item) => {
           const owned = ownedCounts.get(item.id) ?? 0;
           return <li key={item.id}>
-            {/* The description's own first sentence is the SRD's printed type line, so a magic item
-                shows its rarity and attunement requirement here. It has to be this field: a magic
-                row carries no cost and no weight, so `metaLine` alone would read "Wondrous Item"
-                for all 127 of them. Clamped to one line - the entry itself runs to 2000 characters
-                and this is a 400-row list read mostly on a phone. */}
+            {/* The description's first sentence is the SRD type line, the only place a magic item's rarity
+                and attunement requirement appear (magic rows carry no cost or weight for `metaLine`).
+                Clamped to one line. */}
             <div className="sheet-picker-item">
               <span className="sheet-picker-name">{item.name}{owned > 0 && <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>×{owned}</span>}</span>
               <span className="sheet-picker-meta">{metaLine(item)}</span>
               {item.description && <span className="sheet-picker-desc">{item.description}</span>}
             </div>
-            {/* Route 2 (`.tap-target`): the button paints 45x27 and reaches the 44px floor through a
-                centred `::after`, so the row's rhythm does not change. `::before` is the material's
-                here, `::after` was free. It matters more than it looks: this control did nothing at
-                all until the browse-and-add payload was fixed, so its touch ergonomics had never
-                once been exercised - a 27px-tall target on the phone the sheet is mostly read on. */}
+            {/* `.tap-target` reaches the 44px floor through a centred `::after` (the material uses `::before`),
+                so the row's rhythm does not change. */}
             <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => startAdd(item)}>Add</button>
           </li>;
         })}

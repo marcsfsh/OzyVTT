@@ -14,20 +14,16 @@ const formatChallenge = (rating: number) => {
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 
 /**
- * The bestiary browser. It adds; it does not decide who sees what.
- *
- * It used to carry its own "Add as GM-only" checkbox — a visibility decision made inside a modal,
- * away from the list it applied to, and available on no other add path. The staging tray owns that
- * decision now (D2/D28) and passes it in, so every add — browser, Recent, party — obeys one control.
- * `joinEncounter` is the other half: mid-fight, the roster add and the fight join are ONE command,
- * closing the two-step trap where this button promised a reinforcement it did not deliver.
+ * The bestiary browser. It adds monsters; visibility comes from the staging tray (`visibility`),
+ * so every add path obeys one control. With `joinEncounter`, the roster add and joining the fight
+ * are one command.
  */
 export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEncounter = false }: Readonly<{
   onClose: () => void;
   onAdded?: (actorId: string) => void;
   /** The staging tray's current "New tokens" state. */
   visibility?: "public" | "gm-only";
-  /** True while a fight is running: the new monster lands in the roster AND in the turn order. */
+  /** True while a fight is running: the new monster joins the roster and the turn order. */
   joinEncounter?: boolean;
 }>) {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[] | null>(null);
@@ -36,20 +32,14 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState("");
   /**
-   * A SET, not one id. A single in-flight marker meant `disabled={busyId !== null}` greyed all 330
-   * Add buttons for one row's round trip, and a second click overwrote the first row's marker.
-   * Concurrency is what a GM staging four monsters wants, and it is safe: every
-   * `actor:add-from-definition` creates a new actor and carries its own `commandId`.
+   * In-flight rows, as a set so several adds can run at once. Safe: each `actor:add-from-definition`
+   * creates a new actor with its own `commandId`.
    */
   const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(() => new Set());
   /**
-   * What has landed during THIS dialog session. The confirmation line says which monster went in;
-   * this says which ROWS have, which is the half that stops a distracted GM adding the same monster
-   * three times before noticing the first one worked. It resets with the dialog, because the
-   * component unmounts when it closes.
-   *
-   * Deliberately not named `setMessage`/`setFeedback`: this is a per-row mark, not a second feedback
-   * channel, and the one-channel check collides with those two names on purpose.
+   * Rows added during this dialog session, so a GM does not add the same monster again before
+   * noticing the first worked. Resets when the dialog unmounts. Not named `setMessage`/`setFeedback`,
+   * which the one-feedback-channel check reserves.
    */
   const [addedIds, setAddedIds] = useState<ReadonlySet<string>>(() => new Set());
 

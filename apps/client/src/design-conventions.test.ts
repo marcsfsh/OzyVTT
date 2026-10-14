@@ -1,31 +1,19 @@
 /**
- * The design conventions of `docs/ai-context/design-language.md`, enforced as test failures
- * rather than as a page nobody re-reads before typing `<span>✕</span>`.
+ * Design conventions enforced as tests:
+ *   (a) primitives and play surfaces never render a glyph as text
+ *   (b) no raw `<input type="search">` / `type="number">` where a primitive exists
+ *   (c) one `.eyebrow`, and it lives in `packages/ui`
+ *   (d) no hand-typed colours outside `design-tokens.css`
+ *   (e) one feedback channel: `useToast`, not a per-component inline banner
+ *   (f) one breakpoint ladder
+ *   (g) no viewport-fraction caps on in-flow content in app CSS
+ *   (h) every scroll region in app CSS is declared with `.scroll-y`
  *
- * Eight rules, each mechanically detectable, each violated on the tree today:
- *   (a) primitives and play surfaces never render a glyph as text (design-language.md:41-45)
- *   (b) no raw `<input type="search">` / `type="number">` where a primitive exists (:36-40)
- *   (c) one `.eyebrow`, and it lives in `packages/ui` (:36-40, the "do not hand-roll" rule)
- *   (d) no hand-typed colours outside `design-tokens.css` (:46-47)
- *   (e) one feedback channel — `useToast`, not a per-component inline banner
- *   (f) one breakpoint ladder, not per-file taste (§3)
- *   (g) no viewport-fraction caps on in-flow content in app CSS (§7 rule 2)
- *   (h) every scroll region in app CSS is declared — `.scroll-y`, not a bare overflow (§7)
+ * Each check allowlists today's offenders and fails on a new one; a fixed offender fails too, as
+ * a dead row to delete. Allowlist sizes are pinned in `design-conventions-shape.ts`.
  *
- * **Every one of these already has offenders, so every check ships with an allowlist of the
- * CURRENT population and fails on a NEW one.** That is the only shape that can land before the
- * migration it guards: a check that fails on day one gets skipped, and a skipped check is a
- * check that is gone. The allowlists are ratchets, not amnesties —
- *   · a new violation fails, with the replacement named;
- *   · a FIXED violation fails too, as a dead allowlist row that must be deleted;
- *   · and every allowlist's size is pinned in `design-conventions-shape.ts`, so both edits are
- *     a two-file diff a reviewer sees. The numbers there may only go down.
- *
- * **What this file deliberately does not attempt.** It reads source text, so it proves what is
- * typed, never what renders: an icon imported and never used still passes (a), and
- * `color-mix()` over a var, an inline `style={{ color: … }}`, or a colour computed at runtime
- * are all invisible to (d). Those stay with review — `docs/ai-context/design-language.md` and
- * the `/styleguide` route are where a human checks the half a regex cannot.
+ * Source text only: an imported-but-unused icon passes (a), and `color-mix()` over vars, inline
+ * styles or runtime colours are invisible to (d). Those are left to review and `/styleguide`.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -48,47 +36,26 @@ import {
 
 assertRoots();
 
-/** `file:line  detail` — the one shape every failure below prints, so a failure is a jump target. */
+/** `file:line  detail`: the shape every failure prints, so it is a jump target. */
 const cite = (path: string, line: number, detail: string): string => `${path}:${line}  ${detail}`;
 
-// ───────────────────────────────── (a) text glyphs ─────────────────────────────────
+// (a) text glyphs
 
 /**
- * The banned class, built from the MEASURED population rather than trusted from a Unicode
- * property. `\p{Extended_Pictographic}` alone is not enough and it is not close: measured
- * 2026-08-03 over this tree, ⏻ ⇲ ✕ ▩ ▾ ▦ ✎ ✓ ← → and a dozen more of the real offenders are
- * `Extended_Pictographic = No`, so a property-only scan would have passed the entire map
- * toolbar. The five blocks below are where the offenders actually live:
+ * The banned glyphs. `\p{Extended_Pictographic}` alone misses most real offenders (⏻ ⇲ ✕ ▾ ✓ ←
+ * are not pictographic), so these blocks are added:
  *   U+2190-21FF arrows        ← ↑ → ↓ ↻ ⇲
  *   U+2300-23FF technical     ⏻ ⏮ ⏸ ⏭
  *   U+25A0-25FF geometric     ▢ ▦ ▩ ▴ ▹ ▶ ▾ ● ◀ ◧ ◨ ◭ ◯ ◼
  *   U+2600-27BF misc/dingbats ☀ ⚠ ⛌ ⛶ ✎ ✏ ✓ ✕ ✦
  *   U+2B00-2BFF arrows-B      ⬆ ⬇ ⭐
- *
- * Geometric Shapes is IN, deliberately. Carving it out would read as generous and would gut
- * the rule — most of the map toolbar is in that block. If D12's turn pips end up as a textual
- * "●", that is two allowlist rows with a reason, not a block-wide hole. (Drawn pips: no rows.)
- *
- * Typography and dice maths stay legal because they are outside these blocks, not because they
- * are excused: − is U+2212 Mathematical Operators, and so the Stepper's own −/+ glyphs are
- * fine; × · … – — ‘ ’ “ ” likewise.
+ * Typography and maths (− × · … – — and curly quotes) fall outside these blocks and stay legal.
  */
 const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/gu;
 
 /**
- * The measured population, as (file, glyphs) rows — one row per file, one character per
- * violation. Measured 2026-08-03 by this file's own scan: 23 files, 84 pairs. **19 files / 52
- * pairs** now: the map toolbar (D4) took `scene/EncounterMap.tsx` (28 — the largest row this list
- * ever had) and `scene/TokenContextMenu.tsx` with it, and the shell rebuild (D15/D30) took the two
- * roster rows' 🎭 and `main.tsx`'s `→` (the landing's arrows are `IconArrow` now). That is the
- * whole point of a ratchet.
- *
- * Every remaining row is a call site waiting on its icon. The icons exist
- * (`packages/ui/src/primitives/icons.tsx` — `IconArrow`, `IconSelect`, `IconPing`,
- * `IconMeasure`, `IconDraw`, `IconFog`, `IconColor`, `IconCleanup`, `IconScene`, `IconStar`,
- * `IconDownload`, `IconChevronLeft/Right`, …); the call sites have not moved yet. Four of the
- * rows are `packages/ui` itself, which is the sharper embarrassment: design-language.md:41
- * says "**Primitives** never render a glyph as text" and four primitives do.
+ * Today's offenders, one row per file, one character per violation. Each row is a call site
+ * waiting on its icon from `packages/ui/src/primitives/icons.tsx`.
  */
 const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/encounter/ActionRunner.tsx", "→↻▴▾⚠✕✦"],
@@ -102,7 +69,7 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
   ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🗑🗺"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],
-  // packages/ui — the four primitives that break their own rule.
+  // packages/ui: primitives that break their own rule.
   ["packages/ui/src/primitives/Button.tsx", "→"],
   ["packages/ui/src/primitives/Chip.tsx", "✕"],
   ["packages/ui/src/primitives/Menu.tsx", "▾"],
@@ -114,8 +81,7 @@ interface GlyphHit { path: string; line: number; glyph: string }
 function glyphHits(sources: readonly Source[]): GlyphHit[] {
   const hits: GlyphHit[] = [];
   for (const source of sources) {
-    // Comments first. Post-strip, a glyph can only be in a string literal or JSX text — emoji
-    // are not legal identifiers — so every surviving hit is something a person can see.
+    // Strip comments first; what survives is in a string literal or JSX text, so a person sees it.
     const src = stripComments(source.read());
     for (const match of src.matchAll(GLYPH)) hits.push({ path: source.path, line: lineOf(src, match.index), glyph: match[0] });
   }
@@ -176,46 +142,26 @@ describe("(a) a glyph is never text — design-language.md:41-45", () => {
   });
 });
 
-// ───────────────────────────── (b) raw form elements ─────────────────────────────
+// (b) raw form elements
 
 /**
- * A lowercase `<input` is by construction NOT the primitive — JSX components are capitalized,
- * so `<Input type="search">` (three legitimate sites) can never be confused with
- * `<input type="search">` (two hand-rolled ones).
- *
- * `[^>]*` between the tag name and the attribute is what makes this attribute-order- and
- * newline-tolerant: it cannot cross the `>` that closes the tag, so it stays inside one
- * element and still catches `<input className="…" type="number">` and the multi-line form.
- * A per-line grep misses both — measured 2026-08-03, the naive
- * `grep -rn '<input type="number"'` reports 8 where the real population is 10.
- *
- * `packages/ui` is out of scope here on purpose: a raw `<input>` inside `forms.tsx` is the
- * primitive's own implementation, which is the point of having one.
+ * A lowercase `<input` is never the primitive (components are capitalized). `[^>]*` keeps the match
+ * inside one element while tolerating attribute order and newlines, which a per-line grep misses.
+ * `packages/ui` is out of scope: a raw `<input>` there is the primitive's own implementation.
  */
 const rawInput = (type: string) => new RegExp(`<input\\b[^>]*type="${type}"`, "g");
 
-/**
- * Both hand-rolled search fields. `<Input type="search">` is the replacement and already ships
- * in three other places — so this is two files typing out what the tree next door imports.
- * The allowlist reaches 0 with them, which is a two-line change whenever someone picks it up.
- */
+/** Hand-rolled search fields; `<Input type="search">` is the replacement. */
 const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/equipment.tsx", 1]
 ];
 
 /**
- * Raw number inputs. `NumberField` exists, and the styleguide blurb spells out why native
- * `type="number"` is the wrong control (`StyleGuide.tsx`, the `#numberfield` section): a
- * spinner nobody uses at 375px, an empty value reported on a stray letter, and a wheel that
- * changes the number when it rolls over a focused field.
- *
- * Capital-`<Input type="number">` sites are the primitive and out of scope for this rule —
- * whether they should be `NumberField` is a convention question for review, not a raw-element
- * violation.
+ * Raw number inputs; `NumberField` is the replacement (see the styleguide's `#numberfield`
+ * section). Capitalized `<Input type="number">` is the primitive and out of scope here.
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/CharacterSheet.tsx", 3],
-  // 2, not 3, since the scene-prep rebuild: the setup list's per-combatant Initiative field is gone.
   ["apps/client/src/encounter/EncounterPanel.tsx", 2],
   ["apps/client/src/scene/TokenContextMenu.tsx", 1],
   // Two on one line (the X and Y of a calibration point) plus the focus-zoom field.
@@ -286,22 +232,13 @@ describeRawInput("number", "NumberField", RAW_NUMBER_ALLOW, {
   sites: CONVENTION_SHAPE.rawNumberSites
 });
 
-// ────────────────────────────── (c) the second eyebrow ──────────────────────────────
+// (c) the second eyebrow
 
 /**
- * `Eyebrow` is a primitive (`packages/ui/src/primitives/Wordmark.tsx`, class `nh-eyebrow`) and
- * the app declares a SECOND one in `apps/client/src/styles.css:18`. Twenty call sites use the
- * local class; none uses the primitive. That is one role rendered two ways, which is the exact
- * thing design-language.md:36-40 forbids.
- *
- * **The token, not `\beyebrow\b`.** Measured 2026-08-03: the word-boundary form reports 35
- * hits on this tree because `\b` matches at a hyphen, so it also sweeps in the DIFFERENT
- * classes `viewer-eyebrow` (x4, the public shared screen) and `viewer-tools-eyebrow` — the
- * latter retired 2026-08-05 when the shared-screen controls took `<Eyebrow>`. Those are the
- * viewer rebuild's convention problem, not this scan's, and a check that cannot tell them
- * apart is a check nobody will believe. Splitting a className value on non-class characters and comparing
- * for equality keeps `nh-eyebrow` and `viewer-eyebrow` out and cannot miss the composite
- * `className="codex-sidebar-grouplabel eyebrow"` (`codex/SidebarNav.tsx:48`).
+ * `Eyebrow` is a primitive (`packages/ui/src/primitives/Wordmark.tsx`, class `nh-eyebrow`), and
+ * `apps/client/src/styles.css` declares a second one. Matched as a class token, not `\beyebrow\b`
+ * (which matches at a hyphen and sweeps in `viewer-eyebrow`); the token split still catches a
+ * composite like `className="codex-sidebar-grouplabel eyebrow"`.
  */
 const CLASS_TOKEN = /[^A-Za-z0-9_-]+/;
 
@@ -354,8 +291,7 @@ describe("(c) one Eyebrow, and it is the primitive", () => {
   });
 
   it("does not let apps/client/src/styles.css grow another .eyebrow rule", () => {
-    // `(?<![\w-])` and `(?![\w-])` are what keep `.viewer-eyebrow` and `var(--tracking-eyebrow)`
-    // out: only a selector that IS `.eyebrow` counts, whether it declares the class or consumes it.
+    // The lookarounds keep `.viewer-eyebrow` and `var(--tracking-eyebrow)` out: only `.eyebrow` itself counts.
     const selectors = [...readFileSync(`${process.cwd()}/src/styles.css`, "utf8").matchAll(/(?<![\w-])\.eyebrow(?![\w-])/g)];
     expect(
       selectors.length,
@@ -365,24 +301,17 @@ describe("(c) one Eyebrow, and it is the primitive", () => {
   });
 });
 
-// ─────────────────────────── (d) hand-typed colours ───────────────────────────
+// (d) hand-typed colours
 
 /**
- * `#rrggbb`, the data-URI-encoded `%23rrggbb` (an SVG in a `url()` cannot reference a `var()`,
- * so `forms.css`'s Select chevron writes the hex out), and `rgb()`/`rgba()`/`hsl()`/`hsla()`
- * literals. `design-tokens.css` is exempt — it is the definition.
- *
- * Comments are stripped first, and that is load-bearing rather than tidy: `ChoiceCard.css:30`
- * explains a contrast ratio with two literal `rgb()`s, and without the strip an edit to a
- * COMMENT moves this check's numbers.
- *
- * Honest limits, stated so nobody reads more into a green run than is there: `color-mix()` and
- * `oklch()` over vars are fine and unscanned; an inline `style={{ background: "#f0f" }}` in
- * TSX is out of scope v1 (this scan reads `.css`). Both are extendable; neither is claimed.
+ * `#rrggbb`, data-URI `%23rrggbb` (an SVG in `url()` cannot use `var()`), and `rgb()`/`rgba()`/
+ * `hsl()`/`hsla()` literals. `design-tokens.css` is exempt as the definition. Comments are
+ * stripped first so editing a comment cannot move a count. Not scanned: `color-mix()`/`oklch()`
+ * over vars (fine) and inline TSX styles.
  */
 const COLOR = /#[0-9a-fA-F]{3,8}\b|%23[0-9a-fA-F]{3,6}|rgba?\(|hsla?\(/g;
 
-/** Per-file counts, each with the reason those literals are there. Measured 2026-08-03: 51 across 11 files. */
+/** Per-file counts, each with the reason those literals are there. */
 const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: string]> = [
   ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
   ["apps/client/src/codex/codex.css", 1, "graph node-icon fill over arbitrary map art"],
@@ -437,9 +366,7 @@ describe("(d) colours come from design-tokens.css — design-language.md:46-47",
 
   it("keeps the allowlist the size design-conventions-shape.ts says it is, and every row says why", () => {
     expect(COLOR_ALLOW.length, "COLOR_ALLOW file count").toBe(CONVENTION_SHAPE.colorAllowFiles);
-    // This is the one allowlist whose rows are argued rather than merely counted — "SVG paint over
-    // arbitrary map art" is a real defence and "" is not. An unreasoned row is a hole with a
-    // comment's clothes on, so the reason is asserted, not trusted.
+    // Rows here must carry a reason, and the reason is asserted.
     for (const [file, , why] of COLOR_ALLOW) {
       expect(why.trim().length, `COLOR_ALLOW row for ${file} has no reason attached.\nFix: say why these literals cannot be tokens, or take the row out and tokenize them.`).toBeGreaterThan(15);
     }
@@ -451,40 +378,23 @@ describe("(d) colours come from design-tokens.css — design-language.md:46-47",
   });
 });
 
-// ─────────────────────────── (e) one feedback channel ───────────────────────────
+// (e) one feedback channel
 
 /**
- * One feedback channel. `ToastProvider` + `useToast` is it; a component that keeps its own
- * `message` state renders a second, differently-styled, differently-placed notification for
- * the same class of event — and on a phone the inline one is usually off-screen.
- *
- * **Source-level, not string-level, and that is the whole reason it works.** The copy scanner
- * extracts string-literal arguments, and most of these sites pass an expression:
- * `setFeedback(result.ok ? "…" : result.message ?? "…")` (`scene/TokenContextMenu.tsx:82`,
- * `encounter/CharacterSheet.tsx:232`). A call-string extractor never sees one. Counting CALL
- * SITES sees all of them, and when the migration is done the assertion becomes zero — the
- * state is gone, not merely quiet.
- *
- * False positives are deliberate friction: a future local setter genuinely named `setMessage`
- * that is not user feedback collides with the retired idiom. Rename it. `setError`,
- * `setNotice` and `toast` stay legitimate — they ARE the toast channel's calls.
+ * `ToastProvider` + `useToast` is the one feedback channel; local `message` state renders a second
+ * notification, often off-screen on a phone. Counts call sites rather than string arguments, since
+ * most pass an expression. A non-feedback setter named `setMessage` will collide; rename it.
+ * `setError`, `setNotice` and `toast` are the toast channel's own calls.
  */
 const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 
-/**
- * Measured 2026-08-03: 122 call sites across 15 files, every one a surface awaiting its rebuild
- * onto `useToast`. **103 across 13** since the shell rebuild (D15): `actors/ActorRoster.tsx` (18)
- * is gone entirely and the Roster tab's one call became a toast.
- */
+/** Surfaces still awaiting their move to `useToast`. */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/dice/DicePanel.tsx", 7],
   ["apps/client/src/encounter/CharacterSheet.tsx", 8],
   ["apps/client/src/encounter/EncounterPanel.tsx", 17],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
-  // `maps/MapManager.tsx` (15) left this list on 2026-08-05: the C2 redesign collapsed three
-  // competing narration channels — two live `role="status"` regions and a third example line —
-  // into one per-step instruction, and routed errors to `useToast`. The state went with them.
   ["apps/client/src/scene/EncounterMap.tsx", 14],
   ["apps/client/src/scene/TokenContextMenu.tsx", 6],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
@@ -533,27 +443,18 @@ describe("(e) one feedback channel — useToast, not a second inline banner", ()
   });
 });
 
-// ─────────────────────────── (f) the breakpoint ladder ───────────────────────────
+// (f) the breakpoint ladder
 
 /**
- * `@media` declarations ONLY — deliberately narrower than the self-audit grep the doc ships
- * (design-language.md:139), which also catches *property* `max-width`s that are not
- * breakpoints at all: `codex/codex.css:827`'s 820px content clamp and a `min-width: 320px`
- * both disappear here, and neither ever belonged in an allowlist.
- *
- * Direction matters. `max-width: 850px` is off-ladder even though 850 is a rung, and
- * `maps/map-manager.css:95` shows why that is not pedantry: it is a `max-width: 850px` sitting
- * on top of three `min-width: 850px` queries, so at exactly 850px both sides fire.
+ * `@media` declarations only: property `max-width`s are not breakpoints. Direction matters:
+ * `max-width: 850px` would fire alongside `min-width: 850px` at exactly 850px.
  */
-// EMPTY, and it reached empty on 2026-08-05 (Phase C). Every client `@media` width is now a rung:
-// 480->560 and 700->760 widened to the nearest rung, 681/680 became the exact 651/650 complement,
-// and `maps/map-manager.css`'s `max-width: 850px` — the double-fire this docblock describes —
-// became 849. **Do not add a row.** An off-ladder query is now a failure, not a debt.
+// Empty: every client `@media` width is a rung. Do not add a row.
 const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", width: number]> = [];
 
 describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
-  // `ladderStylesheets()`, not `stylesheets()`: (d)'s design-tokens.css exemption is about
-  // COLOUR and does not transfer to breakpoints. See the helper's own note.
+  // `ladderStylesheets()`, not `stylesheets()`: the design-tokens.css colour exemption does not
+  // extend to breakpoints.
   const sources = ladderStylesheets();
   const conditions: { path: string; line: number; kind: string; width: number }[] = [];
   for (const source of sources) {
@@ -577,8 +478,7 @@ describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
   });
 
   it("declares no new off-ladder breakpoint", () => {
-    // Matched by (file, kind, width) with multiplicity, so a SECOND max-width:900 in
-    // homebrew.css fails while the first stays excused.
+    // Matched by (file, kind, width) with multiplicity, so a second identical query fails.
     const remaining = LADDER_ALLOW.map(([file, kind, width]) => `${file} ${kind} ${width}`);
     const offenders: string[] = [];
     for (const c of off) {
@@ -608,27 +508,18 @@ describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
   });
 });
 
-// ─────────────────────────── (g) viewport units in app CSS ───────────────────────────
+// (g) viewport units in app CSS
 
 /**
- * A viewport-fraction cap on in-flow content (`max-height: 64vh`, `min-height: 40vh`) is
- * the codebase's pre-standard substitute for a frame — design-language.md §7 rule 2
- * retires the idiom, and this check holds the line while the refresh drains it surface by
- * surface (the phase tag on each legacy row names the lane that owes the drain).
- *
- * STRUCTURAL ALLOWS, needing no rows: `100dvh`/`100svh` anywhere — the lock unit itself;
- * and `100vh` when the same line also carries a `dvh` value (the fallback-pair idiom, the
- * standalone sheet) or the declaring selector contains `:fullscreen` (the OS-fullscreen
- * map). Everything else — including a bare `100vh` — answers to a row: CONFORMING with a
- * reason (overlay caps, landing clamp() mid-terms), or LEGACY, which only shrinks.
- *
- * Scope is CLIENT CSS only (`appStylesheets()`): `packages/ui`'s dvh usages ARE the
- * blessed lock machinery, and permanent rows for them would be a floor the shape file's
- * down-only header cannot honor.
+ * A viewport-fraction cap on in-flow content (`max-height: 64vh`) stands in for a frame.
+ * Allowed without rows: `100dvh`/`100svh`, and `100vh` when the same line also carries a `dvh`
+ * value (fallback pair) or the selector contains `:fullscreen`. Anything else needs a row:
+ * conforming with a reason, or legacy (shrink-only). Client CSS only; `packages/ui`'s dvh uses
+ * are the lock machinery.
  */
 const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 
-/** Reasoned survivors — the (d) discipline: rows carry a why, growth must argue out loud. */
+/** Reasoned survivors: rows carry a why, and growth must be argued. */
 const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
   ["apps/client/src/encounter/encounter-panel.css", ["85vh", "52vh", "94vh", "92vh"],
     "overlay caps bounding fixed/modal layers (⋯-menu, sheet modal + its capped picker, monster browser) — §8 reference implementations"],
@@ -639,16 +530,10 @@ const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonl
 ];
 
 /**
- * The cap idiom's measured population, one row per occurrence, matched by (file, value)
- * WITH multiplicity — the LADDER_ALLOW consumption pattern — so a SECOND 62vh in
- * codex.css fails while the first four stay excused. The phase column names the refresh
- * lane that drains the row (A = shell/trivials, B = recomposes, C = redesigns).
+ * Legacy cap occurrences, matched by (file, value) with multiplicity, so a second identical value
+ * fails while the first stays excused.
  */
-// EMPTY as of 2026-08-05 (Phase C). Both survivors were drained by giving the box a real height
-// contract instead of a viewport fraction: `.sheet-embedded`'s 78vh became `flex:1; min-height:0`
-// inherited from its containing region, and `.map-empty-hero`'s `min(52vh,30rem)` became
-// `flex:1; min-height:12rem`, banded to `flex:0 1 14rem` below the 979 rung so it mirrors the map
-// stage it stands in for. **Do not add a row.**
+// Empty. Do not add a row.
 const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phase: string]> = [];
 
 interface ViewportHit { path: string; line: number; value: string }
@@ -689,9 +574,8 @@ describe("(g) no viewport-fraction caps on in-flow content — design-language.m
   });
 
   it("adds no viewport-fraction value that no row answers for", () => {
-    // Consumption with multiplicity: every hit spends a row; leftover hits are offenders,
-    // leftover rows are dead. Conforming is consulted first — no (file, value) key appears
-    // in both lists today, and a future collision should land on the reasoned side.
+    // Every hit spends a row; leftover hits are offenders, leftover rows are dead. Conforming rows are
+    // consulted first.
     const remainingConforming = VIEWPORT_CONFORMING.flatMap(([file, values]) => values.map((value) => `${file} ${value}`));
     const remainingLegacy = VIEWPORT_LEGACY.map(([file, value]) => `${file} ${value}`);
     const offenders: string[] = [];
@@ -741,34 +625,16 @@ describe("(g) no viewport-fraction caps on in-flow content — design-language.m
   });
 });
 
-// ─────────────────────────── (h) declared scroll regions ───────────────────────────
+// (h) declared scroll regions
 
 /**
- * A bare `overflow-y: auto` (or `overflow: auto|scroll`) in app CSS is an undeclared
- * scroll region — design-language.md §7 makes `.scroll-y` in the MARKUP the one blessed
- * scroll treatment (quiet thin scrollbar, stable gutter), so the CSS declaration is the
- * tell of a region the standard has not reached. The seed is the measured population; it
- * only shrinks, and it reaching 0 is the refresh's phase-C exit condition.
- *
- * `overflow-x` is deliberately unmatched: the wide-content rule (§7) REQUIRES an
- * `overflow-x` container per wide table/strip. `hidden|clip|visible` are not scrolling.
- *
- * HONEST LIMIT (the (d) pattern): this reads CSS, so an inline
- * `style={{ overflowY: "auto" }}` or a future styled-component is invisible to it. The
- * runtime scroller probe planned for the no-scroll audit (phase B) is the other half.
+ * A bare `overflow-y: auto` (or `overflow: auto|scroll`) in app CSS is an undeclared scroll region;
+ * scroll regions carry `.scroll-y` in the markup. `overflow-x` is not matched: wide tables need it.
+ * Reads CSS only, so an inline `style={{ overflowY: "auto" }}` is invisible here.
  */
 const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
 
-// EMPTY as of 2026-08-05 (Phase C). **Do not add a row** — an undeclared scroller is now a failure,
-// not a debt. The last one out was `map-picker.css`'s `.map-picker-grid`, and the reason it survived
-// a whole phase is worth keeping: this list said draining it "means giving the embedded picker a
-// frame, not deleting a line", which conflated this check with (g). It counts UNDECLARED scrollers,
-// and §7's drain is `.scroll-y` in the MARKUP — so the cap stayed and only the declaration moved.
-// The scene-gallery lesson (a `.scroll-y` belongs on a grid's WRAPPER, never the grid) was the other
-// half of the fear, and it does not apply: that lesson is about a DEFINITE block size, and a
-// `max-height` is not one. Measured at the drain — tile boxes byte-identical at 320/375/560/561, and
-// at 1280 the row followed the cards 146.33 -> 145.27 as `scrollbar-gutter: stable` narrowed the
-// content box, which is the auto row still sizing from its tiles rather than from the container.
+// Empty. Do not add a row: an undeclared scroller is a failure.
 const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [];
 
 describe("(h) every scroll region is declared — design-language.md §7", () => {
@@ -821,20 +687,16 @@ describe("(h) every scroll region is declared — design-language.md §7", () =>
   });
 });
 
-// ─────────────────────────── the checks themselves ───────────────────────────
+// The checks themselves
 
 describe("the design-convention checks themselves", () => {
-  // These checks hold the design language. Nothing holds them, so they hold themselves: a check
-  // that is disabled must not be able to leave the suite green. Measured on this repo's vitest by
-  // docs-tooling.test.ts:121-127 — emptying a check file is caught, but `.skip`ping its assertions
-  // reports "Test Files 1 skipped" and EXITS 0. The server-side detector's glob is
-  // `apps/server/test/docs-*.test.ts` (docs-tooling.test.ts:130) and cannot see these two.
+  // A disabled check must not leave the suite green: vitest reports a `.skip`ped file as skipped and
+  // exits 0, and the server-side detector (`apps/server/test/docs-*.test.ts`) cannot see these files.
   const DISABLED = new RegExp("\\.(?:skip|todo)\\s*\\(");
 
   it("are the files that import design-conventions-shape.ts, and none is skipped", () => {
-    // DISCOVERED, not merely listed. Deleting a row from CONVENTION_SHAPE.checkFiles while the
-    // file it named still imports this module fails here — which is the hole a pinned-only list
-    // has, and the one docs-tooling.test.ts:131-142 closes the same way.
+    // Discovered, not merely listed: a check file that still imports the shape module cannot be
+    // dropped from CONVENTION_SHAPE.checkFiles.
     const importers = walk(`${process.cwd()}/src`, (n) => /\.test\.tsx?$/.test(n))
       .map((rel) => `src/${rel}`)
       .filter((rel) => readFileSync(`${process.cwd()}/${rel}`, "utf8").includes("design-conventions-shape"));
@@ -855,8 +717,7 @@ describe("the design-convention checks themselves", () => {
   });
 
   it("excludes only the two directories it says it excludes", () => {
-    // An exclusion list is the one place this suite can be silently emptied: a `""` entry, or a
-    // bare `src/`, and every scan above reads nothing while the array still looks like a policy.
+    // An empty or over-broad prefix would silently empty every scan above.
     for (const [prefix, why] of PLAY_EXCLUDED) {
       expect(prefix.trim(), "an empty PLAY_EXCLUDED prefix excludes the whole tree").not.toBe("");
       expect(prefix.endsWith("/"), `PLAY_EXCLUDED entry ${JSON.stringify(prefix)} is not a directory prefix`).toBe(true);

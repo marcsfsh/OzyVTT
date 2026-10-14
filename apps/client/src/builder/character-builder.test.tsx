@@ -7,31 +7,12 @@ import type {
 } from "@vtt/domain";
 
 /**
- * **The character wizard's three reading defects (Area 1: issues `1`, `2b`, `2c`).**
- *
- * `apps/client/src/builder/` had no component test at all before this file, which is most of why all
- * three shipped: every one of them is about what the STEP SHOWS, and nothing was reading the step.
- *
- *   - **`1`** — an answered offer hid every option the player did not take. The first fix gated the
- *     fold on option count, which left the rule true for a three-option skill pick and still false
- *     for every long list; the client rejected exactly that. The fold is now DELETED and the page
- *     height it bought comes from `ChoiceGrid bounded` — a capped, internally scrolling card list —
- *     so at every length every option stays mounted and greys at capacity rather than vanishing.
- *   - **`2b`** — the features step invited a subclass pick that does not exist below level 3, and
- *     said so in a pane a phone cannot see.
- *   - **`2c`** — 203 spell names with no way to read what any of them does.
- *
- * These are RENDERED-TEXT assertions on the real component with fixture catalogs, not unit tests of
- * a helper: "the option is still in `offer.options`" was true the whole time the option was invisible.
- *
- * The catalogs arrive over the socket, so the socket is mocked to answer each `content:*` emit
- * synchronously from the fixtures below. They are deliberately SMALL and shaped like the real SRD
- * records they stand for (an Elf whose Keen Senses is choose-1-of-3, a Cleric whose subclass lands at
- * level 3), plus one deliberately long spell list — the rule is universal, so proving it needs a
- * list long enough that the old threshold would have hidden it.
+ * Rendered-text tests of the character wizard with fixture catalogs: answered offers keep their
+ * options, the subclass note on the features step, and reading a spell's rules while choosing.
+ * The socket is mocked to answer each `content:*` emit synchronously from the fixtures.
  */
 
-// ── fixtures ────────────────────────────────────────────────────────────────────────────────────
+// Fixtures
 
 const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">): ContentFeatureSummary => ({
   level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
@@ -44,8 +25,7 @@ const skills: readonly ContentSkillSummary[] = SKILL_IDS.map((id) => ({
   id, name: id.charAt(0).toUpperCase() + id.slice(1), description: "", ability: "wis"
 }));
 
-/** Twelve cantrips: over `SEARCH_THRESHOLD`, so this offer earns a search box — and, under the old
-    threshold, was the list that vanished when answered. It is the long case the rule must also hold for. */
+/** Twelve cantrips: over `SEARCH_THRESHOLD`, so this offer gets a search box. */
 const CANTRIPS = ["Guidance", "Light", "Mending", "Resistance", "Sacred Flame", "Spare the Dying",
   "Thaumaturgy", "Toll the Dead", "Word of Radiance", "Druidcraft", "Message", "Prestidigitation"];
 const spell = (name: string, level: number): ContentSpellSummary => ({
@@ -65,7 +45,7 @@ const levelRow = (level: number, over: Partial<ContentClassLevelRow> = {}): Cont
   spellsKnown: null, preparedFormula: null, preparedCount: null, classResources: [], ...over
 });
 
-/** A Cleric, cut to the two things these tests read: a level-3 subclass pick and a cantrip budget. */
+/** A Cleric cut to what these tests read: a level-3 subclass pick and a cantrip budget. */
 const cleric = {
   id: "cleric", name: "Cleric", source: "srd", summary: "A priestly champion.",
   description: "Clerics are conduits for divine power.", hitDie: "d8",
@@ -99,7 +79,7 @@ const lifeDomain = {
   features: [feature({ id: "disciple-of-life", name: "Disciple of Life", level: 3, description: "Your healing spells restore extra Hit Points." })]
 } as unknown as ContentSubclassSummary;
 
-/** An Elf whose Keen Senses is the reported case: choose ONE of three, three options total. */
+/** An Elf whose Keen Senses is choose one of three. */
 const elf = {
   id: "elf", name: "Elf", source: "srd", summary: "Long-lived and keen-sensed.",
   description: "Elves are magical people of otherworldly grace.",
@@ -113,7 +93,7 @@ const elf = {
   })]
 } as unknown as ContentSpeciesSummary;
 
-/** A second species whose trait asks for TWO of three — the multi-select half of issue `1`. */
+/** A second species whose trait asks for two of three. */
 const halfling = {
   ...elf, id: "halfling", name: "Halfling", summary: "Small and lucky.",
   features: [feature({
@@ -135,13 +115,12 @@ const CATALOG_ANSWERS: Readonly<Record<string, unknown>> = {
   "content:subclasses": { ok: true, subclasses: [lifeDomain], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:species": { ok: true, species: [elf, halfling], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:backgrounds": { ok: true, backgrounds: [acolyte], attribution: "SRD 5.2.1, CC BY 4.0." },
-  // An EMPTY feats/names catalog is never cached (`makeCatalog` refuses a miss), so the wizard would
-  // re-emit forever and `catalogs.loaded` would stay false. One row each is the cheapest honest fix.
+  // An empty catalog is never cached (`makeCatalog` refuses a miss), so the wizard would re-emit
+  // forever and never load; one row each avoids that.
   "content:feats": { ok: true, feats: [{ id: "alert", name: "Alert", source: "srd", summary: "You are hard to surprise.", description: "", category: "origin", repeatable: false, prerequisiteLevel: null, prerequisiteAbilities: [], prerequisiteRequires: [], prerequisiteText: null, feature: feature({ id: "alert-feature", name: "Alert" }) }], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:names": { ok: true, names: [{ speciesId: "elf", source: "srd", pools: [{ id: "given", label: "Given", names: ["Aerin"] }] }], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:skills": { ok: true, skills, attribution: "SRD 5.2.1, CC BY 4.0." },
-  // `useBuilderCatalogs` waits on EVERY catalog; a miss is never cached, so leaving this out kept the
-  // wizard on its loading state forever rather than failing anywhere near the cause.
+  // `useBuilderCatalogs` waits on every catalog, so a missing one keeps the wizard loading forever.
   "content:languages": { ok: true, languages: [{ id: "dwarvish", name: "Dwarvish", description: "A standard language.", table: "standard" }], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:spells": { ok: true, spells, attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:equipment": { ok: true, equipment: [{ id: "club", name: "Club", category: "weapon", costGp: 1, weightLb: 2, description: null, weapon: null, armor: null }], attribution: "SRD 5.2.1, CC BY 4.0." }
@@ -199,7 +178,7 @@ async function toClassFeatures(user: ReturnType<typeof userEvent.setup>, level: 
   await user.click(screen.getByRole("button", { name: "Next" }));
 }
 
-// ── issue 1 ─────────────────────────────────────────────────────────────────────────────────────
+// Issue 1
 
 describe("Issue 1 — an answered offer keeps the options it did not take", () => {
   it("leaves all three Keen Senses skills on screen after Perception is picked, and lets the pick be swapped", async () => {
@@ -212,22 +191,15 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
 
     await user.click(within(keen()).getByRole("radio", { name: /Perception/ }));
 
-    // THE DEFECT: this offer used to fold to a single "Perception" chip the moment it was answered,
-    // and Insight and Survival left the DOM. Nothing folds now, at any length, so the whole
-    // question stays on screen with the answer marked on it.
+    // Answered, the offer still shows every option with the answer marked.
     expect(Object.keys(cardsIn(keen()))).toEqual(["Insight", "Perception", "Survival"]);
     expect(within(keen()).getByRole("radio", { name: /Perception/ })).toHaveAttribute("aria-checked", "true");
     expect(within(keen()).queryByRole("button", { name: "Change" })).toBeNull();
 
     /**
-     * A choose-ONE offer is a radiogroup, so the two it did not take stay ENABLED — swapping is one
-     * tap on the other option, not a de-select of this one.
-     *
-     * This is where the plan's own test text was wrong, and deliberately not followed: it asked for
-     * Insight and Survival to be *disabled* after Perception. Disabling them would make `ChoiceGrid`'s
-     * `selectable` set a single card, so arrow keys would move nowhere and a keyboard player would be
-     * locked into their first answer with no way to change it. The greying belongs to capacity in a
-     * choose-N offer, which the next test holds.
+     * A choose-one offer is a radiogroup, so the untaken options stay enabled: swapping is one tap.
+     * Disabling them would leave a keyboard user unable to arrow to another answer. Greying belongs
+     * to capacity in a choose-N offer (next test).
      */
     expect(Object.values(cardsIn(keen()))).toEqual([false, false, false]);
     await user.click(within(keen()).getByRole("radio", { name: /Survival/ }));
@@ -244,24 +216,20 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     await user.click(within(lore()).getByRole("checkbox", { name: /Insight/ }));
     await user.click(within(lore()).getByRole("checkbox", { name: /Perception/ }));
 
-    // At 2 of 2 the third option is still THERE, greyed, with the reason stated once beside the count.
+    // At 2 of 2 the third option is still there, greyed, with the reason stated once beside the count.
     expect(cardsIn(lore())).toEqual({ Insight: false, Perception: false, Survival: true });
     expect(within(lore()).getByText(/You have already chosen 2/)).toBeInTheDocument();
 
-    // "A selected option can be clicked again to deselect it, which immediately re-enables every
-    // other option" — the reported expectation, held at the far end.
+    // Deselecting a pick immediately re-enables every other option.
     await user.click(within(lore()).getByRole("checkbox", { name: /Insight/ }));
     expect(cardsIn(lore())).toEqual({ Insight: false, Perception: false, Survival: false });
     expect(within(lore()).queryByText(/You have already chosen 2/)).toBeNull();
   });
 
   /**
-   * THE REPLACEMENT for "still folds a LONG offer once it is answered — the collapse is gated, not
-   * deleted", which encoded the behaviour the client then rejected on sight. Their rule, verbatim:
-   * *"it needs to be any time the player is choosing multiple options, once they've selected the
-   * max, all unselected options are greyed out."* No threshold — so a 12-option offer must behave
-   * exactly like the 3-option one above, and the page height that the fold was buying is bought by
-   * the grid's own bounded scroll region instead.
+   * Any multi-select offer greys its unselected options at the maximum, regardless of length; a
+   * 12-option offer behaves like the 3-option one, and the grid's bounded scroll region keeps the
+   * page height in check.
    */
   it("keeps a LONG answered offer's options mounted and greys them — the fold is deleted, not gated", async () => {
     const user = userEvent.setup();
@@ -269,7 +237,7 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     await toClassFeatures(user, 1);
 
     const cantrips = () => offerNamed("Cleric cantrips");
-    // Twelve options, over `SEARCH_THRESHOLD`: the grid is on screen, and it carries a search box.
+    // Twelve options, over `SEARCH_THRESHOLD`: the grid carries a search box.
     expect(Object.keys(cardsIn(cantrips()))).toHaveLength(12);
     expect(within(cantrips()).getByRole("searchbox")).toBeInTheDocument();
 
@@ -277,9 +245,8 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
       await user.click(within(cantrips()).getByRole("checkbox", { name: new RegExp(`^${name}`) }));
     }
 
-    // 3 of 3, and ALL TWELVE cards are still in the DOM: the three chosen enabled (so the pick can
-    // be swapped), the nine declined greyed, and no Change / Done button anywhere — there is
-    // nothing left to reopen.
+    // 3 of 3, and all twelve cards are still in the DOM: the chosen enabled (swappable), the rest
+    // greyed, and no Change / Done button anywhere.
     const cards = cardsIn(cantrips());
     expect(Object.keys(cards)).toHaveLength(12);
     expect(Object.entries(cards).filter(([, disabled]) => disabled)).toHaveLength(9);
@@ -292,22 +259,15 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     expect(within(cantrips()).queryByRole("button", { name: "Done" })).toBeNull();
 
     /**
-     * ...and the height the fold was buying is bought HERE. jsdom computes no layout, so this
-     * asserts the mechanism rather than the pixels: the card list is a DECLARED scroll region
-     * (`.scroll-y` in the markup, design-language.md §7) carrying the cap class. The measured
-     * numbers live in the report — Wizard L20's answered step at 1280px.
+     * jsdom computes no layout, so this asserts the mechanism: the card list is a declared scroll
+     * region (`.scroll-y`) carrying the cap class.
      */
     const items = cantrips().querySelector(".nh-choicegrid-items");
     expect(items).toHaveClass("scroll-y");
     expect(items).toHaveClass("nh-choicegrid-items--bounded");
   });
 
-  /**
-   * The client watched this work for a Cleric's SKILL picks and reported it as broken everywhere
-   * else — which was accurate, because the offers that hid their options were the long ones, and
-   * the long ones are spells, cantrips, feats and equipment. Greying is a fact about an offer's
-   * CAPACITY and never about its kind, so this holds the rule on a spell offer end to end.
-   */
+  /** Greying depends on an offer's capacity, never its kind, so it is held on a spell offer too. */
   it("greys at capacity on a NON-SKILL offer, and un-picking one puts every option back", async () => {
     const user = userEvent.setup();
     mount();
@@ -324,15 +284,14 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     expect(disabledIn()).toContain("ResistanceCantrip");
     expect(within(cantrips()).getByText(/You have already chosen 3/)).toBeInTheDocument();
 
-    // One tap on their own pick puts the other nine back — the reported expectation, on a kind the
-    // client never saw it work on.
+    // One tap on an own pick puts the other nine back.
     await user.click(within(cantrips()).getByRole("checkbox", { name: /^Light/ }));
     expect(disabledIn()).toEqual([]);
     expect(within(cantrips()).queryByText(/You have already chosen 3/)).toBeNull();
   });
 });
 
-// ── issue 2b ────────────────────────────────────────────────────────────────────────────────────
+// Issue 2b
 
 describe("Issue 2b — the class features step and its subclass", () => {
   it("names the level the subclass arrives at, in the step body, when the build is below it", async () => {
@@ -340,16 +299,13 @@ describe("Issue 2b — the class features step and its subclass", () => {
     mount();
     await toClassFeatures(user, 1);
 
-    // There is no subclass offer at level 1 — every SRD class carries `subclassLevel: 3` — so the
-    // step says WHEN instead of inviting a pick nothing on screen can answer.
+    // No subclass offer at level 1 (SRD `subclassLevel: 3`), so the step says when instead.
     expect(screen.getByText("You choose a cleric subclass at level 3.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Cleric Subclass" })).toBeNull();
 
     /**
-     * IN THE BODY, not the detail pane. Below 761px the pane is master-detail and hidden, and its
-     * only door is gated on real content — so the sentence lived where a phone could never read it.
-     * jsdom loads no stylesheet, so this asserts the STRUCTURE that makes it visible: the note is
-     * inside the step, and the pane is not rendered at all (nothing on this step can ever fill it).
+     * In the step body, not the detail pane, which is hidden on narrow screens. jsdom loads no
+     * stylesheet, so this asserts structure: the note is in the step and the pane is not rendered.
      */
     expect(document.querySelector(".cb-step")).toContainElement(screen.getByText("You choose a cleric subclass at level 3."));
     expect(document.querySelector(".nh-wizard-detail")).toBeNull();
@@ -370,12 +326,12 @@ describe("Issue 2b — the class features step and its subclass", () => {
     expect(within(pane).getByRole("heading", { name: "Life Domain" })).toBeInTheDocument();
     expect(within(pane).getByText(/positive energy that sustains all life/)).toBeInTheDocument();
     expect(within(pane).getByText("Disciple of Life")).toBeInTheDocument();
-    // The narrow-screen door only appears once there is something behind it; now there is.
+    // The narrow-screen door appears only once there is something behind it.
     expect(screen.getByRole("button", { name: "Show details" })).toBeInTheDocument();
   });
 });
 
-// ── issue 2c ────────────────────────────────────────────────────────────────────────────────────
+// Issue 2c
 
 describe("Issue 2c — a spell's rules can be read while choosing spells", () => {
   it("opens the rules in a modal, changes no pick, and closes on Escape", async () => {
@@ -390,26 +346,21 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
       .map((card) => card.querySelector(".nh-choice-title")?.textContent);
     expect(picked()).toEqual(["Guidance"]);
 
-    // The control is a SIBLING of the card, never inside it: a `ChoiceCard` is a <button>, and a
-    // nested button would be reparented out of the card's own hit area at parse time.
+    // The control is a sibling of the card, never inside it: a `ChoiceCard` is a <button>, and a
+    // nested button would be reparented out of the card at parse time.
     const info = within(cantrips()).getByRole("button", { name: "Read the Light rules" });
     expect(info.closest("[role='checkbox']")).toBeNull();
 
     /**
-     * ...and a sibling of EXACTLY ONE card, in a wrapper that holds nothing else. That is the
-     * re-opened half of `2g`: the client could not tell which icon belonged to which spell, because
-     * the two were separate boxes 8px apart in a grid whose own gap was 10px, and reading order was
-     * the only tie-break. The frame moved to `.nh-choice-wrap` (ChoiceCard.css) so the pairing is
-     * structural — this holds the structure the paint depends on. The pixels are in the report:
-     * card and control both 46.25px tall, 1px apart, 14px between pairs, measured at 320/375/1280.
+     * ...and a sibling of exactly one card, in a wrapper holding nothing else (`.nh-choice-wrap`,
+     * ChoiceCard.css), so each icon visibly belongs to its spell.
      */
     const pair = info.parentElement as HTMLElement;
     expect(pair).toHaveClass("nh-choice-wrap");
     expect(pair.querySelectorAll("[role='checkbox']")).toHaveLength(1);
     expect(pair.querySelector("[role='checkbox']")?.querySelector(".nh-choice-title")?.textContent).toBe("Light");
     expect(pair.children).toHaveLength(2);
-    // The wrapper IS the grid item, so nothing sits between a pair and the gap that separates it
-    // from the next one.
+    // The wrapper is the grid item, so nothing sits between a pair and the gap after it.
     expect(pair.parentElement).toHaveClass("nh-choicegrid-items");
 
     await user.click(info);
@@ -422,21 +373,17 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     expect(within(modal).getByText("Touch")).toBeInTheDocument();
     expect(within(modal).getByText(/this sentence is its rules text/)).toBeInTheDocument();
 
-    // Reading is not answering. The whole point of a modal over an inline expansion: 203 cards behind
-    // it, and a stray tap must not land on one.
+    // Reading is not answering: no pick changes.
     expect(picked()).toEqual(["Guidance"]);
 
     /**
-     * Escape, through the `cancel` event a native <dialog> raises for it. jsdom implements neither
-     * `showModal()` nor its Escape handling (`test/setup.ts` shims `show()` semantics), so the key
-     * itself would prove nothing here; dispatching `cancel` is the exact event the browser sends and
-     * the one `Modal` listens for. The real-browser press was verified separately.
+     * jsdom implements neither `showModal()` nor its Escape handling, so dispatch the `cancel` event
+     * the browser sends and `Modal` listens for.
      */
     (modal as HTMLDialogElement).dispatchEvent(new Event("cancel", { cancelable: true }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Light spell rules" })).toBeNull());
     expect(picked()).toEqual(["Guidance"]);
-    // ...and the wizard is still standing. Its own window-level Escape used to fire alongside the
-    // dialog's, so one press dismissed the card AND left the builder.
+    // ...and the wizard is still open: its window-level Escape must not fire alongside the dialog's.
     expect(offerNamed("Cleric cantrips")).toBeInTheDocument();
   });
 
@@ -449,7 +396,7 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     for (const name of ["Guidance", "Light", "Mending"]) {
       await user.click(within(cantrips()).getByRole("checkbox", { name: new RegExp(`^${name}`) }));
     }
-    // The locked cards are simply still there — nothing has to be reopened to reach them.
+    // The locked cards are still there; nothing has to be reopened to reach them.
     const locked = within(cantrips()).getByRole("checkbox", { name: /^Resistance/ }) as HTMLButtonElement;
     expect(locked.disabled).toBe(true);
     const info = within(cantrips()).getByRole("button", { name: "Read the Resistance rules" }) as HTMLButtonElement;
@@ -462,7 +409,7 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     const user = userEvent.setup();
     mount();
     await user.click(await screen.findByRole("radio", { name: /Elf/ }));
-    // One idea, one place: a skill has no rules card to open, so its cards grow no second control.
+    // A skill has no rules card, so its cards get no second control.
     expect(within(offerNamed("Keen Senses")).queryAllByRole("button", { name: /^Read the/ })).toHaveLength(0);
   });
 });

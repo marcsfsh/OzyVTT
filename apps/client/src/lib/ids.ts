@@ -1,14 +1,7 @@
 /**
- * A v4 UUID generator that works in insecure browsing contexts.
- *
- * The app is served over plain HTTP on a LAN IP (e.g. http://192.168.x.x:3001), which is NOT a
- * secure context, and browsers gate `crypto.randomUUID` (and all of SubtleCrypto) to secure
- * contexts only. Calling `crypto.randomUUID()` there throws `TypeError: crypto.randomUUID is not
- * a function`, which previously broke every command emit (stuck "Claiming…", dead dice/moves).
- *
- * `crypto.getRandomValues`, unlike `randomUUID`, IS available in insecure contexts, so we build a
- * spec-compliant RFC 4122 v4 UUID from it. Command IDs are validated server-side as UUIDs
- * (`z.string().uuid()`), so the output shape must stay a real v4 UUID.
+ * A v4 UUID generator that works in insecure contexts. The app is served over plain HTTP on a LAN
+ * IP, where browsers withhold `crypto.randomUUID`, but `crypto.getRandomValues` is still available.
+ * The server validates command IDs as UUIDs, so this must produce a real RFC 4122 v4 UUID.
  */
 export function newId(): string {
   const cryptoObj = globalThis.crypto;
