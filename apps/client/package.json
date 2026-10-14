@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
-    "check": "tsc -b --pretty false",
+    "build": "vite build",
+    "check": "tsc -p . --pretty false",
     "test": "vitest run"
   },
   "dependencies": {

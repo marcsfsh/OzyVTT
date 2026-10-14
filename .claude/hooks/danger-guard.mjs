@@ -43,7 +43,10 @@ const CATASTROPHIC = new Set([
   '/', '/*', '~', '~/', '*', '.', '..', '$home', '${home}',
   '/bin', '/etc', '/usr', '/var', '/lib', '/home', '/users', '/system',
 ]);
-const tokens = cmd.split(/\s+/);
+// Analyse each command segment on its own, so flags of a later command (e.g. `--pretty`)
+// are not read as arguments to an earlier `rm`.
+for (const segment of cmd.split(/&&|\|\||[;|\n]/)) {
+const tokens = segment.trim().split(/\s+/);
 for (let i = 0; i < tokens.length; i++) {
   const t = tokens[i];
   if (t === 'rm' || t.endsWith('/rm')) {
@@ -58,8 +61,9 @@ for (let i = 0; i < tokens.length; i++) {
     if (catastrophic) {
       emit('deny', 'vtt danger-guard: refusing a recursive delete of a root / home / wildcard path. If this is genuinely intended, run it yourself outside Claude.');
     }
-    emit('ask', 'vtt danger-guard: recursive rm. Confirm the exact target and your branch/scope (see vtt-branch-safety) before proceeding.');
+    emit('ask', 'vtt danger-guard: recursive rm. Confirm the exact target before proceeding.');
   }
+}
 }
 
 // --- other destructive patterns -> ask ---
