@@ -1,31 +1,24 @@
-import { deadlineFired } from "./codex-store.js";
 import type {
   CodexCalendar,
   CodexCalendarEra,
   CodexCalendarMonth,
-  CodexChronicleRecord,
-  CodexConnectionRow,
-  CodexConnectionSourceKind,
   CodexEntityType,
-  CodexInWorldDate,
-  CodexJournalKind,
-  CodexJournalRow,
-  CodexMapRow,
-  CodexMarkerRow,
-  CodexPageRow,
-  CodexPageSummaryRow,
-  CodexQuestObjective,
-  CodexQuestRow,
-  CodexQuestStatus,
-  CodexPageConnectionRow,
-  CodexRecordKind,
-  CodexSessionRow,
-  CodexStandingRow
-} from "./codex-store.js";
+  CodexInWorldDate
+} from "@vtt/domain";
+import type { CodexMapRow, CodexMarkerRow } from "./codex/atlas.js";
+import type { CodexConnectionRow, CodexConnectionSourceKind, CodexPageConnectionRow } from "./codex/connections.js";
+import { deadlineFired, type CodexJournalKind } from "./codex/journal-kinds.js";
+import type { CodexChronicleRecord, CodexJournalRow } from "./codex/journal.js";
+import type { CodexPageRow, CodexPageSummaryRow } from "./codex/pages.js";
+import type { CodexQuestObjective, CodexQuestRow, CodexQuestStatus } from "./codex/quests.js";
+import type { CodexRecordKind } from "./codex/search.js";
+import type { CodexSessionRow } from "./codex/sessions.js";
+import type { CodexStandingRow } from "./codex/standing.js";
 
 /**
  * The Codex viewer-safety boundary: every player-facing Codex read projects through here. Player shapes are
- * explicit allow-lists (new fields stay secret); callers pass in cross-record reveal state so only this file decides.
+ * explicit allow-lists, so a new field stays secret until it is added. Cross-record reveal state arrives as a
+ * context built by `codex/visibility.ts`.
  */
 
 export type GmCodexPage = CodexPageRow;
@@ -291,7 +284,7 @@ export type PlayerCodexJournalEntry = Readonly<{
 /** Default for an unsupplied revealed-id set: nothing is revealed, so nothing travels. */
 const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
 
-/** Store-resolved facts for a player journal read. Absent sets default to empty, which fails closed. */
+/** Facts for a player journal read, built by `journalContext`. Absent sets default to empty, which fails closed. */
 export type PlayerSessionNumberContext = Readonly<{
   /** Quests the players have been shown; a `quest` history record is gated on its quest. */
   revealedQuestIds?: ReadonlySet<string>;

@@ -5,6 +5,7 @@ import {
   CODEX_SECRET_FIELD_KEYS,
   codexFieldKeys,
   isCodexEntityType,
+  pageLinkKey,
   pruneCodexFields
 } from "./codex-entities.js";
 
@@ -51,5 +52,9 @@ describe("codex entity field table", () => {
     for (const type of CODEX_ENTITY_TYPES) expect(isCodexEntityType(type)).toBe(true);
     expect(isCodexEntityType("dragon")).toBe(false);
     expect(isCodexEntityType(undefined)).toBe(false);
+  });
+
+  it("keys a page title for wiki links by case and spacing only", () => {
+    expect(pageLinkKey("  The   Amber\tTemple ")).toBe("the amber temple");
   });
 });
