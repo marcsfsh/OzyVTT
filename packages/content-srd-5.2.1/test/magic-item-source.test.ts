@@ -4,24 +4,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * THE VENDORED MAGIC-ITEM SOURCE, PINNED.
+ * Pins the vendored `magic-items.md` so a re-vendor cannot silently shift rows under the parser.
+ * `magic-items.test.ts` guards the generated bundle; this guards its input.
  *
- * C5 vendored `magic-items.md` and verified its shape BY HAND at vendoring time. Nothing held it
- * afterwards, which is the gap this file closes: a re-vendor at a different upstream commit would
- * shift 258 item rows underneath C6's parser and every lane built on top of it, and the first
- * symptom would be a wrong item count in a browse list rather than a red test.
- *
- * So the assertions here are deliberately about the SOURCE and not about any bundle. C6 owns the
- * bundle guard (`magic-items.test.ts`); this one owns the input to it. When the two disagree, the
- * parser changed and one of them is the defect.
- *
- * THE DISCRIMINATOR IS THE CATEGORY WORD, NOT THE ITALICS - and that is the whole reason this test
- * asserts both counts separately. All 260 `####` entries in the A-Z section carry an italic second
- * line, INCLUDING the two embedded creature stat blocks, whose lines read `_Large Beast, Unaligned_`
- * and `_Medium Undead, Neutral Evil_`. A parser that separated items from creatures on "has an
- * italic line" would admit both creatures silently. What actually separates them is that 258 of 258
- * item lines open with one of nine category words. The 2 that do not are skipped BY NAME below,
- * with a count assertion beside them, never by a silent filter.
+ * Items are separated from the two embedded creature stat blocks by the category word, not by
+ * italics: every entry, creatures included, has an italic second line.
  */
 
 const SOURCE = fileURLToPath(
@@ -31,7 +18,7 @@ const PROVENANCE = fileURLToPath(
   new URL("../sources/dnd-5e-srd-markdown/PROVENANCE.json", import.meta.url)
 );
 
-/** The nine category words an SRD magic-item type line opens with. C6's parser consumes this list. */
+/** The nine category words an SRD magic-item type line opens with. */
 const CATEGORY_WORDS = [
   "Wondrous Item", "Weapon", "Potion", "Ring", "Armor", "Wand", "Staff", "Rod", "Scroll"
 ] as const;
@@ -65,20 +52,14 @@ const nonItems = entries.filter((e) => !opensWithCategory(e.typeLine));
 
 describe("the vendored magic-item source", () => {
   it("is the exact file C5 vendored, byte for byte", () => {
-    // The strongest pin available: a re-vendor at any other upstream commit fails here first,
-    // naming the file, instead of shifting rows under a parser that reports a plausible number.
     expect(createHash("sha256").update(raw).digest("hex"))
       .toBe("96c71ad35dddf0e79e47ac3d7bbe96704b5209c1f6e1bf01d543080789e18e98");
-    // 5015 is the `wc -l` count C5 recorded - i.e. newlines. The file ends with one, so splitting
-    // on it yields a 5016th empty element; `lines` keeps that element because dropping it would
-    // shift every line number this file asserts.
+    // `wc -l` counts newlines; the trailing newline yields one extra empty element in `lines`.
     expect(lines.length - 1).toBe(5015);
     expect(Buffer.byteLength(raw, "utf8")).toBe(244314);
   });
 
   it("is recorded in PROVENANCE.json as vendored, not as deliberately left out", () => {
-    // C5 split a claim that had justified eight files on a reason true for only seven. The split is
-    // the deliverable, so it is pinned: the file is listed, and it is NOT in the leftover sentence.
     const provenance = JSON.parse(readFileSync(PROVENANCE, "utf8")) as {
       files: string[]; notVendored: string; commit: string;
     };
@@ -90,15 +71,13 @@ describe("the vendored magic-item source", () => {
   it("opens its A-Z run at the line C6's parser starts from", () => {
     expect(azHeadingIndex + 1).toBe(578);
     expect(lines[azHeadingIndex]).toBe("## Magic Items A–Z");
-    // Four `####` headings sit ABOVE the A-Z run and are rules subsections, not items - so a parser
-    // that scans the whole file finds 264 and is wrong by exactly those four.
+    // Four `####` rules subsections sit above the A-Z run.
     expect(raw.split("\n").filter((l) => l.startsWith("#### ")).length).toBe(264);
   });
 
   it("carries 260 entries, of which 258 are items and 2 are creature stat blocks", () => {
     expect(entries.length).toBe(260);
-    // Italics is TOTAL over all 260 and therefore useless as a discriminator - asserted so that a
-    // future parser cannot quietly adopt it and admit two creatures as items.
+    // Italics are present on all 260, so they cannot discriminate items from creatures.
     expect(entries.filter((e) => /^_.*_$/.test(e.typeLine))).toHaveLength(260);
     expect(items).toHaveLength(258);
     expect(nonItems.map((e) => e.name)).toEqual([...NOT_ITEMS]);

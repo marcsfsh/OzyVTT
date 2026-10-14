@@ -10,14 +10,7 @@ import type { FeatureMechanics, MechanicsOverlay } from "../scripts/class-mechan
 import { ClassReferenceSchema, featurePicks } from "../src/character-content.js";
 import { loadClasses, loadSubclasses } from "../src/index.js";
 
-/**
- * THE MECHANICS OVERLAY, held to what it claims: it reaches every one of the twelve classes, it
- * reaches an inline option, and it fails loudly rather than dropping a rider.
- *
- * `applyMechanics` is exercised directly because the ETL is a script, not a module the test suite
- * can call - and because the interesting cases (a key matching nothing, a rider that would overwrite
- * hand-authored content) must FAIL the build, which a test cannot observe by rebuilding.
- */
+// `applyMechanics` is tested directly because the ETL is a top-level script, and its failure cases must fail the build.
 describe("the mechanics overlay", () => {
   const feature = () => [{ id: "rage", name: "Rage", description: "x" }] as Array<{ id: string } & Record<string, unknown>>;
 
@@ -34,12 +27,6 @@ describe("the mechanics overlay", () => {
   });
 
   it("merges `choices` - SEVERAL picks on one record - from a class module", () => {
-    // The overlay's own docblock has always said "`choice` / `choices` and `options` are here", and
-    // for the whole of Stage 4 the type said otherwise: both `Pick<>`s listed `choice` alone, so
-    // `choices` was a hard compile error (TS2561) from every class module. Four lanes reported it
-    // independently. The multi-pick vocabulary itself shipped in `15b5337` and was reachable only
-    // from `feats.v1.json`, which is hand-authored - so Magic Initiate got its level-1 spell and
-    // Wizard's Spell Mastery ("a level 1 AND a level 2 spell") could not be said at all.
     const features = feature();
     const misses = applyMechanics("barbarian", features, {
       barbarian: {
@@ -59,8 +46,6 @@ describe("the mechanics overlay", () => {
   });
 
   it("merges into an inline OPTION, and reports an option id that matches nothing", () => {
-    // The one shape the overlay could not express before, and the reason Thaumaturge's extra cantrip
-    // had to be hand-edited into `classes.v1.json`.
     const features = [{
       id: "divine-order", name: "Divine Order", description: "x",
       choice: { kind: "divine-order", choose: 1, options: [{ id: "thaumaturge", name: "T", description: "y" }] }
@@ -82,9 +67,8 @@ describe("the mechanics overlay", () => {
   });
 
   it("REFUSES to overwrite a value the record already carries", () => {
-    // The hazard the hand-authored three introduce: `classes.v1.json` is both this script's input and
-    // its output, so an overlay that overwrote a rider would rewrite the file it was reading and the
-    // change would be unreviewable. Two homes, one value, and the build says so.
+    // `classes.v1.json` is both the ETL's input and output for hand-authored classes, so an overwrite
+    // would silently rewrite committed data.
     const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, { barbarian: { rage: { tags: ["raging"] } } });
     expect(misses).toEqual(["barbarian.rage.tags (already authored on the record - remove it from one of the two homes)"]);
@@ -92,17 +76,7 @@ describe("the mechanics overlay", () => {
   });
 
   it("`clears` supersedes a value the record already carries, and clearing an absent key is a no-op", () => {
-    // THE INVERSE OF THE TEST ABOVE, and the whole point of the verb (ruled 2026-08-10, decision-log;
-    // the alternatives are costed in `docs/product/plan-content-program.md` §4). The collision
-    // message's own advice - "remove it from one of the two homes" - becomes something the class
-    // module can SAY, instead of requiring a hand edit to a 10,000-line bundle to satisfy it.
-    //
-    // `modifiers` is cleared too and the record does not carry one: MITIGATION 1, idempotence. A
-    // `clears` that has already done its work must stay legal, or the module becomes a build error
-    // the moment it succeeds and the next author deletes the line that explains the deletion. It is
-    // authored beside its `clears` like any other superseded key - mitigation 2 is per KEY - which
-    // is the shape the SECOND build of a hand-authored record takes anyway: run 1 writes the new
-    // value into the bundle, run 2 clears what run 1 wrote and authors the identical thing.
+    // A `clears` that has already done its work (key absent) must stay legal, so the second build passes.
     const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, {
       barbarian: { rage: { clears: ["tags", "modifiers"], tags: ["raging"], modifiers: [{ type: "speed", amount: 10 }] } }
@@ -113,11 +87,8 @@ describe("the mechanics overlay", () => {
   });
 
   it("REFUSES a `clears` with no rider beside it, and deletes nothing", () => {
-    // MITIGATION 2: the verb can never be a silent delete-only tool. On a hand-authored record the
-    // ETL writes the merged record back over its own input, so a delete is one-way - a module that
-    // removed a rider and put nothing in its place would be an irreversible edit with no replacement
-    // to review it against. Nothing is deleted on this path either: an invalid entry contributes
-    // NOTHING rather than half of itself.
+    // `clears` may never delete without a replacement: on a hand-authored record the delete is irreversible.
+    // An invalid entry contributes nothing.
     const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, { barbarian: { rage: { clears: ["tags"] } } });
     expect(misses).toEqual(["barbarian.rage.clears [tags] (deletes without replacing - author the superseding rider in the same entry)"]);
@@ -125,17 +96,12 @@ describe("the mechanics overlay", () => {
   });
 
   it("REFUSES a `clears` whose key is unreplaced even when the entry authors a DIFFERENT rider", () => {
-    // The hole the per-entry form of mitigation 2 left open, and the reason it is now per KEY.
-    // Asking only "does this entry author something" is satisfied by any unrelated rider, so
-    // `{ clears: ["choice"], tags: [...] }` passed while deleting a whole `choice` and replacing
-    // nothing - on a hand-authored record, an irreversible edit to committed JSON, which is the one
-    // outcome the verb was fenced against. Only `choice` is named; `tags` is legitimately authored.
+    // The replacement check is per key: an unrelated rider in the same entry does not satisfy it.
     const features = [{ id: "rage", name: "Rage", description: "x", choice: { id: "c", options: [{ id: "o", name: "O" }] }, tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, {
       barbarian: { rage: { clears: ["choice", "tags"], tags: ["raging"] } }
     });
     expect(misses).toEqual(["barbarian.rage.clears [choice] (deletes without replacing - author the superseding rider in the same entry)"]);
-    // Nothing is deleted on the refusal path - the entry contributes NOTHING, not half of itself.
     expect(features[0].choice).toEqual({ id: "c", options: [{ id: "o", name: "O" }] });
     expect(features[0].tags).toEqual(["already-here"]);
   });
@@ -147,9 +113,6 @@ describe("the mechanics overlay", () => {
   });
 
   it("reaches a HAND_AUTHORED class - the three the overlay used to skip entirely", () => {
-    // `applyMechanics` ran only inside the generation loop, so Cleric, Fighter and Wizard could not
-    // use it at all and Thaumaturge was hand-edited into the bundle instead. This is the read-side
-    // half: the overlay names a hand-authored class, and the bundle carries what it authors.
     expect(Object.keys(CLASS_MECHANICS)).toContain("cleric");
     const cleric = loadClasses().find((record) => record.id === "cleric")!;
     const thaumaturge = cleric.features.find((entry) => entry.id === "divine-order")!.choice!.options!
@@ -160,22 +123,14 @@ describe("the mechanics overlay", () => {
   it("reaches a GENERATED subclass, which had no authoring surface at all", () => {
     expect(Object.keys(SUBCLASS_MECHANICS)).toContain("draconic-sorcery");
     const draconic = loadSubclasses().find((record) => record.id === "draconic-sorcery")!;
-    // `allowShield: true` is AUTHORED, not the schema default: the printed feature restricts only
-    // "wearing armor", and the SRD keeps that apart from wielding a Shield. See the reasoning beside
-    // the record in `scripts/class-mechanics/sorcerer.ts`; the far end is `unarmored-defense-shield.test.ts`.
+    // `allowShield: true` is authored: the printed feature restricts only "wearing armor", not a Shield.
     expect(draconic.features.find((entry) => entry.id === "draconic-resilience")!.modifiers)
       .toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
   });
 
   it("composes the same three exports the ETL consumed before the per-class split", () => {
-    // The split is a refactor: the ETL's inputs must be the same objects, shaped the same way.
     expect(CLASS_MECHANICS.barbarian?.rage?.uses).toEqual({ scaling: { type: "class-resource", id: "rage" }, per: "long-rest" });
-    // NOT a snapshot of the whole map: Stage 4 wires a printed column live in four parallel lanes,
-    // so an equality against every class would be a merge conflict per lane and would say nothing
-    // about the shape. Pin the entry the split was verified against, and hold every entry - whoever
-    // authored it - to the invariant that makes the export meaningful: a non-empty list of ids that
-    // really are printed columns on that class's own table (`class-resource-pools.test.ts` then
-    // proves a live pool answers to each).
+    // Every live column must be printed on its class's own table.
     expect(LIVE_CLASS_RESOURCES.barbarian).toEqual(["rage"]);
     for (const [classId, resources] of Object.entries(LIVE_CLASS_RESOURCES)) {
       const printed = new Set(loadClasses().find((entry) => entry.id === classId)!.levelTable
@@ -183,30 +138,17 @@ describe("the mechanics overlay", () => {
       expect(resources.length).toBeGreaterThan(0);
       expect(resources.filter((id) => !printed.has(id))).toEqual([]);
     }
-    // A class contributing nothing is OMITTED rather than mapped to `{}`, so `applyMechanics` still
-    // short-circuits on it exactly as it did when the overlay was one literal. Stated as the
-    // PROPERTY rather than by naming a class that happens to be empty today: Stage 4 authors all
-    // twelve in parallel, and "Monk contributes nothing" stopped being true the hour its lane began.
+    // Classes contributing nothing are omitted rather than mapped to `{}`.
     expect(Object.entries(CLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
     expect(Object.entries(SUBCLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
   });
 });
 
 /**
- * `clears` THROUGH THE BUILD - the far end the unit tests above cannot reach.
- *
- * The unit tests prove `applyMechanics` deletes and merges. They cannot prove the thing that makes
- * the verb hazardous enough to need a ruling: on a HAND_AUTHORED class the ETL reads
- * `bundles/classes.v1.json`, merges the overlay into the records it read, and writes them back over
- * that same file - so a `clears` is a ONE-WAY edit to committed JSON, and the SECOND build reads what
- * the first one wrote. Only running it twice can show that the superseded key is gone from the file
- * and that the module which removed it is still legal on the next run.
- *
- * The three statements below ARE the ETL's hand-authored branch (`build-class-bundle.ts:841-846` and
- * `:973`); the script is top-level code that reads sources and rewrites bundles on import, so a test
- * cannot call it. It is replicated rather than imported, and the replica is PINNED to the loop it
- * stands for - see the first assertion - so it cannot drift into passing about nothing. It runs over
- * a COPY in a temp directory: the committed bundle is never touched.
+ * `clears` through the build. For hand-authored classes the ETL reads `bundles/classes.v1.json`,
+ * merges the overlay and writes the result back over the same file, so only two runs show the
+ * superseded key is gone and the module is still legal afterwards. The ETL is a top-level script, so
+ * its hand-authored branch is replicated here (and pinned to the script text) and run on a temp copy.
  */
 describe("`clears` through the class-bundle build", () => {
   const bundlePath = fileURLToPath(new URL("../bundles/classes.v1.json", import.meta.url));
@@ -229,20 +171,15 @@ describe("`clears` through the class-bundle build", () => {
   };
 
   it("removes the superseded key from the written bundle, lands the replacement, and is clean on the second run", async () => {
-    // THE PIN. If the hand-authored branch stops doing exactly what `buildOnce` does, this fails here
-    // rather than leaving the rest of the test green about a loop that no longer exists.
+    // Pins the replica to the script's hand-authored branch.
     const script = readFileSync(scriptPath, "utf8");
     expect(script).toContain("applyMechanics(record.id, record.features, CLASS_MECHANICS)");
     expect(script).toContain("ClassReferenceSchema.parse(record)");
     expect(script).toContain('writeFileSync(join(bundles, "classes.v1.json")');
     expect(script).toContain("JSON.stringify(allClasses, null, 1)");
 
-    // THE CARRIER IS CHOSEN BY PROPERTY, NOT BY NAME: the first hand-authored feature that still
-    // ships a `choice`. The program's one measured case is `wizard.spell-mastery` ("choose a level 1
-    // AND a level 2 spell", shipped as one pick of two capped at level 2) and C4 supersedes it FOR
-    // REAL through this verb - at which point that feature stops carrying a `choice` and a test that
-    // named it would go red for the best possible reason. The rule keeps working; the property is
-    // what is being tested.
+    // The carrier is chosen by property (first hand-authored feature still shipping a single `choice`)
+    // so the test survives that feature being superseded for real.
     const shipped = JSON.parse(readFileSync(bundlePath, "utf8")) as RecordShape[];
     const carrier = shipped
       .filter((record) => HAND_AUTHORED.has(record.id))
@@ -252,10 +189,7 @@ describe("`clears` through the class-bundle build", () => {
     const { recordId, feature: before } = carrier!;
     expect(featurePicks(before)).toHaveLength(1);
 
-    // The replacement is DERIVED from the record's own pick, so it is schema-valid for whichever
-    // feature the rule above landed on, and it is the shape of the measured case: one pick becomes
-    // two. `choice` and `choices` cannot coexist on a record (`oneChoiceForm`), which is the second
-    // mechanism - beside the collision guard - that made this unauthorable before `clears`.
+    // `choice` and `choices` cannot coexist on a record (`oneChoiceForm`).
     const replacement: ChoiceInput[] = [{ ...before.choice!, choose: 1 }, { ...before.choice!, choose: 1 }];
     const overlay: MechanicsOverlay = { [recordId]: { [before.id]: { clears: ["choice"], choices: replacement } } };
 
@@ -267,22 +201,18 @@ describe("`clears` through the class-bundle build", () => {
       expect(buildOnce(path, overlay)).toEqual([]);
       const afterFirst = readFileSync(path, "utf8");
 
-      // MITIGATION 1, where it actually matters: run 2 reads the file run 1 wrote, finds no `choice`
-      // left to clear, and neither errors nor changes a byte. The module stays truthful.
+      // Run 2 reads run 1's output, finds nothing to clear, and changes no byte.
       expect(buildOnce(path, overlay)).toEqual([]);
       expect(readFileSync(path, "utf8")).toBe(afterFirst);
 
-      // THE FAR END. Not "the value survived the merge" - the twice-built bundle, parsed with the
-      // schema `loadClasses()` itself uses (`src/index.ts:152-154`), offers TWO picks through
-      // `featurePicks`, the one accessor `character-build.ts` reads a feature's picks through.
+      // Parsed with the same schema `loadClasses()` uses, read through `featurePicks`.
       const built = z.array(ClassReferenceSchema).parse(JSON.parse(afterFirst));
       const after = built.find((record) => record.id === recordId)!.features.find((entry) => entry.id === before.id)!;
       const picks = featurePicks(after);
       expect(picks).toHaveLength(2);
       expect(picks.map((pick) => pick.choose)).toEqual([1, 1]);
 
-      // And the superseded key is GONE FROM THE FILE, not merely absent from a parse - the one-way
-      // edit the ruling's third mitigation (review the bundle's `git diff`) exists for.
+      // The superseded key is gone from the file itself, not just from a parse.
       const raw = (JSON.parse(afterFirst) as RecordShape[])
         .find((record) => record.id === recordId)!.features.find((entry) => entry.id === before.id)!;
       expect(Object.keys(raw)).not.toContain("choice");

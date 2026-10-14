@@ -13,12 +13,8 @@ import {
   type FeatureRecord
 } from "../src/index.js";
 
-/**
- * Phase-2 state: Fighter, Wizard, and Cleric are complete 20-level transcriptions; all nine SRD
- * 5.2.1 species, all four backgrounds, and the full feat chapter are authored. The assertions below
- * cover shape/integrity AND per-class/per-species golden transcription checks (task-packet risk 2:
- * transcription errors ship as rules bugs, so snapshot the printed numbers here).
- */
+// Shape and integrity checks plus golden transcription checks: transcription errors ship as rules
+// bugs, so the printed numbers are pinned here.
 describe("character-builder content records", () => {
   const classes = loadClasses();
   const subclasses = loadSubclasses();
@@ -60,8 +56,7 @@ describe("character-builder content records", () => {
   });
 
   it("agrees with the rules engine on hit dice, stat priority, ASI levels, and multiclass prerequisites", () => {
-    // FULL six-ability fixtures, so multi-ability prerequisites (Paladin/Monk/Ranger style) are
-    // actually exercised - a fixture that only raises `statPriority[0]` cannot catch them.
+    // Full six-ability fixtures, so multi-ability prerequisites are actually exercised.
     const flatEight = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } as const;
     for (const entry of classes) {
       expect(entry.hitDie, entry.id).toBe(hitDieFor(entry.id));
@@ -74,13 +69,12 @@ describe("character-builder content records", () => {
       expect(meetsMulticlassPrerequisites(qualified, entry.id), entry.id).toBe(true);
       if (entry.multiclassPrerequisites) expect(meetsMulticlassPrerequisites(flatEight, entry.id), `${entry.id} at flat 8s`).toBe(false);
     }
-    // "all"-mode multi-ability prerequisites really require EVERY listed minimum (engine table, so
-    // authoring Paladin/Monk/Ranger later cannot silently regress) ...
+    // "all"-mode multi-ability prerequisites require every listed minimum...
     expect(meetsMulticlassPrerequisites({ ...flatEight, str: 13 }, "paladin")).toBe(false);
     expect(meetsMulticlassPrerequisites({ ...flatEight, str: 13, cha: 13 }, "paladin")).toBe(true);
     expect(meetsMulticlassPrerequisites({ ...flatEight, dex: 13 }, "monk")).toBe(false);
     expect(meetsMulticlassPrerequisites({ ...flatEight, dex: 13, wis: 13 }, "monk")).toBe(true);
-    // ... while "any"-mode accepts either minimum alone (Fighter: Strength 13 OR Dexterity 13).
+    // ... while "any"-mode accepts either minimum alone (Fighter: Strength 13 or Dexterity 13).
     expect(meetsMulticlassPrerequisites({ ...flatEight, dex: 13 }, "fighter")).toBe(true);
     // The ASI levels are also exactly the levels whose table row grants the ASI feature.
     for (const entry of classes) {
@@ -112,7 +106,7 @@ describe("character-builder content records", () => {
     expect(resourceAt(9, "indomitable")).toBe(1);
     expect(resourceAt(13, "indomitable")).toBe(2);
     expect(resourceAt(17, "indomitable")).toBe(3);
-    // Fighting Style is a CHOICE, not hardcoded behavior - it writes a `choices[]` row.
+    // Fighting Style is a choice, not hardcoded behavior - it writes a `choices[]` row.
     const style = fighter.features.find((feature) => feature.id === "fighting-style")!;
     expect(style.choice).toMatchObject({ kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" });
     // Extra Attack is a typed modifier, not a special case in the engine.
@@ -177,7 +171,7 @@ describe("character-builder content records", () => {
     });
     expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "turn-undead"]);
     expect(channel.actions[1].save).toEqual({ ability: "wis", dc: "spellcasting" });
-    // Divine Order is a level-1 CHOICE between the two printed sacred roles.
+    // Divine Order is a level-1 choice between the two printed sacred roles.
     const order = cleric.features.find((feature) => feature.id === "divine-order")!;
     expect(order.level).toBe(1);
     expect(order.choice).toMatchObject({ kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"] });
@@ -234,17 +228,12 @@ describe("character-builder content records", () => {
     expect(subclassesForClass("fighter").map((subclass) => subclass.id)).toEqual(["champion"]);
     expect(subclassesForClass("wizard").map((subclass) => subclass.id)).toEqual(["evoker"]);
     expect(subclassesForClass("cleric").map((subclass) => subclass.id)).toEqual(["life-domain"]);
-    // SRD 5.2.1 prints exactly one subclass per class, so every class must offer exactly one - a
-    // class with none is an unfinishable wizard step, and this used to assert `barbarian` had zero.
+    // SRD 5.2.1 prints exactly one subclass per class; a class with none is an unfinishable wizard step.
     for (const entry of classes) expect(subclassesForClass(entry.id).length, entry.id).toBe(1);
   });
 
   it("gates Champion's features at the SRD 5.2.1 levels, not the 2014 ones", () => {
-    // This shipped wrong: the record carried 2024 feature TEXT at 2014 feature LEVELS - Remarkable
-    // Athlete at 7 and Additional Fighting Style at 10 are the old progression - and Heroic Warrior
-    // was missing entirely. Nothing caught it because the generator's cross-check covered
-    // class-level data only. It covers subclass features now; this pins it for the test suite too,
-    // which is what runs in CI.
+    // SRD 5.2.1 levels, not 2014's (Remarkable Athlete at 7, Additional Fighting Style at 10).
     const champion = subclassesForClass("fighter")[0];
     expect(champion.features.map((feature) => [feature.id, feature.level])).toEqual([
       ["improved-critical", 3],
@@ -270,7 +259,7 @@ describe("character-builder content records", () => {
     expect(human.darkvisionFeet).toBeNull();
     // Human's whole identity is choices, exactly as the SRD prints it.
     expect(human.traits.filter((trait) => trait.choice).map((trait) => trait.choice!.kind)).toEqual(["skill", "feat"]);
-    // The bonus SHAPE still exists for 2014-style and homebrew species.
+    // The bonus shape still exists for 2014-style and homebrew species.
     const homebrew = SpeciesReferenceSchema.parse({
       id: "moon-touched", name: "Moon-Touched", source: "homebrew", speedFeet: 30,
       abilityBonuses: [{ ability: "wis", amount: 2 }, { ability: "cha", amount: 1 }],
@@ -322,8 +311,8 @@ describe("character-builder content records", () => {
       "copper-dragon": "acid", "gold-dragon": "fire", "green-dragon": "poison", "red-dragon": "fire",
       "silver-dragon": "cold", "white-dragon": "cold"
     });
-    // Breath Weapon's MECHANICS ride the lineage (only the ancestry knows the damage type), exactly
-    // as Damage Resistance already does; the species-level trait stays the printed prose.
+    // Breath Weapon's mechanics ride the lineage (only the ancestry knows the damage type); the
+    // species-level trait stays prose.
     const speciesBreath = dragonborn.traits.find((trait) => trait.id === "dragonborn-breath-weapon")!;
     expect(speciesBreath.actions).toEqual([]);
     expect(speciesBreath.uses).toBeUndefined();
@@ -337,7 +326,7 @@ describe("character-builder content records", () => {
     expect(ancestry.choice!.from).toEqual(["clouds-jaunt", "fires-burn", "frosts-chill", "hills-tumble", "stones-endurance", "storms-thunder"]);
     expect(ancestry.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
     expect(goliath.traits.find((trait) => trait.id === "goliath-large-form")!.level).toBe(5);
-    // Orc: Adrenaline Rush refreshes on a SHORT rest; Relentless Endurance is 1/Long Rest.
+    // Orc: Adrenaline Rush refreshes on a Short rest; Relentless Endurance is 1/Long Rest.
     const orc = byId("orc");
     expect(orc.traits.find((trait) => trait.id === "orc-adrenaline-rush")!.uses).toMatchObject({ per: "short-rest", scaling: { type: "proficiency-bonus" } });
     expect(orc.traits.find((trait) => trait.id === "orc-relentless-endurance")!.uses).toEqual({ limit: 1, per: "long-rest" });
@@ -371,7 +360,7 @@ describe("character-builder content records", () => {
     expect(soldier.skillProficiencies).toEqual(["athletics", "intimidation"]);
     expect(soldier.originFeatId).toBe("savage-attacker");
     expect(soldier.startingEquipment.at(-1)).toMatchObject({ items: [], goldPieces: 50 });
-    // The soldier's gaming set points at REAL catalog ids (the seeded `dice-set` was a dangling id).
+    // The soldier's gaming set points at real catalog ids.
     expect(soldier.startingEquipment[0].items.map((item) => item.id)).toContain("gaming-set-dice");
     expect(soldier.toolChoices?.from).toEqual(["gaming-set-dice", "gaming-set-playing-cards"]);
     // Acolyte and Criminal complete the SRD 5.2.1 set of four.
@@ -414,7 +403,7 @@ describe("character-builder content records", () => {
       "boon-of-combat-prowess", "boon-of-dimensional-travel", "boon-of-fate", "boon-of-irresistible-offense",
       "boon-of-spell-recall", "boon-of-the-night-spirit", "boon-of-truesight"
     ]);
-    // SRD 5.2.1's feat chapter has NO Tough feat (PHB-2024-only); it must stay out of the srd source.
+    // SRD 5.2.1's feat chapter has no Tough feat (PHB 2024 only); it must stay out of the SRD source.
     expect(feats.some((feat) => feat.id === "tough")).toBe(false);
     // Fighting-style feats gate on the Fighting Style feature; every Epic Boon gates on level 19.
     for (const id of byCategory("fighting-style")) {
@@ -424,8 +413,8 @@ describe("character-builder content records", () => {
       expect(feats.find((feat) => feat.id === id)!.prerequisite?.level, id).toBe(19);
     }
     expect(feats.find((feat) => feat.id === "boon-of-spell-recall")!.prerequisite?.requires).toEqual(["spellcasting"]);
-    // Boons restricted to specific scores say so as data; Grappler's "Str or Dex 13+" stays prose (the
-    // feat-prerequisite shape has no any/all mode - see the schema-gap notes in the task report).
+    // Boons restricted to specific scores say so as data; Grappler's "Str or Dex 13+" stays prose (feat
+    // prerequisites have no any/all mode).
     expect(feats.find((feat) => feat.id === "boon-of-irresistible-offense")!.feature.choice?.from).toEqual(["str", "dex"]);
     expect(feats.find((feat) => feat.id === "boon-of-spell-recall")!.feature.choice?.from).toEqual(["int", "wis", "cha"]);
     expect(feats.find((feat) => feat.id === "grappler")!.prerequisite?.text).toContain("Strength or Dexterity 13+");
@@ -453,10 +442,9 @@ describe("character-builder content records", () => {
     const toolCount = loadEquipment().filter((item) => item.category === "tool").length;
     const languages = loadLanguages();
     /**
-     * Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored
-     * slug must land in a family AND resolve to a non-empty option list, or a wizard step dead-ends.
-     * Recursive, because the grammar has one combinator - `<a>-or-<b>` is the union of its parts, and
-     * a union is legal as long as at least one part resolves.
+     * Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored slug
+     * must resolve to a non-empty option list, or a wizard step dead-ends. `<a>-or-<b>` is the union of
+     * its parts and is legal if at least one part resolves.
      */
     const resolvesNonEmpty = (slug: string): boolean => {
       if (slug.includes("-or-")) {
@@ -488,7 +476,7 @@ describe("character-builder content records", () => {
       expect(speciesIds, pool.speciesId).toContain(pool.speciesId);
       for (const list of pool.pools) expect(list.names.length, `${pool.speciesId}/${list.id}`).toBeGreaterThanOrEqual(10);
     }
-    // EVERY authored species has a pool; a species outside the SRD 5.2.1 roster does not.
+    // Every authored species has a pool; a species outside the SRD 5.2.1 roster does not.
     for (const entry of species) expect(namesForSpecies(entry.id), entry.id).toBeDefined();
     expect(namesForSpecies("elf")!.pools.map((list) => list.id)).toEqual(["elf-given", "elf-family", "elf-child"]);
     expect(namesForSpecies("dwarf")!.pools.map((list) => list.label)).toEqual(["Masculine", "Feminine", "Clan"]);
@@ -526,8 +514,7 @@ describe("character-builder content records", () => {
         expect(equipmentIds, `${entry.id} equipment ${item.id}`).toContain(item.id);
       }
     }
-    // SYMMETRIC on purpose: backgrounds get the same equipment/tool integrity classes get - the
-    // seeded soldier's dangling `dice-set` id slipped through exactly this gap.
+    // Backgrounds get the same equipment and tool integrity checks as classes.
     for (const background of backgrounds) {
       for (const skillId of background.skillProficiencies) expect(skillIds, `${background.id} skill ${skillId}`).toContain(skillId);
       for (const toolId of background.toolProficiencies) expect(equipmentIds, `${background.id} tool ${toolId}`).toContain(toolId);
@@ -574,7 +561,7 @@ describe("character-builder content records", () => {
       [...(owner.features ?? []), ...(owner.traits ?? [])].find((feature) => feature.id === featureId)!.choice!.options!;
 
     // Divine Order: Protector is Martial weapons + Heavy armor training, Thaumaturge is one extra
-    // Cleric cantrip. Both were validated, written to the ledger, and then dropped on the floor.
+    // Cleric cantrip.
     const order = optionsOf(cleric, "divine-order");
     expect(order.map((option) => option.id)).toEqual(["protector", "thaumaturge"]);
     const protector = order.find((option) => option.id === "protector")!;
@@ -583,11 +570,7 @@ describe("character-builder content records", () => {
     // A Protector Cleric's PROFICIENCIES are the class's plus the option's - the SRD's printed result.
     expect([...cleric.weaponProficiencies, ...protector.grants!.weapons]).toEqual(["simple", "martial"]);
     expect([...cleric.armorProficiencies, ...protector.grants!.armor]).toEqual(["light", "medium", "shields", "heavy"]);
-    // Thaumaturge RAISES the Cleric cantrip budget rather than opening a pick of its own. The text
-    // says "you know one EXTRA cantrip from the Cleric spell list" - one budget, one card, one number
-    // - and a separate second-order choice was the only way to say it before `extraPicks` existed.
-    // It also cannot be scoped as a choice in the general case ("your class's skill list" is not a
-    // catalog slug), which is why the budget-raising form is the one Stage 4 authors against.
+    // Thaumaturge raises the Cleric cantrip budget ("one extra cantrip") rather than opening a pick of its own.
     const thaumaturge = order.find((option) => option.id === "thaumaturge")!;
     expect(thaumaturge.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
     expect(thaumaturge.choice).toBeUndefined();
@@ -603,13 +586,12 @@ describe("character-builder content records", () => {
     expect(divineStrike.actions[0].damageByLevel).toEqual([
       { level: 7, formula: "1d8", type: "radiant" }, { level: 14, formula: "2d8", type: "radiant" }
     ]);
-    // Potent Spellcasting is honest prose: "add your Wisdom modifier to cantrip damage" has no rider
-    // in the bounded vocabulary (no ability-derived damage bonus), so it carries none (ADR-0008).
+    // Potent Spellcasting stays prose: no rider expresses an ability-derived damage bonus (ADR-0008).
     expect(strikes[1].actions).toEqual([]);
     expect(strikes[1].modifiers).toEqual([]);
 
-    // Giant Ancestry: all six boons carry their own action AND their own PB-per-Long-Rest counter on
-    // one shared pool - the parent feature's `uses` alone had no action to ride and was dropped.
+    // Giant Ancestry: each of the six boons carries its own action and a PB-per-Long-Rest counter on
+    // one shared pool.
     const goliath = species.find((entry) => entry.id === "goliath")!;
     const boons = optionsOf(goliath, "goliath-giant-ancestry");
     expect(boons.map((option) => option.id)).toEqual(["clouds-jaunt", "fires-burn", "frosts-chill", "hills-tumble", "stones-endurance", "storms-thunder"]);
@@ -627,7 +609,7 @@ describe("character-builder content records", () => {
       "hills-tumble": [], "stones-endurance": [], "storms-thunder": ["1d8 thunder"]
     });
 
-    // ONE vocabulary: an option is structurally a FeatureRecord, so the SAME interpreter reads both.
+    // An option is structurally a FeatureRecord, so the same interpreter reads both.
     for (const option of [...order, ...strikes, ...boons]) {
       const asFeature: FeatureRecord = option;
       expect(FeatureRecordSchema.safeParse(asFeature).success, option.id).toBe(true);
@@ -641,7 +623,7 @@ describe("character-builder content records", () => {
     expect(order.from).toEqual(order.options!.map((option) => option.id));
     const ancestry = species.find((entry) => entry.id === "goliath")!.traits.find((trait) => trait.id === "goliath-giant-ancestry")!.choice!;
     expect(ancestry.from).toEqual(["clouds-jaunt", "fires-burn", "frosts-chill", "hills-tumble", "stones-endurance", "storms-thunder"]);
-    // Authoring the ids WITHOUT mechanics still works unchanged (back-compat for every other record).
+    // Authoring the ids without mechanics still works.
     const legacy = FeatureRecordSchema.parse({ id: "x", name: "X", description: "d", choice: { kind: "skill", from: ["stealth", "arcana"] } });
     expect(legacy.choice!.from).toEqual(["stealth", "arcana"]);
     expect(legacy.choice!.options).toBeUndefined();
@@ -670,7 +652,7 @@ describe("character-builder content records", () => {
     for (const lineage of dragonborn.lineages) {
       const trait = lineage.traits.find((candidate) => candidate.id === `${lineage.id}-breath`)!;
       const action = trait.actions.find((candidate) => candidate.id === "breath-weapon")!;
-      // DC 8 + Constitution modifier + Proficiency Bonus, as DATA - the target rolls Dexterity.
+      // DC 8 + Constitution modifier + Proficiency Bonus, as data - the target rolls Dexterity.
       expect(action.save, lineage.id).toEqual({ ability: "dex", dc: { base: 8, ability: "con", proficiencyBonus: true } });
       // 1d10, rising by 1d10 at character levels 5, 11, and 17 - in the ancestry's own damage type.
       const type = expectedTypes[lineage.id];
@@ -682,7 +664,7 @@ describe("character-builder content records", () => {
       // The damage type agrees with the resistance the same ancestry grants.
       expect(lineage.traits[0].grants!.damageResistances, lineage.id).toEqual([type]);
     }
-    // Divine Spark: a Channel Divinity save (the class's own spell save DC) AND the scaling damage.
+    // Divine Spark: a Channel Divinity save (the class's own spell save DC) and the scaling damage.
     const spark = classes.find((entry) => entry.id === "cleric")!.features.find((feature) => feature.id === "channel-divinity")!
       .actions.find((action) => action.id === "divine-spark")!;
     expect(spark.save).toEqual({ ability: "con", dc: "spellcasting" });
@@ -718,15 +700,8 @@ describe("character-builder content records", () => {
 });
 
 /**
- * `2a` - every class presents its actual features. The observed symptom was Warlock's class step
- * reading "See the warlock class description in SRD 5.2.1."; the cause was a slug mismatch in the
- * ETL (`scripts/build-class-bundle.ts`, `featureProse`), which keyed `#### Level 1: Rage` under
- * `level-1-rage` while the level table asked for `rage`. **149 of 185** class features shipped the
- * stub - Monk 23/23, Barbarian 20/20, Rogue 19/19, Ranger 18/18, Paladin 18/18, Druid 14/14,
- * Warlock 13/13, Bard 13/13, Sorcerer 11/11 - and the prose was in the bundle source the whole time.
- *
- * The build now REFUSES to write a bundle containing one. This is the read-side half of that bar:
- * the build guards regeneration, this guards the committed artefact, and the two fail independently.
+ * Every class and subclass feature carries real prose, never a "See the ... in SRD 5.2.1." stub.
+ * The build refuses stubs; this guards the committed bundle.
  */
 describe("2a - no class or subclass feature falls back to a pointer at an external document", () => {
   const STUB = /^See the .* in SRD 5\.2\.1\.$/;
@@ -742,9 +717,7 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
   });
 
   it("gives every feature real prose, not a placeholder", () => {
-    // The floor is 40, not 60: `paladin.aura-expansion` is 51 characters and is the SRD's COMPLETE
-    // printed text ("Your Aura of Protection is now a 30-foot Emanation."). A 60-character bar would
-    // have failed on correct content, which is the wrong kind of test.
+    // The floor is 40: `paladin.aura-expansion`'s complete printed text is 51 characters.
     for (const record of [...classes, ...subclasses]) {
       for (const feature of record.features) {
         expect(feature.description.length, `${record.id}.${feature.id} is ${feature.description.length} chars: "${feature.description}"`)
@@ -767,7 +740,7 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
   });
 
   it("keys one printed heading onto the whole family the level table splits it into", () => {
-    // Warlock's table grants four Mystic Arcanum slots (levels 11/13/15/17) under ONE heading.
+    // Warlock's table grants four Mystic Arcanum slots (levels 11/13/15/17) under one heading.
     const warlock = classes.find((record) => record.id === "warlock")!;
     const arcana = warlock.features.filter((feature) => feature.id.startsWith("mystic-arcanum-"));
     expect(arcana.map((feature) => feature.level)).toEqual([11, 13, 15, 17]);
@@ -787,35 +760,25 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
 });
 
 /**
- * THE TWO STRUCTURAL BLOCKERS THE PRE-STAGE-4 AUDIT NAMED, held open from the read side.
- *
- * Both were invisible to every existing test: a subclass overlay that is never merged and a table
- * that is thrown away both produce records that PARSE, so only an assertion about the content itself
- * can tell the difference. These are the committed artefact's half - `build-class-bundle.ts` guards
- * regeneration, and the two fail independently.
+ * The subclass overlay merge and the subclass spell tables, checked on the committed bundle
+ * (`build-class-bundle.ts` guards regeneration).
  */
 describe("the subclass authoring surface, and the tables the parser used to throw away", () => {
   const classes = loadClasses();
   const subclasses = loadSubclasses();
-  // Readonly in BOTH dimensions: `loadClasses`/`loadSubclasses` return `readonly ClassReference[]`,
-  // and a mutable parameter type made this helper uncallable with them - invisible while the package
-  // did not typecheck `test/`.
+  // Readonly in both dimensions so the loaders' return types are accepted.
   const featureOf = (records: readonly { id: string; features: readonly FeatureRecord[] }[], recordId: string, featureId: string) =>
     records.find((record) => record.id === recordId)!.features.find((feature) => feature.id === featureId)!;
 
   it("merges SUBCLASS_MECHANICS into an ETL-GENERATED subclass", () => {
-    // Draconic Sorcery is generated (Sorcerer is not HAND_AUTHORED), so before the ETL imported
-    // SUBCLASS_MECHANICS there was no way for this rider to exist at all. Champion / Evoker / Life
-    // Domain are NOT the proof - their class is hand-authored and the whole record is copied through.
+    // Draconic Sorcery is ETL-generated, so this rider can only come from SUBCLASS_MECHANICS.
     const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
-    // `allowShield` is authored `true` here, against the schema default - the printed sentence
-    // restricts only wearing armor. `scripts/class-mechanics/sorcerer.ts` carries the argument.
+    // `allowShield: true` is authored: the printed sentence restricts only wearing armor.
     expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {
-    // Each of these used to end at the word "table", with the spells it promises nowhere in the
-    // record - one truncation per subclass that grants spells by level.
+    // Each spell table is rendered into the description rather than dropped.
     const draconic = featureOf(subclasses, "draconic-sorcery", "draconic-spells").description;
     expect(draconic).toContain("Sorcerer Level 3: Alter Self, Chromatic Orb, Command, Dragon's Breath");
     expect(draconic).toContain("Sorcerer Level 9: Legend Lore, Summon Dragon");
@@ -888,16 +851,15 @@ describe("content-record schema guards", () => {
   });
 
   it("rejects a choice whose option list is EMPTY rather than parsing into a downstream crash", () => {
-    // `{from: []}` used to be schema-legal: it satisfied "has a `from`", then every consumer fell
-    // through to `fromCatalog` - which is undefined - and died with a raw TypeError. An empty option
-    // list is never "no options offered"; it is an authoring mistake, and it fails here, loudly.
+    // An empty option list is an authoring mistake, not "no options": consumers would fall through to an
+    // undefined `fromCatalog`.
     const empty = FeatureChoiceSchema.safeParse({ kind: "skill", from: [] });
     expect(empty.success).toBe(false);
     expect(!empty.success && JSON.stringify(empty.error.issues)).toContain("at least one option");
     expect(FeatureRecordSchema.safeParse({ id: "x", name: "X", description: "d", choice: { kind: "skill", from: [] } }).success).toBe(false);
     expect(FeatureRecordSchema.safeParse({ id: "x", name: "X", description: "d", choice: { kind: "skill", from: [], fromCatalog: "skills" } }).success).toBe(false);
     expect(FeatureChoiceSchema.safeParse({ kind: "x", options: [] }).success).toBe(false);
-    // The fix is to OMIT the field, not to empty it.
+    // The fix is to omit the field, not to empty it.
     expect(FeatureChoiceSchema.safeParse({ kind: "skill", fromCatalog: "skills" }).success).toBe(true);
     // No authored record anywhere in the bundles smuggles one in.
     const everyChoice = [
@@ -941,7 +903,7 @@ describe("content-record schema guards", () => {
     expect(option.grants!.skills).toEqual([]);
     const asFeature: FeatureRecord = option;
     expect(FeatureRecordSchema.safeParse(asFeature).success).toBe(true);
-    // `from` is DERIVED, never co-authored - two lists could disagree, so only one is authorable.
+    // `from` is derived, never co-authored - two lists could disagree, so only one is authorable.
     expect(parsed.choice!.from).toEqual(["warden"]);
     expect(FeatureChoiceSchema.safeParse({ kind: "k", from: ["warden"], options: [{ id: "warden", name: "W", description: "d" }] }).success).toBe(false);
     // Option ids are unique within one choice.
@@ -988,18 +950,14 @@ describe("content-record schema guards", () => {
 });
 
 /**
- * THE ACCEPTANCE TEST for the magic-item rider vocabulary: one fixture per criterion the product
- * owner actually asked for, parsed through the real schemas. A vocabulary that typechecks but
- * cannot express "an extra 1d6 fire on a critical hit" has failed, and only a fixture says so.
- *
- * Every item fixture goes through `EquipmentReferenceSchema`, which is `.strict()` - so a criterion
- * "passing" here means the exact authored keys were ACCEPTED, not silently dropped.
+ * One fixture per requested capability of the magic-item rider vocabulary, parsed through the real
+ * schemas. `EquipmentReferenceSchema` is `.strict()`, so passing means the keys were accepted.
  */
 describe("the magic-item vocabulary expresses what a GM asks for", () => {
   /** The three fields an equipment record requires but that say nothing about the criterion. */
   const bare = { costGp: null, weightLb: null, description: null } as const;
   const item = (patch: Record<string, unknown>) => EquipmentReferenceSchema.parse({ id: "hb-item", name: "Item", category: "wondrous", ...bare, ...patch });
-  /** The same riders on a FEAT carrier - criterion 14 is only true if this parses the identical array. */
+  /** The same riders on a feat carrier. */
   const feat = (modifiers: readonly unknown[], patch: Record<string, unknown> = {}) =>
     FeatReferenceSchema.parse({ id: "hb-feat", name: "Feat", feature: { id: "hb-feat", name: "Feat", description: "The same riders, on a feat.", modifiers, ...patch } });
 
@@ -1015,7 +973,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       ]
     });
     expect(sword.modifiers.map((modifier) => modifier.type)).toEqual(["attack-bonus", "extra-damage"]);
-    // Both are STANDING riders on this weapon: no gate, so they are part of the weapon's own numbers.
+    // Both are standing riders on this weapon: no gate, so they are part of the weapon's own numbers.
     expect(sword.modifiers.every((modifier) => riderLayer(modifier.when) === "standing")).toBe(true);
     expect(feat(sword.modifiers).feature.modifiers).toHaveLength(2);
   });
@@ -1023,7 +981,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   it("2. wands, orbs, potions, amulets, rings, cloaks, circlets and shields each have a slot", () => {
     const kinds = [["wand", "held"], ["orb", "held"], ["potion", "consumable"], ["amulet", "neck"], ["ring", "ring"], ["cloak", "shoulders"], ["circlet", "head"], ["shield", "shield"]] as const;
     for (const [category, slot] of kinds) {
-      // `category` stays the OPEN identity slug; `slot` is the closed mechanical hook beside it.
+      // `category` stays the open identity slug; `slot` is the closed mechanical hook beside it.
       expect(item({ id: `hb-${category}`, name: category, category, slot }).slot, category).toBe(slot);
     }
   });
@@ -1060,7 +1018,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     const rider = shield.modifiers[0];
     expect(rider).toMatchObject({ type: "resource-bonus", poolId: "lay-on-hands", amount: 1 });
-    // A class gate is STATIC - resolvable from the sheet, so it shows as a real number, not a note.
+    // A class gate is static - resolvable from the sheet, so it shows as a real number, not a note.
     expect(riderLayer(rider.when)).toBe("standing");
   });
 
@@ -1088,11 +1046,10 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     const rider = mace.modifiers[0];
     expect(rider).toMatchObject({ type: "extra-damage", formula: "1d6", damageType: "fire" });
-    // 5e does not double dice added AFTER the attack, so the default is false and a GM opts in.
+    // 5e does not double dice added after the attack, so the default is false and a GM opts in.
     expect(rider).toMatchObject({ doubleOnCritical: false });
     expect(riderLayer(rider.when)).toBe("momentary");
-    // This is the typed case `critical-bonus-dice` deliberately cannot express: that one is a bare
-    // untyped COUNT of extra weapon dice, and both exist because they are different things.
+    // `critical-bonus-dice` is an untyped count of extra weapon dice, a different thing from typed extra damage.
     expect(FeatureModifierSchema.parse({ type: "critical-bonus-dice", count: 2 })).toMatchObject({ count: 2 });
   });
 
@@ -1138,8 +1095,8 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     expect(cursed.cursed).toBe(true);
     expect(cursed.modifiers).toHaveLength(5);
-    // A curse you can drop by taking the hat off is not a curse: `cursed` REQUIRES attunement, so
-    // the hiding boundary is exactly one thing - hidden until attuned, and nothing beyond that.
+    // `cursed` requires attunement: the curse is hidden until attuned, and a curse removable by
+    // unequipping is not a curse.
     const orphanCurse = EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "cloak", ...bare, cursed: true });
     expect(orphanCurse.success).toBe(false);
     expect(!orphanCurse.success && JSON.stringify(orphanCurse.error.issues)).toContain("must require attunement");
@@ -1147,9 +1104,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   });
 
   it("14. a FEAT carries every one of these riders, by construction rather than by duplication", () => {
-    // The whole architectural bet: the new riders extend `FeatureModifierSchema`, which a feat's
-    // `feature` already carries. A parallel item-only union would give items everything, feats
-    // nothing, and the difference would be invisible until a GM authored the feat.
+    // Item riders extend `FeatureModifierSchema`, which feats already carry, so feats get every rider too.
     const everyRider = [
       { type: "attack-bonus", amount: 1 },
       { type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] },
@@ -1175,18 +1130,15 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(feat(secondHalf).feature.modifiers).toHaveLength(8);
     expect(item({ id: "hb-a", modifiers: everyRider }).modifiers).toHaveLength(8);
     expect(item({ id: "hb-b", modifiers: secondHalf }).modifiers).toHaveLength(8);
-    // ...and the identical array parses on a chosen OPTION inside a choice, and on a plain feature.
+    // ...and the identical array parses on a chosen option inside a choice, and on a plain feature.
     expect(FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers).toHaveLength(8);
-    // 22 variants: the 8 that existed, the 3 shared with EffectModifierSchema, the 11 the
-    // magic-item vocabulary added (`damage-bonus` - the "+1 weapon"'s damage half - is the 11th).
     expect(FeatureModifierSchema.options).toHaveLength(22);
   });
 
   it("15. an item that grants a feat", () => {
     const gauntlets = item({ id: "hb-gauntlets", name: "Gauntlets of the Bulwark", category: "hands", slot: "hands", isMagic: true, attunement: { required: true }, grantsFeatIds: ["shield-master"] });
     expect(gauntlets.grantsFeatIds).toEqual(["shield-master"]);
-    // The grant edge is ONE-DIRECTIONAL: no feature, feat, or option has a `grants.items`, so a
-    // cycle cannot be drawn rather than merely being checked for.
+    // No feature, feat or option has `grants.items`, so a grant cycle cannot be expressed.
     expect(Object.keys(FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", grants: {} }).grants!)).not.toContain("items");
   });
 
@@ -1197,13 +1149,11 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       const refused = EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "wondrous", ...bare, modifiers: [modifier] });
       expect(refused.success, modifier.type).toBe(false);
       expect(!refused.success && JSON.stringify(refused.error.issues), modifier.type).toContain("cannot change hit points or an ability score");
-      // The SAME rider on a feat is fine, and must stay fine: a feat is granted once and never
-      // un-granted, so baking it is correct. It is the CARRIER that makes this a refusal.
+      // The same rider on a feat is fine: a feat is never un-granted, so baking it in is correct.
       expect(feat([modifier]).feature.modifiers, modifier.type).toHaveLength(1);
       expect(FeatureModifierSchema.safeParse(modifier).success, modifier.type).toBe(true);
     }
-    // A flat `hit-points` maximum is not in the vocabulary at all, so it is refused one level
-    // earlier - by the discriminated union - on every carrier including a feat.
+    // A flat `hit-points` maximum is not in the vocabulary at all, so every carrier refuses it.
     expect(FeatureModifierSchema.safeParse({ type: "hit-points", amount: 5 }).success).toBe(false);
   });
 
@@ -1214,7 +1164,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(riderLayer([{ type: "attuned" }, { type: "while-shield", wielding: true }])).toBe("standing");
     // At most four triggers.
     expect(RiderWhenSchema.safeParse([{ type: "attuned" }, { type: "while-shield" }, { type: "while-unarmored" }, { type: "on-hit" }, { type: "damage-type-is", damageTypes: ["fire"] }]).success).toBe(false);
-    // A rider fires at ONE moment, not two.
+    // A rider fires at one moment, not two.
     const twoMoments = RiderWhenSchema.safeParse([{ type: "on-hit" }, { type: "on-critical-hit" }]);
     expect(twoMoments.success).toBe(false);
     expect(!twoMoments.success && JSON.stringify(twoMoments.error.issues)).toContain("one moment, not two");
@@ -1222,7 +1172,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     const orphanFilter = RiderWhenSchema.safeParse([{ type: "versus-size", sizes: ["large"] }]);
     expect(orphanFilter.success).toBe(false);
     expect(!orphanFilter.success && JSON.stringify(orphanFilter.error.issues)).toContain("needs a moment to narrow");
-    // "Paladin or Cleric" is ONE trigger with two ids - never two triggers OR'd together.
+    // "Paladin or Cleric" is one trigger with two ids, never two triggers OR'd together.
     expect(RiderWhenSchema.safeParse([{ type: "while-character-is", classIds: ["paladin", "cleric"] }]).success).toBe(true);
     expect(RiderWhenSchema.safeParse([{ type: "while-character-is" }]).success).toBe(false);
     expect(RiderWhenSchema.safeParse([{ type: "while-character-is", classIds: ["paladin"] }, { type: "while-character-is", classIds: ["cleric"] }]).success).toBe(false);
@@ -1232,7 +1182,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   });
 
   it("still refuses an undeclared key on the one .strict() content record", () => {
-    // The magic-item block is a LONGER LIST of declared keys, not a loosened schema.
+    // The magic-item block is a longer list of declared keys, not a loosened schema.
     expect(EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "wondrous", ...bare, requiresAttunement: true }).success).toBe(false);
     expect(EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "wondrous", ...bare, slot: "backpack" }).success).toBe(false);
   });

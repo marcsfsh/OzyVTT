@@ -1,77 +1,25 @@
 /**
- * ============================================================================================
- * THE ITEM MECHANICS OVERLAY - hand-authored riders merged over the ETL-generated magic items
- * ============================================================================================
+ * The item mechanics overlay: hand-authored riders merged over the ETL-generated magic items. The ETL
+ * emits content only; riders edited into the generated bundle would be lost on the next build, so they
+ * are authored here and merged at build time.
  *
- * `bundles/magic-items.v1.json` is GENERATED from `sources/dnd-5e-srd-markdown/magic-items.md` by
- * `../build-magic-items.ts`. That script's own header states the split this file is the other half
- * of: *"THIS ETL EMITS CONTENT, NOT MECHANICS. Every row lands with `isMagic`, `slot`, `rarity`,
- * `attunement` and prose; none lands with `modifiers`, `effects`, `actions`, `casts`, `uses` or
- * `cursed`."*
+ * Unlike the class overlay, this one may overwrite freely: the magic-item bundle is output only and
+ * rebuilt from scratch every run, so it needs no `clears`.
  *
- * Those riders cannot be authored where they land. A rider hand-edited into the generated bundle is
- * destroyed by the next `npm run build-magic-item-bundle`, silently and without a diff to notice.
- * So mechanics need a home the ETL READS, and this directory is it - the same answer
- * `scripts/class-mechanics/` already gives for classes: prose is generated, mechanics are authored,
- * and the ETL merges the two at build time. Nothing here is a runtime layer; each item still keeps
- * exactly ONE row in the bundle, so `loadMagicItems`, `loadEquipment`, the homebrew merge and every
- * consumer are unchanged.
+ * Every refusal below guards against a lane authoring nothing while the build stays quiet:
  *
- * THIS OVERLAY MAY OVERWRITE FREELY, AND THAT IS THE ONE PLACE IT DIFFERS FROM THE CLASS OVERLAY.
- * `class-mechanics/overlay.ts` is additive-only and had to grow a `clears` verb, because
- * `classes.v1.json` is its ETL's INPUT as well as its output for the three `HAND_AUTHORED` classes -
- * so an unannounced overwrite there is a one-way, unreviewable edit to committed JSON. A generated
- * magic-item bundle has no such property: it is an OUTPUT ONLY, regenerable from a byte-pinned
- * vendored source with nothing hand-edited into it, and every run rebuilds each row from scratch
- * before this overlay is applied. `docs/product/plan-content-program.md` §1.5 is the ruling, and it
- * is the reason C6 emitted a separate bundle rather than appending 268 rows to the hand-authored
- * `equipment.v1.json`. **Do not copy `clears` here. There is nothing to announce.**
- *
- * ============================================================================================
- * EVERY REFUSAL BELOW EXISTS BECAUSE A LANE CAN OTHERWISE AUTHOR NOTHING AND THE BUILD STAYS
- * QUIET. That is the ONLY failure this file is defending against, stated once so the seven checks
- * below read as one idea rather than seven rules:
- * ============================================================================================
- *
- *   1. A LANE IS A LIST ENTRY, NOT AN OBJECT SPREAD, and that is a correctness requirement rather
- *      than a style. Composing four lanes with `{...a, ...b}` collapses two lanes keyed to the same
- *      item id by JS last-wins BEFORE this function ever sees them - MEASURED through the real ETL:
- *      two modules both keyed to `cloak-of-protection` produced exit 0, "rows carrying overlay
- *      mechanics: 1", and the first lane's rider nowhere in the bundle. A LIST keeps both, so the
- *      collision is visible and REFUSED, naming both lanes.
- *   2. AN ID NO ROW CARRIES is a typo'd or renamed item; the riders keyed to it land on nothing.
- *   3. AN ENTRY THAT NAMES NO RIDER - `{}`, and equally `{modifiers: []}`, `{casts: []}`,
- *      `{grants: {}}` or `{cursed: false}`. A present-but-empty list satisfies "the key is there"
- *      and authors exactly as much as a forgotten key: nothing. The class overlay already treats
- *      this as absence. A named absence is a COMMENT beside the entry, never an empty value.
- *   4. AN ENTRY OUTSIDE ITS LANE'S CATEGORIES - OR, WHERE THE LANE DECLARES THEM, ITS SLOTS.
- *      `plan-content-program.md` §3 justifies the category split by claiming a lane authoring
- *      outside its own category "fails the build the same way an unmatched key does"; `categories`
- *      on the lane is what gives that claim somewhere to stand. `slots` is the same check one column
- *      further in, and it exists because category CANNOT separate C7c from C7d: both own
- *      `wondrous-item` and the worn/carried line between them is `slot`. It is optional and it only
- *      narrows, so a lane that declares no slots is checked exactly as it was.
- *   5. A SLUG POINTING AT ANOTHER BUNDLE THAT NOTHING RESOLVES. `casts[].spellId`,
- *      `grantsFeatIds[]` and the `grants.*` id lists are open slugs by schema, so `fyre-ball`
- *      parses, ships, and is silent at the table. Every one of them is cross-checked below.
- *   6. A RIDER TYPE NO CONSUMER READS YET (the admission rule), from TWO sources rather than one -
- *      review, 2026-08-12. `UNREAD_RIDER_TYPES` is mirrored from the server's own disposition table
- *      and holds whatever that table marks `"unread"`. `MEASURED_INERT_RIDER_TYPES` holds the three
- *      this program drove and found inert on an item carrier - `speed`, `darkvision`, `sense` - which
- *      the mirror cannot name, because the server calls `sense` `"display-only"` and editing that
- *      here would be the drift the mirror exists to prevent. Both refuse; each says which it is.
- *   7. A MERGED ROW THE SCHEMA REFUSES - the item carrier's two refused modifier types, a curse on
- *      an item requiring no attunement, a malformed action. THE REFUSAL IS THE SCHEMA'S AND THIS
- *      FILE ONLY SURFACES IT: `ITEM_REFUSED_MODIFIER_TYPES` (`src/character-content.ts`) is
- *      enforced by `EquipmentReferenceSchema`'s `superRefine`, and a second copy here is exactly
- *      how items and feats would drift apart. The merge re-parses every row it touches so the
- *      refusal arrives WITH the item id attached, rather than out of the bundle's final
- *      `z.array(...).parse` with nothing to say which item caused it.
- *
- * ONE FILE PER LANE (`./weapons-armour.ts`, `./wands-rods.ts`, ...), composed by `./index.ts`, for
- * the reason the class overlay's header gives in its own words: *"A single object literal holding
- * twelve classes is one file that every content author has to edit ... The split is the difference
- * between four agents working and four agents merging."* Here it is four lanes over 268 items.
+ *   1. Lanes are list entries, not an object spread, so two lanes keyed to one item are both seen
+ *      and refused.
+ *   2. An id no row carries.
+ *   3. An entry naming no rider, or only empty ones (`{modifiers: []}`, `{grants: {}}`,
+ *      `{cursed: false}`). Record an absence as a comment, never as an empty entry.
+ *   4. An entry outside its lane's categories, or its declared slots (`slots` separates the two
+ *      lanes sharing `wondrous-item`).
+ *   5. A slug pointing into another bundle that nothing resolves (`fyre-ball`).
+ *   6. A rider type no consumer reads: `"unread"` in the server's disposition table, or one of the
+ *      types measured inert on an item carrier.
+ *   7. A merged row the schema refuses. The refusals are the schema's; the merge re-parses each
+ *      touched row so the error names the item.
  */
 import type { z } from "zod";
 import { EquipmentReferenceSchema, type EquipmentReference } from "../../src/schemas.js";
@@ -80,32 +28,13 @@ import {
 } from "../../src/enums.js";
 import { loadClasses, loadFeats, loadLanguages, loadSkills, loadSpecies, loadSpells, loadWeapons } from "../../src/index.js";
 
-/**
- * Typed off the schema's INPUT rather than its output, deliberately - the same call the class
- * overlay makes. An overlay entry is authored the way a bundle row is authored, so a `.default()`ed
- * key (`whileArmored` on an `armor-class` modifier, the `riderGate` fields on every modifier) should
- * not have to be restated. `applyItemMechanics` re-parses each merged row, which is where those
- * defaults materialise and where an authoring mistake stops the build.
- */
+/** Typed off the schema's input so `.default()`ed keys need not be restated; the merge re-parses each row. */
 type ItemInput = z.input<typeof EquipmentReferenceSchema>;
 
 /**
- * The rider keys an overlay may author on one magic item - READ OFF `EquipmentReferenceSchema`
- * rather than invented, so a key this list names but the schema drops is a compile error at the
- * `Pick` below instead of an entry that authors nothing.
- *
- * The first six are `featureRiders` (`src/character-content.ts`), spread onto the item schema
- * unchanged - which is what makes *"a feat carries the same buffs and debuffs an item does"* true by
- * construction. The last three are the magic-item vocabulary's own mechanical columns.
- *
- * WHAT IS DELIBERATELY NOT HERE is everything the ETL PARSES: `id`, `name`, `source`, `category`,
- * `description`, `costGp`, `weightLb`, `weapon`, `armor`, and the four identity columns `slot`,
- * `rarity`, `isMagic` and `attunement`. Those are read out of the vendored SRD text, they are pinned
- * by `test/magic-items.test.ts`, and an overlay that could rewrite them would be authoring content
- * the source already states - a second, hand-maintained home for a parsed fact. `attunement` is the
- * one worth naming: it is printed on the item's own type line ("(Requires Attunement by a Bard)")
- * and the parse of that line is what `cursed`'s refinement is checked against, so a lane that wants
- * a curse must find an item the SRD already gates behind attunement rather than gating it here.
+ * The rider keys an overlay may author: the six `featureRiders` plus the magic-item columns. Parsed
+ * columns (`slot`, `rarity`, `attunement`, `category`, prose...) are excluded; they come from the SRD
+ * text. A curse therefore needs an item the SRD already gates behind attunement.
  */
 export type ItemRiderKey =
   | "tags" | "actions" | "effects" | "uses" | "grants" | "modifiers"
@@ -116,87 +45,37 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags", "actions", "effects", "uses", "grants", "modifiers", "cursed", "casts", "grantsFeatIds"
 ] as const);
 
-/** The riders ONE magic item may carry. Every key optional: an entry authors only what it names. */
+/** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
 export type ItemMechanics = Partial<Pick<ItemInput, ItemRiderKey>>;
 
-/**
- * What ONE lane file contributes: riders by magic-item id, exactly as `bundles/magic-items.v1.json`
- * spells the id (`cloak-of-protection`, `wand-of-fireballs`, `weapon-1`).
- *
- * Flat rather than nested, unlike `MechanicsOverlay`'s (recordId, featureId) pair, because an item
- * id is not ambiguous the way a bare feature id is: `unarmored-defense` is a Barbarian feature AND a
- * Monk feature, but the ETL's own duplicate-id guard already proves every one of the 268 ids is
- * unique inside this bundle and collides with nothing in the other three.
- */
+/** One lane file's riders, keyed by magic-item id as the bundle spells it. Item ids are unique, so the key is flat. */
 export type ItemMechanicsModule = Readonly<Record<string, ItemMechanics>>;
 
 /**
- * ONE LANE, ATTRIBUTED. This is the shape `./index.ts` holds a LIST of, and the attribution is what
- * every lane-level check below stands on: without a lane name a duplicate id has nobody to blame,
- * and without `categories` §3's category rule has nothing to check an entry against.
- *
- * `categories` are `EquipmentReference.category` values as the ETL emits them. Measured over the
- * committed 268 rows: `wondrous-item 127 · weapon 33 · consumable 25 · ring 22 · wand 15 · armor 14
- * · staff 12 · shield 9 · rod 7 · ammunition 4`.
- *
- * CATEGORY ALONE SEPARATES C7a FROM C7b FROM {C7c, C7d} AND NO FURTHER, which is why `slots` exists
- * beside it. §3 says the split itself: the category comes off the printed type line and the build can
- * check it, but the worn/carried line that divides C7c from C7d is the `slot` column, *"downstream of
- * a judgement rather than free of one"*. Both of those lanes declare `wondrous-item`, so for the
- * 127 rows they share the category check passes for BOTH and stops meaning anything - and what was
- * left holding that boundary was check 1, the duplicate-id refusal, which only fires once a lane has
- * ALREADY authored the other lane's item. A review pass called that a real hole and it is: a C7c
- * entry on a `Bag of Holding` is not a collision with anything (C7d may not have reached it yet), so
- * it lands, ships, and is discovered by a reader rather than by the build.
- *
- * `slots` closes it by NARROWING, never replacing: a lane that declares none is checked exactly as
- * before, so C7a and C7b are untouched by this field's existence.
+ * One lane, attributed, so refusals can name it. `categories` are `EquipmentReference.category`
+ * values. Two lanes share `wondrous-item`, so `slots` optionally narrows a lane by the `slot` column.
  */
 export interface ItemMechanicsLane {
-  /** The unit that owns this lane, exactly as the plan spells it: "C7a", "C7b", "C7c", "C7d". */
+  /** The unit that owns this lane ("C7a"...), used in refusal messages. */
   readonly lane: string;
   /** The bundle categories this lane owns. An entry on a row outside them is refused. */
   readonly categories: readonly string[];
   /**
-   * OPTIONAL. The `EquipmentReference.slot` values this lane owns, checked the same way `categories`
-   * is and refused the same way. Omitted = the category check alone, which is every lane whose
-   * category nobody else claims.
-   *
-   * Measured over the committed 268 rows, the `wondrous-item` category splits
-   * `wondrous 71 · neck 15 · shoulders 15 · head 11 · feet 7 · hands 6 · belt 2` - so C7c declares
-   * the six worn slots and C7d is left with `wondrous`, and each is refused at the other's items by
-   * the build rather than by the first reader to notice.
-   *
-   * Present-but-empty is refused at the lane level, for check 3's reason: `slots: []` matches no row
-   * at all, which is a lane that can author nothing rather than a lane that narrows nothing.
+   * The `EquipmentReference.slot` values this lane owns, checked like `categories`. Omitted = category
+   * check only. Present-but-empty is refused: it would match no row.
    */
   readonly slots?: readonly string[];
   /** This lane's riders, keyed by magic-item id. */
   readonly entries: ItemMechanicsModule;
 }
 
-// ---------------------------------------------------------------------------------------------
-// THE ADMISSION RULE, MIRRORED. Check 6.
-// ---------------------------------------------------------------------------------------------
+// ---- The admission rule (check 6) ---------------------------------------------------------------
 
 /**
- * `CARRIER_RIDER_DISPOSITION` (`apps/server/src/character-build.ts`) IS THE SOURCE OF TRUTH; this is
- * a MIRROR, and `test/item-mechanics.test.ts` fails if the two ever drift.
- *
- * The plan's admission rule is *"a lane authors a rider only when its reader ships today"*, and the
- * server already knows which readers ship: that table maps every rider type the item carrier can
- * reach to `standing` / `at-its-moment` / `unread` / `display-only`, with the consumer named in a
- * comment beside each. `"unread"` means the vocabulary and the collector carry the rider but no
- * consumer applies it YET - so a lane authoring one produces a row that parses, ships, projects and
- * changes nothing at the table. That is the exact failure this file exists to make loud, and until
- * now it was the one shape of it that was accepted silently.
- *
- * WHY A MIRROR RATHER THAN AN IMPORT: `apps/server` DEPENDS ON this package
- * (`apps/server/package.json` lists `"@vtt/content-srd-5.2.1": "*"`; this package's dependencies are
- * `@vtt/rules-5e`, `@vtt/schemas` and `zod`). Importing the server here would invert that edge and
- * make the content package unbuildable without the app that consumes it. The table is also not
- * exported from the server at all. So it is copied, with the drift test standing in for the import -
- * a mirror that cannot silently rot is worth more than a dependency cycle.
+ * A mirror of `CARRIER_RIDER_DISPOSITION` (`apps/server/src/character-build.ts`); importing it would
+ * invert the dependency edge (`apps/server` depends on this package), and it is not exported.
+ * `test/item-mechanics.test.ts` fails if the two drift. `"unread"` means no consumer applies the
+ * rider yet.
  */
 export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing" | "at-its-moment" | "unread" | "display-only">> = Object.freeze({
   "attack-bonus": "standing",
@@ -217,63 +96,28 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing
 });
 
 /**
- * The refused half of the mirror, derived rather than restated so the two cannot disagree.
- *
- * `display-only` is NOT refused, and the reason is a MIRRORING one rather than a claim about the
- * outcome: this set must be derivable from the server's own table, and `sense` is `"display-only"`
- * there, not `"unread"`. Changing it here would be the drift the mirror exists to prevent.
- *
- * **DO NOT READ THAT AS PERMISSION TO AUTHOR ONE.** The earlier wording here said `sense` *"reaches
- * the sheet as prose the way `darkvision` does, which is a real (if thin) outcome"*, and C7c measured
- * that and found no such sheet: `EquipmentDerivation` has no senses field, so a `sense` rider on an
- * item is not even summed, and `CharacterSheet.tsx`'s Senses line is fed by the DEFINITION's
- * `open5e` extension, which the builder fills from a species and never from an item. An item's
- * `sense` (and `darkvision`, and `speed` - whose `derivation.speed` is summed and read by nothing)
- * therefore fails the admission rule's second clause and belongs in a lane's named absences, exactly
- * as an `unread` rider would. `worn-wondrous.ts`'s limit W2 carries the measurement.
+ * Derived from the mirror. `display-only` is not refused here because the set must match the server
+ * table, but `sense` riders on items do reach nothing; see `MEASURED_INERT_RIDER_TYPES`.
  */
 const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
   Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR).filter(([, disposition]) => disposition === "unread").map(([type]) => type)
 );
 
 /**
- * THE SECOND REFUSAL SET, AND THE REASON IT IS SEPARATE — added by review, 2026-08-12.
- *
- * The paragraph above says an item's `speed`, `darkvision` and `sense` "belongs in a lane's named
- * absences, exactly as an `unread` rider would" — and then the seam could not refuse one, because
- * `UNREAD_RIDER_TYPES` is derived from the mirror and the mirror marks exactly ONE type `"unread"`.
- * MEASURED 2026-08-12: `{type:"speed",amount:10}`, `{type:"darkvision",feet:60}` and
- * `{type:"sense",sense:"tremorsense",feet:30}` added to a lane entry all ran the real ETL to exit 0
- * and landed in `bundles/magic-items.v1.json`. In a file whose header says *"EVERY REFUSAL BELOW
- * EXISTS BECAUSE A LANE CAN OTHERWISE AUTHOR NOTHING AND THE BUILD STAYS QUIET"*, that is the hole.
- *
- * It is a SECOND, SEPARATELY NAMED set rather than an edit to the mirror because the mirror must
- * stay derivable from the server's own table — `sense` is `"display-only"` there and changing it
- * here is precisely the drift the mirror exists to prevent. This set makes no claim about the
- * server's table; it records what THIS PROGRAM measured about the three types' readers:
- *   `speed`      `deriveEquipment` sums it into `derivation.speed` (`equipment-derivation.ts:678`)
- *                and grepping that field across `apps/server/src`, `packages/rules-5e/src` and
- *                `apps/client/src` returns the write and NO read.
- *   `darkvision` `EquipmentDerivation` has no darkvision field, so it is not even summed.
- *   `sense`      no senses field either; `CharacterSheet.tsx:696`'s Senses line reads
- *                `extension.senses`, which the builder fills from a SPECIES and never from an item.
- * `worn-wondrous.ts`'s limit W2 carries the same measurement and names the items it emptied.
- *
- * LATENT WHEN ADDED: no lane authors any of the three, so this refuses nothing that exists today.
- * It exists so the next one meets the measurement instead of a silent build.
+ * Rider types measured inert on an item carrier, kept apart from the mirror so it stays derivable
+ * from the server's table: `speed` is summed into `derivation.speed` and never read; `darkvision` and
+ * `sense` have no field in `EquipmentDerivation` (the sheet's Senses line comes from the species).
  */
 const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["speed", "darkvision", "sense"]);
 
-// ---------------------------------------------------------------------------------------------
-// THE CROSS-BUNDLE VOCABULARIES. Check 5.
-// ---------------------------------------------------------------------------------------------
+// ---- Cross-bundle vocabularies (check 5) --------------------------------------------------------
 
 type RefKind =
   | "spell" | "feat" | "skill" | "language" | "class" | "species"
   | "damage type" | "condition" | "school of magic" | "creature type" | "weapon property"
   | "weapon proficiency";
 
-/** Where each kind's ids come from, loaded LAZILY so an empty overlay reads no bundle at all. */
+/** Where each kind's ids come from, loaded lazily so an empty overlay reads no bundle. */
 const VOCABULARIES: Readonly<Record<RefKind, { readonly source: string; readonly ids: () => readonly string[] }>> = {
   spell: { source: "bundles/spells.v1.json", ids: () => loadSpells().map((record) => record.id) },
   feat: { source: "bundles/feats.v1.json", ids: () => loadFeats().map((record) => record.id) },
@@ -287,14 +131,8 @@ const VOCABULARIES: Readonly<Record<RefKind, { readonly source: string; readonly
   "creature type": { source: "src/enums.ts CREATURE_TYPE_IDS", ids: () => CREATURE_TYPE_IDS },
   "weapon property": { source: "src/enums.ts WEAPON_PROPERTY_IDS", ids: () => WEAPON_PROPERTY_IDS },
   /**
-   * `grants.weapons` IS BOTH HALVES, because its reader is: `weaponAction`
-   * (`apps/server/src/equipment-derivation.ts:1003`) computes
-   * `granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id)`, so a
-   * proficiency GROUP and a base weapon's own id are equally first-class there. Both halves are
-   * derived from the same shipped bundle rather than restated, so a new weapon or a third category
-   * needs no edit here. MEASURED over `bundles/weapons.v1.json`: 38 ids and the 2 categories
-   * `simple`, `martial` - and C7c's `bracers-of-archery` authors `["longbow", "shortbow"]`, which
-   * is the id half in use today.
+   * `weaponAction` grants proficiency if `grants.weapons` names the weapon's category or its id, so
+   * both are valid here, read off `bundles/weapons.v1.json`.
    */
   "weapon proficiency": {
     source: "bundles/weapons.v1.json (a weapon id, or one of its `category` groups)",
@@ -310,11 +148,8 @@ const vocabulary = (kind: RefKind): ReadonlySet<string> => {
 };
 
 /**
- * A KEY WHOSE VALUE IS A SLUG (or a list of them) POINTING INTO ANOTHER BUNDLE.
- *
- * Keyed by property name because the rider vocabulary names each of these exactly once - the two
- * places it does NOT (`id` and `type`, both of which mean different things in different parents)
- * are handled by `ELEMENT_REFERENCES` below instead of guessed at here.
+ * Keys whose value is a slug (or list of them) pointing into another bundle. `id` and `type` mean
+ * different things in different parents, so they are handled by `ELEMENT_REFERENCES` instead.
  */
 const SLUG_REFERENCES: Readonly<Record<string, RefKind>> = {
   spellId: "spell", spellIds: "spell", grantsFeatIds: "feat",
@@ -327,7 +162,7 @@ const SLUG_REFERENCES: Readonly<Record<string, RefKind>> = {
   weapons: "weapon proficiency"
 };
 
-/** A key holding OBJECTS, one of whose fields is a slug: `grants.spells[].id`, `damage[].type`. */
+/** A key holding objects, one of whose fields is a slug: `grants.spells[].id`, `damage[].type`. */
 const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
   spells: { id: "spell" },          // grants.spells[]
   conditions: { id: "condition" },  // actions[].onHit[].conditions[]
@@ -336,31 +171,15 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
 };
 
 /**
- * THE SLUGS DELIBERATELY LEFT OPEN, named here rather than silently skipped, because "we did not
- * think of it" and "there is nothing to check it against" look identical in a walker's absence.
+ * Slugs deliberately not checked:
  *
- *   `tags`, `endsWithTag`, `requiresEffectTag`, `while-effect-tag.tags` - the live EFFECT tag
- *       namespace and the sheet's own grouping slugs. Runtime strings, in no bundle.
- *   `uses.pool`, `resource-bonus.poolId` - the live `actionUses` KEY. The schema says so in as many
- *       words: deliberately NOT the class table's `classResources`.
- *   `grants.tools` / `grants.armor` - PROFICIENCY GROUPS, not record ids. Measured over the shipped
- *       bundles: `armor` is `light|medium|heavy|shields`, which is no bundle's id column, and there
- *       is no tool bundle at all.
- *       **`grants.weapons` USED TO BE LISTED HERE AND THE REASON GIVEN WAS FALSE.** It said `weapons`
- *       is `simple|martial` and therefore "not any bundle's id column". C7c measured the reader while
- *       authoring `Bracers of Archery` and found it wider: `weaponAction`
- *       (`apps/server/src/equipment-derivation.ts:1003`) is
- *       `granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id)`, so
- *       a base weapon id is first-class there and `["longbow", "shortbow"]` is what the lane wrote.
- *       Left open, a typo'd `long-bow` would have parsed, shipped and granted nothing - check 5's own
- *       failure mode, on the one key check 5 was not watching. It is CHECKED now, against the weapon
- *       ids and the `category` groups together, both read off `bundles/weapons.v1.json`.
- *   `while-proficient-with.ids` when `kind` is weapon/armor/tool - a proficiency TRIGGER rather than
- *       a grant, and its weapon half is written as a group in the vocabulary that ships. When `kind`
- *       is `"skill"` it IS checked, below.
- *   `sense` - there is no senses model to check against; the disposition table calls it display-only.
- *   `actions[].id`, `multiattack[].actionId`, `uses` shape - local to the item's own action list.
- *   `grants.saves` - `AbilitySchema`, already a closed zod enum; a bad value never reaches here.
+ *   `tags`, `endsWithTag`, `requiresEffectTag`, `while-effect-tag.tags` - runtime effect tags, in no bundle.
+ *   `uses.pool`, `resource-bonus.poolId` - the live `actionUses` key, not a bundle id.
+ *   `grants.tools` / `grants.armor` - proficiency groups; no bundle has those ids.
+ *   `while-proficient-with.ids` for weapon/armor/tool - groups (the `"skill"` kind is checked).
+ *   `sense` - no senses model to check against.
+ *   `actions[].id`, `multiattack[].actionId` - local to the item's own action list.
+ *   `grants.saves` - already a closed zod enum.
  */
 export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
   "tags", "endsWithTag", "requiresEffectTag", "pool", "poolId", "tools", "armor", "sense", "saves", "actionId"
@@ -392,12 +211,7 @@ function closest(slug: string, ids: ReadonlySet<string>): string | null {
 
 interface Reference { readonly path: string; readonly kind: RefKind; readonly slug: string }
 
-/**
- * Walk one authored rider structure and collect every slug that points into another bundle.
- *
- * The walk is over the PARSED row's riders rather than the authored input, so it sees the same
- * materialised shape the bundle will carry - a `when: []` the author never wrote included.
- */
+/** Collect every cross-bundle slug in the parsed riders (so materialised defaults are included). */
 function collectReferences(node: unknown, path: string, into: Reference[]): void {
   if (Array.isArray(node)) {
     node.forEach((element, index) => collectReferences(element, `${path}.${index}`, into));
@@ -438,19 +252,12 @@ function collectReferences(node: unknown, path: string, into: Reference[]): void
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// THE MERGE.
-// ---------------------------------------------------------------------------------------------
+// ---- The merge ----------------------------------------------------------------------------------
 
 /** Where a Zod issue landed inside the merged row, for the refusal message. "" at the root. */
 const where = (path: ReadonlyArray<string | number>): string => (path.length === 0 ? "" : `${path.join(".")}: `);
 
-/**
- * Why a present rider key authors nothing, or null when it authors something.
- *
- * `undefined` is a key the entry simply did not name and is not a refusal on its own - "the entry
- * named no rider AT ALL" is check 3's other half, below.
- */
+/** Why a present rider key authors nothing, or null when it authors something (or is undefined). */
 function authorsNothing(value: unknown): string | null {
   if (value === undefined) return null;
   if (Array.isArray(value)) return value.length === 0 ? "present but empty" : null;
@@ -460,22 +267,11 @@ function authorsNothing(value: unknown): string | null {
 }
 
 /**
- * Merge the overlay lanes onto the generated rows and RETURN the merged rows.
+ * Merge the overlay lanes onto the generated rows. Rows no lane names are returned by reference,
+ * unparsed, so an empty overlay is a byte-for-byte no-op; named rows are re-parsed through
+ * `EquipmentReferenceSchema` so they carry the same materialised defaults as every other row.
  *
- * Rows no lane names are returned BY REFERENCE, untouched and unparsed, so an empty overlay is a
- * byte-for-byte no-op on the emitted bundle - which is what makes this seam provably inert until a
- * lane fills it (`test/item-mechanics.test.ts` asserts exactly that against the committed file, and
- * `build-magic-items.ts --out=` asserts it again through the real ETL). Rows a lane does name are
- * re-parsed through `EquipmentReferenceSchema`, so the merged row carries the same materialised
- * defaults the ETL's own `parse` gives every other row.
- *
- * IT TAKES A LIST, NOT A MERGED OBJECT, and that is check 1: object composition would collapse two
- * lanes keyed to the same item before this function could see either of them.
- *
- * It COLLECTS every refusal and throws once, so a lane fixes its module in one pass rather than one
- * run per mistake. It THROWS rather than returning a miss list (the class overlay's shape) because
- * the caller here is a script whose only response is to die, and because a throw is what lets the
- * test assert the message without spawning a build. Nothing is written on any path that refuses.
+ * Collects every refusal and throws once, so a lane can fix its module in one pass.
  */
 export function applyItemMechanics(
   rows: readonly EquipmentReference[],
@@ -507,8 +303,7 @@ export function applyItemMechanics(
       refused.push(`lane "${lane.lane}" declares no categories, so nothing can check that its entries are its own; declare the bundle categories it owns`);
       continue;
     }
-    // `slots` is OPTIONAL and narrows; present-but-empty narrows to nothing, which is check 3's shape
-    // one level up - a declaration that can admit no row at all.
+    // Present-but-empty `slots` would admit no row.
     if (lane.slots !== undefined && lane.slots.length === 0) {
       refused.push(`lane "${lane.lane}" declares an empty "slots" list, which matches no row at all; name the slots it owns, or omit the field to be checked by category alone`);
       continue;
@@ -535,26 +330,15 @@ export function applyItemMechanics(
         continue;
       }
 
-      // The SECOND half of check 4, and the only one that can separate two lanes sharing a category.
-      // A row with no `slot` at all fails a declared list rather than passing it: `slot` is optional
-      // on the schema, and "the column is missing" is not evidence that the item is this lane's.
+      // A row with no `slot` fails a declared list: a missing column is not evidence the item belongs here.
       if (lane.slots !== undefined && !lane.slots.includes(row.slot ?? "")) {
         refused.push(`${at} - has slot ${row.slot === undefined ? "(none)" : `"${row.slot}"`} and lane "${lane.lane}" owns ${lane.slots.map((slot) => `"${slot}"`).join(", ")}. Two lanes share the "${row.category}" category, so the slot is what divides them (plan §3); author this item in the lane that owns it`);
         continue;
       }
 
       /**
-       * AN UNKNOWN TOP-LEVEL KEY IS A TYPO, AND IT MUST BE LOUD — a regression fix, 2026-08-11.
-       *
-       * The hardening pass introduced this hole while closing six others. Below, the merged row is
-       * built by PICKING the known `ITEM_RIDER_KEYS` out of the entry, so a misspelled key beside a
-       * real one (`modifers` next to `modifiers`) is never handed to the schema at all and
-       * `.strict()` — which caught it before the hardening — never sees it. The build then exits 0
-       * having authored only the half the author spelled correctly, which is the precise failure
-       * this whole overlay exists to make impossible.
-       *
-       * Checked here rather than by spreading the raw entry into the parse, because the pick is what
-       * keeps a lane from setting a PARSED column (`slot`, `rarity`, `attunement`) it must not own.
+       * The merged row is built by picking known rider keys (so a lane cannot set parsed columns like
+       * `slot`), which means a misspelled key would never reach `.strict()`. Refuse unknown keys explicitly.
        */
       const unknown = Object.keys(mechanics)
         .filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
@@ -583,8 +367,7 @@ export function applyItemMechanics(
         continue;
       }
 
-      // Only the ITEM's own `modifiers` are `FeatureModifier`s; `effects[].modifiers` are the
-      // actor-side `EffectModifier` union, which the disposition table does not describe.
+      // Only the item's own `modifiers` are `FeatureModifier`s; `effects[].modifiers` are a different union.
       const unread = parsed.data.modifiers
         .map((modifier, index) => ({ index, type: modifier.type }))
         .filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
@@ -593,8 +376,6 @@ export function applyItemMechanics(
         continue;
       }
 
-      // The same refusal for the three types this PROGRAM measured inert on an item carrier. Kept
-      // apart from the mirror above so the mirror stays derivable from the server's own table.
       const inert = parsed.data.modifiers
         .map((modifier, index) => ({ index, type: modifier.type }))
         .filter((modifier) => MEASURED_INERT_RIDER_TYPES.has(modifier.type));

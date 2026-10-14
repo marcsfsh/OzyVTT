@@ -13,29 +13,14 @@ import {
 } from "../src/index.js";
 
 /**
- * THE INFERENCE-BUDGET GUARD, and it is a TYPE assertion on purpose - it cannot be a runtime one.
+ * Inference-budget guard, as a type assertion. `EquipmentReferenceSchema` is large enough that
+ * growing it can push `z.infer` past TypeScript's expansion budget, which silently truncates a
+ * different inferred type (`SpellReference` lost fields in `packages/domain`). Keep
+ * `EquipmentWeaponStatsSchema` a named schema.
  *
- * `EquipmentReferenceSchema` is the largest object in this package. Inlining one more property in it
- * once pushed `z.infer` past TypeScript's expansion budget, and the compiler responded by silently
- * truncating a DIFFERENT inferred type: the spell shape `packages/domain`'s `catalog-choice.ts`
- * reads went missing its attack-roll and range fields, with no error at the edit site. That is why
- * `EquipmentWeaponStatsSchema` is a NAMED schema (`schemas.ts`), and adding a key to it - as
- * `properties` did - is exactly the move that broke it.
- *
- * `Has` fails to compile when the key is missing, when its type has collapsed to `any` or `never`,
- * or when it no longer satisfies the expected shape - so the failure lands here at `npm run check`
- * (this package typechecks `test`) rather than as a mystery two packages away. Runtime
- * `toMatchObject` cannot catch it: the VALUE is always there; it is the TYPE that goes.
- *
- * Both collapse arms are load-bearing and neither is reachable through plain `extends`. A bare
- * `T[K] extends Expected` answers TRUE for `any` (a conditional on `any` returns both branches
- * unioned, and `true | never` is `true`) and TRUE for `never` (which extends everything), so the
- * two shapes a truncated inference actually takes were the two this guard used to wave through.
- *
- * SCOPE, because this guard is easy to over-read: it proves these types are intact IN THIS
- * PACKAGE'S program. Instantiation budgets are per-program, so it cannot reproduce exhaustion in a
- * larger one - and the historic truncation surfaced in `packages/domain`. The matching assertion
- * for that program lives beside the code that suffered it, in `packages/domain/test/catalog-choice.test.ts`.
+ * `Has` rejects a missing key and a type collapsed to `any` or `never` (a bare `extends` accepts
+ * both). Budgets are per-program; `packages/domain/test/catalog-choice.test.ts` holds the matching
+ * check for that package.
  */
 type Has<T, K extends keyof T, Expected> =
   0 extends (1 & T[K]) ? never
@@ -97,7 +82,7 @@ describe("SRD 5.2.1 monster bundle", () => {
   it("carries structured rules mechanics for the giant crocodile (ADR-0020 golden check)", () => {
     const crocodile = monsters.find((monster) => monster.source.externalId === "giant-crocodile")!;
     expect(crocodile.actions.find((action) => action.id === "multiattack")!.multiattack).toEqual([{ actionId: "bite", count: 1 }, { actionId: "tail", count: 1 }]);
-    // Bite: Grappled AND Restrained ride one source-linked rider with the printed escape DC and size cap.
+    // Bite: Grappled and Restrained ride one source-linked rider with the printed escape DC and size cap.
     expect(crocodile.actions.find((action) => action.id === "bite")!.onHit).toEqual([{ conditions: [{ id: "grappled" }, { id: "restrained" }], escapeDc: 15, maxTargetSize: "large" }]);
     const tail = crocodile.actions.find((action) => action.id === "tail")!;
     expect(tail.onHit).toEqual([{ conditions: [{ id: "prone" }], maxTargetSize: "large" }]);
@@ -137,7 +122,7 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(byId("adult-red-dragon").actions.find((action) => action.id === "fire-breath")!.damage).toEqual([{ formula: "17d6", type: "fire" }]);
     // A condition-only breath (no dice in its Failure clause) stays prose-only.
     expect(byId("adult-brass-dragon").actions.find((action) => action.id === "sleep-breath")!.damage).toEqual([]);
-    // Coverage floor: most save-for-damage actions are now structured (was 12 before the fix).
+    // Coverage floor: most save-for-damage actions are structured.
     const saveActions = monsters.flatMap((monster) => monster.actions).filter((action) => action.save);
     expect(saveActions.filter((action) => action.damage.length > 0).length).toBeGreaterThanOrEqual(100);
   });
@@ -223,18 +208,9 @@ describe("SRD 5.2.1 reference bundles", () => {
   });
 
   /**
-   * THE REBUILD GUARD for the weapon table's two JOINED-IN columns.
-   *
-   * Neither exists in the vendored open5e `Weapon` fixtures; both are joined from the markdown SRD's
-   * Weapons table by `build-bundle.ts`. Both are `.optional()` on `WeaponReferenceSchema`, so a
-   * bundle missing either validates clean and ships inert - which is exactly what `mastery` did. It
-   * was hand-added on top of the ETL output, so every `build-bundle` run deleted all 38 in silence,
-   * and the weapon assertion above spot-checked Battleaxe's category and damage and never noticed.
-   *
-   * So this pins every value BY NAME rather than spot-checking or counting. The 38 masteries are the
-   * whole data basis for weapon mastery, and the 70 property assignments decide which ability a
-   * weapon swings with and what its reach is - a silent re-transcription is a wrong number on a
-   * character sheet, and it should be a red test here instead.
+   * Mastery and properties are joined from the markdown SRD Weapons table by `build-bundle.ts`, and
+   * both are optional on the schema, so a rebuild that dropped them would still validate. Pinned by
+   * name for every weapon.
    */
   it("emits the SRD mastery and property columns for all 38 weapons, by name", () => {
     const weapons = loadWeapons();
@@ -264,17 +240,13 @@ describe("SRD 5.2.1 reference bundles", () => {
     expect(Object.keys(table).length).toBe(38);
     expect(weapons.map((weapon) => weapon.id).sort()).toEqual(Object.keys(table).sort());
 
-    // BY NAME, both columns at once: the failure message says which weapon and what it lost.
+    // By name, both columns at once: the failure message says which weapon and what it lost.
     const actual = Object.fromEntries(weapons.map((weapon) => [weapon.id, [weapon.mastery, weapon.properties]]));
     expect(actual, "a build-bundle run changed or dropped the MASTERY / PROPERTIES columns").toEqual(table);
-    // 70 assignments over 9 slugs - the count the join is measured by, restated so a wholesale drop
-    // reads as a number rather than as a diff.
+    // 70 property assignments over 9 slugs.
     expect(weapons.flatMap((weapon) => weapon.properties!).length).toBe(70);
 
-    // THE THIRD JOINED COLUMN: the table's category band, as melee/ranged, pinned by name like the
-    // other two. It is the whole data basis for "Weapon (Any Melee Weapon)" eligibility (Defender,
-    // Flame Tongue), and it has the same failure mode: `melee` is `.optional()`, so a rebuild that
-    // dropped the band parse would validate clean and resolve those two items against nothing.
+    // The melee/ranged band, joined the same way; it decides "Any Melee Weapon" eligibility.
     const meleeIds = weapons.filter((weapon) => weapon.melee === true).map((weapon) => weapon.id).sort();
     const rangedIds = weapons.filter((weapon) => weapon.melee === false).map((weapon) => weapon.id).sort();
     expect(meleeIds, "the 28 melee-band weapons, by name").toEqual([
@@ -289,7 +261,7 @@ describe("SRD 5.2.1 reference bundles", () => {
     ]);
     expect(meleeIds.length + rangedIds.length, "every weapon sits in exactly one band").toBe(38);
 
-    // The ARMOR table's band, same join, same failure mode, pinned for all 13 by name.
+    // The Armor table's band, same join, same failure mode, pinned for all 13 by name.
     const armorCategories = Object.fromEntries(loadArmor().map((piece) => [piece.id, piece.category]));
     expect(armorCategories, "a build-bundle run changed or dropped the armor CATEGORY column").toEqual({
       "padded-armor": "light", "leather-armor": "light", "studded-leather-armor": "light",
@@ -308,17 +280,14 @@ describe("SRD 5.2.1 reference bundles", () => {
       expect(bare("mastery"), weapon.id).toContain(weapon.mastery);
       for (const property of weapon.properties!) expect(bare("property"), `${weapon.id}: ${property}`).toContain(property);
     }
-    // A Mace really has no properties, and that is a different claim from "not recorded" - the
-    // reason the column is an empty array here rather than an absent key.
+    // A Mace has no properties: an empty array, not an absent key.
     expect(weapons.find((weapon) => weapon.id === "mace")!.properties).toEqual([]);
   });
 
   it("folds the vendored gear bundle together with weapons, armor and the magic items into one addable catalog", () => {
     const equipment = loadEquipment();
-    // THE CATALOG CENSUS - four sources, each counted from its own bundle rather than from a
-    // remembered total, so dropping any one fold names the count it dropped by. The gear bundle
-    // (ammunition/gear/tools/packs/focuses/consumables) plus every non-improvised weapon, every
-    // armor piece, and the 268 generated magic-item rows.
+    // Each of the four sources is counted from its own bundle: gear, non-improvised weapons, armor and
+    // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
     expect(loadMagicItems().length).toBe(268);
     expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length + 268);
@@ -340,8 +309,7 @@ describe("SRD 5.2.1 reference bundles", () => {
     // A weapon mapped in from weapons.v1.json carries its structured weapon sub-object, no armor.
     const longsword = equipment.find((item) => item.id === "longsword");
     expect(longsword).toMatchObject({ category: "weapon", weapon: { category: "martial", damageDice: "1d8", damageType: "slashing" }, armor: null });
-    // Both transcribed columns survive the fold. `properties` has to, or the catalog->inventory copy
-    // in `character-build.ts` has nothing to copy and `weaponPropertiesOf` answers [] forever.
+    // `properties` must survive the fold or `character-build.ts` has nothing to copy into inventory.
     expect(equipment.find((item) => item.id === "dagger")!.weapon).toMatchObject({ mastery: "nick", properties: ["finesse", "light", "thrown"] });
     // The shield row is classified from its low base AC; body armor keeps its own category.
     expect(equipment.find((item) => item.id === "shield")).toMatchObject({ category: "shield", armor: { acBase: 2 } });
@@ -362,10 +330,8 @@ describe("SRD 5.2.1 reference bundles", () => {
 });
 
 /**
- * The homebrew seam on the reference records: one source discriminator, an open item category, and
- * the strictness that stays. These assertions exist because the failure they cover is SILENT - a
- * plain `z.object` strips an undeclared key with no error, so a schema that does not declare
- * `source` loses `source: "homebrew"` on the way in and nothing anywhere reports it.
+ * Homebrew seam on the reference records. A plain `z.object` strips undeclared keys silently, so
+ * `source` must be declared on every record or `source: "homebrew"` is lost.
  */
 describe("homebrew source discriminator and open item categories", () => {
   const spellBody = {
@@ -396,8 +362,7 @@ describe("homebrew source discriminator and open item categories", () => {
   });
 
   it("strips an UNdeclared key from the very same schemas - which is what `source` used to be", () => {
-    // The injection that proves the test above bites: same schema, same call, a key that is NOT
-    // declared comes back gone, with no error raised. Declaring the field is the entire fix.
+    // Proves the test above can fail: an undeclared key is stripped without error.
     for (const [label, schema, body] of records) {
       if (schema === EquipmentReferenceSchema) continue; // the one .strict() record - covered below
       const parsed = schema.parse({ ...body, contentSource: "homebrew" }) as Record<string, unknown>;
@@ -424,14 +389,10 @@ describe("homebrew source discriminator and open item categories", () => {
   });
 
   it("keeps .strict() on the equipment record, so a typo'd key is caught rather than lost", () => {
-    // The opposite failure mode from the strip above, and the reason this ONE record stays strict:
-    // a hand-authored homebrew item is the only place a mistyped key is likely, and it is the only
-    // schema in the system that will tell you about it.
+    // The equipment record stays strict because hand-authored homebrew items are where key typos happen.
     expect(() => EquipmentReferenceSchema.parse({ ...gearBody, weight: 2 })).toThrow();
     expect(() => EquipmentReferenceSchema.parse({ ...gearBody, requiresAttunement: true })).toThrow();
-    // ...and the OTHER half of that contract: declaring a field is what makes it real. `rarity` and
-    // `isMagic` used to throw here for exactly the same reason `weight` still does. The magic-item
-    // vocabulary is not a loosened schema; it is a longer list of declared keys.
+    // Declared magic-item fields parse; undeclared keys still throw.
     const magic = EquipmentReferenceSchema.parse({ ...gearBody, rarity: "rare", isMagic: true, slot: "wondrous" });
     expect(magic.rarity).toBe("rare");
     expect(magic.isMagic).toBe(true);
@@ -444,10 +405,7 @@ describe("homebrew source discriminator and open item categories", () => {
   });
 });
 
-/**
- * The spell-list overlay: membership declared as a record and folded into `classes` at the merge
- * point, so `bundles/spells.v1.json` - a GENERATED, vendored CC-BY artifact - is never edited.
- */
+/** The spell-list overlay folds declared membership into `classes`; `spells.v1.json` is never edited. */
 describe("spell-list overlay", () => {
   const spells = loadSpells();
   const list = (id: string, patch: Partial<{ basedOn: string[]; add: string[]; remove: string[] }> = {}) =>
@@ -461,7 +419,7 @@ describe("spell-list overlay", () => {
     const wizardList = spells.filter((spell) => spell.classes.includes("wizard")).map((spell) => spell.id);
     expect(wizardList.length).toBeGreaterThan(200);              // the SRD Wizard list, inherited whole
     expect(onList).toContain("magic-missile");                   // via basedOn
-    expect(onList).toContain("cure-wounds");                     // an SRD CLERIC spell, added by id
+    expect(onList).toContain("cure-wounds");                     // an SRD Cleric spell, added by id
     expect(onList).not.toContain("fireball");                    // removed after expansion
     expect(onList.length).toBe(wizardList.length + 1 - 1);
     // The overlay only ever APPENDS a tag: the SRD Wizard list is untouched by this list's `remove`.
@@ -478,9 +436,8 @@ describe("spell-list overlay", () => {
   });
 
   it("reports an empty list at PUBLISH time, before a player hits the hard build rejection", () => {
-    // resolveCatalogChoice refuses to return an empty option list and the server turns that into a
-    // rejected character.create - so a caster pointed at an empty list is an UNCREATABLE character,
-    // not an empty picker. This is where that becomes detectable.
+    // An empty list makes a caster uncreatable (`resolveCatalogChoice` refuses empty options), so it is
+    // reported at publish time.
     const blank = list("hb-empty");
     const phantom = list("hb-phantom", { add: ["no-such-spell"], basedOn: ["no-such-list"] });
     const resolution = resolveSpellLists([blank, phantom, list("hb-real", { basedOn: ["cleric"] })], spells);

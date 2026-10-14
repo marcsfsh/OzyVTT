@@ -205,12 +205,9 @@ const usesSuffix = (action: ActionFields): string => {
 };
 
 /**
- * Structured limited-use pool from the upstream uses fields (ADR-0020): "Recharge X-Y" becomes a
- * start-of-turn d6 pool the engine re-arms; "Recharge after a Short or Long Rest" maps to the
- * short-rest scope (a long rest re-arms those too); "N/Day" maps to long-rest (the app has no
- * calendar - a day is a long rest; documented simplification). The display suffix stays on the name.
- * Upstream quirk: RECHARGE with a numeric param IS a roll recharge (basilisk/medusa "Petrifying
- * Gaze (Recharge 4-6/5-6)", blink dog Teleport) - the SRD statblocks print the die range.
+ * Limited-use pool from the upstream uses fields (ADR-0020): "Recharge X-Y" is a start-of-turn d6
+ * pool, "Recharge after a Short or Long Rest" is short-rest, and "N/Day" is long-rest (the app treats
+ * a long rest as a day). Upstream `RECHARGE` with a numeric param is a roll recharge.
  */
 const usesOf = (action: ActionFields): { limit: number; per: "recharge" | "short-rest" | "long-rest"; recharge?: number } | null => {
   if ((action.uses_type === "RECHARGE_ON_ROLL" || action.uses_type === "RECHARGE") && action.uses_param) return { limit: 1, per: "recharge", recharge: action.uses_param };
@@ -220,11 +217,9 @@ const usesOf = (action: ActionFields): { limit: number; per: "recharge" | "short
 };
 
 /**
- * Fallback for the 27 attack actions that have no CreatureActionAttack row upstream (mostly
- * animals): parse the standardized 2024 statblock prose - "Melee Attack Roll: +2, reach
- * 5 ft. 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage." A flat primary ("1 Piercing
- * damage") keeps an empty damage list so the structured part never misrepresents the text;
- * "or ... Bloodied"-style variants deliberately stay prose-only (ADR-0008).
+ * Fallback for attack actions with no CreatureActionAttack row upstream (mostly animals): parses the
+ * 2024 statblock prose ("Melee Attack Roll: +2, reach 5 ft. 10 (2d6 + 3) Slashing damage..."). A flat
+ * primary ("1 Piercing damage") keeps an empty damage list; "or ... Bloodied" variants stay prose.
  */
 type ProseAttack = { bonus: number; reachFeet: number | null; rangeFeet: number | null; rangeNormalFeet: number | null; damage: { formula: string; type: string }[] };
 const parseProseAttack = (desc: string): ProseAttack | null => {
@@ -252,12 +247,9 @@ const parseProseAttack = (desc: string): ProseAttack | null => {
 };
 
 /**
- * Damage a saving-throw action deals on a failed save, from the 2024 statblock's "Failure:" clause -
- * "Failure: 45 (10d8) Fire damage." (+ "plus N (XdY) Type damage"). Without this, breath weapons and
- * other save-for-damage abilities parsed a `save` but an empty `damage`, so answering the save
- * applied nothing (the engine reads "Success: Half damage" from the description separately). A
- * flat-only failure ("Failure: 3 Fire damage", no dice) stays prose-only per ADR-0008. The half-on-
- * success / condition riders are read from the description at resolve time and are unaffected.
+ * Damage a save action deals on a failed save, from the "Failure:" clause ("Failure: 45 (10d8) Fire
+ * damage."). Half-on-success and condition riders are read from the description at resolve time; a
+ * flat-only failure with no dice stays prose (ADR-0008).
  */
 const parseSaveDamage = (desc: string): { formula: string; type: string }[] => {
   const failure = desc.match(/Failure:\s*(.+?)(?:\s*Success:|$)/s);
@@ -271,10 +263,8 @@ const parseSaveDamage = (desc: string): { formula: string; type: string }[] => {
 };
 
 /**
- * Reviewed exclusions: fixtures open5e labels `srd-2024` that are not actually SRD 5.2.1
- * content. Verified against the SRD 5.2.1 text (repo root `5.2.1 SRD.md`).
- * - giant-fly: the SRD mentions a giant fly only inside the Figurine of Wondrous Power item;
- *   it has no statblock, so an "SRD 5.2.1" bundle must not ship one.
+ * Fixtures open5e labels `srd-2024` that are not SRD 5.2.1 content. giant-fly appears only inside
+ * the Figurine of Wondrous Power item and has no statblock.
  */
 const EXCLUSIONS = new Set(["srd-2024_giant-fly"]);
 
@@ -291,11 +281,9 @@ const TINY_PER_SRD = [
 ];
 
 /**
- * Reviewed corrections for upstream fixture bugs, applied before adaptation so the vendored
- * sources stay byte-identical to open5e. Values are the printed SRD 5.2.1 ones.
- * - octopus: upstream stores the CON/CHA *modifiers* (0 / -3) where the scores (11 / 4) belong.
- * - TINY_PER_SRD: see above. (The SRD's "Medium or Small" NPC statblocks stay at open5e's
- *   "small" - that value is within the SRD's own dual-size statement.)
+ * Corrections for upstream fixture bugs, applied before adaptation so the vendored sources stay
+ * byte-identical to open5e. Values are the printed SRD 5.2.1 ones. The SRD's "Medium or Small" NPC
+ * statblocks keep open5e's "small".
  */
 const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // octopus: CON/CHA modifiers stored as scores; a garbage 30 in the CON save column
@@ -363,7 +351,7 @@ const monsters: ActorDefinition[] = creatures
           // A save-for-damage action (Fire Breath) has no attack row; pull its damage from the
           // "Failure:" clause so answering a failed save actually applies it.
           : prose?.damage ?? (save ? parseSaveDamage(action.fields.desc) : []);
-        // rangeFeet is the MAXIMUM attackable range; rangeNormalFeet the normal band when the
+        // rangeFeet is the maximum attackable range; rangeNormalFeet the normal band when the
         // weapon has two ranges (disadvantage between them - SRD Range).
         const attack = row
           ? { bonus: row.to_hit_mod, ...(row.reach !== null ? { reachFeet: row.reach } : {}), ...(row.range !== null ? { rangeFeet: row.long_range ?? row.range } : {}), ...(row.long_range !== null && row.range !== null ? { rangeNormalFeet: row.range } : {}) }
@@ -554,29 +542,12 @@ const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
 }));
 
 /**
- * THE WEAPON TABLE'S TWO MISSING COLUMNS - Properties and Mastery - joined in from the vendored
- * markdown SRD, because the open5e fixtures do not carry them.
+ * The Weapons table's Properties and Mastery columns, joined from the markdown SRD because the open5e
+ * fixtures do not link weapons to properties. Both are optional on the schema, so the join fails
+ * the build rather than dropping them silently.
  *
- * `sources/open5e-srd-2024/Weapon.json` has nine fields (damage_dice, damage_type, distance_unit,
- * document, is_improvised, is_simple, long_range, name, range) and neither column is among them.
- * The property and mastery TEXTS do ship, as 17 `WeaponProperty` rows, but nothing links a weapon
- * to any of them - so there was no mapping to write and both columns had no home here.
- *
- * `mastery` was hand-added on top of this ETL's output instead. Every `build-bundle` run therefore
- * deleted all 38 of them, in silence: `WeaponReferenceSchema.mastery` is `.optional()`, so
- * `validateBundle` passed with the column gone, and that column is the entire data basis for
- * `masteryByActionId` (`apps/server/src/equipment-derivation.ts`). This is the second time this
- * package has had that exact hazard - see `SKILL_ABILITY` below, whose note says the same thing
- * about the skill->ability column - and it is fixed the same way, except that this one has a real
- * source rather than a curated table: `sources/dnd-5e-srd-markdown/equipment.md` prints the whole
- * Weapons table, in the same HTML shape `build-class-bundle.ts` already parses.
- *
- * NAMED ABSENCE: the parenthetical in a property cell is dropped. `Versatile (1d10)` becomes
- * `versatile` and the two-handed die is thrown away; `Thrown (Range 20/60)` becomes `thrown` and the
- * band is already carried by the fixture's own `range`/`long_range`. Riders match the BARE slug
- * (`enums.ts` strips the bundle's own `-wp` suffix for exactly this reason), and
- * `EquipmentWeaponStatsSchema` has nowhere to put a second damage die - inventing a home for it
- * here would be a vocabulary addition with no reader.
+ * A property cell's parenthetical is dropped (`Versatile (1d10)` -> `versatile`): riders match the
+ * bare slug, and `EquipmentWeaponStatsSchema` has nowhere to put a second damage die.
  */
 const weaponTableSource = readFileSync(join(root, "sources", "dnd-5e-srd-markdown", "equipment.md"), "utf8");
 const stripTags = (value: string) => value.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "'").trim();
@@ -586,12 +557,9 @@ const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
   const rows = new Map<string, { properties: readonly string[]; mastery: string; melee: boolean }>();
-  // The four category bands ("Simple Melee Weapons", ...) are `<th colspan="6">` rows. They used to
-  // fall out unread; now they are the MELEE column's source - the SRD prints no per-row melee flag
-  // anywhere, and the open5e fixture has none either (its `range` cannot answer it: a thrown Dagger
-  // has a range band and is a melee weapon, a Dart has one and is not). The band a row sits under is
-  // the printed truth, so a data row appearing before any band, or a band this pattern does not
-  // recognise, fails the build by name rather than guessing.
+  // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
+  // ranged: a thrown Dagger has a range and is melee, a Dart is not. Unknown bands, or data rows before
+  // any band, fail the build.
   let band: { melee: boolean } | null = null;
   for (const [, row] of (table[1].match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
     const heading = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
@@ -615,10 +583,7 @@ const weaponTable = (() => {
       melee: band.melee
     });
   }
-  // Both vocabularies come from the fixtures rather than a second hand-written list: the 17
-  // `WeaponProperty` rows ARE the vocabulary, so a slug the table prints and the bundle does not
-  // publish cannot survive the build. Bare ids, because the pks are suffixed (`light-wp`,
-  // `topple-mastery`) and every rider trigger matches the bare word - `enums.ts`'s own rule.
+  // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
   const bareIds = (kind: "property" | "mastery") =>
     new Set(weaponPropertyRecords.filter((property) => property.kind === kind).map((property) => property.id.replace(/-(wp|mastery)$/, "")));
   const knownProperties = bareIds("property");
@@ -635,22 +600,17 @@ const weaponTable = (() => {
 const weaponRecords = onlySrd(weapons).map((weapon) => {
   const id = slugOf(weapon.pk);
   const row = weaponTable.get(id);
-  // Fail closed rather than emit a weapon whose mastery silently does nothing and whose property
-  // list silently reads empty - both are the "parses, then is inert" failure this package keeps
-  // finding, and the same throw `SKILL_ABILITY` uses for the same reason.
+  // Fail closed rather than emit a weapon with inert mastery and empty properties.
   if (!row) throw new Error(`No SRD Weapons-table row for "${id}" - check the name slug in sources/dnd-5e-srd-markdown/equipment.md.`);
   return {
     id,
     name: weapon.fields.name,
     category: weapon.fields.is_simple ? "simple" as const : "martial" as const,
-    // The Weapons table's category BAND, joined in like `mastery` and `properties` below. It exists
-    // for the magic-item eligibility column: "Weapon (Any Melee Weapon)" (Defender, Flame Tongue)
-    // must resolve against a real column or fail closed, and no other field can answer it.
+    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility.
     melee: row.melee,
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
-    // `[]` rather than an absent key when the table prints "—": a Mace really has no properties,
-    // and "recorded, and it has none" is a different claim from "not recorded".
+    // `[]` when the table prints "—": a Mace has no properties, which differs from "not recorded".
     properties: row.properties,
     damage: { dice: weapon.fields.damage_dice, type: weapon.fields.damage_type },
     // range 0 means a melee weapon.
@@ -658,17 +618,13 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     longRangeFeet: weapon.fields.long_range || null
   };
 });
-// The join is only honest if it is total in BOTH directions: a table row nothing matched is a name
-// that drifted, and it would silently leave a weapon with the wrong columns rather than none.
+// The join must be total in both directions: an unmatched table row is a name that drifted.
 const unmatched = [...weaponTable.keys()].filter((id) => !weaponRecords.some((weapon) => weapon.id === id));
 if (unmatched.length > 0) throw new Error(`Weapons table rows matched no open5e weapon: ${unmatched.join(", ")}.`);
 
 /**
- * The Armor table's category bands, parsed exactly the way the Weapons table's are above: the
- * markdown SRD prints "Light Armor (…)" / "Medium Armor (…)" / "Heavy Armor (…)" / "Shield (…)" as
- * `<th>` rows inside the body, and the band a row sits under is the printed category. Needed by the
- * magic-item eligibility column ("Armor (Any Medium or Heavy, Except Hide Armor)") and answerable
- * from nothing else. Fails closed on an unrecognised band and on a data row before any band.
+ * The Armor table's category bands, parsed like the Weapons table's. Needed to resolve "Armor (Any
+ * Medium or Heavy, Except Hide Armor)" eligibility. Fails closed on an unknown band.
  */
 const armorTable = (() => {
   const table = weaponTableSource.match(/\*\*Armor\*\*\s*(<table>[\s\S]*?<\/table>)/);
@@ -716,14 +672,7 @@ const describesRecords = (rows: Fixture<DescribesFields>[]) => onlySrd(rows).map
   name: titleCase(row.fields.describes),
   description: row.fields.desc
 }));
-/**
- * The SRD's skill -> governing ability column. The open5e `SkillDescription` fixtures carry only the
- * name and blurb, so this column has to come from somewhere; it used to be hand-added on top of the
- * ETL output, which meant every `build-bundle` run silently deleted it and only a guard test stood
- * between that and a shipped regression. Emitting it here closes that hazard: the table is reviewed
- * data in the same spirit as CORRECTIONS, and the guard test now protects a rebuild rather than a
- * hand-edit. Values are the SRD 5.2.1 skills table verbatim.
- */
+// The SRD skills table's governing ability, which the open5e fixtures do not carry.
 const SKILL_ABILITY: Readonly<Record<string, string>> = {
   acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
   history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis",
@@ -761,10 +710,8 @@ const attribution = {
     vendoredFrom: "https://github.com/open5e/open5e-api (data/v2/wizards-of-the-coast/srd-2024, staging branch)",
     retrieved: "2026-07-17"
   },
-  // The open5e fixtures ship no class, subclass, species, background or feat data at all, so the
-  // character-builder bundles had no machine-checkable source and were hand-authored - which is
-  // where both licensing violations landed. This transcription covers exactly that gap. It is
-  // secondary by construction: see sources/dnd-5e-srd-markdown/PROVENANCE.json.
+  // The open5e fixtures carry no character-builder data, so those bundles draw on this transcription.
+  // See sources/dnd-5e-srd-markdown/PROVENANCE.json.
   additionalSources: [{
     name: "dnd-5e-srd-markdown",
     vendoredFrom: "https://github.com/downfallx/dnd-5e-srd-markdown",

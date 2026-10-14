@@ -1,11 +1,6 @@
 /**
- * Markdown/HTML helpers shared by the SRD ETLs.
- *
- * These lived inside `build-class-bundle.ts` until the magic-item ETL needed the same table
- * rendering. They moved here VERBATIM rather than being copied, because two renderings of the same
- * HTML table is exactly the divergence that ends with one bundle's tables reading differently from
- * another's - and `build-class-bundle.ts` writes its bundles at module scope, so importing it to
- * reuse them would regenerate `classes.v1.json` as a side effect of a different build.
+ * Markdown/HTML helpers shared by the SRD ETLs. Kept out of `build-class-bundle.ts` because that
+ * script writes its bundles at module scope, so importing it would regenerate them.
  */
 
 export const strip = (value: string) =>
@@ -15,16 +10,8 @@ export const strip = (value: string) =>
     .replace(/\s+/g, " ").trim();
 
 /**
- * ONE HTML table, as a sentence.
- *
- * Every cell is prefixed with its own column heading, so the rendering is self-describing rather
- * than positional: a player reading "Druid Level 2: Known Forms 4, Max CR 1/4, Fly Speed No" needs
- * no column order in their head. Rows join with "; " because descriptions are collapsed to a single
- * line downstream and a table cannot be laid out there.
- *
- * A TWO-COLUMN table labels only its first cell. "Sorcerer Level 3: Alter Self, Chromatic Orb" is
- * unambiguous, and the alternative ("Sorcerer Level 3: Spells Alter Self, ...") reads like a typo -
- * every spell-by-level table in the SRD's subclasses is this shape, so it is worth the special case.
+ * Renders an HTML table as one sentence. Each cell is prefixed with its column heading; a
+ * two-column table labels only its first cell ("Sorcerer Level 3: Alter Self, Chromatic Orb").
  */
 export function tableAsText(html: string): string {
   const cells = (row: string, tag: "th" | "td") =>
@@ -44,16 +31,7 @@ export function tableAsText(html: string): string {
   return text === "" ? "" : `${text}.`;
 }
 
-/**
- * THE TABLES ARE CONTENT, NOT DECORATION - and dropping them truncated five features mid-sentence.
- *
- * Every parser used to `.replace(/<table>[\s\S]*?<\/table>/g, " ")`, which is why Draconic Spells,
- * Fiend Spells, Oath of Devotion Spells and Circle of the Land Spells each ended at the word
- * "table" with the spells they promise nowhere in the record, and why Nature's Ward, Wild Shape and
- * Font of Magic lost theirs too. The table IS the promise in all seven; a description that stops
- * before it is not shorter prose, it is a feature that does not say what it does. It is the promise
- * in `Armor of Resistance` and `Horn of Valhalla` for the same reason.
- */
+/** Inlines tables as text instead of dropping them: several features' content lives in a table. */
 export const withTables = (value: string) =>
   value.replace(/<table>[\s\S]*?<\/table>/g, (html) => ` ${tableAsText(html)} `);
 

@@ -1,31 +1,9 @@
-/**
- * Druid mechanics - the GENERATED half of the overlay for this class and for Circle of the Land.
- *
- * `build-class-bundle.ts` generates this class's prose from the SRD markdown on every run;
- * this overlay is merged on top of it.
- *
- * Stage 4 lane B3. Author here and nowhere else: this file is the only place a Druid
- * rider, pick, or option mechanic belongs, so two authors working on two classes never touch one
- * file. See `./overlay.ts` for what a `FeatureMechanics` may carry and `./index.ts` for the merge.
- */
+// Druid and Circle of the Land mechanics, merged over the ETL-generated prose.
 import type { ClassMechanicsModule } from "./overlay.js";
 
 export const druid: ClassMechanicsModule = {
   features: {
-    /**
-     * DRUIDIC - a language AND an always-prepared spell, which is the whole of audit row 35.
-     *
-     * "You know Druidic, the secret language of Druids ... you always have the _Speak with Animals_
-     * spell prepared." Both halves are plain grants: `languages` puts Druidic on the sheet's
-     * proficiency block, and an `alwaysPrepared` spell does not charge against the prepared count,
-     * which is exactly what the SRD means by "always have prepared".
-     *
-     * There is no language PICK here - Druidic is handed over, not chosen. (The blocked language
-     * picks in the audit are Ranger's Deft Explorer and Rogue's Thieves' Cant, rows 61-62.)
-     *
-     * WHAT STAYS PROSE: the DC 15 Investigation check to spot a hidden Druidic message is a check a
-     * GM calls for, not a rider.
-     */
+    // Druidic plus Speak with Animals always prepared. Spotting a hidden message is a GM-called check.
     druidic: {
       grants: {
         languages: ["druidic"],
@@ -34,17 +12,8 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * PRIMAL ORDER - the exact twin of Cleric's Divine Order, and the record the pre-Stage-4 audit
-     * called "the single closest twin of the reported bug" (row 4). It shipped with no `choice` at
-     * all, so neither role could be taken and neither role's mechanics existed.
-     *
-     * Magician is Thaumaturge with `druid` in place of `cleric`: one extra cantrip, expressed as a
-     * BUDGET the player still gets to spend rather than a granted outcome. Warden is Protector with
-     * Medium armor instead of Heavy.
-     *
-     * WHAT STAYS PROSE, on both roles and for the same reason Thaumaturge's does: "a bonus to your
-     * Intelligence (Arcana or Nature) checks ... equal to your Wisdom modifier (minimum of +1)" is
-     * an ability-derived check bonus with a floor, and `check-bonus` takes a flat integer.
+     * Magician raises the cantrip budget by one; Warden grants Martial weapons and Medium armor. Both
+     * roles' Wisdom-modifier check bonus stays prose (`check-bonus` is a flat integer).
      */
     "primal-order": {
       choice: {
@@ -68,23 +37,9 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * WILD SHAPE - the POOL, and deliberately only the pool (audit row 54).
-     *
-     * The printed Wild Shape column is the number of uses (2 -> 3 at level 6 -> 4 at level 17), so
-     * `class-resource` reads it rather than a `by-level` table copying the table beside it. Naming
-     * the column in `liveResources` drops its `display: true`, at which point
-     * `class-resource-pools.test.ts` stops accepting the annotation and starts requiring this pool.
-     *
-     * WHAT STAYS PROSE, by the Stage-4 ruling (assignments doc S5C) and by `BUILD_PLAN`'s own note:
-     * the four known Beast forms. That needs a creature catalog family, a Challenge-Rating ceiling
-     * and a "lacks a Fly Speed" predicate - three pieces of vocabulary that do not exist - and both
-     * the count and the CR scale by level. The Temporary Hit Points equal to Druid level have no
-     * rider either (nothing in the vocabulary grants temp HP), and "replace one of your known forms
-     * whenever you finish a Long Rest" is a replacement clause (S5A).
-     *
-     * The SHORT-rest half of the recovery is prose for the same reason Cleric's Channel Divinity
-     * leaves it prose: `FeatureUses.per` names one rest, and losing the long-rest refill to model
-     * the partial short-rest one would be the worse trade.
+     * The use pool only, read off the printed column (2 -> 3 -> 4). Known Beast forms (needs a creature
+     * catalog with CR and Fly Speed filters), the temporary HP, form replacement and the Short Rest
+     * partial recovery stay prose.
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
@@ -97,31 +52,14 @@ export const druid: ClassMechanicsModule = {
       }]
     },
 
-    /**
-     * WILD COMPANION - Find Familiar, cast by spending a slot or a use of Wild Shape.
-     *
-     * `alwaysPrepared` is the right half of the promise: the spell is on the sheet and does not
-     * charge against the prepared count. WHAT STAYS PROSE is the alternative cost (a Wild Shape use
-     * instead of a slot) and the Fey-familiar-until-Long-Rest clause - `ActionSchema.spellSlot`
-     * spends a slot from an ACTION, and there is no vocabulary for "either this pool or a slot".
-     */
+    // Find Familiar always prepared. Casting it with a Wild Shape use instead of a slot stays prose.
     "wild-companion": {
       grants: { spells: [{ id: "find-familiar", level: 1, alwaysPrepared: true }] }
     },
 
     /**
-     * ELEMENTAL FURY - twin of Cleric's Blessed Strikes (audit row 5), which is authored and shipped;
-     * this one had no `choice` at all, so a level-7 Druid was offered neither option.
-     *
-     * Primal Strike is Divine Strike's shape exactly, including the level-15 step: `damageByLevel`
-     * carries the growth that Improved Elemental Fury prints, so the DAMAGE half of row 64 lands
-     * here rather than needing a rider conditioned on the earlier answer. `uses` is the once-per-turn
-     * cap, on its own pool, which is what makes "once on each of your turns" a refusal at the table
-     * rather than a sentence.
-     *
-     * WHAT STAYS PROSE: Potent Spellcasting (adding an ability modifier to every Druid cantrip's
-     * damage is not a rider any carrier can express). Row 64's read-back is authored below through
-     * ruling F's `requires`; only the +300 feet of cantrip range within it stays prose.
+     * Primal Strike's damage grows via `damageByLevel` (covering Improved Elemental Fury's damage), with a
+     * once-per-turn pool. Potent Spellcasting's cantrip damage bonus stays prose.
      */
     "elemental-fury": {
       choice: {
@@ -155,16 +93,8 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * IMPROVED ELEMENTAL FURY - audit row 64, the Druid's twin of Cleric's row 63.
-     *
-     * "The option you chose for Elemental Fury grows more powerful", then two paragraphs of which
-     * one applies. `requires` gates each on the level-7 answer already in the ledger, and since the
-     * gate leaves one legal option against a capacity of one, it is ADOPTED rather than offered - no
-     * card, and the sheet shows the half that is true of this Druid.
-     *
-     * Primal Strike's number was already right (`damageByLevel` steps 1d8 -> 2d8 at 15 on the action
-     * itself); Potent Spellcasting's +300 feet of cantrip range has no rider vocabulary and stays
-     * prose on its own option.
+     * Each option `requires` the matching level-7 pick, so the true one is adopted without a prompt.
+     * Potent Spellcasting's +300 feet of cantrip range stays prose.
      */
     "improved-elemental-fury": {
       choice: {
@@ -187,42 +117,19 @@ export const druid: ClassMechanicsModule = {
       }
     },
 
-    /**
-     * EPIC BOON - audit row 6, the Druid's share of the nine classes that lost theirs outright.
-     * Cleric, Fighter and Wizard already author exactly this and the catalog resolves (7 epic-boon
-     * feats ship), so the level-19 feature that did nothing now offers the feat its text promises.
-     */
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
     }
 
-    /**
-     * NOT AUTHORED, and why - the four that are all the same missing idea.
-     *
-     * `wild-resurgence` (5), `archdruid` (20) and Circle of the Land's `natural-recovery` (6) all
-     * CONVERT one resource into another: a spell slot into a Wild Shape use, Wild Shape uses into a
-     * slot ("each use contributing 2 spell levels"), expended slots back on a Short Rest. Nothing in
-     * the vocabulary spends one pool to refill another, and `uses` cannot even say which of Natural
-     * Recovery's TWO independent once-per-Long-Rest benefits a single counter would be tracking -
-     * one counter for two would make using either block the other, which is worse than prose.
-     *
-     * `beast-spells` (18) is a permission ("you can cast spells in Beast form"), not a rider.
-     */
+    // Not modeled: Wild Resurgence, Archdruid and Natural Recovery (resource conversion between pools)
+    // and Beast Spells (a permission, not a rider).
   },
 
   subclasses: {
     "circle-of-the-land": {
       /**
-       * LAND'S AID - a real rollable that SPENDS the Wild Shape pool.
-       *
-       * `pool: "wild-shape"` is the point: "expend a use of your Wild Shape" is not a second counter,
-       * it is the same one, so the same key the Wild Shape action spends is the key this one spends
-       * and a Druid who has used all of them is refused both. The scaling matches Wild Shape's for
-       * the same reason - two actions sharing a key must agree on how big it is.
-       *
-       * The damage grows on the printed schedule (2d6 -> 3d6 at 10 -> 4d6 at 14). WHAT STAYS PROSE:
-       * the healing half - `FeatureActionSchema` has no healing formula, so the 2d6 restored to one
-       * creature is in the description, exactly as Channel Divinity's healing branch is.
+       * Spends the shared Wild Shape pool (same scaling as Wild Shape). Damage grows 2d6 -> 3d6 -> 4d6; the
+       * healing half stays prose (no healing formula on actions).
        */
       "lands-aid": {
         actions: [{
@@ -242,38 +149,12 @@ export const druid: ClassMechanicsModule = {
       },
 
       /**
-       * NATURE'S WARD - the half of audit row 65 that is authorable at all.
-       *
-       * "You are immune to the Poisoned condition" is a flat grant and is authored. The other half -
-       * "Resistance to a damage type associated with your CURRENT land choice" - is a rider read back
-       * off an earlier answer, which is assignments doc S5F: SPECIFIED, NOT BUILT. It stays prose
-       * rather than being authored as a second pick, because the land is re-chosen on every Long Rest
-       * and a build-time pick would freeze it (S5A).
-       */
-      /**
-       * CIRCLE SPELLS - audit row 29's PICK half. "Choose one type of land: arid, polar, temperate,
-       * or tropical."
-       *
-       * The land is a real choice with real consequences (Nature's Ward reads it back, below), and
-       * it had none: the record carried no `choice` at all, so the four land types existed only in
-       * the prose. It is authored as four inline options carrying nothing but their names, because
-       * that is honestly all that is expressible here.
-       *
-       * WHAT STAYS PROSE, and why it is not a miss. Each land's SPELL SET is tiered by Druid level
-       * (3/5/7/9) and `grants.spells` has no per-character-level gate, so authoring the set on one
-       * record would hand a level-3 Druid the level-9 spell. Life Domain says this shape as four
-       * separate features, one per tier - it can, because Cleric is HAND_AUTHORED and its bundle
-       * holds all four; Circle of the Land is ETL-generated from a single `#### Level 3` heading and
-       * the overlay may only merge onto features the ETL emits.
-       *
-       * The RE-CHOICE ("whenever you finish a Long Rest") is ruling A's rest-time half and rides
-       * `replaces`, which is why this pick is the build-time answer and not the last word.
+       * "Choose one type of land": four inline options carrying only their names, read back by Nature's
+       * Ward. Each land's tiered spell set stays prose (`grants.spells` has no character-level gate, and
+       * the overlay cannot split the feature into staged records).
        */
       "circle-of-the-land-spells": {
-        // "Whenever you finish a Long Rest, choose one type of land" - ruling A's runtime half, and
-        // the completion of audit row 29. The build-time pick below is the answer the character
-        // starts with; `actor.rechoose` writes a Long-Rest override beside it, and the next Long Rest
-        // clears it so the choice is made afresh rather than standing forever.
+        // Re-chosen on every Long Rest: the override lives in `actor.choiceOverrides` and the next Long Rest clears it.
         replaces: [{ offer: "feature:circle-of-the-land-spells", when: "long-rest", amount: 1 }],
         choice: {
           kind: "land",
@@ -288,17 +169,9 @@ export const druid: ClassMechanicsModule = {
       },
 
       /**
-       * NATURE'S WARD - audit row 65, and the one read-back with a real number at the end of it.
-       *
-       * "You are immune to the Poisoned condition, AND you have Resistance to a damage type
-       * associated with your current land choice." The first half was already a plain grant. The
-       * second is ruling F doing exactly what it was specified for: four options, each gated on one
-       * answer to the Circle Spells land pick above, each granting the resistance the SRD's
-       * Nature's Ward table prints - Arid/Fire, Polar/Cold, Temperate/Lightning, Tropical/Poison.
-       *
-       * Gating leaves ONE legal option against a capacity of one, so it is adopted rather than
-       * offered: a Polar Druid gains Cold Resistance without answering a second question about a
-       * decision they already made.
+       * Poisoned immunity plus the resistance for the current land (Arid/Fire, Polar/Cold,
+       * Temperate/Lightning, Tropical/Poison). Each option `requires` one land answer, so the matching one
+       * is adopted without a prompt.
        */
       "natures-ward": {
         grants: { conditionImmunities: ["poisoned"] },
@@ -334,15 +207,7 @@ export const druid: ClassMechanicsModule = {
         }
       },
 
-      /**
-       * NATURE'S SANCTUARY - the third feature that spends the Wild Shape counter, and the reason
-       * the shared `pool` matters rather than being tidy: a Druid who has shaped twice cannot also
-       * raise the sanctuary, and only one key can say so.
-       *
-       * WHAT STAYS PROSE: the 15-foot Cube, Half Cover, moving the Cube as a Bonus Action, and
-       * "your allies gain the current Resistance of your Nature's Ward" - which is the same
-       * choice read-back that leaves the resistance half of row 65 prose in the first place.
-       */
+      // Spends the shared Wild Shape pool. The Cube, cover, movement and sharing Nature's Ward's resistance stay prose.
       "natures-sanctuary": {
         actions: [{
           id: "natures-sanctuary",
@@ -357,9 +222,5 @@ export const druid: ClassMechanicsModule = {
     }
   },
 
-  /**
-   * The Wild Shape column stops being ink: a live pool answers to it now, spent by Wild Shape itself
-   * and by Land's Aid.
-   */
   liveResources: ["wild-shape"]
 };
