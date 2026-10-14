@@ -110,7 +110,8 @@ export class AuthService {
     await this.persist();
   }
   private verifySession(token: string | undefined): Session | null {
-    if (!token || !this.data) return null;
+    // A socket handshake's token is whatever the client sent, not necessarily a string.
+    if (typeof token !== "string" || !this.data) return null;
     const [encoded, signature] = token.split(".");
     if (!encoded || !signature) return null;
     const expected = createHmac("sha256", this.data.tokenSecret).update(encoded).digest("base64url");

@@ -627,7 +627,12 @@ export function createServer(options: CreateServerOptions) {
 
   io.on("connection", (socket) => {
     let joinedSession: { sessionId: string; role: ClientRole } | null = null;
-    socket.on("session:join", ({ token }, acknowledge) => {
+    socket.on("session:join", (payload, ack) => {
+      // Client input: a join without a payload or an acknowledgement must not throw out of the handler.
+      const token = typeof payload?.token === "string" ? payload.token : undefined;
+      const acknowledge: typeof ack = (result) => {
+        if (typeof ack === "function") ack(result);
+      };
       socket.handshake.auth.token = token;
       const gm = auth.verify(token);
       if (gm) {
