@@ -181,6 +181,11 @@ All stores share `data/vtt.sqlite` (WAL). Integration credentials have their own
 GM auth is `data/auth.json`; map, token and Codex images are files under `data/`. Paths are
 chosen in `apps/server/src/index.ts`. `data/` is git-ignored.
 
+Every store opens its database and runs its migrations through `apps/server/src/database.ts`. Each
+store's history starts from one baseline migration recorded in the shared `migrations` table; a file
+created before that reset is refused at startup with a message to move `data/` aside. Add a schema
+change as a new numbered migration in the owning store.
+
 ## Client
 
 A routed single-page app (`apps/client/src/router.ts`); every surface has an address. The game

@@ -4,6 +4,7 @@ paths:
   - "apps/server/src/viewer-*.ts"
   - "apps/server/src/replay-projection.ts"
   - "apps/server/src/codex-projections.ts"
+  - "apps/server/src/codex/visibility.ts"
   - "apps/server/src/codex-http.ts"
   - "apps/client/src/viewer/**"
 ---
