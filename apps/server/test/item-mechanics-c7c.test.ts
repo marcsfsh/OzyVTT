@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
-// The SHIPPED bundle, read the way every consumer reads it. Nothing below is a fixture.
+// The shipped bundle, read as every consumer reads it.
 import { loadMagicItems } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-// The lane list is authoring-side and outside the package's `exports` map, so it is reached by path.
-// That is deliberate: this file's guard is that the COMPOSED lane and the COMMITTED bundle agree.
+// The lane list is authoring-side and outside the package's `exports` map, so it is imported by path;
+// this file checks that the composed lane and the committed bundle agree.
 import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { deriveActorSheet } from "../src/actor-derived.js";
@@ -18,35 +18,12 @@ import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
 import { startEncounter } from "../src/encounter.js";
 
-/**
- * ============================================================================================
- * C7c - WONDROUS ITEMS YOU WEAR, PROVED AT THE FAR END
- * ============================================================================================
- *
- * `packages/content-srd-5.2.1/scripts/item-mechanics/worn-wondrous.ts` authors 21 of this lane's 56
- * items. This file is the proof that the authoring reaches the table, and like C7b's it does NOT
- * inject a fixture catalog the way `item-riders.test.ts` does: it runs the REAL `ContentLibrary`
- * over the REAL committed `magic-items.v1.json`, so a rider the ETL failed to merge, an id that got
- * renamed, or a `skill-is` slug that resolves to nothing fails HERE rather than at a character sheet.
- *
- * NOTHING BELOW IS SUPPLIED BY A FIXTURE. Round 1's headline far end passed only because its test
- * injected a weapon block the shipped row does not have; every row here is minted the way the
- * equipment picker mints one - id, name, category, equipped, attuned - and every number comes out of
- * the bundle. **THE ONE ROW THAT IS NOT A C7c ITEM IS THE BRACERS OF ARCHERY' LONGBOW, and review
- * caught it standing as a hand-written weapon block, which is the exact shape this paragraph
- * forbids.** It is now minted from `view.equipmentRecord("longbow")` - the SHIPPED weapon fold,
- * `1d8` piercing, 150/600, `["ammunition", "heavy", "two-handed"]` - so a to-hit measured through it
- * is measured through the bundle like everything else.
- *
- * THE FAR END IS A REVERSAL. A `Cloak of Protection` moves the AC the sheet shows AND the saving
- * throw the SERVER rolls, and BOTH come back off when the cloak does. A bonus that survives
- * unequipping is the bug this shape exists to rule out.
- *
- * THE LAST DESCRIBE IS THE SALVAGE GUARD. It pins the lane's counts and, item by item, the FIVE
- * casts that were measured producing the wrong thing and taken out - so no later pass can quietly
- * put `teleport`'s 1d100 back - plus the SIXTH removal review added, `Robe of the Archmagi`'s
- * `spell-save-dc`, which had already shipped.
- */
+// Worn wondrous items (`worn-wondrous.ts`), driven through the real `ContentLibrary` over the committed
+// `magic-items.v1.json`, so an unmerged rider, a renamed id or a dangling `skill-is` slug fails here.
+// Inventory rows are minted as the equipment picker mints them; the Bracers of Archery's longbow comes
+// from the shipped equipment catalog via `fromCatalog`, never a hand-written weapon block.
+// A Cloak of Protection moves the sheet's AC and the save the server rolls, and both come off with it.
+// The last describe pins the lane's counts and every removed cast or rider, so none returns.
 
 const view = new ContentLibrary().forAudience("gm");
 const catalog = equipmentCatalogOf(view);
@@ -60,11 +37,9 @@ const IDS = {
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/**
- * A Wizard 5 with AC 12, Dex 14 and NO save proficiencies, so every number a cloak moves below is
- * visibly the cloak's. `proficiencies.weapons: []` matters for the Bracers of Archery: absent, the
- * derivation reads "not recorded" as "proficient" and the grant would be invisible.
- */
+// A Wizard 5 with AC 12, Dex 14 and no save proficiencies, so every number a cloak moves is the cloak's.
+// `proficiencies.weapons: []` matters for the Bracers of Archery: absent, the derivation reads "not
+// recorded" as "proficient" and the grant would be invisible.
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
     name: "Hero", armorClass: 12, proficiencyBonus: 3,
@@ -105,16 +80,13 @@ const newTurn = (state: GameState) => {
   state.combat = { ...state.combat, turn: { ...state.combat.turn, actionUsed: false, actionInstance: null } };
 };
 
-/** The row an equipment picker mints: no weapon block, no armor block, no riders. Exactly the shipped shape. */
+/** The row an equipment picker mints: no weapon block, no armor block, no riders. */
 const worn = (id: string, name: string, over: Record<string, unknown> = {}): InventoryItem =>
   item({ id, name, quantity: 1, equipped: true, attuned: true, category: "wondrous-item", ...over });
 
-/**
- * A MUNDANE weapon row minted from the SHIPPED catalog, copying the same six keys the real builder
- * copies (`character-build.ts:1590`) and dropping `mastery` for the reason stated there. Used only
- * for the Bracers of Archery, whose whole mechanic is about somebody else's weapon: writing that
- * weapon's stats by hand here would be round 1's "the test measured its own fixture", and it was.
- */
+// A mundane weapon row minted from the shipped catalog, copying the same keys the real builder copies
+// (`character-build.ts`, minus `mastery`). Used for the Bracers of Archery, whose mechanic is about
+// another weapon, so its stats must not be hand-written here.
 const fromCatalog = (id: string): InventoryItem => {
   const record = view.equipmentRecord(id)!;
   const weapon = record.weapon!;
@@ -128,15 +100,11 @@ const fromCatalog = (id: string): InventoryItem => {
   });
 };
 
-// -------------------------------------------------------------------------------------------------
-// THE FAR END
-// -------------------------------------------------------------------------------------------------
-
 describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and both come off with it", () => {
   const ROW = { id: "cloak-of-protection", name: "Cloak of Protection", category: "wondrous-item" };
 
   it("carries the two authored riders out of the COMMITTED bundle, through the real content library", () => {
-    // Not the far end - the first link. If the overlay did not merge, this is what says so.
+    // The first link: if the overlay did not merge, this fails.
     const record = view.equipmentRecord("cloak-of-protection")!;
     expect(record.slot).toBe("shoulders");
     expect(record.attunement).toMatchObject({ required: true });
@@ -144,7 +112,7 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
       { type: "armor-class", amount: 1, whileArmored: false, when: [] },
       { type: "save-bonus", amount: 1, when: [] }
     ]);
-    // And the shipped row really has nothing for a fixture to have supplied: no weapon, no armor.
+    // The shipped row has no weapon or armor for a fixture to have supplied.
     expect(record.weapon ?? null).toBeNull();
     expect(record.armor ?? null).toBeNull();
   });
@@ -157,10 +125,10 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
     expect(state.actors[0].armorClass).toBe(12); // worn but not attuned: the item requires it, so inert
 
     setInventoryItem(state, IDS.hero, item({ ...ROW, equipped: true, attuned: true }), () => definition, { catalog });
-    expect(state.actors[0].armorClass).toBe(13); // THE +1
+    expect(state.actors[0].armorClass).toBe(13); // the +1
 
     setInventoryItem(state, IDS.hero, item({ ...ROW, equipped: false, attuned: true }), () => definition, { catalog });
-    expect(state.actors[0].armorClass).toBe(12); // replace-whole IS the un-grant
+    expect(state.actors[0].armorClass).toBe(12); // replacing the row is the un-grant
 
     setInventoryItem(state, IDS.hero, item({ ...ROW, equipped: true, attuned: true }), () => definition, { catalog });
     expect(state.actors[0].armorClass).toBe(13);
@@ -185,10 +153,10 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
       random: () => 13, newRollId: () => "40000000-0000-4000-8000-000000000000", sessionId: IDS.gmSession, role: "gm",
       now: () => "2026-08-12T00:00:00.000Z", resolveDefinition: () => definition, catalog
     });
-    // d20 = 13, +2 Dex, +1 cloak = 16, which exactly MEETS DC 16.
+    // d20 = 13, +2 Dex, +1 cloak = 16, which meets DC 16.
     expect(saved.outcome).toMatchObject({ total: 16, success: true });
 
-    // THE REVERSAL. Same hero, same d20, same DC - the cloak is off, and the save fails.
+    // Same hero, same d20, same DC, cloak off: the save fails.
     const bareState = fight(stateWith([worn("cloak-of-protection", "Cloak of Protection", { equipped: false })]));
     const bare = deriveEquipment(bareState.actors[0], definition, catalog);
     expect(bare.armorClass).toBe(0);
@@ -207,22 +175,9 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// THE HARVEST'S FAR END - W1 closed, and three rows of this lane now change a die
-// -------------------------------------------------------------------------------------------------
-
-/**
- * `apps/server/test/ability-check-roll-mode.test.ts` proved the ENGINE half against an INJECTED
- * record, under a header saying so: *"its bundle record still carries `modifiers: []` - authoring it
- * is the content lane's move, and this suite injects the record the lane will write."* This block is
- * the other side of that sentence. Every record below comes out of the COMMITTED bundle through the
- * real `ContentLibrary`, so it fails if the overlay stopped merging, if `roll-mode` stopped reaching
- * the die, or if the two drifted apart.
- *
- * THE FAR END IS THE DIE THE ENGINE KEPT AND THE DC IT THEN CLEARED, never a derived struct: the
- * same fixed pair (3, 17) is queued into `resolveDefinitionAction`'s own `random` in every case, and
- * the assertion is which face survived and what the total did about Hide's DC 15.
- */
+// Boots and Cloak of Elvenkind and Cloak of the Bat, read from the committed bundle and driven to the
+// die: the same fixed pair (3, 17) is queued into `resolveDefinitionAction`'s `random`, and each case
+// asserts which face survived and whether the total cleared Hide's DC 15.
 describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the higher die", () => {
   /** Resolve one builtin action exactly as the `action.resolve` handler does. */
   const check = (state: GameState, actionId: string, definition: ActorDefinition, faces: number[], n = 1) =>
@@ -248,10 +203,10 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
     const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false })]));
     const resolution = check(state, "hide", definition, [3, 17]);
 
-    // Dex 14 = +2 (this Wizard has no Stealth proficiency, so the +2 is visibly the ability alone).
+    // Dex 14 = +2; this Wizard has no Stealth proficiency, so the +2 is the ability alone.
     expect(resolution.check).toMatchObject({ skill: "Dexterity (Stealth)", naturalRoll: 17, total: 19, dc: 15, success: true });
     expect(resolution.rollMode).toEqual({ mode: "advantage", advantage: ["Boots of Elvenkind"], disadvantage: [] });
-    // TWO dice were thrown and one was kept. A derived number could not say this.
+    // Two dice were thrown and one was kept.
     const record = state.rolls.find((roll) => roll.purpose === "check")!;
     expect(record.normalizedFormula).toBe("2d20kh1+2");
     expect(record.dice.map((die) => ({ face: die.face, kept: die.kept }))).toEqual([{ face: 3, kept: false }, { face: 17, kept: true }]);
@@ -271,9 +226,8 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
   });
 
   it("does NOT reach Search, Study or Influence - the narrow is the whole point", () => {
-    // `skill-is: ["stealth"]` fails CLOSED against a check that passes no skill, and `ability-is`
-    // fails closed against a different ability. Without this, "author to the ability" would have been
-    // the safe default everywhere and three items would quietly cover five checks.
+    // `skill-is: ["stealth"]` fails closed against a check that passes no skill, and `ability-is` fails
+    // closed against a different ability, so three items cannot cover five checks.
     for (const [n, actionId, formula] of [[10, "search", "1d20+0"], [11, "study", "1d20+3"], [12, "influence", "1d20+0"]] as const) {
       const definition = definitionOf();
       const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false })]));
@@ -286,7 +240,7 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
 
   it("Cloak of Elvenkind is the ATTUNEMENT case: worn is not enough, attuned is", () => {
     // The Boots require no attunement and cannot prove this; the Cloak's row carries
-    // `attunement.required: true` off the ETL's read of the printed type line.
+    // `attunement.required: true` from the ETL's read of the printed type line.
     expect(view.equipmentRecord("cloak-of-elvenkind")!.attunement?.required).toBe(true);
 
     const unattuned = fight(stateWith([worn("cloak-of-elvenkind", "Cloak of Elvenkind", { attuned: false })]));
@@ -307,10 +261,6 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// The lane's other rider families, each ending at an engine outcome
-// -------------------------------------------------------------------------------------------------
-
 describe("C7c: an AC bonus the SRD gates on wearing nothing", () => {
   it("gives Bracers of Defense +2 bare, and takes it away the moment a Shield is equipped", () => {
     const definition = definitionOf();
@@ -318,7 +268,7 @@ describe("C7c: an AC bonus the SRD gates on wearing nothing", () => {
     setInventoryItem(state, IDS.hero, worn("bracers-of-defense", "Bracers of Defense"), () => definition, { catalog });
     expect(state.actors[0].armorClass).toBe(14); // 12 + 2
 
-    // A Shield is armour for the gate's purposes: `while-unarmored` defaults `allowShield: false`.
+    // A Shield counts as armor for the gate: `while-unarmored` defaults `allowShield: false`.
     setInventoryItem(state, IDS.hero, item({
       id: "shield", name: "Shield", category: "shield", equipped: true,
       armor: { acBase: 2, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null }
@@ -331,14 +281,14 @@ describe("C7c: an AC bonus the SRD gates on wearing nothing", () => {
 describe("C7c: a +5 that lands on ONE skill row", () => {
   it("puts Gloves of Thievery on Sleight of Hand and nowhere else, including the same ability's other skills", () => {
     const definition = definitionOf();
-    // No attunement on this item, so it is live merely worn - the shipped row says so.
+    // No attunement on this item, so it is live merely worn.
     const state = stateWith([worn("gloves-of-thievery", "Gloves of Thievery", { attuned: false })]);
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
     const sheet = deriveActorSheet(state.actors[0], definition, derivation, skillCatalog);
     const row = (id: string) => sheet.skills.find((entry) => entry.id === id)!;
 
     expect(row("sleight-of-hand").bonus).toBe(7); // Dex +2 and the glove's +5
-    expect(row("stealth").bonus).toBe(2);         // same ability, untouched - the filter really narrows
+    expect(row("stealth").bonus).toBe(2);         // same ability, untouched: the filter narrows
     expect(row("acrobatics").bonus).toBe(2);
     // And it is not a blanket ability bonus either: the raw Dex check is unchanged.
     expect(sheet.abilities.find((entry) => entry.ability === "dex")!.check).toBe(2);
@@ -348,9 +298,7 @@ describe("C7c: a +5 that lands on ONE skill row", () => {
 describe("C7c: a proficiency an item hands out, on the swing", () => {
   it("makes a Longbow proficient through Bracers of Archery and drops it when they come off", () => {
     const definition = definitionOf();
-    // The bow's stats come OUT OF THE SHIPPED CATALOG, not out of this file. A hand-written weapon
-    // block here is round 1's exact mistake - a test measuring its own fixture - and it stood in
-    // this very test until review found it.
+    // The bow's stats come from the shipped catalog, not this file.
     const bow = fromCatalog("longbow");
     expect(bow.weapon).toEqual({ category: "martial", damageDice: "1d8", damageType: "piercing", rangeFeet: 150, longRangeFeet: 600, properties: ["ammunition", "heavy", "two-handed"] });
     const without = effectiveActions(definition, fight(stateWith([bow])).actors[0], catalog)
@@ -361,9 +309,8 @@ describe("C7c: a proficiency an item hands out, on the swing", () => {
     expect(without.attack!.bonus).toBe(2);        // Dex +2, untrained
     expect(withBracers.attack!.bonus).toBe(5);    // + the proficiency bonus 3, from the bracers
 
-    // And the grant really is the two bows the SRD names, not "weapons": a Longsword out of the same
-    // shipped catalog is untrained with the bracers on. Without this, `grants.weapons: ["martial"]`
-    // would pass every assertion above.
+    // The grant is the two bows the SRD names, not "weapons": a Longsword from the same catalog stays
+    // untrained with the bracers on, which `grants.weapons: ["martial"]` would fail.
     const swing = effectiveActions(definition, fight(stateWith([fromCatalog("longsword"), worn("bracers-of-archery", "Bracers of Archery")])).actors[0], catalog)
       .find((entry) => entry.id === "item-longsword")!;
     expect(swing.attack!.bonus).toBe(0);          // Str +0, still untrained
@@ -394,7 +341,7 @@ describe("C7c: resistance and immunity, at the damage pipeline", () => {
     ]);
     expect(state.actors[0].hp.current).toBe(30);
 
-    // The condition half, through the GM's own command: narrated as a skip, and NOT applied.
+    // The condition half, through the GM's own command: narrated as a skip, and not applied.
     const events = setCondition(state, IDS.hero, "poisoned", true, undefined, { role: "gm" }, {
       catalog, resolveDefinition: () => definition
     });
@@ -424,8 +371,8 @@ describe("C7c: the charges a worn item rations", () => {
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
     resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) }, deps([], definition));
-    // The condition is not an authored field - `conditionFrom` reads "Stunned" out of the prose,
-    // which is why the module keeps the SRD's word verbatim in the description.
+    // The condition is not an authored field: `conditionFrom` reads "Stunned" from the prose, which is
+    // why the module keeps the SRD's word verbatim.
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionId: "stunned" });
     expect(actor.actionUses["robe-of-scintillating-colors-charges"]).toBe(1);
 
@@ -445,7 +392,7 @@ describe("C7c: the charges a worn item rations", () => {
       const actor = state.actors[0];
       const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === actionId)!;
       expect(action.uses).toEqual({ limit, per: "long-rest", pool: `${id}-charges` });
-      // The charge is the whole of what these two enforce; the module says so at the entry.
+      // The charge is all these two enforce.
       expect(action.damage).toEqual([]);
       expect(action.attack).toBeUndefined();
 
@@ -465,15 +412,15 @@ describe("C7c: the casts that survived the spell-record check", () => {
     const detect = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-detect-thoughts")!;
     const suggest = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-suggestion")!;
 
-    // The DC is the ITEM's: this Wizard has no spellcasting block at all, so 13 can only be authored.
+    // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
     expect(detect.save).toEqual({ ability: "wis", dc: 13 });
     expect(suggest.save).toEqual({ ability: "wis", dc: 13 });
-    // W6's whole point: neither cast synthesises damage or an attack out of the spell's text.
+    // Neither cast synthesizes damage or an attack from the spell's text.
     expect(detect.damage).toEqual([]);
     expect(suggest.damage).toEqual([]);
     expect(detect.attack).toBeUndefined();
 
-    // SEPARATE pools - "that spell can't be cast from it again" gates each spell on its own.
+    // Separate pools: "that spell can't be cast from it again" gates each spell on its own.
     resolveDefinitionAction(state, detect, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(6) }, deps([], definition));
     expect(actor.actionUses["helm-of-telepathy-detect-thoughts"]).toBe(1);
     expect(actor.actionUses["helm-of-telepathy-suggestion"]).toBeUndefined();
@@ -514,32 +461,27 @@ describe("C7c: the casts that survived the spell-record check", () => {
 });
 
 describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by review", () => {
-  /*
-   * THIS TEST USED TO ASSERT THE OPPOSITE, and that is the point of keeping it here rather than
-   * deleting it. `3a8acb3` authored `spell-save-dc: 2` on the Robe of the Archmagi for "War Mage.
-   * Your spell save DC ... increases by 2", proved a DC-14 action reading 16, and shipped. What the
-   * rider actually reaches is `action.save.dc` on EVERY action carrying a save
-   * (`effective-actions.ts:51` sums it, `:74` folds it, and nothing on the path asks whether the
-   * action is a spell) - so it was raising numbers PRINTED ON OTHER ITEMS. The rider is gone and
-   * the robe is prose; these two assertions are what stops it coming back.
-   */
+  // The Robe of the Archmagi's "spell save DC ... increases by 2" cannot be authored as `spell-save-dc`:
+  // that rider raises `action.save.dc` on every action carrying a save (`effective-actions.ts` sums and
+  // folds it without asking whether the action is a spell), including DCs printed on other items. The
+  // robe stays prose; these assertions keep it that way.
   it("leaves a Wand of Paralysis' printed DC 15 alone, and a Breath Weapon's 13, with the robe on", () => {
     const robe = worn("robe-of-the-archmagi", "Robe of the Archmagi");
-    // A DEFINITION action that is not a spell at all.
+    // A definition action that is not a spell at all.
     const definition = definitionOf({ actions: [{
       id: "breath", name: "Fire Breath", activation: "action",
       description: "Each creature in a 15-foot Cone makes a DC 13 Dexterity saving throw.",
       save: { ability: "dex", dc: 13 }, damage: [{ formula: "2d6", type: "fire" }]
     }] });
-    // A second ITEM whose DC the SRD prints on the item, out of the same shipped bundle. The slots
-    // do not conflict - the robe is `shoulders` and a wand is `held` - so this is a real loadout.
+    // A second item with an SRD-printed DC. The robe is `shoulders` and a wand is `held`, so this is a
+    // real loadout.
     const wand = worn("wand-of-paralysis", "Wand of Paralysis", { category: "wand" });
     const dcs = (inventory: InventoryItem[]) => Object.fromEntries(
       effectiveActions(definition, stateWith(inventory).actors[0], catalog).filter((entry) => entry.save).map((entry) => [entry.id, entry.save!.dc]));
 
     const bare = dcs([wand]);
     expect(bare).toEqual({ breath: 13, "item-wand-of-paralysis-paralyzing-ray": 15 });
-    // With the robe on, both are UNCHANGED. Before the removal they read 15 and 17.
+    // With the robe on, both are unchanged.
     expect(dcs([wand, robe])).toEqual(bare);
   });
 
@@ -548,9 +490,7 @@ describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by 
     expect(record.modifiers ?? []).toEqual([]);
     expect(record.casts ?? []).toEqual([]);
     expect(record.actions ?? []).toEqual([]);
-    // The blast radius, measured rather than assumed: the robe was the only carrier in all 268, so
-    // removing it takes the type out of the shipped content entirely. A later lane authoring one
-    // turns this red and has to read W8 first.
+    // The robe was the only carrier, so no shipped item carries `spell-save-dc`; a new one must justify it.
     expect(loadMagicItems().filter((row) => (row.modifiers ?? []).some((modifier) => modifier.type === "spell-save-dc")).map((row) => row.id)).toEqual([]);
   });
 
@@ -572,10 +512,6 @@ describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// THE GUARD - the lane's shape, and every removal, pinned against the committed bundle
-// -------------------------------------------------------------------------------------------------
-
 describe("C7c: the lane's own shape, machine-checked against the bundle", () => {
   const rows = loadMagicItems();
   const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7c")!;
@@ -591,10 +527,6 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   });
 
   it("authors exactly 21 of the 56 and names the other 35 as absences - the two add to the lane", () => {
-    // WAS 19 AND 37 AT `3a8acb3`, THEN 18 AND 38 AT `07b6177`. Two readings moved rows in opposite
-    // directions: `robe-of-the-archmagi` moved to the absences when review measured what its
-    // `spell-save-dc` raises (W8), and then W1's consumer landed and the harvest moved THREE the
-    // other way - the three rows whose whole clause is "Advantage on Dexterity (Stealth) checks".
     const authored = Object.keys(lane.entries).sort();
     expect(authored).toEqual([
       "boots-of-elvenkind", "boots-of-the-winterlands", "bracers-of-archery", "bracers-of-defense",
@@ -621,9 +553,8 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   });
 
   it("leaves the FIVE casts W6 measured producing the wrong thing unauthored, by name", () => {
-    // Each of these looked authorable until it was driven. If a later pass puts one back, the row
-    // gains a `casts` entry and this fails - which is the only thing standing between a Helm of
-    // Teleportation and 1d100 Force damage at a player's target.
+    // Each of these produced the wrong effect when driven (e.g. a Helm of Teleportation dealing 1d100
+    // Force damage). Re-authoring one adds a `casts` entry and fails here.
     for (const [id, why] of [
       ["helm-of-teleportation", "teleport's damage.roll is the SRD's 1d100 MISHAP table"],
       ["cape-of-the-mountebank", "dimension-door's 4d6 is arrival damage, not a cast's damage"],
@@ -635,7 +566,7 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
       expect(row.casts ?? [], `${id} - ${why}`).toEqual([]);
       expect(row.actions ?? [], `${id} - the charge-alone shape does not rescue a cast`).toEqual([]);
     }
-    // And the two the healing bug owns carry nothing at all.
+    // And the two blocked on healing carry nothing at all.
     for (const id of ["periapt-of-health", "necklace-of-prayer-beads"]) {
       const row = view.equipmentRecord(id)!;
       expect(row.casts ?? []).toEqual([]);
@@ -646,12 +577,10 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
 
   it("leaves the four RESERVED items and the four ability-score refusals entirely to prose", () => {
     for (const id of [
-      // The gloves are NOT waiting on U31. Review measured `on-taking-damage` + `damage-reduction`
-      // already wired (`hit-points.ts:132-136`, driven by `typed-damage.test.ts`), so the module's
-      // "UNBLOCKED BY: U31" was a false record; what actually blocks them is a ROLLED reduction
-      // ("1d10 plus your Dexterity modifier"), the free-hand gate, and the Reaction cost.
-      "gloves-of-missile-snaring", "periapt-of-wound-closure",         // rolled amount; U32
-      "talisman-of-pure-good", "talisman-of-ultimate-evil",            // U26 / U29
+      // The gloves need a rolled reduction ("1d10 plus your Dexterity modifier"), a free-hand gate and a
+      // Reaction cost; `on-taking-damage` + `damage-reduction` alone cannot express it.
+      "gloves-of-missile-snaring", "periapt-of-wound-closure",         // rolled amount
+      "talisman-of-pure-good", "talisman-of-ultimate-evil",            // needs mechanics not modeled yet
       "amulet-of-health", "belt-of-giant-strength",                    // ITEM_REFUSED_MODIFIER_TYPES
       "gauntlets-of-ogre-power", "headband-of-intellect"
     ]) {
@@ -664,19 +593,17 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   });
 
   it("splits the eight 'Advantage on a check' rows 3 authored / 5 prose, and says why for each", () => {
-    // The module's biggest single claim, machine-checked. W1 CLOSED 2026-08-13 and this test used to
-    // assert all eight stayed prose; what it asserts now is the SPLIT, because "the limit closed so
-    // author them all" is exactly the over-grant the lane exists to refuse. The set of eight rows is
-    // unchanged - only which side of the line each sits on.
+    // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
+    // are authored; authoring the rest would over-grant.
     const advantageOnChecks = mine.filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? "")).map((row) => row.id).sort();
     expect(advantageOnChecks).toEqual([
       "belt-of-dwarvenkind", "boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat",
       "eyes-of-minute-seeing", "eyes-of-the-eagle", "robe-of-eyes", "talisman-of-the-sphere"
     ]);
 
-    // AUTHORED (3): the clause is "Advantage on Dexterity (Stealth) checks" with no qualifier, and
-    // `BUILTIN_CHECKS.hide` passes exactly `{ability: "dex", skill: "stealth"}` - so the rider fires
-    // on that check and, because `ability-is`/`skill-is` fail closed, on nothing else.
+    // Authored (3): the clause is "Advantage on Dexterity (Stealth) checks" with no qualifier, and
+    // `BUILTIN_CHECKS.hide` passes exactly `{ability: "dex", skill: "stealth"}`, so the rider fires on that
+    // check and, because `ability-is`/`skill-is` fail closed, on nothing else.
     for (const id of ["boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat"]) {
       const row = view.equipmentRecord(id)!;
       expect(row.modifiers, `${id} lost its harvested rider`).toContainEqual({
@@ -689,8 +616,7 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
       });
     }
 
-    // STILL PROSE (5), each for a SECOND reason W1 never was. If a later pass authors one of these,
-    // this fails with the reason it ignored in the message.
+    // Still prose (5), each for its own reason, which the failure message names.
     for (const [id, why] of [
       ["belt-of-dwarvenkind", "Persuasion narrowed to dwarves and duergar - no trigger names who you are influencing"],
       ["eyes-of-minute-seeing", "Investigation within ONE FOOT - nothing measures a distance"],
@@ -703,9 +629,8 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   });
 
   it("authors no curse, because no row in this lane prints one", () => {
-    // The lane OWNS `cursed`; this is the measurement that says it has no carrier, rather than a
-    // silence that looks the same as forgetting. `Robe of Eyes` prints a Drawbacks clause and is
-    // deliberately not made cursed: it comes off, and a curse would lock its benefits on.
+    // The lane owns `cursed` and has no carrier. `Robe of Eyes` prints a Drawbacks clause but is not
+    // cursed: it comes off, and a curse would lock its benefits on.
     expect(mine.filter((row) => row.cursed === true)).toEqual([]);
     const speakOfCurses = rows.filter((row) => /\bcursed\b/i.test(row.description ?? "")).map((row) => row.id).sort();
     expect(speakOfCurses).toEqual(["armor-of-vulnerability", "berserker-axe", "demon-armor", "mysterious-deck", "shield-of-missile-attraction"]);
@@ -714,7 +639,7 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
 
   it("claims no row outside its own slots - the boundary the seam now enforces", () => {
     const carried = rows.filter((row) => row.category === "wondrous-item" && row.slot === "wondrous");
-    expect(carried.length).toBe(71); // C7d's half of the shared category
+    expect(carried.length).toBe(71); // the consumables lane's half of the shared category
     for (const id of Object.keys(lane.entries)) expect(carried.some((row) => row.id === id)).toBe(false);
   });
 });

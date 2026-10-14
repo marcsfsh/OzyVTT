@@ -4,17 +4,10 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState, type RuleFamily } from "@vtt/domain";
 import { effectiveModeFor, familyModeFor, familyOf, overrideCovers, overrideReason, rememberOverride } from "../src/rules-families.js";
 
-/**
- * The family map is the thing that makes "don't police movement" expressible without also switching
- * off the action economy. Two properties matter and both are tested here:
- *
- *  1. TOTALITY — every rule id the engine can actually throw maps to a real family. `familyOf`
- *     returns null for an unclassified id and `effectiveModeFor` then falls back to the dial, which
- *     fails SAFE (an unknown rule is never silently swept into a family a GM switched off) but is
- *     still a gap. This test reads the rule ids out of the source, so adding one without classifying
- *     it turns the suite red instead of quietly landing in the fallback.
- *  2. PRECEDENCE — a family exception beats the dial, and an absent family follows it.
- */
+// Two properties of the rule-family map:
+// 1. Totality: every rule id the engine can throw maps to a family. An unclassified id falls back to
+//    the dial (safe, but a gap), so the ids are read from source and a new unclassified one fails here.
+// 2. Precedence: a family exception beats the dial, and an absent family follows it.
 
 const SOURCE_DIR = new URL("../src/", import.meta.url).pathname;
 
@@ -64,7 +57,7 @@ describe("rule families", () => {
       ["target.too-large-to-grapple", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
-      // Not thrown yet - the slot checks are a later slice - but the family is the wire vocabulary now.
+      // Not thrown yet, but the family is already part of the wire vocabulary.
       ["slots.none-remaining", "slots"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
@@ -127,7 +120,7 @@ describe("per-turn override memory", () => {
     const state = stateWith({ rulesMode: "strict" });
     rememberOverride(state, "range.out-of-range");
     expect(state.combat.turn.rulesOverridden).toBe(true);
-    // A turn persisted mid-fight by a build that knew only the boolean keeps its old two-prefix meaning.
+    // A turn persisted with only the boolean override keeps its two-prefix meaning.
     const legacy = stateWith({ rulesMode: "strict", turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0, rulesOverridden: true } });
     expect(legacy.combat.turn.rulesOverriddenFamilies).toBeUndefined();
     expect(overrideCovers(legacy.combat.turn, "economy.action-used")).toBe(true);

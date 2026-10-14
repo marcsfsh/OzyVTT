@@ -3,11 +3,9 @@ import { ActorDefinitionSchema } from "@vtt/schemas";
 import { BUILTIN_ACTIONS } from "../src/builtin-actions.js";
 import { EffectAddSchema } from "../src/game-commands.js";
 
-/**
- * The builtin catalog is engine behavior expressed in the content vocabulary: every entry must parse
- * through ActionSchema (via a wrapper definition) so the catalog can never drift from the schema,
- * and its ids are a frozen replay contract.
- */
+// The builtin catalog is engine behavior expressed in the content vocabulary: every entry must parse
+// through ActionSchema (via a wrapper definition) so the catalog can never drift from the schema,
+// and its ids are a frozen replay contract.
 describe("builtin action catalog", () => {
   it("every entry parses through ActionSchema", () => {
     const wrapper = {

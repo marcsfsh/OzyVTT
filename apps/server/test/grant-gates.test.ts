@@ -10,21 +10,9 @@ import { setCondition } from "../src/actor-conditions.js";
 import { validateForPublish, type HomebrewValidationContext } from "../src/homebrew-validate.js";
 import { EMPTY_AUTHORED_INDEX } from "../src/homebrew-store.js";
 
-/**
- * W3 - A GRANTED RESISTANCE, IMMUNITY OR PROFICIENCY CAN CARRY A CONDITION.
- *
- * `FeatureGrantsSchema` was eleven id lists with NO gate while every sibling in
- * `FeatureModifierSchema` spread `when` + `scope`, so a grant the SRD prints under a condition could
- * only be authored UNCONDITIONALLY. That is an over-grant, and the content lanes correctly refused
- * to author one - `Belt of Dwarvenkind`'s "If you aren't a dwarf or duergar" Poison Resistance and
- * `Helm of Brilliance`'s "As long as the helm has at least one ruby" Fire Resistance are both
- * absences, while `Boots of the Winterlands`' identical-looking but UNGATED resistance ships
- * (`packages/content-srd-5.2.1/scripts/item-mechanics/worn-wondrous.ts`, limit W3).
- *
- * EVERY TEST HERE ENDS AT A NUMBER THE TABLE READS - a halved damage total, a full one, a refused
- * condition - never at a derived struct. "The gate survived into `derivation.damageResistances`"
- * would pass with the damage maths never consulting it, which is the whole class of bug this closes.
- */
+// A granted resistance, immunity or proficiency can carry a `when` gate, e.g. Belt of Dwarvenkind's
+// "If you aren't a dwarf or duergar" Poison Resistance. Every test ends at a number the table reads
+// (a halved or full damage total, a refused condition), never at a derived struct.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -34,7 +22,7 @@ const IDS = {
 
 const item = (over: Record<string, unknown>): InventoryItem => InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
-/** Two heroes with IDENTICAL numbers; only `race.id` differs, which is the only thing the gate reads. */
+/** Two heroes with identical numbers; only `race.id` differs, which is all the gate reads. */
 function definitionOf(speciesId: string): ActorDefinition {
   return {
     name: speciesId === "dwarf" ? "Durn" : "Aeliel", armorClass: 12, proficiencyBonus: 2,
@@ -61,21 +49,12 @@ function stateWith(inventory: InventoryItem[], extra: Record<string, unknown> = 
   ] });
 }
 
-/** The whole damage path a `actor.apply-damage` command runs (`game-operations.ts:1053`), verbatim. */
+/** The damage path an `actor.apply-damage` command runs. */
 const hit = (state: GameState, actorId: string, amount: number, type: string, definition: ActorDefinition, catalog: EquipmentCatalog) =>
   applyDamageDetailed(state, actorId, { parts: [{ amount, type }], amount }, { role: "gm" }, { resolveDefinition: () => definition, catalog });
 
-// -------------------------------------------------------------------------------------------------
-// THE FAR END: one hit, two totals, differing only by the gate.
-// -------------------------------------------------------------------------------------------------
-
-/**
- * The authored record, PARSED THROUGH THE REAL SCHEMA rather than hand-shaped.
- *
- * `equipment-derivation.ts` reads grants through a structural `RiderBlockLike` view, so a test that
- * hand-writes the block proves the derivation reads a shape - not that the shape a GM can author is
- * that shape. Parsing it here means the authoring schema and the collector are held to one object.
- */
+// Parsed through the real schema rather than hand-shaped, so the authoring schema and the collector
+// (which reads a structural `RiderBlockLike` view) are held to one object.
 const FORGE_HELM_GRANTS = FeatureGrantsSchema.parse({
   damageResistances: ["fire"],
   weapons: ["martial-weapons"],
@@ -97,8 +76,7 @@ describe("W3 far end: a gated grant on an item halves one hit and not the other"
     expect(resisted.application.totalApplied).toBe(10);
     expect(gateHolds.actors[0].hp.current).toBe(30);
 
-    // THE SAME HELM, THE SAME HIT, THE SAME 20 FIRE. The only difference on the two sheets is the
-    // species the gate names, and it is worth twice the damage.
+    // Same helm, same hit, same 20 fire; only the species the gate names differs.
     const gateFails = stateWith(worn);
     const full = hit(gateFails, IDS.kin, 20, "fire", definitionOf("elf"), catalog);
     expect(full.application.totalApplied).toBe(20);
@@ -126,10 +104,6 @@ describe("W3 far end: a gated grant on an item halves one hit and not the other"
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// BACKWARD COMPATIBILITY: a record with no `when` behaves EXACTLY as it did before the field existed.
-// -------------------------------------------------------------------------------------------------
-
 describe("an ungated grant is untouched", () => {
   const BOOTS: EquipmentRecordLike = {
     id: "boots-of-the-winterlands", name: "Boots of the Winterlands", category: "feet", slot: "feet", isMagic: true,
@@ -148,10 +122,6 @@ describe("an ungated grant is untouched", () => {
     expect(FeatureGrantsSchema.parse({}).when).toBeUndefined();
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// AUTHORING: a gate the derivation cannot answer is REFUSED, never silently ignored.
-// -------------------------------------------------------------------------------------------------
 
 describe("the gate vocabulary is narrowed to what a derivation can answer", () => {
   it("takes every static and dynamic gate", () => {
@@ -185,10 +155,6 @@ describe("the gate vocabulary is narrowed to what a derivation can answer", () =
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// A REFUSAL, not a number: a gated condition immunity.
-// -------------------------------------------------------------------------------------------------
-
 describe("a gated condition immunity refuses the condition only while the gate holds", () => {
   const WARD: EquipmentRecordLike = {
     id: "bloodied-ward", name: "Bloodied Ward", category: "neck", slot: "neck", isMagic: true,
@@ -214,18 +180,8 @@ describe("a gated condition immunity refuses the condition only while the gate h
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// THE BUILDER HALF: a gated grant is never baked, and it still reaches the damage line.
-// -------------------------------------------------------------------------------------------------
-
-/**
- * The REAL SRD Dwarf, with `dwarf-resilience`'s printed Poison Resistance put under a gate.
- *
- * Overriding one record on a delegating view rather than inventing a homebrew species keeps every
- * other id in the build request valid, so the only variable between the two builds below is the
- * `when` list. `dwarf-resilience` really is authored as `grants: { damageResistances: ["poison"] }`
- * in `bundles/species.v1.json`, which is why it is the honest record to gate.
- */
+// The real SRD Dwarf, with `dwarf-resilience`'s printed Poison Resistance put under a gate. Overriding
+// one record on a delegating view keeps every other id valid, so the `when` list is the only variable.
 function viewWithGatedDwarf(gate: readonly unknown[] | null): ContentView {
   const base = new ContentLibrary().forAudience("gm");
   const gateTrait = <T extends { id: string; grants?: unknown }>(trait: T): T =>
@@ -276,7 +232,7 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
   it("leaves the SAME grant out of the definition once it carries a gate", () => {
     const built = buildCharacterDefinition(dwarfInput(), viewWithGatedDwarf(NOT_POISONED), policy);
     expect(built.damageResistances ?? [], "baking a gated grant IS the over-grant - it would read as 'always'").not.toContain("poison");
-    // Not dropped, though: the sheet still records the trait, which is what the derivation looks up.
+    // The sheet still records the trait, which is what the derivation looks up.
     expect(built.character!.features!.some((ref) => ref.id === "dwarf-resilience")).toBe(true);
   });
 
@@ -290,7 +246,7 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
     expect(clean.application.totalApplied, "the gate holds: the trait reaches the damage maths from the derivation, not the definition").toBe(10);
     expect(clean.application.parts[0]).toMatchObject({ adjustment: "resistance", adjustmentSource: "Dwarven Resilience" });
 
-    // Flip the ONE fact the gate reads, through the real `condition.set` path. Nothing else moves.
+    // Flip the one fact the gate reads, through the real `condition.set` path.
     const poisoned = stateWith([]);
     setCondition(poisoned, IDS.hero, "poisoned", true, undefined, { role: "gm" }, { resolveDefinition: () => built, catalog });
     expect(poisoned.actors[0].conditions.map((condition) => condition.id)).toEqual(["poisoned"]);
@@ -315,28 +271,10 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// THE ELEVENTH LIST. The gate covers ten of them; `spells` is refused beside it rather than dropped.
-// -------------------------------------------------------------------------------------------------
-
-/**
- * `FeatureGrantsSchema` has ELEVEN lists and the gated path folds TEN. The eleventh is `spells`, and
- * before this it was not withheld by the gate - it was DELETED by it, silently, at authoring time.
- *
- * The measurement that decided the shape of the fix is the first test below: gating the SHIPPED
- * `high-elf-cantrip` does not make Prestidigitation conditional, it makes `definition.spellcasting`
- * `undefined` outright. That is because a granted spell is not recomputed the way the other ten
- * lists are - `character-build.ts` bakes it into four things at build time (the spell row, the
- * prepared/cantrip cap it is excused from, a cantrip's linked action, and for a character with no
- * class spell list the ENTIRE caster block that exists only because something granted a spell), and
- * `actor.preparedSpellIds` is then written state seeded at claim and at every long rest.
- * `deriveEquipment` has no seam that writes any of that, so "a spell you have only while raging" has
- * nowhere coherent to live today.
- *
- * So the pair is REFUSED at the authoring door, by name, naming the spells that would have been
- * lost - not carried, and above all not dropped. A grant that is authored, parsed, stored and read
- * by NOTHING is the silence W1 and W3 both exist to end.
- */
+// `spells` is the one grant list a gate cannot cover: a granted spell is baked at build time into the
+// spell row, the prepared/cantrip cap, a cantrip's action, and possibly the whole caster block, and
+// `actor.preparedSpellIds` is written state. `deriveEquipment` cannot recompute any of that, so a gated
+// `spells` grant is refused at authoring, naming the spells.
 describe("the eleventh list: `spells` beside a `when` is refused, never silently dropped", () => {
   const GATED_FIREBALL = { spells: [{ id: "fireball", level: 3 }], damageResistances: ["fire"], when: [{ type: "while-character-is", speciesIds: ["dwarf"] }] };
 
@@ -344,7 +282,7 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
     const refused = FeatureGrantsSchema.safeParse(GATED_FIREBALL);
     expect(refused.success, "before this, the block parsed happily and the spell reached nothing at all").toBe(false);
     expect(refused.error!.issues.map((issue) => issue.message).join(" ")).toBe(grantedSpellGateMessage(["fireball"]));
-    // Machine-addressable, so the editor points at the `spells` box rather than at the record.
+    // Machine-addressable, so the editor points at the `spells` box.
     expect(refused.error!.issues.map((issue) => issue.path.join("."))).toEqual(["spells"]);
   });
 
@@ -358,8 +296,7 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
       id: "hb-flamekin-a1b2c3", name: "Flamekin", source: "homebrew", speedFeet: 30,
       traits: [{ id: "flamekin-ember", name: "Ember", description: "A spark you carry.", grants }]
     });
-    // The SAME record without the gate publishes cleanly, so the refusal below is the only thing
-    // wrong with it - `valid: false` here cannot be some other mistake in the fixture.
+    // The same record without the gate publishes, so the refusal below is the only thing wrong with it.
     const { when: _gate, ...ungated } = GATED_FIREBALL;
     expect(validateForPublish("species", species(ungated), publishContext())).toEqual({ valid: true, issues: [] });
 
@@ -367,26 +304,19 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
     expect(validity.valid).toBe(false);
     expect(validity.issues).toHaveLength(1);
     expect(validity.issues[0].message).toBe(grantedSpellGateMessage(["fireball"]));
-    // Machine-addressable all the way down the record, so the editor opens the right trait and
-    // points at the right box rather than printing prose at the top of the form.
+    // Machine-addressable down the record, so the editor opens the right trait and box.
     expect(validity.issues[0].path.join(".")).toBe("traits.0.grants.spells");
   });
 
   it("takes the SAME block once the gate comes off - the refusal is the pair, not the spell", () => {
     const { when: _gate, ...ungated } = GATED_FIREBALL;
     expect(FeatureGrantsSchema.safeParse(ungated).success).toBe(true);
-    // And the gate alone is still fine on the other ten, which is what W3 shipped.
+    // The gate alone is still fine on the other ten lists.
     expect(FeatureGrantsSchema.safeParse({ ...GATED_FIREBALL, spells: [] }).success).toBe(true);
   });
 });
 
-/**
- * THE UNGATED PATH, UNCHANGED - proven on a shipped record rather than a fixture.
- *
- * `high-elf-cantrip` really is authored as `grants: { spells: [{ id: "prestidigitation", ... }] }` in
- * `bundles/species.v1.json`, and it is one of 41 shipped blocks that grant a spell with no gate. The
- * refusal above must not touch any of them.
- */
+/** The ungated spell-grant path is unaffected, shown on the shipped `high-elf-cantrip` record. */
 function elfViewGating(gate: readonly unknown[] | null): ContentView {
   const base = new ContentLibrary().forAudience("gm");
   const gateTrait = <T extends { id: string; grants?: unknown }>(trait: T): T =>
@@ -435,22 +365,21 @@ describe("an ungated granted spell still arrives, on the shipped record that gra
     expect(built.spellcasting!.spells).toEqual([
       { id: "prestidigitation", name: "Prestidigitation", level: 0, prepared: true, alwaysPrepared: true }
     ]);
-    // A Fighter has no spell list at all, so this whole block exists ONLY because a trait granted a
-    // spell - and `ability: "int"` is the grant's own, which is what makes the DC the elf's.
+    // A Fighter has no spell list, so this block exists only because a trait granted a spell, and
+    // `ability: "int"` comes from the grant.
     expect(built.spellcasting!.ability).toBe("int");
   });
 
   it("is what gating it USED to destroy - the measurement that made the refusal the right answer", () => {
-    // The gate is applied BELOW the schema on purpose: this is what the old silent path did, and it
-    // is the reason the pair is refused above rather than carried. `spellcasting` does not become
-    // conditional - it ceases to exist, and Prestidigitation is on no sheet anywhere.
+    // Applying the gate below the schema shows why the pair is refused: `spellcasting` disappears
+    // entirely rather than becoming conditional.
     const built = buildCharacterDefinition(highElfInput(), elfViewGating([{ type: "while-effect-tag", tags: ["raging"] }]), policy);
     expect(built.spellcasting, "a gated spell had nowhere to live: the caster block went with it").toBeUndefined();
     expect(JSON.stringify(built)).not.toContain("prestidigitation");
   });
 });
 
-/** The publish gate's context, with an empty homebrew slice - tier 1 is the record's own schema. */
+/** The publish gate's context with an empty homebrew slice. */
 function publishContext(): HomebrewValidationContext {
   return { catalog: new ContentLibrary().forAudience("gm"), spellLists: [], authored: EMPTY_AUTHORED_INDEX };
 }

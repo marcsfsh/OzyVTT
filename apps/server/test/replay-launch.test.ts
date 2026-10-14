@@ -9,19 +9,10 @@ import { claimCharacter } from "../src/character-claims.js";
 import { projectGmView, projectPlayerView } from "../src/projections.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
 
-/**
- * LAUNCH FROM HERE (D25 / director ruling R3).
- *
- * The behaviour under test is "one table": the current fight PARKS exactly as it does on a scene
- * switch, the recorded moment goes live, and the parked scene resumes through the ordinary
- * `scene.activate`. The id-cloning is data safety and is asserted as such - tonight's characters
- * must come back from the replay with the hit points they had when it started.
- *
- * D3 - KEEP THE CLONE, HIDE THE CLONE. The clone stays; what it may no longer do is show up. The
- * second describe block below is the whole of that ruling: no `(replay)` suffix, absent from every
- * roster, still in the fight, unclaimable, and deleted with its scene - which is also the fix for the
- * leak that made "Launch from here" refuse at 19-20 scenes with a demand no screen could satisfy.
- */
+// Launching from a recorded moment parks the current fight exactly as a scene switch does, makes the
+// recording live, and resumes through `scene.activate`. Ids are cloned so tonight's characters keep
+// their hit points. Clones keep the recorded name, stay out of every roster, remain in the fight,
+// cannot be claimed, and are deleted with their scene so they never leak scene slots.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -54,7 +45,7 @@ function heroDefinition(name: string, maximum: number): ActorDefinition {
   return { ...base, name, hitPoints: { ...base.hitPoints, maximum } };
 }
 
-/** The archived moment: the hero at FULL health, a hidden ambusher, and an effect linking the two. */
+/** The archived moment: the hero at full health, a hidden ambusher, and an effect linking the two. */
 function archivedState(): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
     {
@@ -107,7 +98,7 @@ describe("replay.launch - one table, parked and resumed", () => {
     expect(state.combat.round).toBe(1);
     expect(state.combat.initiative.map((entry) => entry.actorId)).toEqual(outcome.actorIds);
 
-    // The table that was live is PARKED, not lost - the same park/resume motion as a scene switch.
+    // The table that was live is parked, not lost.
     const parked = state.combat.scenes.find((scene) => scene.id === IDS.scene)!;
     expect(parked.combat.round).toBe(4);
     expect(parked.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.hero, IDS.goblin]);
@@ -130,11 +121,11 @@ describe("replay.launch - one table, parked and resumed", () => {
     expect(outcome.actorIds).toHaveLength(2);
     expect(outcome.actorIds).not.toContain(IDS.hero);
     const clonedHero = state.actors.find((actor) => actor.id === outcome.actorIds[0])!;
-    // D3: the recorded name, undecorated. The clone is identified by its scope, not by its label.
+    // The recorded name, undecorated: the clone is identified by its scope, not its label.
     expect(clonedHero.name).toBe("Borin");
     expect(clonedHero.replaySceneId).toBe(IDS.launchScene);
     expect(clonedHero.hp).toMatchObject({ current: 30, maximum: 30 });
-    // Claims do not resurrect - the player owns their LIVE character, not the replay copy.
+    // Claims do not carry over: the player owns their live character, not the replay copy.
     expect(clonedHero.ownerSessionId).toBeNull();
     expect(clonedHero.conditions.map((condition) => condition.id)).toEqual(["prone"]);
   });
@@ -145,7 +136,7 @@ describe("replay.launch - one table, parked and resumed", () => {
     const [heroId, grickId] = outcome.actorIds;
 
     const clonedHero = state.actors.find((actor) => actor.id === heroId)!;
-    // The grapple still points at the creature that made it - the CLONE, never the archived id.
+    // The grapple points at the clone of the creature that made it, never the archived id.
     expect(clonedHero.effects[0].sourceActorId).toBe(grickId);
     expect(state.combat.reactionsUsed).toEqual([heroId]);
     expect(Object.keys(state.combat.legendaryUsed)).toEqual([grickId]);
@@ -160,13 +151,13 @@ describe("replay.launch - one table, parked and resumed", () => {
     const state = liveState();
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
 
-    // `import-borin` exists live with a DIFFERENT body (30 max vs the archive's 44) - the campaign's
-    // copy stays exactly as it was and the replay's copy gets its own namespaced id.
+    // `import-borin` exists live with a different body (30 max vs the archive's 44): the campaign's
+    // copy is unchanged and the replay's copy gets its own namespaced id.
     expect(state.definitions.find((entry) => entry.id === "import-borin")!.definition.hitPoints.maximum).toBe(30);
     const replayCopy = state.definitions.find((entry) => entry.id === "replay-7-import-borin")!;
     expect(replayCopy.definition.hitPoints.maximum).toBe(44);
     expect(state.actors.find((actor) => actor.id === outcome.actorIds[0])!.definitionId).toBe("replay-7-import-borin");
-    // A definition the campaign does NOT have keeps its own id.
+    // A definition the campaign does not have keeps its own id.
     expect(state.definitions.some((entry) => entry.id === "import-grick")).toBe(true);
   });
 
@@ -181,8 +172,8 @@ describe("replay.launch - one table, parked and resumed", () => {
 
   it("refuses up front when there is no room to park the table AND stage the replay", () => {
     const state = liveState();
-    // 19 prepared scenes plus a live unbound encounter: parking needs one slot, the replay needs
-    // another, and the cap is 20 - so this is refused BEFORE anything is cloned.
+    // 19 prepared scenes plus a live unbound encounter: parking needs one slot, the replay another, and
+    // the cap is 20, so this is refused before anything is cloned.
     for (let index = 0; index < 19; index += 1) {
       createScene(state, { sceneId: `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`, name: `Scene ${index}`, mapAssetId: IDS.map, combatantIds: [] }, GEOMETRY);
     }
@@ -194,8 +185,7 @@ describe("replay.launch - one table, parked and resumed", () => {
   });
 
   it("never decorates a name, even when a replay is itself replayed", () => {
-    // Launch once, archive THAT table, and launch it again. The old code appended " (replay)" and
-    // clamped the repeat; there is no suffix to clamp now, and re-scoping must not stack either.
+    // Launch, archive that table, and launch it again: re-scoping must not stack.
     const first = liveState();
     const once = launch(first, documentWith([{ revision: 10, state: archivedState() }]));
     expect(first.actors.find((actor) => actor.id === once.actorIds[0])!.name).toBe("Borin");
@@ -205,13 +195,11 @@ describe("replay.launch - one table, parked and resumed", () => {
     for (const id of outcome.actorIds) {
       const clone = relaunched.actors.find((actor) => actor.id === id)!;
       expect(clone.name).not.toMatch(/\(replay\)/i);
-      // A clone of a clone belongs to the NEW scene - never still pointing at the one it was recorded in.
+      // A clone of a clone belongs to the new scene, not the one it was recorded in.
       expect(clone.replaySceneId).toBe(IDS.launchScene);
     }
   });
 });
-
-// ───────────────── D3: keep the clone, hide the clone (and stop leaking scene slots) ─────────────────
 
 const presenceFor = () => null;
 /** Only the campaign's own members - `rosterActors` is the single rule every management surface uses. */
@@ -222,17 +210,17 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
     const state = liveState();
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
 
-    // THE ROSTER. Tonight's two characters and nothing else - the launch added no campaign members.
+    // Tonight's two characters and nothing else: the launch added no campaign members.
     expect(rosterOf(state)).toEqual(["Borin", "Goblin"]);
     const player = projectPlayerView(state, IDS.session, presenceFor);
     expect(rosterActors(player.actors).map((actor) => actor.name)).toEqual(["Borin", "Goblin"]);
-    // No surface anywhere renders the old suffix, on either side of the boundary.
+    // No surface renders a "(replay)" suffix, on either side of the boundary.
     for (const name of [...state.actors.map((actor) => actor.name), ...player.actors.map((actor) => actor.name)]) {
       expect(name.toLowerCase().endsWith("(replay)")).toBe(false);
     }
 
-    // THE FIGHT. The same clones are still the combatants - initiative, tokens and the actor entries
-    // the map resolves them through. Hiding them from the roster must not empty the battlefield.
+    // The clones are still the combatants (initiative, tokens, actor entries); hiding them from the
+    // roster must not empty the battlefield.
     expect(state.combat.initiative.map((entry) => entry.actorId)).toEqual(outcome.actorIds);
     expect(projectGmView(state, presenceFor).actors.map((actor) => actor.id)).toEqual(expect.arrayContaining([...outcome.actorIds]));
     // The archived ambusher was gm-only, so only the cloned hero is public to a player.
@@ -245,7 +233,7 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
     const state = liveState();
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
     const other = "30000000-0000-4000-8000-000000000002";
-    // The clone is an unowned player-character, which is exactly what "available" looks like.
+    // The clone is an unowned player-character, which is what "available" looks like.
     expect(state.actors.find((actor) => actor.id === outcome.actorIds[0])!.ownerSessionId).toBeNull();
     expect(() => claimCharacter(state, outcome.actorIds[0], other)).toThrow(/unavailable/i);
     expect(state.actors.find((actor) => actor.id === outcome.actorIds[0])!.ownerSessionId).toBeNull();
@@ -276,10 +264,8 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
     createScene(state, { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] }, GEOMETRY);
     activateScene(state, IDS.scene, IDS.implicit);
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
-    // `scene.remove` refuses the LIVE scene, so reaching this branch means the replay is parked -
-    // which the two activate paths now prevent. It is deliberate belt-and-braces: `scene.remove` is
-    // the one other door out of a scene, and it must not be the door that leaves the clones behind.
-    // Hand-parked here because no supported motion can produce a parked replay any more.
+    // `scene.remove` refuses the live scene and the activate paths never leave a replay parked, so this
+    // state is hand-built: `scene.remove` must still not leave the clones behind.
     state.combat = { ...state.combat, activeSceneId: IDS.scene };
 
     removeScene(state, IDS.launchScene);
@@ -287,7 +273,7 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
     for (const id of outcome.actorIds) expect(state.actors.some((actor) => actor.id === id)).toBe(false);
     expect(rosterOf(state)).toEqual(["Borin", "Goblin"]);
 
-    // An ORDINARY prepared scene keeps its combatants - they are campaign members, not clones.
+    // An ordinary prepared scene keeps its combatants; they are campaign members, not clones.
     createScene(state, { sceneId: IDS.launchScene, name: "Next week", mapAssetId: IDS.map, combatantIds: [IDS.hero] }, GEOMETRY);
     removeScene(state, IDS.launchScene);
     expect(rosterOf(state)).toEqual(["Borin", "Goblin"]);
@@ -306,7 +292,7 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
       const sceneId = `40000000-0000-4000-8000-0000000002${String(attempt).padStart(2, "0")}`;
       const outcome = launchReplay(state, { archiveId: 7, document, turnIndex: 0, sceneId, implicitSceneId: IDS.implicit, newActorId });
       expect(state.combat.activeSceneId).toBe(sceneId);
-      // Steady state: tonight's parked scene plus the one replay that is live. Never twenty.
+      // Steady state: tonight's parked scene plus the one live replay. Never twenty.
       expect(state.combat.scenes.map((scene) => scene.id)).toEqual([IDS.scene, sceneId]);
       expect(state.actors).toHaveLength(baselineActors + outcome.actorIds.length);
       expect(rosterOf(state)).toEqual(["Borin", "Goblin"]);

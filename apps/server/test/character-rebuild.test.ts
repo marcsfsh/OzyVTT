@@ -8,14 +8,8 @@ import { startEncounter } from "../src/encounter.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { InventoryItemSchema } from "@vtt/schemas";
 
-/**
- * D13/D14 - LEVEL UP, LEVEL DOWN, RESPEC, and the hit-point rolls the app now remembers.
- *
- * The round trip is the point: a character rebuilt 5 -> 3 -> 5 has to come back to the SAME maximum
- * hit points it started with. That is only possible because the build records what the dice said,
- * which is the whole of D14 - before it, the rolls were consumed and forgotten and a level-down was
- * a one-way door.
- */
+// Level up, level down and respec. A character rebuilt 5 -> 3 -> 5 must come back to the same
+// maximum hit points, which works because the build records the hit-point rolls.
 
 const library = new ContentLibrary().forAudience("gm");
 const policy = BuilderPolicySchema.parse({});
@@ -58,11 +52,8 @@ const fighter = (over: Partial<CharacterCreateRequestInput> = {}): CharacterCrea
   ...over
 });
 
-/**
- * The client's prefill: the wizard supplies the CHOICES for every level up to the target (its own
- * answers, re-offered on the way back up), and the hit-point dice come from the sheet's MEMORY - the
- * half a player cannot re-answer, which is exactly what D14 exists to keep.
- */
+// The client's prefill: the wizard supplies the choices for every level up to the target, and the
+// hit-point dice come from the sheet's recorded rolls, the half a player cannot re-answer.
 function prefillFor(built: { character?: { choices?: readonly { level: number; kind: string }[] } }, level: number, base: CharacterCreateRequestInput): CharacterCreateRequestInput {
   const rolls = storedHitPointRolls((built.character?.choices ?? []) as never, level);
   return {
@@ -92,7 +83,7 @@ describe("the app remembers hit-point rolls (D14)", () => {
     ]);
     expect(storedHitPointRolls(definition.character!.choices!, 5)).toEqual([1, 10, 4, 6]);
     expect(storedHitPointRolls(definition.character!.choices!, 3)).toEqual([1, 10]);
-    // A sheet with no recorded rolls (a PDF import, anything built before this) answers honestly.
+    // A sheet with no recorded rolls (a PDF import, or an older build) returns null.
     expect(storedHitPointRolls([], 3)).toBeNull();
     // Re-running a build over its own prefill must not double the rows.
     expect(hitPointRollRows({ hp: { mode: "average" }, choices: [] })).toEqual([]);
@@ -109,7 +100,7 @@ describe("the app remembers hit-point rolls (D14)", () => {
     expect(state.actors[0].hp.maximum).toBe(down.hitPoints.maximum);
     expect(state.actors[0].hp.maximum).toBeLessThan(startingMaximum);
 
-    // The client prefills from the STORED sheet, which is where the memory lives.
+    // The client prefills from the stored sheet, which holds the recorded rolls.
     const stored = state.definitions.find((entry) => entry.id === `import-${ACTOR_ID}`)!.definition;
     const upInput = prefillFor(stored, 5, fighter());
     // The rolls came back out of the ledger, not out of the request the client happened to send.
@@ -121,13 +112,13 @@ describe("the app remembers hit-point rolls (D14)", () => {
 
   it("falls back to the average for a character whose rolls were never recorded", () => {
     const { state } = tableWith();
-    // A PDF import or a pre-D14 sheet: no `hp-roll` rows anywhere, so the prefill has no dice to reuse.
+    // A PDF import or older sheet: no `hp-roll` rows, so the prefill has no dice to reuse.
     const noLedger = prefillFor({ character: { choices: fighter().choices } }, 4, fighter());
     expect(noLedger.hp).toEqual({ mode: "average" });
     const built = buildCharacterDefinition(noLedger, library, policy);
     rebuildActorDefinition(state, ACTOR_ID, built);
-    // Stated honestly rather than papered over: the product floor is max(roll, average), so an old
-    // rolled character can come back with fewer maximum hit points. No dice are invented.
+    // Known limitation: the floor is max(roll, average), so an old rolled character can come back with
+    // fewer maximum hit points. No dice are invented.
     expect(state.actors[0].hp.maximum).toBe(built.hitPoints.maximum);
   });
 });
@@ -162,7 +153,7 @@ describe("rebuilding a live character", () => {
     // HP: the delta rides along, so a level-down clamps and a level-up arrives as usable hit points.
     expect(actor.hp.maximum).toBe(built.hitPoints.maximum);
     expect(actor.hp.current).toBe(Math.max(0, built.hitPoints.maximum - 7));
-    // And the stored sheet is the NEW one, under the same import key.
+    // And the stored sheet is the new one, under the same import key.
     expect(state.definitions.find((entry) => entry.id === `import-${ACTOR_ID}`)!.definition.hitPoints.maximum).toBe(built.hitPoints.maximum);
     expect(state.definitions).toHaveLength(1);
   });

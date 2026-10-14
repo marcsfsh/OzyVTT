@@ -6,14 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { projectGmSession, projectPlayerSession } from "../src/codex-projections.js";
 
-/**
- * D31 + director ruling R2 - SESSION PREP LISTS TONIGHT'S SCENES.
- *
- * The scene attachment is the marker precedent verbatim (a JSON id array, no foreign key, dangling
- * links rendered honestly), with ONE difference that is the whole ruling: `sceneIds` is GM-only
- * ALWAYS, not "GM-only until the session is revealed". Revealing a session publishes its RECAP; the
- * fights the GM has staged for the evening are spoilers even then.
- */
+// A session's `sceneIds` follow the marker pattern (JSON id array, no foreign key, dangling links
+// shown as such) with one difference: they are always GM-only. Revealing a session publishes its
+// recap; the staged fights stay spoilers.
 
 const SCENE_A = "40000000-0000-4000-8000-000000000001";
 const SCENE_B = "40000000-0000-4000-8000-000000000002";
@@ -34,10 +29,10 @@ describe("session scene attachments", () => {
     expect(session.sceneIds).toEqual([SCENE_A, SCENE_B]);
     expect(store.getSession(session.id)!.sceneIds).toEqual([SCENE_A, SCENE_B]);
 
-    // Omitted means UNCHANGED - the console PATCHes a whole draft on every autosave.
+    // Omitted means unchanged: the console PATCHes a whole draft on every autosave.
     const edited = store.updateSession(session.id, { prepBody: "Ambush at the ford." }, session.rev, "gm");
     expect(edited.sceneIds).toEqual([SCENE_A, SCENE_B]);
-    // Supplied means REPLACED, the marker contract verbatim.
+    // Supplied means replaced, as with markers.
     const detached = store.updateSession(session.id, { sceneIds: [SCENE_B] }, edited.rev, "gm");
     expect(detached.sceneIds).toEqual([SCENE_B]);
     expect(store.updateSession(session.id, { sceneIds: [] }, detached.rev, "gm").sceneIds).toEqual([]);
@@ -76,8 +71,7 @@ describe("session scene attachments", () => {
     const before = first.createSession({ sessionNumber: 1, prepBody: "Written before scenes existed." });
     first.close();
 
-    // Simulate the pre-migration database: drop the column AND forget the migration ran, which is
-    // exactly the state an older campaign's codex is in when this build first opens it.
+    // Simulate a database from before the column existed: drop it and forget the migration ran.
     const raw = new DatabaseSync(path);
     raw.exec("ALTER TABLE codex_sessions DROP COLUMN scene_ids_json;");
     raw.prepare("DELETE FROM codex_schema_migrations WHERE version = ?").run(25);

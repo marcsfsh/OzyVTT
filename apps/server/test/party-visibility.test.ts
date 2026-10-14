@@ -1,13 +1,6 @@
-/**
- * **Party visibility (rulings 5/8/19) — the tier is a PROJECTION decision, so it is proven here.**
- *
- * The setting is only real if a withheld field never reaches the wire. A client-side filter would look
- * identical in the DOM and leak everything on the socket, which is why every assertion below reads the
- * projected payload (and, for the sheet, the RAW SERIALIZED payload) rather than any rendered surface.
- *
- * The per-tier field table these tests enforce lives beside the code that applies it, above
- * `projectPlayerView` in `apps/server/src/projections.ts`.
- */
+// Party visibility is a projection decision: a withheld field must never reach the wire, so every
+// assertion reads the projected (and for the sheet, the serialized) payload. The per-tier field
+// table lives above `projectPlayerView` in `apps/server/src/projections.ts`.
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState, type PartyVisibility } from "@vtt/domain";
 import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
@@ -27,8 +20,7 @@ const definitionOf = (name: string, className: string, level: number, secret: st
   name, size: "medium", armorClass: 14, proficiencyBonus: 3, initiativeBonus: 0, speedFeet: 30,
   abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 8 },
   hitPoints: { maximum: 30 }, extensions: {}, token: { disposition: "friendly" },
-  // Two actions sharing ONE pool plus a solo one, so the derived `pools` list has something with a
-  // real shape to assert: the shared ceiling is the MAX over its members, not the first one printed.
+  // Two actions sharing one pool plus a solo one: the shared ceiling is the max over its members.
   actions: [
     { id: "divine-spark", name: "Channel Divinity: Divine Spark", activation: "action", description: "A surge of divine energy.", uses: { limit: 2, per: "short-rest", pool: "channel-divinity" } },
     { id: "preserve-life", name: "Channel Divinity: Preserve Life", activation: "action", description: "You restore the wounded.", uses: { limit: 1, per: "short-rest", pool: "channel-divinity" } },
@@ -93,13 +85,8 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
     expect(JSON.stringify(viewAt("off"))).not.toContain("THEIRS-SECRET");
   });
 
-  /**
-   * THE REGRESSION THIS RULING EXISTS TO PREVENT, and the only test in the suite that would catch it.
-   * `partyVisibility` does not govern `projectPlayerCombat`, so dropping the actor entry at `off` left
-   * the ally NAMED in the turn order with no actor for `EncounterMap` to resolve their token against -
-   * a name in the initiative list and an empty square on the map. Asserting the tier's field gate is
-   * not enough; the fight has to still be a fight.
-   */
+  // `partyVisibility` does not govern `projectPlayerCombat`, so dropping an ally's actor entry would
+  // leave them named in the turn order with no actor to resolve their token. The fight must stay coherent.
   it("keeps the fight coherent at every tier - the turn order, the tokens and the actor list agree", () => {
     for (const tier of TIERS) {
       const state = tableAt(tier);
@@ -123,7 +110,7 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
       expect(mine, `own character missing at tier ${tier}`).toBeDefined();
       expect(mine!.definition?.name, `own sheet withheld at tier ${tier}`).toBe("My Hero");
       for (const field of RESOURCES) expect(field in mine!, `own ${field} withheld at tier ${tier}`).toBe(true);
-      // And the class line is NOT duplicated onto your own character - you hold the whole definition.
+      // The class line is not duplicated onto your own character; you hold the whole definition.
       expect(mine!.classLine).toBeUndefined();
     }
   });
@@ -189,31 +176,22 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
   });
 });
 
-/**
- * **The pools projection (`3b`'s binding surface) — what the spent counts are OUT OF.**
- *
- * `actionUses` has always been a bare `Record<string, number>` of SPENT counts with nothing on the
- * wire naming the pools or their ceilings, so a client could render "1" and had no way to know
- * whether that was one of two or one of five. `pools` is that missing half.
- *
- * It adds NO state: it is a pure function of the definition's own actions, computed at projection
- * time, so there is nothing to store, migrate, or keep in sync with the counters.
- */
+// `pools` names the pools behind `actionUses` (spent counts) and their ceilings. It is a pure function
+// of the definition's actions computed at projection time, so there is nothing to store or sync.
 describe("pools — the shape a resource tracker binds to", () => {
   it("names every pool, keyed by the exact actionUses key, with the ceiling the engine enforces", () => {
     const mine = actorIn("sheet-and-resources", MINE)!;
     expect(mine.pools).toEqual([
-      // The SHARED pool: keyed on `uses.pool`, ceiling 2 (the max over its members, not Preserve
-      // Life's printed 1), and named from the slug because no action is itself called that.
+      // The shared pool: keyed on `uses.pool`, ceiling 2 (the max over its members, not Preserve Life's
+      // printed 1), and named from the slug.
       { id: "channel-divinity", name: "Channel Divinity", limit: 2, per: "short-rest" },
-      // The SOLO pool: keyed on the action id, and named from the action that owns it.
+      // The solo pool: keyed on the action id and named from that action.
       { id: "second-wind", name: "Second Wind", limit: 3, per: "short-rest" }
     ]);
   });
 
   it("uses the same keys actionUses is indexed by, so a tracker can join the two", () => {
-    // The whole point of the field. If these two namespaces could drift, the tracker would show a
-    // ceiling for one resource beside a spent count for another and never say so.
+    // Pool ids and `actionUses` keys must share one namespace, or a ceiling would sit beside the wrong count.
     const mine = actorIn("sheet-and-resources", MINE)!;
     for (const key of Object.keys(mine.actionUses!)) {
       expect(mine.pools!.some((pool) => pool.id === key), `actionUses key "${key}" has no pool entry`).toBe(true);
@@ -222,15 +200,13 @@ describe("pools — the shape a resource tracker binds to", () => {
   });
 
   it("reaches a player under the SAME gate as actionUses, and no wider", () => {
-    // Viewer safety, stated as the assertion rather than the comment: `pools` is derived from
-    // `definition.actions[].uses`, and the definition itself already ships one tier LOWER
-    // (`full-sheet`). So the tier at which pools appears can never be the tier at which a limit
-    // first becomes knowable - it is strictly later.
+    // `pools` derives from `definition.actions[].uses`, and the definition already ships one tier lower
+    // (`full-sheet`), so pools never reveal a limit that was not already knowable.
     for (const tier of TIERS) {
       const theirs = actorIn(tier, THEIRS)!;
       expect("pools" in theirs, `pools at ${tier}`).toBe(tier === "sheet-and-resources");
       expect("pools" in theirs).toBe("actionUses" in theirs);
-      // Where the sheet IS visible, every ceiling pools would report is already readable off it.
+      // Where the sheet is visible, every ceiling pools reports is already readable off it.
       if ("definition" in theirs) {
         expect(theirs.definition!.actions.map((action) => action.uses?.limit)).toEqual([2, 1, 3]);
       }

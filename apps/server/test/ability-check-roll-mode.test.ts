@@ -8,20 +8,10 @@ import { deriveEquipment, type EquipmentCatalog, type EquipmentRecordLike } from
 import { startEncounter } from "../src/encounter.js";
 import { addEffect } from "../src/effects.js";
 
-/**
- * `roll-mode {roll: "check"}` REACHES THE DIE.
- *
- * The far end is deliberately a ROLLED OUTCOME, not a struct read back: a fixed pair (3 then 17) is
- * queued into the resolver's own `random`, and the assertion is which of the two the check kept.
- * "The rider survived derivation" would pass just as happily with the consumer deleted, which is why
- * every case here goes through `resolveDefinitionAction` - the same function `game-operations.ts`
- * calls for `action.resolve`, with the same catalog it passes (`equipmentCatalog()`).
- *
- * `boots-of-elvenkind` is the shape this exists for and is quoted verbatim from the shipped bundle:
- * *"You also have Advantage on Dexterity (Stealth) checks."* Its bundle record still carries
- * `modifiers: []` - authoring it is the content lane's move, and this suite injects the record the
- * lane will write so the ENGINE half is proved before anything depends on it.
- */
+// `roll-mode {roll: "check"}` must reach the die. A fixed pair (3 then 17) is queued into the
+// resolver's `random` and each case asserts which face the check kept, going through
+// `resolveDefinitionAction` with `equipmentCatalog()` as `action.resolve` does. `BOOTS` mirrors
+// boots-of-elvenkind ("Advantage on Dexterity (Stealth) checks"), whose bundle row has `modifiers: []`.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -59,7 +49,7 @@ function stateWith(inventory: InventoryItem[]): GameState {
   return state;
 }
 
-/** The dice queue IS the experiment: every case below feeds the same two faces and asks which survived. */
+/** Every case feeds the same two faces and asserts which one survived. */
 function deps(faces: number[], catalog?: EquipmentCatalog, definition?: ActorDefinition): ResolveDependencies {
   let index = 0;
   return {
@@ -78,15 +68,11 @@ function resolveBuiltin(state: GameState, actionId: string, dependencies: Resolv
 }
 
 const BOOTS_ROW = { id: "boots-of-elvenkind", name: "Boots of Elvenkind", quantity: 1, equipped: true, category: "wondrous-item" };
-/** The record the content lane will author onto the bundle row, which today carries `modifiers: []`. */
+/** The modifiers the boots-of-elvenkind bundle row should carry; it has `modifiers: []`. */
 const BOOTS: EquipmentRecordLike = {
   id: "boots-of-elvenkind", name: "Boots of Elvenkind", category: "wondrous-item", slot: "feet", isMagic: true,
   modifiers: [{ type: "roll-mode", roll: "check", mode: "advantage", when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }] }]
 };
-
-// -------------------------------------------------------------------------------------------------
-// THE FAR END - a Stealth check keeps the higher of two dice, and stops when the boots come off
-// -------------------------------------------------------------------------------------------------
 
 describe("advantage on an ability check reaches the d20", () => {
   it("Boots of Elvenkind make Hide keep the HIGHER of 3 and 17", () => {
@@ -94,11 +80,11 @@ describe("advantage on an ability check reaches the d20", () => {
     const state = stateWith([item(BOOTS_ROW)]);
     const resolution = resolveBuiltin(state, "hide", deps([3, 17], catalogOf([BOOTS]), definition));
 
-    // DEX 14 = +2. 17 + 2 = 19, which also clears Hide's DC 15 - the outcome moved, not just the die.
+    // DEX 14 = +2. 17 + 2 = 19, which also clears Hide's DC 15: the outcome moved, not just the die.
     expect(resolution.check).toMatchObject({ skill: "Dexterity (Stealth)", naturalRoll: 17, total: 19, dc: 15, success: true });
     expect(resolution.rollMode).toEqual({ mode: "advantage", advantage: ["Boots of Elvenkind"], disadvantage: [] });
 
-    // The recorded roll proves TWO dice were thrown and one was kept - a derived number could not.
+    // The recorded roll shows two dice thrown and one kept.
     const record = state.rolls.find((roll) => roll.purpose === "check")!;
     expect(record.normalizedFormula).toBe("2d20kh1+2");
     expect(record.dice.map((die) => ({ face: die.face, kept: die.kept }))).toEqual([{ face: 3, kept: false }, { face: 17, kept: true }]);
@@ -134,10 +120,6 @@ describe("advantage on an ability check reaches the d20", () => {
     expect(resolution.check).toMatchObject({ naturalRoll: 3 });
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// The narrowing, both directions - "advantage on Stealth" must not become "advantage on everything"
-// -------------------------------------------------------------------------------------------------
 
 describe("which check the rider actually reaches", () => {
   it("does not touch a Wisdom (Search) check - `ability-is` and `skill-is` fail closed", () => {
@@ -190,10 +172,6 @@ describe("which check the rider actually reaches", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// The SECOND check path - Escape a Grapple rolls a d20 too
-// -------------------------------------------------------------------------------------------------
-
 describe("Escape a Grapple takes the same consumer", () => {
   const GAUNTLETS: EquipmentRecordLike = {
     id: "gauntlets-of-ogre-power", name: "Gauntlets of Ogre Power", category: "wondrous-item", slot: "hands", isMagic: true,
@@ -232,10 +210,6 @@ describe("Escape a Grapple takes the same consumer", () => {
     expect(resolution.check).toMatchObject({ naturalRoll: 3 });
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// The collector itself, so a future caller can trust the narrowing without driving a whole action
-// -------------------------------------------------------------------------------------------------
 
 describe("checkRollMode narrows the way checkRiderBonus does", () => {
   it("matches on ability and skill, and stays normal when neither is named", () => {

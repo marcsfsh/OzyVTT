@@ -6,16 +6,8 @@ import { applyRest, spendHitDice } from "../src/rests.js";
 import { setSpellSlotRemaining } from "../src/spellcasting.js";
 import { projectPlayerView } from "../src/projections.js";
 
-/**
- * Multiclass seeding regressions. Two Phase-1 bugs met here:
- *
- *  1. `Actor.hitDice` was derived by regexing `hitPoints.formula`, and `DiceFormulaSchema` allows only
- *     ONE die term - so a Fighter 3 / Wizard 2 (3d10 + 2d6) was literally unparseable and seeded 3
- *     dice instead of 5. The long rest then restored the wrong maximum.
- *  2. Every seeding site read only the TOP-LEVEL `spellcasting.slots`, so a definition that filled
- *     `spellcasting.classes[]` (the multiclass shape) became a "modeled caster with zero slots" and a
- *     long rest restored nothing.
- */
+// Multiclass seeding: hit dice come from class levels (the one-term `hitPoints.formula` cannot say
+// 3d10 + 2d6), and slots are derived from `spellcasting.classes[]`, not only the top-level list.
 
 const ACTOR = "10000000-0000-4000-8000-0000000000a1";
 const OWNER = "30000000-0000-4000-8000-0000000000b1";
@@ -29,16 +21,15 @@ const BASE = {
   actions: [], token: { disposition: "friendly", footprint: { width: 1, height: 1 } }, extensions: {}
 } as const;
 
-/** Fighter 3 / Wizard 2. The hit-point FORMULA can only say one thing; the class levels say the truth. */
+/** Fighter 3 / Wizard 2. The hit-point formula can only describe one class; the class levels are authoritative. */
 function fighterWizard(overrides: Record<string, unknown> = {}): ActorDefinition {
   return ActorDefinitionSchema.parse({
     ...BASE,
-    // A single-term formula is all `DiceFormulaSchema` permits - "3d10 + 2d6" is unparseable - which
-    // is precisely why seeding from the formula lost the Wizard's two dice.
+    // `DiceFormulaSchema` allows a single term only; "3d10 + 2d6" is unparseable.
     hitPoints: { maximum: 40, formula: "3d10 + 10" },
     character: { classes: [{ id: "fighter", name: "Fighter", level: 3 }, { id: "wizard", name: "Wizard", level: 2 }], feats: [] },
-    // Per-class entry only: the combined table is DERIVED, which is exactly the shape that used to
-    // seed zero slots. No per-class `slots`, so the parse-time consistency rule is satisfied.
+    // Per-class entry only, so the combined slot table must be derived. No per-class `slots`, which
+    // satisfies the parse-time consistency rule.
     spellcasting: { ability: "int", saveDc: 14, attackBonus: 6, slots: [], classes: [{ classId: "wizard", ability: "int" }], spells: [{ id: "magic-missile", name: "Magic Missile", level: 1, classId: "wizard" }] },
     ...overrides
   });
@@ -55,7 +46,7 @@ const actorOf = (game: GameState) => game.actors.find((candidate) => candidate.i
 describe("multiclass seeding", () => {
   it("seeds the full multiclass Hit Dice pool, not one die size from the hit-point formula", () => {
     const definition = fighterWizard();
-    // THE BUG, pinned: the formula can only ever describe the first class's dice.
+    // The formula can only ever describe the first class's dice.
     expect(hitDiceFromDefinition(definition)).toEqual({ die: "d10", maximum: 3, remaining: 3 });
     const game = gameWith(definition);
     // The seeded pool is 3d10 (Fighter) + 2d6 (Wizard), largest die first.
@@ -63,7 +54,7 @@ describe("multiclass seeding", () => {
       die: "d10", maximum: 5, remaining: 5,
       entries: [{ die: "d10", maximum: 3, remaining: 3 }, { die: "d6", maximum: 2, remaining: 2 }]
     });
-    // The summary the pre-multiclass sheet UI reads now counts ALL five dice, not three.
+    // The summary the single-class sheet UI reads counts all five dice.
     expect(actorOf(game).hitDice?.maximum).toBe(5);
     expect(GameStateSchema.safeParse(game).success).toBe(true);
   });
@@ -92,7 +83,7 @@ describe("multiclass seeding", () => {
       die: "d10", maximum: 5, remaining: 1,
       entries: [{ die: "d10", maximum: 3, remaining: 0 }, { die: "d6", maximum: 2, remaining: 1 }]
     });
-    // Spending past the whole pool is still rejected on the TOTAL, not on one die size.
+    // Spending past the whole pool is rejected on the total, not on one die size.
     expect(() => spendHitDice(game, ACTOR, [4, 4], { role: "gm" }, resolver(game))).toThrowError(/1 Hit Die left/);
     applyRest(game, ACTOR, "long", resolver(game));
     expect(actorOf(game).hitDice).toEqual({
@@ -103,14 +94,12 @@ describe("multiclass seeding", () => {
 
   it("derives the combined spell-slot table from classes[] when the top level is empty", () => {
     const definition = fighterWizard();
-    // THE BUG, pinned: the only field the old seeding read is empty on this shape, so the character
-    // was seeded as a modeled caster with zero slots instead of failing loudly.
+    // The top-level slot list is empty on this shape; seeding from it would give a caster zero slots.
     expect(definition.spellcasting?.slots).toEqual([]);
     const game = gameWith(definition);
     // SRD multiclassing: Fighter contributes nothing, Wizard 2 -> caster level 2 -> three 1st-level slots.
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 3 }]);
     expect(spellSlotMaxima(fighterWizard())).toEqual([{ level: 1, max: 3 }]);
-    // Prepared spells and the definition link still seed as before.
     expect(actorOf(game).preparedSpellIds).toEqual(["magic-missile"]);
   });
 
@@ -126,9 +115,8 @@ describe("multiclass seeding", () => {
       die: "d10", maximum: 10, remaining: 10,
       entries: [{ die: "d10", maximum: 6, remaining: 6 }, { die: "d6", maximum: 4, remaining: 4 }]
     });
-    // An ODD half-caster level is where the rounding actually shows. SRD 5.2.1: "Half your levels
-    // (round up) in the Paladin and Ranger classes" - Paladin 3 (-> 2) + Wizard 1 = caster level 3,
-    // so the seeded actor gets 4/2. Rounding down seeded 4/0 and deleted the 2nd-level row entirely.
+    // SRD 5.2.1: "Half your levels (round up) in the Paladin and Ranger classes". Paladin 3 (-> 2) +
+    // Wizard 1 = caster level 3, so 4/2; rounding down would drop the 2nd-level row.
     const paladin3Wizard1 = fighterWizard({
       hitPoints: { maximum: 34, formula: "4d10" },
       character: { classes: [{ id: "paladin", name: "Paladin", level: 3 }, { id: "wizard", name: "Wizard", level: 1 }], feats: [] },
@@ -145,7 +133,7 @@ describe("multiclass seeding", () => {
       spellcasting: { ability: "cha", slots: [], classes: [{ classId: "warlock", ability: "cha" }, { classId: "sorcerer", ability: "cha" }], spells: [] }
     });
     const game = gameWith(warlockSorcerer);
-    // Warlock levels stay OUT of the shared table (Sorcerer 3 alone -> 4/2), and drive the pact pool.
+    // Warlock levels stay out of the shared table (Sorcerer 3 alone -> 4/2) and drive the pact pool.
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 4 }, { level: 2, remaining: 2 }]);
     expect(actorOf(game).pactSlots).toEqual({ level: 2, remaining: 2 });
   });
@@ -156,7 +144,7 @@ describe("multiclass seeding", () => {
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 0 }]);
     applyRest(game, ACTOR, "long", resolver(game));
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 3 }]);
-    // The clamp reads the DERIVED maximum too, so restoring cannot overshoot or be capped short.
+    // The clamp reads the derived maximum too, so restoring cannot overshoot or be capped short.
     setSpellSlotRemaining(game, ACTOR, 1, 9, resolver(game));
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 3 }]);
   });
@@ -168,7 +156,7 @@ describe("multiclass seeding", () => {
     expect(own.hitDice?.entries).toEqual([{ die: "d10", maximum: 3, remaining: 3 }, { die: "d6", maximum: 2, remaining: 2 }]);
     const stranger = projectPlayerView(game, "30000000-0000-4000-8000-0000000000b2", () => null).actors[0];
     expect("hitDice" in stranger).toBe(false);
-    // The projection hands out a COPY - mutating it must not reach into GameState.
+    // The projection hands out a copy; mutating it must not reach GameState.
     own.hitDice!.entries[0].remaining = 0;
     expect(actorOf(game).hitDice?.entries[0].remaining).toBe(3);
   });

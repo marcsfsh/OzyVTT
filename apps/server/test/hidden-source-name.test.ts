@@ -24,7 +24,7 @@ const IDS = {
   map: "20000000-0000-5000-8000-000000000001"
 } as const;
 
-/** Distinctive on purpose: every assertion below is a substring search for exactly this string. */
+/** Every assertion below is a substring search for exactly this string. */
 const ATTACKER_NAME = "Vashkar the Unseen";
 const MASK = "A hidden threat";
 
@@ -52,7 +52,7 @@ const attackerBuild = (): CharacterCreateRequestInput => ({
   ] as Row[]
 });
 
-/** A stat-block action carrying a declared on-hit rider - the third of the four authoring sites. */
+/** A stat-block action carrying a declared on-hit rider. */
 const SHADOW_BITE = {
   id: "shadow-bite", name: "Shadow Bite", activation: "action", description: "A bite from the dark.",
   attack: { bonus: 10, reachFeet: 5 },
@@ -91,10 +91,8 @@ let command = 0;
 let rollId = 0;
 const nextCommand = () => `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`;
 
-/**
- * Runs all FOUR sites that bake an attacker's name into an effect's free-form `name`, against one
- * public claimed player character, and returns what that player's own client is handed.
- */
+// Runs all four sites that bake an attacker's name into an effect's free-form `name`, against one
+// public claimed player character, and returns what that player's client is handed.
 function fight(visibility: "public" | "gm-only") {
   const built = buildCharacterDefinition(attackerBuild(), view, POLICY);
   const definition = {
@@ -124,12 +122,12 @@ function fight(visibility: "public" | "gm-only") {
     resolveDefinitionAction(state, effectiveActions(definition, attacker, catalog).find((action) => action.id === actionId)!,
       { actorId: IDS.attacker, targetIds: [IDS.target], commandId: nextCommand() }, deps(faces));
 
-  // SITE 1 - weapon-mastery.ts `slow`.  SITE 2 - weapon-mastery.ts `sap`.
+  // Sites 1 and 2: weapon-mastery.ts `slow` and `sap`.
   const slowed = swing("item-club", [15, 4]);
   const sapped = swing("item-mace", [15, 4]);
-  // SITE 3 - action-resolution.ts declared on-hit rider.
+  // Site 3: action-resolution.ts declared on-hit rider.
   const bitten = swing("shadow-bite", [15, 3]);
-  // SITE 4 - action-resolution.ts unarmed Grapple: the name rides a PENDING SAVE first...
+  // Site 4: action-resolution.ts unarmed Grapple. The name rides a pending save first...
   resolveDefinitionAction(state, builtinAction("unarmed-grapple")!,
     { actorId: IDS.attacker, targetIds: [IDS.target], commandId: nextCommand(), builtin: true }, deps([]));
   const promptView = projectPlayerView(state, IDS.playerSession, () => null);
@@ -146,7 +144,7 @@ function fight(visibility: "public" | "gm-only") {
   return {
     state, promptView,
     outcomes: [slowed.attack?.outcome, sapped.attack?.outcome, bitten.attack?.outcome],
-    /** What the SERVER stored - the four authoring sites' raw output, before any projection. */
+    /** What the server stored, before any projection. */
     storedNames: struck.effects.map((effect) => effect.name),
     playerView: projectPlayerView(state, IDS.playerSession, () => null),
     target: struck as Actor
@@ -156,7 +154,7 @@ function fight(visibility: "public" | "gm-only") {
 describe("a hidden attacker's real name never reaches the player it just hit", () => {
   it("masks the attacker inside every effect NAME the four authoring sites bake it into", () => {
     const { outcomes, storedNames, playerView, promptView } = fight("gm-only");
-    // The fixture really ran all four sites: the stored state is the unmasked truth the GM keeps.
+    // All four sites ran: the stored state is the unmasked truth the GM keeps.
     expect(outcomes).toEqual(["hit", "hit", "hit"]);
     expect(storedNames).toEqual([
       `Slowed by ${ATTACKER_NAME}`,
@@ -165,12 +163,11 @@ describe("a hidden attacker's real name never reaches the player it just hit", (
       `Grappled by ${ATTACKER_NAME}`
     ]);
 
-    // THE FAR END: the whole payload the player's client is handed, serialised. A name hiding in any
-    // other string is caught here too - this is not an assertion about one field.
+    // The whole payload the player's client is handed, serialized, so a name in any field is caught.
     expect(JSON.stringify(playerView)).not.toContain(ATTACKER_NAME);
     expect(JSON.stringify(promptView)).not.toContain(ATTACKER_NAME);
 
-    // ...and the chips still say something. An empty chip would be a worse bug than the leak.
+    // ...and the chips still say something; an empty chip would be worse than the leak.
     expect(playerView.actors.find((actor) => actor.id === IDS.target)!.effects.map((effect) => effect.name)).toEqual([
       `Slowed by ${MASK}`,
       `Sapped by ${MASK}`,
@@ -195,11 +192,8 @@ describe("a hidden attacker's real name never reaches the player it just hit", (
   });
 });
 
-/**
- * THE GUARD ON THE SUBSTITUTION ITSELF. `name` is free-form, so the mask is a text replacement, and a
- * text replacement is exactly where a two-letter creature mangles an unrelated word. These are the
- * two inputs that break a naive `replaceAll`.
- */
+// `name` is free-form, so the mask is a text replacement. These are the two inputs that break a
+// naive `replaceAll`: a short name inside another word, and an empty name.
 describe("the mask replaces a whole name, never a fragment of another word", () => {
   const SHORT = "20000000-0000-4000-8000-000000000001";
   const NAMELESS = "20000000-0000-4000-8000-000000000002";

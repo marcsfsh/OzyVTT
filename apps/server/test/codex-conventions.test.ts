@@ -10,16 +10,10 @@ import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 
-/**
- * The codex surface's CROSS-CUTTING contract, tested where the bytes leave the process: request-id echo,
- * the 401/403 split, integration-credential scopes, structured validation issues, `error.currentRevision`,
- * conditional reads, the sanitized 500 - and the Ajv cross-check that ties the published response schemas
- * to the projections that actually produce them.
- *
- * Kept in its own file rather than appended to `codex-http.test.ts`, which is already 1,800 lines of
- * per-feature viewer-safety cases. These claims are about the ROUTER, not about any one record type, and
- * a reader asking "what does a bad token get?" should not have to find the answer inside the quest suite.
- */
+// The codex router's cross-cutting contract, tested at the HTTP boundary: request-id echo, the
+// 401/403 split, integration-credential scopes, structured validation issues,
+// `error.currentRevision`, conditional reads, the sanitized 500, and Ajv validation of real responses
+// against the published response schemas.
 
 type Json = Record<string, unknown> & { [key: string]: any };
 
@@ -41,8 +35,7 @@ async function fixture() {
     store, assets,
     authorizeGm: (token) => token === "gm-token",
     authorizePlayer: (token) => token === "player-token",
-    // One credential per scope, so "holds codex:read" and "holds codex:write" are different tokens: a
-    // verifier that ignored `scope` would make every scope assertion below vacuous.
+    // One credential per scope, so a verifier that ignored `scope` would fail the scope assertions below.
     verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
     notifyChanged: () => {},
     issuePreviewSession: () => "preview-player-token"
@@ -73,9 +66,7 @@ describe("codex request correlation (X-Request-Id)", () => {
     const ok = await get(base, "/api/v1/codex/pages", { ...GM, "x-request-id": CALLER_ID });
     expect(ok.headers.get("x-request-id")).toBe(CALLER_ID);
 
-    // The body half is the half that regressed: `failure()` used to re-read the response HEADER, which
-    // only ever held the freshly minted id, so a caller who supplied one was answered with a different
-    // one in the very payload they were correlating on.
+    // The error body must echo the caller's request id, not a freshly minted one.
     const failed = await post(base, "/api/v1/codex/pages", { ...GM, "x-request-id": CALLER_ID }, { title: "" });
     expect(failed.status).toBe(400);
     expect((await body(failed)).error.requestId).toBe(CALLER_ID);
@@ -96,11 +87,8 @@ describe("codex request correlation (X-Request-Id)", () => {
   });
 });
 
-/**
- * The rule, stated once: **401 is "no credential"; 403 is "you presented one and were refused".** Every
- * row below is one arm of it. The surface used to answer 401 to an authenticated player, which told a
- * caller who was already signed in to sign in - and a retrying client acts on that.
- */
+// 401 means "no credential"; 403 means "you presented one and were refused". An authenticated player
+// must never be told to sign in, because a retrying client acts on that.
 describe("codex 401 vs 403", () => {
   it("answers 401 only for a missing or unparseable Authorization header", async () => {
     const { base } = await fixture();
@@ -147,12 +135,12 @@ describe("codex integration credentials", () => {
 
     const asCredential = await body(await get(base, "/api/v1/codex/pages", READ_CREDENTIAL));
     const asGm = await body(await get(base, "/api/v1/codex/pages", GM));
-    // Byte-identical to the GM's own read: an integration credential is the GM's automation, and the
-    // whole point of the scope is that a tool no longer has to borrow the GM's session token to get this.
+    // Identical to the GM's own read: a credential is the GM's automation and should not need the GM's
+    // session token to get this.
     expect(asCredential).toEqual(asGm);
     expect(asCredential.data.pages[0].revealedToPlayers).toBe(false);
 
-    // An UNREVEALED page: a player would 404 here, the credential reads it whole, `gmBody` included.
+    // An unrevealed page: a player would 404 here; the credential reads it whole, `gmBody` included.
     const pageId = asGm.data.pages[0].id as string;
     const document = await body(await get(base, `/api/v1/codex/pages/${pageId}`, READ_CREDENTIAL));
     expect(document.data.page.gmBody).toBe("Meets under the inn.");
@@ -164,8 +152,7 @@ describe("codex integration credentials", () => {
     const created = await post(base, "/api/v1/codex/pages", WRITE_CREDENTIAL, { title: "Written by a bot" });
     expect(created.status).toBe(201);
     expect((await body(created)).data.page.title).toBe("Written by a bot");
-    // codex:write does not imply codex:read: scopes are independent everywhere else in this API, and a
-    // write-only automation that could also read the GM's secrets would be a scope that means nothing.
+    // codex:write does not imply codex:read; scopes are independent everywhere in this API.
     expect((await get(base, "/api/v1/codex/pages", WRITE_CREDENTIAL)).status).toBe(403);
     expect((await post(base, "/api/v1/codex/pages", READ_CREDENTIAL, { title: "no" })).status).toBe(403);
   });
@@ -192,7 +179,7 @@ describe("codex error envelopes", () => {
     const issues = failed.error.details.issues as Array<{ path: string[]; message: string }>;
     expect(issues.length).toBeGreaterThanOrEqual(3);
     expect(issues.map((issue) => issue.path.join("."))).toEqual(expect.arrayContaining(["title", "folder"]));
-    // The unknown key is NAMED, which is what makes a `.strict()` body debuggable from a curl session.
+    // The unknown key is named, which makes a `.strict()` body debuggable.
     expect(JSON.stringify(issues)).toContain("notAField");
   });
 
@@ -205,11 +192,11 @@ describe("codex error envelopes", () => {
 
     const stale = await patch(base, `/api/v1/codex/pages/${pageId}`, GM, { title: "Keep III", expectedRev: 0 });
     expect(stale.status).toBe(409);
-    // The number a client needs to rebase on, so recovering from a lost race takes no extra round-trip.
+    // The revision a client needs to rebase on after a lost race.
     expect((await body(stale)).error.currentRevision).toBe(current);
 
-    // A refusal that is NOT a lost race carries none: there is no revision to rebase onto, and sending
-    // one would invite a client to retry something that will never succeed.
+    // A refusal that is not a lost race carries none, so a client is not invited to retry something
+    // that will never succeed.
     await send(base, "PUT", "/api/v1/codex/calendar", GM, { yearName: "AE", months: [{ name: "Rise", days: 30 }], weekdays: ["Sol"], currentDate: { year: 1492, month: 0, day: 1 } });
     const downtime = await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8 } }));
     const entryId = downtime.data.entry.id as string;
@@ -232,7 +219,7 @@ describe("codex error envelopes", () => {
     expect(failed.error.message).toBe("The codex request failed.");
     expect(JSON.stringify(failed)).not.toContain("SQLITE_CORRUPT");
     expect(JSON.stringify(failed)).not.toContain("/srv/vtt/data");
-    // Sanitized OUT, not swallowed: the real error still reaches the operator's log.
+    // Sanitized in the response, but the real error still reaches the operator's log.
     expect(logged).toHaveBeenCalled();
     logged.mockRestore();
   });
@@ -279,18 +266,9 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     expect((await get(base, "/api/v1/codex/pages", READ_CREDENTIAL)).headers.get("etag")).toBe(gmTag);
   });
 
-  /**
-   * A validator is a validator for ONE RESOURCE.
-   *
-   * The tag used to name only the revision and the grade, so every codex read at a given revision handed
-   * out the same string - and presenting it to a DIFFERENT endpoint got a 304 with an empty body. An
-   * integration keeping one "last seen codex ETag" (the contract advertises ETag/304 to credential holders)
-   * would conclude nothing had changed on a resource it had never read once.
-   *
-   * The query is part of the resource and its ORDER is not, both asserted here: a filtered list is a
-   * different answer from an unfiltered one, and a client that reorders its parameters must not silently
-   * lose its cache.
-   */
+  // An ETag is scoped to one resource: a tag from one endpoint must not revalidate another, or an
+  // integration keeping one "last seen" tag would get an empty 304 for a resource it never read. The
+  // query is part of the resource; its parameter order is not.
   it("scopes the validator to the resource, so one endpoint's tag cannot revalidate another", async () => {
     const { base } = await fixture();
     await post(base, "/api/v1/codex/pages", GM, { title: "Keep", folder: "Places", tags: ["ruin"] });
@@ -298,26 +276,23 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     const pagesTag = (await get(base, "/api/v1/codex/pages", GM)).headers.get("etag") as string;
     const sessionsTag = (await get(base, "/api/v1/codex/sessions", GM)).headers.get("etag") as string;
     expect(sessionsTag, "two endpoints at one revision are two resources").not.toBe(pagesTag);
-    // The heart of it: the OTHER endpoint's tag must be a cache MISS, not an empty 304.
+    // The other endpoint's tag must be a cache miss, not an empty 304.
     expect((await get(base, "/api/v1/codex/sessions", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
     expect((await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": sessionsTag })).status).toBe(200);
     // ...and each still 304s against its own.
     expect((await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": pagesTag })).status).toBe(304);
 
-    // The QUERY is part of the resource - a filtered list is a different answer from the whole one.
+    // The query is part of the resource.
     const filtered = (await get(base, "/api/v1/codex/pages?folder=Places", GM)).headers.get("etag") as string;
     expect(filtered).not.toBe(pagesTag);
     expect((await get(base, "/api/v1/codex/pages?folder=Places", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
-    // ...but its ORDER is not: the same filter written the other way round is the same resource.
+    // ...but parameter order is not.
     const bothWays = await get(base, "/api/v1/codex/pages?tag=ruin&folder=Places", GM);
     expect((await get(base, "/api/v1/codex/pages?folder=Places&tag=ruin", { ...GM, "if-none-match": bothWays.headers.get("etag") as string })).status).toBe(304);
   });
 
-  /**
-   * The gate-before-tag rule, which is the viewer-safety half of this feature. A conditional request is
-   * checked at SERIALIZATION, after authorization and existence - so a probe can never turn a 404 into a
-   * 304 and thereby confirm that a record the caller may not see exists and has not changed.
-   */
+  // Conditional requests are evaluated at serialization, after authorization and existence checks, so a
+  // probe can never turn a 404 into a 304 and confirm that a hidden record exists.
   it("still 404s a player's conditional probe of a hidden record, and 403s an unauthorized one", async () => {
     const { base } = await fixture();
     const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult" }));
@@ -330,23 +305,15 @@ describe("codex conditional reads (weak ETag + 304)", () => {
   });
 });
 
-/**
- * The permanent guard on the role-projected schemas: Ajv-validate REAL serialized responses, for BOTH
- * roles, against the response components the served document publishes.
- *
- * Why this and not a schema-shape test. The contract's player components are hand-written mirrors of
- * `codex-projections.ts`; a mirror drifts the moment the projection gains or loses a key, and nothing
- * else in the suite would notice - the projection tests assert the projection, the contract tests assert
- * the document, and the gap between them is exactly where a documented lie lives. Because every codex
- * read component is `additionalProperties: false` with all keys required, a drift in EITHER direction
- * (a field the contract promises and the projection dropped, or a field the projection added and the
- * contract does not declare) fails here.
- */
+// Ajv-validates real serialized responses, for both roles, against the response components the served
+// document publishes. The player components are hand-written mirrors of `codex-projections.ts`, and
+// every read component is `additionalProperties: false` with all keys required, so drift in either
+// direction fails here.
 describe("codex responses validate against the schemas the document publishes", () => {
   const ajv = new Ajv2020({ strict: false });
   ajv.addSchema(openApiDocument as unknown as Record<string, unknown>, "openapi");
   const validatorFor = (component: string) => ajv.compile({ $ref: `openapi#/components/schemas/${component}` });
-  /** The 200 response component the document declares for this GET - read from the document, never restated. */
+  /** The 200 response component the document declares for this GET, read from the document. */
   const documentedResponse = (contractPath: string) => {
     const operation = (openApiDocument.paths as unknown as Record<string, Record<string, { responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }> }>>)[contractPath].get;
     const ref = operation.responses["200"].content?.["application/json"]?.schema?.$ref;
@@ -358,7 +325,7 @@ describe("codex responses validate against the schemas the document publishes", 
     expect(validate(payload), `${label} must match ${component}: ${ajv.errorsText(validate.errors, { separator: "; " })}`).toBe(true);
   };
 
-  /** A codex with one of everything, revealed, so a PLAYER read is non-empty and actually gets validated. */
+  /** A codex with one of everything, revealed, so a player read is non-empty and actually gets validated. */
   async function populated() {
     const { base, store } = await fixture();
     const reveal = (path: string) => post(base, path, GM, { revealed: true });
@@ -372,8 +339,8 @@ describe("codex responses validate against the schemas the document publishes", 
     });
     await post(base, "/api/v1/codex/calendar/publish", GM, {});
 
-    // The Harpers first: a `[[wiki link]]` to a title no page carries yields no edge, so a page written
-    // before its target would leave the link feeds empty and make their validation below vacuous.
+    // The Harpers first: a `[[wiki link]]` to a title no page carries yields no edge, which would leave
+    // the link feeds empty and their validation vacuous.
     const faction = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Harpers", entityType: "faction", playerBody: "Meddlers." }));
     const factionId = faction.data.page.id as string;
     await reveal(`/api/v1/codex/pages/${factionId}/reveal`);
@@ -410,7 +377,7 @@ describe("codex responses validate against the schemas the document publishes", 
 
     await send(base, "PUT", `/api/v1/codex/standing/${factionId}`, GM, { value: -40, reason: "Killed their envoy" });
     await reveal(`/api/v1/codex/standing/${factionId}/reveal`);
-    // The `standing` CHRONICLE record is written hidden; reveal it so the player payload branch is exercised.
+    // The `standing` chronicle record is written hidden; reveal it so the player branch is exercised.
     const entries = (await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[];
     for (const entry of entries.filter((row) => row.kind === "standing")) await reveal(`/api/v1/codex/journal/${entry.id}/reveal`);
 
@@ -419,9 +386,8 @@ describe("codex responses validate against the schemas the document publishes", 
 
   it("validates every role-projected read, for a GM and for a player, against its published schema", async () => {
     const { base, shownId, mapId, markerId, sessionId, questId } = await populated();
-    // The third element names a list `data` key that must be NON-EMPTY for both roles. A schema check
-    // over an empty array proves nothing, and "the player got nothing back" is precisely how a
-    // role-projected read test passes while describing a projection it never exercised.
+    // The third element names a list `data` key that must be non-empty for both roles, since a schema
+    // check over an empty array proves nothing.
     const reads: ReadonlyArray<readonly [string, string, string?]> = [
       [CODEX_PATHS.pages, "/api/v1/codex/pages", "pages"],
       [CODEX_PATHS.pageById, `/api/v1/codex/pages/${shownId}`, "connections"],
@@ -438,9 +404,8 @@ describe("codex responses validate against the schemas the document publishes", 
       [CODEX_PATHS.standing, "/api/v1/codex/standing", "standing"],
       [CODEX_PATHS.calendar, "/api/v1/codex/calendar"],
       [CODEX_PATHS.search, "/api/v1/codex/search?q=barovia", "hits"],
-      // D15's two new role-projected reads. Both are seeded in `populated()` above: the marker is
-      // revealed on a revealed map, and it carries the party flag, so BOTH roles get a non-null body and
-      // the player branch of each component is genuinely exercised rather than trivially satisfied.
+      // Seeded in `populated()`: the marker is revealed on a revealed map and carries the party flag, so
+      // both roles get a non-null body.
       [CODEX_PATHS.markerById, `/api/v1/codex/markers/${markerId}`],
       [CODEX_PATHS.party, "/api/v1/codex/party"]
     ];
@@ -471,12 +436,8 @@ describe("codex responses validate against the schemas the document publishes", 
     }
   });
 
-  /**
-   * `oneOf` guarantees "exactly one branch", so the test above already proves a body is not ambiguous.
-   * This adds the claim that matters for viewer safety: the GM body matches the GM branch and is REJECTED
-   * by the player branch. A player component that had quietly widened to accept a GM body would still
-   * satisfy `oneOf` on the player's own response, and this is what catches it.
-   */
+  // `oneOf` already proves a body is not ambiguous. This adds that the GM body is rejected by the
+  // player branch, which catches a player component that quietly widened to accept a GM body.
   it("matches each role's body to its OWN branch, and the other branch rejects it", async () => {
     const { base, shownId } = await populated();
     for (const [wrapper, url, key] of [

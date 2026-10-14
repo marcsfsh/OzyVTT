@@ -7,13 +7,8 @@ import { addEffect } from "../src/effects.js";
 import { equipmentCatalogOf, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
 import { ContentLibrary } from "../src/content-library.js";
 
-/**
- * TYPED DAMAGE, END TO END (issue `4a`).
- *
- * Every case here proves the FAR end - hit points that actually moved, and the line the table reads
- * telling it why. A defence that survives into a struct and changes no number is the exact bug this
- * file exists to close, so nothing below asserts on an intermediate collection.
- */
+// Typed damage end to end: every case asserts hit points that moved and the line the table reads,
+// never an intermediate collection.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -55,10 +50,6 @@ function hit(state: GameState, parts: Array<{ amount: number; type: string }>, d
   });
   return { hpLost: before - state.actors[0].hp.current, detail: damageAdjustmentDetail(outcome.application), application: outcome.application };
 }
-
-// -------------------------------------------------------------------------------------------------
-// Gap 1 - flat `damage-reduction`
-// -------------------------------------------------------------------------------------------------
 
 describe("gap 1: flat damage-reduction reaches the hit", () => {
   const reducer = (modifiers: unknown[]): EquipmentRecordLike =>
@@ -104,10 +95,6 @@ describe("gap 1: flat damage-reduction reaches the hit", () => {
     expect(plain.detail).toBe("");
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Gap 2 - vulnerability had exactly one channel
-// -------------------------------------------------------------------------------------------------
 
 describe("gap 2: anything can make a target vulnerable, not just a stat block", () => {
   const curse = (state: GameState, damageTypes: string[]) => addEffect(state, IDS.hero, EffectInstanceSchema.parse({
@@ -156,15 +143,11 @@ describe("gap 2: anything can make a target vulnerable, not just a stat block", 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Gap 5 - `choiceOverrides` had no reader at damage time
-// -------------------------------------------------------------------------------------------------
-
 describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", () => {
-  // The REAL SRD catalog, so this is the shipped warlock content and not a fixture that agrees with me.
+  // The real SRD catalog, so this exercises the shipped warlock content.
   const catalog = equipmentCatalogOf(new ContentLibrary().forAudience("gm"));
 
-  /** A Fiend-patron Warlock who BUILT on cold: the definition carries the baked pick. */
+  /** A Fiend-patron Warlock who built on cold: the definition carries the baked pick. */
   const warlock = (extraResistances: string[] = []) => definitionOf({
     name: "Sable", damageResistances: ["cold", ...extraResistances],
     character: {
@@ -220,10 +203,6 @@ describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", (
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Gap 4 (D7) - the GM's manual entry gains an optional type
-// -------------------------------------------------------------------------------------------------
-
 describe("gap 4 (D7): the untyped manual path can name a type", () => {
   const resistant = () => definitionOf({ damageResistances: ["fire"] });
   const manual = (state: GameState, input: Record<string, unknown>) => {
@@ -256,16 +235,12 @@ describe("gap 4 (D7): the untyped manual path can name a type", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// 4b - a hand-entered total that does not lose its damage type
-// -------------------------------------------------------------------------------------------------
-
 describe("4b: an amended total keeps its types", () => {
   it("re-weights the rolled parts instead of going untyped", () => {
     const state = stateWith();
     const before = state.actors[0].hp.current;
     const outcome = applyDamageDetailed(state, IDS.hero, { amount: 17, parts: [{ amount: 17, type: "fire" }], damageOverride: 12 }, GM, { resolveDefinition: () => definitionOf({ damageResistances: ["fire"] }) });
-    // 12 fire, halved to 6 - not 12 untyped landing in full, which is what dropping `parts` did.
+    // 12 fire, halved to 6, not 12 untyped landing in full.
     expect(before - state.actors[0].hp.current).toBe(6);
     expect(damageAdjustmentDetail(outcome.application)).toContain("12 fire → 6, resistance");
   });

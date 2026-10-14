@@ -48,7 +48,7 @@ async function loginGm(url: string) {
   return body.token;
 }
 
-/** Tracks every `state:updated` payload a socket receives, so tests can wait for eventual convergence instead of racing a single event. */
+/** Collects every `state:updated` payload a socket receives, so tests can wait for convergence. */
 function trackState(socket: Socket) {
   let latest: AnyView | undefined;
   socket.on("state:updated", (state: AnyView) => { latest = state; });
@@ -57,7 +57,7 @@ function trackState(socket: Socket) {
 
 const openSockets: Socket[] = [];
 
-/** Connects with `token` and immediately joins with the same token, matching how the real client always keeps the two in sync. The state tracker is attached before the join emit so the synchronous post-join broadcast is never missed. */
+/** Connects and joins with the same token, as the real client does. The tracker attaches before the join so the post-join broadcast is not missed. */
 async function connectAndJoin(url: string, token?: string) {
   const socket = ioClient(url, { auth: { token }, transports: ["websocket"], forceNew: true, reconnection: false });
   openSockets.push(socket);
@@ -271,18 +271,9 @@ describe("realtime presence, reconnect, and convergence", () => {
   });
 });
 
-/**
- * D22, the SOCKET half. `codex-http.test.ts` asserts that the codex router hands its notifier no arguments,
- * which is the only thing a router-level test can see - but the thing the table actually receives is
- * `server.ts`'s emit, and that emit does carry a payload.
- *
- * What D22 requires of it is that the payload is a bare revision counter and NOTHING else. It used to carry
- * a `scope` word - "pages", "journal" - to every connected socket, players included, telling the table
- * which part of the codex the GM was working in. So this pins the key SET, not just the absence of `scope`:
- * a seventh field added tomorrow fails here rather than shipping to every player socket.
- *
- * Observed on a PLAYER's socket deliberately - that is the recipient the rule exists for.
- */
+// The `codex:changed` payload sent to every socket, players included, must be a bare revision counter.
+// A scope word would tell the table which part of the codex the GM is editing, so this pins the whole
+// key set. Observed on a player's socket, the recipient the rule protects.
 describe("codex:changed on the wire (D22, socket half)", () => {
   it("emits a bare revision counter to every socket, players included, and nothing else", async () => {
     const server = await startTestServer();

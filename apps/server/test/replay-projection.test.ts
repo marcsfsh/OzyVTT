@@ -4,14 +4,9 @@ import { playerReplayMapAssetIds, projectPlayerReplay } from "../src/replay-proj
 import { startEncounter } from "../src/encounter.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
 
-/**
- * VIEWER SAFETY: the player's replay (D26).
- *
- * A replay must show a player exactly what they could have seen AT EACH MOMENT of that fight - and
- * nothing the GM was still holding back then, nothing another player rolled privately, and no
- * session id ever. The last one is asserted at the STRING level over the serialized document,
- * because a key-by-key assertion only proves the keys someone thought to name.
- */
+// A player's replay shows exactly what that player could have seen at each moment of the fight:
+// nothing the GM was holding back then, no other player's private roll, and never a session id.
+// Session ids are checked on the serialized string, since a key-by-key check only covers named keys.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -56,8 +51,8 @@ function document(): EncounterArchiveDocument {
     log: [
       logRow(1, 10, { text: "The rafters creak.", gmOnly: false }),
       logRow(2, 11, { text: "Shadow Stalker readies an ambush.", gmOnly: true }),
-      // A self-only roll is stored gm_only = 0 - it IS visible, to its roller. The replay reader is
-      // any player, so it must not survive a gmOnly-only filter.
+      // A self-only roll is stored gm_only = 0 (visible to its roller). The replay reader is any player, so
+      // a gmOnly-only filter is not enough.
       logRow(3, 12, { kind: "roll", text: "Borin rolls in secret.", gmOnly: false, roll: { ...roll("r-self", "self-only", IDS.otherSession), initiatorSessionId: undefined } as never }),
       logRow(4, 21, { kind: "roll", text: "Borin attacks.", gmOnly: false, roll: { ...roll("r-public", "public", IDS.heroSession), initiatorSessionId: undefined } as never })
     ],
@@ -110,7 +105,6 @@ describe("the player's replay is a projection, not a filtered archive", () => {
 
   it("never carries a session id, the journal, the raw states, the notes, or the stat blocks", () => {
     const serialized = JSON.stringify(projectPlayerReplay(3, document()));
-    // The string-level assertion is the point: a key-by-key check only proves the keys someone named.
     expect(serialized).not.toContain(IDS.heroSession);
     expect(serialized).not.toContain(IDS.otherSession);
     expect(serialized).not.toContain("initiatorSessionId");
@@ -130,13 +124,9 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     expect(replay).toMatchObject({ id: 1, turnCount: 0, turns: [], rolls: [], startedAt: null, attribution: null });
   });
 
-  /**
-   * The map door the ride-along opens (D26): a SHARED archive's own battlefield, and nothing else in
-   * the recording. The dangerous version of this function scans the stored document for map ids -
-   * which would also hand out `scenes[].mapAssetId`, i.e. the map of every fight the GM had PREPARED
-   * but not yet run when the recording was made. Reading them back out of the player projection
-   * cannot: a parked scene has no player shape at all.
-   */
+  // A player may load only the battlefield the replay itself renders. Scanning the stored document for
+  // map ids would also hand out `scenes[].mapAssetId`, the maps of fights prepared but not yet run;
+  // reading from the player projection cannot, since a parked scene has no player shape.
   it("yields only the battlefield the player's own document renders, never a prepared scene's map", () => {
     const prepared = "20000000-0000-5000-8000-0000000000ff";
     const source = document();
@@ -147,7 +137,7 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     const maps = playerReplayMapAssetIds(3, withPrepared);
     expect([...maps]).toEqual([IDS.map]);
     expect(maps.has(prepared)).toBe(false);
-    // The stored document really does carry it - so the exclusion is the projection's doing, not the fixture's.
+    // The stored document carries it, so the exclusion is the projection's doing.
     expect(JSON.stringify(withPrepared)).toContain(prepared);
   });
 

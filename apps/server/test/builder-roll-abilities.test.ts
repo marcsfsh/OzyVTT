@@ -6,18 +6,9 @@ import { GameStateSchema } from "@vtt/domain";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
-/**
- * D14 - THE BUILDER'S DICE ARE THE SERVER'S DICE.
- *
- * The wizard used to roll ability scores with `Math.random` in the browser: the oldest server-authority
- * hole in the ledger, and one nobody at the table could see happen. The command below rolls through
- * the same authority every other die goes through and records ONE public roll in the table feed, so
- * character creation is a table event like any other.
- *
- * `character.create` deliberately keeps its bound check rather than binding scores to this roll:
- * physical dice at the table remain a supported path (the build validates that every submitted score
- * is producible by the table's formula). What is closed is client-generated randomness.
- */
+// Ability-score rolls for the builder go through the server's dice and record one public roll in the
+// table feed. `character.create` still accepts physical-dice scores within the formula's bounds;
+// what is closed is client-generated randomness.
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });

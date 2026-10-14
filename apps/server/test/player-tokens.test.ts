@@ -8,13 +8,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { TokenCatalogStore } from "../src/token-catalog.js";
 import { createServer } from "../src/server.js";
 
-/**
- * D18 (+ director ruling R1) - the three gates a player needs to choose their own character's token:
- * the command, the library listing, and the upload. Each is opened for a player's OWN claimed
- * character only, and the GM keeps every management route plus a per-entry `hidden` curation flag.
- * Hidden is CURATION, not approval: a player picks freely from what the library offers and uploads
- * with no gate at all.
- */
+// The three gates a player needs to choose their own character's token: the command, the library
+// listing, and the upload. Each opens only for the player's own claimed character. The GM keeps
+// every management route plus a per-entry `hidden` flag, which is curation, not approval.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const OTHER_ID = "10000000-0000-4000-8000-000000000002";
@@ -122,7 +118,7 @@ describe("the three player gates (D18)", () => {
     // The GM's per-stat-block memory is prep, not a player's business.
     expect(playerList.data.rememberedAssetId).toBeNull();
 
-    // Every MANAGEMENT route stays GM-only.
+    // Every management route stays GM-only.
     expect((await fetch(`${base}${TOKEN_COLLECTION}/${sharedId}`, { method: "PATCH", headers: bearer(playerToken), body: JSON.stringify({ name: "Mine" }) })).status).toBe(401);
     expect((await fetch(`${base}${TOKEN_COLLECTION}/${sharedId}`, { method: "DELETE", headers: bearer(playerToken) })).status).toBe(401);
     expect((await post(base, `${TOKEN_COLLECTION}/folders/visibility`, playerToken, { folder: null, hidden: true })).status).toBe(401);

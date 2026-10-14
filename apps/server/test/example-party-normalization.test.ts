@@ -9,15 +9,9 @@ import { createInitialGameState, LEGACY_EXAMPLE_DEFINITION_IDS, PLACEHOLDER_ACTO
 import { removeActor } from "../src/actor-roster.js";
 import { setCharacterIdentity } from "../src/character-edit.js";
 
-/**
- * The three starter characters used to be second-class: their sheets were keyed `example-*`, and two
- * gates in the codebase read the `import-` prefix as "this sheet belongs to one character and may be
- * edited / removed". A GM could not level Borin up, could not respec him, and could not delete him.
- *
- * Fresh installs are fixed at the source (`initial-game-state.ts`); saves that already exist are
- * repaired once, in place, by a seed. Both are proven here, and the repair is proven idempotent -
- * a seed that runs twice on real campaign data is how one loses real campaign data.
- */
+// The starter characters' sheets were keyed `example-*`, but the edit/delete gates read the `import-`
+// prefix as "this sheet belongs to one character". Fresh installs get `import-*` keys directly;
+// existing saves are re-keyed once by a seed, which must be idempotent.
 
 async function withStore<T>(work: (open: (initial?: GameState) => Promise<GameStore>, databasePath: string) => Promise<T>): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), "vtt-example-party-"));
@@ -36,7 +30,7 @@ async function withStore<T>(work: (open: (initial?: GameState) => Promise<GameSt
   }
 }
 
-/** A save written by the old build: three starter characters pointing at `example-*` sheets. */
+/** A save with three starter characters pointing at `example-*` sheets. */
 function legacyState(): GameState {
   const fresh = createInitialGameState();
   const remap: Record<string, string> = {
@@ -89,7 +83,7 @@ describe("the one-time repair for saves that already exist", () => {
       const borinBefore = before.definitions.find((entry) => entry.id === LEGACY_EXAMPLE_DEFINITION_IDS.fighter)!.definition;
       const borinAfter = after.definitions.find((entry) => entry.id === `import-${PLACEHOLDER_ACTOR_IDS.fighter}`)!.definition;
       expect(borinAfter).toEqual(borinBefore);
-      // The whole point: the repaired character is now editable and deletable.
+      // The repaired character is editable and deletable.
       expect(() => setCharacterIdentity(structuredClone(after), PLACEHOLDER_ACTOR_IDS.fighter, { classes: [{ id: "fighter", name: "Fighter", level: 8 }], feats: [] })).not.toThrow();
     });
   });
@@ -123,7 +117,7 @@ describe("the one-time repair for saves that already exist", () => {
       });
       const store = await open(withShare);
       const after = store.snapshot;
-      // Both actors were re-keyed to their OWN sheet, so nothing is left pointing at the legacy row.
+      // Both actors were re-keyed to their own sheet, so nothing still points at the legacy row.
       expect(after.actors.find((actor) => actor.id === sharedId)!.definitionId).toBe(`import-${sharedId}`);
       expect(after.definitions.some((entry) => entry.id === LEGACY_EXAMPLE_DEFINITION_IDS.fighter)).toBe(false);
       expect(after.definitions.find((entry) => entry.id === `import-${sharedId}`)).toBeDefined();

@@ -9,12 +9,10 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { deriveEquipment, weaponPropertiesOf } from "../src/equipment-derivation.js";
 import { startEncounter } from "../src/encounter.js";
 
-/**
- * End-to-end `character.create` assembly against the REAL content bundles: a Fighter 5 and a
- * Wizard 3 built from choices, asserting the numbers the packet names (HP, AC, saves, skills,
- * slots, prepared list, rider-derived actions, hit-dice pool, the `import-<actorId>` keying), plus
- * the loud-rejection paths (unknown ids, over-cap prepared spells, invalid HP entries, policy).
- */
+// End-to-end `character.create` assembly against the real content bundles: a Fighter 5 and a Wizard 3
+// built from choices, checking HP, AC, saves, skills, slots, prepared list, rider-derived actions, the
+// hit-dice pool and `import-<actorId>` keying, plus the rejection paths (unknown ids, over-cap
+// prepared spells, invalid HP entries, policy).
 
 // `buildCharacterDefinition` takes an audience-scoped view, not the library itself; with no
 // homebrew source wired in both audiences resolve to the same SRD-only catalog.
@@ -22,11 +20,8 @@ const library = new ContentLibrary().forAudience("gm");
 const defaultPolicy = BuilderPolicySchema.parse({});
 const ACTOR_ID = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 
-/**
- * The request input is `Readonly` on the wire; the negative-path tests below build a valid input and
- * then mutate ONE field to make it illegal. This mapped type strips that readonly (and the nested
- * `choices` array's), so those mutations typecheck without a cast per line.
- */
+// The request input is `Readonly` on the wire; negative-path tests build a valid input and then mutate
+// one field. This mapped type strips readonly (including the nested `choices` array).
 type MutableCreateInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
   choices: Array<CharacterCreateRequestInput["choices"][number]>;
   backgroundBonusAllocation: Array<{ ability: CharacterCreateRequestInput["backgroundBonusAllocation"][number]["ability"]; amount: number }>;
@@ -92,7 +87,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "mage-hand" },
     { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
-    // The level-1 spell the feat's text always promised and its record could not carry.
+    // Magic Initiate's level-1 spell pick.
     { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "spell", id: "magic-missile" },
     { level: 1, kind: "spell", id: "mage-armor" },
@@ -107,13 +102,9 @@ function emptyState(): GameState {
   return GameStateSchema.parse({ schemaVersion: 1 });
 }
 
-/**
- * `2a`, at the far end of the pipe the report described. The observed symptom was a Warlock's class
- * step showing only "See the warlock class description in SRD 5.2.1."; the cause was a slug mismatch
- * in the class ETL, and 149 of 185 class features shipped that stub. The bundle-side guards live in
- * `packages/content-srd-5.2.1` (a build-time refusal plus a read-side check). This is the BUILDER
- * half: the prose has to survive `interpretFeature` into the definition the sheet actually renders.
- */
+// Class feature prose must survive `interpretFeature` into the definition the sheet renders, not a
+// "See the warlock class description in SRD 5.2.1." stub. The bundle-side guards live in
+// `packages/content-srd-5.2.1`.
 const warlockInput = (): MutableCreateInput => ({
   name: "Vex",
   speciesId: "human",
@@ -132,9 +123,9 @@ const warlockInput = (): MutableCreateInput => ({
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
     { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
-    // FIVE invocations at level 5, not one: the printed Invocations column runs 1 -> 3 (L2) -> 5 (L5),
-    // and `class-resource-growth` is what lets the budget follow it. Stamped at the level each is
-    // gained so a rebuild DOWN drops the ones the smaller column no longer pays for.
+    // Five invocations at level 5: the printed Invocations column runs 1 -> 3 (L2) -> 5 (L5), and
+    // `class-resource-growth` lets the budget follow it. Each is stamped at the level gained, so a rebuild
+    // down drops the ones the smaller column no longer pays for.
     { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
     { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "devils-sight", payload: { featureId: "eldritch-invocations" } },
     { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-mind", payload: { featureId: "eldritch-invocations" } },
@@ -169,12 +160,10 @@ describe("2a - a built Warlock carries the SRD's real feature prose, not a point
   });
 
   it("does not offer a prose-less \"Subclass Feature\" trait at levels the subclass fills", () => {
-    // The printed table's "Subclass feature" cell is a reminder, not a class feature - it has no
-    // heading and so no text. It used to reach the sheet as a trait reading only the stub.
+    // The printed table's "Subclass feature" cell is a reminder, not a class feature, and has no text.
     expect(traits.map((trait) => trait.name)).not.toContain("Subclass Feature");
   });
 });
-
 
 describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () => {
   const definition = buildCharacterDefinition(fighterInput(), library, defaultPolicy);
@@ -195,14 +184,14 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     const chainMail = definition.startingInventory?.find((item) => item.id === "chain-mail");
     expect(chainMail?.equipped).toBe(true);
     expect(chainMail?.armor?.acBase).toBe(16);
-    // The flat, non-equipment part travels with the sheet so every path that RE-DERIVES AC from the
-    // live loadout can add it back instead of silently dropping it (task-packet risk 3).
+    // The flat, non-equipment part travels with the sheet so every path that re-derives AC from the live
+    // loadout can add it back.
     expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBe(1);
   });
 
   it("holds a whileArmored AC rider back when no armor is worn", () => {
-    // Same Defense pick, but the "just take the gold" equipment option: no body armor, so the rider
-    // must NOT apply and the sheet must fall back to 10 + Dex.
+    // Same Defense pick with the "take the gold" equipment option: no body armor, so the rider must not
+    // apply and AC falls back to 10 + Dex.
     const unarmored = fighterInput();
     unarmored.choices = unarmored.choices.map((row) => row.kind === "equipment" && row.id === "fighter-a" ? { ...row, id: "fighter-c" } : row);
     const built = buildCharacterDefinition(unarmored, library, defaultPolicy);
@@ -220,9 +209,8 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.proficiencies?.armor).toEqual(["light", "medium", "heavy", "shields"]);
     expect(definition.proficiencies?.weapons).toEqual(["simple", "martial"]);
     expect(definition.proficiencies?.tools).toEqual(["gaming-set-dice"]);
-    // Common is the species grant; Dwarvish and Giant are the base "Common plus two languages"
-    // budget every character is owed - `species-languages`, which no SRD species declared until the
-    // language catalog existed, so it was never offered to anybody.
+    // Common is the species grant; Dwarvish and Giant are the base "Common plus two languages" budget
+    // (`species-languages`).
     expect(definition.proficiencies?.languages).toEqual(["common", "dwarvish", "giant"]);
   });
 
@@ -247,8 +235,8 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     // The origin feat (Savage Attacker), the versatile pick (Alert), the fighting style (Defense),
     // and the level-4 ASI-as-feat all record on the sheet's feat list.
     expect(definition.character?.feats.map((feat) => feat.id).sort()).toEqual(["ability-score-improvement", "alert", "defense", "savage-attacker"]);
-    // The ledger is the input's rows VERBATIM, plus the rolled hit points the build consumed (D14) -
-    // the rows that make a level-down/level-up round trip land on the same maximum.
+    // The ledger is the input's rows verbatim, plus the rolled hit points the build consumed, so a
+    // level-down/level-up round trip lands on the same maximum.
     expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(fighterInput().choices);
     expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll"))
       .toEqual((fighterInput().hp.entries ?? []).map((roll, index) => ({ level: index + 2, kind: "hp-roll", id: "hp", payload: { roll } })));
@@ -283,8 +271,7 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(actor.definitionId).toBe(`import-${ACTOR_ID}`);
     expect(state.definitions.map((entry) => entry.id)).toEqual([`import-${ACTOR_ID}`]);
     expect(actor.hp).toEqual({ current: 48, maximum: 48, temporary: 0 });
-    // Task-packet risk 3: `instantiate` RE-DERIVES AC from the loadout, so the builder's flat rider
-    // (Defense +1) has to survive the round trip. Both the concrete number and the invariant.
+    // `instantiate` re-derives AC from the loadout, so the builder's flat rider (Defense +1) must survive.
     expect(actor.armorClass).toBe(17);
     expect(actor.armorClass).toBe(definition.armorClass);
     expect(actor.hitDice).toMatchObject({ die: "d10", maximum: 5, remaining: 5, entries: [{ die: "d10", maximum: 5, remaining: 5 }] });
@@ -310,8 +297,8 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(definition.spellcasting?.slots).toEqual([{ level: 1, max: 4 }, { level: 2, max: 2 }]);
     expect(definition.spellcasting?.classes).toHaveLength(1);
     expect(definition.spellcasting?.classes?.[0]).toMatchObject({ classId: "wizard", ability: "int", prepared: 6 });
-    // Carry-along: the assembled sheet answers the ONE documented resolution order - per-class entry
-    // by classId, and the still-populated top-level fields for pre-multiclass readers.
+    // The assembled sheet answers the documented resolution order: per-class entry by classId, and the
+    // top-level fields for single-class readers.
     expect(resolveSpellcasting(definition.spellcasting, "wizard")).toEqual({ classId: "wizard", ability: "int", saveDc: 13, attackBonus: 5 });
     expect(resolveSpellcasting(definition.spellcasting)).toMatchObject({ ability: "int", saveDc: 13 });
   });
@@ -344,27 +331,21 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(definition.startingCurrency?.gp).toBe(13);
   });
 
-  /**
-   * THE WEAPON-PROPERTY BRIDGE, at the far end that made it worth building.
-   *
-   * `weaponAbilityModifier` has always read `finesse` off the inventory row's `properties`, and no
-   * catalog record could carry one - so the column was empty for every weapon in the game and every
-   * Finesse weapon swung off Strength. This Wizard is the cleanest possible demonstration: STR 10
-   * and DEX 14, holding a Dagger (Finesse) and a Quarterstaff (not), both handed out by the same
-   * build, both Simple, both proficient. If the copy at `character-build.ts` drops the column the
-   * two swing at the same bonus.
-   */
+  // `weaponAbilityModifier` reads `finesse` from the inventory row's `properties`, so the builder must
+  // copy the catalog's properties onto built inventory. This Wizard (STR 10, DEX 14) holds a Dagger
+  // (Finesse) and a Quarterstaff (not), both Simple and proficient; without the copy both swing at the
+  // same bonus.
   it("copies the catalog's weapon properties onto the built inventory, so a Dagger swings off Dexterity", () => {
     const carried = (id: string) => (definition.startingInventory ?? []).find((item) => item.id === id)!;
     expect(carried("dagger").weapon?.properties).toEqual(["finesse", "light", "thrown"]);
     expect(carried("quarterstaff").weapon?.properties).toEqual(["versatile"]);
-    // Batch 0's stated acceptance, on the row a real build produced.
+    // The property reached the row a real build produced.
     expect(weaponPropertiesOf("dagger", definition.startingInventory ?? [])).toContain("light");
-    // `mastery` deliberately does NOT ride along: it resolves against the catalog by item id and is
-    // gated on the bearer unlocking that weapon, and `ItemWeaponSchema` is strict.
+    // `mastery` is not copied: it resolves against the catalog by item id, is gated on the bearer
+    // unlocking that weapon, and `ItemWeaponSchema` is strict.
     expect("mastery" in (carried("dagger").weapon ?? {})).toBe(false);
 
-    // The far end: two swings, one character, differing only by Finesse. DEX +2, STR +0, PB +2.
+    // Two swings, one character, differing only by Finesse. DEX +2, STR +0, PB +2.
     const state = emptyState();
     importActorDefinition(state, definition, ACTOR_ID, "public");
     const derivation = deriveEquipment(state.actors[0], definition, { equipmentRecord: (id: string) => library.equipmentRecord(id) });
@@ -473,12 +454,9 @@ describe("buildCharacterDefinition - loud rejections", () => {
   });
 });
 
-// =================================================================================================
-// Phase-2 rules regressions. Each block pins ONE adversarial-QA finding; the comment on each names
-// the wrong behaviour it replaces, so a revert fails here loudly rather than shipping quietly.
-// =================================================================================================
+// Rules regressions, one behaviour per block.
 
-/** The real library with one accessor swapped, so a malformed content SHAPE can be exercised without touching the bundles. */
+/** The real library with one accessor swapped, so a malformed content shape can be exercised without touching the bundles. */
 function libraryWith(overrides: Partial<ContentView>): ContentView {
   return Object.assign(Object.create(library) as ContentView, overrides);
 }
@@ -510,8 +488,8 @@ const clericInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "sacred-flame" },
     { level: 1, kind: "cantrip", id: "spare-the-dying" },
     { level: 3, classId: "cleric", kind: "subclass", id: "life-domain" },
-    // SEVEN prepared rows against a cap of 6 - legal only because one of them (cure-wounds) is a
-    // Life Domain spell the subclass already grants as always-prepared.
+    // Seven prepared rows against a cap of 6, legal only because cure-wounds is a Life Domain spell the
+    // subclass already grants as always-prepared.
     { level: 1, kind: "spell", id: "cure-wounds" },
     { level: 1, kind: "spell", id: "guiding-bolt" },
     { level: 1, kind: "spell", id: "healing-word" },
@@ -529,9 +507,7 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
   const spells = new Map((definition.spellcasting?.spells ?? []).map((spell) => [spell.id, spell]));
 
   it("keeps a Life Domain spell the player ALSO prepared as the grant's always-prepared form", () => {
-    // The bug: grants were appended last and skipped when the id was already present, so a domain
-    // spell the player also listed stayed `alwaysPrepared: false` - a downgrade - AND spent one of
-    // the six prepared slots on a spell that is free by the rules.
+    // A domain spell the player also listed must become `alwaysPrepared: true` and not spend a prepared slot.
     expect(spells.get("cure-wounds")).toMatchObject({ level: 1, prepared: true, alwaysPrepared: true });
     expect(spells.get("cure-wounds")).not.toHaveProperty("classId"); // the grant's entry, not a class pick
     for (const domainSpell of ["aid", "bless", "cure-wounds", "lesser-restoration"]) {
@@ -545,7 +521,7 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
     expect(charged.map((spell) => spell.id).sort())
       .toEqual(["guiding-bolt", "healing-word", "hold-person", "prayer-of-healing", "shield-of-faith", "spiritual-weapon"]);
     expect(definition.spellcasting?.classes?.[0]).toMatchObject({ classId: "cleric", prepared: 6 });
-    // One more genuinely-charged pick DOES exceed the cap - the exclusion is scoped to grants, not a blanket bypass.
+    // One more charged pick does exceed the cap: the exclusion is scoped to grants.
     const overCap = clericInput();
     overCap.choices.push({ level: 1, kind: "spell", id: "bane" });
     expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(/prepares 6 spells at level 3; got 7/);
@@ -558,8 +534,7 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
   });
 
   it("interprets the chosen Divine Order option's OWN riders (per-option mechanics)", () => {
-    // Protector grants Martial weapon training and Heavy armour training. Before options carried
-    // mechanics the pick was validated, written to the ledger, and then discarded.
+    // Protector grants Martial weapon training and Heavy armor training; option mechanics must reach the sheet.
     expect(definition.proficiencies?.armor).toContain("heavy");
     expect(definition.proficiencies?.weapons).toContain("martial");
     const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
@@ -567,17 +542,15 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
   });
 
   it("RAISES the class cantrip budget when Thaumaturge is the chosen Divine Order role", () => {
-    // Thaumaturge reads "you know one extra cantrip from the Cleric spell list". It used to be
-    // authored as a second-order CHOICE of its own, which is a different promise: two cards, a
-    // separately-tagged ledger row, and a class budget still stuck on the printed 3. It is now an
-    // `extraPicks` grant, so the ONE budget the text is talking about goes from 3 to 4.
+    // Thaumaturge: "you know one extra cantrip from the Cleric spell list". It is an `extraPicks` grant,
+    // so the one class cantrip budget goes from 3 to 4.
     const thaumaturge = clericInput();
     thaumaturge.choices = thaumaturge.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
-    thaumaturge.choices.push({ level: 1, kind: "cantrip", id: "mending" }); // a FOURTH untagged class cantrip
+    thaumaturge.choices.push({ level: 1, kind: "cantrip", id: "mending" }); // a fourth untagged class cantrip
     const built = buildCharacterDefinition(thaumaturge, library, defaultPolicy);
     expect((built.spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
-    expect(built.proficiencies?.armor).not.toContain("heavy"); // the other role's grant does NOT apply
-    // The fifth is still refused, and the message names the COMPOSED cap rather than the printed one.
+    expect(built.proficiencies?.armor).not.toContain("heavy"); // the other role's grant does not apply
+    // The fifth is still refused, and the message names the composed cap rather than the printed one.
     const overCap = clericInput();
     overCap.choices = overCap.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
     overCap.choices.push({ level: 1, kind: "cantrip", id: "mending" }, { level: 1, kind: "cantrip", id: "thaumaturgy" });
@@ -586,9 +559,7 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
   });
 
   it("keeps the printed budget for the role that grants no extra pick (Protector)", () => {
-    // The negative control that makes the test above mean something: the SAME fourth cantrip, on the
-    // SAME class at the SAME level, with Protector chosen instead. If this passed, the composition
-    // would be adding a cantrip to every Cleric rather than to the one whose text promises it.
+    // Negative control: the same fourth cantrip, same class and level, with Protector chosen instead.
     const protector = clericInput(); // clericInput() already picks "protector"
     protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
     expect(() => buildCharacterDefinition(protector, library, defaultPolicy))
@@ -596,14 +567,9 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
   });
 });
 
-/**
- * `extraPicks` - the vocabulary by which a feature RAISES a pick budget, server side.
- *
- * The far end here is what `buildCharacterDefinition` ACCEPTS and REFUSES, because that is the only
- * thing a wizard's offer can disagree with. Every capacity below is derived from the content records
- * rather than typed as a literal, so a change to the composition rule fails these rather than
- * quietly moving what the tests assert.
- */
+// `extraPicks`, the vocabulary by which a feature raises a pick budget, asserted as what
+// `buildCharacterDefinition` accepts and refuses. Capacities are derived from the content records,
+// not typed as literals.
 describe("extra picks raise the budget the server validates against", () => {
   const clericRecord = library.classRecord("cleric")!;
   const divineOrder = clericRecord.features.find((feature) => feature.id === "divine-order")!;
@@ -619,8 +585,8 @@ describe("extra picks raise the budget the server validates against", () => {
     const input = clericInput();
     input.choices = input.choices
       .map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row)
-      // Drop the three untagged cantrips clericInput() carries; the Magic Initiate pair is TAGGED
-      // and belongs to the feat's own offer, so it must survive untouched.
+      // Drop the three untagged cantrips clericInput() carries; the Magic Initiate pair is tagged and belongs
+      // to the feat's own offer.
       .filter((row) => !(row.kind === "cantrip" && !row.payload));
     const pool = ["light", "sacred-flame", "spare-the-dying", "mending", "thaumaturgy", "guidance"];
     for (let index = 0; index < count; index += 1) input.choices.push({ level: 1, kind: "cantrip", id: pool[index] });
@@ -628,24 +594,22 @@ describe("extra picks raise the budget the server validates against", () => {
   };
 
   it("accepts exactly `printed + granted` class cantrips, and refuses one more", () => {
-    // THE CLIENT/SERVER AGREEMENT, at the only place it can be observed from this side: the number
-    // the server accepts is `printed + granted` off the shared content record, computed with the
-    // same sum and keyed on the same string ("class-cantrips") that `computeOffers` builds its
-    // cantrip offer under. `extra-picks.test.ts` asserts the wizard offers this same number.
+    // The server accepts `printed + granted` from the shared content record, keyed on the same string
+    // ("class-cantrips") `computeOffers` uses; `extra-picks.test.ts` asserts the wizard offers the same number.
     const composed = printedCantrips + grantedCantrips;
     expect(composed).toBe(4);
     expect(() => buildCharacterDefinition(withCantrips(composed), library, defaultPolicy)).not.toThrow();
     expect(() => buildCharacterDefinition(withCantrips(composed + 1), library, defaultPolicy))
       .toThrowError(new RegExp(`Cleric knows ${composed} cantrips at level 3; got ${composed + 1}`));
-    // The four are really on the sheet, not merely counted past a cap.
+    // The four are really on the sheet.
     const built = buildCharacterDefinition(withCantrips(composed), library, defaultPolicy);
     const cantrips = (built.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id);
     for (const id of ["light", "sacred-flame", "spare-the-dying", "mending"]) expect(cantrips).toContain(id);
   });
 
   it("SUMS two grants of +1 into +2 (composition, not last-one-wins)", () => {
-    // A species trait raising the same budget Thaumaturge already raises. "Last grant wins" and
-    // "first grant wins" both pass every single-grant test in this file and fail exactly here.
+    // A species trait raising the budget Thaumaturge already raises. "Last grant wins" and "first grant
+    // wins" both pass single-grant tests and fail here.
     const boosted = libraryWith({
       speciesRecord: (id: string) => {
         const real = library.speciesRecord(id);
@@ -659,7 +623,7 @@ describe("extra picks raise the budget the server validates against", () => {
     expect(() => buildCharacterDefinition(withCantrips(5), boosted, defaultPolicy)).not.toThrow();
     expect(() => buildCharacterDefinition(withCantrips(6), boosted, defaultPolicy))
       .toThrowError(/Cleric knows 5 cantrips at level 3; got 6/);
-    // ...and the SAME trait on a Protector Cleric adds its +1 to the printed 3, not to 4.
+    // ...and the same trait on a Protector Cleric adds its +1 to the printed 3, not to 4.
     const protector = clericInput();
     protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
     expect(() => buildCharacterDefinition(protector, boosted, defaultPolicy)).not.toThrow();
@@ -680,27 +644,22 @@ describe("extra picks raise the budget the server validates against", () => {
         }] };
       }
     });
-    // The Cleric prints two skill choices. With the trait it owes THREE - and an offer that is not
-    // filled is as loud a rejection as one that is overfilled, which is what proves the capacity
-    // moved rather than the check being skipped.
+    // The Cleric prints two skill choices; with the trait it owes three, and an underfilled offer is
+    // rejected as loudly as an overfilled one.
     const twoSkills = clericInput();
     expect(() => buildCharacterDefinition(twoSkills, scholarly, defaultPolicy))
       .toThrowError(/"Cleric skills" needs 3 pick\(s\) of kind "skill"; got 2/);
     const threeSkills = clericInput();
     threeSkills.choices.push({ level: 1, classId: "cleric", kind: "skill", id: "insight" });
     expect(() => buildCharacterDefinition(threeSkills, scholarly, defaultPolicy)).not.toThrow();
-    // Without the trait, the third skill is refused - the negative control for the same input.
+    // Without the trait, the third skill is refused.
     expect(() => buildCharacterDefinition(threeSkills, library, defaultPolicy))
       .toThrowError(/exceeds what this build may choose/);
   });
 
-  /**
-   * A BUDGET THAT FOLLOWS THE PRINTED COLUMN. The three records where a level-20 character was
-   * countably wrong: Eldritch Invocations (1 offered against 10 owed at level 20), and Weapon Mastery
-   * on Fighter and Barbarian. `class-resource-growth` reads the column, so `choose` plus the growth is
-   * the printed number at every level - and no marker feature has to be invented at L2/L5/L7/... where
-   * the SRD prints no heading for a repeat grant to hang on.
-   */
+  // Budgets that follow a printed column: Eldritch Invocations, and Weapon Mastery on Fighter and
+  // Barbarian. `class-resource-growth` reads the column, so `choose` plus the growth is the printed
+  // number at every level without a marker feature at each step.
   const INVOCATIONS = ["agonizing-blast", "devils-sight", "eldritch-mind", "eldritch-spear", "repelling-blast", "armor-of-shadows"];
   const warlockWithInvocations = (count: number): MutableCreateInput => {
     const input = warlockInput();
@@ -711,13 +670,11 @@ describe("extra picks raise the budget the server validates against", () => {
   };
 
   it("offers a level-5 Warlock FIVE invocations, and refuses both the sixth and only four", () => {
-    // The printed Invocations column reads 1 at level 1 and 5 at level 5. Before the scaling the
-    // budget was `choose: 1`, granted once, for every level of the class.
+    // The printed Invocations column reads 1 at level 1 and 5 at level 5.
     expect(() => buildCharacterDefinition(warlockWithInvocations(5), library, defaultPolicy)).not.toThrow();
     expect(() => buildCharacterDefinition(warlockWithInvocations(6), library, defaultPolicy))
       .toThrowError(/exceeds what this build may choose \(Eldritch Invocations: 5\)/);
-    // Underfilled is as loud as overfilled - which is what proves the number MOVED rather than the
-    // ceiling simply being lifted.
+    // Underfilled is as loud as overfilled, so the number really moved rather than the ceiling being lifted.
     expect(() => buildCharacterDefinition(warlockWithInvocations(4), library, defaultPolicy))
       .toThrowError(/"Eldritch Invocations" needs 5 pick\(s\)/);
   });
@@ -729,11 +686,8 @@ describe("extra picks raise the budget the server validates against", () => {
     expect(() => buildCharacterDefinition(five, library, defaultPolicy)).toThrowError(/exceeds what this build may choose \(Weapon Mastery: 4\)/);
   });
 
-  /**
-   * A CATALOG **PLUS** ONE BESPOKE OPTION. `from` (which `options` derives) beat `fromCatalog` in
-   * both consumers, so "a Fighting Style feat, or instead Blessed Warrior" was unsayable and the
-   * Paladin's and Ranger's printed variant was unpickable. The offer is their union now.
-   */
+  // An offer can be a catalog plus bespoke options, so "a Fighting Style feat, or instead Blessed
+  // Warrior" is pickable for the Paladin and Ranger.
   it("offers a Paladin the whole feat catalog AND Blessed Warrior, whose own pick is two Cleric cantrips", () => {
     const paladin = (styleId: string, cantrips: readonly string[]): MutableCreateInput => ({
       name: "Var", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
@@ -758,22 +712,18 @@ describe("extra picks raise the budget the server validates against", () => {
         { level: 1, kind: "equipment", id: "soldier-a" }
       ]
     });
-    // The CATALOG half still resolves - a real Fighting Style feat is accepted, with no cantrips.
+    // The catalog half: a real Fighting Style feat is accepted, with no cantrips.
     expect(() => buildCharacterDefinition(paladin("defense", []), library, defaultPolicy)).not.toThrow();
-    // The BESPOKE half is now offerable at all, and its nested pick reaches the sheet.
+    // The bespoke half is offerable, and its nested pick reaches the sheet.
     const blessed = buildCharacterDefinition(paladin("blessed-warrior", ["sacred-flame", "guidance"]), library, defaultPolicy);
     const cantrips = (blessed.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id);
     expect(cantrips.sort()).toEqual(["guidance", "sacred-flame"]);
-    // And an id in NEITHER half is still refused, so the union did not become "anything goes".
+    // An id in neither half is still refused.
     expect(() => buildCharacterDefinition(paladin("eldritch-mind", []), library, defaultPolicy))
       .toThrowError(/not an offered option/);
   });
 
-  /**
-   * TWO PICKS ON ONE RECORD. Magic Initiate's text promises "two cantrips ... and one level 1 spell"
-   * and its record could carry only one `choice` with one `maxSpellLevel`, so the spell was silently
-   * dropped - for two of the four SRD backgrounds, on a level-1 character.
-   */
+  /** One record can carry two picks: Magic Initiate promises "two cantrips ... and one level 1 spell". */
   it("offers Magic Initiate's level-1 spell as a SECOND pick, and puts it on the sheet", () => {
     const built = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
     expect((built.spellcasting?.spells ?? []).map((spell) => spell.id)).toContain("bless");
@@ -796,8 +746,8 @@ describe("extra picks raise the budget the server validates against", () => {
         }] };
       }
     });
-    // clericInput() already sits exactly on the printed cap of 6 charged prepared spells; `bane` is
-    // the seventh, which the base build refuses (asserted in M4 above) and this one allows.
+    // clericInput() sits exactly on the printed cap of 6 charged prepared spells; `bane` is the seventh,
+    // which the base build refuses and this one allows.
     const seventh = clericInput();
     seventh.choices.push({ level: 1, kind: "spell", id: "bane" });
     const built = buildCharacterDefinition(seventh, studious, defaultPolicy);
@@ -809,11 +759,8 @@ describe("extra picks raise the budget the server validates against", () => {
   });
 
   it("holds EVERY authored extraPicks key in the bundles to a budget that exists", () => {
-    // THE STAGE-4 GUARD. 226 content records are about to be authored and every budget-raising one
-    // goes through this vocabulary; a mistyped key is caught here, at `npm run test`, rather than by
-    // one player discovering at Create that their character cannot be made. The census walks the
-    // SUMMARIES rather than the records deliberately - those are exactly what the wizard receives,
-    // so a key that survives here is a key both sides can honour.
+    // Every budget-raising record goes through this vocabulary, so a mistyped key is caught at test time.
+    // The census walks the summaries, which are exactly what the wizard receives.
     const featureIds = new Set<string>();
     const authored: Array<{ where: string; offer: string }> = [];
     const visit = (where: string, features: readonly { id: string; extraPicks: readonly { offer: string }[]; choice: { options: readonly { id: string; extraPicks: readonly { offer: string }[] }[] } | null }[]) => {
@@ -836,14 +783,12 @@ describe("extra picks raise the budget the server validates against", () => {
     const unresolvable = authored.filter(({ offer }) =>
       !named.has(offer) && !(offer.startsWith("feature:") && featureIds.has(offer.slice("feature:".length))));
     expect(unresolvable.map((entry) => `${entry.where} -> ${entry.offer}`)).toEqual([]);
-    // ...and the census is not vacuously empty: Thaumaturge is authored today and must be seen.
+    // ...and the census is not vacuous: Thaumaturge is authored and must be seen.
     expect(authored).toContainEqual({ where: "cleric.divine-order:thaumaturge", offer: "class-cantrips" });
   });
 
   it("REJECTS a grant naming a budget this build has no pick for, loudly and actionably", () => {
-    // The failure this vocabulary exists to end: a rider that parses, validates, writes its ledger
-    // row and then adds zero looks exactly like one that works. A key naming nothing is an authoring
-    // error and it stops the build with the legal keys named.
+    // A key naming nothing is an authoring error, and the build stops with the legal keys named.
     const misnamed = libraryWith({
       speciesRecord: (id: string) => {
         const real = library.speciesRecord(id);
@@ -864,9 +809,8 @@ describe("extra picks raise the budget the server validates against", () => {
 
 describe("M3 - the same feat cannot be taken twice across different offers", () => {
   it("rejects a Versatile pick that repeats the background's origin feat", () => {
-    // A Human Acolyte already holds Magic Initiate (Cleric) from the background. Taking it AGAIN
-    // with the Human's Versatile feat interpreted the whole feature twice: two cantrip offers of two
-    // picks each, so the sheet ended up with 7 cantrips instead of 5.
+    // A Human Acolyte already holds Magic Initiate (Cleric) from the background; taking it again with
+    // Versatile would interpret the feature twice (7 cantrips instead of 5).
     const duplicate = clericInput();
     duplicate.choices = duplicate.choices.map((row) => row.kind === "feat" ? { ...row, id: "magic-initiate-cleric" } : row);
     expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy))
@@ -894,8 +838,8 @@ describe("M3 - the same feat cannot be taken twice across different offers", () 
       { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
     );
     const built = buildCharacterDefinition(differentList, library, defaultPolicy);
-    // The Versatile pick REPLACED Alert here, so the sheet holds the background's Cleric flavour
-    // plus the Wizard one - the same feat name, a different spell list, exactly as the SRD allows.
+    // The Versatile pick replaced Alert here, so the sheet holds both Magic Initiate flavours: same feat
+    // name, different spell list, as the SRD allows.
     expect(built.character?.feats.map((feat) => feat.id).sort()).toEqual(["magic-initiate-cleric", "magic-initiate-wizard"]);
 
     // Positive control 2: a Fighter 6 spends the level-4 AND level-6 ASI on the same repeatable feat.
@@ -916,9 +860,8 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
   const definition = buildCharacterDefinition(fighterInput(), library, defaultPolicy);
 
   it("synthesizes an activation carrying the resolved use count", () => {
-    // `interpretAction` was the only consumer of `feature.uses`, so 20 authored features that print
-    // a use count but no action (Action Surge, Indomitable, Arcane Recovery, Divine Intervention,
-    // Relentless Endurance, the tiefling legacy tiers...) were prose with no trackable pool at all.
+    // A feature that prints a use count but no action (Action Surge, Indomitable, Arcane Recovery, Divine
+    // Intervention, Relentless Endurance, the tiefling legacy tiers...) must get a trackable pool.
     const actionSurge = definition.actions.find((action) => action.id === "action-surge");
     expect(actionSurge).toBeDefined();
     expect(actionSurge?.activation).toBe("other");
@@ -928,9 +871,7 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
   });
 
   it("makes that action resolvable, so the counter can actually be spent", () => {
-    // A counter nothing can decrement is decoration. `resolveDefinitionAction` used to reject any
-    // action with no attack/save/damage/grants as "no structured effect to resolve" - spending a
-    // limited use IS the structured effect, and a self-only feature needs no target.
+    // Spending a limited use is itself a structured effect, and a self-only feature needs no target.
     const state = emptyState();
     importActorDefinition(state, definition, ACTOR_ID, "public");
     const other = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d11";
@@ -940,7 +881,7 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
     const deps: ResolveDependencies = { random: () => 1, newRollId: () => "40000000-0000-4000-8000-000000000001", gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition };
     resolveDefinitionAction(state, surge, { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" }, deps);
     expect(state.actors[0].actionUses["action-surge"]).toBe(1);
-    // ...and the second attempt is correctly refused, because the pool really is 1/short rest.
+    // ...and the second attempt is refused: the pool is 1 per short rest.
     expect(() => resolveDefinitionAction(state, surge, { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" }, deps))
       .toThrowError(/no uses remaining \(1\/short rest\)/);
   });
@@ -955,7 +896,7 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
     const state = emptyState();
     importActorDefinition(state, definition, CLERIC, "public");
     state.actors.push({ ...state.actors[0], id: FOE, name: "Ghoul", kind: "monster", definitionId: undefined, actionUses: {} });
-    // The FOE holds the turn, so the action-economy slot never masks the limited-use gate.
+    // The foe holds the turn, so the action-economy slot never masks the limited-use gate.
     startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: FOE, score: 20 }, { actorId: CLERIC, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
     return state;
   }
@@ -969,9 +910,8 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
   });
 
   it("lets a Cleric 3 use Preserve Life after a Divine Spark, then blocks the third", () => {
-    // The bug: the counter is keyed on the POOL ("channel-divinity") but the gate read the ACTION's
-    // own limit, so Preserve Life (printed "1") reported no uses left the moment any sibling had
-    // spent one - a Cleric 3 lost half their Channel Divinity.
+    // The counter is keyed on the pool ("channel-divinity"), so the gate must read the pool's limit, not
+    // Preserve Life's printed 1.
     const state = encounter();
     const spark = definition.actions.find((action) => action.id === "divine-spark")!;
     const preserve = definition.actions.find((action) => action.id === "preserve-life")!;
@@ -979,7 +919,7 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
     expect(state.actors[0].actionUses["channel-divinity"]).toBe(1);
     resolveDefinitionAction(state, preserve, { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000b" }, deps());
     expect(state.actors[0].actionUses["channel-divinity"]).toBe(2);
-    // Both charges spent: the third attempt is refused, naming the POOL's size, not "1".
+    // Both charges spent: the third attempt is refused, naming the pool's size.
     expect(() => resolveDefinitionAction(state, preserve, { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000c" }, deps()))
       .toThrowError(/no uses remaining \(2\/long rest\)/);
   });
@@ -993,10 +933,8 @@ describe("D3 - a malformed content record rejects instead of throwing a raw Type
       return { ...real, traits: [...real.traits, {
         id: "broken-boon", name: "Broken Boon", description: "A boon whose option list was never authored.",
         tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [],
-        // `{kind, choose, from: []}` used to PARSE (an empty array is truthy, so the schema's
-        // "needs from OR fromCatalog" refinement never fired) and then hand `undefined` to
-        // resolveCatalogChoice - a TypeError, which is neither a CatalogChoiceError nor a
-        // CommandRejectedError, so the socket handler echoed the internal message to the client.
+        // `{kind, choose, from: []}` must fail the schema's "needs from or fromCatalog" refinement; otherwise
+        // `resolveCatalogChoice` throws a TypeError whose internal message reaches the client.
         choice: { kind: "boon", choose: 1, from: [], repeatable: false }
       }] };
     }
@@ -1014,32 +952,29 @@ describe("D3 - a malformed content record rejects instead of throwing a raw Type
 
 describe("D5 - multiclass prerequisites are correct but deliberately uncalled in phase 2", () => {
   it("cannot gate anything yet: `character.create` carries exactly one class", () => {
-    // The wire shape is the whole argument - one `classId`, one `level`. SRD ability minimums attach
-    // to TAKING A SECOND CLASS, never to a starting class, so enforcing them here would reject legal
-    // level-1 characters. This test is the pin: when the request grows a second class entry (packet
-    // phase 6, level-up), it fails and the check has to be wired in.
+    // The request has one `classId` and one `level`. SRD ability minimums apply to taking a second class,
+    // never a starting class, so creation does not enforce them. This fails if the request grows a second
+    // class entry, at which point the check must be wired in.
     const input = fighterInput();
     expect(Object.keys(input)).toContain("classId");
     expect(Object.keys(input)).not.toContain("classes");
     const built = buildCharacterDefinition(input, library, defaultPolicy);
     expect(built.character?.classes).toHaveLength(1);
-    // A Fighter needs STR 13 or DEX 13 to MULTICLASS into. This sheet has STR 19 - but a character
-    // who did not would still be a perfectly legal starting Fighter, which is why creation is silent.
+    // A Fighter needs STR 13 or DEX 13 to multiclass into; a starting Fighter without either is legal.
     expect(meetsMulticlassPrerequisites({ str: 8, dex: 8 }, "fighter")).toBe(false);
     expect(meetsMulticlassPrerequisites({ str: 8, dex: 13 }, "fighter")).toBe(true); // mode "any"
     expect(meetsMulticlassPrerequisites({ dex: 13 }, "monk")).toBe(false); // mode "all": needs WIS 13 too
     expect(meetsMulticlassPrerequisites({ dex: 13, wis: 13 }, "monk")).toBe(true);
     expect(meetsMulticlassPrerequisites({}, "moon-warden")).toBe(true); // unknown/homebrew: no declared minimum
-    // And the authored bundle drives it, not just the static table (the class record's own minimums).
+    // The authored bundle drives it, not just the static table.
     expect(meetsMulticlassPrerequisites({ wis: 12 }, "cleric", library.classProgressionTable())).toBe(false);
     expect(meetsMulticlassPrerequisites({ wis: 13 }, "cleric", library.classProgressionTable())).toBe(true);
   });
 });
 
 describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
-  // Pact Magic is the one caster shape that is NOT a sparse nine-column row, and until the Warlock
-  // was authored no class exercised it - the assembly read `spellSlots` only, so a Warlock came out
-  // with a caster block and zero slots. This pins the shape rather than the fix.
+  // Pact Magic is the one caster shape that is not a sparse nine-column row; the assembly must read it,
+  // not just `spellSlots`.
   const warlockInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
     name: "Vex",
     speciesId: "human",
@@ -1082,7 +1017,7 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
 
   it("gives a Warlock its Pact Magic slots - all at one level, not a sparse row", () => {
     const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
-    // SRD: a Warlock 5 has TWO level-3 slots and no level-1 or level-2 slots at all.
+    // SRD: a Warlock 5 has two level-3 slots and no level-1 or level-2 slots.
     expect(definition.spellcasting?.slots).toEqual([{ level: 3, max: 2 }]);
     expect(definition.spellcasting?.ability).toBe("cha");
     expect(definition.hitPoints.maximum).toBe(38); // d8: 8 + 4x5, then +2 Con x5
@@ -1094,17 +1029,14 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
 });
 
 describe("buildCharacterDefinition - derived save DCs", () => {
-  // `FeatureSaveDcSchema` has THREE forms: the "spellcasting" literal, a printed number, and a
-  // derived `{base, ability, proficiencyBonus}`. Only the first two were resolved, so the object
-  // reached `ActionSchema` - which requires a number - and every Dragonborn character failed to
-  // build with `actions[].save.dc: Expected number, received object`. One of the nine species was
-  // uncreatable through the wizard, and nothing caught it because no test built a Dragonborn.
+  // `FeatureSaveDcSchema` has three forms: the "spellcasting" literal, a printed number, and a derived
+  // `{base, ability, proficiencyBonus}`. All must resolve to a number, since `ActionSchema` requires one.
   it("resolves a species trait's derived save DC to a number (Dragonborn Breath Weapon)", () => {
     const input = {
       ...fighterInput(),
       speciesId: "dragonborn",
-      // Keep only the class-side picks: the base fixture is a Human, whose Skillful/Versatile
-      // choices name features a Dragonborn does not have.
+      // Keep only the class-side picks: the base fixture is a Human, whose Skillful/Versatile choices name
+      // features a Dragonborn does not have.
       choices: [
         ...fighterInput().choices.filter((choice) => {
           const featureId = (choice as { payload?: { featureId?: string } }).payload?.featureId ?? "";
@@ -1116,7 +1048,7 @@ describe("buildCharacterDefinition - derived save DCs", () => {
     const definition = buildCharacterDefinition(input, library, defaultPolicy);
     const breath = definition.actions.find((action) => /breath/i.test(action.name));
     expect(breath, "Dragonborn should grant a Breath Weapon action").toBeTruthy();
-    // 8 + CON modifier + proficiency bonus, resolved at build time - never an object on the wire.
+    // 8 + CON modifier + proficiency bonus, resolved at build time.
     expect(typeof breath!.save?.dc).toBe("number");
     expect(breath!.save?.dc).toBe(8 + abilityModifier(definition.abilityScores.con) + definition.proficiencyBonus);
   });

@@ -26,11 +26,8 @@ function state() {
   ] });
 }
 
-/**
- * The nine LIVE fields a fight is made of. Typed as exactly those keys rather than as the whole
- * `combat` block, because it is called with BOTH the table's combat and a parked scene's - and a
- * scene carries no `scenes`/`activeSceneId`/`mapAssetId`/history cursor of its own.
- */
+// The live fields a fight is made of. Typed as exactly these keys because it is called with both the
+// table's combat and a parked scene's, and a scene has no `scenes`/`activeSceneId`/`mapAssetId`/cursor.
 type LiveCombat = Pick<ReturnType<typeof state>["combat"], "active" | "round" | "turnActorId" | "initiative" | "tokens" | "annotations" | "turn" | "reactionsUsed" | "pendingSaves">;
 const liveOf = (combat: LiveCombat) => ({ active: combat.active, round: combat.round, turnActorId: combat.turnActorId, initiative: combat.initiative, tokens: combat.tokens, annotations: combat.annotations, turn: combat.turn, reactionsUsed: combat.reactionsUsed, pendingSaves: combat.pendingSaves });
 
@@ -147,7 +144,7 @@ describe("scene park and resume", () => {
     startEncounter(game, { mapAssetId: IDS.map1, entries: [{ actorId: IDS.alpha, score: 18 }], ruleExceptions: { movement: "freeform" } }, () => 10, GEOMETRY);
     expect(game.combat.ruleExceptions).toEqual({ movement: "freeform" });
 
-    // Miss this in the snapshot list and a parked scene resumes under the WRONG rules.
+    // Miss this in the snapshot list and a parked scene resumes under the wrong rules.
     activateScene(game, IDS.sceneB, IDS.implicit);
     expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneA)!.combat.ruleExceptions).toEqual({ movement: "freeform" });
     activateScene(game, IDS.sceneA, IDS.implicit);

@@ -9,17 +9,9 @@ import { setInventoryItem } from "../src/inventory.js";
 import { startEncounter } from "../src/encounter.js";
 import { CommandRejectedError } from "../src/game-store.js";
 
-/**
- * C9's SERVER-SIDE BIND, driven from the SHIPPED bundle - never a fixture record.
- *
- * A fixture cannot prove this mechanism: supplying the weapon block is precisely the thing the bind
- * builds, so every catalog record here comes from `loadEquipment()` over the committed bundles, and
- * every row is written through the real `setInventoryItem` path. The far end is the spec's own: ONE
- * shipped template row, TWO picked bases, TWO different derived-and-rolled numbers.
- *
- * The rows chosen stay rider-free by design (`sword-of-sharpness`, `sun-blade` - their printed
- * powers await other units), so these numbers hold still while the +N rows gain their riders.
- */
+// The server-side weapon bind, driven from the shipped bundle: a fixture cannot prove it because the
+// weapon block is what the bind builds. One shipped template row, two picked bases, two different
+// derived and rolled numbers. The chosen rows have no riders, so these numbers stay put.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -35,7 +27,7 @@ const CATALOG: EquipmentCatalog = {
   featRecord: () => undefined
 };
 
-/** STR 12 (+1) / DEX 15 (+2), one point apart on purpose: max(str, dex) would swallow a wide gap. */
+/** STR 12 (+1) / DEX 15 (+2): one point apart so a wrong max(str, dex) cannot pass. */
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
     name: "Hero", armorClass: 12, proficiencyBonus: 2,
@@ -77,11 +69,11 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
 
     const stored = state.actors[0].inventory[0];
     expect(stored.baseId).toBe("greatsword");
-    // The block is the SERVER's copy of the greatsword row - dice, type, band and properties.
+    // The block is the server's copy of the greatsword row.
     expect(stored.weapon).toEqual({ category: "martial", damageDice: "2d6", damageType: "slashing", rangeFeet: null, longRangeFeet: null, properties: ["heavy", "two-handed"] });
 
     const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-sword-of-sharpness")!;
-    // Heavy two-hander: Strength (+1) + proficiency (2). Labelled as the MAGIC item, not the base.
+    // Heavy two-hander: Strength (+1) + proficiency (2). Labelled as the magic item, not the base.
     expect(action.name).toBe("Sword of Sharpness");
     expect(action.attack!.bonus).toBe(3);
     expect(action.damage).toEqual([{ formula: "2d6 + 1", type: "slashing" }]);
@@ -92,11 +84,11 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
     setInventoryItem(state, IDS.hero, row({ id: "sword-of-sharpness", name: "Sword of Sharpness", equipped: true, attuned: true, category: "weapon", baseId: "scimitar" }), resolve, { catalog: CATALOG });
 
     const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-sword-of-sharpness")!;
-    // Finesse: max(str +1, dex +2) = Dexterity. One point apart so a wrong max cannot pass.
+    // Finesse: max(str +1, dex +2) = Dexterity.
     expect(action.attack!.bonus).toBe(4);
     expect(action.damage).toEqual([{ formula: "1d6 + 2", type: "slashing" }]);
 
-    // And the ROLL, not just the number: d20 = 10 -> 14 vs AC 12 (hit), 1d6 = 5 -> 7 damage.
+    // And the roll: d20 = 10 -> 14 vs AC 12 (hit), 1d6 = 5 -> 7 damage.
     startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
     const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000201" }, deps([10, 5]));
     expect(resolution.attack).toMatchObject({ total: 14, outcome: "hit" });
@@ -111,8 +103,8 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
 
   it("auto-binds a single-base template - no question with one answer - and its riders land whole", () => {
     const state = stateWith();
-    // Dwarven Thrower is always a warhammer; the row arrives with NO baseId and binds anyway,
-    // and its authored +3/+3 lands: attack 1 (str) + 2 (prof) + 3 = 6, damage 1d8 + 1 + 3.
+    // Dwarven Thrower is always a warhammer: the row arrives with no baseId and binds anyway, and its
+    // +3/+3 lands: attack 1 (str) + 2 (prof) + 3 = 6, damage 1d8 + 1 + 3.
     setInventoryItem(state, IDS.hero, row({ id: "dwarven-thrower", name: "Dwarven Thrower", equipped: true, attuned: true, category: "weapon" }), resolve, { catalog: CATALOG });
     const stored = state.actors[0].inventory[0];
     expect(stored.baseId).toBe("warhammer");
@@ -123,8 +115,8 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
   });
 
   it("Sun Blade and Energy Bow do NOT bind - a wrong swing may not replace an honest absence", () => {
-    // The 2026-08-14 review's finding: their print is MORE than the base (Radiant/Force conversion,
-    // +2/+1 - U20's mechanism), so the ETL withholds their appliesTo and the rows stay dead.
+    // Their printed effect is more than the base (damage-type conversion plus bonuses), so the ETL
+    // withholds their appliesTo and the rows stay unbound.
     const state = stateWith();
     setInventoryItem(state, IDS.hero, row({ id: "sun-blade", name: "Sun Blade", equipped: true, attuned: true, category: "weapon" }), resolve, { catalog: CATALOG });
     expect(state.actors[0].inventory[0].baseId).toBeUndefined();
@@ -137,8 +129,8 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
     setInventoryItem(state, IDS.hero, row({ id: "sword-of-sharpness", name: "Sword of Sharpness", equipped: true, category: "weapon", baseId: "greatsword", weapon: { category: "simple", damageDice: "9d10", damageType: "force", rangeFeet: null, longRangeFeet: null } }), resolve, { catalog: CATALOG });
     expect(state.actors[0].inventory[0].weapon!.damageDice).toBe("2d6");
 
-    // Unbound choice template (a legacy add): the block is stripped and NOTHING derives - today's
-    // honest dead state, kept legal so pre-C9 rows survive ordinary edits.
+    // Unbound choice template: the block is stripped and nothing derives, kept legal so older rows
+    // survive ordinary edits.
     setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", weapon: { category: "martial", damageDice: "2d6", damageType: "slashing", rangeFeet: null, longRangeFeet: null } }), resolve, { catalog: CATALOG });
     const unbound = state.actors[0].inventory.find((entry) => entry.id === "weapon-1")!;
     expect(unbound.baseId).toBeUndefined();
@@ -155,7 +147,7 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
     const state = stateWith();
     setInventoryItem(state, IDS.hero, row({ id: "sword-of-sharpness", name: "Sword of Sharpness", equipped: true, category: "weapon", baseId: "greatsword" }), () => definition, { catalog: CATALOG });
     const derivation = deriveEquipment(state.actors[0], definition, CATALOG);
-    // A bound Sword of Sharpness IS a greatsword: Graze, off the base record, unlocked by the pick.
+    // A bound Sword of Sharpness is a greatsword: Graze, off the base record, unlocked by the pick.
     expect(derivation.masteryByActionId["item-sword-of-sharpness"]).toMatchObject({ id: "graze" });
   });
 });
@@ -165,9 +157,8 @@ describe("the C9 headline far end: the +N ladder lands whole through the real bi
     const state = stateWith();
     setInventoryItem(state, IDS.hero, row({ id: "weapon-1", name: "Weapon, +1", equipped: true, category: "weapon", baseId: "greatsword" }), resolve, { catalog: CATALOG });
     const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-weapon-1")!;
-    // Str +1, proficiency 2, and the SHIPPED attack-bonus rider's +1 = 4; the SHIPPED damage-bonus
-    // folds into the printed formula: 2d6 + 1 (str) + 1 (flat) = "2d6 + 2". This is the number the
-    // plan said must never be understated - the whole reason limit (A) was co-scheduled with C9.
+    // Str +1, proficiency 2, and the shipped attack-bonus rider's +1 = 4; the damage bonus folds into the
+    // printed formula: 2d6 + 1 (str) + 1 (flat) = "2d6 + 2". The number must never be understated.
     expect(action.attack!.bonus).toBe(4);
     expect(action.damage).toEqual([{ formula: "2d6 + 2", type: "slashing" }]);
 
@@ -186,7 +177,7 @@ describe("the C9 bind: armor", () => {
     const stored = state.actors[0].inventory[0];
     expect(stored.baseId).toBe("chain-mail");
     expect(stored.armor).toEqual({ acBase: 16, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: true, strengthRequired: 13 });
-    // Chain mail's printed 16, not the unarmored 10 + Dex the unbound row used to read.
+    // Chain mail's printed 16, not unarmored 10 + Dex.
     expect(state.actors[0].armorClass).toBe(16);
   });
 
@@ -213,7 +204,7 @@ describe("the C9 bind: the 2026-08-14 review's four write-path rules", () => {
     setInventoryItem(state, IDS.hero, row({ ...state.actors[0].inventory[0], equipped: false }), resolve, { catalog: drifted, role: "player" });
     expect(state.actors[0].inventory[0].weapon).toMatchObject({ damageDice: "2d6" });
     expect(state.actors[0].inventory[0].baseId).toBe("greatsword");
-    // ...and the row is still REMOVABLE - the review's stuck-row reproduction, closed.
+    // ...and the row is still removable.
     setInventoryItem(state, IDS.hero, row({ id: "sword-of-sharpness", name: "Sword of Sharpness", quantity: 0, category: "weapon", baseId: "greatsword" }), resolve, { catalog: drifted, role: "player" });
     expect(state.actors[0].inventory).toHaveLength(0);
   });
@@ -221,7 +212,7 @@ describe("the C9 bind: the 2026-08-14 review's four write-path rules", () => {
   it("a non-template row STRIPS a forged baseId - proficiency and mastery cannot be self-granted", () => {
     const definition = definitionOf({ proficiencies: { saves: [], skills: [], weapons: ["rapier"] }, character: { classes: [{ id: "fighter", name: "Fighter", level: 3 }], feats: [], choices: [{ kind: "weapon-mastery", id: "rapier" }] } });
     const state = stateWith();
-    // A plain greatsword row arrives claiming to BE a rapier: the forged identity dies at the door.
+    // A plain greatsword row claiming to be a rapier: the forged identity is rejected.
     setInventoryItem(state, IDS.hero, row({ id: "greatsword", name: "Greatsword", equipped: true, category: "weapon", baseId: "rapier" }), () => definition, { catalog: CATALOG, role: "player" });
     expect(state.actors[0].inventory[0].baseId).toBeUndefined();
     const derivation = deriveEquipment(state.actors[0], definition, CATALOG);

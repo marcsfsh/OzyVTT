@@ -4,14 +4,9 @@ import { HomebrewUsagesSchema } from "@vtt/api-contract";
 import { ActorDefinitionSchema, ActorSchema, type ActorDefinition } from "@vtt/schemas";
 import { buildHomebrewUsageIndex, homebrewUsages } from "../src/homebrew-usages.js";
 
-/**
- * The reference index behind the edit warning and the delete confirmation.
- *
- * The split it has to get right is decision 9's, and the two halves point opposite ways:
- * character content is INFORMATIONAL (a built character carries a flattened, self-contained
- * definition and does not consult the catalog again), while a MONSTER's actions are late-bound and
- * re-resolved per use, so an edit reaches every live token immediately.
- */
+// The reference index behind the edit warning and the delete confirmation. Character content is
+// informational (a built character carries a flattened copy and never consults the catalog again),
+// while a monster's actions are late-bound, so an edit reaches every live token immediately.
 
 const ACTOR_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const ACTOR_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -29,8 +24,8 @@ const CHARACTER: ActorDefinition = ActorDefinitionSchema.parse({
     race: { id: "hb-gith-a1b2c3", name: "Gith" },
     background: { id: "hb-hermit-a1b2c3", name: "Hermit" },
     feats: [{ id: "hb-blood-maledict-a1b2c3", name: "Blood Maledict" }],
-    // The provenance ledger: the ONLY place recording which option a character actually took,
-    // because most riders are flattened into actions/traits/proficiencies at build time.
+    // The provenance ledger is the only record of which option a character took, because most riders
+    // are flattened into actions/traits/proficiencies at build time.
     choices: [{ level: 1, kind: "lineage", id: "yanki" }, { level: 4, kind: "feat", id: "hb-crimson-rite-a1b2c3" }]
   },
   spellcasting: { ability: "int", slots: [{ level: 1, max: 2 }], spells: [{ id: "hb-crimson-bolt-a1b2c3", name: "Crimson Bolt", level: 1, classId: "hb-blood-hunter-a1b2c3" }] },
@@ -66,8 +61,7 @@ describe("homebrew usages", () => {
   });
 
   it("finds a feat taken through the choices ledger, which nothing else records", () => {
-    // Crimson Rite is in `choices[]` only - it was never written to `character.feats`. Most riders
-    // are flattened at build time and lose their source id, so this ledger is the only witness.
+    // Crimson Rite is only in `choices[]`, never in `character.feats`.
     const usages = homebrewUsages(stateWith(), "feat", "hb-crimson-rite-a1b2c3");
     expect(usages.map((usage) => usage.kind)).toContain("choice");
     expect(usages[0].detail).toContain("level 4");
@@ -100,8 +94,8 @@ describe("homebrew usages", () => {
   });
 
   it("emits only usages the contract can carry - every actorId is a real uuid", () => {
-    // `HomebrewUsageSchema.actorId` is a REQUIRED uuid, so a definition with no actor behind it is
-    // skipped rather than sent as a malformed row that would fail the response schema.
+    // `HomebrewUsageSchema.actorId` is a required uuid, so a definition with no actor is skipped rather
+    // than sent as a row that would fail the response schema.
     const orphaned = stateWith({ definitions: [{ id: "import-orphan", definition: CHARACTER }], actors: [] });
     expect(homebrewUsages(orphaned, "class", "hb-blood-hunter-a1b2c3")).toEqual([]);
 

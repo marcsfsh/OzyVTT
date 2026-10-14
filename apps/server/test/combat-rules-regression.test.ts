@@ -22,13 +22,9 @@ import { gridToImage } from "../src/grid-calibration.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
 
-/**
- * Regression suite derived from the two archived replay encounters (Torva/Pip/Sable vs two giant
- * crocodiles): the manual GM run's rules mistakes - double Frenzy with no Rage on round 1, a
- * single-roll Extra Attack, unresisted crocodile damage against a raging barbarian, grapples that
- * never existed as state, and 1-HP procedural heals standing in for a dying state - must now be
- * blocked, guided, or engine-owned (ADR-0020). Numbers reference the gap-analysis report's tests.
- */
+// Rules regressions drawn from a recorded fight (Torva/Pip/Sable vs two giant crocodiles): Frenzy
+// without Rage, a single-roll Extra Attack, unresisted damage against a raging barbarian, grapples with
+// no state, and 1-HP heals standing in for dying must be blocked, guided, or engine-owned (ADR-0020).
 
 const IDS = {
   torva: "10000000-0000-4000-8000-000000000001",
@@ -94,7 +90,7 @@ const resolve = (game: GameState, definition: ActorDefinition, actionId: string,
 describe("report test 1 - Rage and Frenzy on round 1", () => {
   it("blocks Frenzy without an active Rage, offers the legal path, and blocks a second bonus action", () => {
     const game = buildGame();
-    // The manual run's very first mistake: Frenzy with no Rage.
+    // Frenzy with no Rage is refused.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []))
       .toThrow(RulesBlockedError);
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []))
@@ -108,8 +104,7 @@ describe("report test 1 - Rage and Frenzy on round 1", () => {
     expect(torva.actionUses.rage).toBe(1);
     expect(game.combat.turn.bonusActionUsed).toBe(true);
 
-    // Frenzy now satisfies its Rage requirement but the bonus action is spent - the round-1 double
-    // Frenzy the manual run performed is exactly what strict mode rejects.
+    // Frenzy now satisfies its Rage requirement but the bonus action is spent, so strict mode rejects it.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []))
       .toThrow(/already used a bonus action/);
     try {
@@ -225,8 +220,8 @@ describe("report test 8 - crocodile Multiattack, grapple riders, and target rule
   it("tracks one Bite + one Tail per Multiattack, applies the source-linked grapple, and forbids Tail against the held target", () => {
     const game = buildGame([{ actorId: IDS.croc1, score: 20 }, { actorId: IDS.pip, score: 12 }, { actorId: IDS.torva, score: 8 }]);
 
-    // Bite opens the Multiattack plan and, on a hit, grapples: Grappled + Restrained as ONE
-    // source-linked effect carrying the printed escape DC - the state the manual run never had.
+    // Bite opens the Multiattack plan and, on a hit, grapples: Grappled + Restrained as one source-linked
+    // effect carrying the printed escape DC.
     const bite = resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 5, 5, 5]);
     expect(bite.attack?.outcome).toBe("hit");
     expect(bite.componentsRemaining).toEqual({ bite: 0, tail: 1 });
@@ -247,7 +242,7 @@ describe("report test 8 - crocodile Multiattack, grapple riders, and target rule
     expect(() => resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.torva] }, []))
       .toThrow(/no attacks remaining/);
 
-    // Defeating the crocodile releases everything it sustained: the replay's lost-grapple bug, inverted.
+    // Defeating the crocodile releases everything it sustained.
     applyDamageDetailed(game, IDS.croc1, { amount: 85 }, { role: "gm" });
     expect(game.actors.find((actor) => actor.id === IDS.pip)!.conditions).toEqual([]);
     expect(game.actors.find((actor) => actor.id === IDS.pip)!.effects).toEqual([]);
@@ -319,8 +314,8 @@ describe("report test 9 - zero HP, dying, and healing", () => {
     expect(events).toEqual([{ kind: "condition", text: "Pip Underbough regained consciousness.", actorId: IDS.pip }]);
   });
 
-  // A death save is just a raw d20 (no modifier) run through the same dice engine as every other roll,
-  // with the same preview-then-confirm + adv/disadv flow as a saving throw (#5/#7 - uniform dice UX).
+  // A death save is a raw d20 through the same dice engine as every other roll, with the same
+  // preview-then-confirm and advantage/disadvantage flow as a saving throw.
   describe("death saves through the shared roll widget (#5/#7)", () => {
     const nid = (suffix: number) => `40000000-0000-4000-8000-0000000000${String(suffix).padStart(2, "0")}`;
     const dying = () => { const game = buildGame(); applyDamageDetailed(game, IDS.pip, { amount: 60 }, { role: "gm" }); return { game, pip: game.actors.find((actor) => actor.id === IDS.pip)! }; };
@@ -386,8 +381,8 @@ describe("report test 12 - GM override", () => {
       .toThrow(RulesBlockedError);
     resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1], override: { reason: "haste variant" } }, [15, 6]);
     expect(game.combat.turn.rulesOverridden).toBe(true);
-    // The reported fix: a THIRD bonus action the same turn no longer needs a fresh override
-    // (nat-1 keeps it a harmless miss). The override is once per turn, not once per action.
+    // A third bonus action the same turn needs no fresh override (nat-1 keeps it a harmless miss): the
+    // override is once per turn, not once per action.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6]))
       .not.toThrow();
     expect(game.combat.turn.rulesOverridden).toBe(true);
@@ -402,7 +397,7 @@ describe("report test 12 - GM override", () => {
     torva.hp = { ...torva.hp, current: 0 };
     expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]))
       .toThrow(/is down/);
-    // A standing economy/range override this turn must NOT let a down creature act - it re-prompts.
+    // A standing economy/range override this turn must not let a down creature act; it re-prompts.
     game.combat = { ...game.combat, turn: { ...game.combat.turn, rulesOverridden: true } };
     expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]))
       .toThrow(RulesBlockedError);
@@ -542,7 +537,7 @@ describe("report test 2/3 supplement - Eldritch Blast beams", () => {
 });
 
 describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
-  // Prompt creation needs the TARGET's definition, so these resolves carry the game's own resolver.
+  // Prompt creation needs the target's definition, so these resolves carry the game's own resolver.
   const gameResolver = (game: GameState) => (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition;
   const reactionDeps = (game: GameState, faces: number[] = []) => ({
     resolveDefinition: gameResolver(game),
@@ -562,7 +557,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     expect(game.combat.pendingReactions).toHaveLength(1);
     const prompt = game.combat.pendingReactions[0];
     expect(prompt).toMatchObject({ actorId: IDS.pip, actionId: "uncanny-dodge", sourceActorId: IDS.croc1, sourceName: "Giant Crocodile", proposedDamage: 23, proposedDamageParts: [{ amount: 23, type: "piercing" }], critical: false });
-    // The bite's grapple rider still applied immediately - only the DAMAGE waits on the answer.
+    // The bite's grapple rider applied immediately; only the damage waits on the answer.
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
     expect(pip.conditions.map((condition) => condition.id).sort()).toEqual(["grappled", "restrained"]);
     expect(pip.hp.current).toBe(52); // nothing applied yet
@@ -595,7 +590,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     // The leaves-reach shape movement-rules produces: croc1 (the reactor) swings at Torva (the mover).
     game.combat = { ...game.combat, pendingReactions: [{ id: promptId, kind: "leaves-reach", actorId: IDS.croc1, actionId: "opportunity-attack", actionName: "Opportunity Attack", sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", targetActorId: IDS.torva, triggerCommandId: nextCommandId(), proposedDamage: 0, proposedDamageParts: [], critical: false, createdAt: 0 }] };
     const torvaHp = game.actors.find((actor) => actor.id === IDS.torva)!.hp.current;
-    // PREVIEW: a natural 18 hit shows, but the reaction stays unspent and nothing is applied.
+    // Preview: a natural 18 hit shows, but the reaction stays unspent and nothing is applied.
     const preview = answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game), { commit: false, attackNatural: 18 });
     expect(preview.used).toBe(false);
     expect(preview.resolution?.preview).toBe(true);
@@ -603,7 +598,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     expect(game.combat.reactionsUsed).not.toContain(IDS.croc1);
     expect(game.combat.pendingReactions).toHaveLength(1);
     expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBe(torvaHp);
-    // CONFIRM the shown swing: reaction spent, damage applied, prompt cleared.
+    // Confirm the shown swing: reaction spent, damage applied, prompt cleared.
     const committed = answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game, [6, 6, 6]), { commit: true, attackNatural: 18 });
     expect(committed.used).toBe(true);
     expect(committed.resolution?.preview).toBeFalsy();
@@ -1085,8 +1080,8 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
   });
 
   it("the opportunity swing never range-checks the mover's arrival position (SRD: the attack lands before they leave reach)", () => {
-    // Live-smoke regression: the mover has ARRIVED far away by answer time (arrival-timing
-    // approximation), and on a measurable map a strict range check would wrongly block the swing.
+    // By answer time the mover has already arrived far away, so on a measurable map a strict range check
+    // would wrongly block the swing.
     const game = buildGame();
     place(game, IDS.croc1, 0, 0);
     place(game, IDS.torva, 5, 0);
@@ -1116,16 +1111,11 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(false);
   });
 
-  /* ----------------------------------------------------------------------------------------------
-   * U18 - `speed` as a RUNTIME effect modifier.
-   *
-   * Every assertion below ends at the sentence a player reads when the server refuses their move
-   * (`movement-rules.ts`) or their stand-up (`actor-conditions.ts`), with the FEET quoted in full.
-   * "The modifier survived into the effect" is not a test: the build-time `speed` rider already
-   * satisfied that and moved nothing at runtime, which is the defect U18 exists to close.
-   * -------------------------------------------------------------------------------------------- */
+  // `speed` as a runtime effect modifier. Every assertion ends at the sentence a player reads when the
+  // server refuses their move (`movement-rules.ts`) or their stand-up (`actor-conditions.ts`), feet
+  // included.
 
-  /** A live effect carrying the runtime `speed` modifier - the shape the `slow` mastery (M2) applies. */
+  /** A live effect carrying the runtime `speed` modifier, the shape the `slow` mastery applies. */
   const speedEffect = (id: string, amount: number, sourceActionId: string, over: Partial<EffectInstance> = {}): EffectInstance => ({
     id, name: `Speed ${amount >= 0 ? "+" : ""}${amount}`, tags: [], sourceActorId: IDS.croc1, sourceName: "Giant Crocodile",
     sourceActionId, startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true,
@@ -1147,7 +1137,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     addEffect(game, IDS.torva, speedEffect("slow-1", -10, "slow"));
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
-    // The budget really moved rather than the sentence: 35 ft was legal at 40 and is refused at 30.
+    // The budget moved, not just the sentence: 35 ft was legal at 40 and is refused at 30.
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 35, y: 0 }))
       .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 35 ft).");
 
@@ -1165,7 +1155,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     addEffect(game, IDS.torva, speedEffect("slow-croc2", -10, "slow", { sourceActorId: IDS.croc2, sourceName: "Giant Crocodile 2" }));
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 20 ft of movement left (this move needs 45 ft).");
-    // The real lifecycle, not a hand-removal: the first crocodile's turn begins and its own -10 lapses.
+    // The real lifecycle: the first crocodile's turn begins and its own -10 lapses.
     expireEffectsAtTurnStart(game, IDS.croc1);
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
@@ -1182,20 +1172,15 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     const both = buildGame();
     both.actors.find((actor) => actor.id === IDS.torva)!.effects = [dashingEffect];
     addEffect(both, IDS.torva, speedEffect("slow-1", -10, "slow"));
-    // (40 - 10) x 2 = 60. Summing AFTER the double would read 80 - 10 = 70 and wave this move through.
-    // `dashingEffect` carries no `movementGrantFeet`, so this is ALSO the legacy branch: an effect
-    // persisted before the grant was recorded still doubles the live Speed. A Dash taken now would
-    // record a 30-ft grant off the same slowed Speed and reach the same 60 by adding it - the two
-    // tests below drive the real action and read that number off the effect.
+    // (40 - 10) x 2 = 60; summing after the double would read 70 and allow this move. `dashingEffect`
+    // carries no `movementGrantFeet`, so this is also the fallback for effects persisted without a
+    // recorded grant. The tests below drive the real Dash and read the recorded grant.
     expect(both.actors.find((actor) => actor.id === IDS.torva)!.effects[0].movementGrantFeet).toBeUndefined();
     expect(() => moveRules(both, IDS.torva, { x: 0, y: 0 }, { x: 70, y: 0 }))
       .toThrow("Torva Grimtusk has 60 ft of movement left (this move needs 70 ft).");
   });
 
-  /**
-   * The REAL Dash action, resolved the way the runner resolves it, so the grant this section measures
-   * is the one `action-resolution.ts` writes rather than a number a fixture handed the test.
-   */
+  /** The real Dash action, resolved as the runner resolves it, so the grant is the one `action-resolution.ts` writes. */
   const dashFor = (game: GameState, actorId: string, definition: ActorDefinition) =>
     resolveDefinitionAction(
       game, builtinAction("dash")!,
@@ -1211,13 +1196,12 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 35, y: 0 }).warning).toBeNull();
     expect(game.combat.turn.movementUsedFeet).toBe(35);
 
-    // ...and NOW an opportunity attack slows her. Her Speed is 20 from here on; the feet the Dash
-    // already handed over are not the Dash's to take back.
+    // ...and now an opportunity attack slows her. Her Speed is 20 from here on; feet the Dash already
+    // granted are not taken back.
     addEffect(game, IDS.sable, speedEffect("slow-croc1", -10, "slow"));
 
-    // THE FAR END: 20 (Speed now) + 30 (granted then) - 35 (spent) = 15 ft left, in the sentence the
-    // player reads. Doubling the LIVE Speed here printed "5 ft of movement left" and charged this
-    // creature 20 feet for a swing that happened after it had already moved.
+    // 20 (Speed now) + 30 (granted then) - 35 (spent) = 15 ft left, in the sentence the player reads.
+    // Doubling the live Speed instead would leave 5 ft.
     expect(() => moveRules(game, IDS.sable, { x: 35, y: 0 }, { x: 55, y: 0 }))
       .toThrow("Sable Vex has 15 ft of movement left (this move needs 20 ft).");
     // ...and the 15 really is there: 15 more feet walk, and the 16th does not.
@@ -1226,15 +1210,14 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(() => moveRules(game, IDS.sable, { x: 50, y: 0 }, { x: 55, y: 0 }))
       .toThrow("Sable Vex has 0 ft of movement left (this move needs 5 ft).");
 
-    // And the number behind all three sentences: a QUANTITY recorded when the action was taken, not a
-    // multiplier waiting to be re-read. Asserted last so the refusals above are what a regression hits
-    // first - a stored field that no printed sentence depends on is exactly the failure this repo ships.
+    // The grant is a quantity recorded when the action was taken, not a multiplier re-read later. Asserted
+    // last so the refusals above are what a regression hits first.
     expect(game.actors.find((actor) => actor.id === IDS.sable)!.effects.find((effect) => effect.tags.includes("dashing"))!.movementGrantFeet).toBe(30);
   });
 
   it("a Dash taken while ALREADY slowed grants the reduced Speed, and the total is the same 40", () => {
-    // The other ordering, and the one the doubling always got right: slowed FIRST, so "your Speed
-    // after modifiers" is 20 when the action is taken. 20 granted + 20 live = 40.
+    // The other ordering: slowed first, so "your Speed after modifiers" is 20 when Dash is taken.
+    // 20 granted + 20 live = 40.
     const game = buildGame([{ actorId: IDS.sable, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
     addEffect(game, IDS.sable, speedEffect("slow-croc1", -10, "slow"));
     dashFor(game, IDS.sable, sableDefinition);
@@ -1250,8 +1233,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     sable.speedFeet = 20;
     sable.conditions = [{ id: "exhaustion", level: 5 }];
     addEffect(game, IDS.sable, speedEffect("longstrider", 10, "longstrider"));
-    // 20 - 25 stops at 0, and the +10 then reads 10. Carrying the -5 forward printed 5 ft here and
-    // quietly ate half a spell's worth of feet.
+    // 20 - 25 stops at 0, and the +10 then reads 10, not 5.
     expect(() => moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 15, y: 0 }))
       .toThrow("Sable Vex has 10 ft of movement left (this move needs 15 ft).");
     expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 10, y: 0 }).warning).toBeNull();
@@ -1259,9 +1241,8 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
   });
 
   it("two attackers' Slows are ONE reduction, and the last expiry is what hands the feet back", () => {
-    // SRD 5.2.1 "Combining Game Effects": effects with the same name don't combine, the most potent
-    // applies. Two crocodiles' Slow is the same game effect twice, so it is -10 and not -20 - and
-    // the identity is the effect's `stackKey`, not anything either crocodile knows about the other.
+    // SRD 5.2.1 "Combining Game Effects": effects with the same name don't combine; the most potent
+    // applies. Two crocodiles' Slow is -10, not -20, keyed on the effect's `stackKey`.
     const game = buildGame();
     addEffect(game, IDS.torva, speedEffect("slow-croc1", -10, "slow", { sourceActorId: IDS.croc1, sourceName: "Giant Crocodile", stackKey: "mastery:slow" }));
     addEffect(game, IDS.torva, speedEffect("slow-croc2", -10, "slow-2", { sourceActorId: IDS.croc2, sourceName: "Giant Crocodile 2", stackKey: "mastery:slow" }));
@@ -1269,14 +1250,13 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
 
-    // The first crocodile's turn begins and ITS row expires - the other one is still holding the 10
-    // feet, so nothing changes at the table.
+    // The first crocodile's turn begins and its row expires; the other still holds the 10 feet.
     expireEffectsAtTurnStart(game, IDS.croc1);
     expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toHaveLength(1);
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
 
-    // Only the LAST expiry gives them back.
+    // Only the last expiry gives them back.
     expireEffectsAtTurnStart(game, IDS.croc2);
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 40 ft of movement left (this move needs 45 ft).");
@@ -1290,8 +1270,8 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
       .toThrow("Torva Grimtusk has 25 ft of movement left (this move needs 45 ft).");
 
-    // The tie rule, stated in `morePotent`: a +10 sharing the Slow's key is the same magnitude, so
-    // the WORSE for the bearer wins and the penalty stands. It does not cancel to 0.
+    // Tie rule (`morePotent`): a +10 sharing the Slow's key has the same magnitude, so the one worse for
+    // the bearer wins and the penalty stands.
     const tied = buildGame();
     addEffect(tied, IDS.torva, speedEffect("slow-croc1", -10, "slow", { stackKey: "mastery:slow" }));
     addEffect(tied, IDS.torva, speedEffect("odd-boon", 10, "boon", { stackKey: "mastery:slow" }));
@@ -1309,7 +1289,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(() => moveRules(buried, IDS.torva, { x: 0, y: 0 }, { x: 5, y: 0 }))
       .toThrow("Torva Grimtusk can't move - its Speed is 0.");
 
-    // Grappled is "your Speed is 0 AND can't increase" - the early return is that second clause.
+    // Grappled is "your Speed is 0 and can't increase"; the early return is the second clause.
     const held = buildGame();
     held.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "grappled" }];
     addEffect(held, IDS.torva, speedEffect("haste-1", 20, "haste"));
@@ -1358,11 +1338,8 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
   });
 
   it("assisted mode lets the impossible stand-up happen but SAYS SO - it never reads as a clean event", () => {
-    // The movement family's convention, applied to the other half of the family: `applyMovementRules`
-    // returns the identical refusal sentence as a warning when the mode is not strict, and the move
-    // still happens. Standing up used to compute the same sentence and throw it away, so a grappled
-    // creature's stand-up narrated as "stood up (0 ft of movement)" and nothing else - an illegal
-    // action reading as a legal one.
+    // As with `applyMovementRules`, a non-strict mode returns the refusal sentence as a warning and the
+    // action still happens, so an illegal stand-up does not read as a legal one.
     const game = buildGame();
     game.combat = { ...game.combat, rulesMode: "assisted" };
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
@@ -1385,7 +1362,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
       "Rules note: Standing up costs 20 ft of movement - Torva Grimtusk has 15 ft left."
     ]);
 
-    // The control: a LEGAL stand-up says nothing extra, so the note means something when it appears.
+    // Control: a legal stand-up says nothing extra.
     const legal = buildGame();
     legal.combat = { ...legal.combat, rulesMode: "assisted" };
     legal.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "prone" }];
@@ -1731,8 +1708,8 @@ describe("creature size and distance - footprint-aware, edge-to-edge (SRD Creatu
       now: () => 0,
       commandId: nextCommandId()
     });
-    // Center-to-center the croc's from-position read 10 ft from Torva (beyond his 5 ft reach), so the
-    // old math thought it was never in reach and no prompt fired. Edge-to-edge it starts at 5 ft.
+    // Measured center-to-center the croc's start read 10 ft from Torva (beyond his 5 ft reach) and no
+    // prompt fired; edge-to-edge it starts at 5 ft.
     expect(outcome.prompts).toEqual([{ actorId: IDS.torva, name: "Torva Grimtusk" }]);
   });
 
@@ -1744,8 +1721,8 @@ describe("creature size and distance - footprint-aware, edge-to-edge (SRD Creatu
   });
 
   it("washes out snapping dust so a truly-adjacent creature reads exactly 5 ft (report bug: '5 ft away but out of reach')", () => {
-    // A realistic wizard-drawn grid: off-origin, a hair of rotation, and positions that went through
-    // the 0.001-px position rounding. Center-to-edge here lands at 5.0001-ish ft raw; the fix rounds it.
+    // A realistic drawn grid: off-origin, slight rotation, and positions after the 0.001-px rounding.
+    // Center-to-edge lands at about 5.0001 ft raw, which must round to 5.
     const skewed = { width: 900, height: 600, calibration: { kind: "square" as const, origin: { x: 0.333, y: 0.777 }, cellSizePx: 50, rotationRadians: 0.0009, distancePerCell: 5 } } as const;
     const round3 = (value: number) => Math.round(value * 1000) / 1000; // mimic the token-placement 0.001-px snap
     const at = (col: number, row: number) => {
@@ -1794,7 +1771,7 @@ describe("save-for-damage applies on a failed save (report bug: breath weapons d
     expect(pending).toMatchObject({ ability: "dex", dc: 18, halfOnSuccess: true });
     expect(pending.proposedDamageParts).toEqual([{ amount: 10, type: "fire" }]);
 
-    // Torva fails the save → full 10 fire applied (this is the bug: previously proposedDamage was 0).
+    // Torva fails the save, so the full 10 fire is applied.
     const saveDeps = { random: () => 3, newRollId: (() => { let n = 700; return () => `40000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; })(), sessionId: IDS.gmSession, role: "gm" as const, now: () => "2026-07-18T00:00:00.000Z", resolveDefinition: (id: string) => game.definitions.find((entry) => entry.id === id)?.definition };
     const answered = answerSave(game, nextCommandId(), pending.id, "manual", 5, true, { role: "gm" }, saveDeps);
     expect(answered.outcome).toMatchObject({ success: false, committed: true, appliedDamage: 10 });
@@ -1982,8 +1959,8 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     // Preview: d20 3 + WIS +1 = 4 < 14 - a failure about to land 7 psychic.
     const preview = answerSave(game, nextCommandId(), saveId, "roll", undefined, false, { role: "gm" }, saveDeps(game, 3));
     expect(preview.outcome).toMatchObject({ success: false, committed: false, appliedDamage: 7 });
-    // Commit with Legendary Resistance: forced success - the SUCCESS outcome still applies (this
-    // save halves on success: 3 of 7), one daily use spent, narrated.
+    // Commit with Legendary Resistance: a forced success, so the success outcome still applies (this save
+    // halves on success: 3 of 7), one daily use is spent, and it is narrated.
     const committed = answerSave(game, nextCommandId(), saveId, "manual", preview.outcome.total, true, { role: "gm" }, saveDeps(game, 3), true);
     expect(committed.outcome).toMatchObject({ success: true, committed: true, appliedDamage: 3 });
     const boss = game.actors.find((actor) => actor.id === BOSS)!;
@@ -2103,7 +2080,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
   it("a long rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
     const game = buildRestingGame(2, 10);
     applyRest(game, HERO, "long", resolveTorva(game));
-    // The stored save uses the pre-multiclass single-object shape; it normalises into a one-entry pool.
+    // The stored save uses the single-class single-object shape; it normalizes into a one-entry pool.
     expect(game.actors[0].hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7, entries: [{ die: "d12", maximum: 7, remaining: 7 }] });
     expect(game.actors[0].hp.current).toBe(75);
   });
@@ -2116,7 +2093,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
     expect(ownView.hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7, entries: [{ die: "d12", maximum: 7, remaining: 7 }] });
     const strangerView = projectPlayerView(game, "30000000-0000-4000-8000-00000000000c", () => null).actors[0];
     expect("hitDice" in strangerView).toBe(false);
-    // Pre-hit-dice saves parse with the null default (additive-state pattern).
+    // Saves without hit dice parse with the null default.
     const legacy = GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: HERO, name: "Old Save", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } }] });
     expect(legacy.actors[0].hitDice).toBeNull();
   });

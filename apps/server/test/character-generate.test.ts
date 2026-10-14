@@ -15,24 +15,13 @@ import { actionPools, effectiveActions } from "../src/effective-actions.js";
 import { equipmentCatalogOf, isItemActionId } from "../src/equipment-derivation.js";
 import { createServer } from "../src/server.js";
 
-/**
- * THE RANDOM CHARACTER GENERATOR (issue `2d`) at the FAR END.
- *
- * Twelve classes at levels 1, 5, 11 and 20 - forty-eight characters, built against the REAL content
- * bundles, and each one asked three questions:
- *
- *   1. does it parse as a canonical `ActorDefinition`;
- *   2. does re-submitting its OWN choice ledger through `buildCharacterDefinition` produce an
- *      IDENTICAL definition - the real proof, because it can only hold if the generator answered
- *      legal offers with legal answers and nothing else;
- *   3. does the character have something to DO on its turn.
- *
- * (3) is not decoration. Four mechanisms this area built typechecked perfectly and reached zero
- * content; a generator that runs and produces a sheet with no usable action would be that failure
- * wearing a new hat, and `definition.actions.length > 0` would not catch it either - the weapons a
- * character swings come from `deriveEquipment` at read time, so the assertion has to go through
- * `effectiveActions` on an IMPORTED actor, which is what the sheet itself renders from.
- */
+// The random character generator, for twelve classes at levels 1, 5, 11 and 20 against the real
+// content bundles. Each character must:
+//   1. parse as a canonical `ActorDefinition`;
+//   2. rebuild to an identical definition from its own choice ledger via `buildCharacterDefinition`,
+//      which only holds if every answer was a legal answer to a real offer;
+//   3. have class content to use on its turn, checked through `effectiveActions` on an imported actor
+//      because weapons derive from `deriveEquipment` at read time.
 
 const contentLibrary = new ContentLibrary();
 const library = contentLibrary.forAudience("gm");
@@ -40,10 +29,7 @@ const catalog = equipmentCatalogOf(library);
 const defaultPolicy = BuilderPolicySchema.parse({});
 const ACTOR_ID = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 
-/**
- * A seeded stand-in for `context.random`, same contract: 1..sides. mulberry32, so a seed is a
- * character and this file's numbers are reproducible by anyone who runs it.
- */
+/** A seeded stand-in for `context.random` (1..sides), using mulberry32 so runs are reproducible. */
 function seeded(seed: number): (sides: number) => number {
   let state = seed >>> 0;
   return (sides: number) => {
@@ -65,19 +51,10 @@ function assemble(definition: ActorDefinition) {
   return { actor, actions: effectiveActions(definition, actor, catalog) };
 }
 
-/**
- * ONE THING EACH CLASS OWES A CHARACTER, named by the id the engine really rolls or spends - either a
- * non-item action or a tracked pool (`actionPools`, which is `uses.pool ?? action.id`).
- *
- * This replaces `actions.some((action) => action.attack || action.damage.length > 0)`, which was
- * near-vacuous: every character carries a starting weapon and `deriveEquipment` turns it into an
- * attack, so the assertion passed with ZERO class content. Measured, a generated Druid L1 satisfied
- * it on a Sickle for 1d4 - 1.
- *
- * `atOne: null` is a FACT, not an exemption: Cleric, Druid, Paladin and Warlock are spells and prose
- * at level 1 and the engine tracks nothing of their own. Saying so beats a bar low enough to include
- * them. Every id here was confirmed present in all 15 seeds at that level.
- */
+// One thing each class gives a character, named by the id the engine rolls or spends: a non-item
+// action or a tracked pool (`uses.pool ?? action.id`). A starting weapon alone would satisfy a looser
+// check. `atOne: null` means the class tracks nothing of its own at level 1 (Cleric, Druid, Paladin,
+// Warlock).
 const CLASS_SIGNATURE: Readonly<Record<string, Readonly<{ atOne: string | null; later: string }>>> = {
   barbarian: { atOne: "rage", later: "reckless-attack" },
   bard: { atOne: "bardic-inspiration", later: "cutting-words" },
@@ -93,7 +70,7 @@ const CLASS_SIGNATURE: Readonly<Record<string, Readonly<{ atOne: string | null; 
   wizard: { atOne: "arcane-recovery", later: "arcane-recovery" }
 };
 
-/** Everything on the effective list this character owns RATHER THAN CARRIES - actions and pools, minus the item-derived ones. */
+/** Everything on the effective list this character owns rather than carries: actions and pools, minus item-derived ones. */
 const ownContent = (actions: readonly ActorDefinition["actions"][number][]): Set<string> => new Set([
   ...actions.filter((action) => !isItemActionId(action.id)).map((action) => action.id),
   ...actionPools(actions).map((pool) => pool.id)
@@ -113,10 +90,8 @@ describe("random character generator - the far end", () => {
           const definition = buildCharacterDefinition(generated.request, library, defaultPolicy);
           ActorDefinitionSchema.parse(definition);
 
-          // THE ROUND TRIP. The stored ledger IS the build input (D14) - hand it straight back,
-          // with the hit-point dice recovered from it by the shipped reader, and the definition
-          // must come out byte-identical. A generator that answered an offer it invented, or wrote
-          // a row the validator merely tolerated, cannot survive this.
+          // The stored ledger is the build input: hand it back with the hit-point dice recovered by the shipped
+          // reader, and the definition must come out identical.
           const ledger = definition.character!.choices!;
           const rolls = storedHitPointRolls(ledger, level);
           expect(rolls, `${classId} L${level} recorded no hit-point rolls`).not.toBeNull();
@@ -124,14 +99,13 @@ describe("random character generator - the far end", () => {
             { ...generated.request, choices: ledger, hp: { mode: "entries", entries: rolls! } }, library, defaultPolicy);
           expect(rebuilt, `${classId} L${level} did not round-trip`).toEqual(definition);
 
-          // Playable: the class's own primary ability actually got the good number. The standard
-          // array's top value is 15 (+2), and the background spread can only add to it - so a
-          // generated caster whose spell DC reads 8+prof+0 is a character nobody would play.
+          // The class's primary ability got the good number: the standard array's top value is 15 (+2) and the
+          // background spread can only add to it.
           const primary = statPriorityFor(classId, library.classProgressionTable())[0];
           expect(definition.abilityScores[primary], `${classId} L${level} put ${primary.toUpperCase()} at ${definition.abilityScores[primary]}`)
             .toBeGreaterThanOrEqual(15);
 
-          // Playable: something to do on its turn, and something its own CLASS gave it.
+          // Something to do on its turn, and something its own class gave it.
           const { actions } = assemble(definition);
           const onTurn = actions.filter((action) => action.activation === "action" || action.activation === "bonus-action");
           expect(onTurn.length, `${classId} L${level} has no action to take on its turn`).toBeGreaterThan(0);
@@ -152,7 +126,7 @@ describe("random character generator - the far end", () => {
     for (const classId of CLASS_IDS) {
       const { request } = generateCharacterRequest({ classId, level: 5 }, library, defaultPolicy, seeded(7));
       const priority = statPriorityFor(classId, library.classProgressionTable());
-      // Exactly the standard array, and in priority order - 15 on what the class needs most.
+      // Exactly the standard array, in priority order: 15 on what the class needs most.
       expect([...Object.values(request.baseScores)].sort((a, b) => b - a), classId).toEqual([...STANDARD_ARRAY]);
       expect(priority.map((ability) => request.baseScores[ability]), classId).toEqual([...STANDARD_ARRAY]);
       // The background's printed +2/+1 goes to the best two abilities that background may raise.
@@ -170,7 +144,7 @@ describe("random character generator - the far end", () => {
     const twice = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2026));
     expect(twice).toEqual(once);
     const other = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2027));
-    // Not merely a different name: a different character. (Same class by request, everything else drawn.)
+    // A different character, not just a different name (same class by request, everything else drawn).
     expect(JSON.stringify(other.request.choices)).not.toEqual(JSON.stringify(once.request.choices));
   });
 
@@ -182,13 +156,13 @@ describe("random character generator - the far end", () => {
     const bundle = library.nameBundles().find((entry) => entry.speciesId === generated.request.speciesId)!;
     const pool = bundle.pools.flatMap((entry) => entry.names);
     expect(generated.request.name.split(" ").every((word) => pool.includes(word))).toBe(true);
-    // A name that was ASKED for is used verbatim - the generator names, it does not rename.
+    // A requested name is used verbatim.
     expect(generateCharacterRequest({ level: 3, name: "  Bramblefoot  " }, library, defaultPolicy, seeded(11)).request.name).toBe("Bramblefoot");
   });
 
   it("only ever picks expertise in a skill it is already proficient in", () => {
-    // The three classes that print Expertise over the WHOLE skills catalog; step 8 rejects the build
-    // outright for a skill the character does not hold, so this is the pick most able to go wrong.
+    // The three classes whose Expertise draws on the whole skills catalog; the build rejects Expertise in
+    // a skill the character does not hold, so this pick is the most error-prone.
     for (const classId of ["rogue", "bard", "ranger"]) {
       for (let seed = 1; seed <= 12; seed += 1) {
         const { request } = generateCharacterRequest({ classId, level: 11 }, library, defaultPolicy, seeded(seed));
@@ -199,17 +173,11 @@ describe("random character generator - the far end", () => {
     }
   });
 
-  /**
-   * A GENERATED CHARACTER MUST LEVEL UP LIKE A HAND-BUILT ONE, which is the claim `ChoiceOffer.levels`
-   * makes in its own docstring: `level-ledger.ts` matches a stored row to a wizard offer on the tuple
-   * `(level, kind, classId, featureId)`, "so it can prefill a generated character's level-up exactly
-   * as it prefills a hand-built one". It was false as shipped, twice over, and a generated cleric L11
-   * left `feature:cleric-subclass` and `feature:grappler` unfilled while a hand-built one left nothing.
-   */
+  // A generated character must level up like a hand-built one: `level-ledger.ts` matches a stored row to
+  // a wizard offer on `(level, kind, classId, featureId)`, so every generated row must carry that tuple.
   it("stamps every row with the tuple the level-up flow matches on", () => {
-    // The FIRST bug: the subclass row was hand-written without `payload.featureId`, so no offer ever
-    // claimed it. Checked against the offer the build really has rather than against a spelled-out
-    // string, because "<class>-subclass" being the id is the wizard's convention, not a law.
+    // The subclass row must carry `payload.featureId`. Checked against the offer the build has, since
+    // "<class>-subclass" is the wizard's convention, not a law.
     const misses: string[] = [];
     for (const classId of CLASS_IDS) {
       for (const level of LEVELS) {
@@ -233,22 +201,21 @@ describe("random character generator - the far end", () => {
   });
 
   it("records a chosen feat's own picks at the ASI that took it, not at the first one", () => {
-    // The SECOND bug: a feat's own picks inherited the whole ASI offer's `levels` array, so
-    // `levelOfPick(offer, 0)` filed them at the FIRST improvement whichever one really took the feat.
-    // Measured on the task's own example - a generated cleric 11 takes Grappler at the level-8 ASI.
+    // A feat's own picks must sit at the level the feat was taken, not at the first ASI level. A generated
+    // cleric 11 takes Grappler at the level-8 ASI.
     const cleric = generateCharacterRequest({ classId: "cleric", level: 11 }, library, defaultPolicy, seeded(11)).request;
     const ledger = buildCharacterDefinition(cleric, library, defaultPolicy).character!.choices!;
     expect(ledger.find((row) => row.kind === "asi-or-feat" && row.id === "grappler"))
       .toMatchObject({ level: 8, classId: "cleric" });
     expect(ledger.find((row) => row.payload?.featureId === "grappler"))
       .toMatchObject({ level: 8, kind: "ability-score" });
-    // ...and the subclass row the same character used to write bare.
+    // ...and the subclass row.
     expect(ledger.find((row) => row.kind === "subclass"))
       .toMatchObject({ level: 3, classId: "cleric", id: "life-domain", payload: { featureId: "cleric-subclass" } });
 
-    // The rule, across the sweep: every row a chosen feat's OWN pick wrote sits at that feat's level.
-    // (`ability-score-improvement` is excluded because the class FEATURE shares its id with the
-    // catalog feat, so `payload.featureId` cannot tell one instance's picks from another's.)
+    // Across the sweep, every row a chosen feat's own pick wrote sits at that feat's level.
+    // `ability-score-improvement` is excluded: the class feature shares its id with the catalog feat, so
+    // `payload.featureId` cannot tell one instance's picks from another's.
     let checked = 0;
     const misses: string[] = [];
     for (const classId of CLASS_IDS) {
@@ -265,7 +232,7 @@ describe("random character generator - the far end", () => {
         }
       }
     }
-    // The sweep has to actually reach feats taken at a LATER improvement, or it proves nothing.
+    // The sweep must reach feats taken at a later improvement, or it proves nothing.
     expect(checked, "the sweep found no chosen feat with picks of its own").toBeGreaterThan(0);
     expect(misses, misses.slice(0, 8).join("\n")).toEqual([]);
   });
@@ -277,9 +244,7 @@ describe("random character generator - the far end", () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// The role gate, over the real HTTP door.
-// ---------------------------------------------------------------------------------------------
+// The role gate, over HTTP.
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
@@ -313,7 +278,7 @@ describe("random character generator - the role gate", () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
 
-    // DENY BY DEFAULT - the whole difference from `playerBuilder`, which ships open.
+    // Deny by default, unlike `playerBuilder`, which ships open.
     expect(server.store.snapshot.builderPolicy.playerRandom).toBe("gm-only");
     const denied = await post(base, GAME_PATHS.charactersRandom, playerToken, { commandId: randomUUID(), level: 3 });
     expect(denied.status).toBe(403);
@@ -323,7 +288,7 @@ describe("random character generator - the role gate", () => {
     expect(byGm.status).toBe(200);
     const gmActorId = (await byGm.json()).data.actorId as string;
     const gmActor = server.store.snapshot.actors.find((actor) => actor.id === gmActorId)!;
-    expect(gmActor.ownerSessionId).toBeNull(); // nobody's yet - the GM rolled it FOR someone
+    expect(gmActor.ownerSessionId).toBeNull(); // nobody's yet: the GM rolled it for someone
     expect(gmActor.definitionId).toBe(`import-${gmActorId}`);
 
     // The GM opens the door...
@@ -343,7 +308,7 @@ describe("random character generator - the role gate", () => {
     const second = await post(base, GAME_PATHS.charactersRandom, playerToken, { commandId: randomUUID(), level: 3 });
     expect(second.status).toBe(409);
 
-    // The table's level cap is enforced against the STORED policy, not the caller's word.
+    // The table's level cap is enforced against the stored policy, not the caller's word.
     const capped = await post(base, GAME_PATHS.builderPolicy, gmToken,
       { commandId: randomUUID(), allowedAbilityMethods: ["standard-array"], maxLevel: 5 });
     expect(capped.status).toBe(200);

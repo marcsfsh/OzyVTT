@@ -9,13 +9,7 @@ import { projectPlayerReplay } from "../src/replay-projection.js";
 import { startEncounter } from "../src/encounter.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
 
-/**
- * QA — ADVERSARIAL PROJECTION ATTACK (director's own pass, 2026-08-04).
- *
- * The implementers wrote the happy-path safety tests. These are the attacks: the cases someone hunting
- * a leak would try. Each asserts the CORRECT (safe) behaviour; a failure here is a real leak. They stay
- * in the suite as permanent armour whether or not they ever caught anything.
- */
+// Adversarial projection cases: what someone hunting a leak would try. A failure here is a real leak.
 
 const A_SESSION = "30000000-0000-4000-8000-0000000000a1";
 const B_SESSION = "30000000-0000-4000-8000-0000000000b2";
@@ -51,8 +45,8 @@ describe("QA attack — the one feed never hands a player another's die", () => 
 
     const forA = log.list(false, 250, A_SESSION);
     const forB = log.list(false, 250, B_SESSION);
-    // A sees the public line and NOT B's secret; B sees both. The SQL prefilter passes both self-only
-    // rows (gm_only=0) — the session check inside projectFeedRow is the thing that must hold.
+    // A sees the public line and not B's secret; B sees both. The SQL prefilter passes both self-only
+    // rows (gm_only=0), so the session check inside projectFeedRow is what must hold.
     expect(forA.map((entry) => entry.text)).toEqual(["A rolls in the open."]);
     expect(forB.map((entry) => entry.text).sort()).toEqual(["A rolls in the open.", "B rolls in secret."]);
   });
@@ -69,7 +63,7 @@ describe("QA attack — the one feed never hands a player another's die", () => 
 
   it("keeps a blind roll (hidden from its own roller) out of every player read", async () => {
     const log = await store();
-    // A blind roll is stored gm_only=1 by the writer; a player — even the roller — must never see it.
+    // A blind roll is stored gm_only=1; no player, not even the roller, may see it.
     log.append({ kind: "roll", text: "Blind roll.", gmOnly: true, revision: 1, roll: roll(A_SESSION, A_ACTOR, "blind") });
     expect(log.list(false, 250, A_SESSION)).toEqual([]);
     expect(log.list(false, 250, B_SESSION)).toEqual([]);

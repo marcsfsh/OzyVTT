@@ -19,15 +19,10 @@ import { findCatalogRecord } from "../src/homebrew-srd-copy.js";
 import { createHomebrewValidator } from "../src/homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "../src/homebrew-usages.js";
 
-/**
- * HTTP-boundary tests for the homebrew router.
- *
- * The two that matter most are the authorization gate and the `expectedRev` conflict. This surface
- * is the ONLY way a draft or a published-but-not-visible record can be read, so "every route is
- * GM-only" is not a convention here - it is the whole visibility guarantee's second belt (the first
- * being that drafts are in no merged catalog at all). Every response is also validated against the
- * contract's own Zod schema, so the router cannot drift from the published OpenAPI document.
- */
+// HTTP-boundary tests for the homebrew router. This surface is the only way to read a draft or a
+// published-but-hidden record, so every route being GM-only is part of the visibility guarantee (drafts
+// are also in no merged catalog). Every response is validated against the contract's Zod schema, so the
+// router cannot drift from the published OpenAPI document.
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
@@ -37,11 +32,11 @@ async function fixture(options: { validate?: HomebrewValidator; realValidation?:
   const store = new HomebrewStore(join(directory, "vtt.sqlite"), () => Date.parse("2026-07-27T03:00:00.000Z"));
   await store.initialize();
   const pings: number[] = [];
-  // The SRD catalog behind `/duplicate`. Wired in every fixture because duplicating a bundled record
-  // is a first-class entry point, not an extra - a 20-row class table is not typed into a form.
+  // The SRD catalog behind `/duplicate`, wired in every fixture because duplicating a bundled record is a
+  // primary entry point.
   const contentLibrary = new ContentLibrary(store);
   const app = express();
-  // Mirrors server.ts: the pack parser runs FIRST, so its larger limit wins for that one route.
+  // Mirrors server.ts: the pack parser runs first, so its larger limit wins for that one route.
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
   app.use(express.json({ limit: "512kb" }));
   app.use(createHomebrewRouter({
@@ -120,12 +115,12 @@ describe("homebrew HTTP authorization gate", () => {
       const anonymous = await call();
       expect(anonymous.status, `${label} unauthenticated`).toBe(401);
       const text = await anonymous.text();
-      // Nothing about the GM's library may appear in a denial - not a name, not an id.
+      // Nothing about the GM's library may appear in a denial: not a name, not an id.
       expect(text, `${label} leaked a record name`).not.toContain("Secret");
       expect(text, `${label} leaked a record id`).not.toContain(draft.id);
     }
-    // An authenticated player is FORBIDDEN, not unauthenticated: telling them 401 would send them
-    // to re-login for a surface that is never theirs.
+    // An authenticated player is forbidden, not unauthenticated: a 401 would send them to re-login for a
+    // surface that is never theirs.
     const playerCalls = [
       get(base, CONTENT, PLAYER),
       get(base, byId(draft.id), PLAYER),
@@ -145,13 +140,9 @@ describe("homebrew HTTP authorization gate", () => {
     const declared = Object.values(HOMEBREW_PATHS);
     expect(declared).toHaveLength(10);
     expect(Object.keys(openApiDocument.paths).filter((path) => path.startsWith("/api/v1/homebrew")).sort()).toEqual([...declared].sort());
-    // Read Express's route table rather than probing over HTTP. The probe this replaces asserted the
-    // router's own headers came back per path — but `router.use(...)` is declared with no path and the
-    // router mounts bare, so those headers come back for ANY string whatsoever (measured:
-    // `/completely/unrelated/path` 404s carrying both), and the loop proved nothing about mounting.
-    // The route table is exact: it is the set of routes really registered, so a documented-but-
-    // unmounted path cannot hide in it. Same shape as `codex-http.test.ts`'s mount check, which was
-    // written against this file's mistake.
+    // Read Express's route table rather than probing over HTTP: the router's header middleware runs for every
+    // request, so a probe would pass for any path. The route table is exactly what was registered, so a
+    // documented-but-unmounted path cannot hide. Same shape as `codex-http.test.ts`'s mount check.
     const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-mount-"));
     const store = new HomebrewStore(join(directory, "vtt.sqlite"));
     await store.initialize();
@@ -172,8 +163,7 @@ describe("homebrew HTTP authorization gate", () => {
       mounted.set(path, methods);
     }
     expect([...mounted.keys()].sort()).toEqual([...declared].sort());
-    // ...and per path, the METHODS match the document — without this, a dropped GET hides behind a
-    // surviving PATCH on the same path (measured while probing this very test).
+    // ...and per path, the methods match the document, so a dropped GET cannot hide behind a surviving PATCH.
     for (const path of declared) {
       const documented = Object.keys((openApiDocument.paths as Record<string, Record<string, unknown>>)[path] ?? {})
         .filter((method) => ["get", "post", "put", "patch", "delete"].includes(method)).sort();
@@ -224,7 +214,7 @@ describe("homebrew HTTP CRUD", () => {
     expect(stale.status).toBe(409);
     const conflict = await body(stale);
     expect(conflict.error.code).toBe("conflict");
-    // The editor's single-flight autosave resynchronises from this number instead of clobbering.
+    // The editor's autosave resyncs from this number instead of clobbering.
     expect(conflict.error.currentRevision).toBe(2);
     const after = await body(await get(base, byId(record.id), GM));
     expect(after.data.record.record.name).toBe("Blood Hunter II");
@@ -255,12 +245,12 @@ describe("homebrew HTTP CRUD", () => {
   it("keeps publish and visibility separate, and refuses to make a draft player-visible", async () => {
     const { base } = await fixture();
     const record = await createRecord(base);
-    // draft + visible is meaningless: a loud 409 rather than a silent no-op that makes the flag a lie.
+    // draft + visible is meaningless: a 409 rather than a silent no-op.
     const early = await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, { visibleToPlayers: true });
     expect(early.status).toBe(409);
 
     const published = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, record.id), GM, {}));
-    // Publishing does NOT show it to players - that is the point of the separate endpoint.
+    // Publishing does not show it to players; that is the separate endpoint's job.
     expect(published.data.record).toMatchObject({ state: "published", visibleToPlayers: false });
     const visible = await body(await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, { visibleToPlayers: true, expectedRev: published.data.record.rev }));
     expect(visible.data.record.visibleToPlayers).toBe(true);
@@ -269,7 +259,7 @@ describe("homebrew HTTP CRUD", () => {
   });
 
   it("refuses to publish an invalid draft with a 409 carrying every blocking issue", async () => {
-    // The validation seam (`homebrew-validate.ts`, slice 2) plugs in here with no other change.
+    // The validation seam (`homebrew-validate.ts`) plugs in here.
     const validate: HomebrewValidator = (_type, record) => record.hitDie === "d10"
       ? { valid: true, issues: [] }
       : { valid: false, issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }] };
@@ -277,7 +267,7 @@ describe("homebrew HTTP CRUD", () => {
     const bad = await createRecord(base, { type: "class", name: "Half-Formed" });
     expect(bad.validity).toEqual({ valid: false, issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }] });
     const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, bad.id), GM, {});
-    // 409 not 400: the REQUEST is well-formed; it is the stored draft that refuses the transition.
+    // 409 not 400: the request is well-formed; the stored draft refuses the transition.
     expect(refused.status).toBe(409);
     const failure = await body(refused);
     expect(failure.error.code).toBe("conflict");
@@ -288,15 +278,9 @@ describe("homebrew HTTP CRUD", () => {
     expect((await post(base, sub(HOMEBREW_PATHS.contentPublish, good.id), GM, {})).status).toBe(200);
   });
 
-  /**
-   * PATCH used to be a hole straight through the publish gate.
-   *
-   * It never called `validate` and never touched `state`/`visibleToPlayers`, so a published,
-   * player-visible record could be edited into anything at all - a nonexistent spell list, a bogus
-   * `fromCatalog`, a ghost equipment id, or a body that no longer parses - and the library went on
-   * saying "Published - shown to players" while `publishedFor` quietly dropped it behind a
-   * `console.warn`. The editor AUTOSAVES: no button is pressed to earn any of that.
-   */
+  // A PATCH to a published record goes through validation: an autosave that makes the record invalid
+  // demotes it to a hidden draft, so the library never claims "Published - shown to players" for a record
+  // `publishedFor` would drop.
   describe("editing a published record cannot leave it claiming to be live", () => {
     /** A published, player-visible spell list drawing one real spell. */
     const publishAndShare = async (base: string) => {
@@ -316,20 +300,20 @@ describe("homebrew HTTP CRUD", () => {
       // The autosave that empties the list - still a legal PATCH, and it still lands.
       const patched = await body(await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: [] } }));
       expect(patched.data.record.record.add).toEqual([]);
-      // ...but the record is no longer telling anyone it is live.
+      // ...but the record no longer claims to be live.
       expect(patched.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
       expect(patched.data.record.validity.valid).toBe(false);
       expect(store.publishedFor("player").spellLists).toHaveLength(0);
       expect(store.publishedFor("gm").spellLists).toHaveLength(0);
-      // And the library agrees on the next read, rather than only in the PATCH response.
+      // And the library agrees on the next read, not only in the PATCH response.
       expect((await body(await get(base, byId(id), GM))).data.record.state).toBe("draft");
     });
 
     it("demotes when the patch breaks the record's SCHEMA - the case that used to hide behind a console.warn", async () => {
       const { base, store } = await fixture({ realValidation: true });
       const id = await publishAndShare(base);
-      // `add` must be an array of ids. This body saves, parses as JSON, and then fails its own Zod
-      // schema - exactly the shape `publishedFor` drops in silence while the row still says published.
+      // `add` must be an array of ids. This body saves and parses as JSON but fails its own Zod schema, the
+      // shape `publishedFor` would drop.
       const patched = await body(await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: "fireball" } }));
       expect(patched.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
       // The invariant, stated directly: nothing published is ever missing from the merged catalog.
@@ -344,7 +328,7 @@ describe("homebrew HTTP CRUD", () => {
       const fine = await body(await patch(base, byId(id), GM, { record: { id, name: "Blood Magic II", source: "homebrew", add: ["fireball", "fire-bolt"] } }));
       expect(fine.data.record).toMatchObject({ state: "published", visibleToPlayers: true });
 
-      // A draft may be invalid - that is what drafts are for - so editing one into nonsense is fine.
+      // A draft may be invalid, so editing one into nonsense is fine.
       const draft = await createRecord(base, { type: "spell-list", name: "Scratch", add: ["fireball"] });
       const edited = await body(await patch(base, byId(draft.id), GM, { record: { id: draft.id, name: "Scratch", source: "homebrew", add: [] } }));
       expect(edited.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
@@ -381,8 +365,8 @@ describe("homebrew HTTP CRUD", () => {
   });
 
   it("duplicates an SRD record into an editable, publishable draft", async () => {
-    // The headline authoring path: a `ClassReference` carries a mandatory 20-row level table plus its
-    // full feature list, so "duplicate Wizard and edit" is what makes authoring a class possible.
+    // A `ClassReference` carries a mandatory 20-row level table and its full feature list, so "duplicate
+    // Wizard and edit" is how a class gets authored.
     const { base } = await fixture({ realValidation: true });
     const response = await post(base, sub(HOMEBREW_PATHS.contentDuplicate, "wizard"), GM, {});
     expect(response.status).toBe(201);
@@ -398,20 +382,14 @@ describe("homebrew HTTP CRUD", () => {
     expect(slugs).toContain(`${copy.id}-subclasses`);
     expect(slugs).toContain("wizard-spells");
 
-    // The one thing a fresh copy legitimately cannot do yet - and it says so on the publish button.
+    // The one thing a fresh copy cannot do yet, and the publish button says so.
     const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, copy.id), GM, {});
     expect(refused.status).toBe(409);
     expect((await body(refused)).error.details.invalid.issues[0].message).toContain("no subclass names");
   });
 
-  /**
-   * THE HEADLINE PATH, end to end, in the order a GM would actually do it.
-   *
-   * Publishing a homebrew class was impossible in EVERY order: the class refused until a subclass
-   * was published, the subclass refused until the class was published, and the only escape was to
-   * hand-edit a `fromCatalog` slug the GM has no reason to know exists. Duplicate, re-point, publish,
-   * publish, play - with the numbers checked at the end, because "it published" is not the goal.
-   */
+  // End to end in the order a GM would work: duplicate a class and a subclass, re-point the subclass,
+  // publish in either order, and build a character, checking the resulting numbers.
   it("takes a GM from \"duplicate Fighter\" to a published, playable class - and the character is really built", async () => {
     const { base, contentLibrary } = await fixture({ realValidation: true });
     const duplicate = async (id: string) => (await body(await post(base, sub(HOMEBREW_PATHS.contentDuplicate, id), GM, {}))).data.record as Json;
@@ -420,13 +398,12 @@ describe("homebrew HTTP CRUD", () => {
     // 1. Duplicate Fighter. 2. Duplicate Champion. Both land as invisible drafts.
     const heroClass = await duplicate("fighter");
     const subclass = await duplicate("champion");
-    // 3. Point the copy at the new class - a dropdown in the editor, by NAME. No slug is typed here:
-    //    the id came back in the duplicate response, the same way the editor's class picker gets it.
+    // 3. Point the copy at the new class (a dropdown by name in the editor); the id comes from the
+    //    duplicate response, as the editor's class picker gets it.
     const repointed = await patch(base, byId(subclass.id), GM, { record: { ...subclass.record, classId: heroClass.id } });
     expect(repointed.status).toBe(200);
 
-    // 4. Publish, in the order the GM happens to click. THE CLASS FIRST, on a subclass that is still
-    //    a draft - the direction that used to be a flat 409.
+    // 4. Publish the class first, while its subclass is still a draft.
     const publishedClass = await publish(heroClass.id);
     expect(publishedClass.status, JSON.stringify((await body(await publish(heroClass.id))).error?.details ?? {})).toBe(200);
     expect((await publish(subclass.id)).status).toBe(200);
@@ -465,21 +442,20 @@ describe("homebrew HTTP CRUD", () => {
       ]
     }, gm, BuilderPolicySchema.parse({}));
 
-    // The numbers, not just the absence of a throw - and they are the SRD Fighter's own numbers,
-    // because a duplicate that publishes but computes differently is the M2 bug all over again.
+    // The numbers, not just the absence of a throw, and they match the SRD Fighter's: a duplicate that
+    // publishes but computes differently would be wrong.
     // Level 1: 10+2 Con. Rolls 1/10/4/6 floored at the d10 average -> 6/10/6/6, +2 Con each = 48.
     expect(built.hitPoints.maximum).toBe(48);
     expect(built.proficiencyBonus).toBe(3);
     expect(built.abilityScores).toEqual({ str: 19, dex: 13, con: 15, int: 8, wis: 12, cha: 10 });
     // Chain mail 16 from the copied starting-equipment option + the Defense style's +1.
     expect(built.armorClass).toBe(17);
-    // The homebrew class and ITS subclass are what the sheet records - not the SRD originals.
+    // The homebrew class and its subclass are what the sheet records, not the SRD originals.
     expect(built.character?.classes).toEqual([{
       id: heroClass.id, name: "Fighter (copy)", level: 5, hitDie: "d10",
       subclass: { id: subclass.id, name: "Champion (copy)" }
     }]);
-    // The copied class's own features really came across, the level-3 SUBCLASS feature included -
-    // which is the whole reason a class needs a subclass before it is worth publishing.
+    // The copied class's features came across, the level-3 subclass feature included.
     expect(built.actions.map((action) => action.name)).toContain("Second Wind");
     const traits = (built.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
     expect(traits).toContain("Improved Critical");
@@ -504,8 +480,8 @@ describe("homebrew HTTP CRUD", () => {
     const record = await createRecord(base);
     const usages = await body(await get(base, sub(HOMEBREW_PATHS.contentUsages, record.id), GM));
     expect(HomebrewUsagesResponseSchema.safeParse(usages).success).toBe(true);
-    // A built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew
-    // record never breaks one - the count is informational, and the answer is a calm yes.
+    // A built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record
+    // never breaks one; the count is informational.
     expect(usages.data).toEqual({ id: record.id, usages: [], safeToDelete: true });
     expect((await get(base, sub(HOMEBREW_PATHS.contentUsages, "hb-missing-000000"), GM)).status).toBe(404);
   });
@@ -545,9 +521,8 @@ describe("homebrew HTTP packs", () => {
 
     const applied = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { pack }));
     expect(applied.data.imported).toHaveLength(3);
-    // Every id that is not one of OUR shapes is re-minted: the one colliding with an existing row,
-    // the one in our reserved namespace that we did not mint, and the "clean" foreign id - which
-    // used to be kept verbatim and produced a row that could never publish for as long as it existed.
+    // Every id that is not one of our shapes is re-minted: the one colliding with an existing row, the one
+    // in our reserved namespace that we did not mint, and the "clean" foreign id, which could never publish.
     expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort()).toEqual([existing.id, "brand-new-feat", "hb-not-ours"].sort());
     for (const entry of applied.data.imported) expect(entry.id).toMatch(/^hb-[a-z0-9-]+-[0-9a-f]{6}$/);
     // Everything lands as an invisible draft, which is what makes importing an invalid pack harmless.
@@ -555,14 +530,12 @@ describe("homebrew HTTP packs", () => {
     expect(store.list().total).toBe(4);
   });
 
-  /**
-   * S6/S7. Pack import used to land ids it could never publish and change live records in silence.
-   */
+  /** Pack import re-mints ids that could never publish and reports what it changed. */
   it("re-mints every id it could never publish, and says so instead of leaving a dead row behind", async () => {
     const { base, store } = await fixture({ realValidation: true });
-    // Four ids the identity tier refuses outright: an SRD class id, an SRD spell id, an id ending in
-    // a reserved catalog-choice suffix, and one past the 60-character persistence budget (which is
-    // the id shape that BRICKS CAMPAIGN LOAD once it reaches a persisted ActorDefinition).
+    // Four ids the identity tier refuses: an SRD class id, an SRD spell id, an id ending in a reserved
+    // catalog-choice suffix, and one past the 60-character persistence budget (which would fail campaign
+    // load once in a persisted ActorDefinition).
     const longId = "x".repeat(200);
     const pack = {
       schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Foreign", attribution: null,
@@ -578,17 +551,16 @@ describe("homebrew HTTP packs", () => {
     expect(HomebrewPackImportResponseSchema.safeParse(applied).success).toBe(true);
     expect(applied.data.imported).toHaveLength(4);
     expect(applied.data.rejected).toEqual([]);
-    // Reported, every one of them - and the 200-character id is rendered rather than emitted
-    // verbatim, which would make the response fail the contract it is served under.
+    // All reported, and the 200-character id is rendered rather than emitted verbatim, which would fail the
+    // response contract.
     expect(applied.data.reminted).toHaveLength(4);
     expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort())
       .toEqual(["fire-bolt", "my-list-spells", "wizard", "x".repeat(60)].sort());
     // Nothing outside `hb-` is ours, so the reason names the namespace it came from.
     for (const entry of applied.data.reminted) expect(entry.reason).toBe("srd-collision");
 
-    // THE POINT: the id is no longer what stops any of them. Every one of these rows used to carry a
-    // permanent `["id"]` refusal that no amount of editing in the editor could clear - the id is not
-    // an editable field - so the row was dead on arrival with `reminted` and `rejected` both empty.
+    // The id does not block any of them: it is not editable in the editor, so an id refusal would make the
+    // row permanently unpublishable.
     for (const row of store.list().rows) {
       const document = (await body(await get(base, byId(row.id), GM))).data.record;
       expect(document.validity.issues.filter((issue: Json) => issue.path[0] === "id"), row.name).toEqual([]);
@@ -620,8 +592,7 @@ describe("homebrew HTTP packs", () => {
     const request = { pack, onIdCollision: "overwrite" };
     const dry = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { ...request, dryRun: true }));
     const applied = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, request));
-    // The contract promises the dry run is the same report; a check that lived only inside the write
-    // would have made that promise false.
+    // The contract promises the dry run gives the same report.
     expect(dry.data.rejected).toEqual(applied.data.rejected);
     expect(dry.data.overwritten).toEqual(applied.data.overwritten);
     expect(HomebrewPackImportResponseSchema.safeParse(dry).success).toBe(true);
@@ -630,22 +601,21 @@ describe("homebrew HTTP packs", () => {
     expect(applied.data.rejected.find((entry: Json) => entry.originalId === live.id).issues[0].message).toContain("shown to players");
     expect(applied.data.rejected.find((entry: Json) => entry.originalId === deleted.id).issues[0].message).toContain("Restore it");
 
-    // The live record is EXACTLY as it was: same name, same body, still published, still shared.
+    // The live record is exactly as it was: same name, same body, still published, still shared.
     const untouched = (await body(await get(base, byId(live.id), GM))).data.record;
     expect(untouched).toMatchObject({ state: "published", visibleToPlayers: true });
     expect(untouched.record.name).toBe("Shared List");
     expect(store.publishedFor("player").spellLists).toHaveLength(1);
     // The deleted record stays deleted rather than walking back in.
     expect(store.get(deleted.id)!.deletedAt).not.toBeNull();
-    // And the one row overwriting was ever meant for goes through.
+    // And the row overwriting is meant for goes through.
     expect(applied.data.overwritten.map((entry: Json) => entry.id)).toEqual([draft.id]);
     expect(store.get(draft.id)!.name).toBe("Legitimately Updated");
   });
 
   it("gives a dry run and an apply the same answer about a nameless record, rather than 500ing the preview", async () => {
-    // `imported[].name` is `min(1)` in the contract, so a nameless row used to make the DRY RUN's own
-    // response fail the schema it is served under - a 500 on a preview of a pack the apply path would
-    // have reported cleanly. A preview that cannot be trusted is worse than no preview.
+    // `imported[].name` is `min(1)` in the contract, so a nameless row must not make the dry run's own
+    // response fail its schema.
     const { base } = await fixture();
     const pack = {
       schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Ragged", attribution: null,
@@ -703,8 +673,8 @@ describe("homebrew HTTP envelope conventions", () => {
 
 describe("homebrew wiring in the real server", () => {
   it("mounts the router, initialises the store, and accepts a pack larger than the global 512kb body limit", async () => {
-    // The isolated fixture above proves the router; this proves server.ts actually wires it - the
-    // store's initialize(), the mount, and the pack parser sitting ABOVE the global express.json.
+    // The isolated fixture above proves the router; this proves server.ts wires it: the store's
+    // initialize(), the mount, and the pack parser sitting above the global express.json.
     const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-boot-"));
     const server = createAppServer({
       authPath: join(directory, "auth.json"),
@@ -731,8 +701,8 @@ describe("homebrew wiring in the real server", () => {
     expect((await body(await get(base, CONTENT, auth))).data.total).toBe(1);
     expect((await get(base, CONTENT, ANON)).status).toBe(401);
 
-    // ~900kb of pack: past the global 512kb limit, inside the route-scoped 4mb one. Without the
-    // ordering in server.ts this is a 413 and pack import is unusable for a real library.
+    // ~900kb of pack: past the global 512kb limit, inside the route-scoped 4mb one. Without the ordering in
+    // server.ts this is a 413.
     const filler = "x".repeat(3000);
     const records = Array.from({ length: 300 }, (_, index) => ({ type: "feat", name: `Feat ${index}`, description: filler }));
     const imported = await post(base, HOMEBREW_PATHS.packsImport, auth, {

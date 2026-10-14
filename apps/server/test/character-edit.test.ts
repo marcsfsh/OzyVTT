@@ -56,7 +56,7 @@ describe("character edit", () => {
     const state = stateWith();
     setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 3, subclass: { id: "champion", name: "Champion" }, hitDie: "d10" }], feats: [] });
     setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 3 }], feats: [] });
-    // hitDie (which no editor renders) survives; the subclass the editor DID render is cleared.
+    // hitDie (which no editor renders) survives; the subclass the editor did render is cleared.
     expect(state.definitions[0].definition.character?.classes[0]).toEqual({ id: "fighter", name: "Fighter", level: 3, hitDie: "d10" });
   });
   it("sets save and skill proficiency selections", () => {
@@ -73,7 +73,7 @@ describe("character edit", () => {
       armor: ["heavy"], weapons: ["martial"], tools: ["smiths-tools"], languages: ["common", "dwarvish"],
       saveOverrides: { str: 7 }, skillOverrides: { athletics: 9 }
     });
-    // The sheet's proficiency editor sends ONLY {saves, skills} - one skill toggle must not wipe the rest.
+    // The sheet's proficiency editor sends only {saves, skills}; one skill toggle must not wipe the rest.
     setCharacterProficiencies(state, actorId, { saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "expertise" }] });
     expect(state.definitions[0].definition.proficiencies).toEqual({
       saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "expertise" }],

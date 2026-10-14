@@ -5,19 +5,9 @@ import { GameStateSchema } from "@vtt/domain";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
-/**
- * THE THIRD PLAYER MAP DOOR (D26 ride-along): a SHARED replay's own battlefield, and nothing else.
- *
- * The reported symptom was that a player handed a shared replay saw "Map unavailable" on every turn:
- * `authorizePlayer` in `server.ts` opened only for the live combat map and codex-revealed atlas maps,
- * so the archived fight's map answered 403 to the very people the GM had just shared it with.
- *
- * This is a VIEWER-SAFETY test as much as a feature test, so it asserts the gate in both directions
- * at once. Two fights are recorded on two different maps, exactly one is shared, and the probe checks
- * that sharing opens ONE image and un-sharing closes it again. The failure this guards against is the
- * lazy version of the fix - "the asset belongs to some archive" - which would have handed every
- * player the map of every fight the GM ever ran and never shared.
- */
+// A player may load a shared replay's own battlefield map and nothing else. Two fights are recorded on
+// two maps and one is shared; sharing must open exactly one image and un-sharing must close it.
+// "The asset belongs to some archive" would hand out the map of every fight the GM ever ran.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const cleanups: Array<() => Promise<void>> = [];
@@ -81,7 +71,7 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
 
     const archives = (await (await fetch(`${base}/api/v1/encounters`, { headers: bearer(gmToken) })).json()).data.encounters as ReadonlyArray<{ id: number }>;
     expect(archives).toHaveLength(2);
-    // Newest first, so the LAST fight recorded (the secret map) is index 0.
+    // Newest first, so the last fight recorded (the secret map) is index 0.
     const sharedArchiveId = archives[1].id;
 
     // No fight is running, so the live-map door is shut and neither image is reachable yet.
@@ -93,15 +83,15 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
       (await fetch(`${base}/api/v1/encounters/${id}/visibility`, { method: "POST", headers: bearer(gmToken), body: JSON.stringify({ playerVisible }) })).status;
     expect(await setShared(sharedArchiveId, true)).toBe(200);
 
-    // THE FIX: the shared fight's battlefield opens. THE GATE: the unshared one does not.
+    // The shared fight's battlefield opens; the unshared one does not.
     expect(await image(shared.metadata.id, playerToken)).toBe(200);
     expect(await image(secret.metadata.id, playerToken)).toBe(403);
-    // The GM's own access is unchanged, and a caller with no session at all still gets nothing
-    // (the map router answers 403 for every unauthorized reader, token or not - unchanged here).
+    // The GM's access is unchanged, and a caller with no session still gets nothing (the map router
+    // answers 403 to every unauthorized reader).
     expect(await image(secret.metadata.id, gmToken)).toBe(200);
     expect((await fetch(`${base}/api/v1/map-assets/${shared.metadata.id}/content`)).status).toBe(403);
 
-    // Un-sharing takes the image back - the door is the flag, not the archive.
+    // Un-sharing takes the image back: access follows the flag, not the archive.
     expect(await setShared(sharedArchiveId, false)).toBe(200);
     expect(await image(shared.metadata.id, playerToken)).toBe(403);
   });

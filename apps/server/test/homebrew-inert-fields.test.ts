@@ -10,14 +10,9 @@ import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
 import { startEncounter } from "../src/encounter.js";
 
-/**
- * D21 - "the form is a promise the fight keeps."
- *
- * One describe per row of the inert-field inventory: every field the homebrew editor offers that was
- * authored, stored, derived, and then read by NOTHING. Each test proves the link at the far end (a
- * rolled number, an applied condition, a halved damage line), never merely that the value survived
- * into the derivation - a value in a struct nobody reads is exactly the bug being closed.
- */
+// Every field the homebrew editor offers must change play. One describe per field group; each test
+// proves the effect at the far end (a rolled number, an applied condition, halved damage), not merely
+// that the value survived into the derivation.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -73,10 +68,6 @@ function deps(faces: number[], catalog?: EquipmentCatalog, definition?: ActorDef
 
 const cmd = (n: number) => `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
 
-// -------------------------------------------------------------------------------------------------
-// Row 1 - item grants: saves
-// -------------------------------------------------------------------------------------------------
-
 describe("row 1: an item that grants a saving-throw proficiency", () => {
   const AMULET: EquipmentRecordLike = {
     id: "amulet-of-health", name: "Amulet of Health", category: "wondrous", slot: "neck",
@@ -113,7 +104,7 @@ describe("row 1: an item that grants a saving-throw proficiency", () => {
       deriveActorSheet(game.actors[0], def, deriveEquipment(game.actors[0], def, catalog), []).abilities.find((entry) => entry.ability === "con")!;
 
     expect(row(definition, state)).toMatchObject({ save: 3, saveFromItems: 2, saveProficient: true });
-    // A sheet ALREADY proficient in CON must not pay the bonus a second time.
+    // A sheet already proficient in CON must not get the bonus twice.
     const alreadyProficient = definitionOf({ proficiencies: { saves: ["con"], skills: [], weapons: [], armor: [], tools: [] } });
     expect(row(alreadyProficient, state)).toMatchObject({ save: 3, saveFromItems: 0 });
     // Unequip: replace-whole is the un-grant.
@@ -121,10 +112,6 @@ describe("row 1: an item that grants a saving-throw proficiency", () => {
     expect(row(definition, bare)).toMatchObject({ save: 1, saveFromItems: 0, saveProficient: false });
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Row 2 - item grants: damageResistances  (and row 3's damageImmunities, same pipeline)
-// -------------------------------------------------------------------------------------------------
 
 describe("row 2: an item that grants damage resistance", () => {
   const RING: EquipmentRecordLike = {
@@ -163,10 +150,6 @@ describe("row 2: an item that grants damage resistance", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Row 3 - the four grant kinds the reading surface used to drop
-// -------------------------------------------------------------------------------------------------
-
 describe("row 3: the four dropped grant kinds", () => {
   it("weapons: granted training pays the proficiency bonus on the to-hit", () => {
     const AXE_ROW = { id: "greataxe", name: "Greataxe", quantity: 1, equipped: true, category: "weapon", weapon: { category: "martial", damageDice: "1d12", damageType: "slashing", rangeFeet: null, longRangeFeet: null } };
@@ -174,7 +157,7 @@ describe("row 3: the four dropped grant kinds", () => {
       id: "gauntlets-of-training", name: "Gauntlets of Training", category: "wondrous", slot: "hands",
       isMagic: true, grants: { weapons: ["martial"] }
     };
-    // The sheet records NO martial training, so the untrained attack is str 16 (+3) alone.
+    // The sheet records no martial training, so the untrained attack is str 16 (+3) alone.
     const definition = definitionOf();
     const untrained = deriveEquipment(stateWith([item(AXE_ROW)]).actors[0], definition, catalogOf([]));
     expect(untrained.actions.find((action) => action.id === "item-greataxe")!.attack!.bonus).toBe(3);
@@ -227,10 +210,6 @@ describe("row 3: the four dropped grant kinds", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Row 4 - item-action attack & save halves
-// -------------------------------------------------------------------------------------------------
-
 describe("row 4: an item action's attack and save halves", () => {
   const ROD: EquipmentRecordLike = {
     id: "rod-of-blasting", name: "Rod of Blasting", category: "held", slot: "held", isMagic: true,
@@ -275,10 +254,6 @@ describe("row 4: an item action's attack and save halves", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Row 5 - the item effects rider
-// -------------------------------------------------------------------------------------------------
-
 describe("row 5: an item's effects rider", () => {
   const BLADE: EquipmentRecordLike = {
     id: "blade-of-certainty", name: "Blade of Certainty", category: "weapon", slot: "weapon", isMagic: true,
@@ -313,10 +288,6 @@ describe("row 5: an item's effects rider", () => {
     expect(outcome.application.totalApplied).toBe(5);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Row 6 - cast details: atLevel, ability, saveDc, consumesSpellSlot
-// -------------------------------------------------------------------------------------------------
 
 describe("row 6: an item that casts a spell, with its cast details", () => {
   const FIREBALL: SpellRecordLike = {
@@ -366,7 +337,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(8) }, deps([3, 3, 3, 3, 3, 3, 3, 3], catalog, definition));
     expect(state.actors[0].spellSlots).toEqual([{ level: 3, remaining: 0 }]);
 
-    // A fresh turn (the action slot is not what is being tested here) - the empty POOL is.
+    // A fresh turn: the action slot is not under test here, the empty pool is.
     state.combat = { ...state.combat, turn: { ...state.combat.turn, actionUsed: false, actionInstance: null } };
 
     expect(() => resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) }, deps([3, 3, 3, 3, 3, 3, 3, 3], catalog, definition)))

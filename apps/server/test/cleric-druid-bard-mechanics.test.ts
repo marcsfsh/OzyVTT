@@ -6,19 +6,9 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { startEncounter } from "../src/encounter.js";
 
-/**
- * STAGE 4, LANE B3 - Cleric, Druid and Bard mechanics, held at the far end.
- *
- * Every assertion below is a number a player can act on, a counter the engine really spends, or a
- * refusal the server really issues: the cantrip a Magician may take that a Warden may not, the Wild
- * Shape pool going down and then saying no, the Bardic Inspiration die count that follows Charisma,
- * the damage Primal Strike rolls at level 7 and at level 15. "The rider survived derivation" is
- * deliberately never asserted on its own - that is the failure mode this whole area exists to end,
- * and a record that parses, validates and adds zero looks exactly like one that works.
- *
- * Written against the REAL bundles through a REAL `ContentLibrary`, so what is proved here is the
- * shipped content, not a fixture that agrees with it.
- */
+// Cleric, Druid and Bard mechanics, asserted as numbers a player can act on, counters the engine
+// spends, or refusals the server issues; never "the rider survived derivation" on its own. Uses the
+// real bundles through a real `ContentLibrary`.
 
 const library = new ContentLibrary().forAudience("gm");
 const policy = BuilderPolicySchema.parse({});
@@ -28,11 +18,8 @@ const FOE = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d12";
 type Row = CharacterCreateRequestInput["choices"][number];
 type Mutable = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & { choices: Row[] };
 
-/**
- * The ASI rows a class owes at every ASI level at or below `level` - noise every high-level build
- * needs. Deliberately spread across abilities nothing else asserts, so no score walks into the 20
- * ceiling and no assertion below depends on which ASI landed where.
- */
+// The ASI rows a class owes at every ASI level at or below `level`. Spread across abilities nothing
+// else asserts, so no score hits the 20 cap and no assertion depends on which ASI landed where.
 const ASI_ABILITIES = [["con", "dex"], ["con", "dex"], ["str", "int"], ["str", "int"]] as const;
 const asiRows = (classId: string, level: number): Row[] =>
   [4, 8, 12, 16].filter((asi) => asi <= level).flatMap((asi, index) => ([
@@ -41,7 +28,7 @@ const asiRows = (classId: string, level: number): Row[] =>
     { level: asi, kind: "ability-score", id: ASI_ABILITIES[index][1], payload: { featureId: "ability-score-improvement" } }
   ] as Row[]));
 
-/** The Human's own two picks - Skillful's skill and Versatile's origin feat. Alert asks for nothing. */
+/** The Human's own two picks: Skillful's skill and Versatile's origin feat. */
 const HUMAN: Row[] = [
   { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
   { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } }
@@ -59,11 +46,8 @@ const ACOLYTE_FEAT: Row[] = [
   { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } }
 ];
 
-/**
- * A Druid of any level. `sage` is the background because it is one of the two that can raise Wisdom;
- * its origin feat's own three picks are tagged with their feature id, so they never touch the
- * untagged class budgets the assertions below count.
- */
+// A Druid of any level. `sage` is the background because it can raise Wisdom; its origin feat's
+// picks are tagged with their feature id, so they never touch the class budgets asserted below.
 const druid = (level: number, extra: Row[] = []): Mutable => ({
   name: "Maelin",
   speciesId: "human",
@@ -88,8 +72,7 @@ const druid = (level: number, extra: Row[] = []): Mutable => ({
     ...SAGE_FEAT,
     ...(level >= 3 ? [
       { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
-      // Circle Spells is a REAL pick now (audit row 29's build-time half): "choose one type of land".
-      // Nature's Ward reads this answer back at level 10 for its Resistance.
+      // Circle Spells: "choose one type of land". Nature's Ward reads this answer at level 10.
       { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } }
     ] as Row[] : []),
     ...asiRows("druid", level),
@@ -109,10 +92,8 @@ const epicBoon = (classId: string, featId: string, ability: string): Row[] => ([
   { level: 19, kind: "ability-score", id: ability, payload: { featureId: featId } }
 ] as Row[]);
 
-/**
- * A Bard of any level. `cha` is what Bardic Inspiration counts, so it is a parameter: 15 (+2 from
- * the Acolyte = 17, modifier +3) or 8 (modifier -1, which the authored `minimum` floors at 1).
- */
+// A Bard of any level. `cha` is what Bardic Inspiration counts, so it is a parameter: 15 (+2 from
+// the Acolyte = 17, modifier +3) or 8 (modifier -1, which the authored `minimum` floors at 1).
 const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable => ({
   name: "Ysolde",
   speciesId: "human",
@@ -153,9 +134,8 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable => ({
       { level: 10, classId: "bard", kind: "spell", id: "hypnotic-pattern", payload: { featureId: "magical-secrets" } },
       { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
     ] as Row[] : []),
-    // MAGICAL DISCOVERIES (audit row 56) - two spells drawn from the Cleric, Druid OR Wizard list,
-    // which is the union slug `cleric-spells-or-druid-spells-or-wizard-spells`. Neither is on the
-    // Bard list, which is the whole point of the feature.
+    // Magical Discoveries: two spells from the Cleric, Druid or Wizard list (the union slug). Neither is
+    // on the Bard list.
     ...(level >= 6 ? [
       { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
       { level: 6, kind: "spell", id: "fireball", payload: { featureId: "magical-discoveries" } }
@@ -174,7 +154,7 @@ const build = (input: Mutable) => buildCharacterDefinition(input, library, polic
 const actionOf = (definition: ReturnType<typeof build>, id: string) => definition.actions.find((action) => action.id === id);
 const spellOf = (definition: ReturnType<typeof build>, id: string) => (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
 
-/** An encounter where the FOE holds the turn, so the action-economy slot never masks a use gate. */
+/** An encounter where the foe holds the turn, so the action-economy slot never masks a use gate. */
 function encounterWith(definition: ReturnType<typeof build>): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1 });
   importActorDefinition(state, definition, HERO, "public");
@@ -189,19 +169,16 @@ const deps = (definition: ReturnType<typeof build>): ResolveDependencies => ({
 });
 const command = () => `50000000-0000-4000-8000-0000000000${String((commandSeq += 1) % 90 + 10)}`;
 
-// ═══ DRUID ══════════════════════════════════════════════════════════════════════════════════════
+// Druid
 
 describe("Primal Order - the twin of the bug that started this area (audit row 4)", () => {
   it("lets a MAGICIAN take a third cantrip at level 1, and refuses a WARDEN the same one", () => {
-    // The far end of `extraPicks`, stated as a refusal. The printed level-1 row says two cantrips;
-    // Magician's text says "you know one extra cantrip from the Druid spell list". Before this the
-    // record carried no `choice` at all, so neither role could even be taken.
+    // The printed level-1 row says two cantrips; Magician adds "one extra cantrip from the Druid spell list".
     const third: Row = { level: 1, kind: "cantrip", id: "shillelagh" };
     const magician = build(druid(1, [primalOrder("magician"), third]));
     expect((magician.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id))
       .toContain("shillelagh");
-    // The negative control, in the same choice: a composition that gave EVERY Druid +1 would pass
-    // the assertion above and be just as wrong.
+    // Negative control: a composition that gave every Druid +1 would pass the assertion above.
     expect(() => build(druid(1, [primalOrder("warden"), third])))
       .toThrowError(/Druid knows 2 cantrips at level 1; got 3/);
   });
@@ -225,9 +202,8 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
   });
 
   it("does NOT charge the granted spell against the prepared budget", () => {
-    // "Those spells don't count against the number of spells you can prepare." A level-1 Druid
-    // prepares four: the grant PLUS four chosen spells is legal, and the fifth chosen one is not -
-    // which is the only way to tell "uncharged" from "silently eating a slot".
+    // "Those spells don't count against the number of spells you can prepare." A level-1 Druid prepares
+    // four: the grant plus four chosen spells is legal and a fifth is not.
     const four: Row[] = [{ level: 1, kind: "spell", id: "faerie-fire" }, { level: 1, kind: "spell", id: "fog-cloud" }];
     const full = build(druid(1, [primalOrder("magician"), ...four]));
     expect(spellOf(full, "speak-with-animals")?.alwaysPrepared).toBe(true);
@@ -240,20 +216,19 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
 
 describe("Wild Shape - the pool, read off the printed column (audit row 54)", () => {
   it("counts uses off the Wild Shape column and grows with it", () => {
-    // 2 at level 2, 3 at level 6, 4 at level 17 - the printed column, not a table copied beside it.
+    // 2 at level 2, 3 at level 6, 4 at level 17, from the printed column.
     expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.uses)
       .toEqual({ limit: 2, per: "long-rest" });
     expect(actionOf(build(druid(6, [primalOrder("warden")])), "wild-shape")?.uses)
       .toEqual({ limit: 3, per: "long-rest" });
     expect(actionOf(build(druid(17, [primalOrder("warden"), elementalFury("primal-strike")])), "wild-shape")?.uses)
       .toEqual({ limit: 4, per: "long-rest" });
-    // ...and it is a Bonus Action, which is what the SRD prints - not the "other" a synthesised
-    // action would have carried.
+    // ...and it is a Bonus Action, as the SRD prints.
     expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.activation).toBe("bonus-action");
   });
 
   it("really spends the counter, twice, and then refuses the third", () => {
-    // The bar: a spent counter and a refusal. A pool nothing decrements is decoration.
+    // A spent counter and a refusal.
     const definition = build(druid(2, [primalOrder("warden")]));
     const state = encounterWith(definition);
     const shape = actionOf(definition, "wild-shape")!;
@@ -283,8 +258,7 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
   });
 
   it("rolls the printed damage against the real spell save DC, growing at 10 and 14", () => {
-    // WIS 15 + 2 (background) = 17 -> +3, proficiency +2, so DC 13. The DC is DERIVED from the
-    // character, which is the whole reason `FeatureSaveDc` names an ability instead of a number.
+    // WIS 15 + 2 (background) = 17 -> +3, proficiency +2, so DC 13, derived from the character.
     expect(actionOf(definition, "lands-aid")?.save).toEqual({ ability: "con", dc: 13 });
     expect(actionOf(definition, "lands-aid")?.damage).toEqual([{ formula: "2d6", type: "necrotic" }]);
     expect(actionOf(build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.damage)
@@ -294,8 +268,8 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
   });
 
   it("spends Wild Shape when it resolves, so the two features share one budget", () => {
-    // Cast Land's Aid once and the Druid has ONE shape left, not two - which is the SRD's meaning of
-    // "expend a use of your Wild Shape" and is invisible unless the key is shared.
+    // Cast Land's Aid once and the Druid has one shape left, not two: SRD "expend a use of your Wild
+    // Shape" means a shared key.
     const state = encounterWith(definition);
     resolveDefinitionAction(state, actionOf(definition, "lands-aid")!, { actorId: HERO, targetIds: [FOE], commandId: command() }, deps(definition));
     expect(state.actors[0].actionUses["wild-shape"]).toBe(1);
@@ -308,8 +282,8 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
 
 describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
   it("rolls Primal Strike's 1d8 at level 7 and 2d8 at level 15, once per turn", () => {
-    // The level-15 step is Improved Elemental Fury's DAMAGE half, said with `damageByLevel` rather
-    // than a rider read back off the earlier answer - exactly as the shipped Cleric record says it.
+    // The level-15 step is Improved Elemental Fury's damage half, expressed with `damageByLevel` as the
+    // shipped Cleric record does.
     const seven = build(druid(7, [primalOrder("warden"), elementalFury("primal-strike")]));
     expect(actionOf(seven, "primal-strike")?.damage).toEqual([{ formula: "1d8", type: "lightning" }]);
     expect(actionOf(seven, "primal-strike")?.uses).toEqual({ limit: 1, per: "turn", pool: "primal-strike" });
@@ -326,7 +300,7 @@ describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
   });
 
   it("refuses the build outright when the level-7 pick is missing", () => {
-    // The half that makes the feature real: an unanswered pick is a rejection, not a silent skip.
+    // An unanswered pick is a rejection, not a silent skip.
     expect(() => build(druid(7, [primalOrder("warden")])))
       .toThrowError(/Elemental Fury/);
   });
@@ -375,13 +349,12 @@ describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)
   });
 });
 
-// ═══ BARD ═══════════════════════════════════════════════════════════════════════════════════════
+// Bard
 
 describe("Bardic Inspiration - the counter the class is built around", () => {
   it("hands out as many dice as the Charisma modifier, and never fewer than one", () => {
     // "A number of times equal to your Charisma modifier (minimum of once)". CHA 15 + 2 = 17 -> +3;
-    // CHA 8 -> -1, which the `minimum` floor turns into 1. A build that read the printed Bardic Die
-    // column instead would resolve a dice string to zero uses and hand out nothing.
+    // CHA 8 -> -1, floored to 1. Reading the Bardic Die column instead would yield zero uses.
     expect(actionOf(build(bard(1, 15)), "bardic-inspiration")?.uses).toEqual({ limit: 3, per: "long-rest" });
     expect(actionOf(build(bard(1, 8)), "bardic-inspiration")?.uses).toEqual({ limit: 1, per: "long-rest" });
     expect(actionOf(build(bard(1, 15)), "bardic-inspiration")?.activation).toBe("bonus-action");
@@ -400,8 +373,8 @@ describe("Bardic Inspiration - the counter the class is built around", () => {
   });
 
   it("lets Cutting Words and Peerless Skill spend that SAME counter", () => {
-    // College of Lore spends Bardic Inspiration dice; it does not have dice of its own. A separate
-    // key would silently double a level-14 Bard's real budget.
+    // College of Lore spends Bardic Inspiration dice and has none of its own; a separate key would double
+    // a level-14 Bard's budget.
     const definition = build(bard(14, 15, loreSkills("history", "arcana", "nature")));
     expect(actionOf(definition, "cutting-words")?.uses).toMatchObject({ pool: "bardic-inspiration", limit: 3 });
     expect(actionOf(definition, "peerless-skill")?.uses).toMatchObject({ pool: "bardic-inspiration", limit: 3 });
@@ -422,8 +395,8 @@ describe("College of Lore Bonus Proficiencies - three skills that were promised 
     const definition = build(bard(3, 15, loreSkills("history", "arcana", "nature")));
     const skills = new Set((definition.proficiencies?.skills ?? []).map((skill) => skill.id));
     expect([...["history", "arcana", "nature"]].every((id) => skills.has(id))).toBe(true);
-    // ...and the class's own three are still there, so the subclass added to the budget rather than
-    // replacing it: six skill proficiencies plus the background's two.
+    // The class's own skills are still there, so the subclass added to the budget: six skill
+    // proficiencies plus the background's two.
     expect(skills.size).toBe(9);
     expect(() => build(bard(3, 15, loreSkills("history", "arcana")))).toThrowError(/Bonus Proficiencies/);
   });
@@ -435,8 +408,7 @@ describe("Words of Creation - the level-20 grant (audit row 34)", () => {
       ...epicBoon("bard", "boon-of-spell-recall", "wis")]));
     expect(spellOf(definition, "power-word-heal")).toMatchObject({ alwaysPrepared: true });
     expect(spellOf(definition, "power-word-kill")).toMatchObject({ alwaysPrepared: true });
-    // A level-9 spell on the sheet of a caster whose prepared budget is nowhere near spent: neither
-    // Power Word charges the cap, which is what "always have prepared" means.
+    // Neither Power Word counts against the prepared cap ("always have prepared").
     const charged = (definition.spellcasting?.spells ?? []).filter((spell) => spell.level > 0 && !spell.alwaysPrepared);
     expect(charged.map((spell) => spell.id)).not.toContain("power-word-kill");
     // The negative control: a level-19 Bard has neither.
@@ -446,7 +418,7 @@ describe("Words of Creation - the level-20 grant (audit row 34)", () => {
   });
 });
 
-// ═══ CLERIC ═════════════════════════════════════════════════════════════════════════════════════
+// Cleric
 
 describe("Divine Intervention - a pool that now costs the action the SRD prints", () => {
   const clericInput = (): Mutable => ({
@@ -475,8 +447,7 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
   } as Mutable);
 
   it("is a Magic action with one use per long rest, and the use really goes", () => {
-    // The feature carried `uses` and no `actions`, so the builder synthesised one - correctly, but
-    // always as `activation: "other"`. The SRD says "As a Magic action".
+    // A feature with `uses` and no `actions` gets a synthesized action; the SRD says "As a Magic action".
     const definition = build(clericInput());
     const intervention = actionOf(definition, "divine-intervention");
     expect(intervention?.activation).toBe("action");

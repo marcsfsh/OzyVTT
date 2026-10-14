@@ -14,30 +14,12 @@ import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation
 import { startEncounter } from "../src/encounter.js";
 import { saveRiderBonus, saveRollSources } from "../src/saving-throws.js";
 
-/**
- * A CLASS / SUBCLASS / SPECIES / LINEAGE / BACKGROUND / OPTION FEATURE CARRIES THE WHOLE RIDER
- * VOCABULARY - proved end to end. Issue `2e`.
- *
- * The sibling of `feat-riders.test.ts`, and deliberately its near-copy: the two halves of one sheet
- * had the same defect and now have the same fix, so they must be held to the same bar. A FEAT's
- * roll-time riders reached the table because `character.feats` recorded its id and `deriveEquipment`
- * turned that into a `RiderCarrier`. A class feature was recorded NOWHERE on the definition, so 13 of
- * the 21 authored rider variants were parsed, validated, folded into nothing, and silently dropped -
- * no error, no warning, no trace.
- *
- * WHAT THIS FILE CAUGHT, and the reason it exists rather than the `2e` commit being trusted: the
- * carrier machinery (`character.features` on the schema, `featureRecord` on the catalog,
- * `characterFeatureCarriers` in the derivation) was committed WITHOUT the builder ever writing the
- * array. `dedupeFeatureRefs` in `character-build.ts` is that missing half. Every assertion below ran
- * red against the committed tree.
- *
- * So these tests all run the REAL builder against a REAL `ContentLibrary` with a homebrew class,
- * subclass, species, lineage and background merged in, and then assert AT THE TABLE - the rolled
- * to-hit, the DC the target is actually held to, the pool the engine will actually spend. Following
- * `feat-riders.test.ts` and `item-riders.test.ts`: every criterion that has an obvious way to
- * appear-to-work asserts its NEGATIVE control too - the rider-less build, the wrong roll, the wrong
- * pool, the wrong moment.
- */
+// A class, subclass, species, lineage, background or option feature carries the whole rider
+// vocabulary, the sibling of `feat-riders.test.ts`. The builder records granted features in
+// `character.features` (`dedupeFeatureRefs`), and each becomes a bearer `RiderCarrier`, so riders the
+// build-time fold does not own still reach the table. Tests run the real builder against a real
+// `ContentLibrary` with homebrew records merged in, assert at the table (rolled to-hit, enforced DC,
+// spent pool), and include the negative control wherever a check could appear to work.
 
 const POLICY = BuilderPolicySchema.parse({});
 const IDS = {
@@ -48,7 +30,7 @@ const IDS = {
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/** The 14 variants the build-time fold does NOT own; every one must reach the table as a carrier. */
+/** The variants the build-time fold does not own; every one must reach the table as a carrier. */
 const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "attack-bonus", amount: 1 },
   { type: "save-bonus", amount: 1 },
@@ -57,9 +39,8 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "extra-damage", formula: "1d4", damageType: "fire" },
   { type: "critical-range", threshold: 19 },
   { type: "critical-bonus-dice", count: 1 },
-  // MOVED HERE from the baked list. Baking raised `attack.count` on the actions a FEATURE
-  // declares, and the five classes that get Extra Attack declare none - so it reached nothing at
-  // all. It is a standing rider now, folded onto the DERIVED weapon swings by `effective-actions`.
+  // Not baked: the Extra Attack classes declare no feature actions, so it is a standing rider folded
+  // onto the derived weapon swings by `effective-actions`.
   { type: "extra-attack", count: 1 },
   { type: "damage-reduction", amount: 1 },
   { type: "spell-save-dc", amount: 1 },
@@ -68,7 +49,7 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "resource-bonus", poolId: "rift-surge", amount: 1 },
   { type: "sense", sense: "tremorsense", feet: 30 }
 ];
-/** The 7 the builder BAKES into the definition; none may appear as a carrier, or it applies twice. */
+/** The variants the builder bakes into the definition; none may appear as a carrier, or it applies twice. */
 const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "ability-score", ability: "wis", amount: 1 },
   { type: "hit-points-per-level", amount: 1 },
@@ -79,17 +60,11 @@ const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "darkvision", feet: 60 }
 ];
 
-// -------------------------------------------------------------------------------------------------
-// Harness: a REAL ContentLibrary holding one homebrew class, subclass, species (with a lineage) and
-// background. The riders under test are placed on ONE of the six carriers, named by `on`.
-// -------------------------------------------------------------------------------------------------
+// Harness: a real ContentLibrary holding one homebrew class, subclass, species (with a lineage) and
+// background. The riders under test are placed on one of the six carriers, named by `on`.
 
-/**
- * THE SIX CARRIER KINDS `CharacterFeatureRef` can name, and the record each one puts the riders on.
- * Every kind is exercised by the whole 13-variant sweep, because each is a separate branch of the
- * catalog's feature index and a separate `origin` in the builder - a fix that reached only `class`
- * would pass a class-only test and still drop a species trait's riders.
- */
+// The six carrier kinds `CharacterFeatureRef` can name. Each is a separate branch of the catalog's
+// feature index and a separate `origin` in the builder, so every kind runs the whole variant sweep.
 const CARRIERS = ["class", "subclass", "species", "lineage", "background", "option"] as const;
 type Carrier = (typeof CARRIERS)[number];
 
@@ -101,15 +76,15 @@ const LABEL: Readonly<Record<Carrier, string>> = {
 
 type Homebrew = Readonly<{
   on?: Carrier;
-  /** Where the ACTIONS go, when that is not where the riders go - Agonizing Blast gates an invocation on a cantrip the class grants. Defaults to `on`. */
+  /** Where the actions go, when not where the riders go (Agonizing Blast gates an invocation on a cantrip the class grants). Defaults to `on`. */
   actionsOn?: Carrier;
   modifiers?: readonly unknown[];
   actions?: readonly unknown[];
   scores?: Record<string, number>;
-  /** Adds an epic-boon-shaped ability-score CHOICE to the class: a number is its `maximum`, `false` authors none. */
+  /** Adds an epic-boon-shaped ability-score choice to the class: a number is its `maximum`, `false` authors none. */
   boon?: number | false;
   method?: string;
-  /** Which printed column `rift-channel` scales off - the dice column and a missing id are the negative controls. */
+  /** Which printed column `rift-channel` scales off; the dice column and a missing id are the negative controls. */
   chargeId?: string;
   /** The background spread, when the default STR/CON one is not the ability under test. */
   spread?: ReadonlyArray<{ ability: string; amount: number }>;
@@ -121,18 +96,15 @@ const ridersFor = (brew: Homebrew, carrier: Carrier) => ({
   ...((brew.actionsOn ?? brew.on ?? "class") === carrier ? { actions: brew.actions ?? [] } : {})
 });
 
-/**
- * The homebrew class. Level 5 grants `rift-attunement` (the class carrier), `rift-focus` (whose
- * inline options are the OPTION carrier) and `rift-surge` (an action with a three-use pool, so a
- * `resource-bonus` rider has something real to raise).
- */
+// The homebrew class. Level 5 grants `rift-attunement` (the class carrier), `rift-focus` (whose inline
+// options are the option carrier) and `rift-surge` (an action with a three-use pool, so a
+// `resource-bonus` rider has something to raise).
 function classFor(brew: Homebrew) {
   const levelTable = Array.from({ length: 20 }, (_, index) => ({
     level: index + 1,
     proficiencyBonus: 2 + Math.floor(index / 4),
     features: index === 0 ? ["rift-attunement", "rift-focus", "rift-surge", "rift-channel", ...(brew.boon === undefined ? [] : ["rift-apotheosis"])] : [],
-    // The PRINTED column, stepping 2/2/3/3/4... - exactly the shape `scaling: {type:
-    // "class-resource"}` exists to read without re-typing it into a `by-level` table.
+    // The printed column, stepping 2/2/3/3/4..., read by `scaling: {type: "class-resource"}`.
     classResources: [
       { id: "rift-charge", name: "Rift Charges", amount: 2 + Math.floor(index / 2), display: true },
       { id: "rift-dice", name: "Rift Dice", amount: `${1 + Math.floor(index / 4)}d6`, display: true }
@@ -225,11 +197,8 @@ function libraryWith(brew: Homebrew = {}): ContentLibrary {
   return new ContentLibrary(source);
 }
 
-/**
- * A level-5 Deep Riftborn Riftbreaker. Str 19 after the background spread (+4), proficiency 3, so a
- * martial-proficient greatsword swings at +7 - the same baseline arithmetic `feat-riders.test.ts`
- * uses, deliberately, so a number that drifts is obvious against its sibling.
- */
+// A level-5 Deep Riftborn Riftbreaker. Str 19 after the background spread (+4), proficiency 3, so a
+// martial-proficient greatsword swings at +7, the same baseline `feat-riders.test.ts` uses.
 const heroInput = (brew: Homebrew = {}): CharacterCreateRequestInput => ({
   name: "Vess", speciesId: "hb-riftborn", backgroundId: "hb-riftwalker", classId: "hb-riftwarden", level: 5,
   subclassId: "hb-riftbreaker", abilityMethod: (brew.method ?? "standard-array") as CharacterCreateRequestInput["abilityMethod"],
@@ -252,7 +221,7 @@ type Built = Readonly<{
   hero: Actor;
 }>;
 
-/** Build the sheet through the REAL builder, then put it on the table with the play-time catalog. */
+/** Build the sheet through the real builder, then put it on the table with the play-time catalog. */
 function build(brew: Homebrew = {}): Built {
   const view = libraryWith(brew).forAudience("gm");
   const definition = buildCharacterDefinition(heroInput(brew), view, POLICY);
@@ -283,15 +252,9 @@ function deps(built: Built, faces: number[]): ResolveDependencies {
 const actionOf = (built: Built, id: string) => effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id)!;
 const carrierOf = (built: Built, label: string) => deriveEquipment(built.hero, built.definition, built.catalog).carriers.find((carrier) => carrier.label === label);
 
-// -------------------------------------------------------------------------------------------------
-// The seam: the builder RECORDS which feature records the sheet holds, and each is a BEARER carrier.
-// -------------------------------------------------------------------------------------------------
-
 describe("the builder records every granted feature by id and provenance", () => {
   it("writes character.features with the right kind and sourceId for all six carriers", () => {
-    // THE ASSERTION THE `2e` COMMIT WOULD HAVE FAILED. `character.features` was on the schema, the
-    // catalog could resolve it and the derivation could read it - but nothing ever wrote it, so this
-    // array was `undefined` and every rider below fell straight back into the hole `2e` describes.
+    // The builder must write `character.features`; without it every rider below is dropped.
     const built = build();
     expect(built.definition.character?.features).toEqual([
       { id: "rift-attunement", kind: "class", sourceId: "hb-riftwarden" },
@@ -312,14 +275,14 @@ describe("the builder records every granted feature by id and provenance", () =>
       const carrier = carrierOf(build({ on, modifiers: [{ type: "attack-bonus", amount: 2 }] }), LABEL[on])!;
       expect(carrier, `${on} must produce a carrier`).toBeDefined();
       expect(carrier.modifiers).toMatchObject([{ type: "attack-bonus", amount: 2 }]);
-      // No source item: a class feature is worn by the BEARER, so its riders are not scoped to a weapon.
+      // No source item: a class feature is worn by the bearer, so its riders are not scoped to a weapon.
       expect(carrier.sourceItemId).toBeUndefined();
       expect(carrier.isWeapon).toBeUndefined();
     }
   });
 
   it("reaches all FOURTEEN roll-time variants from all SIX carriers, and none of the seven baked ones", () => {
-    // The before/after of this whole fix: 78 assertions, one per (carrier, variant) pair either way.
+    // One assertion per (carrier, variant) pair, each way.
     for (const on of CARRIERS) {
       for (const modifier of ROLL_TIME_RIDERS) {
         const carrier = carrierOf(build({ on, modifiers: [modifier] }), LABEL[on]);
@@ -335,14 +298,10 @@ describe("the builder records every granted feature by id and provenance", () =>
   it("contributes nothing when no feature carries a rider at all", () => {
     const built = build();
     for (const on of CARRIERS) expect(carrierOf(built, LABEL[on])).toBeUndefined();
-    // The equipped gear is still carried (that is the item half); nothing it holds carries a rider.
+    // The equipped gear is still carried, but nothing it holds carries a rider.
     expect(deriveEquipment(built.hero, built.definition, built.catalog).carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// attack-bonus - the rolled to-hit
-// -------------------------------------------------------------------------------------------------
 
 describe("a feature's attack-bonus reaches the rolled to-hit", () => {
   it("raises the number the resolver reads, and the roll it actually makes", () => {
@@ -354,7 +313,7 @@ describe("a feature's attack-bonus reaches the rolled to-hit", () => {
     const action = actionOf(built, "item-greatsword");
     expect(action.attack!.bonus).toBe(8);
 
-    // The ROLL, not just the number: d20 = 10 -> 18 total against AC 12.
+    // The roll, not just the number: d20 = 10 -> 18 total against AC 12.
     const resolution = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" }, deps(built, [10, 4, 6]));
     expect(resolution.attack).toMatchObject({ total: 18, naturalRoll: 10, targetAc: 12, outcome: "hit" });
   });
@@ -368,10 +327,6 @@ describe("a feature's attack-bonus reaches the rolled to-hit", () => {
     }
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// save-bonus
-// -------------------------------------------------------------------------------------------------
 
 describe("a feature's save-bonus reaches the saving throw", () => {
   it("adds to every save, and narrows when the rider says which ability", () => {
@@ -391,10 +346,6 @@ describe("a feature's save-bonus reaches the saving throw", () => {
     expect(saveRiderBonus(narrowedDerivation, "wis")).toBe(0); // `ability-is` really narrows it
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// spell-save-dc - the DC the server ENFORCES
-// -------------------------------------------------------------------------------------------------
 
 describe("a feature's spell-save-dc raises the DC the target is held to", () => {
   const WAR_CRY = {
@@ -417,15 +368,11 @@ describe("a feature's spell-save-dc raises the DC the target is held to", () => 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// extra-damage - dice actually rolled on the hit
-// -------------------------------------------------------------------------------------------------
-
 describe("a feature's extra-damage is rolled as its own typed damage entry", () => {
   it("adds the die to the swing, and the rider-less build rolls only the weapon", () => {
     const bare = fight(build());
     const plain = resolveDefinitionAction(bare.state, actionOf(bare, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000040" }, deps(bare, [15, 5, 6]));
-    // 2d6 (5 + 6) + Str 3 = 14, and NOTHING else.
+    // 2d6 (5 + 6) + Str 3 = 14, and nothing else.
     expect(plain.damage).toEqual([{ formula: "2d6 + 3", type: "slashing", total: 14 }]);
     expect(plain.damageTotal).toBe(14);
 
@@ -436,10 +383,6 @@ describe("a feature's extra-damage is rolled as its own typed damage entry", () 
     expect(swung.damageTotal).toBe(17); // 14 + a 3 actually rolled on the rider's d4
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// resource-bonus - one more use of a class resource
-// -------------------------------------------------------------------------------------------------
 
 describe("a feature's resource-bonus raises a pool the engine actually spends from", () => {
   it("raises Rift Surge's limit and lets the fourth use resolve where the third was the ceiling", () => {
@@ -467,10 +410,6 @@ describe("a feature's resource-bonus raises a pool the engine actually spends fr
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// A MOMENT-GATED rider fires at its moment and nowhere else
-// -------------------------------------------------------------------------------------------------
-
 describe("a feature's moment-gated roll-mode fires only at its moment", () => {
   const RECKLESS = {
     type: "roll-mode", roll: "attack", mode: "advantage",
@@ -491,12 +430,12 @@ describe("a feature's moment-gated roll-mode fires only at its moment", () => {
     // Two d20s (advantage keeps 18), then the 2d6 greatsword damage.
     const swung = resolveDefinitionAction(melee.state, actionOf(melee, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" }, deps(melee, [4, 18, 3, 5]));
     expect(swung.rollMode).toMatchObject({ mode: "advantage", advantage: ["Rift Blade"] });
-    expect(swung.attack!.naturalRoll).toBe(18); // the HIGHER of the two dice was kept
+    expect(swung.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
 
     const ranged = fight(build({ on: "option", modifiers: [RECKLESS] }));
     const shot = resolveDefinitionAction(ranged.state, actionOf(ranged, "item-shortbow"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" }, deps(ranged, [4, 3]));
     expect(shot.rollMode).toBeUndefined();
-    expect(shot.attack!.naturalRoll).toBe(4); // ONE die - `attack-kind-is` really filtered
+    expect(shot.attack!.naturalRoll).toBe(4); // one die: `attack-kind-is` filtered
   });
 
   it("routes a save roll-mode to saves only, and to the named ability only", () => {
@@ -516,14 +455,10 @@ describe("a feature's moment-gated roll-mode fires only at its moment", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// `scope: "this-item"` on a feature names an item the feature does not have
-// -------------------------------------------------------------------------------------------------
-
 describe("a this-item-scoped rider on a feature does not become an 'always' rider", () => {
   it("fails CLOSED rather than degrading to bearer scope and applying to every attack", () => {
-    // `scopeOf` in @vtt/rules-5e reads a carrier with no `sourceItemId` as bearer-scoped, which would
-    // silently turn an authored "only with this weapon" into "+5 on everything". It is dropped instead.
+    // `scopeOf` in @vtt/rules-5e reads a carrier with no `sourceItemId` as bearer-scoped, which would turn
+    // "only with this weapon" into "+5 on everything", so the rider is dropped.
     const built = build({ on: "class", modifiers: [{ type: "attack-bonus", amount: 5, scope: "this-item" }] });
     expect(carrierOf(built, LABEL.class)).toBeUndefined();
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(6); // the base number, not 11
@@ -535,10 +470,6 @@ describe("a this-item-scoped rider on a feature does not become an 'always' ride
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(11);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// The eight build-time families must be counted ONCE, not twice
-// -------------------------------------------------------------------------------------------------
 
 describe("nothing the builder baked is counted a second time as a carrier", () => {
   it("bakes a feature's speed / initiative / AC exactly once", () => {
@@ -565,10 +496,6 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Fail-open: the definitions that have NO features array at all must keep working
-// -------------------------------------------------------------------------------------------------
-
 describe("the feature carriers fail open", () => {
   it("treats a feature with no catalog record as prose, exactly like an item with none", () => {
     // The sheet is built against a library that knows the class; play-time resolution then runs
@@ -581,9 +508,7 @@ describe("the feature carriers fail open", () => {
   });
 
   it("derives a definition with NO features array at all, exactly as before - PDF imports and the example party", () => {
-    // The additive-optional guarantee, asserted rather than assumed. `character.features` did not
-    // exist when these sheets were written, so `?? []` is the ONLY thing standing between them and a
-    // crash on every derivation.
+    // Sheets written before `character.features` existed have no array; `?? []` must keep derivation working.
     const built = build({ on: "class", modifiers: [{ type: "attack-bonus", amount: 2 }] });
     const legacy = structuredClone(built.definition) as ActorDefinition;
     delete (legacy.character as { features?: unknown }).features;
@@ -594,7 +519,7 @@ describe("the feature carriers fail open", () => {
     expect(derivation.carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]);    // no array, no feature riders
     expect(effectiveActions(legacy, built.hero, built.catalog).find((entry) => entry.id === "item-greatsword")!.attack!.bonus).toBe(6);
 
-    // And the same sheet with the array intact is the +2 one, so the difference is the array itself.
+    // The same sheet with the array intact is the +2 one, so the difference is the array itself.
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
   });
 
@@ -606,17 +531,11 @@ describe("the feature carriers fail open", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// The recorded array is BOUNDED, so a fat sheet cannot fail to build
-// -------------------------------------------------------------------------------------------------
-
 describe("the recorded feature array stays inside the schema's bound", () => {
   it("leaves real headroom for the fattest bundled SRD sheet at level 20", () => {
-    // `dedupeFeatureRefs` TRUNCATES at the schema's 80 rather than rejecting, so a sheet that
-    // overflowed would lose riders silently - the exact failure mode `2e` exists to end. This counts
-    // what the worst real sheet would record (every class feature its 20 level rows grant, its
-    // fattest subclass, the fattest species + lineage, the fattest background) straight off the
-    // bundled content, so the guard is measured rather than assumed.
+    // `dedupeFeatureRefs` truncates at the schema's 80 rather than rejecting, so an overflowing sheet would
+    // lose riders silently. This counts what the largest real sheet would record (every class feature
+    // across 20 levels, the largest subclass, species + lineage and background) from the bundled content.
     const view = new ContentLibrary().forAudience("gm");
     const widest = (counts: readonly number[]) => counts.reduce((high, value) => Math.max(high, value), 0);
     const classCounts = view.classSummaries().map((summary) => {
@@ -635,29 +554,16 @@ describe("the recorded feature array stays inside the schema's bound", () => {
 
     expect(classCounts.length).toBeGreaterThan(0);
     const worst = widest(classCounts.map((entry) => entry.total)) + speciesWidest + backgroundWidest;
-    // Comfortably inside 80, with room for chosen options on top; if this ever tightens, raise the
-    // schema's `.max(80)` and this number together rather than letting the truncation start biting.
+    // Comfortably inside 80, with room for chosen options; if this tightens, raise the schema's
+    // `.max(80)` along with this number.
     expect(worst, `the fattest SRD sheet records ${worst} features`).toBeLessThan(60);
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// D5: AGONIZING BLAST. `spell-id-is` + `extra-damage` naming an ability modifier.
-// -------------------------------------------------------------------------------------------------
-
-/**
- * The two schema gaps that made Warlock read as broken no matter how much prose landed, and the one
- * printed effect that needs BOTH.
- *
- * "When you cast Eldritch Blast, add your Charisma modifier to the damage it deals on a hit" has two
- * halves the vocabulary could not say. WHICH SPELL: `spell-school-is` and `spell-level-is` name
- * categories, and no combination of school and level picks out one cantrip - so the gate had to
- * become `spell-id-is`, matched against the new `ActorAction.spellId`. HOW MUCH: every amount in the
- * vocabulary was an authored constant, and "your Charisma modifier" is a property of the character,
- * not of the record - so `extra-damage` gained `abilityModifier` beside its `formula`.
- *
- * These assert the NUMBER on the damage roll, not that the rider survived derivation.
- */
+// Agonizing Blast: "When you cast Eldritch Blast, add your Charisma modifier to the damage it deals on
+// a hit". `spell-id-is` (matched against `ActorAction.spellId`) picks out one cantrip, which no
+// school/level combination can, and `extra-damage.abilityModifier` adds a property of the character
+// rather than an authored constant. These assert the number on the damage roll.
 describe("Agonizing Blast: a spell-gated rider adds the caster's own ability modifier", () => {
   /** A level-5 sheet with CHA 17 (+3), so the modifier that arrives is unmistakably the right one. */
   const CHA_HERO = {
@@ -665,7 +571,7 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
     spread: [{ ability: "cha", amount: 2 }, { ability: "str", amount: 1 }]
   } as const;
 
-  /** The cantrip, as a feature action that NAMES the spell it is. */
+  /** The cantrip, as a feature action that names its spell. */
   const ELDRITCH_BLAST = {
     id: "eldritch-blast", name: "Eldritch Blast", activation: "action",
     description: "A beam of crackling energy streaks toward a creature.",
@@ -674,7 +580,7 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
     spellId: "eldritch-blast"
   };
 
-  /** The invocation, as an option's rider: + CHA to the damage, but only on that one spell. */
+  /** The invocation, as an option's rider: + CHA to the damage, only on that one spell. */
   const AGONIZING_BLAST = {
     type: "extra-damage", abilityModifier: "cha", damageType: "force",
     when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
@@ -694,7 +600,7 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
 
     const built = warlock([AGONIZING_BLAST]);
     const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000051" }, deps(built, [10, 7]));
-    // The SAME two dice; the difference is +3, and 3 is this character's Charisma modifier.
+    // The same two dice; the difference is +3, this character's Charisma modifier.
     expect(blasted.damage).toEqual([
       { formula: "1d10", type: "force", total: 7 },
       { formula: "3", type: "force", total: 3 }
@@ -704,8 +610,8 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
   });
 
   it("tracks the CHARACTER's Charisma, not an authored constant", () => {
-    // The whole point of `abilityModifier`: the same authored record, a different sheet, a different
-    // number. CHA 12 (+1) here against CHA 17 (+3) above, with no change to the rider.
+    // The same authored record on a different sheet gives a different number: CHA 12 (+1) here against
+    // CHA 17 (+3) above.
     const lesser = fight(build({
       scores: { str: 13, dex: 14, con: 15, int: 8, wis: 10, cha: 12 },
       spread: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
@@ -717,9 +623,8 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
   });
 
   it("does NOT touch a swing that is not that spell", () => {
-    // `spell-id-is` is the whole reason this is expressible: without it the only way to say "on a
-    // spell" is a school or a level, and the greatsword below is neither - but nor is any OTHER
-    // cantrip the Warlock knows, which is what a category gate would have caught by mistake.
+    // A school or level gate would also catch the Warlock's other cantrips; `spell-id-is` does not, and the
+    // greatsword is not a spell at all.
     const built = warlock([AGONIZING_BLAST]);
     const swung = resolveDefinitionAction(built.state, actionOf(built, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000053" }, deps(built, [15, 5, 6]));
     // 2d6 (5 + 6) + Str 2 = 13, with no Charisma anywhere near it.
@@ -746,27 +651,18 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
   it("carries dice AND an ability modifier together when a record authors both", () => {
     const built = warlock([{ ...AGONIZING_BLAST, formula: "1d4" }]);
     const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000056" }, deps(built, [10, 7, 2]));
-    // The d4 rolled a 2, and CHA added 3: ONE entry of 5, because it is one rider.
+    // The d4 rolled a 2 and CHA added 3: one entry of 5, because it is one rider.
     expect(blasted.damage.at(-1)).toEqual({ formula: "1d4", type: "force", total: 5 });
     expect(blasted.damageTotal).toBe(12);
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// An ability-score CHOICE may name its own ceiling - the seven epic boons
-// -------------------------------------------------------------------------------------------------
-
-/**
- * `FeatureChoiceSchema.maximum`, and the reason the modifier's `maximum` was not enough.
- *
- * The two are different mechanisms: an `ability-score` RIDER raises a NAMED ability by a fixed
- * amount and has honoured `maximum` all along; a CHOICE lets the player pick which ability, and the
- * epic boons do the second - "increase one ability score by 1, to a maximum of 30". The offer
- * consumer clamped every chosen point at a hard-coded 20, so all seven boons did nothing at all for
- * the only character who ever takes one: a level-19 character already sitting at 20.
- */
+// `FeatureChoiceSchema.maximum`. An `ability-score` rider raises a named ability and honours its own
+// `maximum`; a choice lets the player pick the ability, as the epic boons do ("increase one ability
+// score by 1, to a maximum of 30"). Without a choice-level ceiling the offer consumer clamps at 20,
+// which would make every boon useless for a character already at 20.
 describe("an ability-score choice raises past 20 when it says so", () => {
-  /** STR 18 rolled + the background's +2 = exactly 20 BEFORE the boon, which is the interesting case. */
+  /** STR 18 rolled + the background's +2 = exactly 20 before the boon. */
   const AT_TWENTY = {
     method: "roll",
     scores: { str: 18, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
@@ -776,15 +672,15 @@ describe("an ability-score choice raises past 20 when it says so", () => {
   it("takes STR from 20 to 21 when the choice names a maximum of 30", () => {
     const built = build({ ...AT_TWENTY, boon: 30 });
     expect(built.definition.abilityScores.str).toBe(21);
-    // And the number reaches the TABLE, not just the definition: +5 from STR 21, +3 proficiency.
+    // And the number reaches the table: +5 from STR 21, +3 proficiency.
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
   });
 
   it("stops at 20 when the choice names no maximum - the SRD default is unchanged", () => {
-    // The negative control that matters: the fix must not quietly lift the cap for every choice.
+    // Negative control: the cap is not lifted for every choice.
     const built = build({ ...AT_TWENTY, boon: false });
     expect(built.definition.abilityScores.str).toBe(20);
-    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8); // +5 either way; the SCORE is the assertion
+    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8); // +5 either way; the score is the assertion
   });
 
   it("honours a maximum BELOW 20 too, because the field is a ceiling and not a boon flag", () => {
@@ -799,20 +695,9 @@ describe("an ability-score choice raises past 20 when it says so", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// `scaling: {type: "class-resource"}` - the printed column IS the number
-// -------------------------------------------------------------------------------------------------
-
-/**
- * The fourth way 5e scales a feature's uses, and the one the other three could not say.
- *
- * Rage, Bardic Inspiration and Channel Divinity step on a schedule that is neither the proficiency
- * bonus nor an ability modifier, and the schedule is already printed on the class table. Re-typing
- * it into a `by-level` table beside the column it duplicates is the second copy that drifts.
- *
- * Nothing here builds a new pool system: the resolved number lands on the SAME `uses.limit` the
- * engine already gates, spends and re-arms - see the Rift Surge tests above.
- */
+// Uses that scale off a printed class-table column (as Rage, Bardic Inspiration and Channel Divinity
+// do), rather than a `by-level` copy of it. The resolved number lands on the same `uses.limit` the
+// engine already gates, spends and re-arms.
 describe("a feature scales its uses off the class table's printed column", () => {
   it("resolves the level-5 printed amount onto the action's real use limit", () => {
     // The column prints 2 + floor((level-1)/2): at level 5 that is 4.
@@ -821,7 +706,7 @@ describe("a feature scales its uses off the class table's printed column", () =>
   });
 
   it("is SPENDABLE up to that limit and refuses the use past it", () => {
-    // The point of resolving it at all: this is the live `actionUses` counter, not a display number.
+    // This is the live `actionUses` counter, not a display number.
     const built = fight(build());
     built.hero.actionUses = { "rift-channel": 3 };
     resolveDefinitionAction(built.state, actionOf(built, "rift-channel"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000060" }, deps(built, []));
@@ -836,8 +721,7 @@ describe("a feature scales its uses off the class table's printed column", () =>
   });
 
   it("resolves a DICE column to no uses, because dice are damage and not a count", () => {
-    // "3d6" is Sneak Attack's shape. A feature that scaled its uses off it would otherwise get a
-    // NaN, a crash, or a silently wrong number; it gets the same "no uses" an unmatched row gives.
+    // "3d6" is Sneak Attack's shape; scaling uses off it gets "no uses", the same as an unmatched row.
     const built = build({ chargeId: "rift-dice" });
     expect(actionOf(built, "rift-channel").uses).toBeUndefined();
   });

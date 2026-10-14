@@ -4,12 +4,8 @@ import { applyMovementRules } from "../src/movement-rules.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { RulesBlockedError } from "../src/game-store.js";
 
-/**
- * The point of families is that a GM can switch ONE kind of policing off without switching the rest
- * off with it. These tests exercise the two enforcement sites that used to read `combat.rulesMode`
- * directly, at the seam - no HTTP, no map assets - so the family logic is proven independently of
- * the whole-fight machinery `combat-rules-regression.test.ts` already covers.
- */
+// A GM can switch one rules family off without switching the rest off with it. These exercise the
+// movement and economy enforcement sites directly, without HTTP or map assets.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-0000000000e1",
@@ -64,17 +60,17 @@ describe("per-family rule exceptions at the enforcement sites", () => {
   });
 
   it("keeps policing everything else when movement is off", () => {
-    // Standing from Prone is a MOVEMENT cost, so it follows the movement family too...
+    // Standing from Prone is a movement cost, so it follows the movement family too...
     const relaxed = fight({ movement: "freeform" }, 30, [{ id: "prone" }]);
     expect(() => setCondition(relaxed, IDS.hero, "prone", false, undefined, { role: "gm" })).not.toThrow();
-    // ...while the same table with movement left ON still blocks it.
+    // ...while the same table with movement left on still blocks it.
     const strict = fight({}, 30, [{ id: "prone" }]);
     expect(() => setCondition(strict, IDS.hero, "prone", false, undefined, { role: "gm" })).toThrow(/Standing up costs/);
   });
 
   it("remembers a movement override for the rest of the turn, so the next step is not re-blocked", () => {
     const game = fight({});
-    // The GM allows the first overrun with no reason at all - D9's one tap.
+    // The GM allows the first overrun with no reason at all.
     const allowed = step(game, {});
     expect(allowed.overridden).toBe("GM override");
     expect(game.combat.turn.rulesOverriddenFamilies).toEqual(["movement"]);

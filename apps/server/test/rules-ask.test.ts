@@ -8,16 +8,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 import { activateScene } from "../src/scenes.js";
 
-/**
- * ASK THE GM (D8/D9). A blocked player used to hit a silent dead end - the server refused, the runner
- * showed nothing, and the only recourse was to say something out loud. These tests pin the whole loop:
- * the block becomes a question, the question belongs to exactly one player, and the GM's one tap
- * re-runs the parked command instead of asking them to reconstruct it.
- *
- * The Allow path carries the trap that makes or breaks the feature: the parked payload's
- * `expectedRevision` is the revision at ask time, so replaying it verbatim would 409 on every single
- * Allow. `rerunPayload` strips it - and the last test here is the one that would catch its return.
- */
+// A blocked player can turn the block into a question to the GM; the question belongs to one player,
+// and Allow re-runs the parked command. The parked payload's `expectedRevision` is from ask time, so
+// `rerunPayload` must strip it or every Allow would 409.
 
 const HERO = "10000000-0000-4000-8000-0000000000a1";
 const OTHER = "10000000-0000-4000-8000-0000000000a2";
@@ -36,12 +29,8 @@ function png(width: number, height: number) {
   return buffer;
 }
 
-/**
- * A live fight, mid-turn: Hero is up, is PRONE, has a 30 ft Speed and has already spent all of it.
- * Standing up costs half their Speed and they have none left, so `actor.set-condition` blocks with
- * `movement.stand-up-cost` - the exact block the intake flagged as having wire support and no way for
- * a player to reach it (intake 02 Table 4).
- */
+// A live fight mid-turn: Hero is up, prone, with a 30 ft Speed already spent. Standing costs half
+// Speed, so `actor.set-condition` blocks with `movement.stand-up-cost`.
 function initialState() {
   return GameStateSchema.parse({ schemaVersion: 1,
     actors: [
@@ -124,7 +113,7 @@ describe("ask the GM", () => {
     expect(asks[0].actorId).toBe(HERO);
     expect(asks[0].rule).toBe("movement.stand-up-cost");
     expect(asks[0].family).toBe("movement");
-    // The parked command is the whole original request - the GM never reconstructs it by hand.
+    // The parked command is the whole original request.
     expect(asks[0].command.type).toBe("actor.set-condition");
     expect((asks[0].command.payload as { conditionId: string }).conditionId).toBe("prone");
   });
@@ -141,9 +130,9 @@ describe("ask the GM", () => {
     // Viewer safety: the parked payload can name target ids a player is not allowed to know.
     expect("command" in mine.combat.pendingRuleAsks[0]).toBe(false);
     expect(JSON.stringify(mine.combat.pendingRuleAsks)).not.toContain("conditionId");
-    // Another player's table shows nothing at all - not the question, not that one was asked.
+    // Another player's table shows nothing: not the question, not that one was asked.
     expect(theirs.combat.pendingRuleAsks).toEqual([]);
-    // The GM's own view carries the whole thing, payload included - that is what Allow replays.
+    // The GM's view carries the whole thing, payload included; that is what Allow replays.
     const gmView = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(gmToken) });
     expect(JSON.stringify((await gmView.json()).data.game)).toContain("pendingRuleAsks");
   });
@@ -155,8 +144,7 @@ describe("ask the GM", () => {
     const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(staleRevision) });
     const askId = (await asked.json()).data.askId as string;
 
-    // ...and let the table move on, so the parked expectedRevision is definitively stale. Replaying it
-    // verbatim is the bug this strip exists to prevent.
+    // ...and let the table move on, so the parked expectedRevision is stale.
     await post(base, GAME_PATHS.rolls, gmToken, { commandId: randomUUID(), formula: "1d20", purpose: "manual", visibility: "public" });
     expect(server.store.snapshot.revision).toBeGreaterThan(staleRevision);
 
@@ -164,8 +152,8 @@ describe("ask the GM", () => {
     expect(allowed.status).toBe(200);
     expect((await allowed.json()).data.allowed).toBe(true);
 
-    // Hero actually stood up, the question is gone, and the family is remembered for this turn - so
-    // D9 holds: the same KIND of block stops re-prompting until the turn ends.
+    // Hero stood up, the question is gone, and the family is remembered for the turn, so the same kind
+    // of block stops re-prompting until the turn ends.
     expect(server.store.snapshot.actors.find((actor) => actor.id === HERO)?.conditions).toEqual([]);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
     expect(server.store.snapshot.combat.turn.rulesOverriddenFamilies).toContain("movement");
@@ -205,8 +193,8 @@ describe("ask the GM", () => {
     const { base, server, heroSession, otherSession } = await fightWithExhaustedMovement();
     const body = standUpBody(server.store.snapshot.revision);
 
-    // Second Hero's player wrapping Hero's blocked move in an ask gets the SAME refusal the raw
-    // command gives them - the ask is not a back door around role boundaries.
+    // Another player wrapping Hero's blocked move in an ask gets the same refusal the raw command gives:
+    // the ask is not a way around role boundaries.
     const impostor = await post(base, GAME_PATHS.rulesAsk, otherSession, { commandId: randomUUID(), type: "actor.set-condition", payload: body });
     expect(impostor.status).toBe(409);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
@@ -221,7 +209,7 @@ describe("ask the GM", () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(server.store.snapshot.revision) });
     await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: { ...standUpBody(server.store.snapshot.revision), conditionId: "prone" } });
-    // A player tapping twice asked ONE question; two rows would make the GM answer it twice.
+    // A double tap is one question; two rows would make the GM answer it twice.
     expect(server.store.snapshot.combat.pendingRuleAsks.length).toBe(1);
     expect((server.store.snapshot.combat.pendingRuleAsks[0].command.payload as { conditionId: string }).conditionId).toBe("prone");
 
@@ -250,9 +238,8 @@ describe("ask the GM", () => {
   });
 
   it("parks and resumes an unanswered question with its scene", () => {
-    // At the seam, not over HTTP: the invariant is that `pendingRuleAsks` is in BOTH the snapshot list
-    // and the empty-scene literal. Miss either and a parked scene resumes with a question that was
-    // answered in another fight - or loses one the GM never saw.
+    // `pendingRuleAsks` must be in both the snapshot list and the empty-scene literal, or a parked scene
+    // resumes with an answered question or loses an unanswered one.
     const ask = {
       id: "90000000-0000-4000-8000-000000000001", actorId: HERO, rule: "movement.stand-up-cost", family: "movement" as const,
       message: "Standing up costs 15 ft of movement - Hero has 0 ft left.",
@@ -279,7 +266,7 @@ describe("ask the GM", () => {
     activateScene(game, IMPLICIT, "90000000-0000-4000-8000-00000000000f");
     expect(game.combat.pendingRuleAsks.length).toBe(1);
     expect(game.combat.pendingRuleAsks[0].id).toBe(ask.id);
-    // The scene the fight came FROM is emptied, which the active-scene invariant requires.
+    // The scene the fight came from is emptied, as the active-scene invariant requires.
     expect(game.combat.scenes.find((scene) => scene.id === CORRIDOR)?.combat.pendingRuleAsks).toEqual([]);
   });
 });

@@ -84,7 +84,7 @@ describe("SQLite GameStore", () => {
       reopened.close(); store = undefined;
 
       const persisted = new DatabaseSync(databasePath, { readOnly: true });
-      // Two seeds now: the placeholder roster backfill and the one-time example-party re-key.
+      // Two seeds: the placeholder roster backfill and the one-time example-party re-key.
       expect((persisted.prepare("SELECT COUNT(*) AS count FROM application_seeds").get() as { count: number }).count).toBe(2);
       persisted.close();
     } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }

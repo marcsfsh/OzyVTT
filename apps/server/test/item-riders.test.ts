@@ -10,14 +10,9 @@ import { answerReaction } from "../src/reactions.js";
 import { applyRest } from "../src/rests.js";
 import { CommandRejectedError } from "../src/game-store.js";
 
-/**
- * The fifteen magic-item criteria, proved SERVER-SIDE by injection.
- *
- * Every test here injects a catalog directly rather than trusting a published record, because this
- * team has repeatedly found guards that did not fire and one that did not exist. Where a criterion
- * has an obvious way to appear-to-work-but-not, the test asserts the NEGATIVE control too: the
- * unequipped case, the wrong class, the non-crit, the on-turn attack.
- */
+// Magic-item rider criteria, proved server-side by injecting a catalog directly. Where a criterion
+// could appear to work without working, the negative control is asserted too (unequipped, wrong
+// class, non-crit, on-turn attack).
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -27,7 +22,7 @@ const IDS = {
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/** A minimal but structurally honest definition; the fields the derivation and resolver actually read. */
+/** A minimal definition carrying the fields the derivation and resolver read. */
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
     name: "Hero", armorClass: 12, proficiencyBonus: 2,
@@ -42,7 +37,7 @@ function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
 
 const item = (over: Record<string, unknown>): InventoryItem => InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
-/** An in-test catalog. `equipmentRecord`/`featRecord` are exactly the two hooks the derivation reads. */
+/** An in-test catalog. `equipmentRecord`/`featRecord` are the two hooks the derivation reads. */
 function catalogOf(records: readonly EquipmentRecordLike[], feats: readonly FeatRecordLike[] = []): EquipmentCatalog {
   return {
     equipmentRecord: (id) => records.find((record) => record.id === id),
@@ -74,10 +69,6 @@ function deps(faces: number[], catalog?: EquipmentCatalog, definition?: ActorDef
 
 const SWORD_ROW = { id: "shortsword-of-lightning", name: "Shortsword of Lightning", quantity: 1, equipped: true, attuned: true, category: "weapon", weapon: { category: "martial", damageDice: "1d6", damageType: "piercing", rangeFeet: null, longRangeFeet: null } };
 
-// -------------------------------------------------------------------------------------------------
-// Criterion 1 - "+1 to hit and an extra 1d4 lightning"
-// -------------------------------------------------------------------------------------------------
-
 describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
   const SWORD: EquipmentRecordLike = {
     id: "shortsword-of-lightning", name: "Shortsword of Lightning", category: "weapon", slot: "weapon",
@@ -98,11 +89,11 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
     // str 16 (+3) + proficiency 2 = 5 base; the rider makes it 6.
     expect(action.attack!.bonus).toBe(6);
 
-    // The ROLL, not just the number: d20 = 10 -> 16 total, which beats AC 12.
+    // The roll, not just the number: d20 = 10 -> 16 total, which beats AC 12.
     const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" }, deps([10, 4, 3], catalog, definition));
     expect(resolution.attack).toMatchObject({ total: 16, naturalRoll: 10, targetAc: 12, outcome: "hit" });
 
-    // Unequip: replace-whole IS the un-grant, so the very next read is back to 5.
+    // Unequip: replacing the row is the un-grant, so the next read is back to 5.
     const bare = fight(stateWith([item({ ...SWORD_ROW, equipped: false })]));
     const without = effectiveActions(definition, bare.actors[0], catalog).find((entry) => entry.id === "item-shortsword-of-lightning");
     expect(without).toBeUndefined(); // an unequipped weapon offers no derived attack at all
@@ -123,7 +114,7 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
       { formula: "1d4", type: "lightning", total: 3 }
     ]);
     expect(resolution.damageTotal).toBe(10);
-    // Three rolls recorded: the attack and both damage dice - the lightning is a real, auditable roll.
+    // Three rolls recorded: the attack and both damage dice.
     expect(state.rolls.map((roll) => roll.purpose)).toEqual(["attack", "damage", "damage"]);
   });
 
@@ -136,10 +127,6 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
     expect(derivation.sources).toHaveLength(0);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 2 - the eight item kinds, made mechanically real by `slot`
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 2: `slot` makes an open category mechanically real", () => {
   it("derives AC from a homebrew category that declares an armor slot, and caps rings at two", () => {
@@ -167,13 +154,9 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
     const state = stateWith([]);
     const shield = (n: number) => item({ id: `shield-${n}`, name: `Shield ${n}`, equipped: true, category: "shield", armor: { acBase: 2, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null } });
     for (const n of [1, 2, 3]) setInventoryItem(state, IDS.hero, shield(n), () => definition, { role: "gm" });
-    expect(state.actors[0].armorClass).toBe(14); // 10 + dex 2 + ONE shield 2, not +6
+    expect(state.actors[0].armorClass).toBe(14); // 10 + dex 2 + one shield 2, not +6
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 3 - a ring that raises AC, and gives it back
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 3: a ring changes AC and the change disappears on unequip", () => {
   const RING: EquipmentRecordLike = {
@@ -191,10 +174,10 @@ describe("criterion 3: a ring changes AC and the change disappears on unequip", 
     expect(state.actors[0].armorClass).toBe(12); // worn but not attuned: inert
 
     setInventoryItem(state, IDS.hero, item({ ...row, equipped: true, attuned: true }), () => definition, { catalog });
-    expect(state.actors[0].armorClass).toBe(13); // THE +1
+    expect(state.actors[0].armorClass).toBe(13); // the +1
 
     setInventoryItem(state, IDS.hero, item({ ...row, equipped: false, attuned: true }), () => definition, { catalog });
-    expect(state.actors[0].armorClass).toBe(12); // replace-whole is the un-grant
+    expect(state.actors[0].armorClass).toBe(12); // replacing the row is the un-grant
 
     setInventoryItem(state, IDS.hero, item({ ...row, equipped: true, attuned: true }), () => definition, { catalog });
     expect(state.actors[0].armorClass).toBe(13);
@@ -203,7 +186,7 @@ describe("criterion 3: a ring changes AC and the change disappears on unequip", 
   });
 
   it("stacks with the builder's own flat AC rider instead of dropping it", () => {
-    // The Defense fighting style rides the extension bag; the item rider must ADD to it, not replace it.
+    // The Defense fighting style rides the extension bag; the item rider must add to it, not replace it.
     const definition = definitionOf({ extensions: { "open5e.srd-2024": { armorClassBonus: 1 } } });
     const state = stateWith([]);
     setInventoryItem(state, IDS.hero, item({ id: "ring-of-protection", name: "Ring of Protection", category: "ring", equipped: true, attuned: true }), () => definition, { catalog: catalogOf([RING]) });
@@ -221,10 +204,6 @@ describe("criterion 3: a ring changes AC and the change disappears on unequip", 
       .toThrow(/Already attuned to 3 items/);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 4 - "cast Message once per day while attuned"
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 4: an item that casts a spell on a limited pool", () => {
   const AMULET: EquipmentRecordLike = {
@@ -245,7 +224,7 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
     resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000010" }, deps([], catalog, definition));
     expect(actor.actionUses["item-amulet-of-whispers-cast-message"]).toBe(1);
 
-    // Second use is refused - the charge really is spent.
+    // Second use is refused: the charge is spent.
     expect(() => resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000011" }, deps([], catalog, definition)))
       .toThrow(/no uses remaining/i);
 
@@ -263,15 +242,11 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
     const catalog = catalogOf([wand]);
     const state = stateWith([item({ id: "wand-of-sparks", name: "Wand of Sparks", equipped: true, category: "held" })]);
     state.actors[0].actionUses = { "item-wand-of-sparks-spark": 3 };
-    // `rests.ts` reading `definition.actions` would find nothing here and leave the wand dead forever.
+    // Recharge must find item actions too, not only `definition.actions`.
     applyRest(state, IDS.hero, "short", () => definition, catalog);
     expect(state.actors[0].actionUses["item-wand-of-sparks-spark"]).toBeUndefined();
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 5 - advantage on Initiative
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 5: a cloak granting advantage on Initiative while attuned", () => {
   const CLOAK: EquipmentRecordLike = {
@@ -291,7 +266,7 @@ describe("criterion 5: a cloak granting advantage on Initiative while attuned", 
     const off = stateWith([item({ ...row, attuned: false })]);
     expect(initiativeRollMode(off, IDS.hero, () => definition, catalog)).toBe("normal");
 
-    // And the roll actually keeps the higher die: the queue gives 3 then 17.
+    // The roll keeps the higher die: the queue gives 3 then 17.
     const faces = [3, 17];
     startEncounter(worn, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero }, { actorId: IDS.foe, score: 5 }] }, () => faces.shift()!, GEOMETRY, () => definition, Date.now(), catalog);
     expect(worn.combat.initiative.find((entry) => entry.actorId === IDS.hero)!.score).toBe(17);
@@ -304,10 +279,6 @@ describe("criterion 5: a cloak granting advantage on Initiative while attuned", 
     expect(derivation.initiative).toBe(2);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 6 - one more use of a class resource, for one class only
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 6: a shield granting a Paladin one more use of Lay on Hands", () => {
   const SHIELD: EquipmentRecordLike = {
@@ -336,15 +307,13 @@ describe("criterion 6: a shield granting a Paladin one more use of Lay on Hands"
     const state = fight(stateWith([item({ id: "devotion-shield", name: "Shield of Devotion", equipped: true, category: "shield" })]));
     state.actors[0].actionUses = { "lay-on-hands": 5 };
     const action = effectiveActions(definition, state.actors[0], catalog).find((a) => a.id === "lay-on-hands")!;
-    // The gate reads the EFFECTIVE limit (6), so the sixth use is legal.
+    // The gate reads the effective limit (6), so the sixth use is legal.
     resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" }, deps([], catalog, definition));
     expect(state.actors[0].actionUses["lay-on-hands"]).toBe(6);
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Criterion 7 - advantage on OPPORTUNITY attacks. The one that reviews as working and does nothing.
-// -------------------------------------------------------------------------------------------------
+// Advantage on opportunity attacks is a distinct moment from ordinary attack advantage.
 
 describe("criterion 7: a dagger granting advantage on opportunity attacks", () => {
   const DAGGER: EquipmentRecordLike = {
@@ -360,8 +329,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
   it("applies advantage on an OFF-TURN opportunity attack - the onOwnTurn gate must not swallow it", () => {
     const definition = definitionOf();
     const catalog = catalogOf([DAGGER]);
-    // The FOE holds the turn. The hero reacts off-turn - which is exactly when the legacy
-    // `attack-advantage` branch would silently drop this.
+    // The foe holds the turn and the hero reacts off-turn, the moment a plain `attack-advantage` check misses.
     const state = fight(stateWith([item(DAGGER_ROW)]), IDS.foe);
     expect(state.combat.turnActorId).toBe(IDS.foe);
     state.combat = { ...state.combat, pendingReactions: [{
@@ -381,7 +349,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
     });
 
     expect(outcome.resolution!.rollMode).toMatchObject({ mode: "advantage", advantage: ["Dagger of Reprisal"] });
-    expect(outcome.resolution!.attack!.naturalRoll).toBe(18); // the HIGHER of the two dice was kept
+    expect(outcome.resolution!.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
   });
 
   it("does NOT apply on an ordinary on-turn attack - the filter really filters", () => {
@@ -401,10 +369,6 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
     expect(available.find((entry) => entry.attack?.reachFeet !== undefined)?.name).toBe("Dagger of Reprisal");
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 8 - an extra spell slot
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 8: an amulet granting one extra 1st-level spell slot", () => {
   const AMULET: EquipmentRecordLike = {
@@ -448,10 +412,6 @@ describe("criterion 8: an amulet granting one extra 1st-level spell slot", () =>
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Criterion 9 - extra typed damage ON A CRITICAL HIT ONLY
-// -------------------------------------------------------------------------------------------------
-
 describe("criterion 9: a mace dealing an extra 1d6 fire on a critical hit", () => {
   const MACE: EquipmentRecordLike = {
     id: "mace-of-embers", name: "Mace of Embers", category: "weapon", slot: "weapon",
@@ -466,8 +426,7 @@ describe("criterion 9: a mace dealing an extra 1d6 fire on a critical hit", () =
 
     const critState = fight(stateWith([item(ROW)]));
     const action = effectiveActions(definition, critState.actors[0], catalog).find((entry) => entry.id === "item-mace-of-embers")!;
-    // nat 20 -> crit. The weapon's own dice double (2d6+3); the RIDER does not (5e does not double
-    // dice added after the attack), so its formula stays 1d6.
+    // nat 20 -> crit. The weapon's own dice double (2d6+3); the rider's formula stays 1d6.
     const crit = resolveDefinitionAction(critState, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000040" }, deps([20, 5, 6, 4], catalog, definition));
     expect(crit.crit).toBe(true);
     expect(crit.damage).toEqual([
@@ -493,10 +452,6 @@ describe("criterion 9: a mace dealing an extra 1d6 fire on a critical hit", () =
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Criterion 10 - a raised spell save DC
-// -------------------------------------------------------------------------------------------------
-
 describe("criterion 10: half-plate that raises the spell save DC", () => {
   it("raises the DC the server ENFORCES, not just the one displayed", () => {
     const armor: EquipmentRecordLike = {
@@ -514,10 +469,6 @@ describe("criterion 10: half-plate that raises the spell save DC", () => {
     expect(state.combat.pendingSaves[0].dc).toBe(15); // the DC the target is actually held to
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 11 - a circlet granting proficiency / expertise, reversibly
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 11: a circlet granting a skill proficiency or expertise", () => {
   const CIRCLET: EquipmentRecordLike = {
@@ -540,17 +491,13 @@ describe("criterion 11: a circlet granting a skill proficiency or expertise", ()
     const off = stateWith([item({ ...row, equipped: false, attuned: true })]);
     const offDerivation = deriveEquipment(off.actors[0], definition, catalog);
     expect(effectiveSkillTier(definition, offDerivation, "perception")).toBe("none");
-    expect(effectiveSkillTier(definition, offDerivation, "stealth")).toBe("proficient"); // back to the BASE tier
+    expect(effectiveSkillTier(definition, offDerivation, "stealth")).toBe("proficient"); // back to the base tier
 
-    // The definition itself is untouched - which is what makes the un-grant free, and what keeps the
-    // grant out of the owner's projected `definition`.
+    // The definition is untouched, which makes the un-grant free and keeps the grant out of the owner's
+    // projected `definition`.
     expect(definition.proficiencies!.skills).toEqual([{ id: "stealth", proficiency: "proficient" }]);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 12 - saving throws: a flat bonus and advantage
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 12: a bow granting a bonus and advantage on saving throws", () => {
   const BOW: EquipmentRecordLike = {
@@ -574,10 +521,6 @@ describe("criterion 12: a bow granting a bonus and advantage on saving throws", 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Criterion 13 - curses: every rider is signed, and a curse will not come off
-// -------------------------------------------------------------------------------------------------
-
 describe("criterion 13: curses are the negative of every rider", () => {
   const CURSED: EquipmentRecordLike = {
     id: "blade-of-weakness", name: "Blade of Weakness", category: "weapon", slot: "weapon",
@@ -595,7 +538,7 @@ describe("criterion 13: curses are the negative of every rider", () => {
 
     const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000060" }, deps([15, 4, 6], catalog, definition));
     expect(resolution.rollMode).toMatchObject({ mode: "disadvantage", disadvantage: ["Blade of Weakness"] });
-    expect(resolution.attack!.naturalRoll).toBe(4); // the LOWER of 15 and 4
+    expect(resolution.attack!.naturalRoll).toBe(4); // the lower of 15 and 4
   });
 
   it("refuses a player's attempt to take it off, and lets the GM remove the curse", () => {
@@ -618,10 +561,6 @@ describe("criterion 13: curses are the negative of every rider", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// Criteria 14 & 15 - one vocabulary for every carrier, and an item that grants a feat
-// -------------------------------------------------------------------------------------------------
-
 describe("criteria 14 & 15: feats carry the same riders, and an item can grant one", () => {
   const FEAT: FeatRecordLike = {
     id: "resilient-guard", name: "Resilient Guard",
@@ -639,7 +578,7 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
 
     expect(derivation.featIds).toEqual([{ id: "resilient-guard", name: "Resilient Guard", sourceItemId: "belt-of-the-guard" }]);
-    // The feat's riders were read by the SAME collector that reads an item's - criterion 14 by construction.
+    // The feat's riders were read by the same collector that reads an item's.
     expect(derivation.armorClass).toBe(1);
     expect(derivation.saveBonus).toBe(2);
     expect(effectiveSkillTier(definition, derivation, "athletics")).toBe("proficient");
@@ -663,8 +602,7 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
   });
 
   it("does not follow a granted feat any further than depth 1", () => {
-    // The grant edge is one-directional (an item may name feats; nothing names an item), so a cycle
-    // cannot be drawn. Depth 1 is the belt-and-braces half: an unresolvable feat is simply skipped.
+    // An item may name feats but nothing names an item, so no cycle is possible; an unresolvable feat is skipped.
     const definition = definitionOf();
     const state = stateWith([item({ id: "belt-of-the-guard", name: "Belt of the Guard", category: "wondrous", equipped: true, attuned: true })]);
     const derivation = deriveEquipment(state.actors[0], definition, catalogOf([BELT], []));
@@ -672,10 +610,6 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
     expect(derivation.armorClass).toBe(0);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Fail-open and viewer safety
-// -------------------------------------------------------------------------------------------------
 
 describe("the derivation fails open and adds no actor state", () => {
   it("treats an item with no catalog record as mundane rather than throwing", () => {
@@ -705,16 +639,11 @@ describe("the derivation fails open and adds no actor state", () => {
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// The authoring/reading seam
-// -------------------------------------------------------------------------------------------------
-
 describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () => {
   it("keeps the authored content records assignable to the structural views this module reads", async () => {
-    // `equipmentCatalogOf` casts, because the authoring schemas live in the content package and these
-    // structural views are the reading surface. That cast is the one place the two could silently
-    // drift, so the claim is asserted at COMPILE time here: if a rider field is renamed or retyped in
-    // `@vtt/content-srd-5.2.1`, this file stops compiling instead of the riders quietly going inert.
+    // `equipmentCatalogOf` casts the authoring schemas to these structural views. The claim is checked at
+    // compile time here, so renaming or retyping a rider field in `@vtt/content-srd-5.2.1` breaks the
+    // build instead of making riders inert.
     const content = await import("@vtt/content-srd-5.2.1");
     const equipment: EquipmentRecordLike = content.EquipmentReferenceSchema.parse({
       id: "ring-of-proof", name: "Ring of Proof", source: "homebrew",
@@ -728,7 +657,7 @@ describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () 
     expect(equipment.slot).toBe("ring");
     expect(equipment.attunement?.required).toBe(true);
 
-    // And the whole way through: a real parsed record drives a real derivation.
+    // And end to end: a real parsed record drives a real derivation.
     const definition = definitionOf();
     const state = stateWith([item({ id: "ring-of-proof", name: "Ring of Proof", category: "ring", equipped: true, attuned: true })]);
     const derivation = deriveEquipment(state.actors[0], definition, catalogOf([equipment]));
@@ -736,10 +665,6 @@ describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () 
     expect(effectiveSkillTier(definition, derivation, "perception")).toBe("proficient");
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// Criterion 16 - the flat "+N to damage rolls" (C9's co-blocker, weapons-armour.ts limit (A))
-// -------------------------------------------------------------------------------------------------
 
 describe("criterion 16: a +1 weapon's flat damage bonus", () => {
   const PLUS_ONE: EquipmentRecordLike = {
@@ -758,12 +683,11 @@ describe("criterion 16: a +1 weapon's flat damage bonus", () => {
     const state = fight(stateWith([item(ROW)]));
     const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-shortsword-plus-one")!;
 
-    // Str +3 and the flat +1 in ONE printed formula - the sheet, the roll and the resolver read the
-    // same number, exactly as `attack-bonus` folds into the to-hit beside it.
+    // Str +3 and the flat +1 in one printed formula, as `attack-bonus` folds into the to-hit.
     expect(action.damage).toEqual([{ formula: "1d6 + 4", type: "piercing" }]);
     expect(action.attack!.bonus).toBe(6);
 
-    // The ROLL: d20 = 10 -> 16 vs AC 12 (hit); 1d6 = 4 -> 8 damage, the +1 inside the total.
+    // The roll: d20 = 10 -> 16 vs AC 12 (hit); 1d6 = 4 -> 8 damage, the +1 inside the total.
     const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000161" }, deps([10, 4], catalog, definition));
     expect(resolution.damage).toEqual([{ formula: "1d6 + 4", type: "piercing", total: 8 }]);
     expect(resolution.damageTotal).toBe(8);
@@ -789,7 +713,7 @@ describe("criterion 16: a +1 weapon's flat damage bonus", () => {
     const state = fight(stateWith([item(row)]));
     const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-smiting-shortsword")!;
 
-    // NOT folded standing: the printed formula stays the plain swing.
+    // Not folded standing: the printed formula stays the plain swing.
     expect(action.damage).toEqual([{ formula: "1d6 + 3", type: "piercing" }]);
 
     // An ordinary hit pays nothing: d20 = 10 -> hit, 1d6 = 4 -> 7, no bonus line.

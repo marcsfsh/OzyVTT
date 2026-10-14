@@ -7,15 +7,9 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
-/**
- * THE FAR END OF TYPED DAMAGE: the row the table actually reads (issue `4a`, gap 3).
- *
- * `answerSave` and both reaction paths folded `application.parts` into a bare `appliedDamage` and
- * dropped the rest, so a fire-resistant target's halved save damage reached the feed as a smaller
- * number with no reason attached - the client could not have rendered one if it wanted to. These
- * tests drive the real HTTP surface and assert on the STORED FEED TEXT, which is the only place that
- * claim can be settled: a unit test on the outcome object would pass with the narration still silent.
- */
+// Typed damage in the feed row the table reads. `answerSave` and both reaction paths must carry
+// `application.parts` through, so a resisted number arrives with its reason. These drive the HTTP
+// surface and assert on stored feed text, since an outcome-object test passes with silent narration.
 
 const DRAGON = "10000000-0000-4000-8000-000000000001";
 const BORIN = "10000000-0000-4000-8000-000000000002";
@@ -36,7 +30,7 @@ const baseDefinition = {
   proficiencyBonus: 2, armorClass: 12, speedFeet: 30, extensions: {}
 } as const;
 
-/** A dragon whose breath is a DEX save for 3d6 fire, and a hero the fire barely touches. */
+/** A dragon whose breath is a DEX save for 3d6 fire, and a hero who resists fire. */
 function initialState(resistances: string[] = ["fire"], uncannyDodge = true) {
   return GameStateSchema.parse({
     schemaVersion: 1,
@@ -137,12 +131,12 @@ describe("save.answer narrates the adjustment it used to swallow", () => {
     expect(answered.status).toBe(200);
     const outcome = (await answered.json()).data.outcome as { appliedDamage: number; parts: Array<{ adjustment: string | null }> };
 
-    // 1. The number really halved.
+    // The number really halved.
     expect(outcome.appliedDamage).toBe(Math.floor(proposed / 2));
     expect(before - hpOf(server, BORIN)).toBe(Math.floor(proposed / 2));
-    // 2. The breakdown survived the call instead of collapsing into a bare total.
+    // The breakdown survived instead of collapsing into a bare total.
     expect(outcome.parts.some((part) => part.adjustment === "resistance")).toBe(true);
-    // 3. And the FEED says why - the assertion no unit test can make.
+    // And the feed says why.
     const row = (await feed(base, gmToken)).find((entry) => entry.kind === "save" && entry.text.includes("Borin"));
     expect(row, "no save row reached the feed").toBeDefined();
     expect(row!.text).toContain("→");
@@ -164,25 +158,10 @@ describe("save.answer narrates the adjustment it used to swallow", () => {
 });
 
 describe("both reaction paths narrate the adjustment they used to swallow", () => {
-  /**
-   * Bite Borin so his Uncanny Dodge parks the hit's damage on a prompt.
-   *
-   * SEEDED ATTACK DIE, and it is load-bearing. +20 vs AC 12 hits on every face except a natural 1,
-   * which the resolver calls a FUMBLE - a miss, so no damage rolls, so no reaction prompt is minted
-   * and `pendingReactions[0]` is `undefined`. That is the whole of the flake this file carried: one
-   * bite in twenty erased the far end these two tests exist to assert, and with two bites per run the
-   * file failed roughly one run in ten (captured: `TypeError: Cannot read properties of undefined
-   * (reading 'proposedDamage')` at the DECLINED test).
-   *
-   * `attackNatural` is the public contract's own door for exactly this ("apply this exact d20 face
-   * for the attack instead of rolling"), so nothing about the server moves to make the test stable -
-   * the opportunity-attack test below already pins its d20 the same way. 18 hits and is below the
-   * critical threshold (20, and no rider here widens it), so the swing lands as an ordinary hit.
-   *
-   * Only the ATTACK die is pinned. The `4d6 + 6` damage still rolls for real and every assertion
-   * downstream derives its expectation from the number that came back, so the far-end proof stays a
-   * real rolled number rather than a hard-coded one.
-   */
+  // Bite Borin so his Uncanny Dodge parks the hit's damage on a prompt.
+  // The attack die is pinned: a natural 1 is a fumble, which rolls no damage and mints no reaction
+  // prompt, so an unseeded bite fails one run in twenty. 18 hits and is below the crit threshold.
+  // The `4d6 + 6` damage still rolls for real; downstream expectations derive from the returned number.
   async function biteBorin(base: string, gmToken: string, mapAssetId: string): Promise<void> {
     expect((await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: DRAGON }, { actorId: BORIN }] })).status).toBe(200);
     expect((await post(base, GAME_PATHS.actionResolve, gmToken, { commandId: randomUUID(), actorId: DRAGON, actionId: "bite", targetIds: [BORIN], attackNatural: 18 })).status).toBe(200);
@@ -198,7 +177,7 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
 
     const answered = await post(base, GAME_PATHS.reactionAnswer.replace("{reactionId}", prompt.id), gmToken, { commandId: randomUUID(), reactionId: prompt.id, use: true, commit: true });
     expect(answered.status).toBe(200);
-    // Uncanny Dodge halves the parked total, THEN fire resistance halves what is left.
+    // Uncanny Dodge halves the parked total, then fire resistance halves what is left.
     const halved = Math.floor(parked / 2);
     expect(before - hpOf(server, BORIN)).toBe(Math.floor(halved / 2));
 
@@ -213,8 +192,7 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
     const { base, server, gmToken, mapAssetId } = await boot();
     await biteBorin(base, gmToken, mapAssetId);
     const prompt = server.store.snapshot.combat.pendingReactions[0];
-    // Same guard as the USED test above: this line is where an unseeded fumble surfaced, and a named
-    // failure beats `TypeError: Cannot read properties of undefined`.
+    // A named failure if the bite fumbled, instead of a TypeError further down.
     expect(prompt, "the bite parked no reaction prompt").toBeDefined();
     const parked = prompt.proposedDamage;
     const before = hpOf(server, BORIN);
@@ -230,11 +208,11 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
 
 describe("the opportunity-attack path narrates it too", () => {
   it("explains the resisted damage of a swing taken as a reaction", async () => {
-    // No Uncanny Dodge here: with it, the swing's damage parks on a SECOND prompt instead of landing.
+    // No Uncanny Dodge here: with it, the swing's damage would park on a second prompt.
     const { base, server, gmToken, mapAssetId } = await boot(["fire"], false);
     expect((await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: DRAGON }, { actorId: BORIN }] })).status).toBe(200);
-    // A leaves-reach prompt is minted by the movement rules; seeding it directly keeps this test
-    // about the ANSWER (which is what discarded the breakdown), not about reach geometry.
+    // A leaves-reach prompt is normally minted by the movement rules; seeding it keeps this test about
+    // the answer, not reach geometry.
     const promptId = randomUUID();
     await server.store.execute({ id: randomUUID(), type: "test.seed-reaction", payload: {}, principal: "gm" }, (state) => {
       state.combat = { ...state.combat, pendingReactions: [{
@@ -259,19 +237,15 @@ describe("the opportunity-attack path narrates it too", () => {
   });
 });
 
-/**
- * `4b` - THE SAVE'S DAMAGE BECOMES ENTERABLE.
- *
- * The damage rolled the instant the action resolved and froze into `pendingSaves[].proposedDamage`;
- * `answerSave` applied it with no door at all - not for the GM, and not for a table rolling physical
- * dice. These drive the real command and read the hit points and the feed row afterwards.
- */
+// The save's damage, rolled when the action resolved and frozen into
+// `pendingSaves[].proposedDamage`, can be amended by whoever answers the save. These drive the real
+// command and read hit points and the feed row afterwards.
 describe("save.answer takes a hand-entered damage total", () => {
   it("applies the amended number, keeps its type, and says so in the feed", async () => {
     const { base, server, gmToken, mapAssetId } = await boot([]); // no resistance: the number is the number
     await breatheOnBorin(base, gmToken, mapAssetId);
     const save = server.store.snapshot.combat.pendingSaves[0];
-    // Force the plan's exact case: a proposal of 17, amended to 3.
+    // A proposal of 17, amended to 3.
     await server.store.execute({ id: randomUUID(), type: "test.seed-proposal", payload: {}, principal: "gm" }, (state) => {
       state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.map((entry) => entry.id === save.id
         ? { ...entry, proposedDamage: 17, proposedDamageParts: [{ amount: 17, type: "fire" }], halfOnSuccess: false }
@@ -307,12 +281,8 @@ describe("save.answer takes a hand-entered damage total", () => {
   });
 
   it("refuses a fat-fingered 9999 in words a GM can act on, and moves nothing", async () => {
-    // THE REFUSAL A GM READS, through the door the prompt posts through. The field is four
-    // characters wide, so 1001-9999 is typeable and `saveDamageAmend` lets it travel on purpose -
-    // swallowing it client-side would quietly apply the auto-rolled number instead. What came back
-    // until 2026-08-10 was zod's own "Number must be less than or equal to 1000": the 0..1000 bound
-    // was bare, and the sentence below lived only on an `answerSave` guard the schema had already
-    // made unreachable. The bound carries it now, which is the only place that can produce it.
+    // The field accepts four digits, so 1001-9999 reach the server; the schema bound must carry the
+    // GM-readable refusal rather than zod's default message.
     const { base, server, gmToken, mapAssetId } = await boot([]);
     await breatheOnBorin(base, gmToken, mapAssetId);
     const save = server.store.snapshot.combat.pendingSaves[0];
@@ -328,7 +298,7 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect(hpOf(server, BORIN)).toBe(before);
     expect(server.store.snapshot.combat.pendingSaves.some((entry) => entry.id === save.id)).toBe(true);
 
-    // The far edge of the bound is INSIDE it - the sentence is a refusal, not a wall at 999.
+    // 1000 itself is inside the bound.
     const accepted = await answer(1000);
     expect(accepted.status).toBe(200);
     expect(before - hpOf(server, BORIN)).toBeGreaterThan(0);
@@ -340,7 +310,7 @@ describe("save.answer takes a hand-entered damage total", () => {
     const save = server.store.snapshot.combat.pendingSaves[0];
     const playerToken = server.auth.issuePlayerSession();
 
-    // A player who has claimed nothing may not answer - much less amend - Borin's save.
+    // A player who has claimed nothing may not answer, much less amend, Borin's save.
     const refused = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride: 3 });
     expect(refused.status).toBeGreaterThanOrEqual(400);
     expect(hpOf(server, BORIN)).toBe(40);
@@ -354,12 +324,7 @@ describe("save.answer takes a hand-entered damage total", () => {
 });
 
 describe("actor.apply-damage narrates the type the GM named", () => {
-  /**
-   * D7's CLIENT HALF MADE THIS PATH REACHABLE. `damageType` had been on `ApplyDamageSchema` since
-   * `4a` and no client control sent one, so the whole branch - including the GM-only typo warning
-   * below - was HTTP-callers-only and had no test anywhere in the repo. The chooser that now sits in
-   * the three hand-entry doors is what a GM types into; these are the rows it produces.
-   */
+  /** The hand-entry damage chooser sends `damageType`; these are the rows it produces, including the GM-only typo warning. */
   const damageBorin = (base: string, token: string, body: Record<string, unknown>) =>
     post(base, GAME_PATHS.actorDamage.replace("{actorId}", BORIN), token, { commandId: randomUUID(), actorId: BORIN, ...body });
 
@@ -371,7 +336,7 @@ describe("actor.apply-damage narrates the type the GM named", () => {
 
     const row = (await feed(base, gmToken)).find((entry) => entry.kind === "damage" && entry.text.includes("Borin"))!;
     expect(row.text).toBe("Borin took 5 damage (10 fire → 5, resistance).");
-    // Not GM-only: a halved number the table cannot explain is the defect ADR-0020 exists to prevent.
+    // Not GM-only: a halved number the table cannot explain is what ADR-0020 exists to prevent.
     const playerToken = server.auth.issuePlayerSession();
     expect((await feed(base, playerToken)).some((entry) => entry.text.includes("10 fire → 5, resistance"))).toBe(true);
   });
@@ -380,8 +345,8 @@ describe("actor.apply-damage narrates the type the GM named", () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
     const before = hpOf(server, BORIN);
-    // The vocabulary is open, so this lands in full rather than being refused - which is exactly why
-    // a typo here is silently inert and worth one line to the person who can fix it.
+    // The vocabulary is open, so this lands in full rather than being refused; that is why a typo is
+    // worth a warning to the GM.
     expect((await damageBorin(base, gmToken, { amount: 10, damageType: "fier" })).status).toBe(200);
     expect(before - hpOf(server, BORIN)).toBe(10);
 

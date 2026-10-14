@@ -7,13 +7,8 @@ import { ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
-/**
- * QA — ADVERSARIAL ROLE-BOUNDARY ATTACK (director's own pass, 2026-08-04).
- *
- * Every probe plays a hostile PLAYER session against the commands this engagement added or loosened,
- * and asserts the server refuses. These are the moves a player who read the API docs would try. Each
- * asserts the CORRECT behaviour; a failure is a live privilege hole. Permanent armour.
- */
+// Adversarial role-boundary cases: a hostile player session tries commands a player must not reach.
+// A failure here is a privilege hole.
 
 const MINE = "10000000-0000-4000-8000-0000000000c1";
 const YOURS = "10000000-0000-4000-8000-0000000000c2";
@@ -101,9 +96,8 @@ describe("QA attack — rules ask/answer (D8/D9)", () => {
 
 describe("QA attack — replays (D26)", () => {
   it("answers a player 404 (never 403) for an archive read, so existence is never confirmed", async () => {
-    // The existence-oracle rule: a player must not be able to tell an unshared archive from a missing
-    // one. Both are 404. (The existing-but-unshared projection path is covered by the archive suite;
-    // here the point is that a player read never returns 403 — that alone would confirm existence.)
+    // A player must not be able to tell an unshared archive from a missing one: both are 404. A 403 on a
+    // player read would alone confirm existence.
     const { base, me } = await twoPlayers();
     const response = await get(base, ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", "999999"), me);
     expect(response.status).toBe(404);
@@ -120,7 +114,7 @@ describe("QA attack — player create/rebuild boundaries (D13)", () => {
   it("refuses character.create from a player once the GM closes the builder to players", async () => {
     const { base, server, gmToken } = await boot();
     const player = server.auth.issuePlayerSession();
-    // Default is open (D13's chosen direction). The security property is that gm-only actually shuts it.
+    // Default is open; the security property is that gm-only actually shuts it.
     expect((await post(base, GAME_PATHS.builderPolicy, gmToken, { commandId: randomUUID(), allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], playerBuilder: "gm-only" })).status).toBe(200);
     const response = await post(base, GAME_PATHS.characters, player, { commandId: randomUUID(), request: { name: "Sneak" } });
     expect([400, 403]).toContain(response.status);

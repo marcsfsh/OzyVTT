@@ -52,9 +52,8 @@ describe("definition action resolution", () => {
     expect(gmGame.rolls.every((roll) => roll.initiatorRole === "gm")).toBe(true);
     expect(gmGame.rolls.every((roll) => roll.initiatorSessionId === IDS.gmSession)).toBe(true);
 
-    // When a player resolves their own claimed character's action, the recorded rolls attribute to that
-    // player (session + role) while staying public with the acting character's label. (The handler's
-    // canInitiateForActor enforces ownership; resolveDefinitionAction just carries the attribution.)
+    // A player resolving their own character's action is attributed to that player (session + role)
+    // while the roll stays public under the character's label. Ownership is enforced by the handler.
     const playerSession = "30000000-0000-4000-8000-00000000000b";
     const playerGame = combatState();
     resolveDefinitionAction(playerGame, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-00000000000c" }, { ...deps([15, 3, 4]), initiatorRole: "player", initiatorSessionId: playerSession });
@@ -93,7 +92,7 @@ describe("definition action resolution", () => {
     expect(missResolution.attack?.outcome).toBe("miss");
     expect(missResolution.damage).toEqual([]);
 
-    // A declared crit auto-hits and doubles the dice even when the entered total is BELOW AC.
+    // A declared crit auto-hits and doubles the dice even when the entered total is below AC.
     const crit = combatState();
     const critResolution = resolveDefinitionAction(crit, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000a3", attackTotal: 12, critical: true }, deps([6, 6, 6, 6]));
     expect(critResolution.attack?.outcome).toBe("crit");
@@ -101,7 +100,7 @@ describe("definition action resolution", () => {
     expect(critResolution.crit).toBe(true);
     expect(critResolution.damage).toEqual([{ formula: "4d6 + 5", type: "piercing", total: 29 }]);
 
-    // The crit is the FLAG, not the number: a total that equals nat-20-plus-bonus is a normal hit unless declared.
+    // A crit is the declared flag, not the number: a total equal to nat-20-plus-bonus is a normal hit.
     const notCrit = combatState();
     const notCritResolution = resolveDefinitionAction(notCrit, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000a4", attackTotal: 29, critical: false }, deps([3, 4]));
     expect(notCritResolution.attack?.outcome).toBe("hit");

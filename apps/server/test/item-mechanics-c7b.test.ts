@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-// The lane list is authoring-side and outside the package's `exports` map, so it is reached by path.
-// That is deliberate: this file's guard is that the COMPOSED lane and the COMMITTED bundle agree.
+// The lane list is authoring-side and outside the package's `exports` map, so it is imported by path;
+// this file checks that the composed lane and the committed bundle agree.
 import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { setCondition } from "../src/actor-conditions.js";
@@ -13,32 +13,12 @@ import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-thro
 import { startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 
-/**
- * ============================================================================================
- * C7b - WANDS, STAFFS, RODS, RINGS AND THE SCROLL, PROVED AT THE FAR END
- * ============================================================================================
- *
- * `packages/content-srd-5.2.1/scripts/item-mechanics/wands-rods-rings.ts` authors 27 of this lane's
- * 57 items. This file is the proof that the authoring reaches the table, and it deliberately does
- * NOT inject a fixture catalog the way `item-riders.test.ts` does: it runs the REAL `ContentLibrary`
- * against the REAL committed `magic-items.v1.json`, so a rider the ETL failed to merge, an item id
- * that got renamed, or a `spellId` that resolves to nothing fails HERE rather than at one player's
- * character sheet.
- *
- * Every assertion below is a number a player can act on or a refusal they would read. Not one of
- * them asks whether a value survived derivation.
- *
- * THE FAR END IS THE REFUSAL. A `Wand of Fireballs` spends one of its seven charges, rolls Fireball's
- * real 8d6 through the item's `casts` block against the printed DC 15 - and when the charges are
- * gone the eighth press is REFUSED, by name.
- *
- * THE SECOND HALF OF THIS FILE IS A SALVAGE'S GUARD, and it exists because the lane first authored
- * 32 items and nine of them produced the WRONG effect at a table. The last two describes below pin
- * every removal so no later pass can quietly put one back: the removed casts by name and reason, the
- * mechanical rule underneath them, and - for the five items whose whole entry came out - the ENGINE
- * outcome that a wounded ally cannot be hit by a Staff of Healing, because the staff offers no
- * action at all.
- */
+// Wands, staffs, rods, rings and the scroll (`wands-rods-rings.ts`), driven through the real
+// `ContentLibrary` over the committed `magic-items.v1.json`, so an unmerged rider, a renamed item id
+// or a dangling `spellId` fails here. Assertions are numbers a player acts on or refusals they read.
+// A Wand of Fireballs spends a charge, rolls Fireball's 8d6 against the printed DC 15, and refuses by
+// name once the charges are gone. The last two describes pin casts and entries that were removed
+// because they produced the wrong effect at the table.
 
 const view = new ContentLibrary().forAudience("gm");
 const catalog = equipmentCatalogOf(view);
@@ -51,7 +31,7 @@ const IDS = {
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/** A Wizard 5 with no spellcasting block, so an item's PRINTED DC is visibly the item's and not hers. */
+/** A Wizard 5 with no spellcasting block, so an item's printed DC is visibly the item's. */
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
     name: "Hero", armorClass: 12, proficiencyBonus: 3,
@@ -89,7 +69,7 @@ function deps(faces: number[], definition: ActorDefinition): ResolveDependencies
 }
 
 const cmd = (n: number) => `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
-/** A fresh action slot - the ECONOMY is not what any test here is measuring; the charge pool is. */
+/** A fresh action slot: the charge pool is under test, not the action economy. */
 const newTurn = (state: GameState) => {
   state.combat = { ...state.combat, turn: { ...state.combat.turn, actionUsed: false, actionInstance: null } };
 };
@@ -98,16 +78,11 @@ const WAND_ROW = { id: "wand-of-fireballs", name: "Wand of Fireballs", quantity:
 const CAST_ID = "item-wand-of-fireballs-cast-fireball";
 const CHARGES = "wand-of-fireballs-charges";
 
-// -------------------------------------------------------------------------------------------------
-// THE FAR END
-// -------------------------------------------------------------------------------------------------
-
 describe("C7b far end: a Wand of Fireballs spends a charge, rolls real damage, and refuses at zero", () => {
   it("carries the authored cast out of the COMMITTED bundle, through the real content library", () => {
-    // Not the far end - the first link. If the overlay did not merge, this is what says so.
+    // The first link: if the overlay did not merge, this fails.
     const record = view.equipmentRecord("wand-of-fireballs")!;
-    // No `atLevel`: the salvage dropped the authored 3 because it equalled Fireball's own level and
-    // `castAction` reads it only through `level > spell.level`, so it selected nothing and moved no die.
+    // No `atLevel`: it would equal Fireball's own level, and `castAction` only reads it when it is higher.
     expect(record.casts).toEqual([{
       spellId: "fireball", saveDc: 15, consumesSpellSlot: false,
       uses: { limit: 7, per: "long-rest", pool: CHARGES }
@@ -121,17 +96,17 @@ describe("C7b far end: a Wand of Fireballs spends a charge, rolls real damage, a
 
     const cast = effectiveActions(definition, actor, catalog).find((entry) => entry.id === CAST_ID)!;
     expect(cast.name).toBe("Cast Fireball (Wand of Fireballs)");
-    // The SPELL bundle supplies the dice and the save ability; the ITEM supplies the DC. The wielder
-    // has no spellcasting block at all, so a DC of 15 can only have come from the authored `saveDc`.
+    // The spell bundle supplies the dice and save ability; the item supplies the DC. The wielder has no
+    // spellcasting block, so DC 15 can only come from the authored `saveDc`.
     expect(cast.damage).toEqual([{ formula: "8d6", type: "fire" }]);
     expect(cast.save).toEqual({ ability: "dex", dc: 15 });
     expect(cast.uses).toEqual({ limit: 7, per: "long-rest", pool: CHARGES });
 
-    // THE ROLL: eight d6 faces of 5 -> 40 Fire, offered to the target as a real pending save.
+    // The roll: eight d6 faces of 5 -> 40 Fire, offered to the target as a pending save.
     const resolution = resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(1) }, deps([5, 5, 5, 5, 5, 5, 5, 5], definition));
     expect(resolution.damage).toEqual([{ formula: "8d6", type: "fire", total: 40 }]);
     expect(state.combat.pendingSaves[0]).toMatchObject({ targetActorId: IDS.foe, ability: "dex", dc: 15, proposedDamage: 40, halfOnSuccess: true });
-    // The charge is really spent, on the authored POOL key rather than the action id.
+    // The charge is spent on the authored pool key, not the action id.
     expect(actor.actionUses[CHARGES]).toBe(1);
   });
 
@@ -144,17 +119,17 @@ describe("C7b far end: a Wand of Fireballs spends a charge, rolls real damage, a
     actor.actionUses = { [CHARGES]: 6 };
     newTurn(state);
     resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(2) }, deps([1, 1, 1, 1, 1, 1, 1, 1], definition));
-    expect(actor.actionUses[CHARGES]).toBe(7); // the seventh charge - still legal.
+    expect(actor.actionUses[CHARGES]).toBe(7); // the seventh charge, still legal
 
     newTurn(state);
-    // THE FAR END. The message names the wand and the pool it exhausted.
+    // The message names the wand and the pool it exhausted.
     expect(() => resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) }, deps([1, 1, 1, 1, 1, 1, 1, 1], definition)))
       .toThrow("Cast Fireball (Wand of Fireballs): no uses remaining (7/long rest).");
     // And nothing was rolled or spent on the refused press.
     expect(actor.actionUses[CHARGES]).toBe(7);
 
-    // The pool re-arms on a long rest, so "refused" is not "dead" (limit L2: the SRD recharges
-    // 1d6 + 1 at dawn and this restores all seven - the module states that over-recovery).
+    // The pool re-arms on a long rest. Known over-recovery: the SRD recharges 1d6 + 1 at dawn, this
+    // restores all seven.
     state.combat = { ...state.combat, active: false, initiative: [] };
     applyRest(state, IDS.hero, "long", () => definition, catalog);
     expect(actor.actionUses[CHARGES]).toBeUndefined();
@@ -169,10 +144,6 @@ describe("C7b far end: a Wand of Fireballs spends a charge, rolls real damage, a
     expect(effectiveActions(definition, unequipped.actors[0], catalog).find((entry) => entry.id === CAST_ID)).toBeUndefined();
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// The lane's other rider families, each ending at an engine outcome
-// -------------------------------------------------------------------------------------------------
 
 describe("C7b: the standing modifiers a ring authors", () => {
   const ROW = { id: "ring-of-protection", name: "Ring of Protection", quantity: 1, equipped: true, attuned: true, category: "ring" };
@@ -195,7 +166,7 @@ describe("C7b: the standing modifiers a ring authors", () => {
       random: () => 11, newRollId: () => "40000000-0000-4000-8000-000000000000", sessionId: IDS.gmSession, role: "gm",
       now: () => "2026-08-11T00:00:00.000Z", resolveDefinition: () => definition, catalog
     });
-    // d20 = 11, +2 DEX, +1 ring = 14, which exactly meets the DC. Without the ring it is a 13 and a fail.
+    // d20 = 11, +2 DEX, +1 ring = 14, which meets the DC. Without the ring it is 13 and a fail.
     expect(outcome.outcome).toMatchObject({ total: 14, success: true });
 
     const off = stateWith([item({ ...ROW, equipped: false })]);
@@ -217,7 +188,7 @@ describe("C7b: an item action with a printed DC, a condition read off its prose,
     expect(action.uses).toEqual({ limit: 1, per: "long-rest" });
 
     resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) }, deps([], definition));
-    // The condition is not an authored field - `conditionFrom` reads the word out of the description.
+    // The condition is not an authored field: `conditionFrom` reads it from the description.
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionId: "charmed" });
 
     newTurn(state);
@@ -259,15 +230,11 @@ describe("C7b: a staff's resistance and its shared charge pool", () => {
     expect(actor.actionUses["staff-of-charming-charges"]).toBe(10);
 
     newTurn(state);
-    // A DIFFERENT cast on the same pool is now refused too - which is what "one pool" means.
+    // A different cast on the same pool is refused too: one pool.
     expect(() => resolveDefinitionAction(state, actions.find((entry) => entry.id === "item-staff-of-charming-cast-charm-person")!, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) }, deps([], definition)))
       .toThrow(/no uses remaining \(10\/long rest\)/);
   });
 });
-
-// -------------------------------------------------------------------------------------------------
-// The lane's module-level guard
-// -------------------------------------------------------------------------------------------------
 
 describe("C7b: the lane authors what it claims to author", () => {
   const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7b")!;
@@ -288,8 +255,8 @@ describe("C7b: the lane authors what it claims to author", () => {
   });
 
   it("landed every authored rider on the COMMITTED bundle - not one entry merged to nothing", () => {
-    // The seam refuses an empty rider at build time; this is the other half - that the build was
-    // actually RUN and its output committed. A module edited without regenerating fails here.
+    // The build refuses an empty rider; this checks the build was run and its output committed, so a
+    // module edited without regenerating fails here.
     for (const [id, mechanics] of Object.entries(lane.entries)) {
       const record = view.equipmentRecord(id)!;
       for (const key of Object.keys(mechanics) as ReadonlyArray<"casts" | "actions" | "modifiers" | "grants">) {
@@ -301,35 +268,25 @@ describe("C7b: the lane authors what it claims to author", () => {
   });
 
   it("reserves U26's spell-attack-bonus rather than authoring it inert", () => {
-    // The four carriers the plan reserves. None of them may carry the rider until U26 ships a reader;
-    // `applyItemMechanics` refuses it at build time, and this is the assertion on the OUTPUT.
+    // These carriers need a reader that does not exist yet; `applyItemMechanics` refuses the rider at
+    // build time, and this asserts the output.
     for (const id of ["wand-of-the-war-mage-1", "wand-of-the-war-mage-2", "wand-of-the-war-mage-3", "staff-of-the-magi", "staff-of-the-woodlands", "staff-of-power"]) {
       const record = view.equipmentRecord(id)!;
       expect(record.modifiers.map((modifier) => modifier.type), id).not.toContain("spell-attack-bonus");
     }
-    // Staff of Power's AC and saving-throw halves ARE readable and ARE authored, from the same sentence.
+    // Staff of Power's AC and saving-throw halves are readable and authored, from the same sentence.
     expect(view.equipmentRecord("staff-of-power")!.modifiers.map((modifier) => modifier.type).sort()).toEqual(["armor-class", "save-bonus"]);
-    // Ring of Warmth is U31's and is a Ring, so it is this lane's absence and not C7c's.
+    // Ring of Warmth is a Ring, so it is this lane's absence.
     const warmth = view.equipmentRecord("ring-of-warmth")!;
     expect(warmth.category).toBe("ring");
     expect(warmth.modifiers).toEqual([]);
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// THE SALVAGE'S GUARD
-// -------------------------------------------------------------------------------------------------
-
-/**
- * THE SPELLS THIS LANE MAY NOT CAST, each with what the cast would have DONE. Every one of these was
- * authored by the lane and removed by the salvage; the module records each as a named absence.
- *
- * The reason is one measured fact stated in the module as L6: `castAction`
- * (`apps/server/src/equipment-derivation.ts:922-961`) reads `spell.damage.roll` as the cast's damage,
- * `spell.damage.types[0] ?? "force"` as its type, and emits an `attack` block from `spell.attackRoll`
- * - and for these seven records those columns describe the spell's TEXT rather than what one cast
- * rolls at a target.
- */
+// Spells this lane may not cast, each with what the cast would have done. `castAction` reads
+// `spell.damage.roll` as the cast's damage, `spell.damage.types[0] ?? "force"` as its type, and emits
+// an `attack` block from `spell.attackRoll`; for these records those columns describe the spell's text
+// rather than what one cast rolls at a target.
 const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
   ["cure-wounds", "{roll: '2d8', types: []} -> a 2d8 FORCE damage action; a Staff of Healing would hit the ally it heals"],
   ["heal", "{roll: null, types: []} -> no damage, no save, no attack: a Rod of Resurrection that restores nothing and debits a charge"],
@@ -341,11 +298,7 @@ const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 describe("C7b salvage: the removed casts stay removed", () => {
-  /**
-   * LAZY, and that is not a style choice. Computed at module scope this threw during COLLECTION when
-   * the lane was stripped from `index.ts` - so the control probe reported "0 tests" instead of a
-   * named failure, which is the weaker signal by a distance. Measured while running that probe.
-   */
+  /** Lazy so that removing the lane from `index.ts` fails a named test instead of throwing during collection. */
   const authoredCasts = () => {
     const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7b");
     expect(lane, "no C7b lane is composed into ITEM_MECHANICS_LANES at all").toBeDefined();
@@ -367,14 +320,9 @@ describe("C7b salvage: the removed casts stay removed", () => {
     }
   });
 
-  /**
-   * The mechanical rule under three of the seven, applied to EVERY cast rather than the named list -
-   * so a spell nobody has looked at yet cannot walk in through the same door. A damage roll with an
-   * EMPTY type set is a record that cannot say what the cast rolls: `known-bugs.md` measures 24 of
-   * the 339 spells in that shape and they are a MIXTURE (healing, flat buffs, temporary hit points,
-   * choose-your-type), so it is not a healing marker and must not be used as one. What it reliably
-   * is, is a record `castAction` will turn into Force damage by its own fallback.
-   */
+  // Applied to every cast, not just the named list. A damage roll with an empty type set cannot say what
+  // the cast rolls (those spells are a mix of healing, buffs, temporary hit points and choose-your-type),
+  // and `castAction` would turn it into Force damage.
   it("names no spell whose damage roll carries no damage type", () => {
     for (const cast of authoredCasts()) {
       const spell = view.spellRecord!(cast.spellId)!;
@@ -384,13 +332,8 @@ describe("C7b salvage: the removed casts stay removed", () => {
     }
   });
 
-  /**
-   * The rule under the other three, scoped to THIS LANE deliberately. `attackRoll` is true for 42 of
-   * the 339 shipped spells and all three occurrences C7b reached for were false positives - the
-   * column is set by a mention of an attack roll ANYWHERE in the text, including attack rolls other
-   * creatures make. This is not a claim that an item may never cast a spell attack; it is a floor for
-   * a lane whose every encounter with the column was wrong.
-   */
+  // The `attackRoll` column is set by any mention of an attack roll in the text, including other
+  // creatures' attacks, so this lane may not rely on it.
   it("names no spell the record marks as an attack roll, while that column is untrustworthy", () => {
     for (const cast of authoredCasts()) {
       const spell = view.spellRecord!(cast.spellId)!;
@@ -400,7 +343,7 @@ describe("C7b salvage: the removed casts stay removed", () => {
 });
 
 describe("C7b salvage: the five whole-entry absences are absent AT THE ENGINE", () => {
-  /** Equipped and attuned - every gate a rider needs is open, so nothing but the absence explains it. */
+  /** Equipped and attuned, so every gate is open and only the absence explains the result. */
   const worn = (id: string, name: string, category: string) =>
     fight(stateWith([item({ id, name, quantity: 1, equipped: true, attuned: true, category })]));
 
@@ -414,18 +357,14 @@ describe("C7b salvage: the five whole-entry absences are absent AT THE ENGINE", 
     const state = worn(id, name, category);
     const mine = effectiveActions(definition, state.actors[0], catalog).filter((entry) => entry.id.startsWith(`item-${id}-`));
     expect(mine.map((entry) => entry.name), `${name} still derives an action`).toEqual([]);
-    // And the row itself carries no rider of any kind - the absence is in the BUNDLE, not just here.
+    // And the row itself carries no rider: the absence is in the bundle.
     const record = view.equipmentRecord(id)!;
     expect({ casts: record.casts, actions: record.actions, modifiers: record.modifiers }).toEqual({ casts: [], actions: [], modifiers: [] });
   });
 
-  /**
-   * The fifth is a RULING rather than a defect, so its proof is the opposite shape: with the ring
-   * worn, a non-magical Paralyzed LANDS. `grants.conditionImmunities` has no source filter, so the
-   * authored immunity refused a Ghoul's Claw and a Giant Spider's Web - both non-magical, both in the
-   * shipped `monsters.v1.json` - where the SRD ("MAGIC can neither... cause you to have the Paralyzed
-   * or Restrained condition") lets them land.
-   */
+  // `grants.conditionImmunities` has no source filter, so an authored immunity would refuse non-magical
+  // paralysis (a Ghoul's Claw, a Giant Spider's Web) that the SRD lets land ("Magic can neither... cause
+  // you to have the Paralyzed or Restrained condition"). With the ring worn, a non-magical Paralyzed lands.
   it("lets a non-magical Paralyzed land on the wearer of a Ring of Free Action", () => {
     const definition = definitionOf();
     const state = worn("ring-of-free-action", "Ring of Free Action", "ring");
@@ -443,10 +382,10 @@ describe("C7b salvage: the two entries that lost a cast and kept the rest", () =
     const definition = definitionOf();
     const state = fight(stateWith([item({ id: "staff-of-power", name: "Staff of Power", quantity: 1, equipped: true, attuned: true, category: "staff" })]));
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
-    // The far end of what SURVIVED: +2 to the derived AC and to the save the server rolls.
+    // What remains: +2 to the derived AC and to the save the server rolls.
     expect(derivation.armorClass).toBe(2);
     expect(saveTotalFor(definition, state.actors[0], "dex", derivation)).toBe(4);
-    // Both casts came out, so the 20-charge pool has nothing drawing on it.
+    // Both casts were removed, so the 20-charge pool has nothing drawing on it.
     expect(view.equipmentRecord("staff-of-power")!.casts).toEqual([]);
     expect(effectiveActions(definition, state.actors[0], catalog).filter((entry) => entry.id.startsWith("item-staff-of-power-"))).toEqual([]);
   });
@@ -468,11 +407,11 @@ describe("C7b salvage: the two entries that lost a cast and kept the rest", () =
       "item-ring-of-shooting-stars-cast-light",
       "item-ring-of-shooting-stars-shooting-stars"
     ]);
-    // Shooting Stars is the ring's own printed effect and is untouched by the salvage: DC 15, 5d4 Radiant.
+    // Shooting Stars is the ring's own printed effect: DC 15, 5d4 Radiant.
     const stars = actions.find((entry) => entry.id === "item-ring-of-shooting-stars-shooting-stars")!;
     expect(stars.save).toEqual({ ability: "dex", dc: 15 });
     expect(stars.damage).toEqual([{ formula: "5d4", type: "radiant" }]);
-    // Not one of the three surviving actions carries an attack roll - Faerie Fire was the one that did.
+    // None of the surviving actions carries an attack roll.
     expect(actions.filter((entry) => entry.attack !== undefined)).toEqual([]);
   });
 
@@ -484,7 +423,7 @@ describe("C7b salvage: the two entries that lost a cast and kept the rest", () =
     const dcOf = (spellId: string) => actions.find((entry) => entry.id.endsWith(`cast-${spellId}`))!.save;
     expect(dcOf("animal-friendship")).toEqual({ ability: "wis", dc: 13 });
     expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13 });
-    // Speak with Animals forces no save, so the authored `saveDc: 13` had no reader and came out.
+    // Speak with Animals forces no save, so a `saveDc` would have no reader.
     expect(dcOf("speak-with-animals")).toBeUndefined();
     expect(view.equipmentRecord("ring-of-animal-influence")!.casts.find((cast) => cast.spellId === "speak-with-animals")!.saveDc).toBeUndefined();
   });

@@ -13,24 +13,10 @@ import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation
 import { initiativeRollMode, startEncounter } from "../src/encounter.js";
 import { saveRollSources } from "../src/saving-throws.js";
 
-/**
- * ============================================================================================
- * STAGE 4, LANE B1 - BARBARIAN, FIGHTER, MONK - PROVED AT THE FAR END
- * ============================================================================================
- *
- * Every assertion below is a number a player can act on: the AC on the sheet, the DC the target is
- * held to, the die the engine actually keeps, the counter it spends, or the refusal it prints. Not
- * one of them asks whether a rider "survived derivation" - that is the failure the `2e` correction
- * named, and content that typechecks and does nothing looks identical to content that works.
- *
- * These run the REAL builder against the REAL SRD bundles, so they are also a check on the ETL: a
- * feature id the markdown renames, a printed column that stops being read, or an overlay key that
- * lands on the wrong record all fail here rather than at one player's character sheet.
- *
- * NEGATIVE CONTROLS, everywhere a rider has an obvious way to appear to work: the ability the save
- * advantage must NOT reach, the crit range before the subclass grants it, the pick that must be
- * refused once the budget is full, the pool that must be empty on the second press.
- */
+// Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
+// target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
+// the real builder against the real SRD bundles, so it also catches ETL drift. Negative controls
+// appear wherever a rider could appear to work without working.
 
 const POLICY = BuilderPolicySchema.parse({});
 const view = new ContentLibrary().forAudience("gm");
@@ -54,10 +40,6 @@ const asi = (classId: string, level: number, first: string, second: string): Row
   { level, kind: "ability-score", id: second, payload: { featureId: "ability-score-improvement" } }
 ] as Row[]);
 
-// ---------------------------------------------------------------------------------------------
-// The three sheets, built from real ledgers.
-// ---------------------------------------------------------------------------------------------
-
 /** The ASI rows for every Ability Score Improvement level at or below `level`, in printed order. */
 const asisTo = (classId: string, level: number, plan: ReadonlyArray<[number, string, string]>): Row[] =>
   plan.filter(([at]) => at <= level).flatMap(([at, first, second]) => asi(classId, at, first, second));
@@ -70,14 +52,10 @@ const masteries = (classId: string, ids: readonly string[], count: number): Row[
 const barbarianMasteries = (level: number) => (level >= 10 ? 4 : level >= 4 ? 3 : 2);
 const fighterMasteries = (level: number) => (level >= 16 ? 6 : level >= 10 ? 5 : level >= 4 ? 4 : 3);
 
-/**
- * A Halfling Berserker at any level. Halfling because it is the ONE SRD species with no ability
- * bonus, no modifier, no `uses` and no choice of its own - so every number below belongs to the
- * class, and a drift in the assertions cannot be blamed on the species.
- *
- * Scores by level 20: Str 15 +2 (background) +2 (L4) +1 (L8) = 20 · Con 13 +1 +1 (L8) +2 (L12)
- * +1 (the boon) = 18 · Dex 14 +2 (L16) = 16. Primal Champion then adds +4 to Str and Con, ceiling 25.
- */
+// A Halfling Berserker at any level. Halfling has no ability bonus, modifier, `uses` or choice, so
+// every number below belongs to the class.
+// Scores by level 20: Str 15 +2 (background) +2 (L4) +1 (L8) = 20 · Con 13 +1 +1 (L8) +2 (L12)
+// +1 (the boon) = 18 · Dex 14 +2 (L16) = 16. Primal Champion then adds +4 to Str and Con, ceiling 25.
 const barbarianInput = (level = 20): MutableInput => ({
   name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level,
   ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
@@ -90,7 +68,7 @@ const barbarianInput = (level = 20): MutableInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
     { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
-    // THE THIRD one only exists because Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
+    // The third skill exists only because Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
     ...(level >= 3 ? ([{ level: 3, classId: "barbarian", kind: "skill", id: "nature" }] as Row[]) : []),
     ...masteries("barbarian", ["greataxe", "handaxe", "javelin", "greatsword"], barbarianMasteries(level)),
     ...(level >= 3 ? ([{ level: 3, classId: "barbarian", kind: "subclass", id: "path-of-the-berserker" }] as Row[]) : []),
@@ -121,7 +99,7 @@ const fighterInput = (level: number): MutableInput => ({
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
     ...masteries("fighter", ["greatsword", "flail", "longbow", "rapier", "handaxe", "maul"], fighterMasteries(level)),
     ...(level >= 3 ? ([{ level: 3, classId: "fighter", kind: "subclass", id: "champion" }] as Row[]) : []),
-    // Champion's own level-7 feature: a SECOND Fighting Style feat, from the same catalog.
+    // Champion's level-7 feature: a second Fighting Style feat, from the same catalog.
     ...(level >= 7 ? ([{ level: 7, classId: "fighter", kind: "fighting-style", id: "great-weapon-fighting", payload: { featureId: "additional-fighting-style" } }] as Row[]) : []),
     ...asisTo("fighter", level, [[4, "str", "str"], [6, "str", "con"], [8, "con", "con"], [12, "con", "con"], [14, "dex", "dex"], [16, "wis", "wis"]]),
     { level: 1, kind: "tool", id: "gaming-set-dice" },
@@ -130,13 +108,10 @@ const fighterInput = (level: number): MutableInput => ({
   ]
 });
 
-/**
- * A Halfling Warrior of the Open Hand.
- *
- * Level 11: Dex 15 +2 (background) +2 (L4) = 19 · Wis 14 +2 (L8) = 16 · proficiency 4.
- * Level 20: Dex 19 +1 (L12) = 20 · Wis 16 +1 (L12) +2 (L16) +1 (the boon) = 20 · proficiency 6,
- * then Body and Mind adds +4 to each with a ceiling of 25.
- */
+// A Halfling Warrior of the Open Hand.
+// Level 11: Dex 15 +2 (background) +2 (L4) = 19 · Wis 14 +2 (L8) = 16 · proficiency 4.
+// Level 20: Dex 19 +1 (L12) = 20 · Wis 16 +1 (L12) +2 (L16) +1 (the boon) = 20 · proficiency 6,
+// then Body and Mind adds +4 to each with a ceiling of 25.
 const monkInput = (level: number): MutableInput => ({
   name: "Shan", speciesId: "halfling", backgroundId: "criminal", classId: "monk", level,
   ...(level >= 3 ? { subclassId: "warrior-of-the-open-hand" } : {}),
@@ -164,9 +139,7 @@ const monkInput = (level: number): MutableInput => ({
 const featIds = (definition: ActorDefinition) =>
   (definition.character?.feats ?? []).map((feat) => feat.id).filter((id) => id !== "ability-score-improvement");
 
-// ---------------------------------------------------------------------------------------------
 // Table harness: build the sheet, put it on a map, roll with seeded dice.
-// ---------------------------------------------------------------------------------------------
 
 type Built = Readonly<{ definition: ActorDefinition; state: GameState; hero: Actor }>;
 
@@ -180,7 +153,7 @@ function onTheTable(definition: ActorDefinition, { fight = true } = {}): Built {
     actors: [{ id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: 200, maximum: 200 }, armorClass: 13 }]
   }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
-  // The hero goes first, which matters: `attack-advantage` is gated to the bearer's OWN turn.
+  // The hero goes first: `attack-advantage` is gated to the bearer's own turn.
   if (fight) startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
   return { definition, state, hero: state.actors.find((actor) => actor.id === IDS.hero)! };
 }
@@ -207,26 +180,23 @@ const use = (built: Built, actionId: string, targetIds: string[] = [], faces: nu
 const actionOf = (built: Built, id: string) => effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === id)!;
 const derivationOf = (built: Built) => deriveEquipment(built.hero, built.definition, catalog);
 
-// ---------------------------------------------------------------------------------------------
-// BARBARIAN
-// ---------------------------------------------------------------------------------------------
+// Barbarian
 
 describe("Barbarian: the sheet's own numbers", () => {
   const definition = build(barbarianInput());
 
   it("Unarmored Defense is 10 + Dex + CON, and the Barbarian's is the one that allows a Shield", () => {
-    // Dex 16 (+3), Con 22 (+6) after Primal Champion. A Monk's identically-named feature reads
-    // Wisdom instead, which is why the overlay is keyed on (recordId, featureId) and never on the id.
+    // Dex 16 (+3), Con 22 (+6) after Primal Champion. The Monk's identically named feature reads Wisdom,
+    // which is why the overlay is keyed on (recordId, featureId), never the id alone.
     expect(definition.abilityScores).toMatchObject({ str: 24, con: 22, dex: 16 });
     expect(definition.armorClass).toBe(19);
   });
 
   it("Primal Champion really passes 20 - the ceiling every other increase is clamped to", () => {
-    // Str is 20 and Con 18 when the capstone applies; a `maximum`-less rider would leave both AT 20,
-    // which is exactly the silent no-op the epic boons shipped with before `maximum` existed.
+    // Str is 20 and Con 18 when the capstone applies; a rider without `maximum` would leave both at 20.
     expect(definition.abilityScores.str).toBeGreaterThan(20);
     expect(definition.abilityScores.con).toBeGreaterThan(20);
-    // ...and it is +4 with a ceiling of 25, not an uncapped add: Str 20 -> 24, Con 18 -> 22.
+    // ...and it is +4 with a ceiling of 25: Str 20 -> 24, Con 18 -> 22.
     expect(definition.abilityScores.str).toBe(24);
   });
 
@@ -235,7 +205,7 @@ describe("Barbarian: the sheet's own numbers", () => {
   });
 
   it("Rage's uses come off the printed Rages column at THIS level, not a copy of it", () => {
-    // 6 at level 20, 2 at level 1 - and neither number is typed anywhere in the overlay.
+    // 6 at level 20, 2 at level 1, from the printed column rather than the overlay.
     expect(definition.actions.find((action) => action.id === "rage")?.uses).toEqual({ limit: 6, per: "long-rest" });
     expect(build(barbarianInput(1)).actions.find((action) => action.id === "rage")?.uses).toEqual({ limit: 2, per: "long-rest" });
   });
@@ -243,8 +213,8 @@ describe("Barbarian: the sheet's own numbers", () => {
 
 describe("Barbarian: Primal Knowledge raises a budget the wizard already had", () => {
   it("accepts a THIRD class skill and refuses a fourth, naming 3", () => {
-    // Audit row 20. The Barbarian's printed `skillChoices.choose` is 2; the third skill exists only
-    // because `extraPicks: [{offer: "class-skills", amount: 1}]` raised it.
+    // The printed `skillChoices.choose` is 2; the third skill comes from
+    // `extraPicks: [{offer: "class-skills", amount: 1}]`.
     const built = build(barbarianInput());
     expect(built.proficiencies!.skills.map((skill) => skill.id))
       .toEqual(expect.arrayContaining(["perception", "survival", "nature"]));
@@ -255,8 +225,7 @@ describe("Barbarian: Primal Knowledge raises a budget the wizard already had", (
   });
 
   it("refuses the third skill on a level-2 Barbarian, who has not gained the feature yet", () => {
-    // The negative control that makes the assertion above mean something: it is Primal Knowledge
-    // (level 3) that raises the budget, not the class simply having three all along.
+    // Negative control: Primal Knowledge (level 3) raises the budget; the class does not have three from the start.
     const early = barbarianInput(2);
     early.choices.push({ level: 1, classId: "barbarian", kind: "skill", id: "nature" } as Row);
     expect(() => build(early)).toThrowError(/Barbarian skills: 2/);
@@ -278,7 +247,7 @@ describe("Barbarian: Danger Sense reaches the save the target actually rolls", (
     const built = onTheTable(build(barbarianInput()), { fight: false });
     const derivation = derivationOf(built);
     expect(saveRollSources(built.hero, "dex", derivation).advantage).toEqual([{ source: "item:Danger Sense", label: "Danger Sense" }]);
-    // The filter really filters: Constitution is the Barbarian's OTHER proficient save.
+    // The filter narrows: Constitution is the Barbarian's other proficient save.
     expect(saveRollSources(built.hero, "con", derivation).advantage).toEqual([]);
     expect(saveRollSources(built.hero, "wis", derivation).advantage).toEqual([]);
   });
@@ -289,7 +258,7 @@ describe("Barbarian: Feral Instinct changes the initiative die", () => {
     const built = onTheTable(build(barbarianInput()), { fight: false });
     const resolve = (id: string) => id === built.hero.definitionId ? built.definition : undefined;
     expect(initiativeRollMode(built.state, IDS.hero, resolve, catalog)).toBe("advantage");
-    // The DIE, not the flag: two faces are offered and the higher survives (+3 Dex).
+    // The die, not the flag: two faces are offered and the higher survives (+3 Dex).
     const faces = [4, 17];
     startEncounter(built.state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero }, { actorId: IDS.foe, score: 10 }] },
       () => faces.shift()!, GEOMETRY, resolve, 0, catalog);
@@ -311,7 +280,7 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
     expect(effect.modifiers.map((modifier) => modifier.type)).toEqual(["attack-advantage", "incoming-attack-advantage"]);
     expect(effect.duration).toEqual({ type: "until-source-next-turn" });
 
-    // The swing: two d20s offered, the HIGHER kept, then the greataxe's 1d12.
+    // Two d20s offered, the higher kept, then the greataxe's 1d12.
     const swung = use(built, "item-greataxe", [IDS.foe], [3, 15, 8]);
     expect(swung.rollMode).toMatchObject({ mode: "advantage" });
     expect(swung.attack!.naturalRoll).toBe(15);
@@ -334,21 +303,10 @@ describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
   });
 });
 
-/**
- * MINDLESS RAGE - "You have Immunity to the Charmed and Frightened conditions while your Rage is
- * active."
- *
- * **THE HARVEST'S GATED-GRANT FAR END, and the only carrier in the whole SRD.** This feature was a
- * named absence in `scripts/class-mechanics/barbarian.ts` for one reason - *"`grants.conditionImmunities`
- * carries no `when` ... so authoring it would make a level-6 Berserker permanently immune"* - and
- * that reason closed on 2026-08-13 when `FeatureGrantsSchema` gained one optional `when` over the
- * whole block. `grant-gates.test.ts` proves the ENGINE half on records it parses itself; this is the
- * proof that a SHIPPED subclass record carries the gate and that the gate really opens and shuts.
- *
- * THE FAR END IS A REFUSAL AND ITS ABSENCE - `setCondition` narrating the skip while Rage runs, and
- * Frightened landing on `actor.conditions` the moment it does not. Both on the SAME character, one
- * `endEffect` apart, so nothing but the gate can explain the difference.
- */
+// Mindless Rage: "You have Immunity to the Charmed and Frightened conditions while your Rage is
+// active." A shipped subclass record carrying a gated grant (`grants.when`); `grant-gates.test.ts`
+// covers the engine half. On the same character, one `endEffect` apart, `setCondition` narrates the
+// skip while Rage runs and Frightened lands once it ends.
 describe("Berserker: Mindless Rage refuses Frightened only while the Rage is running", () => {
   const built = () => onTheTable(build(barbarianInput(6)));
 
@@ -361,8 +319,8 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
   });
 
   it("is NOT baked into the definition - a gate the builder cannot evaluate must not be a fact", () => {
-    // The whole reason this was unauthorable: `interpretFeature` bakes an UNGATED grants block into
-    // the sheet, and a baked immunity never comes back off. It now skips gated blocks by name.
+    // `interpretFeature` bakes ungated grants into the sheet, and a baked immunity never comes off, so it
+    // skips gated blocks.
     const definition = build(barbarianInput(6));
     expect(definition.conditionImmunities ?? []).not.toContain("frightened");
     expect(definition.character!.features!.some((ref) => ref.id === "mindless-rage"), "the feature must still be ON the sheet - it is the derivation that reads it").toBe(true);
@@ -376,7 +334,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
     expect(table.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
     setCondition(table.state, IDS.hero, "frightened", false, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
 
-    // ENTER RAGE through the real action, so the tag comes from the shipped `rage` record.
+    // Enter Rage through the real action, so the tag comes from the shipped `rage` record.
     use(table, "rage");
     expect(table.hero.effects.flatMap((effect) => effect.tags)).toContain("raging");
 
@@ -389,7 +347,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
     expect(charmed[0]!.text).toBe("Ozar is immune to Charmed - not applied.");
     expect(table.hero.conditions).toEqual([]);
 
-    // END THE RAGE and the immunity goes with it - the un-grant the absence record demanded.
+    // End the Rage and the immunity goes with it.
     endEffect(table.state, IDS.hero, table.hero.effects[0]!.id);
     expect(table.hero.effects.flatMap((effect) => effect.tags)).not.toContain("raging");
     const after = setCondition(table.state, IDS.hero, "frightened", true, undefined, { role: "gm" }, { resolveDefinition: () => table.definition, catalog });
@@ -398,8 +356,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
   });
 
   it("gives a level-5 Berserker nothing - the feature is gained at 6", () => {
-    // The non-vacuity control on the gate itself: if the immunity came from anywhere other than this
-    // feature, a raging level-5 Barbarian would show it too.
+    // Non-vacuity: if the immunity came from anywhere but this feature, a raging level-5 Barbarian would show it too.
     const early = onTheTable(build(barbarianInput(5)));
     use(early, "rage");
     expect(early.hero.effects.flatMap((effect) => effect.tags)).toContain("raging");
@@ -410,7 +367,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
 
 describe("Barbarian: the Epic Boon a level-19 Barbarian lost outright", () => {
   it("lands on the sheet as a real feat", () => {
-    // Audit row 6. Nine of the twelve classes had NO `choice` on `epic-boon` at all.
+    // Every class must offer the `epic-boon` feat choice.
     expect(featIds(build(barbarianInput()))).toEqual(["savage-attacker", "boon-of-combat-prowess"]);
     // ...and a level-18 Barbarian has only the background's origin feat, so the boon is the feature's.
     expect(featIds(build(barbarianInput(18)))).toEqual(["savage-attacker"]);
@@ -433,10 +390,8 @@ describe("Barbarian: the Epic Boon a level-19 Barbarian lost outright", () => {
 
 describe("Barbarian: Intimidating Presence holds the target to the Barbarian's own DC", () => {
   it("derives 8 + Strength + proficiency and spends its long-rest use", () => {
-    // A level-14 Berserker (the level the feature is gained): Str 20 (+5), proficiency 5 -> DC 18.
-    // A printed constant would be wrong for every Barbarian but one, which is what
-    // `FeatureSaveDcSchema`'s derived form exists for - so the level-17 sheet is asserted too, where
-    // the proficiency bonus alone moves the number to 19.
+    // A level-14 Berserker: Str 20 (+5), proficiency 5 -> DC 18. The DC is derived (`FeatureSaveDcSchema`),
+    // so the level-17 sheet is asserted too, where proficiency alone moves it to 19.
     const built = onTheTable(build(barbarianInput(14)));
     expect(actionOf(built, "intimidating-presence").save).toEqual({ ability: "wis", dc: 18 });
     const resolution = use(built, "intimidating-presence", [IDS.foe]);
@@ -448,34 +403,26 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
   });
 
   it("counts PRIMAL CHAMPION's +4 - the capstone the DC used to be computed before", () => {
-    // THE ORDERING BUG, at the only level it can be seen. Primal Champion is a level-20 `ability-score`
-    // rider (+4 Str/Con, ceiling 25), and the builder used to fold every such rider AFTER
-    // `interpretFeature` had already derived this feature's DC from `context.finalScores`.
-    //
-    // The tell was that the sheet contradicted itself: `abilityScores.str` read 24 on the same
-    // definition whose Intimidating Presence said DC 19 - a DC that can only come from Str 20. Both
-    // halves are asserted here, so the two can never drift apart again.
-    //
+    // Primal Champion's `ability-score` rider must be folded before this feature's DC is derived from
+    // `context.finalScores`, or the sheet contradicts itself (Str 24 beside a DC computed from Str 20).
     // Str 20 at level 16, +4 from the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21.
     const capstone = onTheTable(build(barbarianInput(20)));
     expect(capstone.definition.abilityScores.str).toBe(24);
     expect(actionOf(capstone, "intimidating-presence").save).toEqual({ ability: "wis", dc: 21 });
-    // Far end: the number the TARGET is actually held to, not just the one printed on the sheet.
+    // The number the target is held to, not just the one printed on the sheet.
     expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// FIGHTER / CHAMPION
-// ---------------------------------------------------------------------------------------------
+// Fighter / Champion
 
 describe("Champion: the crit range the resolver reads", () => {
   it("is 19 at level 3, 18 at level 15, and 20 for a Fighter with no subclass yet", () => {
     const five = onTheTable(build(fighterInput(5)), { fight: false });
     expect(criticalThreshold(derivationOf(five), five.hero, actionOf(five, "item-greatsword"))).toBe(19);
 
-    // Superior Critical does not REPLACE Improved Critical - `criticalThreshold` takes the lowest
-    // any carrier names, so the two compose and no ordering rule is needed.
+    // Superior Critical does not replace Improved Critical: `criticalThreshold` takes the lowest any
+    // carrier names, so the two compose without an ordering rule.
     const fifteen = onTheTable(build(fighterInput(15)), { fight: false });
     expect(criticalThreshold(derivationOf(fifteen), fifteen.hero, actionOf(fifteen, "item-greatsword"))).toBe(18);
 
@@ -485,8 +432,8 @@ describe("Champion: the crit range the resolver reads", () => {
 
   it("turns a natural 19 into a critical hit, and doubles the dice it rolls", () => {
     const built = onTheTable(build(fighterInput(5)));
-    // d20 = 19 -> a crit at threshold 19, so the greatsword's 2d6 is rolled TWICE (2024 doubling):
-    // 6 + 6 + 5 + 5 plus Str 19's +4 = 26. A 19 on a Fighter without the subclass is an ordinary hit.
+    // d20 = 19 -> a crit at threshold 19, so the greatsword's 2d6 is rolled twice:
+    // 6 + 6 + 5 + 5 plus Str 19's +4 = 26. A 19 without the subclass is an ordinary hit.
     const swung = use(built, "item-greatsword", [IDS.foe], [19, 6, 6, 5, 5]);
     expect(swung.attack).toMatchObject({ naturalRoll: 19, outcome: "crit" });
     expect(swung.damageTotal).toBe(26);
@@ -494,7 +441,7 @@ describe("Champion: the crit range the resolver reads", () => {
     const plain = onTheTable(build(fighterInput(2)));
     const ordinary = use(plain, "item-greatsword", [IDS.foe], [19, 6, 5]);
     expect(ordinary.attack).toMatchObject({ naturalRoll: 19, outcome: "hit" });
-    expect(ordinary.damageTotal).toBe(14); // 6 + 5 + Str 17's +3, dice rolled ONCE
+    expect(ordinary.damageTotal).toBe(14); // 6 + 5 + Str 17's +3, dice rolled once
   });
 });
 
@@ -504,14 +451,10 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
     expect(initiativeRollMode(built.state, IDS.hero, (id) => id === built.hero.definitionId ? built.definition : undefined, catalog)).toBe("advantage");
   });
 
-  /**
-   * THE SECOND HALF, HARVESTED 2026-08-13 - *"and Strength (Athletics) checks"*. It was a named
-   * absence in `scripts/class-mechanics/fighter.ts` on a claim that is now false (*"Nothing anywhere
-   * reads `roll-mode {roll: "check"}`"*), and Escape a Grapple is where it lands: that branch narrows
-   * to `{ability: "str", skill: "athletics"}` whenever Athletics beats Acrobatics, which is EXACTLY
-   * the printed clause. Authoring it needed `clears: ["modifiers"]`, because Fighter is hand-authored
-   * and the initiative rider was already in the committed record.
-   */
+  // Remarkable Athlete's "and Strength (Athletics) checks": Escape a Grapple narrows to
+  // `{ability: "str", skill: "athletics"}` whenever Athletics beats Acrobatics, which is exactly the
+  // printed clause. Authoring it needed `clears: ["modifiers"]` because Fighter is hand-authored and the
+  // initiative rider was already in the committed record.
   it("keeps the higher die on the Strength (Athletics) escape, and breaks a real grapple with it", () => {
     const grappledChampion = (level: number) => {
       const built = onTheTable(build(fighterInput(level)));
@@ -523,8 +466,8 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
       return built;
     };
 
-    // Level 5 Champion: Str 19 (+4), Athletics proficient (+3 PB) = +7; Dex 13 (+1) loses the
-    // comparison, so Athletics is the branch that rolls and `skill-is: ["athletics"]` matches it.
+    // Level 5 Champion: Str 19 (+4), Athletics proficient (+3 PB) = +7; Dex 13 (+1) loses the comparison,
+    // so Athletics is the branch that rolls and `skill-is: ["athletics"]` matches it.
     const champion = grappledChampion(5);
     const escaped = resolveDefinitionAction(champion.state, builtinAction("escape-grapple")!, {
       actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000901", builtin: true
@@ -534,8 +477,8 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
     expect(champion.state.rolls.find((roll) => roll.purpose === "check")!.dice.map((die) => die.kept)).toEqual([false, true]);
     expect(champion.hero.effects, "the grapple should have ended").toEqual([]);
 
-    // THE CONTROL: a level-2 Fighter has no subclass and no such rider. Same queue, same escape DC,
-    // one die - and the grapple holds, so the difference is an outcome rather than a formula.
+    // Control: a level-2 Fighter has no subclass and no such rider. Same queue, same DC, one die, and the
+    // grapple holds.
     const plain = grappledChampion(2);
     const stuck = resolveDefinitionAction(plain.state, builtinAction("escape-grapple")!, {
       actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000902", builtin: true
@@ -559,41 +502,33 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
 });
 
 describe("Fighter: EXTRA ATTACK is a second swing that really resolves", () => {
-  /**
-   * THE GAP THIS CLOSES. `extra-attack` was a builder-baked rider: the builder raised `attack.count`
-   * on the actions a FEATURE declares, and no martial class declares one - every Fighter, Barbarian,
-   * Monk, Ranger and Paladin swing is derived from equipped inventory instead. Two lanes measured the
-   * consequence independently: the built definition was byte-identical with and without the rider,
-   * and `definition.actions.filter(a => a.attack)` is EMPTY at every level.
-   *
-   * So the assertion cannot be a count on a definition - that is exactly the number that lied for a
-   * year. It has to be a SECOND ATTACK RESOLVING, and a third being refused.
-   */
+  // Extra Attack: no martial class declares a feature action (every swing derives from equipped
+  // inventory), so a count on the definition proves nothing. The assertion is a second attack
+  // resolving and a third being refused.
   const foeAc = 13;
 
   it("resolves TWO swings on one action slot at level 5, then refuses the third", () => {
-    // Str 19 (+4) + proficiency 3 = +7 to hit; the foe's AC is 13, so a natural 9 hits with room.
+    // Str 19 (+4) + proficiency 3 = +7 to hit; against AC 13 a natural 9 hits.
     const built = onTheTable(build(fighterInput(5)));
     expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.armorClass).toBe(foeAc);
 
     const first = use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
     expect(first.attack?.outcome).toBe("hit");
-    // The second swing is OPEN, and it is a generic pool - this is the number that used to be null.
+    // The second swing is open, as a generic pool.
     expect(first.componentsRemaining).toEqual({ attack: 1 });
 
-    // SRD Extra Attack lets the second swing be a DIFFERENT weapon, which is why the pool is generic.
+    // SRD Extra Attack lets the second swing be a different weapon, which is why the pool is generic.
     const second = use(built, "item-flail", [IDS.foe], [14, 6]);
     expect(second.attack?.outcome).toBe("hit");
     expect(second.componentsRemaining).toBeNull();
 
-    // ...and the third is refused, so the count is a real budget rather than an unbounded one.
+    // ...and the third is refused, so the count is a real budget.
     expect(() => use(built, "item-greatsword", [IDS.foe], [18, 5, 5]))
       .toThrow(/no attacks remaining in this action/);
   });
 
   it("is ONE swing at level 4, the level before the feature is gained", () => {
-    // The negative control that makes the test above mean something: same sheet, same weapon, one
-    // level earlier. If this ever opens a pool, the rider is applying to someone who has not got it.
+    // Negative control: same sheet, same weapon, one level earlier. No pool may open.
     const built = onTheTable(build(fighterInput(4)));
     expect(actionOf(built, "item-greatsword").attack?.count ?? 1).toBe(1);
     const only = use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
@@ -602,24 +537,22 @@ describe("Fighter: EXTRA ATTACK is a second swing that really resolves", () => {
   });
 
   it("counts THREE swings at level 11, off the Fighter's own second tier", () => {
-    // `two-extra-attacks` is a separate feature with `count: 2`, and the Fighter is the only class
-    // that has more than one tier - so this is also the proof that the tiers are read as an absolute
-    // total rather than summed on top of the level-5 rider.
+    // `two-extra-attacks` is a separate feature with `count: 2`; the tiers are read as an absolute total,
+    // not summed on top of the level-5 rider.
     const built = onTheTable(build(fighterInput(11)));
     expect(actionOf(built, "item-greatsword").attack?.count).toBe(3);
     expect(use(built, "item-greatsword", [IDS.foe], [9, 5, 5]).componentsRemaining).toEqual({ attack: 2 });
     expect(use(built, "item-flail", [IDS.foe], [14, 6]).componentsRemaining).toEqual({ attack: 1 });
-    // Exhausted reads as `null`, not `{ attack: 0 }` - the resolver reports remaining components only
-    // while some remain, so this is the same "nothing left" the level-5 pair's second swing gives.
+    // Exhausted reads as `null`, not `{ attack: 0 }`: the resolver reports remaining components only while
+    // some remain.
     expect(use(built, "item-spear", [IDS.foe], [16, 4]).componentsRemaining).toBeNull();
     expect(() => use(built, "item-greatsword", [IDS.foe], [18, 5, 5]))
       .toThrow(/no attacks remaining in this action/);
   });
 
   it("does NOT multiply a non-weapon action that happens to roll to hit", () => {
-    // The scope that keeps this from being a rules bug dressed as a feature: Extra Attack is
-    // "whenever you take the Attack action", so it may only raise a DERIVED WEAPON SWING. Every
-    // other action on the same level-11 sheet keeps the count it declared.
+    // Extra Attack applies "whenever you take the Attack action", so it may only raise a derived weapon
+    // swing; every other action on the sheet keeps its declared count.
     const built = onTheTable(build(fighterInput(11)));
     const swings = new Set(derivationOf(built).weaponActionIds);
     for (const action of effectiveActions(built.definition, built.hero, catalog)) {
@@ -647,9 +580,7 @@ describe("Barbarian and Monk get the same second swing - it was never Fighter-on
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// MONK
-// ---------------------------------------------------------------------------------------------
+// Monk
 
 describe("Monk: the sheet's own numbers", () => {
   const twenty = build(monkInput(20));
@@ -667,20 +598,13 @@ describe("Monk: the sheet's own numbers", () => {
   });
 });
 
-/**
- * MARTIAL ARTS, at the far end.
- *
- * A built Monk had no unarmed strike of its own. The only one on the table was the generic builtin,
- * hard-coded to Strength + Proficiency Bonus to hit and a flat 1 + Strength Bludgeoning - so the
- * printed Martial Arts column (1:1d6 ... 17:1d12) was read by NOTHING, "you can use your Dexterity
- * modifier instead" reached nothing, and because the strike was not in `weaponActionIds` Extra
- * Attack could not reach it either. Flurry of Blows spent a Focus Point to grant two Unarmed Strikes
- * that existed as nothing the engine could roll.
- */
+// A built Monk gets its own Unarmed Strike that reads the printed Martial Arts die column (1:1d6 ...
+// 17:1d12), may use Dexterity, counts as a weapon action for Extra Attack, and is what Flurry of Blows
+// grants.
 describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", () => {
   it("reads the printed column at this character's own level, at Dexterity", () => {
-    // The Martial Arts column, and the Dexterity the class's own text says to use: Dex 17 (+3) at 1,
-    // 19 (+4) from the level-4 ASI, 20 (+5) at 17, 24 (+7) once Body and Mind lands.
+    // The Martial Arts column with Dexterity: Dex 17 (+3) at 1, 19 (+4) from the level-4 ASI, 20 (+5) at
+    // 17, 24 (+7) once Body and Mind lands.
     const strike = (level: number) => build(monkInput(level)).actions.find((action) => action.id === "unarmed-strike");
     for (const [level, bonus, formula] of [
       [1, 5, "1d6 + 3"], [4, 6, "1d6 + 4"], [5, 7, "1d8 + 4"],
@@ -694,7 +618,7 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
   });
 
   it("takes STRENGTH when Strength is the better one - it is 'instead of', not 'always Dexterity'", () => {
-    // Str 15 (+2) against Dex 12 (+1): +2 and 1d6 + 2, where a hard-coded Dexterity would read +1.
+    // Str 15 (+2) against Dex 12 (+1): +2 and 1d6 + 2; a hard-coded Dexterity would read +1.
     const strong = build({ ...monkInput(1), baseScores: { str: 15, dex: 10, con: 13, int: 12, wis: 14, cha: 8 } });
     expect(strong.abilityScores).toMatchObject({ str: 15, dex: 12 });
     expect(strong.actions.find((action) => action.id === "unarmed-strike")).toMatchObject({
@@ -706,7 +630,7 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
     const five = onTheTable(build(monkInput(5)));
     expect(derivationOf(five).weaponActionIds).toContain("unarmed-strike");
     expect(actionOf(five, "unarmed-strike").attack?.count).toBe(2);
-    // ...and the second swing is really tracked: one strike leaves one attack in the pool.
+    // ...and the second swing is tracked: one strike leaves one attack in the pool.
     expect(use(five, "unarmed-strike", [IDS.foe], [17, 5]).componentsRemaining).toEqual({ attack: 1 });
 
     const four = onTheTable(build(monkInput(4)));
@@ -719,14 +643,13 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
     const swung = use(built, "unarmed-strike", [IDS.foe], [17, 5]);
     expect(swung.attack).toMatchObject({ total: 24, outcome: "hit" });
     expect(swung.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning", total: 9 }]);
-    // The builtin's own damage is 1 + Str (+1) = 2 Bludgeoning, pushed through `bonusDamage`. The
-    // Monk's strike SHADOWS that id, so it must not be paid a second, Strength-flavoured time.
+    // The builtin's damage is 1 + Str (+1) = 2 Bludgeoning via `bonusDamage`. The Monk's strike shadows
+    // that id, so it must not be paid a second time.
     expect(swung.damageTotal).toBe(9);
   });
 
   it("leaves every other class on the generic builtin", () => {
-    // A class that prints no Martial Arts column mints nothing, so the SRD's shared Unarmed Strike
-    // is still what a Fighter takes - the builtin catalog covers everyone it always covered.
+    // A class with no Martial Arts column mints nothing; a Fighter uses the shared builtin Unarmed Strike.
     expect(build(fighterInput(5)).actions.some((action) => action.id === "unarmed-strike")).toBe(false);
     expect(build(barbarianInput(5)).actions.some((action) => action.id === "unarmed-strike")).toBe(false);
   });
@@ -748,8 +671,7 @@ describe("Monk: Focus Points are ONE pool, read off the printed column and reall
     use(built, "flurry-of-blows");
     // Stunning Strike is a different feature record entirely, and it draws on the same counter.
     use(built, "stunning-strike", [IDS.foe]);
-    // A fresh turn, so the Bonus Action economy allows the third press (the rules engine's rule,
-    // not this pool's): Step of the Wind then takes the third point.
+    // A fresh turn, so the Bonus Action economy allows the third press: Step of the Wind takes the third point.
     built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, bonusActionUsed: false } };
     use(built, "step-of-the-wind");
     // Three different actions, one key: 3 spent out of 11. Per-action pools would read 1 each.
@@ -776,11 +698,9 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
   });
 
   it("counts BODY AND MIND's +4 - the same ordering bug, one class over", () => {
-    // The Monk's half of the level-20 capstone bug. Body and Mind is +4 Dex/Wis (ceiling 25) and
-    // Stunning Strike's DC is derived from Wisdom, so the two meet on exactly this sheet.
-    //
+    // Body and Mind (+4 Dex/Wis, ceiling 25) must apply before Stunning Strike's Wisdom-derived DC.
     // Wis 20 by level 19 (16 at L8, 17 at L12, 19 at L16, 20 from Boon of the Night Spirit), +4 from
-    // the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21. It read 19 before the fold moved.
+    // the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21.
     const capstone = onTheTable(build(monkInput(20)));
     expect(capstone.definition.abilityScores.wis).toBe(24);
     expect(actionOf(capstone, "stunning-strike").save).toEqual({ ability: "con", dc: 21 });
@@ -814,7 +734,7 @@ describe("Monk: Quivering Palm rolls the 10d12 the SRD prints", () => {
 
 describe("Monk: Wholeness of Body counts uses off an ability modifier", () => {
   it("is Wisdom-many at level 11 and re-armed by a Long Rest, with a floor of one", () => {
-    // Wis 16 (+3) -> three uses. `minimum: 1` is the printed "(minimum of once)", as a field.
+    // Wis 16 (+3) -> three uses. `minimum: 1` is the printed "(minimum of once)".
     const built = onTheTable(build(monkInput(11)));
     expect(actionOf(built, "wholeness-of-body").uses).toEqual({ limit: 3, per: "long-rest" });
     use(built, "wholeness-of-body");

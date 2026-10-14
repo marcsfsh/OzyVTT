@@ -11,12 +11,9 @@ import { looseRollPlan, offTurnVerdict, routeForTap, NOT_YOUR_TURN } from "../sr
 import { familyOf } from "../src/rules-families.js";
 import { createServer } from "../src/server.js";
 
-/**
- * THE TAP IS THE ATTACK (D10 / WI3). The routing that used to be one client-side boolean is now a
- * server decision with three named outcomes, and these tests pin all three - plus the two things the
- * old gate got silently wrong: a monster sheet routed loose for the GM mid-fight, and an off-turn tap
- * produced a die and no explanation.
- */
+// Tapping an action is a server routing decision with three named outcomes. Also pinned: a monster
+// sheet outside the fight rolls loose for the GM, and an off-turn tap is a rules block with an
+// explanation rather than a silent die.
 
 const HERO = "10000000-0000-4000-8000-0000000000b1";
 const OTHER = "10000000-0000-4000-8000-0000000000b2";
@@ -51,8 +48,8 @@ describe("tap routing (the seam)", () => {
     expect(routeForTap(fight.combat, HERO)).toBe("resolved");
     expect(routeForTap(fight.combat, OTHER)).toBe("blocked");
 
-    // No fight at all - and, just as importantly, a creature that is not IN the fight. Telling a GM
-    // rolling a wandering monster's attack to "wait their turn" would be nonsense, so it is loose.
+    // No fight, and a creature that is not in any fight: telling the GM to "wait their turn" would be
+    // nonsense, so it rolls loose.
     const idle = GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } }] });
     expect(routeForTap(idle.combat, HERO)).toBe("loose");
     expect(routeForTap(fight.combat, "10000000-0000-4000-8000-0000000000bf")).toBe("loose");
@@ -65,7 +62,7 @@ describe("tap routing (the seam)", () => {
       const blocked = error as RulesBlockedError;
       expect(blocked.rule).toBe(NOT_YOUR_TURN);
       expect(blocked.message).toBe("Not your turn yet - Hero is up.");
-      // Overridable and askable, which is the whole point of making it a rules block rather than silence.
+      // Overridable and askable, which is why it is a rules block rather than silence.
       expect(blocked.overridable).toBe(true);
       expect(familyOf(blocked.rule)).toBe("economy");
     }

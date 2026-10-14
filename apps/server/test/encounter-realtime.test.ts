@@ -247,12 +247,12 @@ describe("live authoritative encounter workflow", () => {
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
       expect(Array.isArray(document.log)).toBe(true);
       expect(document.log.length).toBeGreaterThan(0); // timestamped commentary bundled in
-      // v2: the complete per-command journal (start → next → end), the final live state, and the dice record.
+      // The per-command journal (start, next, end), the final live state, and the dice record.
       expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["encounter.start", "initiative.next", "encounter.end"]);
       expect(document.journal[0].principal).toMatch(/^gm:/);
       expect(document.journal[0].payload.mapAssetId).toBe(imported.metadata.id);
       expect(document.finalState.combat.active).toBe(true);
-      // v3: the post-encounter aftermath - combat cleared, end-of-fight sweeps landed.
+      // The post-encounter aftermath: combat cleared, end-of-fight sweeps applied.
       expect(document.postEncounterState.combat.active).toBe(false);
       expect(Array.isArray(document.rolls)).toBe(true);
       expect(Array.isArray(document.definitions)).toBe(true);

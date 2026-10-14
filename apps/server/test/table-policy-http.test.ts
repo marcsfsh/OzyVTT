@@ -9,15 +9,9 @@ import { ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
-/**
- * End-to-end evidence for the additive table-policy surface, over the same HTTP adapter an
- * integration uses - so every claim here is proven against real authorization, real persistence and
- * the real projection, not against a hand-built state object.
- *
- * What is under test: the standing rules policy each fight inherits (D7), per-family exceptions (D6),
- * staging defaults and the one-command mid-fight add (D2), prepare-and-go plus staged-list derivation
- * (D1/D3), the archived-sheet keepsake toggle (D26), and archiving releasing a claim (D16).
- */
+// The table-policy surface over the integration HTTP adapter, with real authorization, persistence
+// and projection: standing rules policy, per-family exceptions, staging defaults, mid-fight add,
+// prepare-and-go, the archived-sheet keepsake toggle, and archiving releasing a claim.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECOND_ID = "10000000-0000-4000-8000-000000000002";
@@ -86,7 +80,7 @@ describe("standing rules policy (D6/D7)", () => {
 
     const game = await snapshot(base, gmToken);
     expect(game.rulesPolicy).toEqual({ dial: "assisted", exceptions: { movement: "freeform" } });
-    // The live fight keeps the settings it started with: policy is what the NEXT fight inherits.
+    // The live fight keeps the settings it started with; policy is what the next fight inherits.
     expect(game.combat.rulesMode).toBe("strict");
   });
 
@@ -124,7 +118,7 @@ describe("standing rules policy (D6/D7)", () => {
     await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 10 }] });
     await post(base, GAME_PATHS.rulesMode, gmToken, { mode: "assisted", exceptions: { economy: "freeform" } });
     expect((await snapshot(base, gmToken)).combat.ruleExceptions).toEqual({ economy: "freeform" });
-    // An old mode-only payload still means exactly what it always meant.
+    // A mode-only payload keeps its original meaning.
     await post(base, GAME_PATHS.rulesMode, gmToken, { mode: "strict" });
     const after = await snapshot(base, gmToken);
     expect(after.combat.rulesMode).toBe("strict");
@@ -163,7 +157,7 @@ describe("staging defaults and the one-command mid-fight add (D2)", () => {
     expect(game.revision).toBe(before + 1);
     expect(game.actors.map((actor: { id: string }) => actor.id)).toContain(commandId);
     expect(game.combat.initiative.map((entry: { actorId: string }) => entry.actorId)).toContain(commandId);
-    // The tray token comes with it - the whole point is that no second trip is needed.
+    // The tray token comes with it, so no second trip is needed.
     expect(game.combat.tokens.map((token: { actorId: string }) => token.actorId)).toContain(commandId);
   });
 
@@ -185,7 +179,7 @@ describe("the two doors into a fight (D1/D3)", () => {
     const game = await snapshot(base, gmToken);
     expect(game.combat.activeSceneId).toBe(sceneId);
     expect(game.combat.initiative.map((entry: { actorId: string }) => entry.actorId)).toEqual([HERO_ID]);
-    // The active scene's own slot stays empty - its live copy IS the top-level combat.
+    // The active scene's own slot stays empty; its live copy is the top-level combat.
     expect(game.combat.scenes.find((scene: { id: string }) => scene.id === sceneId).combat.initiative).toEqual([]);
   });
 
@@ -234,7 +228,7 @@ describe("archived characters: sharing and claims (D16/D26)", () => {
     const game = await snapshot(base, gmToken);
     expect(game.actors.find((actor: { id: string }) => actor.id === HERO_ID).ownerSessionId).toBeNull();
 
-    // ...and the player can claim someone else, which the stale claim used to prevent.
+    // ...and the player can now claim someone else.
     expect((await post(base, GAME_PATHS.claims, playerToken, { actorId: SECOND_ID })).status).toBe(200);
   });
 
@@ -299,8 +293,8 @@ describe("the table's level cap (A6)", () => {
     await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["standard-array"], maxLevel: 5 });
     expect((await snapshot(base, playerToken, "player")).builderPolicy.maxLevel).toBe(5);
 
-    // The sheet's free-text identity editor is the OTHER door into a character's level; it must not
-    // be able to walk past the cap the guided builder enforces.
+    // The sheet's free-text identity editor is the other way to set a character's level; it must not
+    // bypass the cap the guided builder enforces.
     const identityPath = GAME_PATHS.characterSetIdentity.replace("{actorId}", HERO_ID);
     const refused = await post(base, identityPath, gmToken, { character: { classes: [{ id: "fighter", name: "Fighter", level: 9 }], feats: [] } });
     expect(refused.status).toBe(409);

@@ -11,22 +11,17 @@ import { afterEach, describe, expect, it } from "vitest";
 import { GAME_COMMAND_SCOPES } from "../src/game-commands.js";
 import { createServer } from "../src/server.js";
 
-/**
- * ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
- * credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
- * commands, hits stale-revision and confirmation conflicts, and loses access on revocation - while
- * the hidden combatant never leaks through any player-safe response.
- */
+// ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
+// credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
+// commands, hits stale-revision and confirmation conflicts, and loses access on revocation - while
+// the hidden combatant never leaks through any player-safe response.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECRET_ID = "10000000-0000-4000-8000-000000000002";
 
-/**
- * One `socket.on(...)` registration: the event name and the shared operation it dispatches to (the
- * operation is where the real authorization gate lives, so the twin check below can compare it).
- * The event class is deliberately `[^"]+` - anything quoted counts, so a name this codebase does not
- * currently use (camelCase, underscores) FAILS the guard rather than disappearing from the scrape.
- */
+// One `socket.on(...)` registration: the event name and the shared operation it dispatches to (where
+// the real authorization gate lives). The event pattern is `[^"]+` so any quoted name is found, and an
+// unexpected naming style fails the guard rather than disappearing from the scrape.
 function scrapeSocketHandlers(source: string): ReadonlyArray<{ event: string; operation: string | null }> {
   const handlers: Array<{ event: string; operation: string | null }> = [];
   for (const line of source.split("\n")) {
@@ -37,7 +32,7 @@ function scrapeSocketHandlers(source: string): ReadonlyArray<{ event: string; op
   return handlers;
 }
 
-/** True when the shared operation refuses a player session outright (`requireGmGrade`) - the socket's actual read gate. */
+/** True when the shared operation refuses a player session outright (`requireGmGrade`), the socket's read gate. */
 const operationsSource = readFileSync(fileURLToPath(new URL("../src/game-operations.ts", import.meta.url)), "utf8");
 function gmOnlyOperation(method: string): boolean {
   const start = [`\n    ${method}(`, `\n    async ${method}(`].map((marker) => operationsSource.indexOf(marker)).find((index) => index >= 0);
@@ -97,7 +92,7 @@ async function bootWithBattlemap() {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
 const post = (base: string, path: string, token: string, body: unknown = {}) =>
   fetch(base + path, { method: "POST", headers: bearer(token), body: JSON.stringify(body) });
-/** Issue an integration credential over the documented GM endpoint - the same door an external tool uses. */
+/** Issue an integration credential over the documented GM endpoint, as an external tool does. */
 async function issueCredential(base: string, gmToken: string, name: string, scopes: readonly string[]) {
   const response = await post(base, "/api/v1/gm/integration-credentials", gmToken, { name, scopes });
   expect(response.status).toBe(201);
@@ -114,7 +109,7 @@ describe("public game API over /api/v1", () => {
     const unauthenticated = await fetch(base + GAME_PATHS.snapshot);
     expect(unauthenticated.status).toBe(401);
 
-    // Integration with game:read gets the FULL GM projection by default...
+    // Integration with game:read gets the full GM projection by default...
     const gmGrade = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(integration.token) });
     expect(gmGrade.status).toBe(200);
     const gmBody = GameSnapshotResponseSchema.parse(await gmGrade.json());
@@ -130,7 +125,7 @@ describe("public game API over /api/v1", () => {
     expect(overlaySerialized).not.toContain("Unrevealed Tyrant");
     expect(overlaySerialized).not.toContain("Secret lair");
 
-    // A player session ALWAYS gets the player view, even asking for gm.
+    // A player session always gets the player view, even asking for gm.
     const player = await fetch(base + GAME_PATHS.snapshot + "?view=gm", { headers: bearer(playerToken) });
     const playerBody = GameSnapshotResponseSchema.parse(await player.json());
     expect(playerBody.data.view).toBe("player");
@@ -176,7 +171,7 @@ describe("public game API over /api/v1", () => {
     const condition = await post(base, GAME_PATHS.actorConditions.replace("{actorId}", HERO_ID), writer.token, { conditionId: "prone", active: true });
     expect(condition.status).toBe(200);
 
-    // Dice roll returns the recorded rollId; retry returns the SAME roll.
+    // Dice roll returns the recorded rollId; retry returns the same roll.
     const rollId = randomUUID();
     const rolled = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.rolls, writer.token, { commandId: rollId, formula: "2d6+3", purpose: "check", visibility: "public" })).json());
     expect(typeof rolled.data.rollId).toBe("string");
@@ -240,8 +235,8 @@ describe("public game API over /api/v1", () => {
     expect((await post(base, GAME_PATHS.claims, playerToken, { actorId: HERO_ID })).status).toBe(200);
     expect((await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 12 }, { actorId: SECRET_ID, score: 6 }] })).status).toBe(200);
 
-    // Supplying the hidden combatant's id as a target is refused (the runner never offers it, but the server
-    // must not trust client input), and the rejection must not echo the hidden actor's name (viewer safety).
+    // Supplying the hidden combatant's id as a target is refused (the server must not trust client input),
+    // and the rejection must not echo the hidden actor's name.
     const hiddenTarget = await post(base, GAME_PATHS.actionResolve, playerToken, { actorId: HERO_ID, actionId: "unarmed-strike", targetIds: [SECRET_ID] });
     expect(hiddenTarget.status).toBe(409);
     const hiddenBody = JSON.stringify(await hiddenTarget.json());
@@ -345,16 +340,15 @@ describe("public game API over /api/v1", () => {
     const reader = await issueCredential(base, gmToken, "builder client", ["game:read"]);
     const playerToken = server.auth.issuePlayerSession();
 
-    // Spells and equipment were socket-only before P1.5; they are public reference like conditions,
-    // so a player session reads them over HTTP too (the character wizard runs from a player seat).
+    // Spells and equipment are public reference like conditions, so a player session reads them over HTTP
+    // too (the character wizard runs from a player seat).
     const spells = await fetch(base + CONTENT_PATHS.spells, { headers: bearer(playerToken) });
     expect(spells.status).toBe(200);
     const spellsBody = await spells.json();
     expect(spellsBody.data.spells.length).toBeGreaterThan(100);
     expect(spellsBody.data.spells[0]).toHaveProperty("castingOptions");
-    // ADR-0015: every displaying surface shows the BUNDLE's canonical statement - author, source URL
-    // and license URI - so no client has to hand-write a weaker paraphrase of it. Spells and
-    // conditions shipped without it while the six builder catalogs carried it.
+    // ADR-0015: every displaying surface shows the bundle's canonical statement (author, source URL and
+    // license URI), so no client hand-writes a paraphrase.
     expect(spellsBody.data.attribution).toContain("System Reference Document 5.2.1");
     expect(spellsBody.data.attribution).toContain("Wizards of the Coast");
     expect(spellsBody.data.attribution).toContain("creativecommons.org/licenses/by/4.0");
@@ -371,8 +365,8 @@ describe("public game API over /api/v1", () => {
     expect(equipmentBody.data.equipment.length).toBeGreaterThan(50);
     expect(typeof equipmentBody.data.attribution).toBe("string");
 
-    // The six character-builder catalogs, on the same audience terms. The bundles are seed content
-    // (phase 1.1) and grow in later phases, so these assert "at least one real row" rather than counts.
+    // The six character-builder catalogs, on the same audience terms. Bundles grow over time, so these
+    // assert "at least one real row" rather than counts.
     const catalogs = [
       [CONTENT_PATHS.classes, "classes"],
       [CONTENT_PATHS.subclasses, "subclasses"],
@@ -396,9 +390,8 @@ describe("public game API over /api/v1", () => {
       expect((await fetch(base + path)).status, `anonymous GET ${path}`).toBe(401);
     }
 
-    // Spot-check that the wire projection actually carries what the wizard picks on, rather than
-    // shipping a well-authorized empty shape: source discriminator, the multiclass hit die, the
-    // generator's stat priority, and features-as-data including the choices a feature asks for.
+    // Spot-check that the wire projection carries what the wizard picks on: source discriminator, the
+    // multiclass hit die, the generator's stat priority, and features-as-data with their choices.
     const fighter = catalogRows.classes.find((entry) => entry.id === "fighter") as Record<string, unknown>;
     expect(fighter.source).toBe("srd");
     expect(fighter.hitDie).toBe("d10");
@@ -416,8 +409,8 @@ describe("public game API over /api/v1", () => {
     const { base, server } = await boot();
     const playerToken = server.auth.issuePlayerSession();
 
-    // content:skills is player-readable reference with the ability column - the data source that
-    // retires the client's hardcoded SKILL_ABILITY table (known-bugs: three edits per homebrew skill).
+    // content:skills is player-readable reference with the ability column, so clients need no hardcoded
+    // skill-to-ability table.
     const skills = await fetch(base + CONTENT_PATHS.skills, { headers: bearer(playerToken) });
     expect(skills.status).toBe(200);
     const skillsBody = await skills.json();
@@ -425,7 +418,7 @@ describe("public game API over /api/v1", () => {
     expect(skillsBody.data.skills.find((skill: { id: string }) => skill.id === "athletics")).toMatchObject({ ability: "str" });
     expect(skillsBody.data.attribution).toContain("System Reference Document 5.2.1");
 
-    // QA must-fix 3: the class/species/background/spell fields the wizard renders from must cross the wire.
+    // The class/species/background/spell fields the wizard renders from must cross the wire.
     const classes = await (await fetch(base + CONTENT_PATHS.classes, { headers: bearer(playerToken) })).json();
     const fighter = classes.data.classes.find((entry: { id: string }) => entry.id === "fighter");
     expect(fighter.armorProficiencies).toEqual(["light", "medium", "heavy", "shields"]);
@@ -436,7 +429,7 @@ describe("public game API over /api/v1", () => {
     expect(wizard.spellcasting).toMatchObject({ ability: "int", prepares: "prepared", ritual: true, progression: "full", spellListId: "wizard" });
     const spells = await (await fetch(base + CONTENT_PATHS.spells, { headers: bearer(playerToken) })).json();
     const fireball = spells.data.spells.find((spell: { id: string }) => spell.id === "fireball");
-    expect(fireball.classes).toContain("wizard"); // the restored spell-list link, wire side
+    expect(fireball.classes).toContain("wizard"); // the spell-list link, wire side
     const species = await (await fetch(base + CONTENT_PATHS.species, { headers: bearer(playerToken) })).json();
     const elf = species.data.species.find((entry: { id: string }) => entry.id === "elf");
     expect(Array.isArray(elf.abilityBonuses)).toBe(true);
@@ -454,10 +447,10 @@ describe("public game API over /api/v1", () => {
 
     // Players see the default policy (all four methods) before the GM touches anything.
     const before = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
-    // `playerRandom` defaults CLOSED, unlike `playerBuilder` - a generator is a roster-filling vector (issue `2d`).
+    // `playerRandom` defaults closed, unlike `playerBuilder`: a generator can be used to fill the roster.
     expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null, maxLevel: 20, playerBuilder: "open", playerRandom: "gm-only" });
 
-    // Player write refused; the policy is the GM's (decision 10).
+    // Player write refused; the policy is the GM's.
     const denied = await post(base, GAME_PATHS.builderPolicy, playerToken, { allowedAbilityMethods: ["standard-array"] });
     expect(denied.status).toBe(403);
 
@@ -470,7 +463,7 @@ describe("public game API over /api/v1", () => {
     const accepted = await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6" });
     expect(accepted.status).toBe(200);
 
-    // Player-READABLE: the stored policy reaches the player projection verbatim.
+    // Player-readable: the stored policy reaches the player projection verbatim.
     const after = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
     // The two additive fields are omitted by this request, so they must survive it untouched.
     expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6", maxLevel: 20, playerBuilder: "open", playerRandom: "gm-only" });
@@ -505,13 +498,13 @@ describe("public game API over /api/v1", () => {
       ]
     };
 
-    // D13: the TABLE'S POLICY decides whether a player may build. Closed, the player seat is refused.
+    // The table's policy decides whether a player may build. Closed, the player seat is refused.
     const methods = ["standard-array", "point-buy", "roll", "custom"];
     expect((await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: methods, playerBuilder: "gm-only" })).status).toBe(200);
     expect((await post(base, GAME_PATHS.characters, playerToken, create)).status).toBe(403);
 
-    // Open, the same player builds their own character - and it is AUTO-CLAIMED by them, so there is
-    // no window in which someone else could take it.
+    // Open, the same player builds their own character, and it is auto-claimed by them so no one else can
+    // take it in between.
     expect((await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: methods, playerBuilder: "open" })).status).toBe(200);
     const playerCommandId = randomUUID();
     const playerCreated = await post(base, GAME_PATHS.characters, playerToken, { ...create, commandId: playerCommandId, name: "Player Built" });
@@ -597,13 +590,13 @@ describe("public game API over /api/v1", () => {
     expect(list.data.encounters).toHaveLength(1);
     const id = list.data.encounters[0].id;
 
-    // D26 - hidden until shared. A player's list is empty and the record itself is 404: never 403,
-    // which would confirm a recording exists that the GM has not shared (the Codex no-oracle rule).
+    // Hidden until shared. A player's list is empty and the record itself is 404, never 403, which would
+    // confirm an unshared recording exists.
     const hiddenList = EncounterArchiveListResponseSchema.parse(await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).json());
     expect(hiddenList.data.encounters).toEqual([]);
     expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) })).status).toBe(404);
 
-    // Shared: the same URL now answers, with the COMPUTED player replay - never the stored document.
+    // Shared: the same URL now answers with the computed player replay, never the stored document.
     await post(base, ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(id)), gmToken, { playerVisible: true });
     const sharedList = EncounterArchiveListResponseSchema.parse(await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).json());
     expect(sharedList.data.encounters.map((entry) => entry.id)).toEqual([id]);
@@ -622,7 +615,7 @@ describe("public game API over /api/v1", () => {
     const envelope = await documentResponse.json();
     expect(envelope.ok).toBe(true);
     const document = envelope.data.document;
-    // The v3 document: turns, log, complete journal (start..end), final + post-encounter states, dice, and the fight's stat blocks.
+    // The archive document: turns, log, complete journal (start..end), final + post-encounter states, dice, and the fight's stat blocks.
     expect(document.archiveSchemaVersion).toBe(3);
     expect(document.postEncounterState.combat.active).toBe(false);
     expect(document.turns.length).toBeGreaterThan(0);
@@ -638,7 +631,7 @@ describe("public game API over /api/v1", () => {
     expect(deleted.status).toBe(200);
     expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { method: "DELETE", headers: bearer(admin.token) })).status).toBe(404);
 
-    // The legacy GM-session endpoints keep working unchanged.
+    // The GM-session endpoints keep working unchanged.
     expect(await (await fetch(`${base}/api/gm/encounters`, { headers: { authorization: `Bearer ${gmToken}` } })).json()).toEqual({ encounters: [] });
   });
 
@@ -901,31 +894,25 @@ describe("public game API over /api/v1", () => {
   });
 
   it("scrapes socket handlers by any event name, so an unconventional one fails instead of vanishing", () => {
-    // The guard below is only worth its green tick if it can SEE every handler. The original
-    // character class (`[a-z0-9:-]+`) silently matched nothing for a camelCase or underscored event
-    // name, so such a handler would ship socket-only with the guard still passing - the exact failure
-    // mode the guard exists to prevent. `[^"]+` turns that silence into a failure.
+    // The guard below is only useful if it can see every handler. A narrow character class
+    // (`[a-z0-9:-]+`) silently matches nothing for a camelCase or underscored event name, so such a
+    // handler would ship socket-only with the guard passing; `[^"]+` turns that into a failure.
     const synthetic = [
       `    socket.on("codex:setPage", (payload, acknowledge) => respond(acknowledge, "x", "y", (principal) => operations.codexSetPage(principal, payload)));`,
       `    socket.on("codex:set_page", (payload, acknowledge) => respond(acknowledge, "x", "y", (principal) => operations.codexSetPage(principal, payload)));`
     ].join("\n");
     expect(scrapeSocketHandlers(synthetic).map((handler) => handler.event)).toEqual(["codex:setPage", "codex:set_page"]);
-    // The old narrow class saw neither, which is what made the blind spot silent.
+    // The narrow class sees neither, which is the blind spot.
     expect([...synthetic.matchAll(/socket\.on\("([a-z0-9:-]+)"/g)].map((match) => match[1])).toEqual([]);
-    // And once they ARE seen, the guard's own assertion rejects them: neither is a cataloged command.
+    // Once they are seen, the guard's own assertion rejects them: neither is a cataloged command.
     for (const handler of scrapeSocketHandlers(synthetic)) expect(Object.keys(GAME_COMMAND_SCOPES)).not.toContain(handler.event.replace(":", "."));
   });
 
   it("gives every Socket.IO capability an HTTP twin - no socket-only capability (ADR-0016)", () => {
-    // The guard the earlier debt slipped past: the route-table test above compares
-    // GAME_COMMAND_SCOPES <-> typed routes <-> OpenAPI, so a capability that never entered
-    // GAME_COMMAND_SCOPES was invisible to all three (character.submit-import / resolve-import,
-    // content:spells, content:equipment all shipped socket-only that way). This test starts from the
-    // OTHER end - the socket surface itself - and demands each event reach the public API.
-    //
-    // The scrape covers EVERY module under src/, not just server.ts: a handler registered from a
-    // feature module (the codex, a future importer) is a socket capability like any other, and
-    // reading one file would leave it invisible here.
+    // The route-table test above compares GAME_COMMAND_SCOPES, typed routes and OpenAPI, so a capability
+    // that never entered GAME_COMMAND_SCOPES is invisible to all three. This test starts from the socket
+    // surface and demands each event reach the public API. The scrape covers every module under src/,
+    // since feature modules (the codex, importers) register handlers too.
     const sourceDirectory = fileURLToPath(new URL("../src/", import.meta.url));
     const handlers = readdirSync(sourceDirectory)
       .filter((file) => file.endsWith(".ts"))
@@ -954,9 +941,9 @@ describe("public game API over /api/v1", () => {
       "content:names": [CONTENT_PATHS.names, "get"]
     };
     const TRANSPORT_ONLY = new Set(["disconnect"]); // Socket.IO lifecycle, not a game capability
-    // `session:join` is how a socket PRESENTS a token; its HTTP twin MINTS one (the GM issues player
-    // sessions), so the two are deliberately gated differently and the authorization comparison below
-    // does not apply. Every other read must serve the same audience on both transports.
+    // `session:join` presents a token while its HTTP twin mints one (the GM issues player sessions), so
+    // the two are gated differently and the authorization comparison does not apply. Every other read must
+    // serve the same audience on both transports.
     const AUTHORIZATION_EXEMPT = new Set(["session:join"]);
 
     for (const handler of handlers) {
@@ -966,11 +953,9 @@ describe("public game API over /api/v1", () => {
       if (twin) {
         expect(openApiDocument.paths, `socket read "${event}" has no documented HTTP twin`).toHaveProperty([twin[0], twin[1]]);
         if (AUTHORIZATION_EXEMPT.has(event)) continue;
-        // A twin that merely EXISTS is not a twin: it has to admit the same callers. The socket's
-        // real gate is the shared operation it dispatches to (`requireGmGrade` or not), so compare
-        // that against the documented security - a GM-only read must not offer `playerAuth`, and a
-        // table-wide read must. Without this, documenting a GM-only bestiary as player-readable (or
-        // locking a builder catalog a player needs) passes unnoticed.
+        // A twin must admit the same callers. The socket's real gate is the shared operation it dispatches to
+        // (`requireGmGrade` or not), so compare that against the documented security: a GM-only read must not
+        // offer `playerAuth`, and a table-wide read must.
         expect(handler.operation, `socket read "${event}" does not dispatch to a shared operation`).not.toBeNull();
         const documented = (openApiDocument.paths as unknown as Record<string, Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>>)[twin[0]][twin[1]];
         const playerReachable = (documented.security ?? []).some((entry) => "playerAuth" in entry);
@@ -987,21 +972,13 @@ describe("public game API over /api/v1", () => {
   });
 });
 
-/**
- * `POST /codex/import` is the one route with a body limit large enough to be a weapon (64 MB, because a
- * backup bundle carries every page revision), and its parser has to be app-level and has to run before the
- * global 512 KB one - body-parser marks a request parsed and every later parser skips it. That put it ahead
- * of every router, so the codex router's per-route `requireWrite` could not run first: the whole body was
- * buffered, utf-8 decoded and `JSON.parse`d before a 401 was written. Any client on the LAN with no
- * Authorization header at all - or a hostile page, since `/api/v1` has wildcard CORS and `authorization` in
- * its allowed headers - could make the process block on that parse, repeatedly, on the same event loop that
- * owns GameState.
- *
- * Tested at the FULL SERVER rather than at the router, because the defect was entirely in the middleware
- * order and a router-level test cannot see it. The oversized-body cases are the load-bearing ones: they are
- * bodies the 512 KB fallback parser also refuses, so a 401/403 there proves the request was answered before
- * ANY parser ran, not merely that the big parser was skipped.
- */
+// `POST /codex/import` has a 64 MB body limit (a backup bundle carries every page revision). Its parser
+// is app-level and must run before the global 512 KB one, which puts it ahead of every router, so it
+// must itself check authorization first. Otherwise any LAN client, or a hostile page via `/api/v1`'s
+// wildcard CORS, could make the process block on a huge `JSON.parse` on the event loop that owns
+// GameState.
+// Tested at the full server because the risk is middleware order. The oversized bodies are also refused
+// by the 512 KB fallback, so a 401/403 proves no parser ran at all.
 describe("the codex import's 64 MB parser runs after authorization, not before it", () => {
   const oversized = () => JSON.stringify({ codex: { pages: [] }, filler: "x".repeat(2 * 1024 * 1024) });
 
@@ -1016,24 +993,19 @@ describe("the codex import's 64 MB parser runs after authorization, not before i
     expect(refusal.error.requestId, "the refusal still speaks the surface's conventions").toEqual(expect.any(String));
     expect(anonymous.headers.get("access-control-allow-origin"), "...including CORS, so a browser integration can read it").toBe("*");
 
-    /**
-     * THE PROBE THAT ACTUALLY SEES THE ORDERING. A body that is both oversized for the 512 KB fallback and
-     * NOT VALID JSON: if the parser runs first it reports the parse failure (400, "not valid JSON"), and if
-     * authorization runs first there is nothing to report but the missing credential (401). Only the second
-     * is compatible with "the 64 MB parse never happened".
-     */
+    // A body oversized for the 512 KB fallback and not valid JSON: if the parser runs first it reports the
+    // parse failure (400), and if authorization runs first it reports the missing credential (401).
     const garbage = await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { "content-type": "application/json" }, body: `{"codex": ${"x".repeat(2 * 1024 * 1024)}` });
     expect(garbage.status, "an unauthorized caller must be refused BEFORE their body is parsed").toBe(401);
     expect((await garbage.json()).error.code).toBe("unauthenticated");
 
-    // A presented-but-wrong credential is 403, the R6 split - and equally unparsed.
+    // A presented-but-wrong credential is 403, and equally unparsed.
     const readOnly = await issueCredential(base, gmToken, "reader", ["codex:read"]);
     const underscoped = await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { authorization: `Bearer ${readOnly.token}`, "content-type": "application/json" }, body: `{"codex": ${"x".repeat(2 * 1024 * 1024)}` });
     expect(underscoped.status, "...and so must a presented-but-underscoped one").toBe(403);
 
-    // The point of the guard is that it only guards. A GM's real restore still reaches the store through
-    // the LARGE parser, at a size the global 512 KB fallback would have refused - which is what proves the
-    // guard did not simply demote every import to the small limit.
+    // A GM's real restore still goes through the large parser, at a size the 512 KB fallback would refuse,
+    // so the guard did not demote every import to the small limit.
     const folders = Array.from({ length: 7000 }, (_, index) => `${"Folder".padEnd(39, "x")}/${String(index).padStart(39, "0")}`);
     const big = JSON.stringify({ codex: { pages: [], folders }, bundleVersion: 1 });
     expect(Buffer.byteLength(big), "the fixture has to be over the 512 KB fallback to mean anything").toBeGreaterThan(512 * 1024);

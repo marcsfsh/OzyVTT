@@ -119,7 +119,7 @@ describe("turn time-travel timeline", () => {
 
     await expect(previous(false)).rejects.toMatchObject({ confirm: "discard-changes" });
     await previous(true); // confirm discard → restore the viewed snapshot in place
-    expect(store.snapshot.combat.historyCursor).toBe(0); // did NOT move further back
+    expect(store.snapshot.combat.historyCursor).toBe(0); // did not move further back
     expect(store.snapshot.combat.historyDirty).toBe(false);
     expect(store.snapshot.actors.find((a) => a.id === PC)?.hp.current).toBe(20); // change undone
   });
@@ -191,14 +191,14 @@ describe("turn time-travel timeline", () => {
     const document = JSON.parse(store.getEncounterArchive(archives[0].id)!);
     expect(document.archiveSchemaVersion).toBe(3);
     expect(document.turns).toHaveLength(captured);
-    // Each turn carries the FULL machine-readable state captured at that boundary, plus the log slice.
+    // Each turn carries the full machine-readable state captured at that boundary, plus the log slice.
     expect(document.turns[0].state.actors.find((a: { id: string }) => a.id === PC)).toBeDefined();
     expect(document.turns[0].revision).toBe(document.turns[0].state.revision);
     expect(document.log).toEqual(LOG);
-    // v2 additions: the journal of the fight's commands and the last live picture before the end wiped it.
+    // The fight's command journal and the last live state before the end cleared it.
     expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["initiative.next", "initiative.next"]);
     expect(document.finalState.combat.active).toBe(true);
-    // v3 addition: the true aftermath - captured after encounter.end cleared the fight.
+    // The aftermath, captured after encounter.end cleared the fight.
     expect(document.postEncounterState.combat.active).toBe(false);
     expect(store.listJournal()).toHaveLength(0); // wiped with the fight, atomically
 

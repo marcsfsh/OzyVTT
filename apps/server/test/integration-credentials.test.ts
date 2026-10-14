@@ -31,11 +31,8 @@ describe("IntegrationCredentialStore", () => {
     expect((await readFile(databasePath)).includes(Buffer.from(issued.token))).toBe(false);
   }));
 
-  /**
-   * The codex scopes are a plain addition to the enum, so the store needs no change at all - which is
-   * exactly the claim worth pinning, because "no change needed" is how a scope ends up mintable but
-   * unverifiable. Independence is the second claim: `codex:write` must not open a read.
-   */
+  // The codex scopes need no store change; pin that they mint and verify, and that `codex:write`
+  // does not grant read.
   it("mints and verifies the codex scopes, and keeps read and write independent", async () => withStore(async (store) => {
     const issued = store.create({ name: "Worldbuilding bot", scopes: ["codex:read", "codex:write"], gameId: null });
     expect(issued.metadata.scopes).toEqual(["codex:read", "codex:write"]);

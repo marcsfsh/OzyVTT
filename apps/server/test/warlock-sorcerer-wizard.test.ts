@@ -12,19 +12,9 @@ import { applyDamageDetailed } from "../src/hit-points.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 
-/**
- * STAGE 4, LANE B4 - WARLOCK, SORCERER, WIZARD, held to the number a player can act on.
- *
- * The bar this file is written to (`docs/product/stage-4-authoring-assignments.md` §6): a test
- * proves a rolled number, a spent counter, a refusal, or rendered text. "The rider survived
- * derivation" is not a test - `2e` shipped inert and typechecking, and that is the failure this
- * whole area exists to end. So every assertion below runs the REAL builder against the REAL SRD
- * bundles and then reads the sheet, the pool, or the table.
- *
- * Each `describe` also names the audit row
- * (`docs/product/pre-stage-4-pick-promise-audit.md`) it closes, so a row that regresses has a test
- * that says which one.
- */
+// Warlock, Sorcerer and Wizard mechanics, asserted as rolled numbers, spent counters, refusals or
+// rendered text; never "the rider survived derivation". Runs the real builder against the real SRD
+// bundles and reads the sheet, the pool, or the table.
 
 const library = new ContentLibrary().forAudience("gm");
 const POLICY = BuilderPolicySchema.parse({});
@@ -38,18 +28,10 @@ const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 type Row = CharacterCreateRequestInput["choices"][number];
 
-// -------------------------------------------------------------------------------------------------
 // Harness
-// -------------------------------------------------------------------------------------------------
 
-/**
- * A Human Acolyte Warlock of the Fiend, at whatever level the test needs.
- *
- * `extra` carries only the rows the level demands (invocations, ASIs, the arcanum) so each test
- * reads as the promise it is checking rather than as a wall of ledger rows. CHA 15 + the Acolyte's
- * +2 = 17 (+3) before any ASI, which is the modifier every Charisma-derived number below is checked
- * against.
- */
+// A Human Acolyte Warlock of the Fiend at the level the test needs. `extra` carries only the rows that
+// level demands (invocations, ASIs, the arcanum). CHA 15 + the Acolyte's +2 = 17 (+3) before any ASI.
 const warlockInput = (level: number, extra: readonly Row[] = []): CharacterCreateRequestInput => ({
   name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level,
   subclassId: "fiend-patron", abilityMethod: "standard-array",
@@ -84,18 +66,15 @@ const asi = (level: number, ability: "cha" | "dex" = "cha"): Row[] => ([
   { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
 ] as Row[]);
 
-/** The invocations a Warlock of this level is OWED by the printed column, as boring a set as possible. */
+/** The invocations a Warlock of this level is owed by the printed column, as plain a set as possible. */
 const FILLER: ReadonlyArray<readonly [level: number, id: string]> = [
   [1, "armor-of-shadows"], [2, "mask-of-many-faces"], [2, "misty-visions"],
   [5, "master-of-myriad-forms"], [5, "one-with-shadows"], [7, "whispers-of-the-grave"],
   [9, "visions-of-distant-realms"], [12, "ascendant-step"], [15, "otherworldly-leap"],
   [18, "fiendish-vigor"]
 ];
-/**
- * The printed Invocations column, restated: 1 at L1, 3 at L2, 5 at L5, 6 at L7, 7 at L9, 8 at L12,
- * 9 at L15, 10 at L18. Every build below is exactly full, which is what makes the budget testable -
- * an under-filled offer rejects and an over-filled one rejects too.
- */
+// The printed Invocations column: 1 at L1, 3 at L2, 5 at L5, 6 at L7, 7 at L9, 8 at L12, 9 at L15,
+// 10 at L18. Every build below is exactly full, since under- and over-filled offers both reject.
 const invocationsAt = (level: number) =>
   [[18, 10], [15, 9], [12, 8], [9, 7], [7, 6], [5, 5], [2, 3], [1, 1]].find(([at]) => level >= at)![1];
 const fillerFor = (level: number): Row[] =>
@@ -135,9 +114,7 @@ const thrown = (run: () => unknown): string => {
   throw new Error("expected a rejection, got none");
 };
 
-// -------------------------------------------------------------------------------------------------
-// WARLOCK - class features
-// -------------------------------------------------------------------------------------------------
+// Warlock: class features
 
 describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting (audit rows 15-18)", () => {
   const arcanum = (level: number, featureId: string, spellId: string): Row =>
@@ -150,9 +127,8 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
   ]), library, POLICY);
 
   it("puts the chosen level-6 Warlock spell on the sheet, above every slot the class has", () => {
-    // The point of the feature and the reason it cannot be a class prepared-spell pick: Pact Magic
-    // tops out at level 5, so the class budget refuses a level-6 spell outright. As a FEATURE pick
-    // it lands - a level-6 spell on a sheet whose highest slot is level 5.
+    // Pact Magic tops out at level 5, so the class budget refuses a level-6 spell; as a feature pick it
+    // lands on a sheet whose highest slot is level 5.
     const built = level11();
     expect(built.spellcasting!.slots.map((slot) => slot.level)).toEqual([5]);
     expect(spellOf(built, "true-seeing")).toMatchObject({ id: "true-seeing", level: 6, prepared: true });
@@ -170,7 +146,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
   });
 
   it("refuses a spell ABOVE the arcanum's level, naming the ceiling", () => {
-    // `maxSpellLevel` is doing real work: the level-6 arcanum will not take a level-7 spell.
+    // `maxSpellLevel` does real work: the level-6 arcanum will not take a level-7 spell.
     const message = thrown(() => buildCharacterDefinition(warlockInput(11, [
       ...fillerFor(11), ...asisFor(11),
       { level: 10, classId: "warlock", kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } } as Row,
@@ -180,8 +156,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
   });
 
   it("refuses the build that leaves the arcanum unchosen", () => {
-    // Before this wave the four arcanum records carried no `choice` at all, so a level-17 Warlock
-    // was never asked and never noticed. Now the pick is owed and the build says so by name.
+    // The arcanum pick is owed, and a build without it is refused by name.
     const message = thrown(() => buildCharacterDefinition(warlockInput(11, [
       ...fillerFor(11), ...asisFor(11),
       { level: 10, classId: "warlock", kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } } as Row
@@ -200,7 +175,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
     ]), library, POLICY));
     expect([6, 7, 8, 9].map((level) => spellOf(built.definition, ["true-seeing", "forcecage", "demiplane", "foresight"][level - 6])!.level))
       .toEqual([6, 7, 8, 9]);
-    // Four SEPARATE pools, not one shared counter: the SRD regains "all uses" on a Long Rest.
+    // Four separate pools, not one shared counter: the SRD regains "all uses" on a Long Rest.
     for (const level of [6, 7, 8, 9]) {
       expect(actionOf(built, `mystic-arcanum-level-${level}-spell`).uses).toMatchObject({ limit: 1, per: "long-rest" });
     }
@@ -213,8 +188,8 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
 
   it("always has Contact Other Plane prepared without charging the prepared budget", () => {
     const built = level9();
-    // A level-9 Warlock prepares 10 spells. The grant is `alwaysPrepared`, so it rides free - that
-    // distinction is the whole reason `grants.spells` exists rather than a silent extra pick.
+    // A level-9 Warlock prepares 10 spells. The grant is `alwaysPrepared`, so it does not count against
+    // that, which is why `grants.spells` exists rather than an extra pick.
     expect(spellOf(built, "contact-other-plane")).toMatchObject({ level: 5, alwaysPrepared: true, prepared: true });
     expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "warlock", prepared: 10 });
   });
@@ -252,8 +227,8 @@ describe("Warlock: Epic Boon is offered at last (audit row 6, the Warlock's)", (
     { level: 17, kind: "spell", id: "foresight", payload: { featureId: "mystic-arcanum-level-9-spell" } } as Row,
     ...(featId === null ? [] : [
       { level: 19, classId: "warlock", kind: "feat", id: featId, payload: { featureId: "epic-boon" } } as Row,
-      // The boon's OWN pick - "increase one ability score by 1, to a maximum of 30". A chosen feat's
-      // feature asks for picks of its own, which is why pass A settles feats before pass B.
+      // The boon's own pick: "increase one ability score by 1, to a maximum of 30". A chosen feat's
+      // feature asks for picks of its own, which is why feats are settled in an earlier pass.
       { level: 19, kind: "ability-score", id: "cha", payload: { featureId: featId } } as Row
     ])
   ]);
@@ -274,9 +249,7 @@ describe("Warlock: Epic Boon is offered at last (audit row 6, the Warlock's)", (
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// WARLOCK - Fiend Patron
-// -------------------------------------------------------------------------------------------------
+// Warlock: Fiend Patron
 
 describe("Fiend Patron: the level-3 Fiend Spells arrive prepared and free (audit row 27)", () => {
   it("hands over all four without charging one prepared slot", () => {
@@ -284,18 +257,16 @@ describe("Fiend Patron: the level-3 Fiend Spells arrive prepared and free (audit
     for (const id of ["burning-hands", "command", "scorching-ray", "suggestion"]) {
       expect(spellOf(built, id)).toMatchObject({ id, alwaysPrepared: true, prepared: true });
     }
-    // Fireball is the LEVEL-5 tier and is deliberately NOT granted: `grants.spells` has no
-    // character-level gate, and the overlay cannot split one printed feature into staged records.
-    // The table is in the description; over-granting it here would arm a level-3 Warlock with Geas.
+    // Fireball is the level-5 tier and is not granted: `grants.spells` has no character-level gate, and
+    // granting every tier would arm a level-3 Warlock with Geas. The table is in the description.
     expect(spellOf(built, "fireball")).toBeUndefined();
   });
 });
 
 describe("Fiend Patron: Dark One's Own Luck counts off the CHARACTER's Charisma", () => {
   it("gives a CHA 17 Warlock three uses and a CHA 20 Warlock five", () => {
-    // The same authored record, two sheets, two numbers - which is what `ability-modifier` scaling
-    // is for. A flat authored limit would be wrong for one of these two.
-    // Level 6, the ASI spent on Dexterity: Charisma stays at the Acolyte's 17 (+3).
+    // The same authored record on two sheets gives two numbers, which is what `ability-modifier` scaling
+    // is for. Level 6 with the ASI spent on Dexterity: Charisma stays at 17 (+3).
     const cha17 = table(buildCharacterDefinition(warlockInput(6, fillerFor(6).concat(asisFor(6, "dex"))), library, POLICY));
     expect(cha17.definition.abilityScores.cha).toBe(17);
     expect(actionOf(cha17, "dark-ones-own-luck").uses).toMatchObject({ limit: 3, per: "long-rest" });
@@ -374,34 +345,29 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// WARLOCK - the 28 Eldritch Invocations
-// -------------------------------------------------------------------------------------------------
+// Warlock: Eldritch Invocations
 
-/**
- * A level-5 Warlock holding FOUR filler invocations plus whichever one is under test, so every
- * build below is exactly on the printed budget of five.
- */
+/** A level-5 Warlock holding four filler invocations plus the one under test, exactly on the printed budget of five. */
 const withInvocation = (id: string, extra: readonly Row[] = []) => buildCharacterDefinition(warlockInput(5, [
   invocation(1, "armor-of-shadows"), invocation(2, "mask-of-many-faces"), invocation(2, "misty-visions"),
   invocation(5, "master-of-myriad-forms"), invocation(5, id),
-  // The level-4 ASI goes into Dexterity so Charisma stays at the Acolyte's 17 (+3) - the number
-  // Agonizing Blast's damage is checked against below.
+  // The level-4 ASI goes into Dexterity so Charisma stays at 17 (+3), which Agonizing Blast's damage is
+  // checked against below.
   ...asisFor(5, "dex"), ...extra
 ]), library, POLICY);
-/** The same Warlock with a fifth FILLER instead - the negative control for every assertion below. */
+/** The same Warlock with a fifth filler instead: the negative control for every assertion below. */
 const withoutInvocation = () => withInvocation("one-with-shadows");
 
 describe("Warlock invocations: the eleven free castings are handed over (audit rows 37-47)", () => {
   it("puts each granted spell on the sheet as always-prepared, and free of the prepared budget", () => {
-    // Four of the eleven, taken together, and none of them is even on the Warlock spell list -
-    // which is the point: `grants.spells` hands over a spell the class could never have prepared.
+    // Four of the spell-granting invocations; none of these spells is on the Warlock list, so
+    // `grants.spells` is the only route.
     const built = withInvocation("otherworldly-leap");
     for (const [id, level] of [["mage-armor", 1], ["disguise-self", 1], ["silent-image", 1], ["alter-self", 2], ["jump", 1]] as const) {
       expect(spellOf(built, id)).toMatchObject({ id, level, alwaysPrepared: true, prepared: true });
     }
-    // A level-5 Warlock prepares 6 spells. Five granted castings on top, all uncharged - the only
-    // charged entry on this sheet is the Magic Initiate spell the background handed over.
+    // A level-5 Warlock prepares 6 spells. The granted castings are uncharged on top; the only charged
+    // extra is the background's Magic Initiate spell.
     expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "warlock", prepared: 6 });
     expect((built.spellcasting!.spells ?? []).filter((spell) => spell.alwaysPrepared === false).map((spell) => spell.id))
       .toEqual(["bless"]);
@@ -414,7 +380,7 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
   });
 
   it("gives Gift of the Depths the once-per-Long-Rest counter the SRD prints, and spends it", () => {
-    // The one of the eleven the text limits. The other ten are at will and carry no pool at all.
+    // The one spell-granting invocation the text limits; the others are at will and carry no pool.
     const built = table(withInvocation("gift-of-the-depths"));
     expect(spellOf(built.definition, "water-breathing")).toMatchObject({ level: 3, alwaysPrepared: true });
     expect(actionOf(built, "gift-of-the-depths").uses).toMatchObject({ limit: 1, per: "long-rest" });
@@ -424,49 +390,38 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     expect(() => resolveDefinitionAction(built.state, actionOf(built, "gift-of-the-depths"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000041" }, deps(built, []))).toThrow();
 
-    // ...and an at-will one mints no pool, so the sheet is not littered with counters nobody spends.
+    // ...and an at-will one mints no pool.
     const atWill = table(withInvocation("otherworldly-leap"));
     expect(effectiveActions(atWill.definition, atWill.hero, atWill.catalog).some((entry) => entry.id === "otherworldly-leap")).toBe(false);
   });
 });
 
 describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the blast (audit row 51)", () => {
-  /**
-   * THE BLAST THIS WARLOCK REALLY OWNS. This test used to resolve a hand-written `ELDRITCH_BLAST`
-   * object because "the builder does not mint spell ACTIONS" - which meant the headline claim of
-   * this area (Agonizing Blast works, with a number) was proved against a fixture and was FALSE on
-   * every character the builder made: no `ActorAction`, no `spellId`, so `structuredActionFor` found
-   * nothing, the sheet fell through to a client-side `rollFlat`, and the rider gate never ran.
-   *
-   * So the cantrip is now a real ledger row - which also makes Agonizing Blast's OWN pick ("choose
-   * one of your known Warlock cantrips that deals damage") resolvable, where before it had no
-   * eligible option and was skipped - and the action under test is the one the builder minted.
-   */
+  // The Eldritch Blast cantrip is a real ledger row, so the builder mints the spell action the sheet's
+  // Cast button sends and `spell-id-is` matches; Agonizing Blast's own pick ("choose one of your known
+  // Warlock cantrips that deals damage") then has an eligible option.
   const KNOWS_ELDRITCH_BLAST: Row[] = [{ level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" } as Row];
   const pointedAtTheBlast: Row[] = [{ level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } } as Row];
 
   const blast = (id: string, faces: number[]) => {
     const built = table(withInvocation(id, [...KNOWS_ELDRITCH_BLAST, ...(id === "agonizing-blast" ? pointedAtTheBlast : [])]));
-    // `actionOf` reads the EFFECTIVE list, so this is the same object the sheet's Cast button sends
-    // an id for - not a shape this test invented.
+    // `actionOf` reads the effective list, so this is the same object the sheet's Cast button sends an id for.
     return resolveDefinitionAction(built.state, actionOf(built, "spell-eldritch-blast"),
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000050" }, deps(built, faces));
   };
 
   it("mints the cantrip as an action of its own, linked from the spell and carrying its id", () => {
     const built = withInvocation("agonizing-blast", [...KNOWS_ELDRITCH_BLAST, ...pointedAtTheBlast]);
-    // The link the sheet resolves a Cast tap through (`structuredActionFor`), and the id `spell-id-is`
-    // matches - the two fields whose absence made every builder-made Warlock roll a bare die.
+    // The link the sheet resolves a Cast tap through (`structuredActionFor`), and the id `spell-id-is` matches.
     expect(spellOf(built, "eldritch-blast")).toMatchObject({ id: "eldritch-blast", level: 0, actionId: "spell-eldritch-blast" });
     // CHA 17 (+3) + PB 3 = +6, derived by the builder from this character's own scores.
     expect(built.actions.find((action) => action.id === "spell-eldritch-blast")).toMatchObject({
       name: "Eldritch Blast", activation: "action", spellId: "eldritch-blast",
       attack: { bonus: 6 }, damage: [{ formula: "1d10", type: "force" }]
     });
-    // CANTRIPS ONLY. A leveled spell mints nothing, because no field on the finished sheet can say
-    // which slot it spends: a Warlock 5's only slots are level 3, so the spell's own level is the
-    // wrong number, and a granted free casting is indistinguishable from a prepared one. `bane` is
-    // on this Warlock's list through Magic Initiate and stays a Cast-control cast.
+    // Cantrips only. A leveled spell mints nothing because no field on the sheet can say which slot it
+    // spends (a Warlock 5's only slots are level 3), and a granted free casting looks like a prepared one.
+    // `bane` is on this Warlock's list through Magic Initiate and stays a Cast-control cast.
     expect(built.actions.find((action) => action.id === "spell-bless")).toBeUndefined();
     expect(built.spellcasting!.spells.find((spell) => spell.id === "bless")!.actionId).toBeUndefined();
   });
@@ -487,31 +442,23 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
   });
 
   it("leaves a swing that is not that spell alone", () => {
-    // `spell-id-is` is what makes the gate sayable at all, and this is the proof it filters: the
-    // Warlock's own starting sickle is not Eldritch Blast and gains nothing.
+    // `spell-id-is` filters: the Warlock's starting sickle is not Eldritch Blast and gains nothing.
     const built = table(withInvocation("agonizing-blast"));
     const swung = resolveDefinitionAction(built.state, actionOf(built, "item-sickle"),
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000051" }, deps(built, [15, 4]));
     expect(swung.damage.some((part) => part.type === "force")).toBe(false);
-    expect(swung.damage).toEqual([{ formula: "1d4 - 1", type: "slashing", total: 3 }]); // Str 8, and no Charisma anywhere
+    expect(swung.damage).toEqual([{ formula: "1d4 - 1", type: "slashing", total: 3 }]); // Str 8, and no Charisma
   });
 });
 
 describe("Warlock invocations: the ones that ask a question of their own (audit rows 24, 25, 50)", () => {
-  /**
-   * LESSONS OF THE FIRST ONES (audit row 24) IS DELIBERATELY NOT AUTHORED, and this pins why.
-   *
-   * `{kind: "feat"}` on an option's nested choice cannot be answered by the current builder: FEAT-
-   * kinded rows are settled in pass A and chosen OPTIONS in pass A2, so the offer would not exist
-   * when the row is matched - and leaving the row out fails the completeness check instead. Both
-   * directions reject, so authoring it would make the invocation untakeable rather than working.
-   * This test is the guard: if the pass ordering is ever fixed, it fails and says to author the row.
-   */
+  // Lessons of the First Ones is not authored. Its nested `{kind: "feat"}` pick cannot be answered:
+  // feat rows are settled before chosen options create their offers, so the row finds no offer, and
+  // omitting it fails the completeness check. If that ordering changes, this fails and the row should be authored.
   it("still takes Lessons of the First Ones as a bare option, because a nested FEAT pick cannot be answered yet", () => {
-    // Takeable today, granting only its prose - which is the honest state.
+    // Takeable, granting only its prose.
     expect(() => withInvocation("lessons-of-the-first-ones")).not.toThrow();
-    // ...and the reason it is not authored: a feat row aimed at it finds no offer, because pass A
-    // ran before pass A2 created one.
+    // ...and a feat row aimed at it finds no offer.
     expect(thrown(() => withInvocation("lessons-of-the-first-ones", [
       { level: 5, classId: "warlock", kind: "feat", id: "tough", payload: { featureId: "lessons-of-the-first-ones" } } as Row
     ]))).toMatch(/No feature "lessons-of-the-first-ones" offers a "feat" choice/);
@@ -533,7 +480,7 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
     for (const id of ["chill-touch", "minor-illusion", "true-strike"]) {
       expect(spellOf(built, id)).toMatchObject({ id, level: 0, prepared: true });
     }
-    // A level-5 Warlock's own cantrip budget is 3 and it is untouched: the book's three are extra.
+    // A level-5 Warlock's own cantrip budget is 3 and untouched: the book's three are extra.
     expect((built.spellcasting!.spells ?? []).filter((spell) => spell.level === 0)).toHaveLength(5); // 3 book + 2 Magic Initiate
     expect(thrown(() => tome(["chill-touch", "minor-illusion"])))
       .toMatch(/"Pact of the Tome" needs 3 pick\(s\) of kind "cantrip"/);
@@ -548,15 +495,13 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// SORCERER
-// -------------------------------------------------------------------------------------------------
+// Sorcerer
 
 /** A Human Acolyte Draconic Sorcerer. CHA 15 + the Acolyte's +2 = 17 (+3) before any ASI. */
 const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCreateRequestInput => ({
   name: "Ilde", speciesId: "human", backgroundId: "acolyte", classId: "sorcerer", level,
-  // The subclass arrives at level 3; below that the builder refuses one, so the low-level cases
-  // below (Font of Magic at 1 and 2) run without it.
+  // The subclass arrives at level 3; below that the builder refuses one, so the Font of Magic cases at
+  // levels 1 and 2 run without it.
   ...(level >= 3 ? { subclassId: "draconic-sorcery" } : {}), abilityMethod: "standard-array",
   baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
   backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
@@ -599,8 +544,7 @@ const sorcerer = (level: number, affinity = "fire") =>
 
 describe("Sorcerer: Font of Magic turns the printed Sorcery Points column into a real pool", () => {
   it("reads the column at the character's own level, and spends down to the refusal", () => {
-    // The printed column: 2 at level 2, 5 at level 5. A `by-level` table retyped beside the column
-    // it duplicates is the second copy that drifts - `class-resource` reads the column itself.
+    // The printed column: 2 at level 2, 5 at level 5, read by `class-resource` from the column itself.
     expect(actionOf(table(sorcerer(2)), "font-of-magic").uses).toMatchObject({ limit: 2, pool: "sorcery-points", per: "long-rest" });
 
     const built = table(sorcerer(5));
@@ -631,12 +575,12 @@ describe("Sorcerer: Innate Sorcery is a Bonus Action, a timer and a twice-a-day 
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000070" }, deps(built, []));
     // 1 minute is exactly ten rounds, and the tag is what "while your Innate Sorcery is active" reads.
     expect(built.hero.effects).toHaveLength(1);
-    // The live effect counts DOWN (`remaining`), which is the engine's own shape for a rounds grant.
+    // The live effect counts down (`remaining`), the engine's shape for a rounds grant.
     expect(built.hero.effects[0]).toMatchObject({ name: "Innate Sorcery", tags: ["innate-sorcery"], duration: { type: "rounds", remaining: 10 } });
 
     expect(built.hero.actionUses["innate-sorcery"]).toBe(1);
 
-    // The POOL's own refusal, on a fresh turn so the Bonus Action economy is not what refuses.
+    // The pool's own refusal, on a fresh turn so the Bonus Action economy is not what refuses.
     const spent = table(sorcerer(5));
     spent.hero.actionUses = { "innate-sorcery": 2 };
     expect(() => resolveDefinitionAction(spent.state, actionOf(spent, "innate-sorcery"),
@@ -645,9 +589,8 @@ describe("Sorcerer: Innate Sorcery is a Bonus Action, a timer and a twice-a-day 
   });
 
   it("does NOT hand out advantage on a plain weapon swing", () => {
-    // The reason the effect carries no `roll-mode`: an effect modifier is normalised through
-    // `toRollModes`, which drops its `when`, so `attack-kind-is: ["spell"]` inside an effect would
-    // be ignored and this dagger would roll two dice. It rolls one.
+    // The effect carries no `roll-mode`: effect modifiers go through `toRollModes`, which drops `when`, so
+    // `attack-kind-is: ["spell"]` would be ignored and this dagger would roll two dice. It rolls one.
     const built = table(sorcerer(5));
     resolveDefinitionAction(built.state, actionOf(built, "innate-sorcery"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000073" }, deps(built, []));
@@ -682,9 +625,8 @@ describe("Sorcerer: Sorcerous Restoration and Epic Boon (audit row 6, the Sorcer
 
 describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Magic opens", () => {
   it("debits the shared counter, so a Metamagic option and Font of Magic spend one supply", () => {
-    // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen OPTION carries a use of the same
-    // `sorcery-points` pool - which is the whole difference between Metamagic as a paragraph and
-    // Metamagic as a button that spends. Before this the ten options carried no rider at all.
+    // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen option carries a use of the same
+    // `sorcery-points` pool, making Metamagic a button that spends.
     const built = table(sorcerer(5));
     expect(actionOf(built, "careful-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
 
@@ -692,7 +634,7 @@ describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Ma
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000100" }, deps(built, []));
     expect(built.hero.actionUses["sorcery-points"]).toBe(1);
 
-    // ...and the four points left are Font of Magic's four, not four more: ONE pool, two doors.
+    // ...and the four points left are Font of Magic's four: one pool, two ways to spend it.
     for (let spent = 0; spent < 4; spent += 1) {
       resolveDefinitionAction(built.state, actionOf(built, "font-of-magic"),
         { actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-00000000011${spent}` }, deps(built, []));
@@ -703,14 +645,13 @@ describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Ma
   });
 
   it("gives the two-point options NO counter, because a use is not a cost", () => {
-    // `ActionUsesSchema` counts uses and has no notion of one costing two, so Quickened Spell
-    // ("Cost: 2 Sorcery Points") stays prose rather than debiting one where the book takes two.
-    // Subtle Spell, chosen at the same level and priced at one, does land.
+    // `ActionUsesSchema` counts uses and cannot charge two, so Quickened Spell ("Cost: 2 Sorcery Points")
+    // stays prose. Subtle Spell, at one point, does land.
     const built = table(sorcerer(10));
     const ids = effectiveActions(built.definition, built.hero, built.catalog).map((entry) => entry.id);
     expect(ids).toContain("subtle-spell");
     expect(ids).not.toContain("quickened-spell");
-    // Both are still on the sheet as prose - the trait carries what the counter cannot.
+    // Both are still on the sheet as prose.
     expect((built.definition.extensions?.["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name))
       .toContain("Quickened Spell");
   });
@@ -722,10 +663,10 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     for (const [id, level] of [["alter-self", 2], ["chromatic-orb", 1], ["command", 1], ["dragons-breath", 2]] as const) {
       expect(spellOf(built, id)).toMatchObject({ id, level, alwaysPrepared: true, prepared: true });
     }
-    // Command is a Cleric/Bard/Paladin spell - not on the Sorcerer list at all, so the grant is the
-    // only route to it. And the level-9 tier is deliberately absent (see the overlay's comment).
+    // Command is not on the Sorcerer list, so the grant is the only route to it. The level-9 tier is
+    // absent (see the overlay's comment).
     expect(spellOf(built, "summon-dragon")).toBeUndefined();
-    // A level-5 Sorcerer prepares 9; the four granted spells ride free on top of that number.
+    // A level-5 Sorcerer prepares 9; the four granted spells are on top of that.
     expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "sorcerer", prepared: 9 });
   });
 
@@ -744,12 +685,7 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
   });
 
   it("adds the Sorcerer's Charisma to a damage roll of the type it names, and to no other", () => {
-    /**
-     * The other half of row 23, and the half that needs a rolled number. The builder does not mint
-     * spell ACTIONS, so the cantrip is supplied here exactly as Agonizing Blast's proof supplies
-     * Eldritch Blast - but the rider comes from the real bundle, off the real chosen option, through
-     * the real derivation and the real resolver.
-     */
+    /** Elemental Affinity's damage half: a supplied cantrip, with the rider from the real bundle off the chosen option, through the real derivation and resolver. */
     const bolt = (type: string) => ({
       id: "fire-bolt", name: "Fire Bolt", activation: "action" as const,
       description: "You hurl a mote of fire at a creature or an object within range.",
@@ -761,7 +697,7 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId }, deps(built, [15, 6, 4]));
     };
 
-    // CHA 17 (+3) at level 6 - the two ASI points went to Dexterity. Same two dice in all three.
+    // CHA 17 (+3) at level 6; the two ASI points went to Dexterity. Same two dice in all three.
     const burned = cast("fire", "fire", "50000000-0000-4000-8000-000000000120");
     expect(burned.damage).toEqual([
       { formula: "2d10", type: "fire", total: 10 },
@@ -772,27 +708,16 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     // A different damage type from the same Sorcerer: the gate filters, so nothing is added.
     const chilled = cast("fire", "cold", "50000000-0000-4000-8000-000000000121");
     expect(chilled.damage).toEqual([{ formula: "2d10", type: "cold", total: 10 }]);
-    // ...and the same fire spell cast by a Sorcerer who chose Poison: also nothing. The rider is the
+    // ...and the same fire spell from a Sorcerer who chose Poison adds nothing: the rider follows the
     // player's answer, not an authored default.
     const unaffiliated = cast("poison", "fire", "50000000-0000-4000-8000-000000000122");
     expect(unaffiliated.damage).toEqual([{ formula: "2d10", type: "fire", total: 10 }]);
   });
 
   it("reaches a SAVE-only spell too — the half of the feature that used to be missing", () => {
-    /**
-     * **This assertion is the inverse of the one it replaces, and deliberately so.**
-     *
-     * It used to pin the narrow behaviour: `action-resolution.ts` built `damageTypes` only inside
-     * the `action.attack && targets.length === 1` branch, so `damage-type-is` had nothing to match
-     * on a spell that forces a save, and the old test said "widen that context and this test is the
-     * one that says to re-check the record." This is that re-check. The record needed no change —
-     * "when you cast a spell that deals Fire damage" says nothing about attack rolls, and the SRD
-     * has no rule that would make Fire Bolt qualify and Burning Hands not.
-     *
-     * The filter is a property of the ACTION (`action.damage`), so it is now built once for both
-     * branches. Kept rather than deleted, because a save-only spell is the edge the whole gate
-     * turns on: shrink that context again and this fails.
-     */
+    // "When you cast a spell that deals Fire damage" says nothing about attack rolls, so `damage-type-is`
+    // must match a save-only spell too. The damage-type context is built from `action.damage` for both
+    // attack and save branches; a save-only spell is the edge case that would catch it shrinking.
     const built = table(sorcerer(6, "fire"));
     const burningHands = {
       id: "burning-hands", name: "Burning Hands", activation: "action" as const,
@@ -801,16 +726,14 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     };
     const swept = resolveDefinitionAction(built.state, burningHands,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000123" }, deps(built, [4, 4, 4]));
-    // CHA 17 (+3) at level 6, the same Sorcerer as the Fire Bolt proof above: 3d6 fire, then the
-    // affinity's flat +3 of the type it names, as its own line on the card.
+    // CHA 17 (+3) at level 6: 3d6 fire, then the affinity's flat +3 as its own line.
     expect(swept.damage).toEqual([
       { formula: "3d6", type: "fire", total: 12 },
       { formula: "3", type: "fire", total: 3 }
     ]);
     expect(swept.damageTotal).toBe(15);
 
-    // ...and the gate still gates. A Sorcerer who chose Cold adds nothing to the same fire spell,
-    // which is what says the widening did not turn `damage-type-is` into "always".
+    // ...and the gate still gates: a Sorcerer who chose Cold adds nothing to the same fire spell.
     const chilly = table(sorcerer(6, "cold"));
     const unaffiliated = resolveDefinitionAction(chilly.state, burningHands,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000124" }, deps(chilly, [4, 4, 4]));
@@ -819,8 +742,7 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
   });
 
   it("keeps Draconic Resilience's Charisma AC, which is the subclass overlay's original proof", () => {
-    // Unarmoured: 10 + Dex 3 (14, +2 from the level-4 ASI) + Cha 3 (17) = 16, and the Sorcerer's
-    // starting kit is a spear and a dagger - no armor anywhere near it.
+    // Unarmored: 10 + Dex 3 (14, +2 from the level-4 ASI) + Cha 3 (17) = 16; the starting kit has no armor.
     expect(sorcerer(5).armorClass).toBe(16);
     // The negative control: a level-2 Sorcerer has no subclass, so no Charisma in the AC at all.
     expect(buildCharacterDefinition(sorcererInput(2, sorcererFor(2)), library, POLICY).armorClass).toBe(12);
@@ -848,17 +770,10 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
   });
 });
 
-// -------------------------------------------------------------------------------------------------
-// WIZARD
-// -------------------------------------------------------------------------------------------------
+// Wizard
 
-/**
- * A level-20 Human Acolyte Evoker, which is the only level Signature Spells exists at.
- *
- * Wizard is HAND_AUTHORED: six of its features already carry a `choice` and two already carry
- * `uses`, so this harness exists to prove the ONE rider the overlay adds - and to hold the ones
- * already on the record, which nothing tested before now.
- */
+// A level-20 Human Acolyte Evoker, the only level Signature Spells exists at. The Wizard record is
+// hand-authored with several `choice` and `uses` already present; this also holds those.
 const wizardInput = (): CharacterCreateRequestInput => ({
   name: "Ansel", speciesId: "human", backgroundId: "acolyte", classId: "wizard", level: 20,
   subclassId: "evoker", abilityMethod: "standard-array",
@@ -898,9 +813,8 @@ const wizardInput = (): CharacterCreateRequestInput => ({
 describe("Wizard: Signature Spells becomes two free castings that a Short Rest gives back", () => {
   it("spends both, refuses the third, and re-arms on a Short Rest", () => {
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
-    // "you can cast each of them once at level 3 without expending a spell slot ... until you finish
-    // a Short or Long Rest" - two uses, recovered on a Short Rest. Before this the level-20 capstone
-    // was prose with no counter anywhere on the sheet.
+    // "you can cast each of them once at level 3 without expending a spell slot ... until you finish a
+    // Short or Long Rest": two uses, recovered on a Short Rest.
     expect(actionOf(built, "signature-spells").uses).toMatchObject({ limit: 2, per: "short-rest" });
 
     for (const commandId of ["50000000-0000-4000-8000-000000000130", "50000000-0000-4000-8000-000000000131"]) {
@@ -912,8 +826,7 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000132" }, deps(built, []))).toThrow();
     expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
 
-    // The half `per: "short-rest"` is actually for: a SHORT rest gives them back. Overchannel, on the
-    // same sheet and once per LONG rest, is the control - it must not be handed back here.
+    // A short rest gives them back. Overchannel, once per long rest, is the control and must not come back.
     built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
     endEncounter(built.state);
     applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);
@@ -922,10 +835,8 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
   });
 
   it("holds the counters and picks the hand-authored record already carried", () => {
-    // Not authored by this lane, and untested until now: Arcane Recovery and Overchannel are the two
-    // pools `class-resource-pools.test.ts` pins the Wizard to, and Spell Mastery's two spells and the
-    // Epic Boon are picks the level-20 build owes. A sheet that quietly lost one would pass every
-    // other test in this file.
+    // Arcane Recovery and Overchannel are the Wizard's pools, and Spell Mastery's two spells and the Epic
+    // Boon are picks the level-20 build owes.
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
     expect(actionOf(built, "arcane-recovery").uses).toMatchObject({ limit: 1, per: "long-rest" });
     expect(actionOf(built, "overchannel").uses).toMatchObject({ limit: 1, per: "long-rest" });
@@ -933,15 +844,8 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
     for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
       expect(spellOf(built.definition, id)).toMatchObject({ id });
     }
-    // INT 15 + the Acolyte's 2 = 17, then four ASIs at +2 each, clamped at 20 - and then the epic
-    // boon's own +1 on top, which is the whole point of a boon and used to be silently lost.
-    //
-    // Boon of Dimensional Travel prints "Increase one ability score of your choice by 1, TO A
-    // MAXIMUM OF 30", and `featureChoiceBase.maximum` exists in the schema for precisely that
-    // sentence. All seven boons printed the 30 and none set `maximum`, so the offer consumer clamped
-    // at 20 and the boon did nothing for a character already there - which, at level 19+, is nearly
-    // every character who has one. Three lanes reported it independently; the seven feats now carry
-    // `maximum: 30` and this expectation moved from 20 to 21 exactly as this comment predicted.
+    // INT 15 + the Acolyte's 2 = 17, then four ASIs at +2 each, clamped at 20, then the epic boon's +1.
+    // Boon of Dimensional Travel prints "to a maximum of 30", carried as `maximum: 30` on the choice.
     expect(built.definition.abilityScores.int).toBe(21);
   });
 
@@ -953,31 +857,15 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
   });
 });
 
-/**
- * SPELL MASTERY IS A LEVEL-1 PICK **AND** A LEVEL-2 PICK (content program C4).
- *
- * The printed text is "Choose a level 1 AND a level 2 spell in your spellbook that have a casting time
- * of an action." The record said `{ kind: "spell", choose: 2, fromCatalog: "wizard-spells",
- * maxSpellLevel: 2 }` - ONE pick of two under ONE ceiling - so a level-18 Wizard could take two level-1
- * spells, or two level-2 spells, and the build accepted both. Neither is the feature.
- *
- * THE FAR END IS THE REFUSAL, because the refusal is the whole bug: under the old single block nothing
- * anywhere said no. Both refusals below are needed to prove there are two DIFFERENT windows rather than
- * two copies of one - two level-1 spells must fail on the second block's FLOOR, and two level-2 spells
- * must fail on the first block's CEILING. A single window cannot produce both.
- *
- * Authored in `scripts/class-mechanics/wizard.ts` through the overlay's `clears` verb (ruled
- * 2026-08-10) and merged into `bundles/classes.v1.json` by `build-class-bundle.ts`; this test reads the
- * shipped bundle through the real `ContentLibrary`, so it fails if either half is reverted.
- */
+// Spell Mastery: "Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an
+// action." These are two picks with separate windows, not one pick of two under a single ceiling. Two
+// level-1 spells must fail on the second block's floor, and two level-2 spells on the first block's
+// ceiling. Reads the shipped bundle through the real `ContentLibrary`.
 describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two picks under one ceiling", () => {
   const mastery = (id: string): Row => ({ level: 18, kind: "spell", id, payload: { featureId: "spell-mastery" } }) as Row;
 
-  /**
-   * A level-18 Evoker - the level Spell Mastery arrives at, and one below the Epic Boon, so the
-   * ledger owes exactly the two mastery rows and nothing later. Derived from `wizardInput()`'s
-   * level-20 ledger by dropping the rows for levels 19-20, so the two harnesses cannot drift apart.
-   */
+  // A level-18 Evoker: Spell Mastery arrives here, one level below the Epic Boon, so the ledger owes
+  // exactly the two mastery rows. Derived from `wizardInput()` by dropping levels 19-20.
   const level18 = (masteryRows: readonly Row[]): CharacterCreateRequestInput => ({
     ...wizardInput(), level: 18,
     choices: [
@@ -987,61 +875,46 @@ describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two pi
   });
 
   it("REFUSES a level-18 Wizard who answers both rows with level-1 spells", () => {
-    // THE BUG, at its far end. `magic-missile` and `detect-magic` are both level 1: the first fills the
-    // level-1 block, and the second has nowhere left to go because the only other block floors at 2.
-    // Before C4 this build was accepted and the sheet carried two level-1 spells.
-    //
-    // The message is asserted WHOLE, and the tail is the load-bearing half: "Spell Mastery: 1, Spell
-    // Mastery: 1" is the builder printing the capacity of each offer this feature raised. Two offers
-    // of one. The single block it replaced printed "Spell Mastery: 2" and never got here at all.
+    // Both spells are level 1: the first fills the level-1 block and the second has nowhere to go. The
+    // message is asserted whole; its tail ("Spell Mastery: 1, Spell Mastery: 1") shows two offers of one.
     const message = thrown(() => buildCharacterDefinition(
       level18([mastery("magic-missile"), mastery("detect-magic")]), library, POLICY));
     expect(message).toBe('The "spell" pick "detect-magic" exceeds what this build may choose (Spell Mastery: 1, Spell Mastery: 1).');
   });
 
   it("REFUSES a level-18 Wizard who answers both rows with level-2 spells, naming the ceiling", () => {
-    // The mirror, and it is what proves the two windows DIFFER. `acid-arrow` and `blur` are both level
-    // 2: one fills the level-2 block and the other is above the level-1 block's ceiling. A pair of
-    // identical windows would accept this; the old single `maxSpellLevel: 2` did.
+    // The mirror: both spells are level 2, so one is above the level-1 block's ceiling. Identical windows
+    // would accept this.
     const message = thrown(() => buildCharacterDefinition(
       level18([mastery("acid-arrow"), mastery("blur")]), library, POLICY));
     expect(message).toBe('The "spell" pick "blur" exceeds what this build may choose (Spell Mastery: 1, Spell Mastery: 1).');
   });
 
   it("REFUSES a cantrip in the level-1 row — a level-0 spell is not \"a level 1 spell\"", () => {
-    // The window's FLOOR, and it is the half C4 shipped without. `wizard-spells` resolves to all 218
-    // Wizard spells, 15 of them cantrips, and `withinSpellWindow` is a plain min/max check - so a
-    // block reading `maxSpellLevel: 1` with no floor accepted a level-0 cantrip as the printed
-    // "level 1 spell". Measured before the fix: `fire-bolt` + `acid-arrow` built CLEAN.
-    //
-    // The client's picker filters cantrips out of a `kind: "spell"` block (build-payload.ts:459), so
-    // this was never reachable by tapping - which is exactly why it needed a server-side test. The
-    // server is the authority and it was not enforcing what the text says.
-    // The refusal is the floor's OWN, not the generic capacity one the other two rows produce —
-    // the builder names the level it got, the minimum it wanted, and the feature that wanted it.
+    // The window's floor: `wizard-spells` includes cantrips and `withinSpellWindow` is a plain min/max
+    // check, so without a floor a cantrip would satisfy "level 1 spell". The client picker filters
+    // cantrips, so only a server-side test reaches this. The refusal names the level, the minimum, and
+    // the feature.
     const message = thrown(() => buildCharacterDefinition(
       level18([mastery("fire-bolt"), mastery("acid-arrow")]), library, POLICY));
     expect(message).toBe('"fire-bolt" is level 0, below the minimum spell level (1) for "Spell Mastery".');
   });
 
   it("ACCEPTS the printed pair, and puts both spells on the sheet", () => {
-    // The other side of the refusal: the feature still works, and it works for the pair the SRD prints.
+    // The feature still works for the pair the SRD prints.
     const built = buildCharacterDefinition(level18([mastery("magic-missile"), mastery("acid-arrow")]), library, POLICY);
     expect(spellOf(built, "magic-missile")).toMatchObject({ id: "magic-missile", level: 1 });
     expect(spellOf(built, "acid-arrow")).toMatchObject({ id: "acid-arrow", level: 2 });
   });
 
   it("offers TWO pick rows with DIFFERENT windows, through the accessor the builder reads", () => {
-    // The content half, read the way the engine reads it: `featurePicks` is the single accessor
-    // `character-build.ts` takes a feature's picks through, so this is the same list that became the
-    // two offers above. It is here to make the control probe (collapse the blocks back to one) fail
-    // LOUDLY at the shape as well as at the refusals.
+    // `featurePicks` is the accessor `character-build.ts` takes a feature's picks through, so this is the
+    // list that became the two offers above.
     const spellMastery = library.classRecord("wizard")!
       .features.find((feature) => feature.id === "spell-mastery")!;
     const picks = featurePicks(spellMastery);
     expect(picks).toHaveLength(2);
-    // BOTH windows are floored as well as capped. The first block's floor of 1 is what keeps a
-    // cantrip out of the level-1 row; before it, this read [null, 1] and level 0 satisfied it.
+    // Both windows are floored as well as capped; the first block's floor of 1 keeps cantrips out.
     expect(picks.map((pick) => [pick.minSpellLevel ?? null, pick.maxSpellLevel ?? null])).toEqual([[1, 1], [2, 2]]);
     expect(picks.map((pick) => pick.choose)).toEqual([1, 1]);
   });

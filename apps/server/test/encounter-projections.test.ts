@@ -55,8 +55,8 @@ describe("recipient-safe encounter projections", () => {
   it("hides the Initiative list when a scene is live but not fighting, keeping the map/fog but no tokens", () => {
     const state = game(PUBLIC); state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(projectViewerInitiative(state)).toEqual({ visible: false, round: 0, hiddenTurn: false, entries: [] });
-    // A live scene keeps its map + fog on the shared screen (so "go live" shows the scene), but every
-    // combatant token - public AND hidden - clears until the fight is running. No actor data leaks.
+    // A live scene keeps its map and fog on the shared screen, but every combatant token (public or
+    // hidden) stays off until the fight is running.
     const scene = projectViewerEncounterScene(state);
     expect(scene).toEqual({ mapAssetId: MAP, tokens: [], annotations: [], fog: { enabled: false, shapes: [] } });
     expect(JSON.stringify(scene)).not.toContain(PUBLIC);
