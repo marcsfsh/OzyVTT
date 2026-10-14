@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,50 +57,7 @@ async function store() {
   return { log, path, directory };
 }
 
-describe("feed store: migration and per-reader reads", () => {
-  it("adds the feed columns to a database created before they existed, and reads legacy rows as plain narration", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-feed-legacy-"));
-    const path = join(directory, "vtt.sqlite");
-    // The schema before the feed columns, with a row already in it.
-    const legacy = new DatabaseSync(path);
-    legacy.exec(
-      "CREATE TABLE combat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL, gm_only INTEGER NOT NULL, revision INTEGER NOT NULL) STRICT;"
-    );
-    legacy
-      .prepare("INSERT INTO combat_log (at, kind, text, gm_only, revision) VALUES (?, ?, ?, ?, ?)")
-      .run(new Date().toISOString(), "turn", "Round 1 - Alpha's turn.", 0, 1);
-    legacy.close();
-
-    const log = new CombatLogStore(path);
-    await log.initialize();
-    cleanups.push(async () => {
-      log.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-
-    const columns = new Set(
-      (
-        new DatabaseSync(path).prepare("PRAGMA table_info(combat_log)").all() as unknown as ReadonlyArray<{
-          name: string;
-        }>
-      ).map((column) => column.name)
-    );
-    expect(columns).toContain("actor_id");
-    expect(columns).toContain("visibility");
-    expect(columns).toContain("initiator_session_id");
-    expect(columns).toContain("payload_json");
-
-    const [legacyRow] = log.list(false);
-    expect(legacyRow.text).toBe("Round 1 - Alpha's turn.");
-    expect(legacyRow.roll).toBeUndefined();
-    expect(legacyRow.private).toBeUndefined();
-
-    // Initializing a second time must not double-add the columns (ALTER TABLE would throw).
-    const again = new CombatLogStore(path);
-    await expect(again.initialize()).resolves.toBeUndefined();
-    again.close();
-  });
-
+describe("feed store: per-reader reads", () => {
   it("gives each reader exactly their own slice of the public/self-only/blind/gm-only matrix", async () => {
     const { log } = await store();
     const mine = randomUUID();

@@ -1,7 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { migrate, openDatabase, type Migration } from "./database.js";
 
 export type ViewerAccessMetadata = Readonly<{
   id: string;
@@ -29,6 +28,24 @@ const MAX_OUTSTANDING_PAIRINGS = 10;
 const FAILED_ATTEMPT_WINDOW_MS = 60_000;
 const MAX_FAILED_ATTEMPTS = 20;
 const TOKEN_PREFIX = "vtt_viewer_";
+
+const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE viewer_access_tokens (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          token_hash TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL,
+          expires_at TEXT,
+          last_used_at TEXT,
+          revoked_at TEXT
+        ) STRICT;
+      `)
+  }
+];
 
 function hash(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -82,26 +99,14 @@ export class ViewerAccessStore {
 
   async initialize() {
     if (this.database) return;
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
+    const database = openDatabase(this.databasePath);
     try {
-      database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS viewer_access_tokens (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          token_hash TEXT NOT NULL UNIQUE,
-          created_at TEXT NOT NULL,
-          expires_at TEXT,
-          last_used_at TEXT,
-          revoked_at TEXT
-        ) STRICT;
-      `);
-      this.database = database;
+      migrate(database, "viewer-access", MIGRATIONS, { path: this.databasePath });
     } catch (error) {
       database.close();
       throw error;
     }
+    this.database = database;
   }
 
   createPairingCode(ttlMs = PAIRING_TTL_MS) {
