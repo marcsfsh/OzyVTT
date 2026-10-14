@@ -6,7 +6,8 @@ import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
-import { healActor, type ActorScope } from "./hit-points.js";
+import type { Initiator } from "./authorization.js";
+import { healActor } from "./hit-points.js";
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
@@ -28,7 +29,7 @@ export function spendHitDice(
   state: GameState,
   actorId: string,
   faces: readonly number[],
-  scope: ActorScope,
+  scope: Initiator,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined
 ): { healed: number; events: EffectNarration[]; conModifier: number } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);

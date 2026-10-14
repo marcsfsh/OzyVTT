@@ -14,7 +14,8 @@ import {
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
-import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
+import { requireGm, type Initiator } from "./authorization.js";
+import { applyDamageDetailed, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import { addEffect, endEffectIfPresent, type EffectNarration } from "./effects.js";
@@ -295,7 +296,7 @@ export function answerSave(
   method: "roll" | "manual",
   manualTotal: number | undefined,
   commit: boolean,
-  scope: ActorScope,
+  scope: Initiator,
   deps: SaveAnswerDependencies,
   legendaryResistance = false,
   explicitRollMode?: "advantage" | "disadvantage" | "normal",
@@ -362,7 +363,7 @@ export function answerSave(
   let legendaryNote: string | null = null;
   if (legendaryResistance) {
     if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");
-    if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can spend Legendary Resistance.");
+    requireGm(scope, "Only the GM can spend Legendary Resistance.");
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
     const perDay = definition?.legendary?.resistancesPerDay ?? 0;
     if (perDay === 0) throw new CommandRejectedError(`${target.name} has no Legendary Resistance.`);
@@ -521,8 +522,8 @@ export function answerSave(
 }
 
 /** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
-export function dismissSave(state: GameState, saveId: string, scope: ActorScope) {
-  if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can dismiss a saving throw.");
+export function dismissSave(state: GameState, saveId: string, scope: Initiator) {
+  requireGm(scope, "Only the GM can dismiss a saving throw.");
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId))
     throw new CommandRejectedError("That saving throw was already answered or dismissed.");
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };

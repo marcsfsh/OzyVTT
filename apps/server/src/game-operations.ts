@@ -46,7 +46,7 @@ import {
   storedDefinition,
   submitPendingImport
 } from "./actor-roster.js";
-import { canInitiateForActor, canPlayerTarget, GameAccessDeniedError } from "./authorization.js";
+import { canPlayerTarget, GameAccessDeniedError, requireActorAccess, type Initiator } from "./authorization.js";
 import { GameInputError, GameNotFoundError } from "./commands/failures.js";
 import { replaceableOffers } from "./choice-overrides.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
@@ -92,8 +92,7 @@ import {
   isSrdDamageType,
   setCurrentHp,
   setTemporaryHp,
-  UNTYPED_DAMAGE,
-  type ActorScope
+  UNTYPED_DAMAGE
 } from "./hit-points.js";
 import { settlePlayerHit, resolvePendingDamage, type AppliedDamage } from "./player-damage.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
@@ -215,15 +214,12 @@ export function isGmGrade(
 ): principal is Exclude<GamePrincipal, Readonly<{ kind: "player"; sessionId: string }>> {
   return principal.kind !== "player";
 }
-function actorScopeOf(principal: GamePrincipal): ActorScope {
-  return principal.kind === "player" ? { role: "player", sessionId: principal.sessionId } : { role: "gm" };
-}
 /** A stable UUID identity for ownership fields (annotation owners, roll initiators). Credential ids are UUIDs too. */
 function sessionIdOf(principal: GamePrincipal): string {
   return principal.kind === "integration" ? principal.credentialId : principal.sessionId;
 }
-/** The reduced initiator the authorization seam reads: GM-grade acts on anyone, a player on their own claimed actor. */
-function initiatorOf(principal: GamePrincipal): { role: "gm" } | { role: "player"; sessionId: string } {
+/** The principal as authorization reads it: GM-grade acts on anyone, a player on their own claimed actor. */
+function initiatorOf(principal: GamePrincipal): Initiator {
   return isGmGrade(principal) ? { role: "gm" } : { role: "player", sessionId: principal.sessionId };
 }
 function annotationActorOf(principal: GamePrincipal): AnnotationActor {
@@ -799,8 +795,7 @@ export function createGameOperations(context: GameOperationsContext) {
         },
         (state) => {
           // A player rolls only their own claimed character's initiative; the GM (integration) anyone's.
-          const verdict = canInitiateForActor(initiator, state, actorId, "check");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiator, state, actorId, "check");
           score = rollSelfInitiative(
             state,
             actorId,
@@ -912,7 +907,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async turnEnd(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(CommandIdentitySchema, raw, "The end-turn command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
       const result = await store.executeTimeline(
@@ -945,7 +940,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async turnUse(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(TurnUseSchema, raw, "The turn command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, slot, used, expectedRevision } = request;
       const result = await store.execute(
         { id: commandId, type: "turn.use", expectedRevision, payload: request, principal: principalTag(principal) },
@@ -968,7 +963,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async turnUseReaction(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(TurnReactionSchema, raw, "The reaction command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, used, expectedRevision } = request;
       const result = await store.execute(
         {
@@ -996,7 +991,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async turnUseLegendary(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(TurnLegendarySchema, raw, "The legendary-action command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, spent, expectedRevision } = request;
       // Silent: the legendary pool is GM knowledge; structured legendary resolves narrate the action itself.
       const result = await store.execute(
@@ -1060,11 +1055,13 @@ export function createGameOperations(context: GameOperationsContext) {
         (state) => {
           if (state.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
-          if (!isGmGrade(principal)) {
-            const actor = state.actors.find((candidate) => candidate.id === actorId);
-            if (!actor || actor.ownerSessionId !== principal.sessionId)
-              throw new CommandRejectedError("You may only move your claimed character token.");
-          }
+          requireActorAccess(
+            initiatorOf(principal),
+            state,
+            actorId,
+            "move",
+            "You may only move your claimed character token."
+          );
           const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
           moveEncounterToken(state, actorId, position, geometry);
           // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
@@ -1336,8 +1333,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const isPlayer = !isGmGrade(principal);
       if (isPlayer && store.snapshot.builderPolicy.playerBuilder !== "open")
         throw new GameAccessDeniedError("Your GM builds the characters at this table.");
-      const verdict = canInitiateForActor(initiatorOf(principal), store.snapshot, actorId, "edit");
-      if (!verdict.ok) throw new GameAccessDeniedError(verdict.message);
+      requireActorAccess(initiatorOf(principal), store.snapshot, actorId, "edit");
       const result = await store.execute(
         {
           id: commandId,
@@ -1348,8 +1344,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const inside = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
-          if (!inside.ok) throw new CommandRejectedError(inside.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "edit");
           if (request.level > state.builderPolicy.maxLevel)
             throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
           const actor = state.actors.find((entry) => entry.id === actorId);
@@ -1550,7 +1545,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async actorApplyDamage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ApplyDamageSchema, raw, "The damage command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const {
         commandId,
         actorId,
@@ -1630,7 +1625,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async actorHeal(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(HpAmountSchema, raw, "The healing command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, amount, expectedRevision } = request;
       let events: EffectNarration[] = [];
       const result = await store.execute(
@@ -1660,7 +1655,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async actorSetTempHp(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(TempHpSchema, raw, "The temporary hit point command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, amount, expectedRevision } = request;
       const result = await store.execute(
         {
@@ -1708,7 +1703,7 @@ export function createGameOperations(context: GameOperationsContext) {
         throw new CommandRejectedError("That condition is not in the bundled rules.");
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, conditionId, active, level, expectedRevision } = request;
       let events: EffectNarration[] = [];
       const result = await store.execute(
@@ -1784,15 +1779,14 @@ export function createGameOperations(context: GameOperationsContext) {
                 )
               : [];
           const attributedActorId = actorId ?? (claimed.length === 1 ? claimed[0].id : null);
-          if (actorId && principal.kind === "player") {
-            const verdict = canInitiateForActor(
-              { role: "player", sessionId: principal.sessionId },
+          if (actorId)
+            requireActorAccess(
+              initiatorOf(principal),
               state,
               actorId,
-              purpose === "save" ? "save" : purpose === "attack" || purpose === "damage" ? "attack" : "check"
+              purpose === "save" ? "save" : purpose === "attack" || purpose === "damage" ? "attack" : "check",
+              "You may only roll for your claimed character."
             );
-            if (!verdict.ok) throw new CommandRejectedError("You may only roll for your claimed character.");
-          }
           let group = 0;
           const dice = resolution.terms.flatMap((term) => {
             if (term.kind !== "dice") return [];
@@ -1898,8 +1892,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
           // Authorize against live state: a player acts only on their own claimed character. The action kind
           // is passed for the per-table policy hook (ADR-0021).
-          const verdict = canInitiateForActor(initiator, state, actorId, "attack");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiator, state, actorId, "attack");
           const definition = attacker.definitionId ? resolveDefinitionIn(state, attacker.definitionId) : undefined;
           // Effective actions, so `item-<itemId>` ids resolve and item-raised numbers apply. A stat-block
           // action wins on id collision; builtins cover every combatant.
@@ -2112,7 +2105,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async saveAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SaveAnswerSchema, raw, "The saving-throw answer is malformed.", true);
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const sessionId = sessionIdOf(principal);
       const {
         commandId,
@@ -2181,7 +2174,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async saveDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SaveDismissSchema, raw, "The dismissal is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, saveId, expectedRevision } = request;
       const result = await store.execute(
         { id: commandId, type: "save.dismiss", expectedRevision, payload: request, principal: principalTag(principal) },
@@ -2195,7 +2188,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async reactionAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ReactionAnswerSchema, raw, "The reaction answer is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const gmSessionId = sessionIdOf(principal);
       const {
         commandId,
@@ -2293,7 +2286,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async reactionDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ReactionDismissSchema, raw, "The dismissal is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, reactionId, expectedRevision } = request;
       const result = await store.execute(
         {
@@ -2315,8 +2308,13 @@ export function createGameOperations(context: GameOperationsContext) {
       const state = store.snapshot;
       const actor = state.actors.find((candidate) => candidate.id === request.actorId);
       if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
-      if (!isGmGrade(principal) && actor.ownerSessionId !== principal.sessionId)
-        throw new GameAccessDeniedError("You can only check your own character's actions.");
+      requireActorAccess(
+        initiatorOf(principal),
+        state,
+        actor.id,
+        "check",
+        "You can only check your own character's actions."
+      );
       const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new GameNotFoundError("That combatant's stat block is unavailable.");
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
@@ -2405,7 +2403,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async effectEnd(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(EffectEndSchema, raw, "The effect command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, effectId, expectedRevision } = request;
       let events: EffectNarration[] = [];
       const result = await store.execute(
@@ -2419,11 +2417,7 @@ export function createGameOperations(context: GameOperationsContext) {
         },
         (state) => {
           // A player may end effects only on their own claimed character; ending fires onEnd and clears linked conditions.
-          if (scope.role === "player") {
-            const actor = state.actors.find((candidate) => candidate.id === actorId);
-            if (!actor || actor.ownerSessionId !== scope.sessionId)
-              throw new CommandRejectedError("You can only track your own character.");
-          }
+          requireActorAccess(scope, state, actorId, "track", "You can only track your own character.");
           events = endEffect(state, actorId, effectId);
         }
       );
@@ -2436,7 +2430,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async deathSaveRoll(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(DeathSaveRollSchema, raw, "The death save is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const { commandId, actorId, commit, rollMode, naturalRoll, expectedRevision } = request;
       const rollId = context.newId();
       const initiatorSessionId = sessionIdOf(principal);
@@ -2454,8 +2448,7 @@ export function createGameOperations(context: GameOperationsContext) {
         (state) => {
           const actor = state.actors.find((candidate) => candidate.id === actorId);
           if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-          if (scope.role === "player" && actor.ownerSessionId !== scope.sessionId)
-            throw new CommandRejectedError("You can only roll for your own character.");
+          requireActorAccess(scope, state, actorId, "save", "You can only roll for your own character.");
           if (actor.deathSaves === null || actor.hp.current > 0)
             throw new CommandRejectedError("That character isn't dying.");
           if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
@@ -2611,8 +2604,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiator, state, actorId, "attack");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiator, state, actorId, "attack");
           const live = state.actors.find((candidate) => candidate.id === actorId)!;
           plan.forEach((entry, index) => {
             const resolution = rollDice(entry.formula, (sides) => context.random(sides));
@@ -2726,8 +2718,7 @@ export function createGameOperations(context: GameOperationsContext) {
             principal: principalTag(principal)
           },
           (state) => {
-            const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "check");
-            if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+            requireActorAccess(initiatorOf(principal), state, actorId, "check");
             parked = parkRuleAsk(state, {
               id: askId,
               actorId,
@@ -3111,8 +3102,7 @@ export function createGameOperations(context: GameOperationsContext) {
           const actor = state.actors.find((candidate) => candidate.id === actorId);
           if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
           // Same owner-or-GM seam as a rest.
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "resource");
           const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
           // GM audience: legality is a content question and must match what the GM would get. Nothing GM-only
           // is projected.
@@ -3162,8 +3152,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "resource");
           events = applyRest(state, actorId, kind, resolveDefinition, equipmentCatalog());
         }
       );
@@ -3182,7 +3171,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async actorSpendHitDice(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ActorSpendHitDiceSchema, raw, "The hit-dice command is malformed.");
-      const scope = actorScopeOf(principal);
+      const scope = initiatorOf(principal);
       const initiatorSessionId = sessionIdOf(principal);
       const { commandId, actorId, count, expectedRevision } = request;
       // Roll before executing: a duplicate retry replays the stored outcome and must not consume fresh
@@ -3259,8 +3248,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "resource");
           setSpellSlotRemaining(
             state,
             actorId,
@@ -3288,8 +3276,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "resource");
           setPreparedSpell(state, actorId, spellId, prepared, (definitionId) =>
             resolveDefinitionIn(state, definitionId)
           );
@@ -3312,8 +3299,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
           setInventoryItem(state, actorId, item, (definitionId) => resolveDefinitionIn(state, definitionId), {
             catalog: equipmentCatalog(),
             role: isGmGrade(principal) ? "gm" : "player"
@@ -3337,8 +3323,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
           setCurrency(state, actorId, currency);
         }
       );
@@ -3359,8 +3344,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "edit");
           setCharacterIdentity(state, actorId, character);
         }
       );
@@ -3381,8 +3365,7 @@ export function createGameOperations(context: GameOperationsContext) {
           principal: principalTag(principal)
         },
         (state) => {
-          const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
-          if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "edit");
           setCharacterProficiencies(state, actorId, proficiencies);
         }
       );
@@ -3716,7 +3699,7 @@ export function createGameOperations(context: GameOperationsContext) {
           payload: request,
           principal: principalTag(principal)
         },
-        (state) => forceReleaseCharacter(state, actorId, "gm")
+        (state) => forceReleaseCharacter(state, actorId)
       );
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -3728,8 +3711,7 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorSetTokenImage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SetTokenImageSchema, raw, "The token image command is malformed.");
       const { commandId, actorId, tokenAssetId, expectedRevision } = request;
-      const verdict = canInitiateForActor(initiatorOf(principal), store.snapshot, actorId, "edit");
-      if (!verdict.ok) throw new GameAccessDeniedError(verdict.message);
+      requireActorAccess(initiatorOf(principal), store.snapshot, actorId, "edit");
       if (tokenAssetId !== null && !context.tokenCatalog.get(tokenAssetId))
         throw new CommandRejectedError("That token image is not in your library.");
       const result = await store.execute(
@@ -3745,8 +3727,7 @@ export function createGameOperations(context: GameOperationsContext) {
           const actor = state.actors.find((item) => item.id === actorId);
           if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
           // Re-checked inside the transaction: the snapshot check above races a claim release.
-          const inside = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
-          if (!inside.ok) throw new CommandRejectedError(inside.message);
+          requireActorAccess(initiatorOf(principal), state, actorId, "edit");
           if (tokenAssetId === null) delete actor.tokenAssetId;
           else actor.tokenAssetId = tokenAssetId;
         }
@@ -3850,7 +3831,7 @@ export function createGameOperations(context: GameOperationsContext) {
           // Release a claim on archive, otherwise the owner holds an invisible claim and the one-claim rule
           // blocks them from claiming anything else.
           releasedClaim = archived && actor.ownerSessionId !== null;
-          if (releasedClaim) forceReleaseCharacter(state, actorId, "gm");
+          if (releasedClaim) forceReleaseCharacter(state, actorId);
           actor.archived = archived;
         }
       );

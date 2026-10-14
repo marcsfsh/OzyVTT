@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { canInitiateForActor, canPlayerTarget } from "../src/authorization.js";
+import {
+  canInitiateForActor,
+  canPlayerTarget,
+  GameAccessDeniedError,
+  requireActorAccess
+} from "../src/authorization.js";
+import { CommandRejectedError } from "../src/game-store.js";
 
 const playerA = "b539ef5e-16e6-46ce-bf33-3ed4b02997c1";
 const playerB = "65cc7d6b-1150-41c4-aa9f-390439313f53";
@@ -34,6 +40,19 @@ describe("canInitiateForActor", () => {
         "check"
       ).ok
     ).toBe(false);
+  });
+});
+
+describe("requireActorAccess", () => {
+  const player = { role: "player", sessionId: playerB } as const;
+  it("denies someone else's character with the caller's wording, and treats a missing one as a rejection", () => {
+    expect(() => requireActorAccess(player, state, mine, "move", "Not your token.")).toThrow(
+      new GameAccessDeniedError("Not your token.")
+    );
+    const missing = () => requireActorAccess(player, state, "00000000-0000-4000-8000-000000000000", "check");
+    expect(missing).toThrow(CommandRejectedError);
+    expect(missing).not.toThrow(GameAccessDeniedError);
+    expect(() => requireActorAccess({ role: "gm" }, state, monster, "attack")).not.toThrow();
   });
 });
 

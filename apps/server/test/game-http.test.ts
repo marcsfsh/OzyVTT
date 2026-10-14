@@ -315,9 +315,9 @@ describe("public game API over /api/v1", () => {
     const foreignDamage = await post(base, GAME_PATHS.actorDamage.replace("{actorId}", HERO_ID), playerToken, {
       amount: 3
     });
-    expect(foreignDamage.status).toBe(409); // unclaimed character → same reducer rejection as the table
+    expect(foreignDamage.status).toBe(403); // unclaimed character → the same denial the table gets
     const move = await post(base, GAME_PATHS.tokenMove.replace("{actorId}", HERO_ID), playerToken, { position: null });
-    expect(move.status).toBe(409);
+    expect(move.status).toBe(403);
     expect((await move.json()).error.message).toBe("You may only move your claimed character token.");
 
     // Malformed input → validation envelope with issues.
@@ -391,7 +391,7 @@ describe("public game API over /api/v1", () => {
           targetIds: [HERO_ID]
         })
       ).status
-    ).toBe(409);
+    ).toBe(403);
   });
 
   it("exposes the generic command tunnel with a discoverable catalog and per-command scopes", async () => {
