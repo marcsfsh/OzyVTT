@@ -46,7 +46,8 @@ import {
   storedDefinition,
   submitPendingImport
 } from "./actor-roster.js";
-import { canInitiateForActor, canPlayerTarget } from "./authorization.js";
+import { canInitiateForActor, canPlayerTarget, GameAccessDeniedError } from "./authorization.js";
+import { GameInputError, GameNotFoundError } from "./commands/failures.js";
 import { replaceableOffers } from "./choice-overrides.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { setCurrency, setInventoryItem } from "./inventory.js";
@@ -201,18 +202,6 @@ import {
 
 /** Transport-agnostic game capabilities. The socket handlers and the HTTP API both validate, authorize,
  *  execute and narrate through these functions, so the two cannot fork (ADR-0016). */
-
-/** A request that failed schema validation. Adapters map it to the transport's "malformed" shape. */
-export class GameInputError extends Error {
-  constructor(
-    message: string,
-    public readonly issues?: ReadonlyArray<{ path: ReadonlyArray<string | number>; message: string }>
-  ) {
-    super(message);
-  }
-}
-/** The principal's role may not perform this operation. */
-export class GameAccessDeniedError extends Error {}
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
  *  (ADR-0016); players keep player limits. The public viewer never reaches these operations. */
@@ -563,7 +552,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const actions = imported
         ? imported.actions.map(actionSummaryOf)
         : catalog.monsterActionSummaries(request.definitionId);
-      if (!actions) throw new CommandRejectedError("That stat block is not in the bundled content.");
+      if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = BUILTIN_ACTIONS.filter(
         (candidate) => !definition?.actions.some((declared) => declared.id === candidate.id)
@@ -584,7 +573,7 @@ export function createGameOperations(context: GameOperationsContext) {
       // GM-only and often reached from a live token, so it uses the play-time resolver: a soft-deleted
       // creature still on the table must stay readable.
       const definition = resolveDefinition(request.definitionId);
-      if (!definition) throw new CommandRejectedError("That stat block is not in the bundled content.");
+      if (!definition) throw new GameNotFoundError("That stat block is not in the bundled content.");
       return { definition };
     },
 
@@ -2325,12 +2314,11 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(ActorAvailableActionsSchema, raw, "The availability lookup is malformed.");
       const state = store.snapshot;
       const actor = state.actors.find((candidate) => candidate.id === request.actorId);
-      if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
       if (!isGmGrade(principal) && actor.ownerSessionId !== principal.sessionId)
         throw new GameAccessDeniedError("You can only check your own character's actions.");
       const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-      if (actor.definitionId && !definition)
-        throw new CommandRejectedError("That combatant's stat block is unavailable.");
+      if (actor.definitionId && !definition) throw new GameNotFoundError("That combatant's stat block is unavailable.");
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
       const available = effectiveActions(definition, actor, equipmentCatalog());
       const builtins = BUILTIN_ACTIONS.filter(

@@ -10,21 +10,9 @@ import {
   type ApiErrorCode,
   type IntegrationScope
 } from "@vtt/api-contract";
-import {
-  CommandRejectedError,
-  RevisionConflictError,
-  RulesBlockedError,
-  TimelineConfirmationRequired,
-  type EncounterArchiveSummary
-} from "./game-store.js";
-import {
-  GameAccessDeniedError,
-  GameInputError,
-  isGmGrade,
-  type GameCommandDescriptor,
-  type GameOperations,
-  type GamePrincipal
-} from "./game-operations.js";
+import type { EncounterArchiveSummary } from "./game-store.js";
+import { describeFailure } from "./commands/failures.js";
+import { isGmGrade, type GameCommandDescriptor, type GameOperations, type GamePrincipal } from "./game-operations.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { projectPlayerReplay } from "./replay-projection.js";
 
@@ -93,7 +81,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     status: number,
     code: ApiErrorCode,
     message: string,
-    details?: Record<string, unknown>,
+    details?: Readonly<Record<string, unknown>>,
     currentRevision?: number
   ) {
     return res.status(status).json({
@@ -109,29 +97,16 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     });
   }
 
-  /** One mapping for every operation failure, so REST semantics stay uniform. */
   function sendOperationError(res: Response, error: unknown) {
-    if (error instanceof GameInputError)
-      return sendError(
-        res,
-        400,
-        "validation_failed",
-        error.message,
-        error.issues ? { issues: error.issues } : undefined
-      );
-    if (error instanceof GameAccessDeniedError) return sendError(res, 403, "forbidden", error.message);
-    if (error instanceof TimelineConfirmationRequired)
-      return sendError(res, 409, "conflict", error.message, { needsConfirm: error.confirm });
-    if (error instanceof RevisionConflictError)
-      return sendError(res, 409, "conflict", error.message, undefined, options.revision());
-    // Rules-mode rejections stay 409 but carry machine-readable details so integrations can resend with
-    // `override: {reason}` (ADR-0020).
-    if (error instanceof RulesBlockedError)
-      return sendError(res, 409, "conflict", error.message, {
-        blocked: { rule: error.rule, message: error.message, overridable: error.overridable }
-      });
-    if (error instanceof CommandRejectedError) return sendError(res, 409, "conflict", error.message);
-    return sendError(res, 500, "internal_error", "The command could not be processed.");
+    const failure = describeFailure(error);
+    return sendError(
+      res,
+      failure.status,
+      failure.code,
+      failure.message,
+      failure.details,
+      failure.stale ? options.revision() : undefined
+    );
   }
 
   function sendData(res: Response, data: unknown) {
@@ -222,7 +197,6 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
         ops.actorAvailableActions(res.locals.principal as GamePrincipal, { actorId: req.params.actorId })
       );
     } catch (error) {
-      if (error instanceof CommandRejectedError) return sendError(res, 404, "not_found", error.message);
       return sendOperationError(res, error);
     }
   });
@@ -411,12 +385,10 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Bundled content reads ----------
 
-  /** Content misses are 404s here (resource semantics), keeping the operation's message text. */
   function sendContent(res: Response, read: () => unknown) {
     try {
       return sendData(res, read());
     } catch (error) {
-      if (error instanceof CommandRejectedError) return sendError(res, 404, "not_found", error.message);
       return sendOperationError(res, error);
     }
   }

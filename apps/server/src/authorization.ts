@@ -1,5 +1,9 @@
 import type { GameState } from "@vtt/domain";
 
+/** The principal may not do this: a GM-only command from a player, or a player acting on a character that
+ *  is not theirs. Always a 403 over HTTP. */
+export class GameAccessDeniedError extends Error {}
+
 /** What a principal is trying to initiate on an actor; lets a per-table policy vary by action class. */
 export type InitiateKind = "attack" | "check" | "save" | "resource" | "inventory" | "edit";
 

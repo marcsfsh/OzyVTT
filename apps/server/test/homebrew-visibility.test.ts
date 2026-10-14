@@ -21,9 +21,9 @@ import {
   type HomebrewCatalogSlice,
   type HomebrewContentSource
 } from "../src/content-library.js";
+import { GameAccessDeniedError } from "../src/authorization.js";
 import {
   createGameOperations,
-  GameAccessDeniedError,
   type GameOperations,
   type GameOperationsContext,
   type GamePrincipal

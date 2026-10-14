@@ -24,7 +24,8 @@ import { CombatLogStore, projectFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
-import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
+import { CommandRejectedError, GameStore } from "./game-store.js";
+import { describeFailure } from "./commands/failures.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
 import { HomebrewStore } from "./homebrew-store.js";
@@ -672,33 +673,31 @@ export function createServer(options: CreateServerOptions) {
       const player = auth.verifyPlayer(token);
       return player ? { kind: "player", sessionId: player.sessionId } : null;
     };
-    /** Socket adapter: resolve the principal, run the operation, map the outcome to the ack (a timeline
-     *  confirmation bounce is an ok:true ack). */
+    /** Socket adapter: resolve the principal, run the operation, map the outcome to the ack through the same
+     *  failure mapping as HTTP. A timeline confirmation bounce is an ok:true ack, and an emit without an
+     *  acknowledgement still runs. */
     const respond = async <Result extends { ok: boolean }>(
-      acknowledge: (result: Result) => void,
+      acknowledge: ((result: Result) => void) | undefined,
       unauthenticatedMessage: string,
-      fallbackMessage: string,
+      _fallbackMessage: string,
       work: (principal: GamePrincipal) => Promise<Record<string, unknown>> | Record<string, unknown>
     ) => {
+      const reply = (result: Record<string, unknown>) => {
+        if (typeof acknowledge === "function") acknowledge(result as Result);
+      };
       const principal = principalOf();
-      if (!principal) return acknowledge({ ok: false, message: unauthenticatedMessage } as unknown as Result);
+      if (!principal) return reply({ ok: false, message: unauthenticatedMessage });
+      let outcome: Record<string, unknown>;
       try {
-        acknowledge({ ok: true, ...(await work(principal)) } as unknown as Result);
+        outcome = { ok: true, ...(await work(principal)) };
       } catch (error) {
-        if (error instanceof TimelineConfirmationRequired)
-          return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message } as unknown as Result);
-        // Rules-mode rejections carry machine-readable details for the one-tap audited override (ADR-0020).
-        if (error instanceof RulesBlockedError)
-          return acknowledge({
-            ok: false,
-            message: error.message,
-            blocked: { rule: error.rule, message: error.message, overridable: error.overridable }
-          } as unknown as Result);
-        acknowledge({
-          ok: false,
-          message: error instanceof Error ? error.message : fallbackMessage
-        } as unknown as Result);
+        const failure = describeFailure(error);
+        const { needsConfirm, blocked } = failure.details ?? {};
+        outcome = needsConfirm
+          ? { ok: true, needsConfirm, message: failure.message }
+          : { ok: false, message: failure.message, ...(blocked ? { blocked } : {}) };
       }
+      reply(outcome);
     };
     socket.on("character:claim", (payload, acknowledge) =>
       respond(acknowledge, "Join a session first.", "The character claim failed.", (principal) =>
