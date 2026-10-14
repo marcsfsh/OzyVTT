@@ -221,20 +221,16 @@ describe("multiclass casting", () => {
 
   it("counts full levels whole, half-caster levels halved ROUNDING UP, third-caster levels thirded", () => {
     expect(multiclassCasterLevel([{ classId: "wizard", level: 5 }, { classId: "cleric", level: 3 }])).toBe(8);
-    // SRD 5.2.1 Multiclassing/Spell Slots: "Half your levels (ROUND UP) in the Paladin and Ranger
-    // classes" - one of the explicit exceptions to the game's round-down default. This assertion
-    // previously demanded 2 (round down), which is the answer the SRD does not give.
+    // SRD 5.2.1 Multiclassing: Paladin and Ranger levels count half, rounded up.
     expect(multiclassCasterLevel([{ classId: "paladin", level: 5 }])).toBe(3);
     expect(multiclassCasterLevel([{ classId: "paladin", level: 6 }, { classId: "wizard", level: 4 }])).toBe(7);
     expect(multiclassCasterLevel([{ classId: "ranger", level: 3 }, { classId: "druid", level: 2 }])).toBe(4);
-    // Third-casters keep the round-down default: SRD 5.2.1's multiclass list names only Paladin and
-    // Ranger for round-up, and no third-caster subclass is in this SRD at all.
+    // Third-casters keep the round-down default; the SRD names only Paladin and Ranger for round-up.
     expect(multiclassCasterLevel([{ classId: "fighter", level: 7, casterProgression: "third" }])).toBe(2);
   });
 
   it("gives a Paladin 3 / Wizard 1 the 2nd-level slot row the round-down bug ate", () => {
     // Paladin 3 -> ceil(3/2) = 2, Wizard 1 -> 1: caster level 3, which is 4/2 on the shared table.
-    // Rounding the Paladin's levels down produced caster level 2 and silently deleted a whole row.
     expect(multiclassCasterLevel([{ classId: "paladin", level: 3 }, { classId: "wizard", level: 1 }])).toBe(3);
     expect(multiclassSpellSlots(multiclassCasterLevel([{ classId: "paladin", level: 3 }, { classId: "wizard", level: 1 }])))
       .toEqual([4, 2, 0, 0, 0, 0, 0, 0, 0]);

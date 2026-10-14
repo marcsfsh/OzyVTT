@@ -11,8 +11,8 @@ import "./forms.css";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
-  /** `title` is the borderless display-face field a record's own name is typed into (Codex page,
-      session recap heading). It keeps the well only on hover/focus, so a heading reads as a heading. */
+  /** `title` is the borderless display-face field a record's own name is typed into; the well appears only on
+      hover/focus so it reads as a heading. */
   variant?: "default" | "title";
   ref?: Ref<HTMLInputElement>;
 }

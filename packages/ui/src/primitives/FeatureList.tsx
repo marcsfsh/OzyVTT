@@ -27,14 +27,9 @@ export interface FeatureListProps {
   className?: string;
 }
 
-/** In-flow disclosure list for long class/species feature sets. `Menu` is a
-    popover — wrong shape for twenty features you need to read side by side with
-    the rest of the step.
-
-    Built on native `<details>`, so keyboard and screen-reader behaviour come from
-    the platform rather than a hand-rolled aria-expanded dance. Collapsed rows are
-    a single tappable line, which is what makes a twenty-feature class readable at
-    375px. */
+/** In-flow disclosure list for long class/species feature sets (a `Menu` popover is the wrong shape for twenty
+    features read side by side). Built on native `<details>` for platform keyboard and screen-reader behaviour;
+    collapsed rows are one tappable line. */
 export function FeatureList({ items, openIds, onToggle, allowExpandAll = false, ariaLabel, className }: FeatureListProps) {
   const [internal, setInternal] = useState<ReadonlySet<string>>(
     () => new Set(items.filter((item) => item.defaultOpen).map((item) => item.id))

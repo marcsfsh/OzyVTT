@@ -14,25 +14,20 @@ export interface WizardShellProps {
   current: number;
   /** Jump back to a completed step from the indicator. Upcoming steps stay locked. */
   onStepSelect?: (index: number) => void;
-  /** Highest step index the indicator may jump to (inclusive) — see `Steps.maxSelectable`.
-      Lets a flow that tracks how far the player has reached keep a visited-but-unfinished
-      step reachable, instead of the indicator guessing from position. */
+  /** Highest step index the indicator may jump to (inclusive); see `Steps.maxSelectable`. */
   maxSelectable?: number;
 
   children: ReactNode;
 
   /** Back is hidden on the first step — omit the handler there. */
   onBack?: () => void;
-  /** An extra action beside Back, for a flow whose "one step at a time" walk is not the
-      only way out of a step (e.g. "Back to review" once the end has been reached). It sits
-      with Back rather than beside Next: it moves you, it does not commit anything. */
+  /** An extra action beside Back for another way out of a step (e.g. "Back to review"). It moves, it doesn't commit. */
   footerSecondary?: ReactNode;
   onNext?: () => void;
   backLabel?: string;
   nextLabel?: string;
-  /** Per-step validation gate. Present ⇒ Next is disabled and this reason is shown
-      and announced; the button is `aria-describedby` it, so the block is never
-      silent. Absent ⇒ Next is live. */
+  /** Per-step validation gate. Present ⇒ Next is disabled and this reason is shown and announced (Next is
+      `aria-describedby` it). Absent ⇒ Next is live. */
   blockedReason?: ReactNode;
   /** Disables both footer actions while a submit is in flight. */
   busy?: boolean;
@@ -43,43 +38,27 @@ export interface WizardShellProps {
   /** Resume-draft affordance slot: an Alert, a Button, whatever the flow needs. */
   resume?: ReactNode;
 
-  /** Optional detail/preview pane beside the step body. This is the ONE detail pane
-      in a guided flow — `ChoiceGrid` deliberately has none, so a phone never has to
-      scroll past the whole grid to read what it just picked. */
+  /** Optional detail/preview pane beside the step body; the one detail pane in a guided flow. */
   detail?: ReactNode;
   detailTitle?: ReactNode;
-  /** Narrow screens are master-detail (mirroring the Codex workspace): the detail
-      pane replaces the body when this is true, with a back link to the list. */
+  /** On narrow screens the detail pane replaces the body (master-detail) while this is true, with a back link. */
   detailOpen?: boolean;
-  /** The narrow-screen way IN. Rendered above the step body below 760px (where the
-      pane is hidden) so every consumer gets the same affordance instead of
-      hand-rolling a "Show preview" button. */
+  /** The narrow-screen way in: rendered above the step body below 760px, where the pane is hidden. */
   onOpenDetail?: () => void;
   detailOpenLabel?: string;
   onCloseDetail?: () => void;
   detailBackLabel?: string;
 
-  /** Persistent footnote — the wizard's CC BY attribution line lives here. */
+  /** Persistent footnote; the wizard's CC BY attribution line goes here. */
   footnote?: ReactNode;
   ariaLabel?: string;
   className?: string;
 }
 
-/** The multi-step frame for the character builder (and any other long guided flow).
-    NOT a modal: it is a full page on a laptop and a full-screen sheet on a phone
-    (builder decision 4), so it owns the viewport instead of floating over it.
-
-    What it guarantees:
-      - A step indicator that does not blob at 375px (Steps ships a compact form).
-      - A Back / Next footer with real validation gating — a disabled Next always
-        comes with a visible, announced reason.
-      - Sticky header and footer, so the actions stay reachable while the step body
-        scrolls on a phone.
-      - An optional detail/preview pane that collapses to master-detail on narrow
-        screens rather than stacking two panes nobody can read.
-
-    It owns no step state: the flow drives `current`, `blockedReason`, and the
-    handlers. */
+/** The multi-step frame for the character builder and other long guided flows. Not a modal: a full page on a
+    laptop and a full-screen sheet on a phone. Provides a compact-capable step indicator, a Back / Next footer
+    whose disabled Next always has an announced reason, sticky header and footer, and an optional detail pane
+    that becomes master-detail on narrow screens. The flow owns all step state. */
 export function WizardShell({
   title, eyebrow, steps, current, onStepSelect, maxSelectable, children,
   onBack, footerSecondary, onNext, backLabel = "Back", nextLabel = "Next", blockedReason, busy = false,
@@ -110,29 +89,21 @@ export function WizardShell({
 
       {resume != null && <div className="nh-wizard-resume">{resume}</div>}
 
-      {/* The step body is the wizard's one scrolling region (design-language §7): `.scroll-y`
-          declares it, the sticky head and foot above and below it never move. */}
+      {/* The step body is the wizard's one scrolling region; head and foot stay put. */}
       <div className={cx("nh-wizard-body", "scroll-y", detail != null && "nh-wizard-body--split", detailOpen && "has-detail")}>
         <div className="nh-wizard-main">
           {detail != null && onOpenDetail && (
             <Button variant="ghost" size="sm" className="nh-wizard-detail-open" onClick={onOpenDetail}>{detailOpenLabel}</Button>
           )}
           {children}
-          {/* The footnote (an SRD attribution, in practice) rides the step's SCROLL, at the end of
-              the column. It used to sit below the sticky footer, where the layer's own scroll kept
-              it out of the way; with the frame pinned it would instead stand permanently on screen
-              — ~110px of licence text on a 390px phone, taken from the step. */}
+          {/* The footnote scrolls with the step so licence text doesn't permanently take phone height. */}
           {footnote != null && <p className="nh-wizard-footnote">{footnote}</p>}
         </div>
         {detail != null && (
           <aside className="nh-wizard-detail" aria-label={typeof detailTitle === "string" ? detailTitle : "Details"}>
             {onCloseDetail && (
               <Button variant="ghost" size="sm" className="nh-wizard-detail-back" onClick={onCloseDetail}>
-                {/* A PRIMITIVE NEVER RENDERS A GLYPH AS TEXT. "‹" (U+2039) does sit inside Manrope's
-                    declared U+2000-206F subset, so unlike "→" it very probably did render in the
-                    body face - but it rendered at 8.19px beside a 13px label, because a single
-                    guillemet is drawn small by design. The system already owns this shape: the
-                    disclosure caret, turned a quarter clockwise, at `currentColor` and 1.05em. */}
+                {/* The disclosure caret, turned a quarter, rather than a "‹" glyph that renders too small. */}
                 <span className="nh-wizard-detail-back-icon" aria-hidden="true"><IconChevron /></span>
                 {detailBackLabel}
               </Button>

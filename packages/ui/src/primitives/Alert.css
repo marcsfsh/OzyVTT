@@ -1,10 +1,6 @@
-/* RULING 39 — severity is a LEADING RULE, not a fill. Text sits on a neutral ground in every
-   theme, which is what makes it survive daybreak: coloured-text-on-tint is the combination that
-   fails there first. The severity hues are unchanged, and `--caution` in particular keeps its
-   meaning (warning / not finished) — the segmented on-state does not borrow it (ruling 4/7).
-
-   The material rides a backing layer, not the element: an Alert routinely carries a Button in its
-   body (the builder's "Resume draft"), and `clip-path` clips hit-testing. */
+/* Severity is a 2px leading rule, not a fill: text sits on a neutral ground in every theme (tinted text on a tint
+   fails in daybreak). The material is on a backing layer because an Alert can contain a Button and clip-path
+   clips hit-testing. */
 .nh-alert {
   position: relative;
   isolation: isolate;
@@ -26,7 +22,7 @@
   pointer-events: none;
   clip-path: var(--chamfer-cut);
   border: 1px solid var(--line);
-  /* The 2px leading rule. Was 3px; ruling 39 names 2. */
+  /* The 2px leading rule. */
   border-left: 2px solid var(--nh-rule);
   background: var(--surface-2);
 }
@@ -45,8 +41,7 @@
 .nh-alert-text { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .nh-alert-title + .nh-alert-text { margin-top: 2px; }
 
-/* Tone: the leading rule + a matching icon; the surface stays quiet. The icon's own disc is the
-   one tinted thing left, and no text sits on it. */
+/* Tone: the leading rule plus a matching icon; the surface stays quiet. */
 .nh-alert--info    { --nh-rule: var(--info); }
 .nh-alert--info    .nh-alert-icon { color: var(--indigo); background: color-mix(in srgb, var(--info) 22%, transparent); }
 .nh-alert--success { --nh-rule: var(--success); }

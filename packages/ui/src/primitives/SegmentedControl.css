@@ -1,21 +1,8 @@
-/* THE ON STATE IS FILLED, PER THEME, AND CARRIES A SHAPE (rulings 4 + 7).
-
-   Ruling 4 fills the pressed segment with `--state-on` — dark's magenta, dusk's sunset orange,
-   light's cyan. All three clear 3:1 filled, so contrast was never the problem; COLLISION was.
-   Each of the three hues already means something else:
-
-     dusk's orange IS `--caution` (warning / not finished — ruling 39 keeps it)
-     light's cyan IS the focus ring and `--line-hover`
-     dark's magenta IS the primary action and the Switch's own ON track
-
-   Ruling 7 resolves all three at once BY SHAPE rather than by hue: the group takes the corner cut
-   and the pressed option takes a leading tick — a silhouette neither the Switch nor the focus ring
-   has. The hue can then be shared safely.
-
-   THE CUT IS ON THE GROUP AND NEVER ON THE OPTION, and that is a hit-testing rule, not a taste
-   one: the option carries `.tap-target`'s 44px extension and `clip-path` clips hit-testing. The
-   group CONTAINS those tap targets, so even there the cut is painted on a backing layer — a
-   clip-path on `.nh-segmented` would clip its children's hit areas just as surely. */
+/* The pressed option is filled with the per-theme `--state-on` and carries a leading tick. Each theme's hue also
+   means something else (dusk's orange = caution, light's cyan = focus, dark's magenta = primary/Switch), so the
+   shape disambiguates: the group takes the corner cut and the pressed option the tick.
+   The cut is on the group's backing layer, never on an option or the group itself, because clip-path would clip
+   the options' `.tap-target` hit areas. */
 .nh-segmented {
   position: relative;
   isolation: isolate;
@@ -49,10 +36,8 @@
   gap: var(--space-2);
   /* Paint stays compact; `.tap-target` on the option lifts the hit area to 44px. */
   min-height: 2.25rem;
-  /* THE TICK'S OWN LANE. `--space-3` (10px) left the mark inside the label's first glyph — see
-     the `--cue-*` note below — so the leading pad is the trailing pad plus the tick's width and
-     a gap. It is on EVERY option, pressed or not: the tick is a background and adds no width, so
-     buying its room only on the pressed option would reflow the whole row on every press. */
+  /* The tick's own lane, on every option (the tick is a background and adds no width), so pressing never reflows
+     the row. */
   padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + var(--cue-w) + var(--space-2));
   border: 0;
   border-radius: 0;
@@ -60,13 +45,8 @@
   color: var(--text-dim);
   font: 600 var(--fs-sm) / 1 var(--font-body);
   cursor: pointer;
-  /* THE CUE AT THIS CONTROL'S SCALE — the same re-declaration `Button.css` makes and this file
-     never did. The root token is the landing door's (`--cue-inset: .95rem` = 15.2px, sized for
-     2.4rem of padding); against an option's 10px it painted the wedge THROUGH the first letter —
-     over the D of "Dark", the A of "Auto-roll", the D of "Digital". The 1:2 w:h ratio is not free
-     choice: the token's conic wedge is exact only there. Slightly wider than the button's .3rem
-     because this mark is a persistent STATE, not a hover cue, and the client read the old one as
-     a rendering artifact rather than a design — it has to read as a triangle at rest. */
+  /* The cue at this control's scale; the root token's inset would paint through the first letter. Keep the 1:2
+     w:h ratio. Wider than the button's because this mark is a persistent state. */
   --cue-w: .4rem;
   --cue-h: .8rem;
   --cue-inset: .3rem;
@@ -78,28 +58,14 @@
   --cue-h: .68rem;
   --cue-inset: .26rem;
 }
-/* THE LABEL AND THE ICON STATE THEIR OWN INK, and that is a fix rather than a formality —
-   the same lesson `.nav-arrow` and `.nh-switch span` already carry. The client app's base
-   control styling has `button strong, button span { display: block }` and
-   `button span { color: var(--text-dim); font-size: .9rem; margin-top: var(--space-1) }`
-   (apps/client/src/styles.css:748-750), written for card-shaped buttons with a dim second line.
-   An INHERITED value loses to any matching rule whatever its specificity, so that element
-   selector beat `[aria-pressed="true"] { color: var(--state-on-ink) }` on the label and the icon
-   while leaving the option's own `color` — and the tick, which is `currentColor` — correct.
-   Measured on the pressed option: label 1.42 night / 1.15 dusk / 1.40 daybreak against the fill,
-   where the token pair reads 5.70 / 8.80 / 6.39. That gap IS the client's "almost impossible".
-   `margin: 0` re-centres the label, which the same rule was pushing 4px below the tick. */
+/* Label and icon state their own ink: the client's `button span { color: var(--text-dim); margin-top }` would
+   otherwise beat the inherited pressed colour (leaving unreadable text on the fill) and push the label down. */
 .nh-segmented-label, .nh-segmented-icon { color: inherit; margin: 0; font: inherit; }
-/* Ruling 40's touch clause: `:active` says what `:hover` says. */
+/* `:active` says what `:hover` says. */
 .nh-segmented-option:hover, .nh-segmented-option:active { color: var(--text); }
-/* Pressed = the per-theme ON fill plus the leading tick. NO glow: this control is a filter, and it
-   lives in the same region as the answer it filters (a ChoiceCard grid, whose selected card glows
-   cyan). Two glows in one region breaks §8.1, and the louder of the two was the one that isn't the
-   answer — the fill and the tick carry the state instead.
-
-   The tick is a BACKGROUND on the option, not a pseudo-element: `::after` is `.tap-target`'s hit
-   extension and `::before` would have to be too, since this element must never be clipped. It sits
-   inside the existing left padding and adds no width, so pressing an option cannot reflow the row. */
+/* Pressed = the per-theme fill plus the leading tick, no glow (a filter shouldn't outshine the answer it
+   filters). The tick is a background because `::after` is the `.tap-target` extension; it sits inside the
+   left padding, so pressing can't reflow the row. */
 .nh-segmented-option[aria-pressed="true"] {
   background-color: var(--state-on, var(--magenta));
   color: var(--state-on-ink);

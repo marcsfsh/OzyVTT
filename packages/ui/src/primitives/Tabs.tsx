@@ -18,16 +18,9 @@ export interface TabsProps {
   className?: string;
 }
 
-/** The one tab bar (retires the ad-hoc gm-tabs / viewer tool tabs / map-kind
-    chips). Rest = text-dim; active = text + 2px magenta underline (or left bar
-    when vertical) with a faint steady glow. Full keyboard control.
-
-    A horizontal bar that overflows solves two problems the bare `overflow-x: auto`
-    did not: the scrollbar is hidden, so at 375px an eighth tab was simply GONE with
-    nothing on screen saying otherwise; and selecting a tab by keyboard could leave the
-    selected tab outside the scrollport. So the bar now keeps the active tab in view and
-    fades whichever edge has more content behind it — and shows no fade at all when
-    everything fits, because a permanent fade is decoration, not an affordance. */
+/** The one tab bar. Rest = text-dim; active = text + 2px magenta underline (left bar when vertical) with a faint
+    glow. Full keyboard control. An overflowing horizontal bar hides its scrollbar, keeps the active tab in view
+    and fades whichever edge has more content (no fade when everything fits). */
 export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ariaLabel, className }: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const barRef = useRef<HTMLDivElement>(null);
@@ -35,9 +28,7 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
 
   const horizontal = orientation === "horizontal";
 
-  /* Measure on mount, on resize, and on scroll. A ResizeObserver rather than a window
-     listener because the bar overflows when its CONTAINER narrows (a rail collapsing,
-     a detail pane opening), which a window resize event does not always accompany. */
+  /* A ResizeObserver rather than a window listener, because the bar overflows when its container narrows. */
   useEffect(() => {
     const bar = barRef.current;
     if (!bar || !horizontal) return;
@@ -56,11 +47,8 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
     return () => { observer.disconnect(); bar.removeEventListener("scroll", measure); };
   }, [horizontal, tabs.length]);
 
-  /* Bring the selected tab into the scrollport. Deliberately NOT `scrollIntoView`: that
-     walks every scrollable ancestor, so on mount it would drag the whole page to
-     wherever the tab bar happens to sit. Scrolling the bar itself can only move the bar.
-     SCROLL_PAD matches `scroll-padding-inline` in Tabs.css, so the tab lands clear of
-     the edge fade instead of under it, and agrees with the scroll-snap position. */
+  /* Scroll the bar itself, not `scrollIntoView`, which would scroll every ancestor (and the page on mount).
+     SCROLL_PAD matches `scroll-padding-inline` in Tabs.css so the tab lands clear of the edge fade. */
   useLayoutEffect(() => {
     const bar = barRef.current;
     if (!bar || !horizontal) return;

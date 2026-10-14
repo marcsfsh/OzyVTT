@@ -1,17 +1,10 @@
 /**
- * Pure rider evaluation - the ONE collector shared by every carrier (item, feature, feat, chosen
- * option) and every consumer (equipment reconciliation, the attack roll, the damage roll, saves).
+ * Pure rider evaluation: the one collector shared by every carrier (item, feature, feat, chosen option) and
+ * every consumer (equipment reconciliation, attack, damage, saves). Callers flatten state into a plain
+ * `RiderContext`; nothing here parses or evaluates a string (ADR-0008).
  *
- * Like the rest of `@vtt/rules-5e` this file has no GameState, schema, or content knowledge: the
- * caller flattens whatever it has into a `RiderContext` of plain values and gets back the riders
- * that fire. ADR-0008 holds - `when` is an AND-list of at most four NAMED triggers with bounded
- * parameters. Nothing here parses an expression, and no string is ever evaluated.
- *
- * The types below are declared STRUCTURALLY on purpose. The authoring schemas (`FeatureModifier`,
- * `RiderTrigger`) live in `@vtt/content-srd-5.2.1` / `@vtt/schemas`, which this package must not
- * import (it is the leaf of the dependency graph, and the content package imports schemas). A Zod
- * type inferred from the matching spec shape is assignable to these, so nothing has to change here
- * when the authoring schemas land.
+ * Types are structural because this leaf package cannot import `@vtt/schemas` or the content package; their
+ * inferred Zod types are assignable to these.
  */
 
 export type RiderAbility = "str" | "dex" | "con" | "int" | "wis" | "cha";
@@ -19,7 +12,7 @@ export type ArmorWeight = "light" | "medium" | "heavy";
 /** How an attack is being made. `reaction`/`opportunity` are only knowable from the resolve's caller. */
 export type AttackKind = "melee" | "ranged" | "spell" | "unarmed" | "thrown" | "reaction" | "opportunity";
 
-/** The named roll or event a rider fires at. At most one per rider (the spec's `.superRefine`). */
+/** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =
   | "on-attack-roll" | "on-hit" | "on-critical-hit" | "on-critical-miss" | "on-damage-roll"
   | "on-saving-throw" | "on-ability-check" | "on-initiative-roll" | "on-death-save"
@@ -36,7 +29,7 @@ const FILTERS: ReadonlySet<string> = new Set([
 ]);
 const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
 
-/** Which of the four kinds a trigger belongs to - the static table that decides a rider's layer. */
+/** Which of the four kinds a trigger belongs to; decides a rider's layer. */
 export function triggerKind(type: string): "static-gate" | "dynamic-gate" | "moment" | "filter" {
   if (MOMENTS.has(type)) return "moment";
   if (FILTERS.has(type)) return "filter";
@@ -44,7 +37,7 @@ export function triggerKind(type: string): "static-gate" | "dynamic-gate" | "mom
   return "static-gate";
 }
 
-/** One entry in a rider's `when` AND-list. Unknown types fail CLOSED (see `passes`). */
+/** One entry in a rider's `when` AND-list. Unknown types fail closed (see `passes`). */
 export type RiderTrigger = Readonly<{
   type: string;
   weights?: readonly ArmorWeight[];
@@ -70,23 +63,19 @@ export type RiderTrigger = Readonly<{
   sizes?: readonly string[];
 }>;
 
-/**
- * A typed numeric rider. The union is open-ended structurally (one `type` discriminant plus the
- * bounded fields every variant uses) so the eleven consumers can each read the two or three fields
- * they care about without a 21-arm switch, and so an authored variant this build does not yet read
- * is inert rather than a type error - the ADR-0008 fail-open the rest of the interpreter uses.
- */
+/** A typed numeric rider, structurally open so each consumer reads only its fields and a variant this build
+ * doesn't read yet is inert rather than a type error. */
 export type RiderModifier = Readonly<{
   type: string;
   amount?: number;
   ability?: RiderAbility;
   whileArmored?: boolean;
-  /** `unarmored-defense`'s own sub-field, beside `armor-class`'s `whileArmored`: does the benefit survive a Shield? */
+  /** `unarmored-defense`: does the benefit survive a shield? */
   allowShield?: boolean;
   count?: number;
   feet?: number;
   formula?: string;
-  /** `extra-damage` may name an ABILITY instead of (or beside) dice - the bearer's modifier, resolved at the roll. */
+  /** `extra-damage` may name an ability instead of (or beside) dice: the bearer's modifier, resolved at the roll. */
   abilityModifier?: RiderAbility;
   damageType?: string;
   doubleOnCritical?: boolean;
@@ -109,7 +98,7 @@ export type RiderCarrier = Readonly<{
   modifiers: readonly RiderModifier[];
   /** Present for an item carrier; drives `scope: "this-item"` and the derivation's provenance. */
   sourceItemId?: string;
-  /** Riders on a weapon default to `this-item` for the attack/damage/crit family (spec 3, `scope`). */
+  /** Riders on a weapon default to `this-item` for the attack/damage/crit family. */
   isWeapon?: boolean;
 }>;
 
@@ -134,7 +123,7 @@ export type RiderContext = Readonly<{
   hitPointFraction?: number;
   bearerConditionIds?: readonly string[];
   // ---- the moment, and its filters ----
-  /** null selects the STANDING+CONDITIONAL pass (riders that name no moment); a value selects that moment. */
+  /** null selects the standing + conditional pass (riders naming no moment); a value selects that moment. */
   moment: RiderMoment | null;
   attackKinds?: readonly AttackKind[];
   weaponProperties?: readonly string[];
@@ -143,25 +132,23 @@ export type RiderContext = Readonly<{
   skill?: string;
   spellSchool?: string;
   spellLevel?: number;
-  /** WHICH spell is being cast, for `spell-id-is`. Absent = not a spell, so the filter fails closed. */
+  /** Which spell is being cast, for `spell-id-is`. Absent = not a spell, so the filter fails closed. */
   spellId?: string;
   targetSize?: string;
   targetConditionIds?: readonly string[];
   targetCreatureType?: string;
-  /** Which item this roll is being made WITH - `scope: "this-item"` matches against it. */
+  /** Which item this roll is made with; `scope: "this-item"` matches against it. */
   sourceItemId?: string | null;
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
   allowed !== undefined && have !== undefined && allowed.some((entry) => have.includes(entry));
 
-/** Evaluate ONE trigger. An unrecognised trigger type fails CLOSED - a rider whose gate the engine
- *  cannot check must not fire, or an authored "while mounted" would silently become "always". */
+/** Evaluate one trigger. Unknown types fail closed, so an unsupported gate ("while mounted") never becomes "always". */
 function passes(trigger: RiderTrigger, context: RiderContext): boolean {
   switch (trigger.type) {
     // ---- static gates ----
-    // `attuned` is redundant when the item's own attunement is required (the derivation already
-    // gated on it); it exists for an optional-attunement item with one attunement-only rider.
+    // `attuned` matters for an optional-attunement item with one attunement-only rider.
     case "attuned":
       return context.sourceItemId != null && (context.attunedItemIds ?? []).includes(context.sourceItemId);
     case "while-armored":
@@ -218,10 +205,7 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
   }
 }
 
-/**
- * `armor-class.whileArmored` is authored in shipped bundles and predates `when`. Normalise it into
- * the one evaluation path rather than branching twice (spec 8.4); the authored field is left alone.
- */
+/** Folds the legacy `armor-class.whileArmored` flag into the `when` path. */
 function gatesOf(modifier: RiderModifier): readonly RiderTrigger[] {
   const authored = modifier.when ?? [];
   return modifier.type === "armor-class" && modifier.whileArmored === true
@@ -229,7 +213,7 @@ function gatesOf(modifier: RiderModifier): readonly RiderTrigger[] {
     : authored;
 }
 
-/** Riders whose `scope` resolves to "this-item" - authored, or derived for a weapon's own family. */
+/** Riders that default to `scope: "this-item"` on a weapon. */
 const THIS_ITEM_BY_DEFAULT: ReadonlySet<string> = new Set(["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"]);
 function scopeOf(modifier: RiderModifier, carrier: RiderCarrier): "bearer" | "this-item" {
   if (modifier.scope !== undefined) return carrier.sourceItemId === undefined ? "bearer" : modifier.scope;
@@ -237,16 +221,11 @@ function scopeOf(modifier: RiderModifier, carrier: RiderCarrier): "bearer" | "th
 }
 
 /**
- * THE collector. Two passes, selected by `context.moment`:
- *
- * - `moment: null` - the STANDING + CONDITIONAL set: riders that name no moment and carry no
- *   filter, whose static and dynamic gates all pass. This is what `reconcileEquipment` and every
- *   plain numeric read (AC, save bonus, slot maxima, pool limits) asks for.
- * - `moment: "on-…"` - the MOMENTARY set: riders naming exactly that moment whose gates and
- *   filters all pass. This is what the attack, damage and save paths ask for.
- *
- * A filter with no moment is an authoring mistake the publish validator rejects; here it simply
- * never matches, so it cannot leak into the standing pass and become "always".
+ * Collect the riders that fire, in one of two passes chosen by `context.moment`:
+ * - `null`: standing + conditional riders (no moment, no filter) whose gates pass; used for AC, save bonus,
+ *   slot maxima and pool limits.
+ * - `"on-…"`: riders naming exactly that moment whose gates and filters pass; used by attack, damage, saves.
+ * A filter without a moment never matches, so it cannot leak into the standing pass.
  */
 export function collectRiders(carriers: readonly RiderCarrier[], context: RiderContext): readonly ResolvedRider[] {
   const collected: ResolvedRider[] = [];
@@ -267,31 +246,14 @@ export function collectRiders(carriers: readonly RiderCarrier[], context: RiderC
   return collected;
 }
 
-/**
- * The probe modifier `gatePasses` hands the collector. Private, and it never escapes this function:
- * it is built, collected and discarded inside one call, so no consumer can ever see the type.
- */
+/** Probe modifier type used only inside `gatePasses`. */
 const GATE_PROBE_TYPE = "__gate-probe";
 
 /**
- * DOES A STANDING GATE HOLD RIGHT NOW - the question a GRANT asks, answered by the collector above
- * rather than by a second evaluator.
- *
- * `FeatureGrantsSchema.when` gates a flat list of ids (a resistance, an immunity, a proficiency)
- * instead of a numeric rider, so it has no `RiderModifier` to hang on. The temptation is to write a
- * small `when.every(passes)` loop next to the collection site - and that is exactly how items and
- * feats drift apart, because the loop would not know about `gatesOf`'s `whileArmored` normalisation,
- * about `scopeOf`, about the standing/momentary split, or about `passes`' fail-closed `default`. So
- * this wraps the authored list in a throwaway carrier and asks `collectRiders` the same question it
- * answers for every other rider: does this survive the STANDING pass?
- *
- * That reuse buys the fail-closed property for free and twice over. An unrecognised trigger fails
- * closed in `passes`; a `moment` or a `filter` that somehow reached here (the authoring schema
- * refuses both) is dropped by the standing pass and the gate reads FALSE - no grant - rather than
- * leaking through as "always". A gate that cannot be checked never grants.
- *
- * `sourceItemId` binds `attuned` to the right item. Pass the ITEM's id for an item's grants; pass
- * nothing (or an id no inventory row has) for a feature's, where `attuned` correctly cannot hold.
+ * Whether a standing gate holds now, for a grant's `when` (resistances, immunities, proficiencies). Runs the
+ * list through `collectRiders`' standing pass instead of a second evaluator so items and feats can't drift;
+ * unknown triggers, moments and filters all read false, so an uncheckable gate never grants.
+ * Pass the item's id as `sourceItemId` for an item's grants so `attuned` binds to it; omit it for features.
  */
 export function gatePasses(when: readonly RiderTrigger[] | undefined, context: Omit<RiderContext, "moment">, sourceItemId?: string): boolean {
   if (when === undefined || when.length === 0) return true;
@@ -303,26 +265,18 @@ export function gatePasses(when: readonly RiderTrigger[] | undefined, context: O
   return collectRiders([carrier], { ...context, moment: null }).length > 0;
 }
 
-/** Sum the `amount` of every collected rider of one type (the numeric families). Signed, so a curse subtracts. */
+/** Sum the `amount` of every collected rider of one type. Signed, so a curse subtracts. */
 export function sumRiders(riders: readonly ResolvedRider[], type: string): number {
   return riders.reduce((total, rider) => rider.modifier.type === type ? total + (rider.modifier.amount ?? 0) : total, 0);
 }
 
-/**
- * SRD armor weight from the item's own AC fields. `ItemArmorSchema` records no weight class, but the
- * three SRD rules are exactly recoverable from the two fields it does record: heavy armor adds no
- * Dex, medium caps it at +2, light adds it uncapped.
- */
+/** SRD armor weight from the item's AC fields: heavy adds no Dex, medium caps it at +2, light adds it uncapped. */
 export function armorWeightOf(armor: Readonly<{ addDexModifier: boolean; dexModifierCap: number | null }>): ArmorWeight {
   if (!armor.addDexModifier) return "heavy";
   return armor.dexModifierCap === null ? "light" : "medium";
 }
 
-/**
- * The mechanical hook an item hangs on. `slot` is the explicit field; `category` is the open
- * identity slug and only its three engine-known literals fall back. A homebrew `category: "relic"`
- * with `slot: "armor"` therefore derives AC, while `category` goes back to being a browse facet.
- */
+/** The mechanical slot: explicit `slot` first, else `category` when it is "armor", "shield" or "weapon". */
 export function effectiveSlot(item: Readonly<{ slot?: string; category?: string }>): string {
   if (item.slot !== undefined) return item.slot;
   return item.category === "armor" || item.category === "shield" || item.category === "weapon" ? item.category : "none";

@@ -1,37 +1,23 @@
-/**
- * Per-class progression DATA for the twelve SRD 5.2.1 classes - hit die, ability priority, ASI
- * levels, spellcasting progression, and multiclass prerequisites.
- *
- * This is deliberately a plain table, not a switch: every accessor below takes the table as its last
- * argument, so a homebrew class supplies the SAME record and the rules math works unchanged
- * (architecture principle 1, features-as-data). Content bundles carry the authored copy of these
- * numbers; this table is the built-in fallback the generator and the level-up math read when no
- * bundle row is loaded, and the shape both must agree on.
- */
+// Built-in progression data for the twelve SRD 5.2.1 classes (hit die, stat priority, ASI levels, casting,
+// multiclass prerequisites). Every accessor takes the table as its last argument so homebrew classes supply
+// the same record; content bundles carry the authored copy and this table is the fallback.
 import type { Ability } from "./character.js";
 import { ABILITIES } from "./ability-scores.js";
 
 export type HitDie = "d4" | "d6" | "d8" | "d10" | "d12";
 
-/**
- * How much a class level contributes to the shared multiclass caster level (SRD Multiclassing):
- * full = every level, half = half rounded down (Paladin, Ranger), third = a third rounded down
- * (Eldritch Knight, Arcane Trickster), pact = Warlock Pact Magic, which stays a separate pool and
- * contributes nothing, none = not a caster.
- */
+/** How a class level counts toward the multiclass caster level (SRD Multiclassing): full = every level,
+ * half = half rounded up (Paladin, Ranger), third = a third rounded down, pact = separate Pact Magic pool. */
 export type CasterProgression = "full" | "half" | "third" | "pact" | "none";
 
-/**
- * SRD multiclass ability minimums. `mode: "any"` covers the Fighter's "Strength 13 or Dexterity 13";
- * `mode: "all"` covers the Monk's "Dexterity 13 and Wisdom 13".
- */
+/** SRD multiclass ability minimums: `any` for the Fighter's "Str 13 or Dex 13", `all` for the Monk's "Dex 13 and Wis 13". */
 export type MulticlassRequirement = Readonly<{ mode: "all" | "any"; minimums: readonly (readonly [Ability, number])[] }>;
 
 export type ClassProgression = Readonly<{
   hitDie: HitDie;
-  /** Ability order the random generator assigns rolled/array scores in - highest score first. */
+  /** Ability order the random generator assigns scores in, highest first. */
   statPriority: readonly Ability[];
-  /** The class's headline ability (used for display and for the multiclass prerequisite text). */
+  /** The class's headline abilities (display and multiclass prerequisite text). */
   primaryAbilities: readonly Ability[];
   /** The two saving throws this class is proficient in at level 1. */
   savingThrows: readonly Ability[];
@@ -44,11 +30,8 @@ export type ClassProgression = Readonly<{
   multiclassPrerequisite: MulticlassRequirement;
 }>;
 
-/**
- * SRD 5.2.1 (2024 rules) ASI levels: 4/8/12/16 for every class, plus Fighter 6 and 14 and Rogue 10.
- * Level 19 is NOT an ASI in this ruleset - it grants an Epic Boon feat (see EPIC_BOON_LEVEL), which
- * the content bundles model as an ordinary feature with a `feat` choice.
- */
+/** SRD 5.2.1 ASI levels: 4/8/12/16, plus Fighter 6 and 14 and Rogue 10. Level 19 grants an Epic Boon feat
+ * instead (`EPIC_BOON_LEVEL`), modelled as an ordinary feature with a `feat` choice. */
 const ASI_STANDARD: readonly number[] = [4, 8, 12, 16];
 const ASI_FIGHTER: readonly number[] = [4, 6, 8, 12, 14, 16];
 const ASI_ROGUE: readonly number[] = [4, 8, 10, 12, 16];
@@ -82,11 +65,7 @@ export function classProgression(classId: string, table: ClassProgressionTable =
   return table[classId];
 }
 
-/**
- * The generator's core lookup: which abilities matter most to this class, best first. An unknown
- * (homebrew, not-yet-loaded) class falls back to SRD sheet order rather than throwing, so the
- * generator never dead-ends.
- */
+/** Which abilities matter most to this class, best first; unknown classes fall back to sheet order. */
 export function statPriorityFor(classId: string, table: ClassProgressionTable = SRD_CLASS_PROGRESSION): readonly Ability[] {
   return table[classId]?.statPriority ?? ABILITIES;
 }
@@ -111,11 +90,7 @@ export function casterProgressionFor(classId: string, table: ClassProgressionTab
   return table[classId]?.casterProgression ?? "none";
 }
 
-/**
- * The class fields the progression adapter reads, STRUCTURALLY - the shape a content-bundle
- * `ClassReference` (or a homebrew record) already satisfies. Declared here rather than importing the
- * content package so `@vtt/rules-5e` stays dependency-free; the content schema is the superset.
- */
+/** The class fields the progression adapter reads; a content `ClassReference` or homebrew record satisfies it. */
 export type ClassProgressionSource = Readonly<{
   id: string;
   hitDie: HitDie;
@@ -128,12 +103,8 @@ export type ClassProgressionSource = Readonly<{
   multiclassPrerequisites?: Readonly<{ mode: "all" | "any"; minimums: ReadonlyArray<Readonly<{ ability: Ability; minimum: number }>> }> | null;
 }>;
 
-/**
- * ONE authored class record -> the progression row every rules function reads. This is the adapter
- * the bundle-served catalog (and tomorrow's homebrew) drives the math through, so an authored class
- * gets ITS OWN hit die, stat priority, caster progression, ASI levels, and multiclass prerequisites
- * instead of silently falling back to SRD defaults (d8, sheet order, "none", 4/8/12/16, always-pass).
- */
+/** An authored class record as a progression row, so authored and homebrew classes use their own values
+ * instead of SRD defaults. */
 export function progressionFromClass(source: ClassProgressionSource): ClassProgression {
   return {
     hitDie: source.hitDie,
@@ -151,22 +122,14 @@ export function progressionFromClass(source: ClassProgressionSource): ClassProgr
   };
 }
 
-/**
- * The full table for a set of authored classes, with the static SRD rows as the FALLBACK for classes
- * the catalog has not authored yet (task-packet phase 14: content lands class by class). An authored
- * class always wins over its SRD row - the bundle is the source of truth, `class-data.ts` the net.
- */
+/** The progression table for authored classes, with the built-in SRD rows as fallback; authored classes win. */
 export function progressionTableFromClasses(classes: readonly ClassProgressionSource[], fallback: ClassProgressionTable = SRD_CLASS_PROGRESSION): ClassProgressionTable {
   const table: Record<string, ClassProgression> = { ...fallback };
   for (const source of classes) table[source.id] = progressionFromClass(source);
   return table;
 }
 
-/**
- * SRD multiclass prerequisites: to take a level in `classId` the character needs its listed ability
- * minimums (all of them, or any one of them for the Fighter's "Strength 13 or Dexterity 13").
- * An unknown class has no declared prerequisite and is allowed - homebrew declares its own.
- */
+/** SRD multiclass prerequisites for taking a level in `classId`. A class with none declared is allowed. */
 export function meetsMulticlassPrerequisites(
   abilityScores: Readonly<Partial<Record<Ability, number>>>,
   classId: string,

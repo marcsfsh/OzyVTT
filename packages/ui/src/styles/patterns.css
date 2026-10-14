@@ -1,6 +1,5 @@
-/* Layout patterns — reusable class-only templates (no component needed) for content-heavy surfaces
-   the app is growing into: stat blocks, credential/content lists, import previews, empty states.
-   Documented live in /styleguide. Import once via @vtt/ui/styles.css. */
+/* Layout patterns: class-only templates for content-heavy surfaces (stat blocks, content lists, import
+   previews, empty states). Documented in /styleguide. Imported via @vtt/ui/styles.css. */
 
 /* ---- Data table (content lists, credentials, import previews) ---- */
 .nh-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
@@ -26,14 +25,7 @@
 .nh-statlist dd { margin: 2px 0 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; font-family: var(--font-mono); }
 
 /* ---- Empty state (no data yet / no results) ----
-   RULING 55 — NO DASHED BOXES. The dashed rim was this pattern's whole visual idea and it said the
-   wrong thing: a dashed outline reads as a placeholder, a drop zone or something half-built, on a
-   screen whose job is to name the one next thing to do. It goes here rather than per-surface because
-   the border is declared once and reaches every call site at the same time (measured population:
-   `ClaimCharacter.tsx`, `IntegrationsPanel.tsx`, `CharacterBuilder.tsx` x2, `HomebrewPanel.tsx`,
-   `StyleGuide.tsx`). A solid hairline keeps the box legible as a bounded region — the ruling retires
-   the DASH, not the boundary — and it is `--line` rather than `--line-strong` so an empty surface
-   reads as quiet rather than as an alert. */
+   A solid `--line` hairline, never dashed: a dashed outline reads as a placeholder or something half-built. */
 .nh-empty {
   display: grid;
   place-items: center;
@@ -49,13 +41,10 @@
 .nh-empty-title { color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h3); }
 .nh-empty-text { max-width: 26rem; font-size: var(--fs-sm); }
 
-/* ---- Card gallery (scene library, map library — any browse-and-pick grid of thumbnail cards) ----
-   A card carries its own explicit actions in a trailing `.nh-card-actions` row (e.g. Prepare / Go
-   live, sitting in opposite corners); the status badge and the ⋯ tools menu layer over the thumb.
-   For a pure picker where the whole card is one target instead, drop a stretched transparent
-   `.nh-card-open` button in and add `.is-interactive` for the hover lift. Live is a STATE, so the
-   live card — and only it — glows magenta; a privately-staged card takes a quiet cyan edge. Tokens
-   only; theme-aware; reduced-motion-safe. */
+/* ---- Card gallery (scene library, map library: any browse-and-pick grid of thumbnail cards) ----
+   Cards carry explicit actions in a trailing `.nh-card-actions` row; the status badge and ⋯ tools menu layer
+   over the thumb. For a whole-card picker, add a stretched `.nh-card-open` button and `.is-interactive`. Only
+   the live card glows (magenta); a privately staged card gets a quiet cyan edge. */
 .nh-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -64,23 +53,10 @@
   padding: 0;
   list-style: none;
 }
-/* DE-PILLED TO THE CHAMFERED RECTANGLE (rulings 10/24, and the director's card ruling). The
-   radius tokens have read 0 since the square standard, so what was left to change is the
-   SILHOUETTE: the card now wears the same cut corner as the largest button and the smallest
-   count badge — one shape from top to bottom of the system.
-
-   THE CUT IS ON A BACKING LAYER, not on the card, and that is not stylistic. `clip-path` clips
-   hit-testing as well as paint, and this card is full of hit areas: `.nh-card-open` is stretched
-   across the whole box, `.nh-card-tools` carries two 44px targets in the top-right and
-   `.nh-card--new` IS a button. Clipping the card would silently eat all of them. Verified with
-   elementFromPoint: all four corners of a chamfered card still hit `.nh-card-open`.
-
-   The element keeps a 1px TRANSPARENT border so nothing reflows, and the backing layer covers
-   the border box exactly (`inset: -1px`) so there is no 1px halo where the gallery shows
-   through. `--card-edge` is the one knob the states repaint. Elevation and glow ride FILTERS on
-   that layer — box-shadow cannot follow the cut, and on a cut card a square shadow shows through
-   the notch. Wave 5 promotes `--card-edge` to the 2px `--rim-color` when it applies the
-   material; this lane changes the shape only. */
+/* The card wears the system's cut corner, painted on a backing layer because clip-path would also clip the
+   card's hit areas (`.nh-card-open`, `.nh-card-tools`, the `.nh-card--new` button). A 1px transparent border
+   avoids reflow and the layer covers the border box (`inset: -1px`). `--card-edge` is the one knob states
+   repaint; elevation and glow are filters on the layer. */
 .nh-card {
   position: relative;
   isolation: isolate;         /* so the backing layer at z-index -1 stays inside this card */
@@ -97,7 +73,7 @@
 .nh-card::before {
   content: "";
   position: absolute;
-  inset: -1px;                /* the element's border box, so the edge lands where it used to */
+  inset: -1px;                /* the element's border box */
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
@@ -115,11 +91,7 @@
 /* Being privately staged by the GM: a quiet cyan selection edge, never a glow. */
 .nh-card.is-staging { --card-edge: var(--cyan); }
 
-/* The thumbnail carries the card's top-left cut so the artwork follows the silhouette instead of
-   sitting square inside it. Only the top-left: the bottom-right cut belongs to the card's own
-   bottom edge, which the thumb never reaches. Safe to clip — nothing interactive lives in here
-   (`.nh-card-status` and `.nh-card-tools` are the CARD's children, not the thumb's), which is
-   exactly the distinction that makes the card itself unclippable. */
+/* The thumbnail carries the card's top-left cut. Safe to clip: nothing interactive lives in it. */
 .nh-card-thumb {
   position: relative;
   aspect-ratio: 16 / 10;
@@ -132,41 +104,25 @@
 .nh-card-thumb-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.7rem; opacity: .45; }
 
 .nh-card-status { position: absolute; top: var(--space-2); left: var(--space-2); z-index: 2; }
-/* Tools sit above the actions row (z-index 2) so the ⋯ menu's popover is never painted under the
-   Prepare / Go live buttons. The gallery also lifts a card whose menu is open above its siblings. */
-/* The tools are icon-only squares (see Menu.css `.nh-menu-trigger--icon`), each carrying a
-   44px hit area around a 1.75rem paint. --space-4 is the gap that keeps two neighbouring
-   hit areas from overlapping — anything tighter and the second tool steals the first's taps. */
+/* Tools sit above the actions row so the ⋯ popover isn't painted under the buttons. Each tool has a 44px hit
+   area around 1.75rem paint; a --space-4 gap keeps neighbouring hit areas from overlapping. */
 .nh-card-tools { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 4; display: flex; align-items: center; gap: var(--space-4); }
 
 .nh-card-body { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); }
 .nh-card-title { margin: 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nh-card-meta { color: var(--text-muted); font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .nh-card-actions { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: auto; padding: 0 var(--space-3) var(--space-3); }
-/* Action buttons share the row equally so a narrow card (e.g. inside the picker popup) can never
-   push one button past the rounded corner; two of them still read as opposite corners. A non-button
-   child (a lone "live now" caption) keeps its intrinsic width and sits at the start. */
+/* Action buttons share the row equally so a narrow card can't push one past the corner. A non-button child
+   keeps its intrinsic width. */
 .nh-card-actions > button { flex: 1 1 0; min-width: 0; }
 
-/* Stretched, transparent button = the card's hit area + focus target; content layers below (thumb/body)
-   and the interactive overlays (tools/actions) layer above it. */
+/* Stretched transparent button: the card's hit area and focus target, between content and overlays. */
 .nh-card-open { position: absolute; inset: 0; z-index: 1; border: 0; background: transparent; cursor: pointer; border-radius: inherit; }
-/* -5px, not -2px: at -2px the ring's own square corner sits outside the card's cut and pokes
-   into the notch. -5px is the offset the chamfered primitives already use for the same reason. */
+/* -5px so the ring's corner stays inside the card's cut. */
 .nh-card-open:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -5px; }
 
-/* Add-new tile — the call to action sharing the gallery grid. Fills its cell so it reads as one more
-   listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. It is a
-   BUTTON, so its edge and its hover fill both ride the backing layer for the same hit-testing reason
-   as above; the element itself is never clipped.
-
-   RULING 55 — NO DASHED BOXES, and this tile was the last one in the app. `patterns.css`'s `.nh-empty`
-   was converted in the QA fix pass and this was missed because it is not an empty state: it is an
-   ADD tile, so nothing scanning for `.nh-empty` found it. The ruling's reasoning applies to it more
-   directly than to anything it did catch — "a dashed outline reads as a placeholder, a drop zone or
-   something half-built" is exactly how a real, working button was reading, sitting in a grid of solid
-   cards. It keeps its quieter edge (`--line-strong` against the cards' own rim) so it still reads as
-   the odd one out by INTENT rather than by looking unfinished. */
+/* Add-new tile: fills its gallery cell like a real card. A button, so edge and hover ride the backing layer
+   and the element is never clipped. Solid, not dashed; a quieter `--line-strong` edge marks it as different. */
 .nh-card--new {
   display: grid;
   place-items: center;

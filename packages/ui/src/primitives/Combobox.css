@@ -1,10 +1,7 @@
 .nh-combobox { position: relative; display: block; }
 .nh-combobox-input { width: 100%; }
 
-/* RULING 24 — the same chip family as `Chip.css`, which has read `border-radius: 0` since the
-   de-pilling. The clear ✕ below is deliberately NOT part of this change: it is the exact analogue of
-   `.nh-chip-remove`, which `Chip.css` protects by name, and squaring a 20px close control would make
-   a chip look like it holds a second chip. */
+/* Same chip shape as `Chip.css`. The clear ✕ stays round like `.nh-chip-remove`. */
 .nh-combobox-chip {
   display: inline-flex;
   align-items: center;
@@ -20,8 +17,7 @@
 }
 .nh-combobox-chiplabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* §4 route 2: 20px paint, `.tap-target` centres a 44px box on it. It is the last thing in the chip and
-   nothing sits beside it, so the overhang has nothing to steal. */
+/* 20px paint with a 44px `.tap-target`; it's last in the chip, so the overhang steals nothing. */
 .nh-combobox-clear {
   display: inline-flex;
   align-items: center;
@@ -53,7 +49,7 @@
   box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 35%));
 }
 
-/* §4 route 1 (grow the paint): a stacked list must never use `::after` overhang. */
+/* A stacked list grows its paint to 44px; never an `::after` overhang. */
 .nh-combobox-option {
   display: flex;
   align-items: center;

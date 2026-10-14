@@ -10,9 +10,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   /** Stretch to the container width. */
   block?: boolean;
-  /** Add a hover-lift — for card-like / CTA buttons, not dense toolbars. */
+  /** Add a hover-lift, for card-like / CTA buttons, not dense toolbars. */
   lift?: boolean;
-  /** Append a forward → that nudges on hover — for navigational actions. */
+  /** Append a forward → that nudges on hover, for navigational actions. */
   arrow?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -66,7 +66,7 @@ export function LinkButton({ variant = "secondary", size = "md", block = false, 
 }
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Accessible name — icon-only buttons have no text, so this is required. */
+  /** Accessible name; required because icon-only buttons have no text. */
   label: string;
   size?: ButtonSize;
   ref?: Ref<HTMLButtonElement>;

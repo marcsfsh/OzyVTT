@@ -2,13 +2,8 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 /**
- * `@vtt/ui`'s own tests. The package is consumed as SOURCE by the client's Vite build, so there is no
- * build step to test through — these run straight against `src/`.
- *
- * `jsdom` because every primitive here is a DOM contract. What jsdom cannot do is LAYOUT: no stylesheet
- * is loaded and no box is measured, so the alignment work (D23) is split deliberately — the structure
- * half is asserted here, the geometry half by `scripts/primitive-align-check.mjs` in a real browser.
- * Each test file states which half it is proving in its own header.
+ * Runs against `src/` directly (the package is consumed as source). jsdom does no layout, so tests here assert
+ * structure; geometry is measured in a browser by `scripts/primitive-align-check.mjs`.
  */
 export default defineConfig({
   plugins: [react()],

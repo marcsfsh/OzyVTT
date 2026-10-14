@@ -8,21 +8,18 @@ export interface StepperProps {
   min?: number;
   max?: number;
   step?: number;
-  /** Optional visible label. Rendered as a label BAND above the control (D23a) so a labeled Stepper
-      top-aligns with the Field-wrapped inputs beside it; without one the control renders inline. */
+  /** Optional visible label, rendered as a band above the control so it top-aligns with Field-wrapped inputs
+      beside it; without one the control renders inline. */
   label?: ReactNode;
   /** Render the value display (e.g. signed modifiers `+3` / `±0`). Defaults to `String(value)`. */
   format?: (value: number) => ReactNode;
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
-  /** Point at the element describing what the value produces (e.g. the resulting
-      total + modifier), so focusing the spinner announces the outcome too. */
+  /** Points at the element describing what the value produces, so focusing the spinner announces it. */
   "aria-describedby"?: string;
-  /** Announce the value as it changes. Off by default: the −/+ buttons are already
-      announced on press, and six Steppers on one screen (the ability allocator) would
-      be six live regions all shouting over each other. Turn it on for a LONE stepper
-      whose value is the whole point. */
+  /** Announce the value as it changes. Off by default: −/+ presses are already announced, and several steppers
+      on one screen would compete. Use it for a lone stepper whose value is the point. */
   announceValue?: boolean;
 }
 

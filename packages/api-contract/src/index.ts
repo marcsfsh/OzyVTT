@@ -21,12 +21,8 @@ export const INTEGRATION_CREDENTIAL_PATHS = {
   audit: `${API_NAMESPACE}/gm/integration-credentials/{id}/audit`
 } as const;
 
-/**
- * Documentation-only path constants for `map-http.ts`'s already-shipped router (mounted
- * separately from `api-v1.ts`). Kept here so the served OpenAPI document matches the real,
- * running routes; the router itself keeps its own literal path strings rather than importing
- * these, since the two use different templating (`:id` vs `{id}`).
- */
+/** Documentation-only paths for `map-http.ts`, kept so the OpenAPI document matches the running routes. The router
+ * keeps its own literal paths because it templates `:id` rather than `{id}`. */
 export const MAP_ASSET_PATHS = {
   collection: `${API_NAMESPACE}/map-assets`,
   byId: `${API_NAMESPACE}/map-assets/{id}`,
@@ -37,7 +33,7 @@ export const MAP_ASSET_PATHS = {
   calibrationWizardComplete: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 } as const;
 
-/** Documentation-only path constants for `viewer-http.ts`'s already-shipped router. See the note on MAP_ASSET_PATHS. */
+/** Documentation-only path constants for `viewer-http.ts`'s router. See the note on MAP_ASSET_PATHS. */
 export const VIEWER_PATHS = {
   pairings: `${API_NAMESPACE}/viewer/pairings`,
   pairingsExchange: `${API_NAMESPACE}/viewer/pairings/exchange`,
@@ -49,15 +45,10 @@ export const VIEWER_PATHS = {
 } as const;
 
 /**
- * The worldbuilding Codex surface (`codex-http.ts`), a router mounted separately from `api-v1.ts` like the
- * map-asset and viewer routers - documented here so the served OpenAPI document matches the real, running
- * routes. Reads accept a GM **or** player session (a player receives the revealed-only projection - `gmBody`,
- * GM fields, and unrevealed pages/maps/markers/entries are stripped server-side); every write is GM-grade.
- *
- * Reads and writes ALSO accept an integration credential scoped `codex:read` / `codex:write`, which acts at
- * GM grade - external tools no longer need to borrow the GM's session token. The one exception is
- * `POST /codex/preview-session`, which mints a player session token and stays GM-session-only.
- *
+ * The worldbuilding Codex surface (`codex-http.ts`). Reads accept a GM or player session (players get the
+ * revealed-only projection with `gmBody`, GM fields and unrevealed pages/maps/markers/entries stripped
+ * server-side); every write is GM-grade. A `codex:read` / `codex:write` credential acts at GM grade, except
+ * `POST /codex/preview-session`, which mints a player token and stays GM-session-only.
  * `{id}` is OpenAPI-style; the Express router substitutes `:id`.
  */
 export const CODEX_PATHS = {
@@ -83,14 +74,12 @@ export const CODEX_PATHS = {
   markerById: `${API_NAMESPACE}/codex/markers/{id}`,
   markerMove: `${API_NAMESPACE}/codex/markers/{id}/move`,
   markerReveal: `${API_NAMESPACE}/codex/markers/{id}/reveal`,
-  // M12 (CT-7): the party pin is an ORDINARY marker with a flag, so it has exactly one route of its own -
-  // the flag - and is moved, revealed and deleted through the marker routes directly above.
+  // The party pin is an ordinary marker with a flag; it is moved, revealed and deleted through the marker routes.
   markerParty: `${API_NAMESPACE}/codex/markers/{id}/party`,
   party: `${API_NAMESPACE}/codex/party`,
   timeline: `${API_NAMESPACE}/codex/timeline`,
   journal: `${API_NAMESPACE}/codex/journal`,
-  // M11 (CT-5/CT-10): literal segments, declared BEFORE the `{id}` family so the router registers them
-  // first and a later `POST /codex/journal/{id}` cannot swallow them.
+  // Literal segments, declared before the `{id}` family so `POST /codex/journal/{id}` cannot swallow them.
   journalDeadline: `${API_NAMESPACE}/codex/journal/deadline`,
   journalDowntime: `${API_NAMESPACE}/codex/journal/downtime`,
   journalMilestone: `${API_NAMESPACE}/codex/journal/milestone`,
@@ -104,23 +93,18 @@ export const CODEX_PATHS = {
   quests: `${API_NAMESPACE}/codex/quests`,
   questById: `${API_NAMESPACE}/codex/quests/{id}`,
   questReveal: `${API_NAMESPACE}/codex/quests/{id}/reveal`,
-  // M12 (CT-6): a standing is addressed by its FACTION PAGE id - `faction_page_id` is unique, so that names
-  // exactly one row, and an id of its own would be a second way to say the same thing.
+  // A standing is addressed by its faction page id, which is unique.
   standing: `${API_NAMESPACE}/codex/standing`,
   standingByFaction: `${API_NAMESPACE}/codex/standing/{factionPageId}`,
   standingReveal: `${API_NAMESPACE}/codex/standing/{factionPageId}/reveal`,
-  // M12 (CT-9): the reveal audit. GM-only, read-only, and an AGGREGATION - it adds no reveal state of its
-  // own and no unreveal verb; every row carries the id its own kind's existing reveal route already takes.
+  // GM-only, read-only aggregation of reveal state; each row carries the id its own reveal route takes.
   revealAudit: `${API_NAMESPACE}/codex/reveal-audit`,
   calendar: `${API_NAMESPACE}/codex/calendar`,
   calendarPublish: `${API_NAMESPACE}/codex/calendar/publish`,
-  // OWNER DECISION (2026-07-30): codex-WIDE settings, addressed as a singleton because `codex_meta` is one row.
-  // GM-only on the read as well as the write - nothing here is player-facing (see the route's own comment).
+  // Codex-wide settings, a singleton (`codex_meta` is one row). GM-only for reads and writes.
   settings: `${API_NAMESPACE}/codex/settings`,
-  // ...and the delete that goes with them. The WHOLE `codex_page_revisions` table, which is why it is a
-  // top-level collection rather than a verb under `/codex/pages/{id}/revisions`: the question it answers
-  // ("reclaim the space my history uses") is about the codex, not about one page. `pageRevisions` above stays
-  // the per-page READ. Distinct literal segments, so neither can be mis-matched by the router.
+  // Deletes the whole `codex_page_revisions` table to reclaim space, hence a top-level collection;
+  // `pageRevisions` above stays the per-page read.
   pageRevisionsCollection: `${API_NAMESPACE}/codex/page-revisions`,
   export: `${API_NAMESPACE}/codex/export`,
   import: `${API_NAMESPACE}/codex/import`
@@ -133,13 +117,10 @@ export const CODEX_ASSET_PATHS = {
 } as const;
 
 /**
- * The GM homebrew authoring surface (`homebrew-http.ts`), a router mounted separately from `api-v1.ts`
- * like the codex, map-asset, and viewer routers. **Every operation is GM-only** - there is no player
- * read here at all. Players reach homebrew exclusively through the merged `CONTENT_PATHS` catalogs,
- * and only records that are `state: "published"` **and** `visibleToPlayers: true` **and** not deleted.
- * One polymorphic collection serves all nine content types via the `type` discriminator, the same way
- * `CODEX_PATHS.pages` serves eight entity types. `{id}` is OpenAPI-style; the Express router
- * substitutes `:id`. The id is a content slug (`hb-<slug>-<6 hex>`, <=60 chars), not a UUID.
+ * The GM homebrew authoring surface (`homebrew-http.ts`). Every operation is GM-only; players see homebrew
+ * only through the merged `CONTENT_PATHS` catalogs, and only records that are published, `visibleToPlayers`
+ * and not deleted. One polymorphic collection serves all content types via `type`. `{id}` is OpenAPI-style;
+ * ids are content slugs (`hb-<slug>-<6 hex>`, <=60 chars), not UUIDs.
  */
 export const HOMEBREW_PATHS = {
   content: `${API_NAMESPACE}/homebrew/content`,
@@ -154,11 +135,8 @@ export const HOMEBREW_PATHS = {
   packsImport: `${API_NAMESPACE}/homebrew/packs/import`
 } as const;
 
-/**
- * The live-game integration surface (`game-http.ts`): reads project per principal, writes dispatch
- * through the exact same operations the built-in UI's Socket.IO commands use (ADR-0016 - adapters,
- * never forks). `{param}` is OpenAPI-style; the Express router substitutes `:param`.
- */
+/** The live-game integration surface (`game-http.ts`): reads project per principal; writes dispatch through the
+ * same operations as the UI's Socket.IO commands (ADR-0016). `{param}` is OpenAPI-style. */
 export const GAME_PATHS = {
   snapshot: `${API_NAMESPACE}/game`,
   log: `${API_NAMESPACE}/game/log`,
@@ -258,13 +236,9 @@ export const SESSION_PATHS = {
   player: `${API_NAMESPACE}/sessions/player`
 } as const;
 
-/**
- * Bundled SRD reference content (read-only). The bestiary is GM-grade - stat blocks are the GM's
- * material - but every *rules* catalog (conditions, spells, equipment, and the character-builder
- * catalogs) is public reference text any joined GM, player, or integration session may read: a
- * player builds their own character. Each catalog that renders SRD prose carries the CC BY 4.0
- * `attribution` line the displaying surface must show (ADR-0015).
- */
+/** Bundled SRD reference content (read-only). The bestiary is GM-grade; every rules catalog (conditions, spells,
+ * equipment, character-builder catalogs) is readable by any joined session. Catalogs with SRD prose carry the
+ * CC BY 4.0 `attribution` line the displaying surface must show (ADR-0015). */
 export const CONTENT_PATHS = {
   monsters: `${API_NAMESPACE}/content/monsters`,
   monsterById: `${API_NAMESPACE}/content/monsters/{definitionId}`,
@@ -282,11 +256,7 @@ export const CONTENT_PATHS = {
   names: `${API_NAMESPACE}/content/names`
 } as const;
 
-/**
- * The archive document's own schema version, exported rather than spelled out in prose, because it was
- * spelled out in prose in three places and one of them said 2 while the code said 3. The generated
- * reference interpolates this constant, so the heading can no longer disagree with the document.
- */
+/** The archive document's schema version; the generated reference interpolates it. */
 export const ENCOUNTER_ARCHIVE_SCHEMA_VERSION = 3 as const;
 
 /** Permanent Time Machine records of ended encounters (archiveSchemaVersion 3). GM-grade only: documents hold full state. */
@@ -294,7 +264,7 @@ export const ENCOUNTER_ARCHIVE_PATHS = {
   collection: `${API_NAMESPACE}/encounters`,
   byId: `${API_NAMESPACE}/encounters/{id}`,
   visibility: `${API_NAMESPACE}/encounters/{id}/visibility`,
-  /** Launch-from-here (D25): make one recorded moment live on the table. */
+  /** Make one recorded moment live on the table. */
   launch: `${API_NAMESPACE}/encounters/{id}/launch`
 } as const;
 
@@ -320,10 +290,8 @@ export const IntegrationScopeSchema = z.enum([
   "combat:read",
   "combat:write",
   "roll:create",
-  // The worldbuilding surface. Inserted BESIDE the other live scopes rather than after the reserved
-  // pair, so "scopes an endpoint actually requires" stays one contiguous run. A codex credential acts
-  // at GM grade (it is the GM's own trusted automation, exactly as the game surface's credentials are),
-  // which is why there is no third player-grade scope: a player-grade bot already has a player session.
+  // Codex scopes. A codex credential acts at GM grade (the GM's own automation), so there is no player-grade
+  // scope; a player-grade bot uses a player session.
   "codex:read",
   "codex:write",
   "events:read",
@@ -455,12 +423,8 @@ export const EventEnvelopeSchema = z.object({
 
 export const GameCommandTypeSchema = z.string().regex(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/).max(200);
 
-/**
- * The single source of each game command's required integration-credential scope - part of the
- * public contract. The server's command registry (tunnel + typed routes) enforces exactly these at
- * runtime, the OpenAPI operations above declare them per route, and tests on both sides pin the
- * three views together. Command types use the store's dot-separated receipt form.
- */
+/** Each game command's required integration-credential scope. The server's command registry enforces these, the
+ * OpenAPI operations declare them per route, and tests pin the views together. Types use the dot-separated form. */
 export const GAME_COMMAND_SCOPES = {
   "encounter.start": "combat:write",
   "encounter.end": "combat:write",
@@ -553,11 +517,8 @@ export const GAME_COMMAND_SCOPES = {
 } as const satisfies Record<string, z.infer<typeof IntegrationScopeSchema>>;
 export type GameCommandType = keyof typeof GAME_COMMAND_SCOPES;
 
-/**
- * The generic command tunnel's request: the same dot-separated command types the realtime protocol
- * and the store's receipts use. `commandId` is the idempotency identity - resend the same one to
- * retry safely; omit it and the server mints one (returned in the response).
- */
+/** The generic command tunnel's request (dot-separated command types). `commandId` is the idempotency key: resend
+ * it to retry safely; omit it and the server mints one. */
 export const GameCommandEnvelopeSchema = z.object({
   type: GameCommandTypeSchema,
   commandId: z.string().uuid().optional(),
@@ -573,7 +534,7 @@ export const GameMutationAcceptedSchema = z.object({
 }).catchall(z.unknown());
 
 export const GameViewKindSchema = z.enum(["gm", "player"]);
-/** The projection envelope for GET /game. `game` is the full GM view or the player-safe view - shapes owned by @vtt/domain and deliberately not duplicated here. */
+/** The projection envelope for GET /game. `game` is the full GM view or the player-safe view - shapes owned by @vtt/domain and not duplicated here. */
 export const GameSnapshotSchema = z.object({
   view: GameViewKindSchema,
   revision: z.number().int().nonnegative(),
@@ -604,7 +565,7 @@ export const EncounterArchiveSummarySchema = z.object({
   startedAt: TimestampSchema.nullable(),
   endedAt: TimestampSchema,
   turnCount: z.number().int().nonnegative(),
-  /** Has the GM shared this record with players (D26)? False for every archive until the GM says otherwise. */
+  /** Has the GM shared this record with players? False until the GM does. */
   playerVisible: z.boolean()
 }).strict();
 export const EncounterArchiveListSchema = z.object({ encounters: z.array(EncounterArchiveSummarySchema) }).strict();
@@ -630,30 +591,17 @@ export const EncounterArchiveLaunchResponseSchema = successEnvelopeSchema(Encoun
 export const PlayerSessionIssuedResponseSchema = successEnvelopeSchema(PlayerSessionIssuedSchema);
 
 // ---- Homebrew authoring wire shapes (HOMEBREW_PATHS / homebrew-http.ts). GM-only end to end.
-// Each of these is mirrored by a hand-written OpenAPI component below; `test/contract-parity.test.ts`
-// keeps the two representations honest in BOTH directions (a fixture must validate against the
-// component, and the component's `required` must equal the Zod schema's non-optional keys).
+// Each is mirrored by a hand-written OpenAPI component below; `test/contract-parity.test.ts` checks both directions.
 
-/** The nine content types the one polymorphic authoring collection serves (decision-log 2026-07-26). */
 /**
- * The nine authorable homebrew types.
- *
- * `class-feature` is deliberately absent: a feature is authored INSIDE its class or subclass, and a
- * standalone one was deferred in planning - an enum entry with no endpoint behind it promises a
- * capability that does not exist. `equipment` rather than `item` because that is the word the rest
- * of the codebase already uses (`EquipmentReferenceSchema`, `equipmentSummaries`,
- * `ContentEquipmentSummary`); one name per thing. `spell-list` is here because a homebrew caster
- * needs a list to draw from, and a list that resolves to nothing is a hard `character.create`
- * rejection rather than a soft one.
+ * The authorable homebrew types. `class-feature` is absent because features are authored inside their class or
+ * subclass. `spell-list` exists because a homebrew caster needs a list to draw from.
  */
 export const HomebrewContentTypeSchema = z.enum(["class", "subclass", "species", "background", "feat", "spell", "equipment", "monster", "spell-list"]);
 /** Set only by `/publish` and `/unpublish`; orthogonal to `visibleToPlayers`, which only `/visibility` sets. */
 export const HomebrewContentStateSchema = z.enum(["draft", "published"]);
-/**
- * A persisted homebrew id (`hb-<slug>-<6 hex>`). 60 characters, NOT the 80 a bare content slug allows:
- * every persisted ActorDefinition id caps at 60, so a longer id passes creation and then fails
- * `GameStateSchema.parse` on the next boot, bricking campaign load.
- */
+/** A persisted homebrew id (`hb-<slug>-<6 hex>`). Capped at 60, not 80: persisted ActorDefinition ids cap at 60,
+ * and a longer one would fail `GameStateSchema.parse` on the next boot. */
 const HomebrewIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
 /** The offending field, machine-addressable, so a form editor can point at it instead of parsing prose. */
 export const HomebrewValidationIssueSchema = z.object({
@@ -782,8 +730,7 @@ const envelopeSchema = (dataRef: string) => ({
   }
 });
 
-// Builders for the live-game operations, which all share one response/security shape. Used inside
-// openApiDocument below, so the served document stays a single self-contained literal.
+// Builders for the live-game operations, which share one response/security shape.
 const apiError = { $ref: "#/components/responses/ApiError" } as const;
 const uuidParam = (name: string) => ({ name, in: "path", required: true, schema: { type: "string", format: "uuid" } });
 const jsonBody = (schemaRef: string, required = true) => ({ required, content: { "application/json": { schema: { $ref: `#/components/schemas/${schemaRef}` } } } });
@@ -807,12 +754,8 @@ const gameCommandOperation = (operationId: string, scope: IntegrationScope, desc
   responses: mutationResponses
 });
 
-/**
- * A bundled-content catalog read. Every one of these is public SRD *rules* reference, so it accepts a
- * player session alongside a GM session and a `game:read` credential - a player browses spells, gear,
- * and the character-builder catalogs for their own character. (The bestiary is the deliberate
- * exception and keeps the GM-only `gameSecurity` builder.)
- */
+/** A bundled-content catalog read: public SRD rules reference, so it also accepts a player session. The bestiary
+ * is the exception and uses the GM-only `gameSecurity`. */
 const contentCatalogOperation = (operationId: string, description: string, responseRef: string) => ({
   operationId,
   security: gameSecurityWithPlayer("game:read"),
@@ -824,15 +767,14 @@ const contentCatalogOperation = (operationId: string, description: string, respo
   }
 });
 
-// Reusable fragments for the character-builder catalogs (shared object refs like `apiError`, so the
-// served document stays a single self-contained literal).
-/** Identity ids stay open slugs, never closed enums - homebrew must be additive (character-builder principle 3). */
+// Reusable fragments for the character-builder catalogs.
+/** Identity ids are open slugs, never closed enums, so homebrew stays additive. */
 const contentSlug = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 } as const;
-/** The single discriminator that lets one merged catalog serve bundled SRD and GM homebrew (principle 2). */
+/** The discriminator that lets one merged catalog serve bundled SRD and GM homebrew. */
 const contentSource = { type: "string", enum: ["srd", "homebrew"] } as const;
 const contentAbilities = { type: "array", items: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] } } as const;
 const contentFeatures = { type: "array", items: { $ref: "#/components/schemas/ContentFeature" } } as const;
-/** A starting-equipment bundle with its RESOLVABLE contents - a label alone can be displayed but never turned into inventory. Shared by classes and backgrounds, which offer the identical choice. */
+/** A starting-equipment bundle with resolvable contents (a label alone can't become inventory). Shared by classes and backgrounds, which offer the identical choice. */
 const contentStartingEquipmentOptions = {
   type: "array",
   description: "Starting-equipment bundles with their items and the \"or take N gp\" alternative; the chosen option's id is recorded in the character's choice ledger",
@@ -869,7 +811,7 @@ const contentSpellcastingSummary = {
     { type: "null" }
   ]
 } as const;
-/** The printed 20-row class table as DISPLAY data. Optional columns are null ("this class has no such column"), never 0. Structured feature riders stay server-side so the wizard can't become a second rules engine. */
+/** The printed 20-row class table as display data. Optional columns are null ("this class has no such column"), never 0. Structured feature riders stay server-side so the wizard can't become a second rules engine. */
 const contentClassLevelTable = {
   type: "array",
   description: "The class's full 20-row printed progression: slot columns, cantrips/spells known, the prepared-spell formula, and the named resources that grow with level (Second Wind 2 to 4, Rage 3, Sneak Attack 3d6)",
@@ -890,13 +832,8 @@ const contentClassLevelTable = {
   }
 } as const;
 
-// Codex operation builders. Codex routes accept a GM session, a player session (reads only, with the
-// revealed-only projection), or an integration credential scoped `codex:read` / `codex:write`.
-//
-// The credential grade is deliberately GM: an integration credential is the GM's own trusted automation,
-// which is the game surface's established model verbatim (game-http.ts: "integration credentials … act
-// with GM authority"). A player-grade bot is already expressible with a player session token from
-// `POST /api/v1/sessions/player`, so a third read scope would only be a second way to say that.
+// Codex operation builders. An integration credential acts at GM grade, as on the game surface; a player-grade
+// bot uses a player session token from `POST /api/v1/sessions/player`.
 const codexJson = (schemaRef: string) => ({ content: { "application/json": { schema: { $ref: `#/components/schemas/${schemaRef}` } } } });
 /** Writes: a GM session, or a `codex:write` credential. There is no player write anywhere in the Codex. */
 const codexWrite = [{ bearerAuth: ["codex:write"] }, { gmAuth: [] }] as const;
@@ -904,91 +841,54 @@ const codexWrite = [{ bearerAuth: ["codex:write"] }, { gmAuth: [] }] as const;
 const codexRead = [{ bearerAuth: ["codex:read"] }, { gmAuth: [] }, { playerAuth: [] }] as const;
 /** GM-grade reads (folders, revision history, settings, the reveal audit, export): no player branch. */
 const codexGmRead = [{ bearerAuth: ["codex:read"] }, { gmAuth: [] }] as const;
-/**
- * The ONE codex operation with no credential branch: `POST /codex/preview-session` mints a real PLAYER
- * SESSION TOKEN. Letting a scoped credential mint ambient player sessions would widen the token surface
- * for no consumer need - the route exists solely so the GM's own UI can preview the player Codex.
- */
+/** No credential branch: `POST /codex/preview-session` mints a real player session token, and only the GM's own UI
+ * needs it (to preview the player Codex). */
 const codexGmSessionOnly = [{ gmAuth: [] }] as const;
-// Reusable codex schema fragments (shared object refs, like `apiError`, so the served document stays a single literal).
+// Reusable codex schema fragments.
 const codexEntityType = { type: "string", enum: ["note", "character", "location", "faction", "item", "species", "religion", "event"] } as const;
 const codexMapKind = { type: "string", enum: ["battlemap", "regional", "world"] } as const;
 const codexStringMap = { type: "object", additionalProperties: { type: "string" } } as const;
 const codexUuid = { type: "string", format: "uuid" } as const;
 const codexNullableUuid = { type: ["string", "null"], format: "uuid" } as const;
 const codexInWorldDateOrNull = { oneOf: [{ $ref: "#/components/schemas/CodexInWorldDate" }, { type: "null" }] } as const;
-/** The non-nullable form. Only a DEADLINE requires one (CT-5): a deadline with no date could never fire. */
+/** The non-nullable form, used only by deadlines (a deadline with no date could never fire). */
 const codexInWorldDate = { $ref: "#/components/schemas/CodexInWorldDate" } as const;
-/**
- * CT-11 dating, identical on a page and on a journal entry because it IS the same contract: `inWorldDate`
- * is the raw date the GM typed and the source of truth; `inWorldLabel` and `calendarInstant` are derived
- * from it and recomputed for every dated record whenever the world calendar changes. Only a dated `event`
- * page appears on the chronicle, but the fields exist on every page so a type switch loses nothing.
- */
+/** Dating shared by pages and journal entries: `inWorldDate` is the GM's raw input and source of truth;
+ * `inWorldLabel` and `calendarInstant` are derived and recomputed whenever the world calendar changes. */
 const codexPageDating = {
   inWorldLabel: { type: ["string", "null"], description: "Display form of the in-world date, derived from the calendar." },
   calendarInstant: { type: ["number", "null"], description: "Sortable absolute day index derived from the calendar." },
   inWorldDate: { ...codexInWorldDateOrNull, description: "The raw in-world date; the source of truth the other two are derived from." }
 } as const;
 const codexCoord = { type: "number", minimum: 0, maximum: 1_000_000 } as const;
-/**
- * M9 session vocabulary. `codexSessionNumber` is shared with the JOURNAL write body rather than
- * repeated beside it, because they are the SAME number - a journal entry's `sessionNumber` resolves
- * against a session record - and two copies of one bound is how a surface silently accepts a value
- * its counterpart rejects. The server shares the bound for the same reason (`SessionNumberSchema`).
- */
+/** Shared with the journal write body because a journal entry's `sessionNumber` resolves against a session record;
+ * the server shares the bound too (`SessionNumberSchema`). */
 const codexSessionNumber = { type: ["integer", "null"], minimum: 0, maximum: 100_000 } as const;
-/** D10: the codex-wide tag vocabulary on a WRITE - one bound shared by every taggable record's request. */
+/** The codex-wide tag bound on writes, shared by every taggable record. */
 const codexTagsInput = { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 }, description: "Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present." } as const;
 const codexSessionAttendees = { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } } as const;
 const codexSessionStatus = { type: "string", enum: ["planned", "played"] } as const;
-/**
- * M10 quest vocabulary. `codexQuestObjectives` is the FIRST ordered mutable list in the Codex, and
- * its bounds are the repo's existing ones rather than new numbers: 24 items (every codex list -
- * `tags`, `attendees`, `pageIds`, `sceneIds` - caps at 24) and 120 characters of text (the repo's
- * one-line-of-display bound, shared with a marker `label` and an `inWorldLabel`). Nothing richer than
- * `{ text, done }`: a shape beyond that is unapproved scope (M10 escalation clause).
- */
+/** Quest objectives: 24 items and 120 characters of text, the repo's existing list and one-line bounds. */
 const codexQuestStatus = { type: "string", enum: ["not-started", "active", "completed", "failed", "canceled"], description: "In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`." } as const;
 const codexQuestObjectives = { type: "array", maxItems: 24, items: { $ref: "#/components/schemas/CodexQuestObjective" } } as const;
 const codexQuestEntityIds = { type: "array", maxItems: 24, items: codexUuid } as const;
 const codexArrayRef = (schemaRef: string) => ({ type: "array", items: { $ref: `#/components/schemas/${schemaRef}` } });
 const codexDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
 /**
- * A ROLE-PROJECTED read shape: `Codex<X>` for a GM-grade caller, `Codex<X>Player` for a player session.
- *
- * Why a two-branch `oneOf` and not one merged component with optional keys. A codex read genuinely
- * returns two different bodies, and the merged shape the document used to publish was false in both
- * directions: it declared GM-only fields a player never receives, and it validated a player body against
- * a schema that promised them. A spec-driven client generated ONE type and got runtime `undefined`s.
- *
- * Why this is unambiguous. Every branch is `additionalProperties: false` with every key required, and the
- * GM branch requires at least one key the player branch does not even DECLARE (`gmBody`, `rev`,
- * `revealedToPlayers`, `publishedDate`, …). So a GM body carries a key the player branch forbids, and a
- * player body omits a key the GM branch requires: exactly one branch matches, which is what `oneOf` means.
- * `test/contract.test.ts` asserts that one-sided property mechanically for every pair.
- *
- * The rule is deliberately ONE-SIDED. Several player shapes (marker, map, page summary, standing,
- * calendar, chronicle) are strict key-subsets of their GM twin, so a symmetric "each branch has a key the
- * other lacks" rule would be unsatisfiable for them - and unsatisfiable is how a disjointness test gets
- * weakened to nothing.
+ * A role-projected read: `Codex<X>` for a GM-grade caller, `Codex<X>Player` for a player session. Each branch is
+ * `additionalProperties: false` with every key required, and the GM branch requires a key the player branch
+ * does not declare, so exactly one branch matches (`test/contract.test.ts` checks this for every pair). The
+ * rule is one-sided because several player shapes are strict key-subsets of their GM twin.
  */
 const codexProjected = (base: string) => ({
   description: `Role-projected. A GM session or a \`codex:read\` credential receives \`${base}\`; a player session receives \`${base}Player\`, the revealed-only projection. Exactly one branch matches any response body.`,
   oneOf: [{ $ref: `#/components/schemas/${base}` }, { $ref: `#/components/schemas/${base}Player` }]
 });
 /**
- * One codex operation. `bad`/`notFound`/`conflict` decide which error responses the route can actually
- * return; `notModified` marks a GET that answers conditional requests.
- *
- * Two responses are UNCONDITIONAL, and the pair is the point. `401` is a caller with no (or an
- * unparseable) `Authorization` header. `403` is a caller who presented something and was refused - a
- * player session on a GM surface, or a bearer token that is invalid, revoked, or missing the required
- * scope. Every codex route can now answer both, because every route accepts a bearer credential, so
- * documenting 403 per-route would be documenting it everywhere with extra ceremony.
- *
- * `conflict` takes a DESCRIPTION rather than a boolean (the `homebrewOp` pattern): the two kinds of
- * codex 409 differ in what the body carries, and only one of them carries `error.currentRevision`.
+ * One codex operation. `bad`/`notFound`/`conflict` select the error responses the route can return; `notModified`
+ * marks a GET that answers conditional requests. 401 and 403 are always documented because every route accepts a
+ * bearer credential. `conflict` takes a description because only one kind of codex 409 carries
+ * `error.currentRevision`.
  */
 const codexOp = (operationId: string, security: readonly unknown[], okRef: string, options: { ok?: string; params?: readonly unknown[]; body?: string; description?: string; bad?: boolean; notFound?: boolean; conflict?: string; notModified?: boolean; tooLarge?: boolean } = {}) => ({
   operationId,
@@ -1008,17 +908,12 @@ const codexOp = (operationId: string, security: readonly unknown[], okRef: strin
   }
 });
 
-// Homebrew operation builders. Two deliberate differences from codexOp: `security` is NOT a parameter
-// (this surface is structurally GM-only - no player read, no integration scope - so there is nothing to
-// vary), and `conflict` takes a DESCRIPTION rather than a boolean so publish/visibility/import can each
-// document what their own 409 carries, the way mutationResponses does for the game surface.
+// Homebrew operation builders. Unlike codexOp, security is fixed (the surface is GM-only) and `conflict` takes a
+// description so each route documents what its own 409 carries.
 const homebrewGmOnly = [{ gmAuth: [] }] as const;
 const homebrewJson = (schemaRef: string) => ({ content: { "application/json": { schema: { $ref: `#/components/schemas/${schemaRef}` } } } });
-/**
- * A persisted homebrew id. `contentSlug` allows 80 characters but every persisted ActorDefinition id
- * caps at 60: a longer id passes creation, then fails `GameStateSchema.parse` on the next boot and
- * bricks campaign load. The contract is the right place to publish the real budget.
- */
+/** A persisted homebrew id, capped at 60 (not `contentSlug`'s 80): persisted ActorDefinition ids cap at 60 and a
+ * longer one would fail `GameStateSchema.parse` on the next boot. */
 const homebrewId = { ...contentSlug, maxLength: 60 } as const;
 const homebrewIdParam = { name: "id", in: "path", required: true, schema: homebrewId } as const;
 const homebrewContentType = { type: "string", enum: HomebrewContentTypeSchema.options } as const;
@@ -1026,31 +921,20 @@ const homebrewState = { type: "string", enum: HomebrewContentStateSchema.options
 const homebrewExpectedRev = { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on." } as const;
 const homebrewDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
 
-// ---- Homebrew AUTHORING vocabulary -------------------------------------------------------------
-// Every fragment below mirrors a Zod schema the SERVER already parses - `contentRecordBase`,
-// `FeatureRecordSchema` and friends in `@vtt/content-srd-5.2.1/src/character-content.ts`,
-// `ActionSchema`/`EffectGrantSchema` in `@vtt/schemas` - field for field.
-// `test/contract-parity.test.ts` compares the two representations mechanically in both directions,
-// so a field that reaches `properties` but not `required` fails the build rather than shipping as a
-// documented lie.
+// ---- Homebrew authoring vocabulary --------------------------------------------------------------
+// Each fragment mirrors, field for field, a Zod schema the server parses (`contentRecordBase`, `FeatureRecordSchema`
+// in `@vtt/content-srd-5.2.1/src/character-content.ts`, `ActionSchema`/`EffectGrantSchema` in `@vtt/schemas`);
+// `test/contract-parity.test.ts` compares them in both directions.
 //
-// THE INVERSION that makes a parallel vocabulary necessary: `ContentFeature` is the PUBLISHED
-// PROJECTION, and its own description says a feature's structured riders "stay server-side - the
-// server applies them when it builds the character, so the wizard never becomes a second rules
-// engine". Homebrew authoring inverts exactly that: the GM must now WRITE those riders, so they
-// become public schema here. `ContentFeature` is therefore NOT reused; it stays as-is for reading.
-//
-// Two conventions differ from the published catalogs, both because these are AUTHORED INPUTS:
-//   1. ABSENT, never present-but-null. A catalog projection uses present-but-null so a reader never
-//      branches on key presence; a Zod `.optional()` field REJECTS an explicit null, so an authoring
-//      body must omit it instead. `required` here is exactly the Zod schema's non-optional keys - a
-//      field carrying a Zod `.default()` is optional on the wire, because the server supplies it.
-//   2. Riders are HOISTED into named components, never inlined. `reference.ts` flattens exactly one
-//      level of nesting, so an inlined rider three levels down renders as a bare `object`.
+// `ContentFeature` (the published projection) hides riders, but authoring must write them, so it is not reused.
+// Two conventions differ from the published catalogs because these are authored inputs:
+//   1. Absent, never null: Zod `.optional()` rejects null. `required` is exactly the Zod schema's non-optional
+//      keys; a field with a Zod `.default()` is optional on the wire.
+//   2. Riders are hoisted into named components, because `reference.ts` flattens only one level of nesting.
 const homebrewAbility = { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] } as const;
 const homebrewLevel = { type: "integer", minimum: 1, maximum: 20 } as const;
 const homebrewSize = { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] } as const;
-/** ADR-0008's bounded dice grammar: ONE die term plus at most one flat modifier. "2d6 + 1d4" is deliberately unrepresentable. */
+/** ADR-0008's bounded dice grammar: one die term plus at most one flat modifier ("2d6 + 1d4" is unrepresentable). */
 const homebrewDiceFormula = { type: "string", pattern: "^\\d+[dD](4|6|8|10|12|20|100)(\\s*[+-]\\s*\\d+)?$", description: "One die term plus at most one flat modifier (\"1d8 + 3\"). Anything richer stays prose (ADR-0008)" } as const;
 const homebrewDamageType = { type: "string", minLength: 1, maxLength: 40 } as const;
 const homebrewConditionId = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 } as const;
@@ -1059,19 +943,14 @@ const homebrewActionId = { type: "string", pattern: "^[a-z0-9-]+$" } as const;
 const homebrewRef = (schemaRef: string) => ({ $ref: `#/components/schemas/${schemaRef}` });
 const homebrewRefArray = (schemaRef: string, maxItems: number) => ({ type: "array", maxItems, items: { $ref: `#/components/schemas/${schemaRef}` } });
 const homebrewSlugArray = (maxItems: number) => ({ type: "array", maxItems, items: contentSlug });
-/** A discriminated union: `oneOf` over HOISTED branches plus the `discriminator` mapping, keyed by each branch's own `type` const. Branches are `$ref`s so the reference renderer can name and document them. */
+/** A discriminated union: `oneOf` over hoisted branches plus the `discriminator` mapping, keyed by each branch's own `type` const. Branches are `$ref`s so the reference renderer can name and document them. */
 const homebrewUnion = (description: string, mapping: Readonly<Record<string, string>>) => ({
   description,
   discriminator: { propertyName: "type", mapping: Object.fromEntries(Object.entries(mapping).map(([value, schemaRef]) => [value, `#/components/schemas/${schemaRef}`])) },
   oneOf: Object.values(mapping).map((schemaRef) => ({ $ref: `#/components/schemas/${schemaRef}` }))
 });
-/**
- * A discriminated union whose BRANCH SET is smaller than its discriminator MAPPING, because several
- * discriminator values legitimately share one component. `HomebrewRiderTrigger` is the only such
- * union here: its eleven parameterless moments are a single component carrying an eleven-value
- * `type` enum, since eleven byte-identical `{ type }`-only components would document nothing eleven
- * times. The mapping still names all thirty triggers, so the discriminator resolves every one.
- */
+/** A discriminated union whose branch set is smaller than its mapping. Only `HomebrewRiderTrigger` uses it: its
+ * eleven parameterless moments share one component with an enum `type`, and the mapping still names every trigger. */
 const homebrewFoldedUnion = (description: string, mapping: Readonly<Record<string, string>>) => ({
   description,
   discriminator: { propertyName: "type", mapping: Object.fromEntries(Object.entries(mapping).map(([value, schemaRef]) => [value, `#/components/schemas/${schemaRef}`])) },
@@ -1083,36 +962,21 @@ const homebrewVariant = (constant: string, description: string, required: readon
   required: ["type", ...required],
   properties: { type: { const: constant }, ...properties }
 });
-/**
- * WHERE an item is worn or held. The ONE closed enum on this surface, deliberately: `slot` is not
- * identity (that stays the open `category` slug), it is the mechanical hook the engine exhaustively
- * switches on - what derives AC, what may be equipped twice, what an attunement gate applies to.
- */
+/** Where an item is worn or held: the one closed enum here, because the engine switches on it exhaustively. */
 const homebrewItemSlot = { type: "string", enum: ["weapon", "shield", "armor", "head", "neck", "shoulders", "hands", "ring", "belt", "feet", "held", "wondrous", "consumable", "ammunition", "none"] } as const;
-/**
- * The two gate fields EVERY rider carries (Zod's `riderGate`). `when` defaults to `[]`, so it is
- * never in a variant's `required` - but it does materialise on every parsed rider, which is why
- * `additionalProperties: false` makes declaring it on all of them mandatory rather than optional.
- */
+/** The gate fields every rider carries (Zod's `riderGate`). `when` defaults to `[]`, so it is never required, but
+ * it appears on every parsed rider and `additionalProperties: false` means every variant must declare it. */
 const homebrewRiderGate = {
   when: { type: "array", maxItems: 4, default: [], items: { $ref: "#/components/schemas/HomebrewRiderTrigger" }, description: "AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow" },
   scope: { type: "string", enum: ["bearer", "this-item"], description: "What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means \"with this weapon\", everything else means the bearer. On a non-item carrier \"this-item\" resolves to \"bearer\"" }
 } as const;
-/** One branch of a RIDER union: `homebrewVariant` plus the shared `when`/`scope` gate, spelled once so a new rider cannot land ungated. */
+/** One branch of a rider union: `homebrewVariant` plus the shared `when`/`scope` gate, so no rider lands ungated. */
 const homebrewRiderVariant = (constant: string, description: string, required: readonly string[], properties: Readonly<Record<string, unknown>> = {}) =>
   homebrewVariant(constant, description, required, { ...properties, ...homebrewRiderGate });
-/** One trigger branch: the same shape as a variant, but a trigger carries no gate of its own (a gate made of gates is the expression language ADR-0008 refuses). */
+/** One trigger branch; triggers carry no gate of their own (ADR-0008). */
 const homebrewTrigger = homebrewVariant;
-/**
- * Mirrors `contentRecordBase`, which is spelled once in Zod and spread into SIX of the nine record
- * schemas (class, subclass, species, background, feat, spell-list).
- *
- * Spell, equipment and monster deliberately do NOT compose it, because their Zod schemas do not:
- * `SpellReferenceSchema` has no `summary`, `EquipmentReferenceSchema` has neither `summary` nor
- * `attribution` AND is `.strict()` (documenting a field it never declared would publish one that
- * makes the request FAIL), and a monster body is an `ActorDefinition`, whose `source` is bundle
- * provenance rather than the srd/homebrew discriminator.
- */
+/** Mirrors `contentRecordBase`, which six of the nine record schemas spread. Spell, equipment and monster don't:
+ * their Zod schemas lack these fields, and `EquipmentReferenceSchema` is `.strict()`. */
 const homebrewRecordBase = {
   id: { ...homebrewId, description: "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas" },
   name: { type: "string", minLength: 1, maxLength: 120 },
@@ -1121,15 +985,10 @@ const homebrewRecordBase = {
   description: { type: "string", maxLength: 20000, description: "Long prose. Always the display source of truth; the structured riders only add mechanics on top" },
   attribution: { type: "string", maxLength: 400, description: "Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead" }
 } as const;
-/**
- * `type` is the wire discriminator and it is required on every branch. It lives on the ROW: the
- * server strips it before storing the body, because leaving it in would make
- * `EquipmentReferenceSchema` - the one `.strict()` content schema - reject its own record. It is put
- * back on every record that goes out, because a pack is a bare array and each record must be
- * self-describing.
- */
+/** `type` is the wire discriminator. The server strips it before storing (strict `EquipmentReferenceSchema` would
+ * reject it) and restores it on output so each record in a pack is self-describing. */
 const homebrewRecordBaseRequired = ["type", "id", "name"] as const;
-/** THE rider vocabulary, spelled once - mirrors Zod's `featureRiders`, which a FeatureRecord and a FeatureOption share so there is one vocabulary to author and one interpreter to write. */
+/** The rider vocabulary, mirroring Zod's `featureRiders` (shared by FeatureRecord and FeatureOption). */
 const homebrewFeatureRiders = {
   tags: { ...homebrewSlugArray(8), description: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)" },
   actions: { ...homebrewRefArray("HomebrewFeatureAction", 8), description: "Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon)" },
@@ -1138,18 +997,13 @@ const homebrewFeatureRiders = {
   grants: { ...homebrewRef("HomebrewFeatureGrants"), description: "Flat proficiency/language/spell grants" },
   modifiers: { ...homebrewRefArray("HomebrewFeatureModifier", 8), description: "Typed numeric riders" }
 } as const;
-/**
- * EXTRA PICKS - deliberately NOT part of `homebrewFeatureRiders`, because that block is spread into
- * `HomebrewEquipmentRecord` too and a pick budget is the one thing an item must never carry: a pick
- * is made once at build time and written to the provenance ledger, so a +1 that came off with the
- * cloak would strand a chosen skill with nothing granting it. Declared here and attached only to the
- * two carriers that are BUILT rather than equipped - a feature and an inline option.
- */
+/** Extra picks, kept out of `homebrewFeatureRiders` because that block also goes on equipment, and an item must
+ * never carry a pick budget (removing it would strand a chosen pick). Attached only to features and options. */
 const homebrewExtraPicks = {
   extraPicks: { ...homebrewRefArray("HomebrewExtraPick", 4), description: "Budgets this raises rather than outcomes it grants: \"you know one extra cantrip from the Cleric spell list\", \"one additional skill from your class's list\". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2" },
   replaces: { ...homebrewRefArray("HomebrewReplaceableChoice", 4), description: "Picks this lets the character RE-MAKE later - \"whenever you finish a Long Rest, choose one type of land\". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest" }
 } as const;
-/** The fields describing WHAT is being picked, shared by a feature's choice and an option's own (Zod's `featureChoiceBase`). */
+/** The fields describing what is being picked, shared by a feature's choice and an option's own (Zod's `featureChoiceBase`). */
 const homebrewChoiceBase = {
   kind: { ...contentSlug, description: "Open slug the wizard renders generically: fighting-style, skill, expertise, subclass, asi, feat, spell, cantrip, language, tool, or anything homebrew invents" },
   choose: { type: "integer", minimum: 1, maximum: 10, default: 1 },
@@ -1161,7 +1015,7 @@ const homebrewChoiceBase = {
   maximum: { type: "integer", minimum: 1, maximum: 30, description: "Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons (\"increase one ability score by 1, to a maximum of 30\") do the second" },
   repeatable: { type: "boolean", default: false, description: "The same option may be picked more than once (Expertise across levels)" }
 } as const;
-/** Everything an action carries EXCEPT `attack`/`save`, which is the only place a statblock action (flat numbers) and a feature action (derived from the character) differ. Mirrors `ActionSchema` minus those two - the same omit Zod's `FeatureActionSchema` performs. */
+/** Everything an action carries except `attack`/`save`, which is the only place a statblock action (flat numbers) and a feature action (derived from the character) differ. Mirrors `ActionSchema` minus those two - the same omit Zod's `FeatureActionSchema` performs. */
 const homebrewActionBase = {
   id: homebrewActionId,
   name: { type: "string", minLength: 1, maxLength: 120 },
@@ -1180,11 +1034,7 @@ const homebrewActionBase = {
   spellId: { ...contentSlug, description: "WHICH spell this action is a casting of. Identity only - every number the action rolls is already on the action itself - so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: \"when you cast Eldritch Blast\" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed" }
 } as const;
 const homebrewActionBaseRequired = ["id", "name", "activation", "description"] as const;
-/**
- * The nine authored bodies, one per `HomebrewContentTypeSchema` option. `satisfies` is the point:
- * adding a tenth content type is a COMPILE error here until its branch component exists, so the enum
- * and the union cannot drift apart.
- */
+/** One authored body per `HomebrewContentTypeSchema` option; `satisfies` makes a missing branch a compile error. */
 const HOMEBREW_RECORD_COMPONENTS = {
   class: "HomebrewClassRecord",
   subclass: "HomebrewSubclassRecord",
@@ -1196,7 +1046,7 @@ const HOMEBREW_RECORD_COMPONENTS = {
   monster: "HomebrewMonsterRecord",
   "spell-list": "HomebrewSpellListRecord"
 } as const satisfies Record<HomebrewContentType, string>;
-/** One homebrew operation. Security is never a parameter - it is always `homebrewGmOnly`. */
+/** One homebrew operation; security is always `homebrewGmOnly`. */
 const homebrewOp = (operationId: string, okRef: string, options: { ok?: string; params?: readonly unknown[]; body?: string; bodyRequired?: boolean; description?: string; bad?: boolean; notFound?: boolean; conflict?: string; tooLarge?: boolean } = {}) => ({
   operationId,
   security: homebrewGmOnly,
@@ -1207,7 +1057,7 @@ const homebrewOp = (operationId: string, okRef: string, options: { ok?: string; 
     [options.ok ?? "200"]: { description: "Success", ...homebrewJson(okRef) },
     ...(options.bad === false ? {} : { "400": apiError }),
     "401": apiError,
-    // A player session is authenticated and denied, which is a 403 - never the 401 an unauthenticated caller gets.
+    // A player session is authenticated and denied: 403, never 401.
     "403": apiError,
     ...(options.notFound ? { "404": apiError } : {}),
     ...(options.conflict ? { "409": { description: options.conflict, content: { "application/json": { schema: { $ref: "#/components/schemas/ApiErrorEnvelope" } } } } } : {}),
@@ -1220,9 +1070,7 @@ export const openApiDocument = {
   info: {
     title: "Combat-First VTT Integration API",
     version: API_VERSION,
-    // Per-SURFACE rather than API-wide, because the API-wide claim was false: "every write accepts an
-    // optional commandId" was only ever true of the game surface, and a codex or homebrew caller who
-    // believed it got a 400 from a `.strict()` body. Say what each surface actually does instead.
+    // Described per surface: only game writes accept an optional `commandId`; codex and homebrew bodies are strict.
     description: "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). Role denials are 403, a missing credential is 401, and the existence of a secret record always reads as 404."
   },
   servers: [{ url: API_NAMESPACE }],
@@ -1374,10 +1222,9 @@ export const openApiDocument = {
     },
     [ENCOUNTER_ARCHIVE_PATHS.visibility]: { post: { operationId: "setEncounterArchiveVisibility", security: gameSecurity("combat:write"), description: "Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default - an ended fight is the GM's record until the GM says otherwise. Sharing makes the archive appear in a player's `GET /encounters` list and lets `GET /encounters/{id}` answer them with the computed player replay; un-sharing takes both away again.", parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveVisibilityRequest" } } } }, responses: { "200": { description: "The stored visibility", content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveVisibilityResponse" } } } }, "400": apiError, "401": apiError, "403": apiError, "404": apiError } } },
     [ENCOUNTER_ARCHIVE_PATHS.launch]: { post: { operationId: "launchEncounterArchive", security: gameSecurity("combat:write"), description: "Launch-from-here (D25): parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it. The moment's combatants are CLONED under new ids (tonight's characters are never rewritten) and the parked scene resumes any time through scene.activate. GM-grade only.", parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchRequest" } } } }, responses: { "200": { description: "The launched scene and the cloned combatants", content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchResponse" } } } }, "400": apiError, "401": apiError, "403": apiError, "404": apiError, "409": apiError } } },
-    // ===== Codex: worldbuilding wiki / atlas / journal / calendar (codex-http.ts). Reads project per role;
-    // writes are GM-grade. Every operation also accepts a scoped integration credential (`codex:read` /
-    // `codex:write`) acting at GM grade - `POST /codex/preview-session` is the single exception, because it
-    // mints a player SESSION TOKEN. Every codex GET answers a conditional request with 304. =====
+    // ===== Codex: worldbuilding wiki / atlas / journal / calendar (codex-http.ts). Reads project per role; writes
+    // are GM-grade. Scoped credentials act at GM grade except on `POST /codex/preview-session`. Every codex GET
+    // answers a conditional request with 304. =====
     [CODEX_PATHS.pages]: {
       get: codexOp("listCodexPages", codexRead, "CodexPageListResponse", { notModified: true, bad: false, description: "Every page's summary (a player sees only revealed pages). Optional `folder` (empty string = top level) and `tag` filters.", params: [{ name: "folder", in: "query", schema: { type: "string" } }, { name: "tag", in: "query", schema: { type: "string" } }] }),
       post: codexOp("createCodexPage", codexWrite, "CodexPageResponse", { ok: "201", body: "CodexPageCreateRequest", description: "Creates a page." })
@@ -1539,7 +1386,7 @@ export const openApiDocument = {
       IntegrationCredentialAuditResponse: envelopeSchema("#/components/schemas/IntegrationCredentialAudit"),
       ApiErrorEnvelope: { type: "object", additionalProperties: false, required: ["ok", "apiVersion", "error"], properties: { ok: { const: false }, apiVersion: { const: API_VERSION }, error: { type: "object", additionalProperties: false, required: ["code", "message", "requestId"], properties: { code: { type: "string", enum: ApiErrorCodeSchema.options }, message: { type: "string" }, requestId: { type: "string", format: "uuid" }, details: { type: "object", additionalProperties: true }, retryAfterSeconds: { type: "integer", minimum: 1 }, currentRevision: { type: "integer", minimum: 0 } } } } },
       ImagePoint: { type: "object", additionalProperties: false, required: ["x", "y"], properties: { x: { type: "number" }, y: { type: "number" } } },
-      /** Calibration/scale/wizard-state internals are intentionally left as flexible objects rather than fully typed here - the geometry lives in apps/server/src/grid-calibration*.ts and is out of scope for this documentation pass. */
+      /** Calibration/scale/wizard-state internals stay flexible objects; the geometry lives in apps/server/src/grid-calibration*.ts. */
       MapAssetMetadata: { type: "object", additionalProperties: false, required: ["id", "name", "kind", "originalName", "format", "mediaType", "width", "height", "byteLength", "importedAt", "calibration", "scale", "updatedAt"], properties: { id: { type: "string", format: "uuid" }, name: { type: "string" }, kind: { type: "string", enum: ["battlemap", "regional", "world"] }, originalName: { type: "string" }, format: { type: "string" }, mediaType: { type: "string" }, width: { type: "integer", minimum: 1 }, height: { type: "integer", minimum: 1 }, byteLength: { type: "integer", minimum: 1 }, importedAt: { type: "string", format: "date-time" }, calibration: { type: ["object", "null"], additionalProperties: true }, scale: { type: ["object", "null"], additionalProperties: true }, updatedAt: { type: "string", format: "date-time" } } },
       MapCatalogEntry: { type: "object", additionalProperties: false, required: ["assetId", "name", "kind", "calibration", "scale", "createdAt", "updatedAt"], properties: { assetId: { type: "string", format: "uuid" }, name: { type: "string" }, kind: { type: "string", enum: ["battlemap", "regional", "world"] }, calibration: { type: ["object", "null"], additionalProperties: true }, scale: { type: ["object", "null"], additionalProperties: true }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
       MapAssetUploadResponse: envelopeSchema("#/components/schemas/MapAssetUploadData"),
@@ -1644,9 +1491,8 @@ export const openApiDocument = {
       ContentSpellsResponse: envelopeSchema("#/components/schemas/ContentSpellsData"),
       ContentEquipmentData: { type: "object", additionalProperties: false, required: ["equipment", "attribution"], properties: { equipment: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "name", "category", "costGp", "weightLb", "description", "weapon", "armor", "appliesTo"], properties: { id: { type: "string" }, name: { type: "string" }, category: { type: "string", description: "Open slug: weapon, armor, shield, ammunition, adventuring-gear, tool, equipment-pack, consumable, focus, wondrous, or any homebrew kind. Not a closed set - derive groupings from the data." }, costGp: { type: ["number", "null"] }, weightLb: { type: ["number", "null"] }, description: { type: ["string", "null"] }, weapon: { description: "Populated for weapons only", oneOf: [{ type: "object", additionalProperties: false, required: ["category", "damageDice", "damageType", "rangeFeet", "longRangeFeet"], properties: { category: { type: "string", enum: ["simple", "martial"] }, damageDice: { type: "string" }, damageType: { type: "string" }, rangeFeet: { type: ["integer", "null"] }, longRangeFeet: { type: ["integer", "null"] }, mastery: { type: "string", enum: ["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"], description: "The SRD weapon-mastery property this weapon has. Browse-only: it is NOT copied onto an inventory row, and it does nothing until a character unlocks THIS weapon through Weapon Mastery. Absent on gear and on homebrew weapons that declare none." }, properties: { type: "array", maxItems: 12, items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 }, description: "The SRD weapon table's Properties column (finesse, light, thrown, versatile, reach, heavy, two-handed, loading, ammunition). Unlike `mastery` these ARE copied onto an inventory row and the engine reads them there - finesse decides whether the swing uses Dexterity, reach decides 10 feet versus 5. An empty array means the weapon genuinely has none." } } }, { type: "null" }] }, armor: { description: "Populated for armor and shields only", oneOf: [{ type: "object", additionalProperties: false, required: ["acBase", "addDexModifier", "dexModifierCap", "stealthDisadvantage", "strengthRequired"], properties: { acBase: { type: "integer" }, addDexModifier: { type: "boolean" }, dexModifierCap: { type: ["integer", "null"] }, stealthDisadvantage: { type: "boolean" }, strengthRequired: { type: ["integer", "null"] } } }, { type: "null" }] }, appliesTo: { description: "C9: the eligibility column for a TEMPLATE magic item - the printed type-line qualifier (\"Any Simple or Martial\") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player's pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.", oneOf: [{ type: "object", additionalProperties: false, required: ["label", "baseIds"], properties: { label: { type: "string" }, baseIds: { type: "array", minItems: 1, maxItems: 40, items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 } } } }, { type: "null" }] } } } }, attribution: { type: "string" } } },
       ContentEquipmentResponse: envelopeSchema("#/components/schemas/ContentEquipmentData"),
-      // ---- Character-builder catalogs. Features-as-data: every class/subclass/species/background/feat
-      // feature is a declarative ContentFeature record, never hardcoded client or server behavior, so a
-      // homebrew record and an SRD record are indistinguishable to the wizard (character-builder principle 1).
+      // ---- Character-builder catalogs. Every feature is a declarative ContentFeature record, so homebrew and SRD
+      // records are indistinguishable to the wizard.
       ContentFeature: { type: "object", additionalProperties: false, required: ["id", "name", "level", "description", "tags", "choice", "choices", "grantedAtLevels", "extraPicks"], description: "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.", properties: { id: contentSlug, name: { type: "string" }, level: { type: ["integer", "null"], minimum: 1, maximum: 20, description: "The class/subclass level the feature lands at; null when it is not level-gated (species traits, feats)" }, description: { type: "string" }, tags: { type: "array", items: contentSlug, description: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)" }, choice: { description: "The FIRST pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking.", oneOf: [{ $ref: "#/components/schemas/ContentFeatureChoice" }, { type: "null" }] }, choices: { type: "array", items: { $ref: "#/components/schemas/ContentFeatureChoice" }, description: "EVERY pick this feature asks for, in authored order - one record may owe more than one, with different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell, and reading only `choice` is what silently dropped the spell. Empty when the feature asks for nothing." }, grantedAtLevels: { type: "array", items: { type: "integer", minimum: 1, maximum: 20 }, description: "Every level at which the owning class's table grants this feature - the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features)." }, extraPicks: { type: "array", items: { $ref: "#/components/schemas/ContentExtraPick" }, description: "Budgets this feature RAISES rather than picks it asks for. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable." } } },
       ContentFeatureChoice: { type: "object", additionalProperties: false, required: ["kind", "choose", "from", "fromCatalog", "maxSpellLevel", "minSpellLevel", "fromPicks", "options"], description: "One pick a feature asks for. Options arrive either as plain ids in `from`, as an open catalog slug in `fromCatalog`, or as inline `options` carrying their own name and any second-order pick.", properties: { kind: contentSlug, choose: { type: "integer", minimum: 1, maximum: 10 }, from: { type: "array", items: contentSlug, description: "Explicit option ids; empty when fromCatalog names an open list instead" }, fromCatalog: { type: ["string", "null"], description: "An open catalog slug resolved at pick time (skills, feats, wizard-spells)" }, maxSpellLevel: { type: ["integer", "null"], minimum: 0, maximum: 9, description: "Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling — a picker that ignores it offers spells the server then rejects" }, minSpellLevel: { type: ["integer", "null"], minimum: 0, maximum: 9, description: "Floor on a spell pick's level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell rather than \"6 or lower\"). null when the pick has no floor" }, fromPicks: { description: "The options are the character's OWN earlier answers rather than a catalog - \"choose one of your known Warlock cantrips that deals damage\". null for every ordinary pick.", oneOf: [{ type: "object", additionalProperties: false, required: ["offer", "where"], properties: { offer: { type: "string", description: "The budget whose answers are the option list (\"class-cantrips\", \"feature:<id>\")" }, where: { type: ["string", "null"], enum: ["deals-damage", "attack-roll", "ranged", null], description: "Closed predicate narrowing those answers; null means all of them" } } }, { type: "null" }] }, options: { type: "array", items: { $ref: "#/components/schemas/ContentFeatureOption" }, description: "Inline options with their authored names and any nested pick; empty when the options are plain ids or come from a catalog" } } },
       ContentFeatureOption: { type: "object", additionalProperties: false, required: ["id", "name", "description", "requires", "choice", "choices", "extraPicks"], description: "One inline option of a feature's pick. Carries its authored name (an id alone would force the client to titleize) and any SECOND-ORDER pick it owes - Cleric Divine Order's Thaumaturge grants an extra cantrip, so choosing it opens another choice. Riders stay server-side.", properties: { id: contentSlug, name: { type: "string" }, description: { type: "string" }, requires: { description: "The earlier answer that makes this option legal, or null when it is always offerable. \"The option you chose for Blessed Strikes grows more powerful\": the later feature's options are gated on a pick already in the ledger. When gating leaves exactly as many legal options as the capacity, the answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it.", oneOf: [{ type: "object", additionalProperties: false, required: ["offer", "id"], properties: { offer: { type: "string", description: "The offer key holding the earlier answer (\"feature:blessed-strikes\", or a named budget)" }, id: contentSlug } }, { type: "null" }] }, choice: { description: "The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options.", oneOf: [{ $ref: "#/components/schemas/ContentFeatureChoice" }, { type: "null" }] }, choices: { type: "array", items: { $ref: "#/components/schemas/ContentFeatureChoice" }, description: "EVERY nested pick this option owes, in authored order." }, extraPicks: { type: "array", items: { $ref: "#/components/schemas/ContentExtraPick" }, description: "Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget." } } },
@@ -1711,12 +1557,7 @@ export const openApiDocument = {
       CodexChronicleRecord: {
         type: "object", additionalProperties: false,
         description: "One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the single row shape every timeline record uses. `kind` says what it is and therefore what opening it means: `entry`/`combat`/`deadline`/`downtime` carry a journal-entry id, `event` carries a PAGE id. Every key is present on every kind (null where it does not apply), so no reader branches on key presence. The player's row is the separate `CodexChronicleRecordPlayer`; the two are joined by `CodexChronicleRecordProjected`.",
-        // Every key REQUIRED, including the GM-only ones. This used to be a merged shape - `required` was
-        // the GM-player intersection and each GM-only key was an optional property with "absent from a
-        // player projection" prose - which meant a player body validated against this component too. That
-        // made the role `oneOf` ambiguous (two matching branches is a `oneOf` failure), and it published a
-        // shape no response ever actually has: the GM projection emits all of these on every row, nullable
-        // where the value does not apply.
+        // Every key required, GM-only ones included (nullable where unused), so the role `oneOf` stays unambiguous.
         required: ["kind", "id", "title", "text", "gmText", "revealedToPlayers", "sessionId", "sessionNumber", "realDate", "inWorldLabel", "calendarInstant", "inWorldDate", "tags", "attachPageId", "attachMarkerId", "sourceEncounterId", "fired", "payload", "proposedDate", "createdAt", "updatedAt"],
         properties: {
           kind: { type: "string", enum: ["entry", "combat", "event", "deadline", "downtime", "milestone", "standing", "quest"], description: "What the row IS, read by icon AND word - never by colour alone. A discriminator for DISPLAY only: it never decides visibility, which is `revealedToPlayers` and nothing else." },
@@ -1736,9 +1577,7 @@ export const openApiDocument = {
           attachMarkerId: { ...codexNullableUuid, description: "GM-only; not declared on `CodexChronicleRecordPlayer`." },
           sourceEncounterId: { type: ["integer", "null"], description: "GM-only replay linkage (K2); not declared on `CodexChronicleRecordPlayer`." },
           fired: { type: "boolean", description: "CT-5: has the campaign clock reached this deadline's own date? DERIVED on every read from `inWorldDate` against the clock, never stored - so rewinding the clock correctly un-fires a deadline. `false` for every kind that is not a dated deadline. Measured against WHOSE clock is a viewer-safety decision: the GM's row uses the GM's clock, a player's row uses the PUBLISHED date, so this boolean can never tell the party that a date they have not been shown has already gone by." },
-          // The GM branch's payloads only. The player payloads used to ride in this same list, which made
-          // it ambiguous in its own right: a player standing payload with a non-null `factionPageId` is a
-          // valid `CodexStandingPayload` too, so `oneOf` had two matches. Each audience now names its own.
+          // The GM branch's payloads only; player payloads are listed separately so `oneOf` has one match.
           payload: { oneOf: [{ $ref: "#/components/schemas/CodexDowntimePayload" }, { $ref: "#/components/schemas/CodexMilestonePayload" }, { $ref: "#/components/schemas/CodexStandingPayload" }, { $ref: "#/components/schemas/CodexQuestHistoryPayload" }, { type: "null" }], description: "The kind's structured facts, discriminated by `kind`; null for the kinds that carry none. Allow-listed per kind, never a spread of the stored blob: the GM receives the full downtime payload including `applied` (CT-10), a milestone's `{ level, reason }` (CT-8), and a standing change's `delta`/`reason` (CT-6)." },
           proposedDate: { ...codexInWorldDateOrNull, description: "GM-only (not declared on `CodexChronicleRecordPlayer`): for an unapplied downtime, the date `apply-downtime` would move the clock to. Null once applied, and for every other kind. A clock move the GM has not confirmed - and may never confirm - is prep." },
           createdAt: { type: "string", format: "date-time" },
@@ -1795,24 +1634,12 @@ export const openApiDocument = {
       },
       CodexCalendarMonth: { type: "object", additionalProperties: false, required: ["name", "days"], properties: { name: { type: "string" }, days: { type: "integer", minimum: 1, maximum: 400 } } },
       CodexCalendarEra: { type: "object", additionalProperties: false, description: "A named era, running from `startYear` until the next era begins (`5f`). A date's era is DERIVED - the last era whose `startYear` the date's year has reached - and is never stored on the date, so adding one re-labels existing records without rewriting any of them. Sorted ascending by `startYear` on the way in.", required: ["name", "startYear"], properties: { name: { type: "string", maxLength: 40 }, startYear: { type: "integer", minimum: -100_000, maximum: 100_000 } } },
-      // Both date keys are REQUIRED (nullable), not optional. The GM projection always emits both - null
-      // when the clock has never been set - so optional keys documented a shape no response has, and they
-      // made the role `oneOf` ambiguous: a player calendar validated against this component as well as
-      // against `CodexCalendarPlayer`.
+      // Both date keys are required (nullable), matching what the GM projection emits and keeping the role `oneOf` unambiguous.
       CodexCalendar: { type: "object", additionalProperties: false, description: "The world's calendar as the **GM** receives it. The campaign has two clocks (M11/O-1): the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. The player's calendar is the separate `CodexCalendarPlayer`, where `currentDate` is sourced from the published date and `publishedDate` is not declared at all; the two are joined by `CodexCalendarProjected`.", required: ["yearName", "eras", "months", "weekdays", "currentDate", "publishedDate"], properties: { yearName: { type: "string" }, eras: { type: "array", maxItems: 20, items: { $ref: "#/components/schemas/CodexCalendarEra" }, description: "The world's named eras, ascending by `startYear`. Empty on every calendar written before eras existed, which is exactly today's rendering: `yearName` stays the trailing suffix. Where an era applies it LEADS the year instead (\"Third Age 1492\")." }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string" } }, currentDate: { ...codexInWorldDateOrNull, description: "The GM's own clock - where the campaign is now. Null until a date is set. Never reaches a player by any path." }, publishedDate: { ...codexInWorldDateOrNull, description: "What the party currently sees as 'now'. Equal to `currentDate` until the GM runs ahead while prepping, and moved only by `POST /codex/calendar/publish`. Not declared on `CodexCalendarPlayer`, where `currentDate` already IS this value." } } },
-      // ---- Player projections of the role-projected read shapes, and the wrappers that join them.
-      //
-      // Each component below mirrors `apps/server/src/codex-projections.ts` LITERALLY - the same key set,
-      // in the same order, with nothing added. That file stays the implementation source of truth; these
-      // exist so the published contract stops describing only half of what the surface returns. A player
-      // response used to FAIL validation against its own documented schema, which is the worst kind of
-      // documentation bug: machine-checkable and silently false.
-      //
-      // `apps/server/test/codex-http.test.ts` Ajv-validates real serialized GM and player responses against
-      // these components, so a projection that gains or loses a key fails the build rather than drifting.
-      //
-      // Widening one of these is a VIEWER-SAFETY change, not a documentation change. The contract must
-      // describe what the projection emits; if the two disagree, the projection is the fact.
+      // ---- Player projections of the role-projected read shapes.
+      // Each mirrors `apps/server/src/codex-projections.ts` exactly (same keys, same order); that file is the source of
+      // truth, and `apps/server/test/codex-http.test.ts` validates real responses against these. Widening one is a
+      // viewer-safety change, not a documentation change.
       CodexPagePlayer: { type: "object", additionalProperties: false, description: "A page as a PLAYER receives it: the player body (renamed `body` - the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers` or `createdAt`. An unrevealed page is never projected at all - it 404s.", required: ["id", "title", "entityType", "fields", "folder", "tags", "body", "bannerAssetId", "updatedAt"], properties: { id: codexUuid, title: { type: "string" }, entityType: codexEntityType, fields: { ...codexStringMap, description: "The player-facing typed entity fields. `gmFields` has no player form." }, folder: { type: ["string", "null"] }, tags: { type: "array", items: { type: "string" } }, body: { type: "string", description: "The page's `playerBody`." }, bannerAssetId: codexNullableUuid, updatedAt: { type: "string", format: "date-time" } } },
       CodexPageProjected: codexProjected("CodexPage"),
       CodexPageSummaryPlayer: { type: "object", additionalProperties: false, description: "A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`.", required: ["id", "title", "entityType", "folder", "tags", "bannerAssetId", "updatedAt"], properties: { id: codexUuid, title: { type: "string" }, entityType: codexEntityType, folder: { type: ["string", "null"] }, tags: { type: "array", items: { type: "string" } }, bannerAssetId: codexNullableUuid, updatedAt: { type: "string", format: "date-time" } } },
@@ -1861,11 +1688,8 @@ export const openApiDocument = {
       CodexCalendarRequest: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string", maxLength: 20 }, eras: { type: "array", maxItems: 20, items: { $ref: "#/components/schemas/CodexCalendarEra" }, description: "Optional so a caller written before eras existed is not met with a 400. It is replaced like every other field on this route: omitting it CLEARS the stored eras." }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 40 } }, currentDate: codexInWorldDateOrNull , commandId: { type: "string", format: "uuid", description: "Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write." } } },
       CodexDeletedData: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } },
       CodexDeletedResponse: envelopeSchema("#/components/schemas/CodexDeletedData"),
-      // ---- Response envelopes. A `*Data` for a ROLE-PROJECTED read names the `*Projected` wrapper;
-      // a `*Data` reached only by a GM-grade read or a write keeps the direct GM ref, because those
-      // routes have no player branch to document. `CodexRelationshipEdgeListData`/`CodexLinkEdgeListData`
-      // are role-projected but role-UNIFORM (a player simply receives fewer rows, in the same shape), so
-      // they need no wrapper - the projection filters the list rather than reshaping the row.
+      // ---- Response envelopes. A role-projected read's `*Data` names the `*Projected` wrapper; GM-only reads and
+      // writes keep the direct GM ref. Edge lists are role-uniform (players just get fewer rows), so need no wrapper.
       CodexPageListData: codexDataObject("pages", codexArrayRef("CodexPageSummaryProjected")),
       CodexPageListResponse: envelopeSchema("#/components/schemas/CodexPageListData"),
       CodexSearchHit: { type: "object", additionalProperties: false, required: ["kind", "id", "title", "tags", "entityType", "mapId"], description: "One row of the single suite-wide result list. Uniform across record types - every key is present on every kind, null where it does not apply, so a consumer never branches on key presence. Deliberately narrow: enough to render a row and open the record, and nothing more. A player's hit list is gated by exactly the reveal predicate that kind's LIST endpoint applies (a marker additionally requires ITS MAP to be revealed), and a journal `title` is excerpted from the player text alone.", properties: { kind: { type: "string", enum: ["page", "journal", "map", "marker", "quest", "session"], description: "Which record matched; decides where the client navigates." }, id: codexUuid, title: { type: "string", description: "Page title, map name, marker label, or quest title; for a journal entry, a bounded one-line excerpt of its text; for a SESSION, `Session {n}`, else a recap excerpt, else `Untitled session` - never an empty string." }, tags: { type: "array", items: { type: "string" }, description: "Always present, so no consumer branches on key presence." }, entityType: { oneOf: [codexEntityType, { type: "null" }], description: "The page's entity type; null for every other kind." }, mapId: { ...codexNullableUuid, description: "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed." } } },
@@ -1904,8 +1728,7 @@ export const openApiDocument = {
       CodexMarkerListData: codexDataObject("markers", codexArrayRef("CodexMarkerProjected")),
       CodexMarkerListResponse: envelopeSchema("#/components/schemas/CodexMarkerListData"),
       CodexMarkerData: codexDataObject("marker", { $ref: "#/components/schemas/CodexMarker" }),
-      // D15: the role-projected single-pin read. `CodexMarkerData` above stays GM-shaped because every
-      // route that uses it is a WRITE answering the GM; this is the read, and it has a player branch.
+      // The role-projected single-pin read; `CodexMarkerData` above stays GM-shaped because only writes use it.
       CodexMarkerProjectedData: codexDataObject("marker", { $ref: "#/components/schemas/CodexMarkerProjected" }),
       CodexMarkerProjectedResponse: envelopeSchema("#/components/schemas/CodexMarkerProjectedData"),
       CodexPartyLocation: { type: "object", additionalProperties: false, description: "The party pin and the map it is on. `marker.mapId` is the jump target; `mapName` rides along so a caller needs no second fetch to label the card.", required: ["marker", "mapName"], properties: { marker: { $ref: "#/components/schemas/CodexMarkerProjected" }, mapName: { type: "string" } } },
@@ -1918,30 +1741,24 @@ export const openApiDocument = {
       CodexChronicleListResponse: envelopeSchema("#/components/schemas/CodexChronicleListData"),
       CodexJournalEntryData: codexDataObject("entry", { $ref: "#/components/schemas/CodexJournalEntry" }),
       CodexJournalEntryResponse: envelopeSchema("#/components/schemas/CodexJournalEntryData"),
-      // M11's two payloads that carry a sibling beside the record, so neither can use `codexDataObject`.
-      // Creating downtime answers with the date it PROPOSES, because the GM's confirm affordance has to be
-      // able to say what it will do before it does it; applying answers with the calendar, because one
-      // operation moved both and a client that refetched only the entry would render a stale "now".
+      // Payloads with a sibling beside the record, so neither uses `codexDataObject`. Creating downtime returns the
+      // date it proposes (so the GM can confirm it); applying returns the calendar, since one operation moved both.
       CodexDowntimeCreatedData: { type: "object", additionalProperties: false, required: ["entry", "proposedDate"], properties: { entry: { $ref: "#/components/schemas/CodexJournalEntry" }, proposedDate: { ...codexInWorldDateOrNull, description: "Where the campaign clock WOULD land if the GM confirms. Null when there is no current date to advance from. Nothing has moved yet." } } },
       CodexDowntimeCreatedResponse: envelopeSchema("#/components/schemas/CodexDowntimeCreatedData"),
       CodexDowntimeAppliedData: { type: "object", additionalProperties: false, required: ["entry", "calendar"], properties: { entry: { $ref: "#/components/schemas/CodexJournalEntry" }, calendar: { $ref: "#/components/schemas/CodexCalendar" } }, description: "The confirmed downtime and the moved calendar, together - they changed in one transaction and are returned in one payload so a reader cannot hold one without the other. The calendar is the GM projection; the party's published date has NOT moved." },
       CodexDowntimeAppliedResponse: envelopeSchema("#/components/schemas/CodexDowntimeAppliedData"),
-      // The one Codex list payload that carries a sibling field beside its array, so it cannot use
-      // `codexDataObject`: the active-session pointer belongs to the codex, not to any one session.
+      // Carries the active-session pointer beside the array, so it cannot use `codexDataObject`.
       CodexSessionListData: { type: "object", additionalProperties: false, required: ["sessions", "activeSessionId"], properties: { sessions: codexArrayRef("CodexSessionProjected"), activeSessionId: { ...codexNullableUuid, description: "The session new journal entries are stamped from. GM-only: always `null` for a player, because the active session is frequently the unrevealed one being prepped and naming it would leak that it exists." } } },
       CodexSessionListResponse: envelopeSchema("#/components/schemas/CodexSessionListData"),
       CodexSessionData: codexDataObject("session", { $ref: "#/components/schemas/CodexSession" }),
       CodexSessionResponse: envelopeSchema("#/components/schemas/CodexSessionData"),
-      // `GET /codex/sessions/{id}` projects per role while the writes above it are GM-grade, so the read
-      // gets its own envelope rather than widening the write's documented response to a union.
+      // The session read projects per role while writes are GM-grade, so the read gets its own envelope.
       CodexSessionProjectedData: codexDataObject("session", { $ref: "#/components/schemas/CodexSessionProjected" }),
       CodexSessionProjectedResponse: envelopeSchema("#/components/schemas/CodexSessionProjectedData"),
-      // Activate answers with the POINTER alone, never the session row. Activating changes nothing
-      // about the record (no `rev`, no `updatedAt`), so echoing it back would imply it did.
+      // Activate returns only the pointer: activation changes nothing on the session row.
       CodexSessionActiveData: codexDataObject("activeSessionId", codexNullableUuid),
       CodexSessionActiveResponse: envelopeSchema("#/components/schemas/CodexSessionActiveData"),
-      // Quests need no sibling pointer beside the array, so unlike the session list this IS a plain
-      // `codexDataObject`: "which quests are open" is answered by each row's own `status`.
+      // Open quests are answered by each row's `status`, so this is a plain `codexDataObject`.
       CodexQuestListData: codexDataObject("quests", codexArrayRef("CodexQuestProjected")),
       CodexQuestListResponse: envelopeSchema("#/components/schemas/CodexQuestListData"),
       CodexQuestData: codexDataObject("quest", { $ref: "#/components/schemas/CodexQuest" }),
@@ -1952,17 +1769,9 @@ export const openApiDocument = {
       CodexStandingListResponse: envelopeSchema("#/components/schemas/CodexStandingListData"),
       CodexStandingData: codexDataObject("standing", { $ref: "#/components/schemas/CodexStanding" }),
       CodexStandingResponse: envelopeSchema("#/components/schemas/CodexStandingData"),
-      // CT-9. ONE uniform row shape for every record type, the `CodexSearchHit` pattern rather than seven
-      // parallel payloads: the audit is a list the GM scans and acts on, so a reader must not have to
-      // branch on which kind it got. Each row is deliberately narrow - enough to name the record and hand
-      // its id back to that kind's own reveal route, and nothing more.
-      //
-      // `journalKind` is the ONE exception to "narrow", added 2026-07-30, and it is the same exception
-      // `CodexSearchHit` already makes with `entityType`/`mapId`: a fact only one kind has, present-and-null
-      // on the rest so the row stays one uniform shape. It is here because `title` could not carry it - a
-      // revealed deadline WITH prose and a revealed note with prose read identically, on the one surface
-      // whose whole job is answering "is that deadline visible?" - and it is a FIELD rather than a prefix
-      // on `title` because the client badges it (a kind reads by icon AND label, never by colour alone).
+      // One uniform, narrow row for every record type, enough to name the record and hand its id to that kind's own
+      // reveal route. `journalKind` is present-and-null on non-journal rows (as `CodexSearchHit` does with
+      // `entityType`/`mapId`) so the GM can tell a revealed deadline from a note; the client badges it.
       CodexRevealAuditRow: { type: "object", additionalProperties: false, description: "One record the party can currently see.", required: ["kind", "id", "title", "journalKind"], properties: { kind: { type: "string", enum: ["page", "map", "marker", "journal", "session", "quest", "standing"], description: "Which reveal surface this row belongs to - and therefore which existing reveal route un-reveals it." }, id: { ...codexUuid, description: "The record's OWN id, which is exactly the id that kind's existing reveal route takes. For a `standing` row this is the FACTION PAGE id, because `POST /codex/standing/{factionPageId}/reveal` is addressed that way." }, title: { type: "string", description: "One line naming the record, taken from the record's own PLAYER projection - a page title, a map name, a marker label, a bounded excerpt of a journal entry's player text, \"Session 4\", a quest title, a faction name. Empty string when the record has no name (an unlabelled pin)." }, journalKind: { oneOf: [{ type: "string", enum: ["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"] }, { type: "null" }], description: "WHICH kind of journal record this is - the same six-value vocabulary `CodexJournalEntry.kind` uses. Set on every `kind: \"journal\"` row and `null` on all six other kinds, present either way so no consumer branches on key presence. Render it as a badge beside `title`, never by parsing `title`: the title is the record's own prose whenever it has any, and only names the kind when the record is silent." } } },
       CodexRevealAuditSection: { type: "object", additionalProperties: false, description: "One reveal surface's report. ALWAYS present, empty ones included with `revealed: 0` and `rows: []` - \"nothing is revealed here\" and \"this did not load\" must not look the same.", required: ["kind", "revealed", "total", "rows"], properties: { kind: { type: "string", enum: ["page", "map", "marker", "journal", "session", "quest", "standing"] }, revealed: { type: "integer", minimum: 0, description: "How many records of this kind the party can CURRENTLY SEE - which is not always the same as how many carry a reveal flag. A marker flagged revealed on a hidden map is not counted, because the player-facing marker read does not return it either." }, total: { type: "integer", minimum: 0, description: "How many exist at all, so \"3 of 40\" reads as deliberate rather than as an empty screen." }, rows: codexArrayRef("CodexRevealAuditRow") } },
       CodexRevealAudit: { type: "object", additionalProperties: false, description: "CT-9: everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections - it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly rather than approximately.", required: ["sections", "revealed", "total"], properties: { sections: { ...codexArrayRef("CodexRevealAuditSection"), description: "All seven surfaces, in a fixed order, always all present." }, revealed: { type: "integer", minimum: 0, description: "Total records the party can see, across every surface." }, total: { type: "integer", minimum: 0, description: "Total records that exist, across every surface." } } },
@@ -1970,35 +1779,22 @@ export const openApiDocument = {
       CodexRevealAuditResponse: envelopeSchema("#/components/schemas/CodexRevealAuditData"),
       CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
       CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
-      // Same split as sessions/quests: the GET projects per role; `PUT /codex/calendar`,
-      // `POST /codex/calendar/publish` and the apply-downtime payload are GM-grade and keep the GM shape.
+      // The GET projects per role; calendar writes and the apply-downtime payload keep the GM shape.
       CodexCalendarProjectedData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendarProjected" }),
       CodexCalendarProjectedResponse: envelopeSchema("#/components/schemas/CodexCalendarProjectedData"),
-      // OWNER DECISION (2026-07-30). `revisionHistory` is HOISTED into its own component rather than inlined,
-      // the convention `CodexDowntimeCreateRequest`/`CodexMilestoneCreateRequest` already follow for a nested
-      // input object: the substantive documentation belongs to the knobs themselves, and a hoisted component
-      // gets its own field table in `docs/api-reference.md` instead of two flattened rows.
-      // The two knobs a caller may SET. Named `*Input` rather than `*Request` on purpose: a nested component
-      // whose name ends in `Request` is filtered out of the reference's "Shared shapes" section, so its field
-      // table would render nowhere at all. `CodexDowntimeInput` / `CodexMilestoneInput` set the precedent.
+      // Hoisted into its own component so the knobs get their own field table in the generated reference. Named
+      // `*Input`, not `*Request`, because nested `*Request` components are omitted from the reference's shared shapes.
       CodexRevisionHistoryInput: { type: "object", additionalProperties: false, description: "The two SETTABLE revision-history knobs, and the difference between them is load-bearing: `enabled: false` writes NO new revisions at all, while `windowMinutes: 0` writes one for EVERY save. `0` is therefore not \"off\" - it is the behaviour every codex had before this setting existed - and the two are separate fields so nothing has to guess which a zero meant. Neither setting ever DELETES a revision: switching history off stops new checkpoints and nothing else, and the existing history stays listable and restorable, because disabling a feature must not destroy the GM's only undo. Deleting is a separate, explicit act (`DELETE /codex/page-revisions`).", required: ["enabled", "windowMinutes"], properties: { enabled: { type: "boolean", description: "Whether a page save may write a new revision at all. Default `true` - every existing codex upgrades with history on, exactly as it was." }, windowMinutes: { type: "integer", minimum: 0, maximum: 10_080, description: "Coalescing window. A save whose page already has a checkpoint younger than this writes no new one, so at most this much authoring can be lost. Measured against WHEN THE CHECKPOINTED CONTENT WAS AUTHORED, not when its row was written, which is what makes the guarantee hold across an idle gap as well as during continuous work. `0` keeps every save; the 10080 ceiling is one week of minutes, past which the window stops coalescing a work session and starts meaning \"keep almost nothing\" - which `enabled: false` already says more honestly. The owner's default is 90." } } },
       CodexRevisionHistorySettings: { type: "object", additionalProperties: false, description: "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they are a superset here rather than a second object because a settings screen wants the cost beside the control that changes it.", required: ["enabled", "windowMinutes", "versionCount", "versionBytes"], properties: { enabled: { type: "boolean", description: "Whether a page save may write a new revision at all." }, windowMinutes: { type: "integer", minimum: 0, maximum: 10_080, description: "Coalescing window in minutes; `0` keeps every save. See `CodexRevisionHistoryInput.windowMinutes`." }, versionCount: { type: "integer", minimum: 0, description: "How many revision rows exist, across the WHOLE codex rather than one page - the same set `DELETE /codex/page-revisions` operates on. Read-only: it is a fact about the table, so it is never accepted on a write." }, versionBytes: { type: "integer", minimum: 0, description: "Roughly how much TEXT that history holds: the summed length of the content columns a revision duplicates from its page (both bodies, both field maps, the title and the tags). Deliberately APPROXIMATE and deliberately not disk usage or the export's serialized size - it exists to be compared against itself before and after a trim, and a figure precise enough to invite comparison against the sqlite file's size would be a figure that disagrees with it. Render it as \"about 8.0 MB of text\". Read-only, like `versionCount`." } } },
-      // D6: autosave. ONE component for both directions, unlike `revisionHistory` above, and the asymmetry is
-      // the point rather than an oversight: revision history has server-computed usage figures that must have
-      // no place in a body, and autosave has nothing of the kind. A second identical component would be the
-      // one that drifts.
+      // One component for both directions: unlike revision history, autosave has no server-computed fields.
       CodexAutosaveSettings: { type: "object", additionalProperties: false, description: "Whether the Codex's editors save your work as you type, and how often. The server stores a PREFERENCE and nothing else - there is no server-side draft, so the behaviour (and the explicit Save plus unsaved-changes warning when it is off) is the editor's. Storing it here is what makes the setting follow the GM from a phone to a laptop.", required: ["enabled", "intervalSeconds"], properties: { enabled: { type: "boolean", description: "Default `true`. `false` does not slow autosave down, it stops it: the editors then require an explicit Save and warn about unsaved changes." }, intervalSeconds: { type: "integer", minimum: 1, maximum: 600, description: "How long the editors wait after you stop typing before saving. SECONDS, and the unit is the same everywhere - wire, column, and store - so nothing converts at a boundary. Default `1`, which is what the shipping editors already did (an 800 ms debounce) expressed on this scale, so an upgraded codex saves exactly as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, which is not a cadence anyone means - a GM who wants none says `enabled: false`. The 600 ceiling is ten minutes, past which the setting stops meaning \"save while I work\"." } } },
       CodexSettings: { type: "object", additionalProperties: false, description: "Every codex-WIDE setting as a READER sees it, nested by area, including the read-only usage figures. The nesting by area is what gives a later codex-wide setting a home without inventing fields for it today: `codex_meta` is the codex's singleton settings row, and this is that row as a caller sees it.", required: ["revisionHistory", "autosave"], properties: { revisionHistory: { $ref: "#/components/schemas/CodexRevisionHistorySettings" }, autosave: { $ref: "#/components/schemas/CodexAutosaveSettings" } } },
-      // The write shape is a SEPARATE component from the read shape (rather than one object used both ways, as
-      // this pair originally was) for exactly one reason: the usage figures must have no place in a body. A
-      // caller cannot see the revision table, so a body able to carry them would be a caller asserting them.
+      // Separate from the read shape so the server-computed usage figures have no place in a request body.
       CodexSettingsRequest: { type: "object", additionalProperties: false, description: "Every codex-wide setting a caller may SET. Identical to `CodexSettings` except that the server-computed usage figures are absent - not ignored, absent: sending `versionCount` or `versionBytes` is a 400, because they are facts about a table the caller cannot see. Both groups are REQUIRED: this replaces the settings wholesale, so an omitted group would silently reset a setting the caller never mentioned.", required: ["revisionHistory", "autosave"], properties: { revisionHistory: { $ref: "#/components/schemas/CodexRevisionHistoryInput" }, autosave: { $ref: "#/components/schemas/CodexAutosaveSettings" } , commandId: { type: "string", format: "uuid", description: "Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write." } } },
       CodexSettingsData: codexDataObject("settings", { $ref: "#/components/schemas/CodexSettings" }),
       CodexSettingsResponse: envelopeSchema("#/components/schemas/CodexSettingsData"),
       CodexRevisionsDeleteRequest: { type: "object", additionalProperties: false, description: "Which revisions to delete, by age. Required rather than defaulted: the destructive route must not have a meaning when the body is silent.", required: ["olderThanDays"], properties: { olderThanDays: { type: "integer", minimum: 0, maximum: 36_500, description: "Delete every revision authored more than this many days ago. **`0` deletes them all** - arithmetic, not a magic value, since nothing is younger than zero days old. A negative or fractional value is a 400 rather than a clamp, because this destroys data. The 36500 ceiling (100 years) is a guard, not a policy: a larger value pushes the cutoff date out of the representable range, which would turn a silly request into a 500." } } },
-      // A COUNT, unlike `CodexDeletedData`'s `deleted: true` - the two are separate shapes because "it is gone"
-      // and "seventy-one rows went" are different answers, and a route that reports a number must report the
-      // real one for the GM to trust the screen it lands on.
+      // A count rather than `CodexDeletedData`'s `deleted: true`: the real number of rows removed.
       CodexRevisionsDeletedData: codexDataObject("deleted", { type: "integer", minimum: 0, description: "How many revision rows were actually removed - the database's own count, not what was requested." }),
       CodexRevisionsDeletedResponse: envelopeSchema("#/components/schemas/CodexRevisionsDeletedData"),
       CodexExportData: { type: "object", additionalProperties: false, required: ["codex", "exportedAt", "bundleVersion"], properties: { codex: { type: "object", additionalProperties: true, description: "Opaque backup bundle; round-trips through `POST /codex/import`." }, exportedAt: { type: "string", format: "date-time" }, bundleVersion: { const: 1, description: "The bundle FORMAT version - a fact about the file, not about the world, which is why it sits beside `codex` rather than inside it. `POST /codex/import` refuses anything else." } } },
@@ -2009,18 +1805,15 @@ export const openApiDocument = {
       CodexExportResponse: envelopeSchema("#/components/schemas/CodexExportData"),
       CodexAssetUploadData: codexDataObject("asset", { $ref: "#/components/schemas/CodexAsset" }),
       CodexAssetUploadResponse: envelopeSchema("#/components/schemas/CodexAssetUploadData"),
-      // ---- Homebrew authoring (homebrew-http.ts). Three distinct shapes, deliberately not one:
-      // HomebrewRecord is the authored body alone, HomebrewRecordDocument is that body PLUS row state,
-      // and HomebrewRecordSummary is the flat list row. `state` and `visibleToPlayers` appear ONLY here
-      // and must NEVER be added to a CONTENT_PATHS component: the merged catalog contains only records
-      // that already passed the audience filter, and it carries `source` alone.
+      // ---- Homebrew authoring (homebrew-http.ts). HomebrewRecord is the authored body, HomebrewRecordDocument adds
+      // row state, HomebrewRecordSummary is the list row. `state` and `visibleToPlayers` must never be added to a
+      // CONTENT_PATHS component: the merged catalog holds only audience-filtered records and carries `source` alone.
       HomebrewValidationIssue: { type: "object", additionalProperties: false, required: ["path", "message", "recordId"], properties: { path: { type: "array", items: { type: ["string", "integer"] }, description: "Field path into the authored record, e.g. [\"levelTable\", 3, \"spellSlots\"] - the offending field, machine-addressable, so a form editor can point at it instead of parsing prose" }, message: { type: "string", minLength: 1, maxLength: 500 }, recordId: { type: ["string", "null"], maxLength: 60, description: "Which record in a pack the issue belongs to; null for a single-record publish. Present-but-null, so a consumer never branches on key presence" } } },
       HomebrewValidity: { type: "object", additionalProperties: false, required: ["valid", "issues"], description: "Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say \"3 drafts can't publish yet\" without a round-trip per record.", properties: { valid: { type: "boolean" }, issues: { type: "array", items: { $ref: "#/components/schemas/HomebrewValidationIssue" } } } },
       HomebrewRecord: homebrewUnion("The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. Every branch mirrors the Zod schema the server actually parses the body with, so `required` here is exactly that schema's non-optional keys: a field with a server-side default is OPTIONAL on the wire, and an optional field is ABSENT rather than null (an authoring body is an input, and a Zod `.optional()` rejects an explicit null).", HOMEBREW_RECORD_COMPONENTS),
 
-      // ---- The nine authored bodies. Six of them spread `homebrewRecordBase` because their Zod
-      // schemas spread `contentRecordBase`; spell, equipment and monster do not, because theirs do
-      // not - see the fragment's own comment for why copying the header there would be a lie.
+      // ---- The nine authored bodies. Six spread `homebrewRecordBase` because their Zod schemas spread
+      // `contentRecordBase`; spell, equipment and monster do not.
       HomebrewClassRecord: {
         type: "object", additionalProperties: false,
         description: "A character class. The heaviest of the nine: a full 20-row printed table plus every feature it can grant. Duplicating an SRD class (`POST /content/{id}/duplicate` with `wizard`) is what makes that tractable to author.",
@@ -2233,9 +2026,8 @@ export const openApiDocument = {
       HomebrewEquipmentWeapon: { type: "object", additionalProperties: false, required: ["category", "damageDice", "damageType", "rangeFeet", "longRangeFeet"], properties: { category: { type: "string", enum: ["simple", "martial"] }, damageDice: { type: "string", maxLength: 20 }, damageType: { type: "string", maxLength: 40 }, rangeFeet: { type: ["integer", "null"], minimum: 1 }, longRangeFeet: { type: ["integer", "null"], minimum: 1, description: "Attacks past `rangeFeet` up to this roll at disadvantage" }, mastery: { type: "string", enum: ["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"], description: "The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery." }, properties: { type: "array", maxItems: 12, items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 }, description: "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` keeps a ranged weapon on a melee reach, and `reach` makes it 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none." } } },
       HomebrewEquipmentArmor: { type: "object", additionalProperties: false, required: ["acBase", "addDexModifier", "dexModifierCap", "stealthDisadvantage", "strengthRequired"], description: "Body armor carries its full base AC (11-18); a shield carries its +2 bonus.", properties: { acBase: { type: "integer", minimum: 2, maximum: 25 }, addDexModifier: { type: "boolean" }, dexModifierCap: { type: ["integer", "null"] }, stealthDisadvantage: { type: "boolean" }, strengthRequired: { type: ["integer", "null"] } } },
 
-      // ---- The feature rider vocabulary. THE authoring inversion: `ContentFeature` publishes prose
-      // and keeps riders server-side so the wizard never becomes a second rules engine; a homebrew
-      // author has to write them, so they are public schema here. The two components stay separate.
+      // ---- The feature rider vocabulary. `ContentFeature` keeps riders server-side; authors must write them, so they
+      // are public schema here and the two components stay separate.
       HomebrewFeature: {
         type: "object", additionalProperties: false,
         description: "THE shared feature record: a class feature, a subclass feature, a species trait, a background feature, and a feat's mechanics are all this one shape. `description` is always the display source of truth, and every rider is optional - a prose-only feature is perfectly valid and is how most text starts life. This is the AUTHORING counterpart of `ContentFeature`, which publishes the same feature with its riders stripped.",
@@ -2367,15 +2159,13 @@ export const openApiDocument = {
       HomebrewEffectSaveDisadvantage: homebrewVariant("save-disadvantage", "The bearer's saving throws have disadvantage; omit `ability` for all saves.", [], { ability: homebrewAbility }),
       HomebrewEffectSpeed: homebrewVariant("speed", "The bearer's Speed while the effect lasts, in feet - signed, so Longstrider is +10 and the `slow` weapon mastery is -10. THE RUNTIME half of speed, and distinct from HomebrewFeatureModifier's `speed`: that one is BAKED into the sheet's own speedFeet at build time, which an effect that ends could never give back. This one is summed off the bearer's live effects on every read of the movement budget, so the feet return the moment the effect does. Same bounds as the build-time rider (-30..60) because the same GM authors both. NOTE the one carrier it does not reach: an ITEM's effect is read as a standing rider rather than as a live effect, and a rider's speed has no consumer, so this modifier moves no feet when an equipment record carries it.", ["amount"], { amount: { type: "integer", minimum: -30, maximum: 60 } }),
 
-      // ---- the three riders BOTH vocabularies carry ------------------------------------------
-      // One component each, named by HomebrewFeatureModifier and HomebrewEffectModifier alike. The
-      // Zod side declares them exactly once and spreads them into both unions for the same reason:
-      // two copies is how an item's +1 and an effect's +1 would quietly come to mean two things.
+      // ---- Riders both vocabularies carry, one component each (as in Zod), so an item's +1 and an effect's +1 mean
+      // the same thing.
       HomebrewRiderAttackBonus: homebrewRiderVariant("attack-bonus", "A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit was the action's printed bonus plus exhaustion and nothing else could reach it.", ["amount"], { amount: { type: "integer", minimum: -10, maximum: 10 } }),
       HomebrewRiderExtraDamage: homebrewRiderVariant("extra-damage", "Extra TYPED damage. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer with no type, and an attack's `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry one either. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice (\"an extra 1d6 fire\"), and `abilityModifier` adds the BEARER's modifier in that ability as a flat number resolved at the roll (\"add your Charisma modifier to the damage\") - a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: \"cha\"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish rather than stored to silently add nothing. `doubleOnCritical` defaults false because 5e does not double dice added after the attack, and an ability modifier is never doubled at all.", ["damageType"], { formula: homebrewDiceFormula, abilityModifier: homebrewAbility, damageType: homebrewDamageType, doubleOnCritical: { type: "boolean", default: false } }),
       HomebrewRiderRollMode: homebrewRiderVariant("roll-mode", "Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather than two per roll kind. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: \"disadvantage\"` and needs no separate machinery.", ["roll", "mode"], { roll: { type: "string", enum: ["attack", "incoming-attack", "save", "check", "initiative", "death-save", "concentration"] }, mode: { type: "string", enum: ["advantage", "disadvantage"] } }),
 
-      // ---- WHEN a rider applies: thirty-one named triggers, in four kinds ---------------------
+      // ---- When a rider applies: named triggers in four kinds ----
       HomebrewRiderTrigger: homebrewFoldedUnion("WHEN a rider applies. Thirty-one named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty-one branches below cover all thirty-one names.", {
         attuned: "HomebrewTriggerAttuned", "while-armored": "HomebrewTriggerWhileArmored", "while-unarmored": "HomebrewTriggerWhileUnarmored", "while-shield": "HomebrewTriggerWhileShield", "while-character-is": "HomebrewTriggerWhileCharacterIs", "while-proficient-with": "HomebrewTriggerWhileProficientWith",
         "while-effect-tag": "HomebrewTriggerWhileEffectTag", "while-hp-at-or-below": "HomebrewTriggerWhileHpAtOrBelow", "while-condition": "HomebrewTriggerWhileCondition",

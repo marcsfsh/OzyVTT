@@ -1,10 +1,7 @@
 .nh-tooltip { position: relative; display: inline-flex; }
 .nh-tooltip-trigger { display: inline-flex; }
-/* RULING 52 — panel material, brighter rim. One rule for menus, popovers and tooltips: they read
-   as panels that arrived, and the rim carries "on top" instead of a drop shadow.
-   The bubble is `pointer-events: none`, so a clip-path on it could not clip anything that
-   matters — the backing layer is used anyway, because the cut and the material are one recipe and
-   a later edit that makes a tooltip interactive should not have to rediscover ruling 14. */
+/* Panel material with the brighter rim, as for menus and popovers. On a backing layer for consistency, even though
+   the bubble is `pointer-events: none`. */
 .nh-tooltip-bubble {
   position: absolute;
   isolation: isolate;

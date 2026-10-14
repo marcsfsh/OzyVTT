@@ -1,8 +1,7 @@
 import { SegmentedControl } from "../primitives/SegmentedControl";
 import { THEMES, type Theme } from "./theme";
 import { useTheme } from "./useTheme";
-/* No stylesheet of its own on purpose: it looks exactly like every other
-   SegmentedControl. The old ThemeToggle.css was a copy of SegmentedControl.css. */
+/* No stylesheet of its own: it is a SegmentedControl. */
 
 const THEME_META: Record<Theme, { label: string; glyph: string }> = {
   dark: { label: "Dark", glyph: "◑" },
@@ -16,11 +15,7 @@ export interface ThemeToggleProps {
   className?: string;
 }
 
-/** Dark / dusk / light switch — the app's one look-and-feel control (theme and
-    OS accessibility settings are the only knobs, per the design language).
-    It IS a `SegmentedControl` ("pick exactly one", icon + label, aria-pressed):
-    re-implementing that container and pressed state is how this control ended up
-    26px tall while every other pressable option in the app met the 44px floor. */
+/** Dark / dusk / light switch, built as a `SegmentedControl` so it shares its look and 44px floor. */
 export function ThemeToggle({ compact = false, className }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
   return (

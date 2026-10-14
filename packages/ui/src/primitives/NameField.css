@@ -11,9 +11,7 @@
   letter-spacing: var(--tracking-eyebrow);
 }
 .nh-namefield-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-/* RULING 24 — a suggestion is a CHIP, so it takes the chip's shape: `Chip.css` has read
-   `border-radius: 0` since the de-pilling, and a second chip class next to it wearing a pill is the
-   drift the ruling exists to close. */
+/* A suggestion is a chip, so it takes the chip's shape. */
 .nh-namefield-suggestion {
   display: inline-flex;
   align-items: center;
@@ -27,7 +25,6 @@
   cursor: pointer;
 }
 .nh-namefield-suggestion:hover:not(:disabled) { background: var(--surface-3); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-/* The one already in the field — a quiet cyan edge, matching selection everywhere
-   else. No glow: the field itself is the answer, not this chip. */
+/* The one already in the field: a quiet cyan selection edge, no glow. */
 .nh-namefield-suggestion.is-taken { border-color: var(--cyan); color: var(--text); }
 .nh-namefield-suggestion:disabled { color: var(--text-muted); cursor: not-allowed; }

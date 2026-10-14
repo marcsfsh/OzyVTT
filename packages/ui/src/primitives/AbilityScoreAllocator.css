@@ -22,10 +22,8 @@
 .nh-abil-budget { display: grid; gap: var(--space-2); }
 
 /* ---- The six rows ----
-   Capped, because a table of five short tracks does not get better by being wider: stretched to the
-   full page the eye travelled the best part of a thousand pixels from "STR" to its own total, six
-   times over, across an empty middle. 36rem clears the ~520px the five tracks actually need and
-   sits above 375px's 343px, so the phone's stacked card layout below is untouched. */
+   Width-capped so a row's label and total stay close; 36rem fits the five tracks and leaves the phone layout
+   alone. */
 .nh-abil-table { display: grid; gap: var(--space-2); max-width: 36rem; }
 .nh-abil-head,
 .nh-abil-row {
@@ -65,8 +63,7 @@
 :root[data-theme="light"] .nh-abil-num--mod { color: var(--cyan); }
 .nh-abil-note { grid-column: 1 / -1; color: var(--text-muted); font-size: var(--fs-xs); }
 
-/* ---- Phone: each ability becomes a small card with its own labels.
-   650 is the documented "dense table folds" step in the ladder (760/650/560/850/980). ---- */
+/* ---- Phone: each ability becomes a small card with its own labels. 650px is the dense-table fold step. ---- */
 @media (max-width: 650px) {
   .nh-abil-head { display: none; }
   .nh-abil-row {

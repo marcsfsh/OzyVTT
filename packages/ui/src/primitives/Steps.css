@@ -1,5 +1,4 @@
-/* Two indicators, one component (see Steps.tsx): the compact phone form and the
-   full horizontal rail. The media query picks exactly one. */
+/* Two indicators (see Steps.tsx): the compact phone form and the full rail; the media query shows one. */
 
 .nh-steps-compact { display: grid; gap: var(--space-2); }
 .nh-steps-compact-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
@@ -35,7 +34,7 @@
   margin: 0;
   padding: 0 0 var(--space-1);
   list-style: none;
-  /* Never wrap — a seven-step flow scrolls sideways instead of blobbing into rows. */
+  /* Never wrap; a long flow scrolls sideways. */
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
@@ -69,16 +68,9 @@
 .nh-step--current .nh-step-marker { border-color: transparent; background: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
 .nh-step--current .nh-step-label { color: var(--text); }
 
-/* Visited, and NOT finished. CAUTION violet, never rose: §2 reserves rose-red for damage and
-   destruction, and nothing has gone wrong here — a step is simply owed an answer. It is the same
-   family (and the same glyph) the wizard's blocked reason already speaks in.
-
-   Three signals, so it never rests on hue alone and survives all three themes:
-     ring STYLE   dashed, against done/upcoming/current's solid — readable in greyscale;
-     ring HUE     --caution, against done's cyan and upcoming's --line-strong;
-     GLYPH        the caution mark, against done's check and upcoming's number.
-   The LABEL takes --text-dim, the same weight as done: both are steps the player has been to, and
-   only --text-muted (upcoming) means "not yet". */
+/* Visited but not finished: caution, never rose (nothing went wrong). Three signals so it never rests on hue: a
+   dashed ring, the --caution hue and the caution glyph. The label uses --text-dim like done steps (both were
+   visited); only upcoming uses --text-muted. */
 .nh-step--incomplete .nh-step-marker {
   border-style: dashed;
   border-color: var(--caution);

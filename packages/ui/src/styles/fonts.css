@@ -1,6 +1,5 @@
-/* Self-hosted retro-arcade font set (LAN-safe: no runtime CDN — @fontsource
-   bundles WOFF2 locally and Vite fingerprints + serves them). Family names here
-   match the --font-* tokens in design-tokens.css. */
+/* Self-hosted fonts (no runtime CDN on a LAN): @fontsource bundles WOFF2 and Vite serves them. Family names match
+   the --font-* tokens in design-tokens.css. */
 
 /* Wordmark — Bungee (chunky arcade signage) */
 @import "@fontsource/bungee/400.css";

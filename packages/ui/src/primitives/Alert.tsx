@@ -13,9 +13,7 @@ export interface AlertProps {
   children?: ReactNode;
 }
 
-/* System SVG glyphs, never text/emoji: a primitive's tone mark must take a token
-   color and render the same on every platform. `IconCheck` is the system's one
-   confirm tick — success reuses it rather than introducing a second tick shape. */
+/* System SVG glyphs, never text or emoji. Success reuses `IconCheck`, the system's one confirm tick. */
 const TONE_ICON: Record<AlertTone, ComponentType<{ className?: string }>> = {
   info: IconInfo,
   success: IconCheck,

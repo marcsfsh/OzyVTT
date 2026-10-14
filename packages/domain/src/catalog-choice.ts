@@ -4,47 +4,21 @@ import type {
 } from "./index.js";
 
 /**
- * THE resolver for `fromCatalog` choice slugs (task-packet phase-2 must-fix; QA blocker B1).
+ * Resolver for `fromCatalog` choice slugs, shared by the wizard (to render a picker) and the server (to
+ * validate `character.create`), so both agree on what was offerable.
  *
- * Content features ask for picks from OPEN catalog lists ("choose a skill", "choose a Wizard spell")
- * by naming a slug instead of enumerating options. This module is the single documented mapping from
- * those slugs to concrete option lists, shared by BOTH consumers: the wizard UI resolves a slug to
- * render a picker, and the server resolves the SAME slug through the SAME function when it validates
- * a `character.create` choice row - so the two can never disagree about what was offerable
- * (CLAUDE.md rule 2: the client must not become a second rules engine).
+ * Slug families over open ids:
+ *   - `skills`, `weapons`, `tools`, `languages` -> the whole catalog list.
+ *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages").
+ *   - `<listId>-spells`      -> spells whose `classes` includes the class's `spellcasting.spellListId`.
+ *   - `<classId>-subclasses` -> that class's subclasses.
+ *   - `<category>-feats`     -> feats in that category ("origin-feats", "fighting-style-feats").
+ *   - `<speciesId>-lineages` -> that species' lineages.
+ *   - `<a>-or-<b>[-or-<c>]`  -> union in order, first name winning a duplicate id (Skilled's
+ *                               `skills-or-tools`). A part that resolves to nothing is skipped.
  *
- * The slug grammar is a closed set of FAMILIES over open ids (no closed content enums, principle 3):
- *
- *   - `skills`               -> every skill in the skills catalog.
- *   - `weapons`              -> every weapon in the equipment catalog (Weapon Mastery-style picks).
- *   - `tools`                -> every tool in the equipment catalog (Skilled's "skills or tools" half).
- *   - `languages`            -> every language in the languages catalog.
- *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages",
- *                               "rare-languages"). The base "Common plus two languages" budget draws
- *                               from `standard`; `druidic` and `thieves-cant` are `rare` and arrive
- *                               as grants, never as a level-1 pick.
- *   - `<listId>-spells`      -> spells whose `classes` includes `<listId>` ("wizard-spells" -> the
- *                               Wizard list). `<listId>` is the class's `spellcasting.spellListId`
- *                               (an open slug, so a homebrew list works unchanged).
- *   - `<classId>-subclasses` -> subclasses whose `classId` is `<classId>`.
- *   - `<category>-feats`     -> feats whose `category` is `<category>` ("origin-feats",
- *                               "general-feats", "fighting-style-feats", "epic-boon-feats", ...).
- *   - `<speciesId>-lineages` -> the named species' lineages ("elf-lineages").
- *   - `<a>-or-<b>[-or-<c>]`  -> the UNION of the named families, in order, first name winning a
- *                               duplicate id. The one COMBINATOR in the grammar, and it exists
- *                               because two SRD records say exactly this: Skilled's "any combination
- *                               of three skills or tools" (`skills-or-tools`) and Magical
- *                               Discoveries' "the Cleric, Druid, or Wizard spell list"
- *                               (`cleric-spells-or-druid-spells-or-wizard-spells`). A part that is
- *                               itself a content gap contributes NOTHING rather than taking the whole
- *                               union down - the same call `from` + `fromCatalog` already makes - but
- *                               a union that resolves to nothing overall still throws.
- *
-
- * An unresolvable slug - unknown family, unknown id, or a family that resolves to ZERO options (a
- * content gap the player would otherwise hit as a silently empty picker) - throws
- * `CatalogChoiceError`. Never return a silent empty list: a wizard step with no data path must say
- * so loudly, and a server validation against nothing must reject, not accept.
+ * Any slug that is unknown or resolves to zero options throws `CatalogChoiceError`: an empty picker
+ * must fail loudly, and server validation against nothing must reject.
  */
 
 /** One offerable option. `level` is populated for spells so callers can apply `maxSpellLevel`. */
@@ -75,14 +49,9 @@ function nonEmpty(slug: string, options: CatalogChoiceOption[], emptyMessage: st
   return options;
 }
 
-/**
- * Resolve a `fromCatalog` slug to its concrete option list. Throws `CatalogChoiceError` for anything
- * unresolvable - see the module doc for the slug grammar. Pure: same inputs, same options, no I/O.
- */
+/** Resolve a `fromCatalog` slug to its option list; throws `CatalogChoiceError` if unresolvable. Pure. */
 export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalogs): CatalogChoiceOption[] {
-  // THE UNION COMBINATOR, checked first so a composite never falls through to a suffix family. Parts
-  // are resolved left to right and de-duplicated by id, so an option in two lists keeps the name the
-  // FIRST list gave it. Split on the whole "-or-" token, which no family id contains.
+  // Union first, so a composite never falls through to a suffix family. Split on "-or-", which no family id contains.
   if (slug.includes("-or-")) {
     const parts = slug.split("-or-");
     if (parts.every((part) => part.length > 0)) {
@@ -107,9 +76,7 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       "The equipment catalog has no weapons."
     );
   }
-  // TOOLS - the same read `weapons` makes, one column over. `equipment` already carries all 35 SRD
-  // tools (`category: "tool"`), so Skilled's "any combination of three skills or tools" needed a
-  // family, never a new bundle: the ids the wizard offers are the ids `grants.tools` already names.
+  // Tools are equipment rows with `category: "tool"`.
   if (slug === "tools") {
     return nonEmpty(
       slug,
@@ -120,11 +87,8 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
   if (slug === "languages") {
     return nonEmpty(slug, catalogs.languages.map((entry) => ({ id: entry.id, name: entry.name })), "The languages catalog is empty.");
   }
-  // ONE SRD TABLE of languages. The base budget every character is owed reads "Common plus two
-  // languages ... from the Standard Languages table", so the narrowing is part of the promise and not
-  // a nicety: offering Druidic or Thieves' Cant at level 1 would hand out a secret language the SRD
-  // gives only through a class feature. Checked BEFORE `-spells` etc. because `-languages` is its own
-  // suffix; the plain `languages` slug above is matched first so it never falls in here with an empty table.
+  // Narrowing to one table matters: the base "two languages from the Standard Languages table" must not offer
+  // Druidic or Thieves' Cant, which the SRD grants only through class features.
   if (slug.endsWith("-languages")) {
     const table = slug.slice(0, -"-languages".length);
     return nonEmpty(
@@ -175,21 +139,10 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
 export type PickSourceReference = Readonly<{ offer: string; where?: string | null }>;
 
 /**
- * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - the resolver for `fromPicks`.
- *
- * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast), "...that has a
- * range of 10+ feet" (Eldritch Spear), "...that requires an attack roll" (Repelling Blast). The list
- * is the ledger, not a catalog, so no `fromCatalog` slug can express it - and the predicate is a
- * CLOSED slug list rather than an expression (ADR-0008), each one a field the spell catalog already
- * carries.
- *
- * `answered` is what that budget already holds - the ledger's rows on the server, the draft's picks
- * in the wizard - and the same function narrows both, so the two cannot disagree about what was
- * offerable. An id the spell catalog does not know is dropped rather than guessed at: the predicates
- * are all spell facts, so a non-spell answer can never satisfy one.
- *
- * Throws `CatalogChoiceError` when nothing survives, which both consumers already treat as DEFER
- * rather than reject - a Warlock who has not chosen their cantrips yet is not shown an empty picker.
+ * Resolver for `fromPicks`: the options are the character's own earlier answers ("one of your known Warlock
+ * cantrips that deals damage"), narrowed by a closed predicate slug over spell catalog fields (ADR-0008).
+ * `answered` is the ledger on the server or the draft in the wizard. Unknown spell ids are dropped. Throws
+ * `CatalogChoiceError` when nothing survives, which both consumers treat as "defer", not "reject".
  */
 export function resolvePickChoice(source: PickSourceReference, answered: readonly string[], catalogs: CatalogChoiceCatalogs): CatalogChoiceOption[] {
   const spellsById = new Map(catalogs.spells.map((spell) => [spell.id, spell]));

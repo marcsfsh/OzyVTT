@@ -4,7 +4,7 @@ import {
   SRD_CLASS_PROGRESSION, type ClassProgressionSource
 } from "../src/index.js";
 
-/** A fully homebrew class record - the adapter must carry ITS values, never SRD defaults (known-bugs M2). */
+/** A fully homebrew class record: the adapter must carry its values, never SRD defaults. */
 const bloodKnight: ClassProgressionSource = {
   id: "blood-knight",
   hitDie: "d12",
@@ -53,7 +53,7 @@ describe("progressionFromClass (bundle -> rules adapter)", () => {
   it("keeps the SRD rows as the fallback for classes the catalog has not authored", () => {
     const table = progressionTableFromClasses([bloodKnight]);
     expect(table.rogue).toBe(SRD_CLASS_PROGRESSION.rogue);
-    // An authored class SHADOWING an SRD id wins over the static row.
+    // An authored class shadowing an SRD id wins over the static row.
     const homebrewFighter = progressionTableFromClasses([{ ...bloodKnight, id: "fighter" }]);
     expect(homebrewFighter.fighter.hitDie).toBe("d12");
   });

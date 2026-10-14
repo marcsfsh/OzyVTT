@@ -15,7 +15,7 @@ export interface DiceInputRowProps {
   notation?: ReactNode;
   mode: DiceEntryMode;
   onModeChange: (mode: DiceEntryMode) => void;
-  /** "Roll it for me". The caller owns the roll — this control never rolls dice. */
+  /** "Roll it for me". The caller owns the roll; this control never rolls dice. */
   onRoll: () => void;
   /** "I rolled it myself": a validated integer within [min, max]. */
   onManual: (total: number) => void;
@@ -30,22 +30,16 @@ export interface DiceInputRowProps {
   min?: number;
   max?: number;
   busy?: boolean;
-  /** Nothing left to roll — every result this row collects is already in. It locks the roll and
-      Apply actions while leaving `onReroll` live, so a finished set reads as finished instead of
-      offering a button that silently does nothing. Distinct from `busy`, which is "in flight". */
+  /** Every result this row collects is in: locks roll and Apply while leaving `onReroll` live. Distinct from
+      `busy` (in flight). */
   complete?: boolean;
   hint?: ReactNode;
   className?: string;
 }
 
-/** The manual-vs-auto roll control for everything OUTSIDE combat: ability
-    generation, starting HP, starting gold.
-
-    It deliberately speaks the same two-mode vocabulary as the encounter's
-    RollControls — "roll it for me" or type what your physical dice showed — so a
-    player who has rolled once anywhere knows how to roll everywhere. It shares no
-    state with combat: no roll mode, no prompt, no encounter. The caller owns the
-    roll (the server owns any roll that matters) and passes the result back in. */
+/** The manual-vs-auto roll control outside combat (ability generation, starting HP, starting gold). Uses the
+    same "roll it for me" / "type what your dice showed" vocabulary as the encounter's RollControls but shares
+    no state with combat. The caller owns the roll and passes the result back. */
 export function DiceInputRow({
   label, notation, mode, onModeChange, onRoll, onManual, onReroll, result,
   rollLabel = "Roll it for me", manualLabel = "Rolled total", manualPlaceholder = "Type the total",

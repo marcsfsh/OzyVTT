@@ -6,17 +6,9 @@ import { SegmentedControl } from "./SegmentedControl";
 import "./MarkdownEditor.css";
 
 /**
- * D13 — **one editor everywhere.**
- *
- * The Codex's writing experience (toolbar, `[[link]]` autocomplete, image drop/paste, an Edit↔View
- * switch) lived inside `PageEditor` and nowhere else, so session prep, quest bodies and journal entries
- * were bare textareas: typing `[[` in one of them silently did nothing. Extracting it here — as a
- * primitive, per the repo rule that a new control goes to `@vtt/ui` + `/styleguide`, never inline in a
- * feature — is what lets every writing surface behave the same way.
- *
- * Deliberately **markdown-agnostic**: it renders no markdown itself. `renderPreview` is supplied by the
- * caller, which is what keeps the Codex's viewer-safe redlink renderer (and its GM-layer violet chrome)
- * out of the design system.
+ * The one writing editor (toolbar, `[[link]]` autocomplete, image drop/paste, Edit↔View switch) for every
+ * writing surface. Renders no markdown itself: the caller supplies `renderPreview`, which keeps the Codex's
+ * viewer-safe renderer out of the design system.
  */
 
 export interface MarkdownSuggestion { id: string; label: string }
@@ -28,11 +20,11 @@ export interface MarkdownEditorProps {
   placeholder?: string;
   /** Turns markdown into nodes. Omitted hides the Edit/View switch — an editor with no reader. */
   renderPreview?: (markdown: string) => ReactNode;
-  /** `[[` autocomplete. Page targets only in v1; other target syntaxes still parse and persist. */
+  /** `[[` autocomplete for page targets; other target syntaxes still parse and persist. */
   suggest?: (query: string) => readonly MarkdownSuggestion[];
   /** Enables drop/paste of an image; returns the markdown to insert at the caret. */
   onUploadImage?: (file: File) => Promise<string>;
-  /** Extra chrome inside the editor frame — the Codex hangs its violet "GM only" tag here. */
+  /** Extra chrome inside the editor frame (the Codex puts its violet "GM only" tag here). */
   overlay?: ReactNode;
   rows?: number;
   className?: string;
@@ -62,12 +54,8 @@ export function applyMarkdownFormat(value: string, start: number, end: number, k
   }
 }
 
-/**
- * The toolbar's marks. Letterforms (B / I / S / H) are set in the body face and are genuinely letters,
- * so they stay text; everything that would otherwise be a *symbol* character is an SVG path, per the
- * design language's §0 rule — a primitive must not render a glyph as text, because Manrope has no glyph
- * for most of them and the platform substitutes a face at the wrong size (and, on phones, emoji).
- */
+/** Toolbar marks. Letterforms (B / I / S / H) stay text; symbols are SVG paths because Manrope lacks them and
+ * the platform would substitute a face at the wrong size or an emoji. */
 function Mark({ children }: Readonly<{ children: ReactNode }>) {
   return <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false">{children}</svg>;
 }

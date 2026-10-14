@@ -15,16 +15,14 @@
   font-size: 1rem;
   pointer-events: none;
 }
-/* Hide the WebKit search decorations — the magnifier is ours, on the left. */
+/* Hide WebKit's search decorations; the magnifier is ours, on the left. */
 .nh-choicegrid-search input[type="search"]::-webkit-search-decoration,
 .nh-choicegrid-search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 .nh-choicegrid-count { margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
 
-/* "You have already chosen 6" is a fact about the GRID, so it is stated once, here, next to the
-   count — not stamped onto every locked card (that put 409 copies of one sentence on the wizard's
-   fourth step at level 20). Same CAUTION violet and same --fs-sm as the per-option reason it
-   replaces: locked reads the same wherever it is said. */
+/* The capacity reason, stated once next to the count rather than on every locked card. Same caution colour and
+   size as a per-option reason. */
 .nh-choicegrid-locked {
   display: flex;
   align-items: center;
@@ -42,51 +40,25 @@
   gap: var(--space-3);
 }
 
-/* PROXIMITY, once the cards come in PAIRS. `onInspect` gives every card a reference control beside
-   it (`.nh-choice-wrap`, ChoiceCard.css), and the client could not tell which icon belonged to which
-   spell: the gap WITHIN a pair was 8px and the gap BETWEEN pairs was 10px, so in a four-column grid
-   an icon standing between two cards was ambiguous by construction and reading order was the only
-   tie-break. The frame fixed ownership; this fixes the rhythm — within a pair the two halves now sit
-   1px apart inside one border, between pairs the gap steps up to --space-4.
-
-   Scoped with `:has()` rather than raised for every grid, because the grids WITHOUT an inspect
-   control have no pairs to separate: species, classes, backgrounds and feats keep the 10px they
-   shipped with. (Their CARDS did get tighter — `.nh-choice`'s own rhythm changed for everyone, and
-   `known-bugs.md`'s step-height table moved with it.) */
+/* When cards come in pairs (`onInspect`), widen the gap between pairs so each icon clearly belongs to its card.
+   Scoped with `:has()` so grids without pairs keep their gap. */
 .nh-choicegrid-items:has(.nh-choice-wrap) { gap: var(--space-4); }
 
-/* A BOUNDED REGION, and the reason it replaced a fold.
-   `ChoiceGrid bounded` (ChoiceGrid.tsx) caps the card list and scrolls it in place. The thing it
-   replaced unmounted the whole grid once the offer was full, which bought the same page height by
-   deleting the one thing a player needs to see — the options they did NOT take. The cap costs
-   nothing but a scroll: every option stays mounted, greys at capacity, and stays one tap away.
-
-   THE CAP RIDES THE GRID, NOT A WRAPPER, and that is the narrow exception the scene-gallery lesson
-   allows (scene-gallery.css:31-38, restated at map-picker.css:12-17): that lesson is about a grid
-   given a DEFINITE block size, which stops it sizing its auto rows from its cards. A `max-height`
-   is not one. Measured on this grid at 320/375/561/1280 — card boxes byte-identical capped and
-   uncapped.
-
-   21rem matches `.map-picker-grid`'s cap rather than inventing a second number, and it is about
-   four cards on a phone: enough that the list reads as a list, short enough that a dozen answered
-   offers still fit a step. `overscroll-behavior: contain` stops a flick inside the region from
-   chaining into the wizard body behind it. `--space-1` of padding is the focus ring's room: the
-   ring is a box-shadow, so it never scrolls, but `overflow` still CLIPS it at the region's edge. */
+/* Bounded region (`ChoiceGrid bounded`): caps the list and scrolls it in place, keeping every option mounted.
+   The cap sits on the grid itself, which is safe because `max-height` isn't a definite block size (auto rows
+   still size from their cards). 21rem matches `.map-picker-grid`. `overscroll-behavior: contain` stops scroll
+   chaining; the padding leaves room for the focus ring, which `overflow` would clip. */
 .nh-choicegrid-items--bounded {
   max-height: 21rem;
   padding: var(--space-1);
   overscroll-behavior: contain;
-  /* A card walked to with the arrow keys lands clear of the edge rather than flush against it. */
+  /* Arrow-key focus lands clear of the edge. */
   scroll-padding: var(--space-3);
 }
 
-/* No detail pane here — WizardShell owns the one master-detail layout (see
-   ChoiceGrid.tsx). This file only lays out search, facets, and the card grid. */
+/* No detail pane; WizardShell owns master-detail. */
 
-/* auto-FIT, not auto-fill: with `fill` the grid reserves the full five 15rem tracks even when the
-   offer has two options, so the equipment step showed two 240px cards adrift in 1248px of row while
-   the kit inside them was clipped. `fit` collapses the empty tracks and the two cards take the row.
-   A grid of fifteen cards is laid out identically either way. */
+/* auto-fit, not auto-fill, so an offer with two options doesn't reserve empty tracks and leave the cards adrift. */
 @media (min-width: 561px) {
   .nh-choicegrid-items { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
 }

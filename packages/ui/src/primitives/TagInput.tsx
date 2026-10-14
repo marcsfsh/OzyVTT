@@ -9,35 +9,18 @@ import "./TagInput.css";
 export interface TagInputProps {
   values: readonly string[];
   onChange: (next: readonly string[]) => void;
-  /** The vocabulary this field draws on. Free entry is ALWAYS allowed — see the note below.
-      Invisible (a `<datalist>`) unless `pick` is set. */
+  /** The vocabulary this field draws on; free entry is always allowed. A `<datalist>` unless `pick` is set. */
   suggestions?: readonly string[];
   /**
-   * **Show the list.** The entry box becomes a `Combobox` instead of an `<input list>`.
-   *
-   * The bug it repairs is the one a `<datalist>` cannot: it has **no affordance at all** — no arrow,
-   * no border cue, nothing that says a list exists — and iOS Safari renders it as *nothing*, so on a
-   * phone a complete shipped vocabulary is simply invisible. The client reported both halves of this
-   * (item rarity, damage types) as "the field is free-form"; it never was, it was unreadable.
-   *
-   * Opt-in rather than automatic, because `suggestions` here means two different things at two kinds
-   * of call site. A **canonical vocabulary** (the thirteen SRD damage types) is a list a GM should be
-   * choosing from and only rarely departing from — that is a chooser. A **corpus of what already
-   * exists** (every tag any Codex page carries) is a type-ahead over an open-ended set where the
-   * normal act is to type a new one — that is a hint, and turning it into a menu would put a wall of
-   * previously-used tags in front of the box. Same prop, two intents; the call site knows which.
-   *
-   * Same contract either way: still open, still normalised through `normalize`, still takes a word
-   * the list has never heard of.
-   *
-   * ONE behaviour is traded: Backspace-on-empty no longer removes the last tag, because the entry box
-   * is `Combobox`'s and its keyboard belongs to the listbox. Every chip keeps its own ✕, which is the
-   * removal gesture on a phone in either mode.
+   * Show the list: the entry box becomes a `Combobox` instead of an `<input list>`, whose datalist has no visible
+   * affordance and renders nothing on iOS Safari. Opt in for a canonical vocabulary (the SRD damage types); leave
+   * it off for a corpus of existing values (Codex tags), where typing new entries is the norm. Either way the
+   * field stays open and normalised. Trade-off: in this mode Backspace on empty doesn't remove the last tag, since the
+   * keyboard belongs to the listbox; each chip keeps its ✕.
    */
   pick?: boolean;
-  /** How a suggestion READS in the chooser — `"very-rare"` → "Very Rare". Display only: the value
-      picked, normalised and stored is the entry itself. Passed in rather than derived here so the
-      one deriving rule lives at the call site that owns the vocabulary, never copied into this file. */
+  /** How a suggestion reads in the chooser (`"very-rare"` → "Very Rare"). Display only; the stored value is the
+      entry itself. */
   optionLabel?: (value: string) => string;
   /** Default: slugify to /^[a-z0-9-]+$/. Return "" to reject the entry. */
   normalize?: (raw: string) => string;
@@ -49,21 +32,10 @@ export interface TagInputProps {
   className?: string;
 }
 
-/** An open list of slugs — armour proficiencies, languages, damage resistances, tags.
-
-    Composed from `Chip` + `Input` rather than invented, and open rather than a
-    multiselect on purpose: the content schemas keep these fields as free slugs so a
-    homebrew author can name a proficiency the SRD never had. `suggestions` is a
-    datalist, which hints without closing the set — a `Select` here would be a
-    closed-world control over an open-world field.
-
-    Enter or comma commits; Backspace on an empty input removes the last tag (the
-    established chip-entry idiom, and the only reason it is safe is that the tag is one
-    click from being re-added). Adds and removes are announced politely, because a chip
-    appearing above the field you are typing in is otherwise silent.
-
-    `pick` swaps the entry box for a visible chooser over the same suggestions — see the
-    prop. It changes what the GM can SEE, never what the field accepts. */
+/** An open list of slugs (armour proficiencies, languages, damage resistances, tags), built from `Chip` +
+    `Input`. Open rather than a multiselect because the schemas keep these as free slugs for homebrew.
+    Enter or comma commits; Backspace on an empty input removes the last tag. Adds and removes are announced
+    politely. `pick` shows a visible chooser over the same suggestions without changing what is accepted. */
 export function TagInput({
   values,
   onChange,
@@ -88,10 +60,8 @@ export function TagInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const full = max != null && values.length >= max;
-  /* Decided by the LIST's existence, never by what is left of it: basing it on the unchosen
-     remainder would swap the whole entry component out from under the cursor on the tap that
-     chooses the last option. A chooser with nothing left to offer is still a text box that takes
-     a word of the GM's own, which is what `Combobox allowFreeText` already is. */
+  /* Decided by whether a list exists, not by what is left of it, so the entry component never swaps out
+     under the cursor when the last option is chosen. */
   const picking = pick && suggestions !== undefined && suggestions.length > 0;
   const offered = picking ? (suggestions ?? []).filter((entry) => !values.includes(entry)) : [];
   const describedBy = cx(hintId, full && maxReachedReason ? reasonId : false);
@@ -136,20 +106,15 @@ export function TagInput({
         <Combobox
           id={fieldId}
           ariaLabel={ariaLabel ?? "Add"}
-          /* Already-chosen entries drop out of the menu rather than sitting there inert: `add`
-             refuses a duplicate anyway, so offering one is offering a tap that does nothing. */
+          /* Chosen entries drop out of the menu; `add` would refuse a duplicate anyway. */
           options={offered.map((entry) => ({ id: entry, label: optionLabel ? optionLabel(entry) : entry }))}
-          /* Always null. This control is not holding a value — the CHIPS above hold them — so a
-             choice is an `onChange` that lands in `values` and leaves the box empty for the next. */
+          /* Always null: the chips hold the values, and the box stays empty for the next entry. */
           value={null}
           onChange={(next) => { if (next !== null) add(next); }}
           placeholder={full ? undefined : placeholder}
           disabled={full}
           describedBy={describedBy}
-          /* The whole point is that the vocabulary is REACHABLE, so the default page of 8 would
-             reintroduce "ten of the thirteen damage types" at the renderer instead of at the
-             constant. `.nh-combobox-list` scrolls at 17rem, so a complete bounded list is safe;
-             a 300-entry catalog is not this control, it is `searchable` + `CatalogPicker`. */
+          /* Show the whole vocabulary (the list scrolls at 17rem); a large catalog belongs in `CatalogPicker` instead. */
           limit={Math.max(offered.length, 1)}
           allowFreeText
         />
@@ -168,8 +133,7 @@ export function TagInput({
           aria-describedby={describedBy}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
-          // Commit whatever is typed when focus leaves, so a half-entered tag is not
-          // silently thrown away by tabbing on.
+          // Commit typed text on blur so a half-entered tag isn't lost by tabbing away.
           onBlur={() => { if (text.trim() !== "") add(text); }}
         />
       )}
@@ -177,16 +141,14 @@ export function TagInput({
         <datalist id={listId}>{suggestions.map((entry) => <option key={entry} value={entry} />)}</datalist>
       )}
       <p className="nh-taginput-hint" id={hintId}>{picking ? "Pick from the list, or type your own." : "Press Enter to add."}</p>
-      {/* Annotate at capacity; never hide the field (readiness rule 1). The reason keeps
-          full strength in --caution-hi — the disabled input dims, the explanation does not. */}
+      {/* At capacity, annotate rather than hide; the reason stays full strength while the input dims. */}
       {full && maxReachedReason && <p className="nh-taginput-reason" id={reasonId}>{maxReachedReason}</p>}
       <span className="nh-sr-only" role="status">{announcement}</span>
     </div>
   );
 }
 
-/** Content ids are open slugs (`/^[a-z0-9-]+$/`), so "Heavy Armour" and "heavy armour"
-    must not become two different proficiencies. */
+/** Content ids are open slugs (`/^[a-z0-9-]+$/`), so "Heavy Armour" and "heavy armour" must be the same. */
 export function slugify(raw: string): string {
   return raw
     .trim()

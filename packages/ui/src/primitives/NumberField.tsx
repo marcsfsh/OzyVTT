@@ -8,7 +8,7 @@ export interface NumberFieldProps {
   onChange: (next: number | null) => void;
   min?: number;
   max?: number;
-  /** Costs and weights (1.5 lb, 0.02 gp). Off by default — most numbers here are counts. */
+  /** Costs and weights (1.5 lb, 0.02 gp). Off by default; most numbers here are counts. */
   allowDecimal?: boolean;
   /** Modifier amounts (−2 STR, a −1 attack bonus). Off by default. */
   allowNegative?: boolean;
@@ -22,20 +22,10 @@ export interface NumberFieldProps {
   className?: string;
 }
 
-/** A free-typed number — "1250 gp", "133 hit points", a −2 ability bonus.
-
-    Two decisions, both of which are bugs if taken the other way:
-
-    1. **`type="text"` + `inputMode`, not `type="number"`.** The repo's established idiom
-       (EncounterPanel's d20 field, DiceInputRow's manual entry). `type="number"` gives a
-       spinner nobody uses at 375px, silently swallows the value on a stray letter (the
-       input reports ""), and scroll-wheels over a focused field change the number.
-    2. **Clamp on BLUR, never mid-typing.** Clamping per keystroke against `min: 10` eats
-       the first digit of "12" the instant it is typed — the field fights the GM. While
-       typing, only characters are filtered; the range is enforced when the field is left.
-
-    `Stepper` remains the control for small bounded nudges (an ability score, "choose 3").
-    This is for the values where nudging by one twelve hundred times is absurd. */
+/** A free-typed number ("1250 gp", a −2 ability bonus).
+    `type="text"` + `inputMode`, not `type="number"`, which adds a useless spinner, reports "" on a stray letter
+    and changes value on scroll. Clamp on blur, never while typing, or a `min: 10` field eats the "1" of "12".
+    Use `Stepper` for small bounded nudges. */
 export function NumberField({
   value,
   onChange,
@@ -54,8 +44,8 @@ export function NumberField({
   const fieldId = id ?? `nh-num-${autoId}`;
   const unitId = `${fieldId}-unit`;
   const [text, setText] = useState(() => format(value));
-  /** The last number this field emitted, so an EXTERNAL change adopts but a round-trip
-      of our own value never rewrites what is being typed ("1." → "1"). */
+  /** The last number this field emitted, so an external change is adopted but our own round-trip never rewrites
+      what is being typed ("1." → "1"). */
   const emitted = useRef<number | null>(value);
 
   useEffect(() => {
@@ -101,8 +91,7 @@ export function NumberField({
         id={fieldId}
         className="nh-numberfield-input tabular"
         type="text"
-        /* "decimal" surfaces the point on the iOS keypad; "numeric" does not, which
-           would make 1.5 lb untypeable on a phone. */
+        /* "decimal" shows the point on the iOS keypad; "numeric" doesn't. */
         inputMode={allowDecimal ? "decimal" : "numeric"}
         pattern={allowNegative ? "-?[0-9]*" : "[0-9]*"}
         autoComplete="off"
@@ -114,8 +103,7 @@ export function NumberField({
         onChange={(event) => commit(clean(event.target.value))}
         onBlur={blur}
       />
-      {/* Not aria-hidden: "1250" and "1250 gp" are different facts, and the unit is the
-          one that says which. It rides aria-describedby so the control announces both. */}
+      {/* Not aria-hidden: the unit changes the meaning, so the input is described by it. */}
       {unit != null && <span className="nh-numberfield-unit" id={unitId}>{unit}</span>}
     </div>
   );

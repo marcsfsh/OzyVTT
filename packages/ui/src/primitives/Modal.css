@@ -8,18 +8,12 @@
 }
 .nh-modal--sm { max-width: min(100vw - 2rem, 28rem); }
 .nh-modal--lg { max-width: min(100vw - 2rem, 56rem); }
-/* Full — the documented full-screen sheet. Roomy centred surface on a laptop; on a
-   phone it goes edge-to-edge for the whole viewport, so long content (wizards,
-   sheets, browsers) stops hand-rolling its own max-height overrides. */
+/* Full: the full-screen sheet. A roomy centred surface on a laptop, edge-to-edge on a phone, so long content
+   needn't override max-height. */
 .nh-modal--full { max-width: min(100vw - 2rem, 72rem); }
 .nh-modal--full .nh-modal-surface { max-height: min(94vh, 60rem); }
-/* RULING 41 — the scrim is DARKEN PLUS A VIGNETTE, so the dialog sits in a pool of light.
-   A scanline scrim was rejected on ruling 28's own grounds: it would lie directly over the
-   scanlined surface beneath it, which is where moiré lives. The dialog is the outermost panel
-   while open and carries the scanline (see `.nh-modal-surface`); the scrim must not.
-   The vignette is a second pass of `--overlay` itself rather than a new colour, so it deepens
-   correctly in all three themes — in daybreak `--overlay` is a low-alpha ink and doubling it at
-   the edges darkens, where a `--void`-based vignette would have brightened them. */
+/* The scrim darkens with a vignette (a second pass of `--overlay`, so it deepens correctly in every theme). No
+   scanlines on the scrim: the dialog itself carries them, and stacking two would cause moiré. */
 .nh-modal::backdrop {
   background:
     radial-gradient(ellipse 125% 115% at 50% 42%, transparent 30%, var(--overlay) 100%),
@@ -28,9 +22,8 @@
   -webkit-backdrop-filter: blur(6px);
 }
 
-/* The dialog is the outermost panel while it is open (ruling 28), so it takes the full material:
-   2px rim, scanline-over-gradient fill, inner bezel. On a backing layer, because a modal is
-   nothing but tap targets. */
+/* The dialog takes the full material (rim, scanline-over-gradient fill, inner bezel) on a backing layer, since a
+   modal is mostly tap targets. */
 .nh-modal-surface {
   position: relative;
   isolation: isolate;
@@ -59,25 +52,15 @@
   background-size: 100% var(--scanline-gap), 100% 100%;
   background-origin: border-box;
   background-clip: border-box;
-  /* The inner bezel — a quieter line just inside the rim, the landing cabinet's own detail.
-     Painted as two inset shadows, the first re-laying the fill over the gap so the bezel reads
-     as a separate line rather than as a thicker rim. */
+  /* The inner bezel as two inset shadows, the first re-laying the fill so the bezel reads as a separate line. */
   box-shadow:
     inset 0 0 0 var(--bezel-inset) var(--surface-2),
     inset 0 0 0 calc(var(--bezel-inset) + 1px) var(--bezel-color);
-  /* A dialog floats over the whole app, so it keeps its lift — as a filter, since box-shadow
-     cannot follow the cut and is already spoken for by the bezel. */
+  /* The dialog keeps its lift, as a filter because box-shadow can't follow the cut and holds the bezel. */
   filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--void) 60%, transparent));
 }
-/* THE ACCENT HAIRLINE RIDES `::after`, AND THAT IS THE WHOLE FIX FOR A TRANSPARENT DIALOG.
-   `nh-modal--accent-*` is set on `.nh-modal-surface` (Modal.tsx:64), the same element whose
-   `::before` is the material's backing layer three rules up — so this block used to reach into
-   that layer and destroy it: `inset: 0 0 auto 0` + `height: 2px` collapsed the plate to a 2px
-   strip, and the `background` SHORTHAND cleared `background-color: var(--surface-2)` AND the
-   scanline/sheen images with it. `accent` defaults to "magenta", so EVERY modal in the app was
-   painting no plate at all — measured on the character sheet, whose body copy sat directly on
-   the blurred roster sky behind it (the client's "too transparent to read against"). The
-   surface uses no `::after` of its own and is not a tap target, so the hairline lives there. */
+/* The accent hairline uses `::after`: `::before` on the same element is the material's backing layer, and
+   styling it here would collapse the plate and clear its background (leaving the dialog transparent). */
 .nh-modal--accent-magenta::after,
 .nh-modal--accent-cyan::after,
 .nh-modal--accent-violet::after {
@@ -93,13 +76,7 @@
 .nh-modal--accent-violet::after { background: var(--violet); }
 
 .nh-modal-head {
-  /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:
-     the client's styles.css carries a bare `header { max-width: 40rem }` (written for
-     its landing hero) which clamps EVERY <header> in the app — including this one, so a
-     `size="lg"`/`"full"` modal's title bar stopped 640px short of its own surface and
-     the bottom rule ended mid-air. A primitive must not depend on which element
-     selectors its host happens to define, and the app must not become coupled to a
-     primitive's class name, so the fix lives here and never in styles.css. */
+  /* The client's bare `header { max-width: 40rem }` would clamp this title bar; fix it here, not in the app. */
   max-width: none;
   display: flex;
   align-items: center;
@@ -111,8 +88,7 @@
 }
 .nh-modal-title { margin: 0; font: 400 var(--fs-h1) / var(--lh-snug) var(--font-display); }
 .nh-modal-close {
-  /* Pinned to the surface's actual top-right corner (position:relative on .nh-modal-surface), so the ×
-     is always in the corner regardless of whether the modal has a header/title (v5 #3). */
+  /* Pinned to the surface's top-right corner (position:relative on .nh-modal-surface), with or without a header. */
   position: absolute;
   top: var(--space-4);
   right: var(--space-4);
@@ -135,7 +111,7 @@
   isolation: isolate;
   --nh-rim: var(--rim-color);
 }
-/* Ruling 49 reaches the close ✕ too — cut on a backing layer, never on the button. */
+/* The close ✕ is cut on a backing layer too, never on the button. */
 .nh-modal-close::before {
   content: "";
   position: absolute;
@@ -150,9 +126,7 @@
 }
 .nh-modal-close:hover, .nh-modal-close:active { color: var(--text); --nh-rim: var(--rim-color-hi); }
 
-/* overscroll-behavior: a flick past this region's end must chain nowhere — the app's page is locked
-   behind it, and rubber-banding a dead page reads as breakage. Every app-side region carries this;
-   the two primitive scrollers were the gap. */
+/* overscroll-behavior: contain, so a flick past the end doesn't rubber-band the locked page behind. */
 .nh-modal-body { padding: var(--space-6); overflow-y: auto; overscroll-behavior: contain; }
 .nh-modal-foot {
   display: flex;
@@ -162,8 +136,8 @@
   border-top: 1px solid var(--line);
 }
 
-/* Full-screen sheet on a phone: the dialog fills the viewport, the surface loses its
-   radius and its max-height cap, and the footer clears the home indicator. */
+/* Full-screen sheet on a phone: the dialog fills the viewport, the surface loses its max-height cap, and the
+   footer clears the home indicator. */
 @media (max-width: 760px) {
   .nh-modal--full {
     max-width: 100vw;
@@ -176,14 +150,12 @@
     height: 100dvh;
     max-height: 100dvh;
   }
-  /* An edge-to-edge sheet has no corner to cut and no edge to rim — the viewport is its frame. */
+  /* An edge-to-edge sheet has no corner to cut and no edge to rim. */
   .nh-modal--full .nh-modal-surface::before { clip-path: none; border: 0; box-shadow: none; filter: none; }
   .nh-modal--full .nh-modal-body { padding: var(--space-4); }
   .nh-modal--full .nh-modal-foot { padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
 }
 
-/* Top-aligned dialog — the command-palette shape. A palette is a jump-to control, so it
-   belongs under the eye rather than centred in the viewport; the same primitive, one flag,
-   instead of the bespoke scrim + panel it replaces (D25). */
+/* Top-aligned dialog: the command-palette shape, under the eye rather than centred. */
 .nh-modal--top { margin-block: 10vh auto; }
 @media (max-width: 650px) { .nh-modal--top { margin-block: var(--space-4) auto; } }

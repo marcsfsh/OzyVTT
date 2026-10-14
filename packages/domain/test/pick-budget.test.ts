@@ -2,13 +2,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { classResourceGrowth, extraPickAmount, type PrintedResourceRow } from "../src/pick-budget.js";
 
-/**
- * THE NUMBER A LEVEL-20 CHARACTER IS OWED, against the columns the SRD actually prints.
- *
- * The three records the pre-Stage-4 audit put in Tier 1 are the only gaps where a build was
- * quantifiably, countably wrong rather than merely missing something - so they are checked against
- * the shipped bundle's own level table, not a fixture that could agree with a mistake.
- */
+// Checked against the shipped bundle's level tables, not a fixture that could agree with a mistake.
 const classes = createRequire(import.meta.url)("../../content-srd-5.2.1/bundles/classes.v1.json") as Array<{
   id: string; levelTable: PrintedResourceRow[]; features: Array<{ id: string; choice?: { choose: number } }>;
 }>;
@@ -21,9 +15,9 @@ describe("a pick budget that follows a printed column", () => {
     const printed = [1, 3, 3, 3, 5, 5, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10];
     const choose = chooseOf("warlock", "eldritch-invocations");
     const offered = printed.map((_, index) => choose + classResourceGrowth(tableOf("warlock"), index + 1, "eldritch-invocations"));
-    // `choose` plus the growth IS the printed column - all twenty rows, not just the endpoints.
+    // `choose` plus the growth equals the printed column at every level.
     expect(offered).toEqual(printed);
-    expect(offered[19]).toBe(10); // the level-20 Warlock who used to be offered one
+    expect(offered[19]).toBe(10);
   });
 
   it("gives Fighter and Barbarian the Weapon Mastery the column prints", () => {
@@ -36,8 +30,7 @@ describe("a pick budget that follows a printed column", () => {
   });
 
   it("adds nothing where there is nothing to read", () => {
-    // A column this class does not print, and a DICE column ("3d6" is not a count of anything) both
-    // resolve to zero - the same "adds nothing" a flat grant of zero would mean.
+    // A column the class doesn't print and a dice column ("3d6") both resolve to zero.
     expect(classResourceGrowth(tableOf("warlock"), 20, "rage")).toBe(0);
     expect(classResourceGrowth(tableOf("rogue"), 20, "sneak-attack")).toBe(0);
     expect(classResourceGrowth([], 5, "eldritch-invocations")).toBe(0);

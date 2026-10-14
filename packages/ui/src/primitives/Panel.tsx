@@ -8,7 +8,7 @@ export interface PanelProps extends HTMLAttributes<HTMLElement> {
   /** Optional 2px top hairline labelling the panel kind (magenta = combat,
       cyan = notes/info, violet = special). Used sparingly and consistently. */
   accent?: PanelAccent;
-  /** Frosted, semi-transparent surface for sticky/floating panels (§7.8). */
+  /** Frosted, semi-transparent surface for sticky/floating panels. */
   frost?: boolean;
   /** Clickable card: adds press feedback + a hover-lift. */
   interactive?: boolean;

@@ -12,8 +12,7 @@ import {
 } from "../src/character.js";
 
 describe("weaponAbilityModifierFrom - the ONE rule the server and the sheet both roll off", () => {
-  // A duellist who makes the two axes visible: Dexterity is the better score, so a Finesse weapon
-  // must take it and a Strength weapon must not.
+  // Dexterity is the better score here, so Finesse must take it and a Strength weapon must not.
   const str = abilityModifier(12); // +1
   const dex = abilityModifier(18); // +4
 
@@ -21,17 +20,16 @@ describe("weaponAbilityModifierFrom - the ONE rule the server and the sheet both
     expect(weaponAbilityModifierFrom(["finesse"], null, str, dex)).toBe(4);        // Rapier
     expect(weaponAbilityModifierFrom(["finesse", "light"], null, str, dex)).toBe(4); // Shortsword
     expect(weaponAbilityModifierFrom(["heavy", "two-handed"], null, str, dex)).toBe(1); // Greatsword
-    // Finesse is the better of the two, not "Dexterity" - a STR 18 / DEX 12 brute keeps Strength.
+    // Finesse takes the better of the two, so a STR 18 / DEX 12 brute keeps Strength.
     expect(weaponAbilityModifierFrom(["finesse"], null, 4, 1)).toBe(4);
   });
 
   it("rolls a THROWN weapon off Strength even though it has a range", () => {
-    // The half the sheet used to get wrong in the other direction: `rangeFeet != null` is not the
-    // same question as "is this a ranged weapon". Throwing a Javelin is a Strength attack.
+    // Having a range is not the same as being ranged: throwing a Javelin is a Strength attack.
     expect(weaponAbilityModifierFrom(["thrown"], 30, str, dex)).toBe(1);            // Javelin
     expect(weaponAbilityModifierFrom(["light", "thrown"], 20, str, dex)).toBe(1);   // Handaxe
     expect(weaponAbilityModifierFrom([], 80, str, dex)).toBe(4);                    // Shortbow
-    // Both properties at once resolves through Finesse, which is why a Dagger agrees either way.
+    // Finesse wins when both properties are present (Dagger).
     expect(weaponAbilityModifierFrom(["finesse", "light", "thrown"], 20, str, dex)).toBe(4);
   });
 
@@ -111,7 +109,7 @@ describe("armorClassFromEquipment", () => {
   it("returns null when nothing armor-like is equipped (keep the stored/base AC)", () => {
     expect(armorClassFromEquipment(3, [])).toBeNull();
     expect(armorClassFromEquipment(3, [item({ category: "weapon" })])).toBeNull();
-    // an UN-equipped suit of armor does not count
+    // an unequipped suit of armor does not count
     expect(armorClassFromEquipment(3, [item({ equipped: false, category: "armor", armor: armor(14, true, 2) })])).toBeNull();
   });
   it("light armor adds full Dex", () => {
@@ -135,18 +133,14 @@ describe("armorClassFromEquipment", () => {
     expect(armorClassFromEquipment(3, [shield])).toBe(15);
   });
 
-  /**
-   * U28. A shield alone used to answer a flat 10 + Dex + shield, which is how a Barbarian who picked
-   * one up came out BELOW their bare-handed AC. `allowShield` is the whole Barbarian/Monk difference
-   * and these four numbers are the same four the table reads.
-   */
+  /** A shield alone must not drop a Barbarian below their bare-handed AC; `allowShield` is the Barbarian/Monk difference. */
   describe("Unarmored Defense", () => {
     const shield = item({ category: "shield", armor: armor(2, false, null) });
     const barbarian = { bonus: 3, allowShield: true } as const; // Con +3, "you can use a Shield"
     const monk = { bonus: 3, allowShield: false } as const; // Wis +3, "or wielding a Shield"
 
     it("keeps the bonus under a shield when the feature allows one", () => {
-      // 10 + Dex +2 + Con +3 + shield 2 - the +2 lands ON TOP OF Constitution, not instead of it
+      // 10 + Dex +2 + Con +3 + shield 2: the shield adds on top of Constitution
       expect(armorClassFromEquipment(2, [shield], barbarian)).toBe(17);
     });
     it("loses the bonus under a shield when the feature does not", () => {

@@ -4,34 +4,17 @@ import "./StableSwap.css";
 export interface StableSwapProps {
   /** The text actually being shown right now. */
   current: ReactNode;
-  /** The text this control shows in its OTHER state. Reserved, never read, never displayed. */
+  /** The text this control shows in its other state. Reserved for width, never displayed. */
   alternate: string;
   className?: string;
 }
 
 /**
- * D23c — a control whose LABEL is its state must not resize when the state changes.
- *
- * The bug it exists for: the reveal switch's label swaps a 15-character string for a 19-character one
- * ("Shown to players" ⇄ "Hidden from players"). The label lives inside the same `<button>` as the track,
- * and the button sits in a right-anchored cluster, so the extra width grows LEFTWARD — the track slides
- * out from under the pointer and the second click misses. `SaveState` already established the principle
- * ("the label reserves the width of the longest string so the buttons beside it never shuffle"); its own
- * implementation is a hand-tuned `min-width` in rem, which is a guess that has to be re-tuned per font,
- * per theme and per breakpoint. This is the exact version of the same idea.
- *
- * Both strings occupy ONE `inline-grid` cell, so the cell is as wide as the longer of them in whatever
- * font it actually inherits — no `ch` arithmetic, no JS measurement, no breakpoint.
- *
- * **The reserved string is a `data-` attribute painted by `::after`, not a second text node**, and that
- * is a deliberate departure from the obvious "render both, hide one". Rendering it as text puts the
- * record's OTHER visibility phrase into the DOM of every reveal control, and the phrase pair is
- * test-locked: `apps/client/src/codex/prep-clock-reveal.test.tsx` asserts that a revealed journal row
- * never says "Hidden from players" anywhere, which is the 2026-07-30 fix for the two visibility axes
- * colliding on one row. A hidden text node satisfies `queryByText` (verified — `aria-hidden` and
- * `visibility: hidden` are both invisible to it) and would have turned that lock red. Generated content
- * is not in the DOM at all, so the lock keeps meaning what it says while the width is still reserved
- * exactly. The structural assertion moves with it: `stable-swap.test.tsx` pins the attribute.
+ * A label that is its own state must not resize when the state changes, or a neighbouring control slides
+ * out from under the pointer. Both strings share one `inline-grid` cell, so the width is the longer one in
+ * the inherited font. The alternate string is a `data-` attribute painted by `::after`, not a hidden text
+ * node: a hidden node would still match `queryByText`, and client tests assert that a revealed row never
+ * contains "Hidden from players".
  */
 export function StableSwap({ current, alternate, className }: StableSwapProps) {
   return (

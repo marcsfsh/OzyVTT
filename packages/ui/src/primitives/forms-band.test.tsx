@@ -1,21 +1,8 @@
 /**
- * D23 (a) and (b) — the label band, and the two controls that had to learn about it.
- *
- * The defect, reported from the homebrew forms and reproduced against the primitives: in a `FieldGrid`
- * row, an Input/Select/Textarea is wrapped in a `Field`, which stacks a label over the control, so its
- * well begins one label-height plus one row-gap below the cell top. A `Stepper` rendered its label
- * *beside* the control and a `Switch` rendered no label band at all, so both started at the cell top —
- * roughly 25px high — and the stepper dragged its centred label up out of the label row with it.
- *
- * **What this file can and cannot prove.** jsdom loads no stylesheet and lays out no boxes, so it cannot
- * measure that the tops line up. It is split accordingly, and both halves are here:
- *   - STRUCTURE: the elements and modifier classes that produce the band exist, in the right order, and
- *     only in the cases that should have one.
- *   - SOURCE WIRING: the rules those classes resolve to really are the band — `--nh-label-band` is
- *     declared, it is derived from the very `.nh-field` metrics it has to match, and the modifiers spend
- *     it. A class with no rule behind it is the way this regresses silently, so the rules are read.
- * The geometry itself (top(.nh-stepper-controls) === top(.nh-input) ±1px, at 390 and 1280) is measured
- * by `scripts/primitive-align-check.mjs` against the /styleguide alignment row.
+ * The label band: in a `FieldGrid` row, a Field-wrapped input's well starts one label line plus one row-gap
+ * below the cell top, so `Stepper` and `Switch` must reserve the same band. jsdom has no layout, so this checks
+ * structure and the CSS source wiring (`--nh-label-band` is declared from `.nh-field`'s metrics and the modifiers
+ * use it); `scripts/primitive-align-check.mjs` measures the geometry in a browser.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
@@ -25,7 +12,7 @@ import { Stepper } from "./Stepper";
 import { Switch } from "./Switch";
 
 const css = (file: string): string => readFileSync(`${process.cwd()}/src/primitives/${file}`, "utf8");
-/** The declaration block for one selector, with comments and newlines flattened out of the way. */
+/** The declaration block for one selector, with comments and newlines flattened. */
 function ruleFor(source: string, selector: string): string {
   const match = source.replace(/\/\*[\s\S]*?\*\//g, "").match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`));
   expect(match, `no rule for ${selector}`).not.toBeNull();
@@ -35,9 +22,7 @@ function ruleFor(source: string, selector: string): string {
 describe("the label band is one named token, derived from the field metrics it has to match", () => {
   it("declares --nh-label-band in forms.css as label line-box + field gap", () => {
     const forms = css("forms.css");
-    // The two rules the band is a restatement of. Read them rather than hard-coding 13px/8px, so the
-    // day someone re-tunes a field's label this fails HERE, naming the pairing, instead of shipping a
-    // band that silently no longer matches anything.
+    // Read the two rules the band restates rather than hard-coding values, so a retune fails here.
     const labelFont = ruleFor(forms, ".nh-field-label");
     const fieldGap = ruleFor(forms, ".nh-field");
     const size = labelFont.match(/font:\s*600\s*var\((--[\w-]+)\)\s*\/\s*([\d.]+)/);
@@ -55,25 +40,23 @@ describe("the label band is one named token, derived from the field metrics it h
   });
 
   it("is spent by the switch modifier as margin, so the tap target is not pushed with it", () => {
-    // `margin-top`, deliberately: `.tap-target`'s 44px `::after` extension and the button's own paint are
-    // both measured from its border box, so padding here would drag the hit area down with the track.
+    // `margin-top`: the 44px `::after` and the paint are measured from the border box, so padding would drag the hit
+    // area down.
     const switchCss = css("Switch.css");
     expect(ruleFor(switchCss, ".nh-switch--banded")).toBe("margin-top: var(--nh-label-band);");
-    // The band is measured to the TRACK, and the labeled form pads itself above the track — so the
-    // labeled+banded pair has to hand that padding back. This landed because the browser check measured
-    // the row 4.00px out, which is exactly the size of `.nh-switch--labeled`'s own top padding: the two
-    // rules are one decision and drift apart the moment either is edited alone.
+    // The band is measured to the track, and the labeled form pads above the track, so labeled+banded gives that
+    // padding back. The two rules must change together.
     const padding = ruleFor(switchCss, ".nh-switch--labeled").match(/padding:\s*var\((--[\w-]+)\)/);
     expect(padding, ".nh-switch--labeled no longer states its padding as a single token").not.toBeNull();
     expect(ruleFor(switchCss, ".nh-switch--banded.nh-switch--labeled")).toBe(`margin-top: calc(var(--nh-label-band) - var(${padding![1]}));`);
   });
 
   it("is matched — not spent — by the labeled stepper, which stacks its own real label into the band", () => {
-    // The stepper HAS a label, so it does not need a spacer; it needs the same gap under the same font.
+    // The stepper has a label, so it needs the same gap under the same font, not a spacer.
     const stepper = css("Stepper.css");
     expect(ruleFor(stepper, ".nh-stepper--labeled")).toContain("display: grid");
     expect(ruleFor(stepper, ".nh-stepper--labeled")).toContain("gap: var(--space-2)");
-    // Same font shorthand as `.nh-field-label`, or the band is the right height for the wrong text.
+    // Same font shorthand as `.nh-field-label`.
     expect(ruleFor(stepper, ".nh-stepper-label")).toContain(ruleFor(css("forms.css"), ".nh-field-label").match(/font:[^;]+;/)![0]);
   });
 });
@@ -83,8 +66,7 @@ describe("Stepper (D23a)", () => {
     const { container } = render(<Stepper value={3} onChange={() => {}} label="Dice" />);
     const root = container.querySelector(".nh-stepper")!;
     expect(root.className).toContain("nh-stepper--labeled");
-    // Document order IS the band: a label after the controls would render below them, which is a
-    // different layout that happens to use the same class.
+    // Document order is the band: label first, then controls.
     expect([...root.children].map((child) => child.className)).toEqual(["nh-stepper-label", "nh-stepper-controls"]);
     expect(screen.getByText("Dice")).toBeInTheDocument();
   });
@@ -95,7 +77,7 @@ describe("Stepper (D23a)", () => {
     expect(root.className).not.toContain("nh-stepper--labeled");
     expect(root.querySelector(".nh-stepper-label")).toBeNull();
     expect([...root.children].map((child) => child.className)).toEqual(["nh-stepper-controls"]);
-    // A phantom band in a non-form context is the regression the `iff` above exists to prevent.
+    // No band outside a form context.
     expect(screen.getByRole("group", { name: "Strength" })).toBeInTheDocument();
   });
 
@@ -109,8 +91,7 @@ describe("Stepper (D23a)", () => {
 
     view.rerender(<Stepper value={1} onChange={onChange} min={1} max={6} label="Dice" />);
     expect(screen.getByRole("button", { name: "Decrease" })).toBeDisabled();
-    // Both edges disabled means neither can be walked past, which is what makes the clamp honest rather
-    // than a silent correction of a value the caller thinks it set.
+    // Both edges disabled, so the clamp is visible rather than a silent correction.
     expect(screen.getByRole("button", { name: "Increase" })).toBeEnabled();
   });
 
@@ -118,7 +99,7 @@ describe("Stepper (D23a)", () => {
     const view = render(<Stepper value={0} onChange={() => {}} label="Modifier" format={(v) => (v === 0 ? "±0" : `+${v}`)} />);
     const value = view.container.querySelector(".nh-stepper-value")!;
     expect(value.textContent).toBe("±0");
-    // Six steppers on one screen would be six live regions shouting over each other, so this is opt-in.
+    // Opt-in, so several steppers on one screen don't compete as live regions.
     expect(value.getAttribute("aria-live")).toBeNull();
     view.rerender(<Stepper value={2} onChange={() => {}} label="Modifier" announceValue />);
     expect(view.container.querySelector(".nh-stepper-value")!.getAttribute("aria-live")).toBe("polite");
@@ -133,8 +114,7 @@ describe("Switch (D23b)", () => {
 
     rerender(<Switch checked={false} onChange={() => {}} label="Auto-stage" banded />);
     expect(screen.getByRole("switch").className).toContain("nh-switch--banded");
-    // The band is margin on the BUTTON. A wrapper element around it would break the tap target and the
-    // label's membership of it — which is the whole reason the fix is a spacer and not a `Field`.
+    // The band is margin on the button itself; a wrapper would break the tap target.
     expect(container.firstElementChild).toBe(button);
     expect(button.querySelector(".nh-switch-label")!.textContent).toBe("Auto-stage");
     expect(button.querySelector(".nh-switch-track")).not.toBeNull();
@@ -145,8 +125,7 @@ describe("Switch (D23b)", () => {
     const onChange = vi.fn();
     render(<Switch checked={false} onChange={onChange} label="Auto-stage" banded />);
     const button = screen.getByRole("switch");
-    // jsdom cannot measure the ::after extension; what it CAN hold is that the class which paints it is
-    // still on the element the band moved. Losing it silently is exactly how a phone loses the target.
+    // jsdom can't measure the ::after extension, but the class that paints it must stay on the element.
     expect(button.className).toContain("tap-target");
     expect(button).toHaveAttribute("aria-checked", "false");
     await user.click(button);
@@ -157,8 +136,7 @@ describe("Switch (D23b)", () => {
     const view = render(<Switch checked onChange={() => {}} label="Auto-stage" />);
     expect(screen.getByRole("switch")).toHaveAccessibleName("Auto-stage");
     view.rerender(<Switch checked onChange={() => {}} label="Shown to players" aria-label="Show this page to players" />);
-    // A label that CHANGES with the state would rename the control on every click, so a constant
-    // accessible name wins outright — this is the reveal control's contract.
+    // A constant accessible name, not one that changes with the state label.
     expect(screen.getByRole("switch")).toHaveAccessibleName("Show this page to players");
   });
 });

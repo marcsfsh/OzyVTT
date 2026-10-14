@@ -11,12 +11,11 @@ export interface ModalProps {
   title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  /** Top accent hairline; magenta by default (§5.4: one accent hairline). */
+  /** Top accent hairline; magenta by default. */
   accent?: PanelAccent;
-  /** `full` is the full-screen sheet: a roomy centred surface on a laptop, edge-to-edge
-      over the whole viewport at ≤760px. Reach for it instead of overriding max-height. */
+  /** `full` is a roomy centred sheet on a laptop and edge-to-edge at ≤760px. Use it instead of overriding max-height. */
   size?: "sm" | "md" | "lg" | "full";
-  /** `top` pins the dialog near the top of the viewport — the command-palette shape. */
+  /** `top` pins the dialog near the top of the viewport (the command-palette shape). */
   align?: "center" | "top";
   /** Accessible label when there's no visible title. */
   ariaLabel?: string;

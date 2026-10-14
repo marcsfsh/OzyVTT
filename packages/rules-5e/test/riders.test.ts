@@ -35,8 +35,7 @@ describe("collectRiders: the two passes", () => {
   });
 
   it("never lets a filter leak into the standing pass and become 'always'", () => {
-    // A filter with no moment is an authoring mistake the publish validator rejects; here it must
-    // simply never match, rather than quietly applying at every read.
+    // A filter with no moment must never match rather than apply at every read.
     const carriers = carrierOf([{ type: "attack-bonus", amount: 2, when: [{ type: "versus-size", sizes: ["large"] }] }]);
     expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring", targetSize: "large" })).toHaveLength(0);
   });
@@ -51,8 +50,7 @@ describe("collectRiders: gates fail closed", () => {
   });
 
   it("refuses a trigger the engine cannot evaluate rather than treating it as satisfied", () => {
-    // "while mounted" has no world-state system behind it. Failing OPEN would silently turn an
-    // authored narrative gate into an unconditional bonus.
+    // "while mounted" has no state behind it; failing open would turn it into an unconditional bonus.
     const carriers = carrierOf([{ type: "armor-class", amount: 5, when: [{ type: "while-mounted" }] }]);
     expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring" })).toHaveLength(0);
   });
@@ -86,9 +84,9 @@ describe("collectRiders: gates fail closed", () => {
 describe("collectRiders: scope", () => {
   it("defaults the attack/damage family to this-item on a weapon and to the bearer elsewhere", () => {
     const weapon = carrierOf([{ type: "attack-bonus", amount: 1 }, { type: "armor-class", amount: 1 }], { sourceItemId: "sword", isWeapon: true });
-    // Rolling WITH the sword: both apply.
+    // Rolling with the sword: both apply.
     expect(collectRiders(weapon, { ...base, moment: null, sourceItemId: "sword" }).map((r) => r.modifier.type)).toEqual(["attack-bonus", "armor-class"]);
-    // Rolling with something else: the sword's +1 to hit does NOT follow, but its AC still does.
+    // Rolling with something else: the sword's +1 to hit does not follow, but its AC does.
     expect(collectRiders(weapon, { ...base, moment: null, sourceItemId: "axe" }).map((r) => r.modifier.type)).toEqual(["armor-class"]);
   });
 

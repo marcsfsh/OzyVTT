@@ -1,29 +1,13 @@
-/* Checklist — an ordered list of short tickable lines (a quest's objectives).
-
-   SPECIFICITY NOTE (readiness rule 5 — a primitive defends its own state against the
-   host app's element-selector globals, rather than the app being coupled to a primitive's
-   class name). This is the same defence `RowEditor.css` documents, and it bites HARDER
-   here because this component renders a raw `<input type="checkbox">`, which the app's
-   `apps/client/src/styles.css` catches with
-
+/* Checklist: an ordered list of short tickable lines (a quest's objectives).
+   The client's styles.css styles bare elements, so this file restates what it needs:
      input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; … }   (0,0,1)
-
-   — a 100%-wide, padded, top-shifted checkbox. `.nh-checklist-tick input` at (0,1,1)
-   wins, which is why the size/padding/margin resets below are load-bearing rather than
-   tidiness. The remove button meets the same problem from
-
      button { padding: 1.3rem; border: 1px solid var(--line-strong); background: … }   (0,0,1)
      button:hover:not(:disabled) { border-color: … }                                   (0,2,1)
+   `.nh-checklist-tick input` (0,1,1) beats the first. The remove button's hover is written at (0,3,0) because
+   a single class at (0,2,0) loses to (0,2,1); don't simplify it. /styleguide doesn't load the app's styles, so
+   only the app shows these problems. */
 
-   so its RESTING rule is a plain class (0,1,0), which beats (0,0,1), but its hover rule is
-   written `.nh-checklist-item .nh-checklist-remove:hover` — (0,3,0) — because a single
-   class at (0,2,0) LOSES to (0,2,1). Do not "simplify" that back to one class. None of
-   this is visible on `/styleguide`, which loads only `@vtt/ui/styles.css`; it only shows
-   up inside the app. */
-
-/* `minmax(0, 1fr)` and `min-width: 0` all the way down: a grid track and a grid/flex ITEM
-   both default to an `auto` minimum, so a long objective would otherwise push the document
-   sideways at 375px. A primitive must never widen its container. */
+/* `minmax(0, 1fr)` and `min-width: 0` throughout so a long objective can't widen the container. */
 .nh-checklist {
   box-sizing: border-box;
   display: grid;
@@ -51,18 +35,10 @@
   gap: var(--space-2);
 }
 
-/* ---- 44px TOUCH FLOOR: ROUTE 1 (grow the paint) on every control in this component. ----
-   Route 2 (`.tap-target`, a --tap-min `::after` centred on the control) is FORBIDDEN here,
-   and the gap-budget arithmetic is why. The rows are a vertical stack gapped by --space-2
-   (8px). A route-2 box on the ~20px native checkbox would overhang by (44 − 20) / 2 = 12px
-   per side; 12px of overhang against an 8px gap reaches 4px INTO the neighbouring row's
-   paint, and the same is true of a 36px `.nh-iconbtn` remove ((44 − 36) / 2 = 4px, which
-   exactly consumes the gap and leaves 0). The later sibling wins the hit test, so every row
-   would quietly steal the tap aimed at the row above it — worst on a phone, where the rows
-   are closest together and the finger is least precise. So each control below carries the
-   floor as REAL PAINT: the tick label is 44×44, `.nh-input` already ships
-   `min-height: var(--tap-min)`, and the remove button is 44×44. Real paint cannot overlap,
-   so there is no gap budget left to get wrong. */
+/* ---- 44px touch floor as real paint on every control ----
+   `.tap-target` is not usable here: its overhang (12px on the checkbox, 4px on a 36px button) exceeds the 8px
+   row gap, so each row would steal taps aimed at the row above. The tick label and remove button are 44×44,
+   and `.nh-input` already has `min-height: var(--tap-min)`. */
 .nh-checklist-tick {
   flex: none;
   display: grid;
@@ -72,16 +48,13 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-/* Cyan, not the `accent-color: var(--magenta)` the encounter panel's checkboxes use: those
-   pick a thing (a selection, adjacent to an action), and magenta is the action colour. A
-   ticked objective is a COMPLETED STATE, which this system paints cyan (a Step's done ring,
-   the selection edge) — and it has to agree with the read-only mark below, because the GM
-   and the player are looking at the same fact. */
+/* Cyan, not the magenta action colour: a ticked objective is a completed state, and it must match the
+   read-only mark the player sees. */
 .nh-checklist-tick input {
   flex: none;
   width: 1.25rem;
   height: 1.25rem;
-  /* Beats the app's global `input` rule — see the specificity note at the top. */
+  /* Beats the app's global `input` rule (see the top note). */
   margin: 0;
   padding: 0;
   accent-color: var(--cyan);
@@ -97,9 +70,7 @@
   width: var(--tap-min);
   height: var(--tap-min);
   padding: 0;
-  /* line-height:1 so the glyph centres on the grid instead of riding its inherited line box.
-     The glyph is sized in em, so 1.1rem keeps it at roughly the optical weight `.nh-iconbtn`
-     carries (a 15px glyph in a 36px square) now that the square is the full 44px. */
+  /* line-height:1 centres the glyph; 1.1rem keeps its optical weight in the 44px square. */
   line-height: 1;
   font-size: 1.1rem;
   border: 0;
@@ -109,7 +80,7 @@
   cursor: pointer;
   transition: color var(--dur-hover), background var(--dur-hover);
 }
-/* (0,3,0) on purpose — see the specificity note at the top. */
+/* (0,3,0) on purpose; see the top note. */
 .nh-checklist-item .nh-checklist-remove:hover { color: var(--danger); background: var(--surface-2); }
 
 /* ---- Read-only row. Nothing focusable, nothing tickable. ---- */
@@ -132,13 +103,11 @@
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
 }
-/* Done reads three ways at once and never by hue alone (design-language R2): the glyph, the
-   strike, and the sr-only word the component renders beside it. `--text-dim`, never
-   `--text-muted` — that token is 3.61:1 and fails AA. */
+/* Done reads three ways, never by hue alone: the glyph, the strike, and the sr-only word. `--text-dim`, never
+   `--text-muted`, which fails AA. */
 .nh-checklist-item.is-done .nh-checklist-text { color: var(--text-dim); text-decoration: line-through; }
 
 .nh-checklist-foot { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--space-3); }
 .nh-checklist-add-icon { display: grid; place-items: center; margin: 0; font-size: 1.05em; }
-/* Full strength beside a disabled Add — the reason is the one thing that must stay readable
-   when the control it explains is dimmed. */
+/* Full strength beside a disabled Add: the reason must stay readable. */
 .nh-checklist-reason { margin: 0; font-size: var(--fs-sm); color: var(--caution-hi); }

@@ -27,52 +27,34 @@ export interface ChoiceGridProps {
   /** Single-select answer. Ignored (pass null) when `selection` is "multiple". */
   value: string | null;
   onChange: (value: string) => void;
-  /** Required — a radiogroup needs an accessible name. */
+  /** Required: a radiogroup needs an accessible name. */
   ariaLabel: string;
 
-  /** "single" (default) is the pick-one radiogroup. "multiple" is the choose-N
-      list every content offer needs (three Weapon Masteries, six prepared spells):
-      same cards, same one chosen treatment, checkbox semantics. */
+  /** "single" (default) is a pick-one radiogroup; "multiple" is a choose-N list with checkbox semantics. */
   selection?: "single" | "multiple";
   /** multiple: the chosen ids. */
   values?: readonly string[];
   /** multiple: `next` is false when the card was already chosen. */
   onToggle?: (value: string, next: boolean) => void;
-  /** multiple: how many may be chosen. Once `values` is full, the unchosen cards
-      lock with a reason rather than silently swallowing taps — the grid owns this
-      so every choose-N step says the same thing the same way. */
+  /** multiple: how many may be chosen. At capacity the unchosen cards lock with a reason instead of silently
+      ignoring taps. */
   max?: number;
   /** The reason shown on locked cards at capacity. */
   maxReachedReason?: ReactNode;
 
   /**
-   * READ about an option without answering with it. Present ⇒ every card grows a sibling control
-   * that calls this with the option's value; the grid never touches `value` / `values` for it.
-   *
-   * This is the only honest shape for a multi-select list of 203 spells: the rules a player needs
-   * in order to choose cannot live inside the card (a `ChoiceCard` IS a button, so nothing
-   * interactive nests in it) and cannot expand inline (that pushes the rest of the list off a
-   * phone). The caller opens whatever reference it owns — a `Modal`, never a `Drawer`, because a
-   * stray tap beside a scrimless overlay must not land on a card.
+   * Read about an option without choosing it: every card gets a sibling control that calls this with the
+   * option's value. A sibling because a `ChoiceCard` is a button and can't nest controls. Callers should open a
+   * `Modal`, not a `Drawer`, so a stray tap beside the overlay can't land on a card.
    */
   onInspect?: (value: string) => void;
   /** Accessible name for that control. Defaults to "About <title>". */
   inspectLabel?: (option: ChoiceOption) => string;
 
   /**
-   * Cap the card list and scroll it INSIDE the grid, instead of letting it push the page.
-   *
-   * This is the alternative to hiding options once a choose-N list is full, and it exists because
-   * hiding them was the bug: a player must be able to see what they did NOT take, at every list
-   * length, and a chosen card must stay tappable so the pick can be swapped. Unmounting the grid
-   * bought page height at the cost of both. A `max-height` buys the same height and costs neither
-   * — every option stays mounted, greyable and reachable, and the search box above it (which
-   * outlives the cap, being a sibling) is what makes a 203-card region navigable.
-   *
-   * The cap rides `.nh-choicegrid-items` itself rather than a wrapper, which is only safe because
-   * a `max-height` is NOT a definite block size: the grid's auto rows still size from their cards
-   * (the same reading `map-picker.css` measured at 320/375/560/561/1280). The region is declared
-   * with `.scroll-y` in the markup, per design-language.md §7.
+   * Cap the card list's height and scroll it inside the grid, so long choose-N lists keep every option mounted,
+   * visible and swappable. The cap sits on `.nh-choicegrid-items` itself, which is safe because `max-height`
+   * isn't a definite block size, so auto rows still size from their cards.
    */
   bounded?: boolean;
 
@@ -81,19 +63,15 @@ export interface ChoiceGridProps {
   /** Debounce for the search box, ms. 0 filters on every keystroke. */
   searchDelay?: number;
 
-  /** Facet row. Include your own "all" option; `facetAllValue` says which one
-      means "don't filter". */
+  /** Facet row. Include your own "all" option; `facetAllValue` says which one means "don't filter". */
   facets?: readonly SegmentedOption[];
   facetValue?: string;
   onFacetChange?: (value: string) => void;
   facetLabel?: string;
   facetAllValue?: string;
 
-  /* NO detail pane. A grid of a dozen cards plus a detail column has exactly one
-     honest narrow-screen layout — master-detail — and `WizardShell` already owns it
-     (`detail` / `detailOpen` / `onOpenDetail`). Stacking a detail after the cards, as
-     this used to, meant scrolling past every card to read the one you just tapped.
-     Pass the detail to the shell instead: one idea, one place. */
+  /* No detail pane: on narrow screens that needs master-detail, which `WizardShell` already owns
+     (`detail` / `detailOpen` / `onOpenDetail`). Pass the detail to the shell. */
 
   emptyTitle?: string;
   emptyText?: string;
@@ -103,17 +81,9 @@ export interface ChoiceGridProps {
   className?: string;
 }
 
-/** Faceted picker: search + facets + a `ChoiceCard` grid.
-    The closest existing surface is MonsterBrowser, which is a flat undebounced list;
-    this fixes the three things that made it feel cheap:
-
-      - the search is debounced, so a long catalog doesn't refilter per keystroke;
-      - no results is a real `.nh-empty` state, not a stray list row;
-      - the grid is a keyboard radiogroup (arrows move and select, Home/End jump,
-        roving tabindex so Tab enters and leaves the grid once).
-
-    Filtering is plain substring matching over title + keywords. Content, ordering,
-    and any smarter ranking belong to the caller. */
+/** Faceted picker: debounced search, facets and a `ChoiceCard` grid with a real empty state. The grid is a
+    keyboard radiogroup (arrows move and select, Home/End jump, roving tabindex). Filtering is substring
+    matching over title + keywords; ordering and ranking belong to the caller. */
 export function ChoiceGrid({
   options, value, onChange, ariaLabel,
   selection = "single", values, onToggle, max, maxReachedReason,
@@ -151,23 +121,17 @@ export function ChoiceGrid({
   const multiple = selection === "multiple";
   const chosen = useMemo(() => new Set(values ?? []), [values]);
   const isChosen = (option: ChoiceOption) => multiple ? chosen.has(option.value) : option.value === value;
-  // At capacity the UNCHOSEN cards lock (the chosen ones must stay tappable, or the
-  // player can never change their mind) — with a reason, per the disabled rule.
-  //
-  // The reason is stated ONCE, beside the count, and every capacity-locked card points at it with
-  // `aria-describedby`. It used to be stamped INTO each card: a choose-6 grid of 70 spells rendered
-  // 64 copies of one sentence, and at level 20 the wizard's fourth step carried 409 of them — a
-  // third of that step's DOM restating a fact about the GRID, not about any card. One idea, one
-  // place; a locked option still says why, it just does not say it 64 times.
+  // At capacity the unchosen cards lock (chosen ones stay tappable so a pick can be swapped). The reason is
+  // stated once beside the count and locked cards reference it via `aria-describedby`, rather than repeating it
+  // on every card.
   const atCapacity = multiple && max != null && chosen.size >= max;
   const lockedReason = maxReachedReason ?? (max != null ? `You have already chosen ${max}. Unpick one to swap.` : undefined);
   const capacityLocked = (option: ChoiceOption) => atCapacity && option.disabled !== true && !chosen.has(option.value);
   const lockedOf = (option: ChoiceOption) => option.disabled === true || capacityLocked(option);
-  // Announced only when it is true AND there is something it applies to.
+  // Announced only when it is true and there is something it applies to.
   const showLockedNotice = atCapacity && lockedReason != null && shown.some(capacityLocked);
 
-  // Roving tabindex: a chosen card is the grid's single tab stop, falling back to the
-  // first selectable one so the group is always reachable.
+  // Roving tabindex: the chosen card is the single tab stop, else the first selectable one.
   const selectable = shown.filter((option) => !lockedOf(option));
   const tabStop = selectable.find(isChosen)?.value ?? selectable[0]?.value ?? null;
 
@@ -176,8 +140,7 @@ export function ChoiceGrid({
     else onChange(option.value);
   };
 
-  // Arrow keys MOVE in both modes; only a radiogroup also selects as it moves — a
-  // checkbox group that selected on arrow would tick every card you scrolled past.
+  // Arrow keys move in both modes; only a radiogroup also selects as it moves.
   const move = (from: string, delta: number, toEdge?: "first" | "last") => {
     if (selectable.length === 0) return;
     const index = selectable.findIndex((option) => option.value === from);
@@ -224,19 +187,16 @@ export function ChoiceGrid({
           </div>
         )}
 
-        {/* "9 of 9" counts nothing: with no search text and no facet, `shown` IS `options`, and every
-            offer already carries its own "2 of 3 chosen" heading — so an unfiltered step announced
-            two numbers, one of them constant. The count returns the moment a filter hides something,
-            which is the only moment the two can differ. */}
+        {/* The count appears only while a filter hides something; unfiltered it would just restate the offer's own
+            "2 of 3 chosen". */}
         {filtering && (
           <p className="nh-choicegrid-count tabular" role="status">
             {shown.length} of {options.length}
           </p>
         )}
 
-        {/* The capacity rule, stated once. NOT a live region: `.cb-offer-count` already announces
-            "6 of 6 chosen" the moment the last pick lands, and two announcements of one event is the
-            duplication this replaced. It is a DESCRIPTION — the locked cards point at it. */}
+        {/* The capacity rule, stated once. Not a live region (the offer count already announces it); locked cards
+            point at it as a description. */}
         {showLockedNotice && (
           <p className="nh-choicegrid-locked" id={lockedNoticeId}>
             <span className="nh-choicegrid-locked-icon" aria-hidden="true"><IconWarning /></span>
@@ -252,8 +212,7 @@ export function ChoiceGrid({
             {emptyAction}
           </div>
         ) : (
-          // `.scroll-y` IS THE DECLARATION, and it belongs in the markup — a bare `overflow-y` in
-          // the stylesheet is an undeclared region (design-language.md §7, ratchet (h)).
+          // `.scroll-y` declares the scroll region in the markup.
           <div
             className={cx("nh-choicegrid-items", bounded && "nh-choicegrid-items--bounded", bounded && "scroll-y")}
             role={multiple ? "group" : "radiogroup"}
@@ -280,15 +239,10 @@ export function ChoiceGrid({
                   badge={option.badge}
                   meta={option.meta}
                   disabled={locked}
-                  /* PER-OPTION only. `option.disabled` is the caller saying something true about THIS
-                     option ("you already have Perception from your background") — it belongs on the
-                     card and nowhere else. Capacity is a fact about the grid, so a capacity-locked
-                     card points at the one notice above instead of carrying a copy of it. */
+                  /* Per-option reasons only; capacity-locked cards reference the shared notice above. */
                   disabledReason={option.disabled === true ? option.disabledReason : undefined}
                   {...(byCapacity && showLockedNotice ? { "aria-describedby": lockedNoticeId } : {})}
-                  /* Reading is never locked. A card can be at capacity — the whole reason a player
-                     wants to read the two they did not take — so the reference control stays live
-                     on a disabled card, and it is the one thing on it that is. */
+                  /* Reading is never locked: the reference control stays live on a disabled card. */
                   action={onInspect
                     ? <button
                         type="button"

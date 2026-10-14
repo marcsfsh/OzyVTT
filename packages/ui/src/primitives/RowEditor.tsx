@@ -9,7 +9,7 @@ import "./RowEditor.css";
 export interface RowEditorProps<T> {
   rows: readonly T[];
   onChange: (next: readonly T[]) => void;
-  /** STABLE id, never the array index — see the note on the component. */
+  /** Stable id, never the array index (see the component note). */
   rowKey: (row: T) => string;
   renderRow: (row: T, index: number) => ReactNode;
   /** The caller mints the row (with `newId()`), so the primitive never invents data. */
@@ -26,25 +26,13 @@ export interface RowEditorProps<T> {
   className?: string;
 }
 
-/** The repeating-rows editor behind every `kind: "rows"` field — monster actions,
-    starting-equipment options, ability bonuses, damage parts, granted spells.
-
-    **`rowKey` is a stable id, not the index.** Keying by index is the bug this
-    primitive exists to prevent: remove row 2 of 5 and React reuses row 3's DOM for
-    row 2, so the focused input, the open disclosure and any uncommitted keystrokes
-    silently belong to a different record. The caller mints the id with `newId()` when
-    it mints the row, which is also why `onAdd` returns the row rather than the
-    primitive constructing one.
-
-    **One ⋯ menu per row, not four icon buttons.** Move up, move down and remove are
-    three targets that would each need a 44px hit area in a dense list; collapsed into
-    one menu they cost one target, they match `.nh-card-tools`, and there is no gap
-    budget to get wrong. The drag grip is a pointer-only ENHANCEMENT on top — every
-    reorder it offers is also in the menu, so nothing here is mouse-only.
-
-    Collapse is UI-local and derived from what the caller passes, never stored in the
-    draft: there is nothing to invalidate, and a newly added row opens because you just
-    asked for it. */
+/** The repeating-rows editor behind every `kind: "rows"` field (monster actions, equipment options, damage
+    parts, granted spells).
+    `rowKey` must be a stable id, not the index: keyed by index, removing a row hands its focus, open state and
+    unsaved keystrokes to the next record. The caller mints the id with `newId()`, which is why `onAdd` returns
+    the row.
+    One ⋯ menu per row (Move up, Move down, Remove) instead of three icon targets; the drag grip is a pointer-only
+    extra. Collapse state is UI-local and never stored in the draft. */
 export function RowEditor<T>({
   rows,
   onChange,
@@ -95,10 +83,8 @@ export function RowEditor<T>({
     setAnnouncement(`${addLabel} — ${rows.length + 1} total.`);
   };
 
-  /* Pointer drag, not HTML5 drag-and-drop: `dragstart` never fires from a touch, so a
-     DnD handle would be a mouse-only affordance with the menu as its "fallback" — the
-     wrong way round. Pointer capture keeps the moves coming to the grip even when the
-     finger leaves it. */
+  /* Pointer events, not HTML5 drag-and-drop, which never fires from touch. Pointer capture keeps moves coming
+     when the finger leaves the grip. */
   const onGripDown = (event: ReactPointerEvent<HTMLSpanElement>, index: number) => {
     if (!reorderable || rows.length < 2) return;
     event.preventDefault();
@@ -132,9 +118,7 @@ export function RowEditor<T>({
   return (
     <div className={cx("nh-roweditor", dragFrom !== null && "is-reordering", className)}>
       {rows.length === 0 && emptyText != null && (
-        /* `.nh-empty` reused rather than rebuilt, with its 12rem min-height dropped:
-           this one sits INSIDE a form section, where a half-screen dashed box would
-           dwarf the fields around it. */
+        /* `.nh-empty` without its 12rem min-height, which would dwarf the fields in a form section. */
         <p className="nh-empty nh-roweditor-empty">{emptyText}</p>
       )}
 
@@ -156,9 +140,7 @@ export function RowEditor<T>({
               >
                 <div className="nh-roweditor-head">
                   {reorderable && rows.length > 1 && (
-                    /* Not a <button>: pressing Enter on it would do nothing, and a
-                       control that announces itself and then refuses to act is worse
-                       than no control. Keyboard reorder is Move up / Move down below. */
+                    /* Not a <button>: Enter would do nothing. Keyboard reorder is Move up / Move down in the menu. */
                     <span
                       className="nh-roweditor-grip tap-target"
                       aria-hidden="true"
@@ -186,8 +168,7 @@ export function RowEditor<T>({
                     <span className="nh-roweditor-label nh-roweditor-label--static">{label}</span>
                   )}
 
-                  {/* Row-scoped names throughout: a screen reader hearing five bare
-                      "Remove"s in a list has been told nothing. */}
+                  {/* Row-scoped names so a screen reader doesn't hear five bare "Remove"s. */}
                   <Menu icon trigger="⋯" align="end" label={`Actions for ${label}`} className="nh-roweditor-menu">
                     {reorderable && (
                       <MenuItem disabled={index === 0} onClick={() => move(index, index - 1)}>Move {label} up</MenuItem>
@@ -207,8 +188,7 @@ export function RowEditor<T>({
       )}
 
       <div className="nh-roweditor-foot">
-        {/* Annotate at capacity, never hide the Add button (readiness rule 1): a control
-            that vanishes teaches nothing, a disabled one with its reason does. */}
+        {/* At capacity, disable Add with its reason rather than hiding it. */}
         <Button
           variant="secondary"
           size="sm"

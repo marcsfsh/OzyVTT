@@ -14,7 +14,7 @@ function sequence(...faces: number[]) { let index = 0; return () => faces[index+
 describe("STANDARD_ARRAY", () => {
   it("is the SRD array, highest first", () => {
     expect(STANDARD_ARRAY).toEqual([15, 14, 13, 12, 10, 8]);
-    // 15+14+13+12+10+8 = 72 - the well-known total, a cheap transcription guard.
+    // The well-known total of 72, a cheap transcription guard.
     expect(STANDARD_ARRAY.reduce((sum, score) => sum + score, 0)).toBe(72);
   });
 });
@@ -43,7 +43,7 @@ describe("point buy", () => {
   });
 
   it("prices the standard-array-shaped spread and reports what is left", () => {
-    // 15,14,13,12,10,8 -> 9+7+5+4+2+0 = 27 ... the standard array is exactly a 27-point buy.
+    // The standard array is exactly a 27-point buy: 9+7+5+4+2+0.
     expect(pointBuyRemaining([15, 14, 13, 12, 10, 8])).toBe(0);
     // A cheaper spread leaves points on the table.
     expect(pointBuyRemaining([14, 14, 13, 12, 10, 8])).toBe(2);
@@ -65,7 +65,7 @@ describe("point buy", () => {
 describe("rollAbilityScores", () => {
   it("rolls 4d6 keep-highest-3 six times and returns the scores highest first", () => {
     expect(ABILITY_ROLL_FORMULA).toBe("4d6kh3");
-    // Six groups of four faces. Group totals (drop lowest): 15, 12, 9, 18, 6(min is 3x1+... ) etc.
+    // Six groups of four faces; each line's total drops the lowest.
     const faces = [
       6, 5, 4, 1, // 15
       4, 4, 4, 4, // 12

@@ -11,17 +11,15 @@ export interface MenuProps {
   /** Accessible name when the trigger is icon-only. */
   label?: string;
   hideCaret?: boolean;
-  /** Icon-square trigger: a compact 1.75rem square instead of the padded pill, for
-      dense tool clusters (the ⋯ beside a card's drag grip). The 44px floor is met by
-      the hit AREA, not the paint — see Menu.css. Implies `hideCaret`. */
+  /** Icon-square trigger: a compact 1.75rem square for dense tool clusters. The 44px floor is met by the hit area
+      (see Menu.css). Implies `hideCaret`. */
   icon?: boolean;
   className?: string;
   triggerClassName?: string;
 }
 
-/** Disclosure menu built on native <details>/<summary> (§7.6): the caret rotates
-    on open, the popover eases in, and it closes on Escape, outside-click, or item
-    activation. Default marker is hidden. */
+/** Disclosure menu on native <details>/<summary>: the caret rotates on open, the popover eases in, and it closes
+    on Escape, outside click or item activation. */
 export function Menu({ trigger, children, align = "start", label, hideCaret = false, icon = false, className, triggerClassName }: MenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -38,18 +36,10 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
         el.querySelector<HTMLElement>("summary")?.focus();
       }
     };
-    /* Keep the open popover inside the viewport (Menu.css "Popover" note). CSS alone can
-       cap the box's WIDTH but cannot know where in the viewport its trigger landed, so
-       the offset is measured once per open and again on resize/rotate. Both edges are
-       handled: a `--start` menu deep in a rail overflows right, a `--end` menu near the
-       left margin overflows left. When the box cannot fit at all, the LEFT edge wins —
-       labels read left to right.
-
-       Geometry comes from offsetLeft/offsetWidth, NOT getBoundingClientRect(): the box
-       carries `.anim-popover`, whose entrance keyframes animate `transform`, and a client
-       rect includes that transform — measuring on open therefore read the box 10px right
-       of where it settles and left it 10px out of place. Layout offsets are transform-free.
-       Resetting the shift first keeps the function idempotent across repeat opens. */
+    /* Keep the open popover inside the viewport horizontally, measured on open and on resize/rotate. When it can't
+       fit, the left edge wins. Uses offsetLeft/offsetWidth rather than getBoundingClientRect(), which includes
+       `.anim-popover`'s entrance transform and would misplace the box by 10px. Resetting the shift first keeps it
+       idempotent. */
     const clampToViewport = () => {
       const pop = popoverRef.current;
       if (!el.open || !pop) return;
@@ -64,28 +54,10 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
       if (left + shift < gutter) shift = gutter - left;
       if (shift) pop.style.setProperty("--nh-menu-shift", `${Math.round(shift)}px`);
 
-      /* THE SAME PROBLEM ON THE OTHER AXIS, and it is the one that makes a menu UNREACHABLE
-         rather than merely clipped. `top: calc(100% + …)` assumed there is always room below;
-         the map's own Scenes button sits in the bottom-right CORNER of the map (ruling 12 put
-         both scene errands there), so its menu had nowhere to go — measured 70px off the bottom
-         of the window at 1280x900 and at 1280x620 with nothing to scroll, and on a 390x844 phone
-         it was worse: painted nowhere at all and hit-testing to the dock behind it.
-
-         So the box flips to whichever side has room, and ROOM MEANS ROOM WHERE IT CAN BE SEEN.
-         The window is not the bound that bites — every ancestor that clips is. The phone case
-         proves it: `innerHeight` said 579px of room below, while `.encounter-map-stage`'s
-         `overflow: hidden` (224px tall, ending 13px under the trigger) said 9px. Both edges of
-         the visible box are collected the same way, so a menu inside a scroll region flips for
-         the same reason a menu inside the map does. A `position: fixed` ancestor ends the walk:
-         nothing above it clips it.
-
-         When NEITHER side fits it takes the side with MORE room — a menu clipped by a pixel is
-         still a menu, and the case this decides is a 667x375 landscape phone where the map
-         stage leaves 9px under the trigger and 126px over it against a 127px box.
-
-         The trigger's rect is the reference and it is transform-free (`.anim-popover`'s entrance
-         keyframes belong to the POPOVER, the geometry note above), and `offsetHeight` is read
-         off the popover for the same reason `offsetLeft` is used a few lines up. */
+      /* Vertically, flip to whichever side has visible room. Room is bounded by every clipping ancestor, not just
+         the window (e.g. the map stage's `overflow: hidden`); a `position: fixed` ancestor ends the walk. If neither
+         side fits, take the side with more room. The trigger's rect is transform-free, and `offsetHeight` avoids the
+         popover's entrance transform. */
       const trigger = el.querySelector("summary");
       if (!trigger) return;
       let top = 0;

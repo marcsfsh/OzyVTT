@@ -1,8 +1,5 @@
-/**
- * Pure 5e combat math (ADR-0019): typed damage against defenses, advantage aggregation, and the
- * death-save state machine. No game-state knowledge - the server passes plain values in and applies
- * the returned transitions, so every rule here is unit-testable against the SRD text it implements.
- */
+// Pure 5e combat math (ADR-0020): typed damage against defenses, advantage aggregation and the death-save state
+// machine. The server passes plain values in and applies the returned transitions.
 
 export type DamagePart = Readonly<{ amount: number; type: string }>;
 export type DamageDefenses = Readonly<{
@@ -19,23 +16,14 @@ export type AdjustedDamagePart = Readonly<{
   adjustment: "resistance" | "immunity" | "vulnerability" | null;
 }>;
 
-/**
- * THE ONE damage-type normaliser, exported so both halves of the vocabulary share it.
- *
- * The engine matches types by this form, and the homebrew editor writes them; a second copy anywhere
- * is a silent-inertness bug ("Fire" resisted by nothing). It lives HERE rather than beside
- * `DAMAGE_TYPE_IDS` because `@vtt/content-srd-5.2.1` depends on this package and not the reverse -
- * declaring it there and importing it here would be a dependency cycle. That package re-exports it.
- */
+/** The one damage-type normaliser; the engine matches types by it and the homebrew editor writes with it. Lives
+ * here because the content package depends on this one (it re-exports it). */
 export const normalizeDamageType = (type: string): string => type.trim().toLowerCase();
 
 const normalizeType = normalizeDamageType;
 
-/**
- * SRD order per part: immunity zeroes, resistance halves rounding down, vulnerability doubles.
- * Immunity wins outright; resistance and vulnerability on the same type cancel (SRD 5.2.1: they
- * don't stack - a creature with both takes normal damage).
- */
+/** SRD per part: immunity zeroes, resistance halves (round down), vulnerability doubles; resistance and
+ * vulnerability on the same type cancel. */
 export function adjustDamageParts(parts: readonly DamagePart[], defenses: DamageDefenses): AdjustedDamagePart[] {
   const resistances = new Set(defenses.resistances.map(normalizeType));
   const immunities = new Set(defenses.immunities.map(normalizeType));
@@ -51,32 +39,14 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
   });
 }
 
-/**
- * Flat reduction ("reduce the damage by 3" - Heavy Armor Master, Armor of Gleaming) is the LAST step
- * and the only one that is not per-type: it applies once to the total the per-type adjustments
- * produced, and it floors at 0 rather than turning damage into healing.
- *
- * Per TOTAL rather than per part because the SRD phrases it against "the damage" one attack deals,
- * not against each damage die's own type. `adjustDamageParts` has already run when this is called, so
- * a resistance halves BEFORE the reduction subtracts - which is the order that makes a resisted hit
- * survivable rather than the reverse.
- */
+/** Flat reduction ("reduce the damage by 3", Heavy Armor Master): applied once to the total after per-type
+ * adjustments, so resistance halves first. Floors at 0. */
 export function reduceDamageTotal(total: number, reduction: number): number {
   return reduction <= 0 ? total : Math.max(0, total - reduction);
 }
 
-/**
- * A HAND-ENTERED TOTAL, re-weighted across the types that were actually rolled.
- *
- * The alternative - what every amend path did before this - is to send the number as an untyped
- * total, which skips the defence pipeline entirely: the GM corrects 17 to 12 and the fire-resistant
- * target suddenly takes all 12. Scaling keeps every type, so the amended hit is still fire, still
- * halved, and still explains itself.
- *
- * Exact by construction: each part floors to its share and the whole remainder lands on the largest
- * one, so the result always sums to `total`. An empty or zero-valued proposal has nothing to weight
- * by, so the number goes on a single part carrying the first type it can see.
- */
+/** Re-weight a hand-entered total across the rolled damage types so an amended hit still runs the defence
+ * pipeline. Each part floors to its share and the remainder goes to the largest, so the sum is exact. */
 export function rescaleDamageParts(parts: readonly DamagePart[], total: number): DamagePart[] {
   const target = Math.max(0, Math.trunc(total));
   const rolled = parts.reduce((sum, part) => sum + part.amount, 0);
@@ -123,7 +93,7 @@ export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): 
   }
   if (naturalRoll >= 10) {
     const successes = Math.min(3, current.successes + 1);
-    // Becoming stable resets both counters (SRD 5.2.1) - dying later starts from a clean slate.
+    // Becoming stable resets both counters (SRD 5.2.1).
     if (successes >= 3) return { state: { successes: 0, failures: 0, stable: true }, outcome: "success", regainsOneHitPoint: false, dead: false };
     return { state: { ...current, successes }, outcome: "success", regainsOneHitPoint: false, dead: false };
   }
@@ -145,10 +115,7 @@ export function damageWhileDying(current: DeathSaveState, damage: number, critic
   return { state: { successes: base.successes, failures, stable: false }, failuresAdded, dead: failures >= 3 };
 }
 
-/**
- * Damage that drops a creature from above 0 to 0: instant death when the REMAINING damage (beyond
- * what reduced it to 0) equals or exceeds the hit point maximum; otherwise the dying state begins.
- */
+/** Damage that drops a creature to 0: instant death when the damage beyond 0 equals or exceeds the HP maximum. */
 export function droppedToZero(overflowDamage: number, hpMaximum: number): Readonly<{ instantDeath: boolean; state: DeathSaveState }> {
   const instantDeath = overflowDamage >= hpMaximum;
   return { instantDeath, state: instantDeath ? { successes: 0, failures: 3, stable: false } : { successes: 0, failures: 0, stable: false } };

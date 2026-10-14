@@ -1,6 +1,4 @@
-// ajv is CJS, so under `module: NodeNext` a default import resolves to the whole module namespace
-// (no construct signature). The named export is the same class object at runtime, and it is what
-// every other ajv call site in the repo already uses.
+// ajv is CJS: under `module: NodeNext` the default import is the module namespace, so use the named export.
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import character from "../../test-fixtures/actors/player-character.v1.json" with { type: "json" };
@@ -13,8 +11,7 @@ import { ActorDefinitionSchema, ActorSchema, EffectModifierSchema, RIDER_TRIGGER
 
 describe("actor definition v1", () => {
   const jsonValidate = new Ajv2020({ strict: false }).compile(jsonSchema);
-  // The replay party carries every ADR-0020 mechanics field (grants, multiattack pools, uses,
-  // criticalBonusDice) - validating them against BOTH schemas keeps the JSON twin from drifting.
+  // Validating against both the Zod schema and its JSON twin keeps the two from drifting.
   it.each([character, monster, torva, pip, sable])("accepts a representative fixture", (fixture) => {
     const parsed = ActorDefinitionSchema.safeParse(fixture);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
@@ -28,8 +25,6 @@ describe("actor definition v1", () => {
     const invalid = structuredClone(character); invalid.token.disposition = "hostile";
     expect(ActorDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
-  // The new character-sheet fields (class/proficiencies/spellcasting/inventory/currency) must parse
-  // under BOTH schemas so the JSON twin can't drift from the Zod source.
   it("accepts a definition carrying the new character-sheet fields", () => {
     const withSheet = structuredClone(character) as Record<string, unknown>;
     withSheet.character = { classes: [{ id: "wizard", name: "Wizard", subclass: { id: "evocation", name: "Evocation" }, level: 5 }], race: { id: "human", name: "Human" }, background: { id: "sage", name: "Sage" }, feats: [{ id: "alert", name: "Alert" }] };
@@ -42,15 +37,9 @@ describe("actor definition v1", () => {
     expect(jsonValidate(withSheet), JSON.stringify(jsonValidate.errors)).toBe(true);
   });
 
-  // ---- character-builder deltas (task packet P1.2) ----------------------------------------------
-  // Every field below is additive-optional with a default, so schemaVersion stays 1 (ADR-0007).
+  // ---- character-builder fields (optional, so schemaVersion stays 1; ADR-0007) ----
 
-  /**
-   * BACK-COMPAT PROOF. This literal is a definition exactly as it was persisted BEFORE the builder
-   * deltas existed - no `choices`, no per-class `hitDie`, no per-class spellcasting, no proficiency
-   * lists, no weapon `properties`. A stored GameState full of these must keep parsing, and the new
-   * fields must materialize as empty defaults rather than errors.
-   */
+  /** A definition as persisted before the builder fields existed; it must still parse and round-trip unchanged. */
   const legacyDefinition = Object.freeze({
     schemaId: "vtt.actor-character", schemaVersion: 1,
     source: { name: "hand-authored", version: "1" },
@@ -69,10 +58,8 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(structuredClone(legacyDefinition));
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(structuredClone(legacyDefinition)), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // schemaVersion is NOT bumped - the old document is still a v1 document.
     expect(parsed.success && parsed.data.schemaVersion).toBe(1);
-    // Every new field stays ABSENT rather than materializing as an empty value, so re-saving a
-    // legacy definition does not silently rewrite stored content (ADR-0007).
+    // New fields stay absent rather than materializing as empty values, so re-saving does not rewrite stored content.
     const data = parsed.success ? parsed.data : undefined;
     expect(data?.character?.choices).toBeUndefined();
     expect(data?.character?.classes[0].hitDie).toBeUndefined();
@@ -82,18 +69,13 @@ describe("actor definition v1", () => {
     expect(data?.proficiencies?.languages).toBeUndefined();
     expect(data?.spellcasting?.classes).toBeUndefined();
     expect(data?.startingInventory?.[0].weapon?.properties).toBeUndefined();
-    // The pre-existing single-object spellcasting fields are untouched - old consumers keep working.
     expect(data?.spellcasting?.ability).toBe("int");
-    // Round-trip: re-serializing a legacy document introduces NONE of the new builder keys, so a
-    // stored definition is not silently rewritten just by being loaded and saved. (Fields that were
-    // already `.default()` before this change - quantity, currency, ... - still fill in as before.)
+    // Re-serializing introduces none of the builder keys (fields that already had `.default()` still fill in).
     const roundTripped = JSON.stringify(data);
     for (const newKey of ["choices", "hitDie", "weapons", "tools", "languages", "properties", "classId"]) {
       expect(roundTripped, newKey).not.toContain(`"${newKey}"`);
     }
-    // Readers that just want a list use the helper instead of `?? []` at every call site.
     expect(characterChoices(data?.character)).toEqual([]);
-    // ...and the single-caster resolution falls through to the top-level fields.
     expect(resolveSpellcasting(data?.spellcasting)).toEqual({ ability: "int", saveDc: undefined, attackBonus: undefined });
     expect(resolveSpellcasting(data?.spellcasting, "wizard")).toEqual({ ability: "int", saveDc: undefined, attackBonus: undefined });
     expect(resolveSpellcasting(undefined)).toBeUndefined();
@@ -106,14 +88,14 @@ describe("actor definition v1", () => {
       { level: 1, kind: "skill", id: "athletics", payload: { from: "fighter", featureId: "fighter-skills" } },
       { level: 4, classId: "fighter", kind: "asi", id: "str", payload: { increases: { str: 2 } } },
       { level: 4, classId: "fighter", kind: "feat", id: "alert" },
-      // an entirely homebrew choice kind needs no schema change
+      // a homebrew choice kind needs no schema change
       { level: 6, classId: "moon-warden", kind: "lunar-boon", id: "waxing-tide" }
     ];
     const parsed = ActorDefinitionSchema.safeParse(withChoices);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withChoices), JSON.stringify(jsonValidate.errors)).toBe(true);
     expect(characterChoices(parsed.success ? parsed.data.character : undefined).length).toBe(5);
-    // An empty ledger is distinguishable from an absent one - respec depends on that difference.
+    // An empty ledger must be distinguishable from an absent one; respec depends on it.
     const emptyLedger = structuredClone(legacyDefinition) as Record<string, any>;
     emptyLedger.character.choices = [];
     expect(ActorDefinitionSchema.parse(emptyLedger).character?.choices).toEqual([]);
@@ -126,8 +108,7 @@ describe("actor definition v1", () => {
       { id: "paladin", name: "Paladin", level: 6, hitDie: "d10", subclass: { id: "oath-of-devotion", name: "Oath of Devotion" } },
       { id: "wizard", name: "Wizard", level: 4, hitDie: "d6" }
     ];
-    // Paladin casts off CHA, Wizard off INT - the whole point of the per-class array. The top-level
-    // fields stay populated (primary caster) so pre-existing consumers keep resolving.
+    // Paladin casts off CHA, Wizard off INT; the top-level fields mirror the primary caster.
     multiclass.spellcasting = {
       ability: "cha", saveDc: 15, attackBonus: 7,
       slots: [{ level: 1, max: 4 }, { level: 2, max: 3 }, { level: 3, max: 3 }],
@@ -160,18 +141,13 @@ describe("actor definition v1", () => {
     expect(data?.spellcasting?.classes?.find((entry) => entry.classId === "wizard")?.ability).toBe("int");
     expect(data?.spellcasting?.ability).toBe("cha");
     expect(data?.startingInventory?.[1].weapon?.properties).toEqual(["light", "thrown"]);
-    // The documented resolution order: per-class entry first, top-level fields as the fallback.
     expect(resolveSpellcasting(data?.spellcasting, "wizard")).toEqual({ classId: "wizard", ability: "int", saveDc: 14, attackBonus: 6 });
     expect(resolveSpellcasting(data?.spellcasting, "paladin")).toEqual({ classId: "paladin", ability: "cha", saveDc: 15, attackBonus: 7 });
-    // An unknown class id with several entries falls back to the top-level (primary caster) fields.
+    // An unknown class id with several entries falls back to the top-level fields.
     expect(resolveSpellcasting(data?.spellcasting, "bard")).toEqual({ ability: "cha", saveDc: 15, attackBonus: 7 });
   });
 
-  /**
-   * REGRESSION: the lone-entry shortcut (resolution step 2) used to fire even when the caller named a
-   * DIFFERENT class, so an Eldritch Knight / Wizard sheet answered "what are the fighter's numbers?"
-   * with the Wizard's INT and DC. Step 2 exists for the caller who names no class at all.
-   */
+  /** The lone-entry shortcut must not answer a named class with another class's numbers. */
   it("never answers an explicitly named class with another class's spellcasting numbers", () => {
     const single = structuredClone(legacyDefinition) as Record<string, any>;
     single.spellcasting = {
@@ -182,15 +158,13 @@ describe("actor definition v1", () => {
     };
     const parsed = ActorDefinitionSchema.parse(single);
     expect(jsonValidate(single), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // Naming NO class keeps the single-entry shortcut - the ordinary single-class caster.
+    // Naming no class keeps the single-entry shortcut.
     expect(resolveSpellcasting(parsed.spellcasting)).toEqual({ classId: "wizard", ability: "int", saveDc: 15, attackBonus: 7 });
     expect(resolveSpellcasting(parsed.spellcasting, "wizard")).toEqual({ classId: "wizard", ability: "int", saveDc: 15, attackBonus: 7 });
-    // Naming a class with NO entry must NOT be handed the wizard's entry; it falls through to the
-    // top-level fields (step 3), and it never claims to be the wizard's.
+    // A named class with no entry falls through to the top-level fields.
     const fighter = resolveSpellcasting(parsed.spellcasting, "fighter");
     expect(fighter).toEqual({ ability: "int", saveDc: 15, attackBonus: 7 });
     expect(fighter?.classId).toBeUndefined();
-    // Same rule with a differing per-class entry: asking for "fighter" cannot borrow the wizard's DC.
     const differing = structuredClone(single);
     differing.spellcasting.classes = [{ classId: "wizard", ability: "int", saveDc: 19, attackBonus: 11 }];
     differing.spellcasting.saveDc = 13;
@@ -200,12 +174,7 @@ describe("actor definition v1", () => {
     expect(resolveSpellcasting(parsedDiffering.spellcasting, "fighter")).toEqual({ ability: "cha", saveDc: 13, attackBonus: 5 });
   });
 
-  /**
-   * REGRESSION: the doc block on SpellcastingSchema always said a builder filling `classes[]` must
-   * keep the top-level pool populated, but nothing enforced it - so a definition with per-class slots
-   * and an empty top-level `slots` parsed happily and seeded a caster with ZERO live slots that no
-   * long rest could refill. It is now a parse error under BOTH schemas.
-   */
+  /** Per-class slots without the combined top-level pool would seed a caster with zero live slots. */
   it("rejects per-class spell slots without the combined top-level pool", () => {
     const inconsistent = structuredClone(legacyDefinition) as Record<string, any>;
     inconsistent.spellcasting = {
@@ -221,52 +190,42 @@ describe("actor definition v1", () => {
     expect(parsed.success).toBe(false);
     expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join("."))).toContain("spellcasting.slots");
     expect(jsonValidate(inconsistent)).toBe(false);
-    // Omitting `slots` entirely is the same violation (it defaults to an empty pool).
+    // Omitting `slots` is the same violation (it defaults to empty).
     const omitted = structuredClone(inconsistent);
     delete omitted.spellcasting.slots;
     expect(ActorDefinitionSchema.safeParse(omitted).success).toBe(false);
     expect(jsonValidate(omitted)).toBe(false);
-    // Filling the combined pool makes the same sheet legal again under both schemas.
     const consistent = structuredClone(inconsistent);
     consistent.spellcasting.slots = [{ level: 1, max: 4 }, { level: 2, max: 3 }, { level: 3, max: 3 }];
     expect(ActorDefinitionSchema.safeParse(consistent).success).toBe(true);
     expect(jsonValidate(consistent), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // Per-class ENTRIES without per-class slots stay legal - the server derives the combined table.
+    // Per-class entries without per-class slots stay legal; the server derives the combined table.
     const derived = structuredClone(inconsistent);
     for (const entry of derived.spellcasting.classes) delete entry.slots;
     expect(ActorDefinitionSchema.safeParse(derived).success).toBe(true);
     expect(jsonValidate(derived), JSON.stringify(jsonValidate.errors)).toBe(true);
   });
 
-  /**
-   * REGRESSION: `Actor.hitDice` was one `{die, maximum, remaining}`, so a Fighter 3 / Wizard 2 could
-   * only ever be stored as ONE die size and silently lost 2 of its 5 dice. It is now a pool. The
-   * change must stay additive: a GameState persisted with the old single-object shape still loads.
-   */
+  /** Hit dice are a pool; a GameState saved with the older single-object shape must still load. */
   it("normalises every Hit-Dice shape into one pool, old saves included", () => {
     const pool = makeHitDicePool([{ die: "d10", maximum: 3, remaining: 1 }, { die: "d6", maximum: 2, remaining: 2 }]);
-    // The summary is DERIVED: total dice, labelled with the largest size present.
+    // The summary is derived: total dice, labelled with the largest size present.
     expect(pool).toEqual({ die: "d10", maximum: 5, remaining: 3, entries: [{ die: "d10", maximum: 3, remaining: 1 }, { die: "d6", maximum: 2, remaining: 2 }] });
     expect(makeHitDicePool([])).toBeNull();
 
     const base = { id: "3f1c9e2a-0000-4000-8000-00000000f001", name: "Old Save", kind: "player-character" as const, hp: { current: 10, maximum: 10 } };
-    // A save written before pools existed loads as a one-entry pool (no schemaVersion bump needed).
     expect(ActorSchema.parse({ ...base, hitDice: { die: "d12", maximum: 7, remaining: 4 } }).hitDice)
       .toEqual({ die: "d12", maximum: 7, remaining: 4, entries: [{ die: "d12", maximum: 7, remaining: 4 }] });
-    // A save with no hit dice at all keeps the null default (unmodeled).
     expect(ActorSchema.parse(base).hitDice).toBeNull();
     expect(ActorSchema.parse({ ...base, hitDice: null }).hitDice).toBeNull();
-    // A hand-written summary can never disagree with the pool: it is recomputed from `entries`.
+    // A hand-written summary is ignored and recomputed from `entries`.
     expect(ActorSchema.parse({ ...base, hitDice: { die: "d4", maximum: 99, remaining: 99, entries: [{ die: "d8", maximum: 2, remaining: 0 }] } }).hitDice)
       .toEqual({ die: "d8", maximum: 2, remaining: 0, entries: [{ die: "d8", maximum: 2, remaining: 0 }] });
-    // Garbage still fails loudly rather than being normalised into something plausible.
     expect(ActorSchema.safeParse({ ...base, hitDice: { die: "d7", maximum: 1, remaining: 1 } }).success).toBe(false);
     expect(ActorSchema.safeParse({ ...base, hitDice: { die: "d6", maximum: 1, remaining: 1, entries: "nope" } }).success).toBe(false);
   });
 
-  // ---- the shared rider vocabulary (magic items, feats, effects) --------------------------------
-  // `EffectModifierSchema` grew three variants that `FeatureModifierSchema` carries as the very same
-  // objects. The JSON twin has to grow with them or the two documents disagree about the wire.
+  // ---- shared rider vocabulary (magic items, feats, effects); the JSON twin must keep pace ----
 
   it("carries the three shared riders through BOTH schemas, gates and all", () => {
     const withRiders = structuredClone(legacyDefinition) as Record<string, any>;
@@ -278,8 +237,7 @@ describe("actor definition v1", () => {
           { type: "attack-bonus", amount: 1, scope: "this-item" },
           { type: "extra-damage", formula: "1d6", damageType: "fire", doubleOnCritical: false, when: [{ type: "on-critical-hit" }] },
           { type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] },
-          // The six legacy advantage/disadvantage variants keep working unchanged - `roll-mode` is
-          // the general form beside them, never a replacement that would break a stored effect.
+          // The legacy advantage/disadvantage variants keep working beside `roll-mode`.
           { type: "attack-advantage" }, { type: "save-disadvantage", ability: "con" }
         ]
       }
@@ -287,16 +245,10 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(withRiders);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // Thirteen variants: the eight that existed, the three shared with FeatureModifierSchema,
-    // `damage-vulnerability` - the mirror of `damage-resistance`, without which nothing in the game
-    // could make a player character vulnerable to a damage type - and U18's runtime `speed`, the one
-    // that cannot be said with the BAKED `speed` rider because an effect that ends has to give the
-    // feet back. Its reader is `effectiveSpeedFeet`, and the far end is the movement refusal.
     expect(EffectModifierSchema.options).toHaveLength(13);
-    // ...and the JSON twin declares exactly as many branches, which is the lockstep this test buys.
+    // The JSON twin must declare exactly as many branches.
     expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(13);
-    // The runtime speed member goes through BOTH documents, bounds and all - a branch only Zod knows
-    // about is a stored effect the JSON validator would reject on the next load.
+    // A branch only Zod knows about is a stored effect the JSON validator would reject on load.
     expect(EffectModifierSchema.safeParse({ type: "speed", amount: -10 }).success).toBe(true);
     expect(EffectModifierSchema.safeParse({ type: "speed", amount: 61 }).success).toBe(false);
     const striding = structuredClone(withRiders) as Record<string, any>;
@@ -306,22 +258,18 @@ describe("actor definition v1", () => {
   });
 
   it("normalises every advantage shape through ONE function, so no consumer branches on eleven", () => {
-    // The point of `roll-mode`: the legacy variants and the general form come back identical, and
-    // 5e cancellation (`aggregateRollMode`) then works on the labelled sources without knowing which
-    // shape produced them. A curse is `mode: "disadvantage"` and needs no separate machinery.
+    // Legacy variants and `roll-mode` normalise to the same claim.
     expect(toRollModes(EffectModifierSchema.parse({ type: "attack-advantage" }))).toEqual([{ roll: "attack", mode: "advantage" }]);
     expect(toRollModes(EffectModifierSchema.parse({ type: "roll-mode", roll: "attack", mode: "advantage" }))).toEqual([{ roll: "attack", mode: "advantage" }]);
     expect(toRollModes(EffectModifierSchema.parse({ type: "save-advantage", ability: "dex" }))).toEqual([{ roll: "save", mode: "advantage", ability: "dex" }]);
     expect(toRollModes(EffectModifierSchema.parse({ type: "incoming-attack-disadvantage" }))).toEqual([{ roll: "incoming-attack", mode: "disadvantage" }]);
-    // A rider that is not an advantage claim normalises to nothing rather than to a wrong claim.
     expect(toRollModes(EffectModifierSchema.parse({ type: "damage-bonus", amount: 2 }))).toEqual([]);
     expect(toRollModes(EffectModifierSchema.parse({ type: "attack-bonus", amount: 1 }))).toEqual([]);
   });
 
   it("declares thirty-one named triggers, every one classified and accepted by the JSON twin", () => {
-    // One sample per trigger. The JSON twin folds the eleven parameterless moments into a single
-    // enum branch, so a branch COUNT would not prove agreement - running every name through both
-    // documents does. A trigger added to Zod and forgotten in the mirror fails right here.
+    // One sample per trigger: the JSON twin folds parameterless moments into one enum branch, so a branch count would
+    // not prove agreement.
     const samples: Record<string, Record<string, unknown>> = {
       attuned: {}, "while-armored": { weights: ["heavy"] }, "while-unarmored": { allowShield: true },
       "while-shield": { wielding: false }, "while-character-is": { classIds: ["paladin"], speciesIds: ["dwarf"] },
@@ -341,8 +289,7 @@ describe("actor definition v1", () => {
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
     expect(declared).toHaveLength(31);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
-    // Six static gates, three dynamic gates, eleven moments, eleven filters - and every trigger is
-    // classified, because an unclassified one would silently evaluate in the wrong layer.
+    // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
     expect(kinds.filter((kind) => kind === undefined)).toEqual([]);
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
@@ -352,8 +299,7 @@ describe("actor definition v1", () => {
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };
-      // A filter needs a moment beside it, and only a moment may accompany itself: build the
-      // smallest legal `when` for each kind rather than special-casing the assertion.
+      // A filter needs a moment beside it.
       const when = RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS] === "filter" ? [{ type: "on-hit" }, trigger] : [trigger];
       expect(RiderWhenSchema.safeParse(when).success, type).toBe(true);
       const definition = structuredClone(legacyDefinition) as Record<string, any>;
@@ -364,13 +310,11 @@ describe("actor definition v1", () => {
   });
 
   it("rejects a `when` list the JSON twin would also reject", () => {
-    // Structural refinements (one moment, a filter needs a moment) live in Zod alone; the shapes
-    // themselves must agree, and an unnamed trigger must fail on both sides.
+    // Structural refinements live in Zod alone; the shapes must agree and an unknown trigger fails on both sides.
     const bad = structuredClone(legacyDefinition) as Record<string, any>;
     bad.actions = [{ id: "x", name: "X", activation: "action", description: "d", grants: { tags: ["x"], duration: { type: "encounter" }, modifiers: [{ type: "attack-bonus", amount: 1, when: [{ type: "while-it-is-tuesday" }] }] } }];
     expect(ActorDefinitionSchema.safeParse(bad).success).toBe(false);
     expect(jsonValidate(bad)).toBe(false);
-    // The layer table is a pure lookup, shared by every consumer so it cannot be decided twice.
     expect(riderLayer(RiderWhenSchema.parse([{ type: "while-effect-tag", tags: ["raging"] }]))).toBe("conditional");
     expect(riderLayer(RiderWhenSchema.parse([]))).toBe("standing");
   });

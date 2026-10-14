@@ -7,8 +7,7 @@ export interface KbdProps {
   className?: string;
 }
 
-/** A single keyboard key cap, for shortcut hints and cheat sheets (e.g. the
-    coming ⌘K palette). Compose several for a chord: <Kbd>⌘</Kbd><Kbd>K</Kbd>. */
+/** A single keyboard key cap for shortcut hints. Compose several for a chord: <Kbd>⌘</Kbd><Kbd>K</Kbd>. */
 export function Kbd({ children, className }: KbdProps) {
   return <kbd className={cx("nh-kbd", className)}>{children}</kbd>;
 }
