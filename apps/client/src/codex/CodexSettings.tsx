@@ -4,36 +4,18 @@ import { codexApi, AUTOSAVE_INTERVAL_CHOICES, AUTOSAVE_INTERVAL_MAX, AUTOSAVE_IN
 import { useConfirm } from "../components/feedback";
 
 /**
- * Codex-wide settings — **owner decision, 2026-07-30**, and the FOURTH destination laid over the content
- * region, on identical terms to the session log, the quest log and the reveal audit: the five mode tabs
- * already overflow a 375px strip, so codex-wide surfaces are reached from the ops row instead, and each
- * opener closes the others rather than leaving one stacked behind another.
- *
- * WHY IT EXISTS AT ALL. Completing the export bundle showed `codex_page_revisions` is unbounded: every page
- * save writes a row, nothing prunes, and a revision row weighs the same as a page row (both bodies). It is
- * worse than "per save" implies, because the editor autosaves on an 800ms debounce — a version is written on
- * every pause in typing, so an hour of writing produces hundreds of rows for one page. Measured at a
- * deliberately conservative 15 revisions per page, the export went from 1.24 MB to 20.8 MB.
- *
- * The controls started life inside the page editor's Revision history panel, on the argument that it is
- * where a GM is when they wonder why the list is short. The owner chose a real settings screen instead, and
- * that argument is served differently now: the panel keeps a read-only sentence naming the setting in force,
- * so the short list still explains itself, and the controls that CHANGE it live here.
- *
- * **This screen only ever holds settings, never records.** A destructive action is allowed here (deleting old
- * versions is a setting-shaped decision about how much history to keep) but it is the only one, and it
- * confirms with the real count rather than a generic warning.
+ * Codex-wide settings: autosave and version history. Holds settings only, never records; its one
+ * destructive action (trimming old versions) confirms with the real count.
  */
 export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmToken: string; onSettingsChanged?: (settings: CodexSettingsRecord) => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [settings, setSettings] = useState<CodexSettingsRecord | null>(null);
-  // CF-2 at the level of the whole surface: before the first read settles, this screen is not entitled to
-  // claim what the codex's settings ARE — an unread switch rendered "off" is a guess presented as state.
+  // Until the first read settles, don't show a guessed state.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  /** How many days of history to keep when trimming. Local to the action, deliberately not a stored setting. */
+  /** Days of history to keep when trimming. Local to the action, not a stored setting. */
   const [trimDays, setTrimDays] = useState("30");
 
   const load = useCallback(async () => {
@@ -44,29 +26,23 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
   }, [gmToken]);
   useEffect(() => { void load(); }, [load]);
 
-  /**
-   * Written straight through on change, with no Save button: each is one value, and the response carries the
-   * CLAMPED result, so a field shows what the server actually stored rather than what was typed at it.
-   */
+  /** Written through on change; the response carries the clamped value the server stored. */
   const save = async (patch: Readonly<{ revisionHistory?: CodexRevisionHistorySettings; autosave?: CodexAutosaveSettings }>) => {
     if (!settings) return;
     const revisionHistory = patch.revisionHistory ?? { enabled: settings.revisionHistory.enabled, windowMinutes: settings.revisionHistory.windowMinutes };
     const autosave = patch.autosave ?? settings.autosave;
-    // Optimistic on the writable fields only; the usage figures stay whatever the last read reported,
-    // because a client that recomputed them would be guessing about a table it cannot see.
+    // Optimistic on writable fields only; usage figures stay as last reported by the server.
     setSettings((prev) => prev ? { revisionHistory: { ...prev.revisionHistory, ...revisionHistory }, autosave } : prev);
     setNotice(null);
     try {
-      // The PUT is WHOLESALE — both groups are required, so a body carrying one is a 400. Every write
-      // from this screen therefore sends the pair it is holding, not the field that changed.
+      // The PUT is wholesale, so send both groups every time.
       const next = await codexApi.setSettings(gmToken, { revisionHistory, autosave });
-      // Keep the optimistic value if the answer is unusable rather than blanking the screen: the next
-      // control the GM touches must still know what the codex holds.
+      // Keep the optimistic value if the answer is unusable, rather than blanking the screen.
       if (next) { setSettings(next); onSettingsChanged?.(next); }
       setError(null);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "That setting could not be saved.");
-      // Re-read, so the control shows what the codex holds rather than a value that never landed.
+      // Re-read so the control shows what the codex actually holds.
       try { const fresh = await codexApi.getSettings(gmToken); setSettings(fresh); onSettingsChanged?.(fresh); } catch { /* the error above already says it did not save */ }
     }
   };
@@ -74,16 +50,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
   const history = settings?.revisionHistory ?? null;
   const autosave = settings?.autosave ?? null;
 
-  /**
-   * The one destructive action on this screen (owner decision, 2026-07-30).
-   *
-   * `olderThanDays: 0` deletes EVERYTHING, and that is arithmetic rather than a magic value — nothing is
-   * younger than zero days old. It is still reached by its own button and its own confirm, never by winding
-   * the day field down to 0, because the two are different decisions and one of them is unrecoverable.
-   *
-   * The confirm names the real count. "This cannot be undone" over an unknown number is a warning a GM
-   * learns to click through; "delete 1,412 versions" is one they read.
-   */
+  /** `olderThanDays: 0` deletes everything, reached only by its own button and confirm. */
   const trim = async (olderThanDays: number) => {
     const kept = history?.versionCount ?? 0;
     const what = olderThanDays === 0
@@ -110,8 +77,6 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
 
   return (
     <>
-      {/* No exit row: since D1 the sidebar is always on screen, so every section is one tap from every
-          other one and a per-surface "back" would be a second navigation system. */}
       <div className="codex-settings">
         <header className="codex-audit-head">
           <h3 className="codex-audit-title">Settings</h3>
@@ -122,8 +87,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
         {notice && <p className="notice notice-success" role="status">{notice}</p>}
         {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
 
-        {/* D6: the autosave setting, above version history because it governs the thing a GM notices
-            first — whether their typing is being kept. */}
+        {/* Autosave first: it governs what a GM notices first. */}
         {!loading && autosave && (
           <section className="codex-settings-section">
             <h4 className="codex-audit-h">Autosave</h4>
@@ -133,15 +97,13 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
               <Field label="Save after a pause of" htmlFor="autosave-interval" help="Longer intervals save fewer versions and risk losing more unsaved work.">
                 <Select id="autosave-interval" value={String(autosave.intervalSeconds)}
                   onChange={(event) => {
-                    // Clamped here as well as on the server, so the control cannot ask for a value that
-                    // comes back changed; the server's answer is still what lands in state.
+                    // Clamped like the server; the server's answer still lands in state.
                     const typed = Math.trunc(Number(event.target.value));
                     const intervalSeconds = Number.isFinite(typed) ? Math.min(AUTOSAVE_INTERVAL_MAX, Math.max(AUTOSAVE_INTERVAL_MIN, typed)) : AUTOSAVE_INTERVAL_MIN;
                     void save({ autosave: { ...autosave, intervalSeconds } });
                   }}>
                   {AUTOSAVE_INTERVAL_CHOICES.map((seconds) => <option key={seconds} value={seconds}>{intervalLabel(seconds)}</option>)}
-                  {/* A value set outside the picker (say, by an integration) renders as its own option, so
-                      the control never claims a cadence the codex is not actually running. */}
+                  {/* A value set outside the picker renders as its own option. */}
                   {!AUTOSAVE_INTERVAL_CHOICES.includes(autosave.intervalSeconds) && (
                     <option value={autosave.intervalSeconds}>{autosave.intervalSeconds} seconds (custom)</option>
                   )}
@@ -172,15 +134,13 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
                   <Input id="rev-window" type="number" inputMode="numeric" min={REVISION_WINDOW_MIN} max={REVISION_WINDOW_MAX}
                     value={String(history.windowMinutes)}
                     onChange={(event) => {
-                      // Clamped here as well as on the server, so the field cannot ask for something that
-                      // comes back changed; the server's answer is still what lands in state.
+                      // Clamped like the server; the server's answer still lands in state.
                       const typed = Math.trunc(Number(event.target.value));
                       const windowMinutes = Number.isFinite(typed) ? Math.min(REVISION_WINDOW_MAX, Math.max(REVISION_WINDOW_MIN, typed)) : REVISION_WINDOW_MIN;
                       void save({ revisionHistory: { enabled: history.enabled, windowMinutes } });
                     }} />
                 </Field>
-                {/* With a window set, the newest version is normally BEHIND the page as it stands — the one
-                    thing about the history list that would otherwise read as a bug. */}
+                {/* With a window set, the newest version normally lags the page; say so. */}
                 {history.windowMinutes > 0 && (
                   <p className="codex-composer-hint">A page always keeps what you last typed. The newest saved version can be up to {history.windowMinutes} minutes behind it.</p>
                 )}
@@ -189,8 +149,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
               <p className="codex-composer-hint">New versions are not being saved. The ones you already have are kept, and can still be restored from a page's History.</p>
             )}
 
-            {/* What it currently costs, so "should I trim this?" is answerable here rather than by exporting
-                the codex and looking at the file size. */}
+            {/* What history currently costs. */}
             <p className="codex-settings-usage">
               <Badge>{history.versionCount.toLocaleString()} saved version{history.versionCount === 1 ? "" : "s"}</Badge>
               {" "}<span className="codex-revision-when">about {formatBytes(history.versionBytes)} of text</span>
@@ -207,8 +166,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
                 <Button variant="secondary" disabled={busy || history.versionCount === 0} onClick={() => void trim(days)}>
                   {busy ? "Deleting…" : `Delete versions older than ${days} day${days === 1 ? "" : "s"}`}
                 </Button>
-                {/* Its OWN button and its own confirm. Winding the field above down to zero must not be a
-                    route to deleting everything — the two are different decisions and one is unrecoverable. */}
+                {/* Its own button and confirm; the day field above can't reach zero. */}
                 <Button variant="destructive" disabled={busy || history.versionCount === 0} onClick={() => void trim(0)}>
                   Delete all version history
                 </Button>
@@ -222,7 +180,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
   );
 }
 
-/** The four cadences the picker offers, said in words rather than as a bare number of seconds. */
+/** The picker's presets in words. */
 function intervalLabel(seconds: number): string {
   if (seconds === 1) return "1 second";
   if (seconds < 60) return `${seconds} seconds`;
@@ -230,7 +188,7 @@ function intervalLabel(seconds: number): string {
   return `${Math.round(seconds / 60)} minutes`;
 }
 
-/** Human-readable size for the history figure. Approximate on purpose — it is text length, not disk usage. */
+/** Approximate on purpose: text length, not disk usage. */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${Math.max(0, Math.trunc(bytes))} bytes`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

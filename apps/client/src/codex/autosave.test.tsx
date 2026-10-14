@@ -8,23 +8,14 @@ import { navigate } from "../router";
 import { goTo } from "../../test/route";
 
 /**
- * D6 — one rule, one implementation: **the Codex always keeps your work.**
- *
- * Before this hook every editor had its own answer, and the disagreements were where work was lost: the
- * page editor debounced at 800ms, sessions and quests demanded an explicit Save (so a quest objective
- * ticked without saving was simply gone), and the pin inspector wrote through per control. So the tests
- * here are about the two MODES and the one discipline, not about any surface — a per-surface test would
- * re-prove the same hook five times and still not cover the part that actually bites.
- *
- * The part that actually bites is serialization. Two overlapping saves race the same `expectedRev`,
- * 409 against *themselves*, and then wedge the editor because the local rev never resyncs. That is the
- * bug this hook exists to make unrepeatable, and it is the hardest thing here to get right.
+ * The shared autosave hook: its two modes and its serialization. Overlapping saves would race the same
+ * `expectedRev`, 409 against themselves and wedge the editor.
  */
 
 const ON: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
 const OFF: CodexAutosaveSettings = { enabled: false, intervalSeconds: 1 };
 
-/** A minimal editor: one field, the hook, and the readout. Nothing else, so nothing else can explain a result. */
+/** A minimal editor: one field, the hook and its readout. */
 function Editor({ settings, save, onConflict, initial = "a", disabled = false }: Readonly<{
   settings: CodexAutosaveSettings;
   save: (draft: { text: string }) => Promise<void>;
@@ -55,7 +46,7 @@ describe("Autosave ON", () => {
     render(<Editor settings={ON} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    expect(save).not.toHaveBeenCalled();               // not on the keystroke — that would be a write per character
+    expect(save).not.toHaveBeenCalled();               // not on the keystroke
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
@@ -88,12 +79,7 @@ describe("Autosave ON", () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
   });
 
-  /**
-   * THE ONE THAT MATTERS. Two saves in flight race the same `expectedRev` and 409 against each other,
-   * and the editor then wedges because its local rev never resyncs. A test that only checked "the second
-   * edit was saved" would pass on the broken version too, so this asserts the OVERLAP directly: while
-   * the first write is unresolved, no second write may start.
-   */
+  /** Asserts the overlap directly: while the first write is unresolved, no second write may start. */
   it("never has two writes in flight — an edit mid-save waits and then re-runs", async () => {
     let release: (() => void) | null = null;
     const inFlight: string[] = [];
@@ -109,13 +95,12 @@ describe("Autosave ON", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
 
-    // Edit again while the first write is still unresolved, and let the debounce fire.
     await user.type(screen.getByLabelText("Body"), "c");
     await act(async () => { await vi.advanceTimersByTimeAsync(1_500); });
     expect(save).toHaveBeenCalledTimes(1);                 // ...and nothing started
 
     await act(async () => { release!(); await Promise.resolve(); });
-    // Only once the first settles does the second run — and it carries the LATEST draft, not a stale one.
+    // Only once the first settles does the second run, with the latest draft.
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
     expect(inFlight).toEqual(["ab", "abc"]);
   });
@@ -130,8 +115,7 @@ describe("Autosave ON", () => {
     await user.type(screen.getByLabelText("Body"), "b");
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
     await waitFor(() => expect(screen.getByLabelText("Status")).toHaveTextContent("conflict"));
-    // The distinction is load-bearing: "conflict" offers Reload, "error" offers Retry, and retrying a
-    // 409 with the same stale rev fails forever.
+    // "conflict" offers Reload, "error" offers Retry; retrying a 409 with a stale rev fails forever.
     expect(onConflict).toHaveBeenCalledTimes(1);
   });
 
@@ -187,8 +171,7 @@ describe("Autosave OFF", () => {
 
     expect(screen.getByLabelText("Status")).toHaveTextContent("idle");
     await user.type(screen.getByLabelText("Body"), "b");
-    // The whole point of the OFF mode's readout: "Saved" over an unsaved draft is a lie the GM only
-    // discovers on leaving, which is the moment it is most expensive.
+    // With autosave off, an unsaved draft must not read "Saved".
     await waitFor(() => expect(screen.getByLabelText("Status")).toHaveTextContent("dirty"));
     expect(screen.getByLabelText("Dirty")).toHaveTextContent("true");
   });
@@ -212,27 +195,21 @@ describe("Autosave OFF", () => {
 
     await user.type(screen.getByLabelText("Body"), "b");
     navigate("/codex/journal");
-    // A macrotask, not one microtask: `mayLeave` awaits the guard, so the push that this asserts the
-    // ABSENCE of lands three microtasks out. Resuming earlier passed whether or not the answer was
-    // honoured, which is no test at all.
+    // A macrotask: `mayLeave` awaits the guard, so the push being checked lands a few microtasks later.
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(confirmSpy).toHaveBeenCalledTimes(1);
-    // The address must not half-move: the editor stays mounted with the draft in it.
+    // The address doesn't half-move; the editor stays mounted with the draft.
     expect(window.location.pathname).toBe("/codex/pages/p1");
     confirmSpy.mockRestore();
   });
 
-  /**
-   * **The phone case, and the one that lost work.** The guard was consulted by `navigate()` and by
-   * nothing else, so browser Back and the Android back gesture walked out of a dirty editor with no
-   * prompt at all. On a phone, Back *is* the navigation.
-   */
+  /** Browser Back and the Android back gesture must hit the guard too; on a phone, Back is the navigation. */
   it("BLOCKS the browser Back when the GM declines, and the draft is still on screen after", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<Editor settings={OFF} save={vi.fn().mockResolvedValue(undefined)} />);
 
-    // A real history entry to go back FROM, pushed while the draft is still clean.
+    // A real history entry to go back from, pushed while the draft is clean.
     navigate("/codex/pages/p2");
     await waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p2"));
     await user.type(screen.getByLabelText("Body"), "b");
@@ -270,8 +247,7 @@ describe("Autosave OFF", () => {
     await user.type(screen.getByLabelText("Body"), "b");
     navigate("/codex/journal");
     await waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
-    // "Leave without saving" has to mean it. Silently saving would be a different, worse answer than
-    // either of the two the prompt offered.
+    // "Leave without saving" must not silently save.
     expect(save).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });

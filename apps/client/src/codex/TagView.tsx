@@ -10,24 +10,11 @@ import { useCodexSearch } from "./SearchResults";
 import { atlasPath, journalEntryPath, pagePath, questPath, sessionPath } from "./routes";
 
 /**
- * D10 — **clicking a tag anywhere opens everything that carries it.**
+ * Everything carrying a tag. Composed client-side from the shell's feeds, filtered by exact slug; pins load
+ * per map, so they come from the search route, exact-matched on their tags, with truncation reported.
  *
- * Client-composed, with no route of its own: every kind except pins is already in a feed the shell
- * holds, so filtering those by exact slug is one pass over data that is on screen. **Pins** are the one
- * kind that is not client-enumerable — they load per map — so they come from the existing search route
- * and are exact-matched on the hit's own `tags`. When search reports `truncated`, the section says so
- * rather than presenting a clipped list as the whole answer.
- */
-/**
- * **Role-blind row shapes: the minimum this view reads, with the reveal state OPTIONAL.**
- *
- * The player shell used to satisfy GM-typed props with five `as never` casts and a fabricated
- * `revealedToPlayers: true` on every row — switching off the compile-time protection the rest of the
- * Codex is built on, at exactly the boundary it exists to guard, and inventing a GM field on player
- * data to do it. A player's real projections satisfy these types unchanged, and the *absence* of the
- * field is what makes "no reveal state to show" and "no badge" the same fact rather than two.
- *
- * Same discipline as `SessionRef` and `ChroniclePayloadRef`: widen the shape, never cast the caller.
+ * Row shapes are the minimum this view reads, with `revealedToPlayers` optional, so player projections
+ * satisfy them unchanged and a missing field simply means no badge.
  */
 export type TagPageRef = Readonly<{ id: string; title: string; entityType: EntityType; tags: readonly string[]; revealedToPlayers?: boolean }>;
 export type TagMapRef = Readonly<{ id: string; name: string; tags: readonly string[]; revealedToPlayers?: boolean }>;
@@ -45,7 +32,7 @@ export type TagViewProps = Readonly<{
   sessions: readonly TagSessionRef[];
   quests: readonly TagQuestRef[];
   onNavigate: (path: string) => void;
-  /** The player shell passes its own token and reads through `playerCodexApi` — never the GM search. */
+  /** The player shell reads through `playerCodexApi`, never the GM search. */
   player?: boolean;
 }>;
 
@@ -157,8 +144,7 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
               <button key={quest.id} type="button" className="codex-campaign-recentitem" onClick={() => onNavigate(questPath(quest.id))}>
                 <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{quest.title}</span>
-                {/* The status LABEL, never the wire value: every other quest surface reads "In progress",
-                    and only this one read "active". */}
+                {/* The status label, never the wire value. */}
                 <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
                 {quest.revealedToPlayers !== undefined && <VisibilityBadge revealed={quest.revealedToPlayers} />}
               </button>

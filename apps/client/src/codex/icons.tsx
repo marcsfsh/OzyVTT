@@ -2,18 +2,9 @@ import { type CSSProperties, type ReactNode } from "react";
 import { entityColor, entityIconId, type EntityType } from "./entities";
 
 /**
- * Codex icon system: hand-drawn fantasy-cartography glyphs on a 0 0 24 24 grid, filled with
- * currentColor so a marker's (or an entity type's) chosen color drives them. Silhouette style, in the
- * spirit of hand-labelled fantasy maps - castles with turrets, hachured peaks, tree clusters. One
- * registry serves both the map-marker picker and the typed-entity icons (see entityIconId).
- *
- * WEIGHT (ruling 43). Same pass as `@vtt/ui`'s chrome set - heavier drawing, not a heavier stroke,
- * because nothing here is stroked either. This set keeps its OWN register: it is a finer, more
- * detailed cartographer's hand and converting it to the chrome set's weight would make it the chrome
- * set. So the rule here is a FLOOR rather than a single line weight - no structural limb below ~2.4
- * units, where the old drawings ran as thin as 1.0. That floor is a legibility fix as much as a
- * weight one: entity glyphs render at ~10.9px, where 1 unit is 0.45px and a 1-unit limb is a grey
- * ghost. Masses (mountain, desert, cave, town, treasure) were already dense and barely move.
+ * Codex icons: fantasy-cartography silhouettes on a 0 0 24 24 grid, filled with currentColor so the
+ * marker's or entity type's colour drives them. One registry serves the marker picker and entity icons.
+ * No structural limb thinner than ~2.4 units: entity glyphs render near 11px, where thinner limbs vanish.
  */
 
 export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
@@ -61,13 +52,8 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   henge: <><path d="M3.6 21.4V9.6h3.6v11.8zm6.6 0V8.4h3.6v13zm6.6 0V9.6h3.6v11.8z" /><path d="M2.6 8.4h9v2.8h-9zm9.8 0h9v2.8h-9z" /></>,
   obelisk: <path d="M9.9 22.4 10.5 6 12 2.6l1.5 3.4.6 16.4z" />,
   statue: <><path d="M8 22.4v-2.6h8v2.6z" /><path d="M9.6 19.8v-2.2h4.8v2.2z" /><path d="M12 3.4a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z" /><path d="M9.4 17.6 11.1 9h1.8l1.7 8.6z" /></>,
-  /* The cross was a second contour in the same nonzero path as the headstone, wound the same way, so
-     it had always painted stone-on-stone and never rendered. evenodd makes it the counter it was
-     drawn to be - the one shape change in this pass, and it is a fix, not a redraw. */
+  /* evenodd so the cross renders as a counter in the headstone. */
   graveyard: <><path d="M2.8 21.4v-5.9a2.4 2.4 0 0 1 4.8 0v5.9z" /><path d="M16.6 21.4v-4.9a2 2 0 0 1 4 0v4.9z" /><path fillRule="evenodd" d="M9.6 21.4V14a3.4 3.4 0 0 1 6.8 0v7.4zm2.2-6.8h2.4v1.8h-2.4zm.5-2.1h1.4v3.4h-1.4z" /></>,
-  /* The two hilt crosses were left as hairlines while the blades carried the weight, and at 17px the
-     glyph collapsed to a bare V. They now match the blades exactly (3.1u), which is what made this
-     the weakest read in the set rather than anything about the blades. */
   battle: <><path d="M5 2.8 2.8 5l9.2 9.2 2.2-2.2zM19 2.8 21.2 5 12 14.2l-2.2-2.2z" /><path d="M11.2 14.4 14.6 17.8l-2.2 2.2-3.4-3.4zm1.6 0-3.4 3.4 2.2 2.2 3.4-3.4z" /></>,
   camp: <path fillRule="evenodd" d="M12 3.2 1.2 20.8h21.6zm0 6.4-5 11.2h10z" />,
   campfire: <><path d="M12 2.8c2.2 3.2 3.5 4.5 3.5 7.6a3.5 3.5 0 0 1-7 0c0-1.2.6-2.3 1.9-3.5 0 2.2 1.6 2.2 1.6 0 0-1.2-1-2.3 0-4.1z" /><path d="m3 20.2 18-2.4v2.6L3 22.8zm0-2.6 18 2.4v2.6L3 20.2z" /></>,
@@ -90,13 +76,10 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   hourglass: <path d="M4.4 2h15.2v2.8h-2L12 10.6 6.4 4.8h-2zM6.4 19.6 12 13.8l5.6 5.8h2v2.8H4.4v-2.8z" />,
   sun: <path fillRule="evenodd" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM10.6 1h2.8v3.6h-2.8zm0 18.4h2.8V23h-2.8zM1 10.6h3.6v2.8H1zm18.4 0H23v2.8h-3.6zM4 3.4 6.7 6.1 4.7 8.1 2 5.4zm13.3 12.5L20 18.6l-2 2-2.7-2.7zM20 3.4 22 5.4l-2.7 2.7-2-2zM6.7 17.9l2 2L6 22.6l-2-2z" />,
 
-  // Sidebar navigation (D1). Silhouette style like the rest, on the same 0 0 24 24 grid, so a nav item
-  // and a marker glyph never read as two icon systems.
+  // Sidebar navigation, in the same silhouette style so nav and marker icons read as one system.
   home: <path d="M12 2 1.8 11.2l1.9 2.1 1.1-1V22h5.4v-6.4h3.6V22h5.4v-9.7l1.1 1 1.9-2.1z" />,
   graph: <><path d="M5.8 3.6a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4zm12.4 0a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4zM12 13.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4z" /><path d="m7.2 8.3 4.3 6.3-2.2 1.5-4.3-6.3zm9.6 0 2.2 1.5-4.3 6.3-2.2-1.5zM8.4 5.5h7.2v2.6H8.4z" /></>,
-  /* The two ruled lines were their own <path> over a filled page in the same colour, so like the
-     graveyard's cross they had never been visible. Folded into the page's own evenodd path, they
-     are counters. */
+  /* The ruled lines are counters in the page's evenodd path. */
   sessions: <><path fillRule="evenodd" d="M3.6 3.6h13.8v17.2H3.6zm3 3.6h7.2v2.4H6.6zm0 3.8h7.2v2.4H6.6z" /><path d="M18.2 6h2.8v16.4h-2.8z" /></>,
   book: <path fillRule="evenodd" d="M3 3.2h6.4a3.2 3.2 0 0 1 2.6 1.1 3.2 3.2 0 0 1 2.6-1.1H21v16.6h-6.4a1.6 1.6 0 0 0-1.4.9h-2.4a1.6 1.6 0 0 0-1.4-.9H3zm2.8 2.8v11h4a3.2 3.2 0 0 1 1 .2V7.6a1.8 1.8 0 0 0-1.2-1.6zm12.4 0h-3.8A1.8 1.8 0 0 0 13.2 7.6v9.6a3.2 3.2 0 0 1 1-.2h4z" />,
   calendar: <path fillRule="evenodd" d="M6.6 1.8h2.8v2.4h5.2V1.8h2.8v2.4h3.2v17.6H3.4V4.2h3.2zM6.2 9.6V19h11.6V9.6zm1.4 1.6h3.6v3.6H7.6zm5.2 0h3.6v3.6h-3.6z" />,
@@ -104,9 +87,7 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   gear: <path fillRule="evenodd" d="m11.3 2.2-.4 2.6a8.7 8.7 0 0 0-2 1.1L5.2 3.9 3.2 7.4l2.1 1.7a8.7 8.7 0 0 0 0 2.3L3.2 13l2 3.5 2.5-.9a8.7 8.7 0 0 0 2 1.1l.4 2.6h3.7l.4-2.6a8.7 8.7 0 0 0 2-1.1l2.5.9 2-3.5-2.1-1.6a8.7 8.7 0 0 0 0-2.3l2.1-1.7-2-3.5-2.5.9a8.7 8.7 0 0 0-2-1.1L13.9 1zM12 8.3a3.7 3.7 0 1 1 0 7.5 3.7 3.7 0 0 1 0-7.5z" />,
   mask: <path fillRule="evenodd" d="M12 1.9c4.5 0 9 1.2 9 2.9 0 5.6-1.6 10.3-4.8 13.3A6.2 6.2 0 0 1 12 19.8a6.2 6.2 0 0 1-4.1-1.7C4.6 15.1 3 10.4 3 4.8 3 3.2 7.5 1.9 12 1.9zM8 8a1.8 2.1 0 1 0 0 4.3A1.8 2.1 0 0 0 8 8zm8.1 0a1.8 2.1 0 1 0 0 4.3 1.8 2.1 0 0 0 0-4.3zM9.2 14.9h5.6a2.9 2.9 0 0 1-5.6 0z" />,
   menu: <path d="M3 5h18v3H3zm0 5.5h18v3H3zm0 5.5h18v3H3z" />,
-  /* The sidebar's Search entry and the phone top bar's search button both used to draw the EYE — the
-     glyph this product uses for visibility, and the same one "Reveal audit" carries two groups below.
-     The path is `@vtt/ui`'s own `IconSearch`, kept here because this registry is what CodexIcon reads. */
+  /* `@vtt/ui`'s `IconSearch` path, copied here because CodexIcon reads this registry. Not the eye, which means visibility. */
   search: <><path fillRule="evenodd" d="M10.3 2.6a7.7 7.7 0 1 0 0 15.4 7.7 7.7 0 0 0 0-15.4zm0 2.8a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8z" /><path d="M13.8 16 19.6 21.8 21.8 19.6 16 13.8z" /></>,
 
   // Utility (editor toolbar + notebook tree - not in the marker picker)
@@ -115,7 +96,7 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   trash: <path fillRule="evenodd" d="M9.6 2.6h4.8V5H20v2.8H4V5h5.6zM6 8.6h12l-1 12.8H7zm3.9 2.8v7.2h1.9v-7.2zm3.2 0v7.2h1.9v-7.2z" />
 };
 
-/** Pin-picker groupings (a curated subset - the registry holds more, incl. entity glyphs). */
+/** Pin-picker groupings: a curated subset of the registry. */
 export const ICON_CATEGORIES: ReadonlyArray<{ label: string; ids: readonly string[] }> = [
   { label: "Settlements", ids: ["village", "town", "city", "capital", "castle", "fort", "tower", "watchtower"] },
   { label: "Structures", ids: ["temple", "shrine", "lighthouse", "gate", "bridge", "mine", "ruin", "obelisk"] },
@@ -125,12 +106,8 @@ export const ICON_CATEGORIES: ReadonlyArray<{ label: string; ids: readonly strin
 ];
 
 /**
- * D25: the pin palette the picker OFFERS is tokenized (`--pin-1 … --pin-8` in `design-tokens.css`), so
- * the light theme can darken them for contrast without eight hex values living in a component.
- *
- * Pin colour persistence stays **hex on the wire** — the server stores `#rrggbb` and no API changed — so
- * `MARKER_COLORS` remains the list of stored values and `pinSwatchVar` is how a swatch paints itself. An
- * already-stored hex outside this list still renders as itself; only the offered palette is tokenized.
+ * Pin colours are stored as hex on the wire; the offered palette paints through tokens (`--pin-1` to
+ * `--pin-8`) so themes can adjust contrast. A stored hex outside the list renders as itself.
  */
 export const MARKER_COLORS: readonly string[] = ["#FF2E9A", "#2DE2FF", "#A45CFF", "#FF2D5E", "#FFB020", "#57E39A", "#E8ECF4", "#94A3B8"];
 /** The token that paints a palette colour, or the raw stored value for a colour outside the palette. */
@@ -151,7 +128,7 @@ export function CodexIcon({ iconId, className, style }: Readonly<{ iconId: strin
   return <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{iconChildren(iconId)}</svg>;
 }
 
-/** The icon for a typed entity, drawn in that type's accent color - the emoji-free replacement everywhere. */
+/** The icon for a typed entity, in that type's accent colour. */
 export function EntityIcon({ type, className }: Readonly<{ type: EntityType | undefined; className?: string }>) {
   return <CodexIcon iconId={entityIconId(type)} className={`codex-ent-icon${className ? ` ${className}` : ""}`} style={{ color: entityColor(type) }} />;
 }
@@ -159,8 +136,7 @@ export function EntityIcon({ type, className }: Readonly<{ type: EntityType | un
 export function IconPicker({ iconId, color, onIcon, onColor }: Readonly<{ iconId: string; color: string; onIcon: (id: string) => void; onColor: (color: string) => void }>) {
   return (
     <div className="codex-iconpicker">
-      {/* §4 route 2: 32px paint + `.tap-target`, gapped by `--space-3` (6px overhang each side — the
-          budget the design language's worked example uses for exactly this shape). */}
+      {/* 32px swatches with an ::after hit area; the 12px gap covers the 6px overhang. */}
       <div className="codex-swatches" role="group" aria-label="Pin colour">
         {MARKER_COLORS.map((swatch, index) => (
           <button key={swatch} type="button" className={`codex-swatch tap-target${swatch === color ? " is-active" : ""}`} style={{ color: pinSwatchVar(swatch) }} aria-label={`Colour ${index + 1}`} aria-pressed={swatch === color} onClick={() => onColor(swatch)}>

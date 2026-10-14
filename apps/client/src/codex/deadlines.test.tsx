@@ -63,23 +63,6 @@ import { CHRONICLE_KIND_META, campaignDeadlines, deadlineFired, downtimeProposed
 import { CODEX_ICONS } from "./icons";
 import type { CodexChronicleRecord, GmCodexCalendar, PlayerCodexChronicleRecord } from "./api";
 
-/**
- * M11 — deadlines (CT-5) and downtime (CT-10) on the client, plus O-1's prep clock.
- *
- * What each group here is actually for, stated so a later reader does not soften it:
- *  - **R2** — a record's kind reads by icon AND word. The colour assertion is the accessibility rule and
- *    the one a "tidy-up" would break by dropping a badge as redundant. The icon-registry test is its
- *    quiet half: `iconChildren` falls back to `pin` for an unknown id, so a typo in `CHRONICLE_KIND_META`
- *    would not throw — every deadline in the campaign would simply draw a map pin.
- *  - **O-3** — creating downtime PROPOSES; a separate, explicit action applies it. Two assertions carry
- *    that: the create path must not touch the clock, and the confirm must state its effect before it.
- *  - **O-1** — the GM's clock and the players' clock are two values. The quiet case (they agree → nothing
- *    on screen) is tested as hard as the loud one, because "always visible" would be the easy wrong
- *    answer that still passed a divergence test.
- *  - **Viewer safety** — the player surface must read the PLAYER calendar route. Asserting that the GM
- *    route was never called is the only version of this a client test can honestly prove: what the two
- *    routes return is the server's business, but which one this surface asks is entirely ours.
- */
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
   months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }],
@@ -102,9 +85,7 @@ const DEADLINE = RECORD({
 const DOWNTIME = RECORD({
   kind: "downtime", id: "w1", text: "A quiet tenday in Daggerford.",
   payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null, applied: false },
-  // The server's answer for where the clock lands. Hammer 3 + 7 = Hammer 10 — the same date local
-  // arithmetic would reach, so the ordinary tests below read naturally; the test that proves WHICH of
-  // the two the row is showing deliberately makes them disagree.
+  // The server's landing date (Hammer 3 + 7). One test makes it disagree with local arithmetic on purpose.
   proposedDate: { year: 1492, month: 0, day: 10 },
   inWorldLabel: "Hammer 3, 1492 DR", calendarInstant: 1492 * 60 + 2, inWorldDate: { year: 1492, month: 0, day: 3 }
 });
@@ -123,11 +104,7 @@ const playerRowOf = (id: string) => document.getElementById(`codex-player-entry-
 beforeEach(() => sessionStorage.clear());
 
 
-/**
- * Ruling 57: an entry's filing — session, in-world date, attached page, tags — lives in the composer's
- * summonable Details panel, not stacked under the writing. Asked rather than assumed, because the
- * panel's state is REMEMBERED across mounts.
- */
+/** Filing fields live in the Details panel, whose open state persists across mounts. */
 const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
   const details = await screen.findByRole("button", { name: "Details" });
   if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
@@ -135,21 +112,19 @@ const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
 
 describe("A new kind reads by icon AND word (R2)", () => {
   it("every chronicle kind names an icon the registry actually has", () => {
-    // `iconChildren` falls back to `pin` rather than throwing, so an invented id is silent at runtime:
-    // every deadline row in the campaign would draw a map pin and nothing would ever say so.
+    // `iconChildren` silently falls back to `pin` for an unknown id.
     for (const [kind, meta] of Object.entries(CHRONICLE_KIND_META)) {
       expect(CODEX_ICONS[meta.iconId], `${kind} names an icon that does not exist: ${meta.iconId}`).toBeDefined();
       expect(meta.label.trim()).not.toBe("");
     }
-    // And the labels are distinct — two kinds sharing a word would leave colour as the only difference.
+    // Distinct labels, or colour would be the only difference.
     const labels = Object.values(CHRONICLE_KIND_META).map((meta) => meta.label);
     expect(new Set(labels).size).toBe(labels.length);
   });
 
   it("a deadline and a downtime row each say their kind in text, with no colour at all", async () => {
     await renderJournal([DEADLINE, DOWNTIME]);
-    // Colour lives entirely in CSS classes, so the proof is that the TEXT of each row distinguishes the
-    // kinds: strip every stylesheet and a reader still knows which row is which.
+    // Colour is CSS-only, so the row text must distinguish the kinds.
     expect(rowOf("d1").textContent).toContain("Deadline");
     expect(rowOf("w1").textContent).toContain("Downtime");
     expect(rowOf("d1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
@@ -167,8 +142,7 @@ describe("A deadline's state is the SERVER's, and it reads as a word (CT-5)", ()
   });
 
   it("says nothing about firing on a record that is not a deadline", async () => {
-    // `fired` is derived against the clock for whatever the server hands over; the kind gate is what
-    // stops an ordinary note that happens to carry the flag from announcing a state it does not have.
+    // The kind gate stops a non-deadline that carries the flag from showing a state.
     await renderJournal([RECORD({ id: "j9", fired: true })]);
     expect(rowOf("j9").textContent).not.toContain("Passed");
     expect(rowOf("j9").textContent).not.toContain("Approaching");
@@ -189,7 +163,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
     await waitFor(() => expect(createDowntime).toHaveBeenCalled());
     expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({ who: "Aldric", activity: "Forging a blade", days: 7 });
-    // The whole of O-3 in three lines: nothing here moved the campaign date.
+    // Creating downtime must not move the clock.
     expect(applyDowntime).not.toHaveBeenCalled();
     expect(setCalendar).not.toHaveBeenCalled();
     expect(publishCalendar).not.toHaveBeenCalled();
@@ -201,7 +175,6 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     const user = userEvent.setup();
     const row = within(rowOf("w1"));
 
-    // Hammer 3 + 7 days = Hammer 10. The sentence is the affordance; the button only agrees with it.
     expect(row.getByText("Move your date to Hammer 10, 1492 DR")).toBeInTheDocument();
     expect(row.getByText("Aldric · Forging a blade · 7 days")).toBeInTheDocument();
 
@@ -209,24 +182,14 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     await waitFor(() => expect(applyDowntime).toHaveBeenCalledWith("gm", "w1"));
   });
 
-  /**
-   * OWNER DECISION (2026-07-30): the confirm names what the clock move would COST, not only where it lands.
-   *
-   * Measured before this existed: a 7-day confirm moved the clock 16→23 and flipped two deadlines to
-   * "Passed" with no notice anywhere — the GM found out by going back to the dashboard. A deadline exists
-   * precisely because it happens whether or not the party acts, which makes the instant the clock jumps
-   * over it the instant the GM most needs to know.
-   *
-   * The fixture is built so a wrong implementation gives a wrong NUMBER rather than merely a wrong row:
-   * counting everything gives 4, ignoring `fired` gives 3, comparing `<` instead of `<=` gives 1.
-   */
+  /** The fixture is built so each likely bug gives a different number: all 4, ignoring `fired` 3, `<` instead of `<=` 1. */
   it("says how many deadlines confirming would pass", async () => {
     await renderJournal([
       DOWNTIME,                                                                     // proposes Hammer 10
-      DEADLINE,                                                                     // Hammer 10 — exactly the landing day, counts
+      DEADLINE,                                                                     // Hammer 10, exactly the landing day: counts
       RECORD({ kind: "deadline", id: "d2", text: "The caravan leaves.", fired: false,
         inWorldLabel: "Hammer 5, 1492 DR", calendarInstant: 1492 * 60 + 4, inWorldDate: { year: 1492, month: 0, day: 5 } }),
-      RECORD({ kind: "deadline", id: "d3", text: "The tax was due.", fired: true,    // already passed — not caused by this
+      RECORD({ kind: "deadline", id: "d3", text: "The tax was due.", fired: true,    // already passed: not caused by this
         inWorldLabel: "Hammer 2, 1492 DR", calendarInstant: 1492 * 60 + 1, inWorldDate: { year: 1492, month: 0, day: 2 } }),
       RECORD({ kind: "deadline", id: "d4", text: "Midwinter.", fired: false,         // beyond the landing day
         inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })
@@ -236,19 +199,12 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(row.getByText("Move your date to Hammer 10, 1492 DR. This passes 2 deadlines.")).toBeInTheDocument();
   });
 
-  /** One is "1 deadline", not "1 deadlines" — the sentence is read mid-session, at speed. */
   it("counts one deadline in the singular", async () => {
     await renderJournal([DOWNTIME, DEADLINE]);
     expect(within(rowOf("w1")).getByText("Move your date to Hammer 10, 1492 DR. This passes 1 deadline.")).toBeInTheDocument();
   });
 
-  /**
-   * Zero says NOTHING, rather than "this passes 0 deadlines".
-   *
-   * The clause is a warning. A campaign with no deadlines would otherwise carry it on every downtime it ever
-   * logs, and a warning that is always present is one the GM stops reading — which costs the real case the
-   * only notice it gets.
-   */
+  /** A warning that is always present stops being read. */
   it("adds no clause when the move passes nothing", async () => {
     await renderJournal([DOWNTIME, RECORD({ kind: "deadline", id: "d5", text: "Midwinter.", fired: false,
       inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })]);
@@ -258,16 +214,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(row.queryByText(/deadline/)).not.toBeInTheDocument();
   });
 
-  /**
-   * The Confirm sentence names the SERVER's date, not a second local computation of it.
-   *
-   * The client can do this arithmetic and for the composer's live preview it must — no record exists yet
-   * to ask about. But once a row exists the server decides where its own clock lands, and Confirm promises
-   * that date out loud. Two implementations of one answer is the shape this overhaul exists to remove.
-   *
-   * Proved by making them DISAGREE: local arithmetic on Hammer 3 + 7 days reaches Hammer 10, so a row
-   * whose server-supplied date is Alturiak 12 can only render that if it is reading the server's value.
-   */
+  /** Server and local arithmetic disagree here, so the row can only show Alturiak 12 by reading the server. */
   it("names the SERVER's proposed date, not a locally recomputed one", async () => {
     await renderJournal([RECORD({ ...DOWNTIME, id: "w3", proposedDate: { year: 1492, month: 1, day: 12 } })]);
     const row = within(rowOf("w3"));
@@ -276,7 +223,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(row.queryByText(/Hammer 10/)).not.toBeInTheDocument();
   });
 
-  /** A row the server gave no proposed date offers no promise — and therefore no Confirm to break it. */
+  /** No server date, no promise, no Confirm. */
   it("promises nothing when the server proposed no date", async () => {
     await renderJournal([RECORD({ ...DOWNTIME, id: "w4", proposedDate: null })]);
     const row = within(rowOf("w4"));
@@ -285,21 +232,14 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
   });
 
-  /**
-   * A deadline's date cannot be edited away — the composer will not arm, and it says why.
-   *
-   * The create path guarded this from the start; the EDIT path did not, and it is the door a GM uses more
-   * often. Clearing the Year field on an existing deadline produced a row reading "Deadline · Approaching"
-   * forever that could never fire, on the GM journal, the dashboard card and every player's timeline.
-   * The store refuses it too; this is the affordance, so the GM never meets that refusal.
-   */
+  /** The edit path must guard the date too; a dateless deadline never fires. */
   it("will not let an edit take a deadline's date away", async () => {
-    await renderJournal([DEADLINE, RECORD()]);   // a deadline and an ordinary entry, so the contrast is real
+    await renderJournal([DEADLINE, RECORD()]);   // the ordinary entry is the contrast
     const user = userEvent.setup();
     await user.click(within(rowOf(DEADLINE.id)).getByRole("button", { name: "Edit" }));
 
     const save = screen.getByRole("button", { name: "Save entry" });
-    expect(save).not.toBeDisabled();                                  // as loaded, the date is there
+    expect(save).not.toBeDisabled();
 
     await openEntryDetails(user);
     await user.clear(screen.getByLabelText("Year"));
@@ -307,7 +247,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(screen.getByText(/A deadline needs a date/)).toBeInTheDocument();
     expect(updateEntry).not.toHaveBeenCalled();
 
-    // Editing an ORDINARY entry is unaffected — only a deadline's date is load-bearing.
+    // Only a deadline's date is required.
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await user.click(within(rowOf("j1")).getByRole("button", { name: "Edit" }));
     await user.clear(screen.getByLabelText("Year"));
@@ -320,7 +260,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
     expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
     expect(row.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
-    // It still says what it was, and that it has been applied — an applied downtime is not a silent row.
+    // An applied downtime still says what it was.
     expect(row.getByText("Aldric · Forging a blade · 7 days")).toBeInTheDocument();
     expect(row.getByText(/Your date has already been moved/)).toBeInTheDocument();
   });
@@ -333,10 +273,8 @@ describe("A deadline cannot be written without a date (CT-5)", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: "Deadline" }));
-    // "Player-visible notes" on every kind since 5a.1 — a deadline's player layer used to be labelled
-    // "What will happen", one of the four names the one composer gave one control.
     await user.type(screen.getByLabelText("Player-visible notes"), "The duke's ultimatum expires.");
-    // Text alone is not enough: a deadline with no date could never fire, and the store rejects it.
+    // A deadline with no date could never fire.
     expect(screen.getByRole("button", { name: "Add deadline" })).toBeDisabled();
     expect(screen.getByText(/A deadline needs a date/)).toBeInTheDocument();
 
@@ -349,7 +287,7 @@ describe("A deadline cannot be written without a date (CT-5)", () => {
     const payload = createDeadline.mock.calls.at(-1)![1];
     expect(payload.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });
     expect(payload.playerText).toBe("The duke's ultimatum expires.");
-    // A deadline stores no payload of its own — what will happen IS this text (D11-C).
+    // A deadline stores no payload; its text is what will happen.
     expect(payload).not.toHaveProperty("downtime");
     expect(createEntry).not.toHaveBeenCalled();
   });
@@ -358,11 +296,9 @@ describe("A deadline cannot be written without a date (CT-5)", () => {
 describe("The prep clock is quiet until it matters (O-1)", () => {
   it("says nothing at all while the GM's clock and the players' clock agree", async () => {
     await renderJournal([]);
-    // The normal state is the matching state; a permanent "in sync" readout would make every GM who has
-    // never prepped ahead learn a second clock exists for no reason.
+    // While the clocks agree there is no prep-clock UI at all.
     expect(screen.queryByRole("button", { name: "Publish the date" })).not.toBeInTheDocument();
     expect(screen.queryByText("Players' date:")).not.toBeInTheDocument();
-    // The GM's own clock still reads, exactly as it did before M11.
     expect(screen.getByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
   });
 
@@ -372,13 +308,13 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
     const user = userEvent.setup();
 
     expect(screen.getByText("Players' date:")).toBeInTheDocument();
-    // BOTH dates on screen at once, and they are different values — the GM's ahead, the table's behind.
+    // Both dates on screen: the GM's ahead, the players' behind.
     expect(screen.getByText("Your date: Hammer 20, 1492 DR")).toBeInTheDocument();
     expect(screen.getByText("Hammer 3, 1492 DR")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Publish the date" }));
     await waitFor(() => expect(publishCalendar).toHaveBeenCalledWith("gm"));
-    // Publishing is its own action: it must never be reachable as a side effect of writing the calendar.
+    // Publishing is never a side effect of saving the calendar.
     expect(setCalendar).not.toHaveBeenCalled();
   });
 });
@@ -397,8 +333,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
     playerChronicle.mockResolvedValue(records);
     playerListRelationships.mockResolvedValue([]);
     playerListLinks.mockResolvedValue(null);
-    // The PLAYER's projection: `currentDate` is the published date, and there is no `publishedDate` key
-    // and no GM clock on this shape at all.
+    // The player projection: `currentDate` is the published date; no GM clock on this shape.
     playerCalendar.mockResolvedValue({ yearName: "DR", months: CALENDAR.months, weekdays: [], currentDate: { year: 1492, month: 0, day: 3 } });
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerChronicle).toHaveBeenCalled());
@@ -414,7 +349,6 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
 
     expect(playerRowOf("d1").textContent).toContain("Deadline");
     expect(playerRowOf("d1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
-    // A revealed deadline the campaign has passed reads as passed.
     expect(within(playerRowOf("d1")).getByText("Passed")).toBeInTheDocument();
     expect(playerRowOf("w1").textContent).toContain("Downtime");
     expect(within(playerRowOf("w1")).getByText("Aldric · Forging a blade · 7 days")).toBeInTheDocument();
@@ -423,14 +357,11 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   it("never asks the GM calendar route, and never offers a Confirm", async () => {
     await renderPlayer([PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null } })]);
 
-    // The one half of the prep clock a client test can honestly prove: which route this surface asks.
-    // `calendarApi.get` is the GM read and its answer carries the GM's own clock beside `publishedDate`.
+    // What a client test can prove: this surface asks the player route, never `calendarApi.get`.
     expect(playerCalendar).toHaveBeenCalledWith("player");
     expect(getCalendar).not.toHaveBeenCalled();
-    // The date a player sees is the one the player projection sent.
     expect(await screen.findByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
-    // Applying downtime is a GM action against the GM's clock; neither the control nor the state that
-    // drives it exists here — `applied` is not even a field on the player payload.
+    // Applying downtime is GM-only; `applied` isn't even on the player payload.
     expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
   });
@@ -450,8 +381,7 @@ describe("The Campaign dashboard's deadlines card (CT-5)", () => {
 
     const card = within(screen.getByRole("navigation", { name: "Deadlines" }));
     const rows = card.getAllByRole("button").map((row) => row.textContent ?? "");
-    // Passed first: unlike a completed quest, nobody marked this done — the clock did, and it is the one
-    // thing on this card that needs the GM's attention now.
+    // Passed first: the clock finished it, and it needs the GM's attention.
     expect(rows[0]).toContain("The comet fell.");
     expect(rows[0]).toContain("Passed");
     expect(rows[1]).toContain("The duke's ultimatum expires.");
@@ -469,17 +399,8 @@ describe("The Campaign dashboard's deadlines card (CT-5)", () => {
 });
 
 /**
- * P6 / §4. jsdom loads no stylesheet, so this cannot MEASURE 44px — only a browser can, and
- * `scripts/tap-audit.mjs` is where that number comes from. What it can prove is the thing a later edit
- * would actually get wrong: **which route each new control takes.**
- *
- * §4 forbids route 2 (`.tap-target::after`) for a control in a vertical stack, because overlapping
- * invisible boxes steal their neighbours' taps — and both new controls here sit in one. `Button` at its
- * default size is route 1 (`.nh-btn`, `min-height: var(--tap-min)`, no `::after`); `Button size="sm"` is
- * route 2 (`.nh-btn--sm`, 32px paint + a 44px `::after` overhanging 6px per side). The Confirm sits
- * directly above `.codex-entry-foot`, which is a row of route-2 small buttons; the Publish sits directly
- * above the composer's field stack. Changing either to `size="sm"` is a one-word edit that looks tidier
- * and would quietly break both — so it fails here.
+ * jsdom can't measure 44px, but it can check which tap route each control takes: default-size `Button`
+ * grows its paint; `size="sm"` adds an ::after that would overlap neighbours in these stacks.
  */
 describe("The new controls take the tap route §4 requires of a stacked control (P6)", () => {
   it("Confirm and Publish are route 1, and the card's rows use the route-1 chassis", async () => {
@@ -495,7 +416,7 @@ describe("The new controls take the tap route §4 requires of a stacked control 
     expect(publish).not.toHaveClass("nh-btn--sm");
     expect(publish).not.toHaveClass("tap-target");
 
-    // The downtime fields are `@vtt/ui` inputs, which carry the floor themselves (`.nh-input`).
+    // `@vtt/ui` inputs carry the tap floor themselves.
     await userEvent.setup().click(screen.getByRole("button", { name: "Downtime" }));
     for (const label of ["Who", "Activity", "Days"]) expect(screen.getByLabelText(label)).toHaveClass("nh-input");
   });
@@ -503,8 +424,7 @@ describe("The new controls take the tap route §4 requires of a stacked control 
   it("a deadline card row is the dashboard's own row chassis, not a new control", () => {
     render(<CampaignHome pages={[]} deadlines={[{ id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }]}
       onOpenEntry={vi.fn()} onPickType={vi.fn()} onPickTag={vi.fn()} onOpenPage={vi.fn()} onOpenMap={vi.fn()} />);
-    // `.codex-campaign-recentitem` is §4 route 1 and is where every list on this surface gets its floor;
-    // a bespoke class here would be a new control with a new floor to argue about (R2 and §4 both).
+    // Reuses the row class that carries the floor rather than a bespoke one.
     expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByRole("button"))
       .toHaveClass("codex-campaign-recentitem");
   });
@@ -512,10 +432,7 @@ describe("The new controls take the tap route §4 requires of a stacked control 
 
 describe("The shared reading rules themselves", () => {
   it("only a deadline can be fired, and an absent flag reads as not fired", () => {
-    // The helper's own gate, below the components. Both halves are load-bearing: the kind check is what
-    // stops "has this passed" from being asked of a record that has no such question, and the `=== true`
-    // is what makes a row that arrives WITHOUT the key read as not-fired rather than as `undefined` —
-    // which is exactly what an older server, or a fixture written before M11, would send.
+    // The kind check, and `=== true` so a row without the key reads as not fired.
     expect(deadlineFired({ kind: "deadline", fired: true })).toBe(true);
     expect(deadlineFired({ kind: "deadline", fired: false })).toBe(false);
     expect(deadlineFired({ kind: "entry", fired: true })).toBe(false);
@@ -530,16 +447,13 @@ describe("The shared reading rules themselves", () => {
 
   it("walks months and years when downtime advances the clock, and never clamps into the wrong day", () => {
     const calendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: [] };
-    // Within a month.
     expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 3 } }, 7)).toEqual({ year: 1492, month: 0, day: 10 });
-    // Off the end of a month: rolls into the next one rather than stopping at 30.
+    // Rolls into the next month.
     expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 28 } }, 5)).toEqual({ year: 1492, month: 1, day: 3 });
-    // Off the end of a year: rolls the year.
+    // Rolls the year.
     expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 1, day: 28 } }, 5)).toEqual({ year: 1493, month: 0, day: 3 });
-    // The one lossy date the calendar admits (F-4): a stored day 31 of a 30-day month computes as day 30
-    // on the SERVER, so advancing from it must land on Hammer 31 + 0... which is Alturiak 1, not day 31.
+    // A stored day 31 of a 30-day month counts as day 30, as on the server, so +1 is the next month's day 1.
     expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 31 } }, 1)).toEqual({ year: 1492, month: 1, day: 1 });
-    // Nothing to advance from is not a date.
     expect(downtimeProposedDate({ ...calendar, currentDate: null }, 7)).toBeNull();
     expect(downtimeProposedDate(null, 7)).toBeNull();
   });

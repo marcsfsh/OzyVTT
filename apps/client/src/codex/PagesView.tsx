@@ -12,14 +12,7 @@ import { atlasPath, graphPath, pagePath, pathForHit, pathForSection, tagPath } f
 import { useConfirm, usePrompt } from "../components/feedback";
 import type { QuickCreateRequest } from "./QuickCreate";
 
-/**
- * Pages — the notebook rail and the two-layer editor, lifted whole out of `CodexWorkspace`.
- *
- * The mechanics are the ones that already worked (the folder tree, the suite search overlay, the
- * single-owner page feed handed down from the shell). What changed is the vocabulary — every "note" and
- * "entity" naming a page is now "page" (D5) — and that selection, filters and search all live in the
- * URL, so a page is a bookmarkable address rather than a latch inside a component.
- */
+/** Pages: the notebook rail and the two-layer editor. Selection, filters and search live in the URL. */
 export type PagesViewProps = Readonly<{
   gmToken: string;
   pages: readonly CodexPageSummary[];
@@ -50,8 +43,7 @@ export function PagesView({
   const { prompt, dialog: promptDialog } = usePrompt();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // D10: the filters live in the URL, so a dashboard "By type" card and a tag chip navigate here rather
-  // than reaching into this component's state.
+  // Filters live in the URL, so dashboard cards and tag chips can navigate here.
   const typeFilter = (query.get("type") as EntityType | null) ?? null;
   const tagFilter = query.get("tag");
 
@@ -154,10 +146,7 @@ export function PagesView({
     try { await codexApi.deleteFolder(gmToken, path); await onRefresh(); }
     catch (deleteError) { onError(deleteError instanceof Error ? deleteError.message : "Couldn't delete that folder."); }
   };
-  /**
-   * D7 / G22 — clicking an unresolved `[[link]]` used to CREATE an untyped page, silently, with no
-   * dialog. It now opens quick-create with the link's text prefilled; cancelling creates nothing.
-   */
+  /** An unresolved `[[link]]` opens quick-create with its text prefilled; cancelling creates nothing. */
   const followLink = useCallback((target: string) => {
     const bare = target.replace(/^(page|actor|monster|spell|map|marker):/i, "").trim();
     const existing = pages.find((page) => page.title.trim().toLowerCase() === bare.toLowerCase());
@@ -173,11 +162,7 @@ export function PagesView({
         <div className="codex-rail-head">
           <Input value={search} placeholder="Search the Codex" aria-label="Search the Codex"
             onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
-{/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
-              screen, and the empty state's own create is the primary when there is nothing to select
-              — the rail's create steps down rather than competing with either. Two magenta-filled
-              buttons at once (twice with the identical label "New page") make neither one the
-              answer to "what do I do here". */}
+{/* One primary per view: the rail's create steps down when the editor's Save (autosave off) is primary. */}
           <Button variant={selectedId ? (autosave.enabled ? "primary" : "secondary") : "secondary"} size="sm" className="codex-newpage" onClick={() => onQuickCreate({})}><IconPlus /> New page</Button>
         </div>
         {!search.trim() && (
@@ -187,7 +172,6 @@ export function PagesView({
               <option value="name-desc">Name Z–A</option>
               <option value="recent">Recently edited</option>
             </Select>
-            {/* D10: filters in place, on every list. */}
             <Select aria-label="Filter by kind" value={typeFilter ?? ""} onChange={(event) => setFilter({ type: event.target.value || null })}>
               <option value="">All kinds</option>
               {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].label}</option>)}
@@ -234,8 +218,7 @@ export function PagesView({
 
       <section className="codex-main scroll-y">
         {selectedId && (
-          /* D25/G17: the bespoke `.codex-back` link becomes the ghost Button primitive, which carries the
-             44px floor itself (route 2, `.nh-btn--sm` + `.tap-target`). */
+          /* A ghost `Button`, which carries the tap floor. */
           <Button variant="ghost" size="sm" className="codex-back" onClick={() => navigate(pathForSection("pages"))}><IconChevron className="codex-chevron-left" aria-hidden="true" />All pages</Button>
         )}
         {missing && <MissingRecordNotice noun="page" />}
@@ -263,8 +246,7 @@ export function PagesView({
       </section>
 
       <Modal open={!!movingPageId} onClose={() => setMovingPageId(null)} title="Move to folder" size="sm" ariaLabel="Move to folder">
-        {/* D25: the bespoke `.codex-move-opt` rows become `MenuItem`, which carries route 1 (grow the
-            paint) — required here, because these are a vertical stack. */}
+        {/* `MenuItem` rows grow to 44px, as a vertical stack requires. */}
         <div className="codex-move-list">
           <MenuItem onClick={() => void doMove(null)}>Top level</MenuItem>
           {allFolders.map((path) => <MenuItem key={path} onClick={() => void doMove(path)}>{path}</MenuItem>)}

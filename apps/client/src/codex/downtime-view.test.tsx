@@ -2,26 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-/**
- * D12 — the Downtime tracker, and the owed test for it.
- *
- * The tracker is **a lens over the Journal, never a second store** (invariant 7): every row on it is a
- * `downtime` chronicle record the Journal already carries, and there is deliberately no aggregation
- * endpoint. So the things worth pinning are the ones a lens can still get wrong.
- *
- * **Totals group by `characterPageId ?? who`** — the whole point of D12's new field. Before it, "Vex",
- * "vex" and "Vex the Bold" were three people; a linked row must total with its page whatever its `who`
- * string says, and an unlinked row must still total by name. The **Edit** action is the adoption path for
- * everything recorded before the field existed, and it must not offer to edit `days` (the clock has
- * already moved by them).
- *
- * **Confirming states its consequence in words** — the date the clock will move to, and how many
- * deadlines that passes — because the confirm is what actually advances the campaign's date.
- *
- * **D13: the note is the shared editor**, not a bare `Textarea`. It was the last writing surface in the
- * suite that was not, which meant typing `[[` here silently did nothing while the identical write
- * through the Journal composer linked pages properly.
- */
 
 const createDowntime = vi.fn();
 const applyDowntime = vi.fn();
@@ -93,7 +73,7 @@ describe("Totals — a person, not a spelling (D12)", () => {
     });
 
     const rows = screen.getAllByRole("row").slice(1); // drop the header row
-    // Two people, not three — and the linked one is named by its PAGE, not by either string.
+    // Two people, not three; the linked one is named by its page.
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByRole("rowheader")).toHaveTextContent("Vex");
     expect(within(rows[0]).getAllByRole("cell")[0]).toHaveTextContent("10");
@@ -112,10 +92,9 @@ describe("Totals — a person, not a spelling (D12)", () => {
       ]
     });
 
-    // The free-text name survives — D12 preserves it deliberately, so a table with no character pages
-    // still tracks people.
+    // Unlinked free-text names still total.
     expect(screen.getByRole("rowheader", { name: "The party" })).toBeInTheDocument();
-    // A linked name is a way INTO the page; an unlinked one is plain text with nothing to open.
+    // A linked name opens the page; an unlinked one is plain text.
     await user.click(within(screen.getByRole("rowheader", { name: "Vex" })).getByRole("button"));
     expect(onOpenPage).toHaveBeenCalledWith("c1");
     expect(within(screen.getByRole("rowheader", { name: "The party" })).queryByRole("button")).toBeNull();
@@ -140,10 +119,9 @@ describe("Logging downtime", () => {
 
     await waitFor(() => expect(createDowntime).toHaveBeenCalled());
     const [, body] = createDowntime.mock.calls[0];
-    // The page id is what makes the totals a person; `who` carries the page's TITLE so an old reader
-    // (and the player projection) still has a name to print.
+    // `who` carries the page title so readers without the page still have a name.
     expect(body.downtime).toMatchObject({ who: "Vex", activity: "Forging a blade", days: 7, characterPageId: "c1" });
-    // A create is the write worth an idempotency key — this button is double-tappable on a phone.
+    // Creates carry an idempotency key (double-tap on a phone).
     expect(body.commandId).toEqual(expect.any(String));
   });
 
@@ -162,7 +140,7 @@ describe("Logging downtime", () => {
   it("refuses to log nobody, and says the date it is proposing before anything moves", () => {
     renderDowntime();
     expect(screen.getByRole("button", { name: "Log downtime" })).toBeDisabled();
-    // Seven days from Hammer 10 is Hammer 17 — stated up front, and stated as a proposal.
+    // Hammer 10 + 7 = Hammer 17, stated as a proposal.
     expect(screen.getByText(/Hammer 17, 1491 DR/)).toBeInTheDocument();
     expect(screen.getByText(/Nothing moves until you confirm it below/)).toBeInTheDocument();
   });
@@ -171,10 +149,9 @@ describe("Logging downtime", () => {
     const user = userEvent.setup();
     renderDowntime();
 
-    // The toolbar is the tell — a bare `Textarea` has none of it.
+    // The toolbar shows it's the shared editor, not a bare Textarea.
     const editors = screen.getAllByRole("toolbar", { name: "Formatting" });
     expect(editors).toHaveLength(1);
-    // …and the `[[` autocomplete offers the campaign's pages, which is the capability D13 exists for.
     await user.type(screen.getByLabelText("Note"), "Worked with [[[[Ire");
     const list = await screen.findByRole("listbox", { name: "Link to page" });
     expect(within(list).getByRole("option", { name: "Ireena" })).toBeInTheDocument();
@@ -193,7 +170,7 @@ describe("Pending confirmations", () => {
     const pending = within(document.querySelector(".codex-downtime-pending")!);
     expect(pending.getAllByRole("listitem")).toHaveLength(1);
     expect(pending.getByText("Vex · Forging · 7 days")).toBeInTheDocument();
-    // The button says what confirming DOES — the date the clock lands on — rather than "Confirm".
+    // The button names the landing date rather than "Confirm".
     expect(pending.getByRole("button", { name: /^Move your date to Hammer 17, 1491 DR/ })).toBeInTheDocument();
   });
 
@@ -205,8 +182,7 @@ describe("Pending confirmations", () => {
     } as unknown as CodexChronicleRecord;
     renderDowntime({ records: [downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }), deadline] });
 
-    // Hammer 14 falls between the clock (10) and the proposal (17) — the count is on the button, because
-    // this is the tap that would silently fire it.
+    // Hammer 14 falls between the clock (10) and the proposal (17).
     expect(screen.getByRole("button", { name: /passes 1 deadline/ })).toBeInTheDocument();
   });
 
@@ -224,29 +200,19 @@ describe("Pending confirmations", () => {
     expect(await screen.findByText("Couldn't move the clock.")).toBeInTheDocument();
   });
 
-  /**
-   * `5e.4` — reported as "Confirm does nothing." It never did nothing: the click fired, the route was
-   * right, the store write was right, and the server answered with a reason. The reason rendered at the TOP
-   * of this view, above a ~450px `Log downtime` section, and this list is the section below it — so from
-   * where the GM was looking, a correct 400 and a dead button are the same thing.
-   *
-   * Both branches are asserted, because a one-branch fix re-creates the silence for the other one.
-   */
+  /** Both failure branches show their reason in view: no campaign date (prevented) and already applied (409). */
   it("`5e.4`: with no campaign date, says why in view and does not fire a request it knows will fail", async () => {
     const user = userEvent.setup();
     renderDowntime({
-      // The exact cause: `proposedDateFor` has nothing to advance FROM, so the server 400s. `proposedDate`
-      // arrives null with it, which is also what made the button read a bare "Confirm".
+      // No current date: nothing to advance from.
       calendar: { ...CALENDAR, currentDate: null, publishedDate: null },
       records: [{ ...downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }), proposedDate: null } as CodexChronicleRecord]
     });
 
-    // The section headed "Pending confirmations", found by its heading rather than by DOM position: the
-    // claim is that the reason is beside the control, and a positional selector would not be making it.
+    // Found by heading, since the claim is that the reason sits beside the control.
     const pending = within(screen.getByRole("heading", { name: "Pending confirmations" }).closest("section")!);
     const confirm = pending.getByRole("button", { name: "Confirm" });
     expect(confirm).toBeDisabled();
-    // The reason is IN the Pending section, beside the control it explains — not 450px above it.
     expect(pending.getByText(/Set your date on the Calendar before passing time/)).toBeInTheDocument();
 
     await user.click(confirm);
@@ -264,17 +230,15 @@ describe("Pending confirmations", () => {
       ]
     });
 
-    // The 409 arm: this list renders only unapplied rows, so "already applied" means the page is stale -
-    // someone confirmed it elsewhere, or this is a double-submit.
+    // 409: already applied elsewhere, so this list is stale.
     applyDowntime.mockRejectedValueOnce(new Error("That downtime has already passed - the clock has already moved."));
     const rows = within(document.querySelector(".codex-downtime-pending")!).getAllByRole("listitem");
     await user.click(within(rows[0]).getByRole("button", { name: /^Move your date to/ }));
 
-    // On the row that was pressed, and on that row ALONE - which is the whole difference from the old
-    // top-of-view Alert.
+    // On the pressed row only.
     expect(await within(rows[0]).findByText(/already passed/)).toBeInTheDocument();
     expect(within(rows[1]).queryByText(/already passed/)).toBeNull();
-    // ...and the refetch is the actual repair for a stale page, so it runs on failure too.
+    // The refetch is the repair, so it runs on failure too.
     expect(onChanged).toHaveBeenCalled();
   });
 });
@@ -285,14 +249,11 @@ describe("Adopting an old row (the Edit path)", () => {
     renderDowntime({ records: [downtime("d1", { who: "vex", activity: "Forging", days: 7, applied: true })] });
 
     expect(screen.getByText("Not linked")).toBeInTheDocument();
-    // Scoped to the history list: since D13 the composer's shared editor has an Edit/View switch, so
-    // "Edit" is no longer unique on this screen.
+    // Scoped to the history list: the composer's editor also has an "Edit" switch.
     const history = within(document.querySelector(".codex-downtime-history")!);
     await user.click(history.getByRole("button", { name: "Edit" }));
 
-    // Days are what the clock has already moved by; a "typo" there would desynchronise the campaign date
-    // from its own history, so the ROW says so instead of offering the field. (The composer above still
-    // has its own Days field — this is about the row being edited.)
+    // Days are what the clock already moved by, so the row edit doesn't offer them.
     expect(history.queryByLabelText("Days")).toBeNull();
     expect(history.getByText("Days cannot be changed after logging. Delete the entry and log it again to correct it.")).toBeInTheDocument();
 
@@ -310,25 +271,14 @@ describe("Adopting an old row (the Edit path)", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
     const options = (await screen.findAllByRole("option")).map((option) => option.textContent);
-    // Vallaki is a location; linking downtime to it would make the totals meaningless.
+    // Locations are excluded.
     expect(options).toEqual(["Vex", "Ireena"]);
   });
 });
 
-/**
- * **A ninth character is not a lost character.**
- *
- * `Combobox` pages at `limit = 8` and truncates silently — `.slice(0, limit)` with no "8 of 13" line
- * and no scroll cue — so before these two call sites named their own limit, a party of nine lost its
- * ninth member from the unfiltered list. The edit row was the worse half: it has no `allowFreeText`
- * escape, so the ninth character could not be linked to an old row at all.
- *
- * Both tests open the list WITHOUT typing, deliberately. Filtering by name would find the ninth even
- * at `limit = 8` — the truncation only bites the browse case, which is exactly the case a GM who does
- * not remember a name is in.
- */
+/** `Combobox` truncates at 8 by default; both tests browse without typing, which is where truncation bites. */
 describe("A party bigger than the Combobox's default page", () => {
-  // Nine characters, plus a location that must still be excluded — one past the default cap.
+  // Nine characters (one past the default cap) plus a location that must be excluded.
   const NAMES = ["Ana", "Bo", "Cass", "Dain", "Eda", "Finn", "Gale", "Hex", "Ivy"];
   const NINE = [...NAMES.map((name, index) => page(`c${index + 1}`, name)), page("l1", "Vallaki", "location")];
 
@@ -339,7 +289,7 @@ describe("A party bigger than the Combobox's default page", () => {
     await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
     const options = (await screen.findAllByRole("option")).map((option) => option.textContent);
     expect(options).toEqual(NAMES);
-    // Named rather than left to the count: "Ivy" is the row the default cap dropped.
+    // "Ivy" is the one the default cap would drop.
     expect(options).toContain("Ivy");
   });
 
@@ -367,7 +317,7 @@ describe("A party bigger than the Combobox's default page", () => {
     const options = (await screen.findAllByRole("option")).map((option) => option.textContent);
     expect(options).toEqual(NAMES);
 
-    // This row is the one with no free-text escape: if "Ivy" is not in the list, the link is unreachable.
+    // The edit row has no free-text escape, so Ivy must be listed.
     await user.click(screen.getByRole("option", { name: "Ivy" }));
     await user.click(history.getByRole("button", { name: "Save" }));
 
@@ -384,13 +334,11 @@ describe("The player's Downtime (D12/D14)", () => {
   it("has no Pending section — by construction, not by a role check", () => {
     render(<PlayerDowntimeView records={PLAYER_ROWS as never} pages={[{ id: "c1", title: "Vex" }]} onOpenEntry={vi.fn()} onOpenPage={vi.fn()} />);
 
-    // `applied` is a GM-payload field with no player equivalent, so this component could not render a
-    // pending row even if it tried — and there is no Confirm anywhere on it.
+    // `applied` isn't on the player payload, so there is no Pending section or Confirm.
     expect(screen.queryByText("Pending confirmations")).toBeNull();
     expect(screen.queryByRole("button", { name: /Confirm|Move your date to/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(screen.queryByText("Log downtime")).toBeNull();
-    // What they DO get is the same lens: their totals and their history.
     expect(screen.getByRole("rowheader", { name: "Vex" })).toBeInTheDocument();
   });
 

@@ -4,18 +4,16 @@ import { type CodexPageSummary } from "./api";
 import { CodexIcon, EntityIcon } from "./icons";
 
 /**
- * The campaign notebook's organizational tree: every page grouped into a collapsible nested-folder
- * hierarchy (folder paths like "NPCs/Villains"), Obsidian/OneNote style. Folders come from two sources
- * unioned together — each page's `folder` path AND explicit folder records (so an empty folder persists).
- * Within any folder, notes render ABOVE subfolders. Pages can be re-organized by drag-and-drop (desktop)
- * or a "move" affordance (touch), and folders sorted + renamed.
+ * The notebook tree: pages grouped into nested folders ("NPCs/Villains"). Folders are the union of page
+ * folder paths and explicit folder records, so an empty folder persists. Pages sort above subfolders.
+ * Reorganize by drag-and-drop (desktop) or the move action (touch).
  */
 export type FolderNode = { name: string; path: string; folders: Map<string, FolderNode>; pages: CodexPageSummary[] };
 export type NotebookSort = "name-asc" | "name-desc" | "recent";
 const DRAG_TYPE = "application/x-codex-page";
 const FOLDER_DRAG_TYPE = "application/x-codex-folder";
-// The folder path being dragged this gesture. `getData` is unavailable during dragOver, so we need this to
-// reject dropping a folder onto itself or its own descendant before the drop fires.
+// The folder being dragged. `getData` is unavailable during dragOver, and this is needed there to reject
+// dropping a folder onto itself or a descendant.
 let draggedFolderPath: string | null = null;
 /** A folder can't be dropped onto itself or into one of its own descendants. */
 const invalidFolderDrop = (target: string, dragged: string | null) => dragged !== null && (target === dragged || target.startsWith(`${dragged}/`));
@@ -60,10 +58,7 @@ type Handlers = Readonly<{
   onMovePage: (pageId: string, folderPath: string | null) => void;
   onMoveFolder: (fromPath: string, toParentPath: string | null) => void;
   onRequestMove: (pageId: string) => void;
-  /**
-   * Intake Mobile #5: a folder could only be MOVED by dragging it, which is unreachable with a thumb.
-   * This is the keyboard-and-touch route — the same "Move to folder" modal a page's row menu opens.
-   */
+  /** The touch and keyboard way to move a folder, via the same modal a page's row menu opens. */
   onRequestMoveFolder: (path: string) => void;
 }>;
 
@@ -109,15 +104,8 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
           <span className="codex-tree-count">{countPages(folder)}</span>
         </button>
         {/*
-          §4 touch floor. Four 13-15px icon buttons used to sit here and NEITHER §4 route could reach 44px:
-          route 2 centres a 44px box on ~15px of paint (a 14.5px overhang per side) on buttons gapped by ~8px,
-          so each would silently steal its neighbour's taps - the precise failure the gap budget exists to
-          prevent; route 1 needs 4x44 = 176px of actions inside a row measured at 223px on a ~343px rail,
-          leaving the folder name ~47px. So the fix is not CSS: four controls do not belong on a tree row.
-          They collapse into ONE `Menu`, the same single-dots shape `.codex-tree-page-move` already gives a
-          note row, and the primitive carries the floor itself (`.nh-menu-trigger--icon` is §4 route 2 on 28px
-          of paint; `.nh-menu-item` is route 1). Gap budget for the 8px-per-side trigger overhang is paid by
-          `.codex-tree-folder-actions`' margin in codex.css.
+          One `Menu` instead of four small icon buttons: their ::after hit areas would overlap each other,
+          and 4x44px won't fit the row. The trigger's overhang is covered by `.codex-tree-folder-actions`' margin.
         */}
         <div className="codex-tree-folder-actions">
           <Menu trigger={<IconDrag />} icon align="end" label={`Actions for ${folder.name}`} className="codex-tree-folder-menu">
@@ -139,7 +127,7 @@ type NotebookTreeProps = Handlers & Readonly<{ node: FolderNode; depth?: number 
 export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps) {
   const folders = sortFolders(node, handlers.sort);
   const pages = sortPages(node, handlers.sort);
-  // The top-level container is the drop target for "move to the top level" (clear a page's folder).
+  // The top-level container is the drop target for moving a page to the top level.
   const rootDrop = depth === 0
     ? {
         onDragOver: (event: React.DragEvent) => { const types = event.dataTransfer.types; if (types.includes(DRAG_TYPE) || types.includes(FOLDER_DRAG_TYPE)) event.preventDefault(); },
@@ -153,7 +141,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
     : {};
   return (
     <div className="codex-tree" role={depth === 0 ? "tree" : "group"} {...rootDrop}>
-      {/* Notes belonging directly to this folder sort ABOVE its subfolders (the owner's preferred order). */}
+      {/* Pages sort above subfolders. */}
       {pages.map((page) => (
         <div key={page.id} className="codex-tree-page-row" style={{ paddingInlineStart: `${depth * 14 + 20}px` }}>
           <button
@@ -166,26 +154,9 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
             {page.entityType !== "note" && <EntityIcon type={page.entityType} className="codex-tree-icon" />}
             <span className="codex-list-title">{page.title}</span>
           </button>
-          {/* RULING 58 — ONE REVEAL LANGUAGE EVERYWHERE, and it is a SAFETY property rather than
-              tidiness: reveal is the control where a GM misreading the state leaks something to the
-              table, so the mark is the same glyph in the same place every time they meet it. That
-              means the VALUE is passed, never gated on — a row with no mark is UNREADABLE, because
-              "hidden from players" and "no reveal state at all" then look identical. This used to
-              render only when `revealedToPlayers` was true, on the argument that a mark on every row
-              of a dense tree is noise; measured on this tree it left 1 row in 7 carrying nothing.
-              Density is a styling question, not a rendering one. Every other call site already
-              passes the value — `PagesView.tsx`, `QuestsView.tsx`, `SessionsView.tsx`,
-              `SessionConsole.tsx` — and `VisibilityBadge` renders both states, the off one being the
-              struck-through eye with its own accessible name.
-
-              IT IS A SIBLING OF THE ROW'S CONTROL, NOT A CHILD OF IT, and that is the a11y half of
-              the same ruling: `Reveal.tsx` builds this as a STATUS ("deliberately not a switch and
-              not focusable"), and a status nested inside a button becomes part of that button's
-              accessible NAME. Rendered inside, the tree item stopped being called "Barovia" and
-              started being called "Barovia Hidden from players" — the page's name and its reveal
-              state fused into one string. Outside, the item keeps its title and the mark keeps its
-              own name. Visually unchanged: `.codex-tree-page` takes `flex: 1`, so the mark sits at
-              the row's trailing edge either way. */}
+          {/* Always rendered, with the value passed: a row with no mark can't be told from a hidden one.
+              A sibling of the row's button, not a child, so it doesn't become part of the button's
+              accessible name. */}
           <VisibilityBadge revealed={page.revealedToPlayers} />
           <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}><IconDrag /></button>
         </div>

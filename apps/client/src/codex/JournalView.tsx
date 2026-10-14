@@ -12,48 +12,27 @@ import { sessionByNumber, sessionTitle } from "./sessions";
 import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
 
 /**
- * The campaign chronicle (CT-11 / CT-12): **one** timeline carrying GM-written two-layer journal entries
- * AND dated `event` pages, placed on the world's own calendar and readable through two lenses — by
- * in-world date or by session. A structured in-world date is what puts a record on it; entries can also
- * carry a session #, be pinned to a page, and reveal to players. Logged encounters auto-post here.
- *
- * The composer below writes JOURNAL ENTRIES only. An `event` row is a wiki page: its two layers, its
- * fields and its date are edited on the page itself, which is why an event row offers "Open page" where
- * an entry row offers Edit/Delete. One timeline, two kinds of record, each edited where it lives.
+ * The campaign chronicle: one timeline of two-layer journal entries and dated `event` pages, read by
+ * in-world date or by session. The composer writes journal entries only; an event row is a wiki page and
+ * is edited on the page.
  */
 /**
- * M12: the composer writes FOUR shapes of the same record — an entry, a deadline (CT-5), downtime
- * (CT-10) and a milestone (CT-8). One composer rather than four, because they are one row in one table:
- * two layers of prose, a reveal flag and an in-world date. A deadline adds only the rule that the date is
- * required (a deadline with no date can never fire); downtime adds who/activity/days; a milestone adds
- * the level reached and why.
- *
- * A `standing` record is deliberately NOT a fifth option here. It is not something a GM writes on the
- * timeline — it is written BY the standing card, as the second half of one transaction that also moves
- * the number. Offering it in this switch would be a second way to write a record that must never exist
- * without the table change it describes.
+ * The composer's record shapes, all one journal row. `standing` records are written only by the standing
+ * card, together with the value change, so they are not offered here.
  */
 const COMPOSER_KINDS = ["entry", "deadline", "downtime", "milestone"] as const;
 type ComposerKind = (typeof COMPOSER_KINDS)[number];
-/** The words each shape uses. The KIND labels come from `CHRONICLE_KIND_META`, so the composer's switch
-    and the rows it produces can never call the same record two different things.
-
-    **There is no per-kind label for the player layer any more.** Each kind used to name its own player
-    side — "Player-facing summary", "What will happen", "What the party knows" twice — which made the
-    same toggle read differently on four screens of one view. The layer is named once, by
-    `TwoLayerBodyTabs`; what stays per-kind is the PLACEHOLDER, which is an example of what to write
-    rather than a name for the layer it is written into. */
+/** Per-kind copy. Kind labels come from `CHRONICLE_KIND_META`; the layer names come from `TwoLayerBodyTabs`. */
 const COMPOSER_COPY: Readonly<Record<ComposerKind, Readonly<{ heading: string; textPlaceholder: string; submit: string }>>> = {
   entry: { heading: "New journal entry", textPlaceholder: "What players know about this", submit: "Add entry" },
-  // D11-C: a deadline stores no payload — WHAT will happen is this text, WHEN is the record's own date.
   deadline: { heading: "New deadline", textPlaceholder: "The duke's ultimatum expires", submit: "Add deadline" },
   downtime: { heading: "New downtime", textPlaceholder: "How the time was spent", submit: "Log downtime" },
   milestone: { heading: "New milestone", textPlaceholder: "What players know about this level", submit: "Record milestone" }
 };
-/** The server's bounds, stated here too, so a slip is a disabled field rather than a generic 400. */
+/** The server's bounds, so a slip is a disabled field rather than a 400. */
 const DOWNTIME_TEXT_MAX = 120;
 const DOWNTIME_DAYS_MAX = 3650;
-/** CT-8: the 5e level range. "No XP arithmetic" — the GM says which level was reached, nothing is computed. */
+/** The 5e level range. No XP arithmetic. */
 const MILESTONE_LEVEL_MIN = 1;
 const MILESTONE_LEVEL_MAX = 20;
 const MILESTONE_REASON_MAX = 120;
@@ -62,71 +41,35 @@ type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionId
 const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionId: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
-/**
- * Ruling 57 — **the journal is a document, and its composer wears the page editor's shape.**
- *
- * What did NOT move: the feed. Ruling 57's own principle is that a surface keeps its composition when a
- * document shape would fight what it is, and a chronicle entry is an ARTICLE — kind badge, in-world date,
- * session link, two layers of prose, tags, a downtime's confirm row and four footer actions. Squeezed
- * into a 300px rail beside a detail pane it would be unreadable, which is the "map is spatial" argument
- * applied to a timeline. So the Journal stays a centred column with a composer over an entry feed.
- *
- * What DID move is the composer, and it is the half that was actually wrong: MEASURED at 1280x900 it
- * stood roughly 1,100px tall — two stacked 224px/179px writing fields plus five filing controls — so the
- * first entry of the campaign began below the fold on every laptop. It now uses the same two controls as
- * a page and a quest: one body at a time, and the filing behind Details.
- *
- * The kind PAYLOAD (a downtime's who/activity/days, a milestone's level) deliberately stays in the
- * centre. It is not metadata — it IS the record, and it is what arms the submit button; behind a panel a
- * GM would meet a button that will not press and no visible reason why.
- */
 const JOURNAL_DETAILS_KEY = "codex-journal-details";
 const JOURNAL_DETAILS_ID = "codex-journal-details";
-/**
- * OWNER DECISION (2026-07-30): the prep-clock reveal warning is switchable off, and the switch is per
- * DEVICE — `localStorage`, like every other GM reading preference in this app (`vtt.show-occupied`,
- * `codex-notebook-sort`). Deliberately not server state: it changes nothing a player can observe and
- * nothing the server authorises, so putting it in `codex_meta` would have cost a migration, a route and an
- * API-contract change to store a preference about a dialog. Absent means ON — a warning that defaults off
- * because storage is unavailable is not a warning.
- */
+/** Per-device switch for the prep-clock reveal warning. Absent (or unreadable storage) means on. */
 const REVEAL_WARN_KEY = "codex.warn-reveal-ahead";
 const readRevealWarn = (): boolean => { try { return localStorage.getItem(REVEAL_WARN_KEY) !== "off"; } catch { return true; } };
 const writeRevealWarn = (on: boolean) => { try { localStorage.setItem(REVEAL_WARN_KEY, on ? "on" : "off"); } catch { /* private mode - the preference stays in-session */ } };
 
-/**
- * CI-6 (return edge): an entry knows where it happened (`attachMarkerId`, set by the combat bridge when
- * a battle is logged at a pin) and which encounter produced it (`sourceEncounterId`). Both jumps are
- * owned by surfaces above this one — the Atlas for the pin, the replay panel for the fight — so the
- * journal hands the id up rather than reaching sideways into either. `onOpenReplay` is the SAME prop
- * `PageTimeline` already takes, threaded from the same place, so there is one replay path and not two.
- */
+/** Pin and replay jumps are handed up via `onOpenMarker`/`onOpenReplay`; this view never navigates sideways. */
 export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {}, sessions = [], activeSessionId = null, onOpenSession, onOpenCalendar, kindFilter = null, tagFilter = null, textFilter = "", onFilterChange }: Readonly<{
   gmToken: string;
-  /** D6: the GM's cadence, for the edit path. The composer keeps an explicit Add (creation ≠ editing). */
+  /** Autosave cadence for the edit path. New entries still use an explicit Add. */
   autosave: CodexAutosaveSettings;
-  /** The shell's one page feed, for `[[` autocomplete. Never a second fetch. */
+  /** The shell's page feed, for `[[` autocomplete. */
   pages: readonly CodexPageSummary[];
   onOpenPage: (pageId: string) => void;
   onOpenMarker?: (markerId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   openEntryId?: string | null;
   onOpenedEntry?: () => void;
-  /** D10: in-place filters, held in the URL so a dashboard card can deep-link to a filtered Journal. */
+  /** Filters live in the URL so a dashboard card can deep-link to a filtered Journal. */
   kindFilter?: string | null;
   tagFilter?: string | null;
   textFilter?: string;
   onFilterChange?: (next: Readonly<Record<string, string | null>>) => void;
-  /** D17: the Calendar is a section of its own now, not a modal opened from here. */
   onOpenCalendar?: () => void;
   activeSessionId?: string | null;
-  /**
-   * M9: the session RECORDS, handed down from the workspace's single feed rather than fetched here.
-   * A second read would be a second answer to "which sessions exist", and the by-session lens would be
-   * the surface where the two disagreed.
-   */
+  /** From the workspace's single session feed, so the by-session lens agrees with Sessions. */
   sessions?: readonly CodexSession[];
-  /** R1: opens Sessions ON that session. Absent = the lens keeps rendering exactly as it did. */
+  /** Opens Sessions on that session. */
   onOpenSession?: (sessionId: string) => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -134,9 +77,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [calendar, setCalendar] = useState<GmCodexCalendar | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  // A draft saved before CI-2 has no `tags` key, so EMPTY supplies one; the Array guard also stops a
-  // corrupt value reaching TagInput, which maps over it. `kind` is parsed the same fail-closed way (a
-  // draft saved before M11 has none, and an unknown one must land on `entry` rather than on undefined).
+  // Older drafts may lack `tags` or `kind`; fall back to safe defaults.
   const [draft, setDraft] = useState<Draft>(() => {
     try {
       const saved = sessionStorage.getItem(DRAFT_KEY);
@@ -151,21 +92,14 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingKind, setEditingKind] = useState<CodexChronicleKind | null>(null);
-  // An in-progress NEW entry, set aside while the composer is borrowed to edit an existing one. Without
-  // this, clicking Edit overwrote the draft AND (via the effect below) deleted its sessionStorage backup.
+  // A new entry set aside while the composer edits an existing one, so Edit never destroys it.
   const [stashedDraft, setStashedDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // CF-2: an empty list is ambiguous until the first fetch settles — without this the journal
-  // asserts "No journal entries yet." over a campaign that simply has not loaded.
+  // Until the first fetch settles, an empty list is not "no entries".
   const [loading, setLoading] = useState(true);
-  /**
-   * Publishing the clock used to be silent: the prep-clock row renders only WHILE the two clocks disagree,
-   * so a successful publish made the row — and with it the only readout of what the table is on — vanish,
-   * which reads identically to a click that did nothing. This is the acknowledgement, and it names the date
-   * so the answer to "what do the players think it is?" survives the row it was asked on.
-   */
+  /** Acknowledges a publish, since the prep-clock row disappears once the clocks agree. */
   const [notice, setNotice] = useState<NoticeMessage>(null);
-  /** The reveal warning's own switch (see `REVEAL_WARN_KEY`). State, not a raw read, so turning it back on re-arms without a reload. */
+  /** State rather than a raw read, so turning it back on takes effect without a reload. */
   const [revealWarn, setRevealWarn] = useState(readRevealWarn);
   const [bodyTab, setBodyTab] = useState<BodyLayer>("player");
   const detailsRef = useRef<HTMLElement>(null);
@@ -178,8 +112,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   }, []);
   useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
 
-  // CT-12: the lens is a reading preference, so it survives leaving and returning to the mode — the same
-  // sessionStorage discipline the composer draft uses, and for the same reason.
+  // The lens survives leaving and returning to the Journal.
   const [lens, setLens] = useState<ChronicleLens>(() => {
     try { return sessionStorage.getItem(LENS_KEY) === "session" ? "session" : "date"; } catch { return "date"; }
   });
@@ -195,23 +128,18 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { const onChanged = () => { void load(); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load]);
-  // Persist an in-progress NEW entry so switching Codex tabs mid-compose doesn't silently drop it. While
-  // editing an existing entry the composer holds that entry, so the thing worth keeping is the stash.
+  // Persist an in-progress new entry across tab switches. While editing, the stash is what's worth keeping.
   useEffect(() => {
     try {
       const pending = stashedDraft ?? (editingId ? null : draft);
-      // M11: a downtime draft can be worth keeping with no prose at all — who/activity carry it — so
-      // emptiness has to ask about those too, or switching tabs mid-compose would silently drop one.
-      // M12: a milestone draft is the same case — its level and reason ARE the record.
+      // Downtime and milestone drafts can carry the record without any prose.
       const isEmpty = !pending || (!pending.playerText.trim() && !pending.gmText.trim() && !pending.who.trim() && !pending.activity.trim() && !pending.level.trim() && !pending.reason.trim());
       if (isEmpty) sessionStorage.removeItem(DRAFT_KEY); else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(pending));
     } catch { /* private mode - fine */ }
   }, [draft, editingId, stashedDraft]);
 
-  // CI-1 / R1: arriving from a search hit, the destination is prepared — the entry is marked and scrolled
-  // to, not merely "the Journal mode, somewhere in a year of entries". Same handled-latch shape as the
-  // atlas target and ReplayPanel's `openArchiveId`; the latch clears when the request does, so the same
-  // entry can be reached again from a later search.
+  // Arriving from a search hit: mark and scroll to the entry once. The latch clears with the request so
+  // the same entry can be reached again later.
   const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const handledEntryRef = useRef<string | null>(null);
   useEffect(() => {
@@ -236,31 +164,23 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
       playerText: draft.playerText, gmText: draft.gmText.trim() || null, revealedToPlayers: draft.revealed,
       attachPageId: draft.attachPageId || null,
       /**
-       * D9: entries join their session **by identity**. `sessionNumber` is display data the server
-       * resolves from the linked record and is a 400 on any write body, so it is never serialized here.
-       * An empty string means "None" and travels as an explicit null; omitting the key on a CREATE
-       * would auto-file under the active session, which is a different (and also correct) behaviour, so
-       * the composer states its choice rather than relying on the default.
+       * Sessions are linked by id; `sessionNumber` is a 400 on writes. Send an explicit null for "None",
+       * since omitting the key on create would auto-file under the active session.
        */
       sessionId: draft.sessionId ? draft.sessionId : null,
       inWorldDate,
-      // Always sent, never omitted: on an edit, omitting `tags` would leave the old ones in place, so
-      // removing the last tag from an entry has to travel as an explicit empty array.
+      // Always sent: omitting `tags` on an edit would keep the old ones, so clearing needs `[]`.
       tags: draft.tags
     };
     try {
-      // `editingId` is asked FIRST and the kind is never consulted on that path. The PATCH route edits
-      // an entry's prose, date, session, pin and tags whatever kind the row is; it has no notion of kind
-      // at all, which is why the switch is hidden while editing — a record's kind is fixed once written.
+      // The edit path ignores kind; a record's kind is fixed once written.
       if (editingId) await journalApi.update(gmToken, editingId, input);
       else if (draft.kind === "deadline") {
-        // Guarded here as well as by the disabled button: `createDeadline` requires a date, and a
-        // rejected create is a worse way to learn that than a button that will not arm.
+        // Also guarded by the disabled button.
         if (!inWorldDate) { setError("A deadline needs a date. Set the year, month and day above."); return; }
         await journalApi.createDeadline(gmToken, { ...input, inWorldDate });
       } else if (draft.kind === "downtime") {
-        // O-3: this creates a RECORD and nothing else. The clock does not move here, and the response's
-        // proposed date is not applied — confirming it is a separate action on the row itself.
+        // Creates the record only; the clock moves when the GM confirms on the row.
         await journalApi.createDowntime(gmToken, {
           ...input,
           downtime: {
@@ -270,9 +190,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           }
         });
       } else if (draft.kind === "milestone") {
-        // CT-8: level history, and nothing derived from it. The level is clamped to the 5e range here as
-        // well as on the server, for the same reason downtime's days are — a rejected create is a worse
-        // way to learn a bound than a field that would not accept the value.
+        // Clamped to the 5e level range, matching the server.
         await journalApi.createMilestone(gmToken, {
           ...input,
           milestone: {
@@ -281,48 +199,34 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           }
         });
       } else await journalApi.create(gmToken, input);
-      // Finishing an edit hands the composer back to whatever new entry was in progress; finishing a NEW
-      // record keeps the composer on the kind it was on, since a GM setting deadlines usually sets several.
+      // After an edit, restore any stashed new entry; after a create, stay on the same kind.
       setDraft(editingId ? (stashedDraft ?? EMPTY) : { ...EMPTY, kind: draft.kind }); setStashedDraft(null); setEditingId(null); setEditingKind(null); await load();
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Could not save the entry."); }
   };
   const edit = (record: CodexChronicleRecord) => {
-    // Set aside an unsaved NEW entry before the composer is reused, so Edit can never destroy it.
     if (!editingId && (draft.playerText.trim() || draft.gmText.trim() || draft.who.trim() || draft.activity.trim() || draft.level.trim() || draft.reason.trim())) setStashedDraft(draft);
     setEditingId(record.id);
-    // What KIND is being edited. The composer's own `kind` is a new-record choice and is parked below, so
-    // without this the edit path could not tell a deadline from a note — and a deadline's date is the one
-    // field an edit must not be allowed to clear (D11-C).
+    // The edit path needs the kind so a deadline's date cannot be cleared.
     setEditingKind(record.kind);
-    const date = record.inWorldDate; // the raw date the GM typed - correct even if the calendar has since changed
+    const date = record.inWorldDate; // the raw date the GM typed, still valid if the calendar changed
     setDraft({
-      // The composer's kind is a NEW-record choice; on the edit path it is never read (see `submit`), so
-      // it is parked back on `entry` rather than pretending a deadline's kind can be changed here.
+      // Never read on the edit path (see `submit`).
       kind: "entry",
       playerText: record.text, gmText: record.gmText ?? "", sessionId: record.sessionId ?? "",
       dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : "",
       attachPageId: record.attachPageId ?? "", revealed: record.revealedToPlayers, tags: record.tags,
-      // A downtime's who/activity/days and a milestone's level/reason are not editable — there is no
-      // route that rewrites a payload — so the composer does not pretend to offer them on the edit path.
+      // Payloads have no update route, so they are not editable here.
       who: "", activity: "", days: "", level: "", reason: ""
     });
   };
-  /**
-   * O-3, the confirmation itself: mark this downtime applied and move the campaign clock by its days, in
-   * one server-side transaction. The whole chronicle is re-read afterwards rather than patched from the
-   * response, because moving the clock changes what every dated row's "Today" marker and every deadline's
-   * fired state say — the clock is not a field on this record, it is the frame the whole timeline hangs in.
-   */
+  /** Re-reads the whole chronicle afterwards: moving the clock changes every row's dating and deadline state. */
   const applyDowntime = async (record: CodexChronicleRecord) => {
     try { await journalApi.applyDowntime(gmToken, record.id); await load(); }
     catch (applyError) { setError(applyError instanceof Error ? applyError.message : "Could not advance the campaign clock."); }
   };
-  /** O-1 / D11-H: hand the GM's clock to the table. The only thing on this client that publishes it. */
+  /** Publish the GM's clock to players. Nothing else on this client does. */
   const publishDate = async () => {
-    // Read the date BEFORE the round-trip: `load()` replaces `calendar`, and after a successful publish the
-    // two clocks agree, so "the date players now see" and "the GM's clock" are the same value either way —
-    // but naming it from the pre-publish state is what makes the message true even if the GM edits the
-    // calendar between the click and the refetch.
+    // Name the date before the round-trip so the message reflects what was published.
     const published = calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null;
     try {
       await calendarApi.publish(gmToken);
@@ -332,22 +236,12 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
     catch (publishError) { setError(publishError instanceof Error ? publishError.message : "Could not publish the date."); }
   };
   const cancelEdit = () => { setEditingId(null); setEditingKind(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
-  /**
-   * Reveal from the row, whichever kind it is. Both branches call the record type's OWN reveal route —
-   * an event row's switch flips the page's reveal flag, which is the same flag the page editor shows,
-   * because there is one reveal state per record and the chronicle is a view of it, not a second copy.
-   */
+  /** Each kind uses its own reveal route; an event row flips the page's reveal flag. */
   const reveal = async (record: CodexChronicleRecord, revealed: boolean) => {
     /**
-     * OWNER DECISION (2026-07-30): warn before a reveal hands players a date the GM has not published.
-     *
-     * Gated on `revealed` — HIDING a record discloses nothing, so it is never worth a dialog. The switch is
-     * controlled by `record.revealedToPlayers`, which nothing here mutates, so a cancelled warning leaves it
-     * visibly off rather than showing a reveal that did not happen.
-     *
-     * Only the chronicle warns, and only about ITS records. A page carries an in-world date solely because
-     * the GM typed one in the page editor, so revealing it discloses a date they chose deliberately; these
-     * six kinds auto-date at the prep clock without being asked, which is the whole reason this exists.
+     * Warn before a reveal hands players a date past their published clock. Hiding never warns. Pages are
+     * not checked: their date is one the GM typed deliberately, whereas these records auto-date at the
+     * prep clock.
      */
     if (revealed && revealWarn && revealAheadOfPlayers(record, calendar)) {
       const dated = record.inWorldLabel ?? (record.inWorldDate && calendar ? formatWorldDate(calendar, record.inWorldDate) : "a later date");
@@ -366,16 +260,10 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   };
   const remove = async (record: CodexChronicleRecord) => { if (await confirm({ title: "Delete entry", body: "Delete this journal entry? This cannot be undone.", confirmLabel: "Delete", danger: true })) { await journalApi.remove(gmToken, record.id); await load(); } };
 
-  // One vocabulary across the suite: hint with the tags already in use on pages AND on other entries, so
-  // the GM reuses "session-recap" instead of inventing a near-duplicate. Free entry stays open (datalist).
+  // Suggest tags already in use on pages and entries, so the GM reuses existing ones.
   const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...records.flatMap((record) => record.tags)])].sort(), [pages, records]);
 
-  // CT-12: the same records, grouped for whichever lens is on. Regrouping only — nothing is refetched and
-  // nothing is written, so toggling can never change what the chronicle contains.
-  /**
-   * D10: the filtered set, then the groups. Filtering BEFORE grouping is what keeps an empty group from
-   * rendering as a heading with nothing under it.
-   */
+  // Filter before grouping so an empty group never renders as a bare heading.
   const allTags = useMemo(() => [...new Set(records.flatMap((record) => record.tags))].sort(), [records]);
   const filtered = useMemo(() => {
     const needle = textFilter.trim().toLowerCase();
@@ -386,46 +274,25 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   }, [records, kindFilter, tagFilter, textFilter]);
   const groups = useMemo(() => groupChronicle(filtered, lens, calendar), [filtered, lens, calendar]);
 
-  // The world's "now": a readout + a Today marker placed in its year on the timeline. Since M11 this is
-  // explicitly the GM's OWN clock — see the prep-clock row below for what the table is currently on.
+  // The GM's clock; the prep-clock row shows what players are on.
   const now = calendar?.currentDate ?? null;
   const nowYear = now && calendar ? calendarYearOf(calendar, dateToInstant(calendar, now)) : null;
   const nowLabel = now && calendar ? formatWorldDate(calendar, now) : null;
-  /**
-   * O-1, the prep clock. Two values, and this is the only place both are on screen.
-   *
-   * The quiet state is the normal state: while the two agree there is nothing here at all — no chip, no
-   * button, no "in sync" badge — because a GM who has never run ahead of the party should not have to
-   * learn a second clock exists. It appears the moment they diverge, which is the moment it matters.
-   */
+  /** The prep-clock row appears only while the GM's clock and the published clock differ. */
   const publishedLabel = calendar?.publishedDate ? formatWorldDate(calendar, calendar.publishedDate) : null;
   const clockDiverged = calendar !== null && !sameInWorldDate(calendar.currentDate, calendar.publishedDate);
-  /** The composer's own preview of what logging this downtime would later propose (O-3, stated up front). */
+  /** The composer's preview of the date this downtime would propose. */
   const composerProposal = draft.kind === "downtime" && calendar
     ? downtimeProposedDate(calendar, Math.min(DOWNTIME_DAYS_MAX, Math.max(0, Math.trunc(Number(draft.days) || 0))))
     : null;
   const hasText = draft.playerText.trim() !== "" || draft.gmText.trim() !== "";
-  /**
-   * What each shape needs before it can be written. A deadline needs its date (the store rejects one
-   * without it); downtime can stand on its who/activity alone, because the payload IS the record for a
-   * downtime that nobody has written prose about yet.
-   */
-  /**
-   * A deadline needs its date on the EDIT path too, not only on create.
-   *
-   * The store rejects an edit that clears it, but a disabled button is a better way to learn that a field
-   * is not optional than a save that fails. The create path guarded this from the start; the edit path did
-   * not, and clearing the Year field on an existing deadline produced a row that says "Deadline -
-   * Approaching" forever and can never fire.
-   */
+  /** A deadline needs its date on edit as well as create; a dateless deadline can never fire. */
   const needsDate = editingId ? editingKind === "deadline" : draft.kind === "deadline";
   const canSubmit = (editingId || draft.kind === "entry"
     ? hasText
     : draft.kind === "deadline"
     ? hasText && draft.dateYear.trim() !== ""
-    // CT-8: a milestone stands on its LEVEL alone. "The party reached 5" is the whole record; the prose
-    // is optional colour, exactly as a downtime's is, and requiring text would make the one field that
-    // actually carries the record optional and the decoration mandatory.
+    // A milestone needs only its level; prose is optional.
     : draft.kind === "milestone"
     ? draft.level.trim() !== ""
     : hasText || draft.who.trim() !== "" || draft.activity.trim() !== "")
@@ -434,9 +301,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   return (
     <div className="codex-journal">
       <Panel accent="cyan" className="codex-composer">
-        {/* M11: which shape of record this is. Hidden while editing — a record's kind is fixed once it is
-            written, and there is no route that changes one. `SegmentedControl` is the `@vtt/ui` primitive
-            (R9) and carries its own 44px floor; the labels come from the chronicle's own kind vocabulary. */}
+        {/* Hidden while editing: a record's kind is fixed once written. */}
         {!editingId && (
           <div className="codex-composer-kind">
             <SegmentedControl ariaLabel="What to write" value={draft.kind} onChange={(next) => set({ kind: next as ComposerKind })}
@@ -454,40 +319,23 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             {editingId && <Button variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>}
           </div>
         </div>
-        {/* O-1: what the TABLE is currently on, and the one control that changes it. Rendered only while
-            the two clocks disagree (see `clockDiverged`). §4: `Button` at its default size is route 1 —
-            it grows the paint to 44px and has no `::after` at all — which is what this row needs, sitting
-            as it does directly above the composer's own stack of fields. */}
+        {/* Rendered only while the two clocks differ. Default-size buttons here: this row sits directly above
+            the composer's fields, where a `size="sm"` control's 44px ::after hit area would overlap them. */}
         {clockDiverged && (
           <div className="codex-prepclock">
             <span className="codex-prepclock-label">Players' date:</span>
             <span className="codex-now-chip">{publishedLabel ?? "not shared yet"}</span>
-            {/* SECONDARY here, primary on the Calendar. §5 allows one primary action per view, and on the
-                Journal that is the composer's own submit. */}
             <Button variant="secondary" onClick={publishDate}>Publish the date</Button>
-            {/* The way BACK from "Stop warning me about this". It lives here rather than in a settings screen
-                because this row is the only place both clocks are on screen, and it renders exactly when the
-                warning would have mattered — so the GM meets the switch at the moment they want it, instead
-                of having to remember which dialog they dismissed. Absent while the warning is on: nothing to
-                offer a GM who never turned it off. */}
-            {/* §4 ROUTE 1, like `Publish the date` beside it and for the row's stated reason: this row sits
-                directly above the composer's stack of fields, so a `size="sm"` control here would meet the
-                floor through `.tap-target`'s ::after — a 44px box centred on 32px of paint, overhanging 6px
-                into the first Textarea's top edge. Measured at 176x32 paint before this was corrected.
-                Default size grows the paint itself and carries no ::after at all. */}
+            {/* The way back from "Stop warning me about this". */}
             {!revealWarn && (
               <Button variant="ghost" onClick={() => { setRevealWarn(true); writeRevealWarn(true); }}>Warn me again before showing an entry</Button>
             )}
           </div>
         )}
-        {/* Ruling 57: one body at a time, the page editor's own control and the page editor's own words
-            for the two layers — now literally the same component, so "the page editor's own words" can no
-            longer become four kinds' four different words the next time a kind is added. */}
         <TwoLayerBodyTabs value={bodyTab} onChange={setBodyTab}>
           {bodyTab === "gm" && <GmOnlyTag />}
         </TwoLayerBodyTabs>
-        {/* D13: the SAME writing surface a page body gets, so `[[links]]` typed into a journal entry
-            autocomplete and join the connection graph instead of silently doing nothing. */}
+        {/* The same editor a page body uses, so `[[links]]` autocomplete and join the connection graph. */}
         {bodyTab === "player"
           ? <CodexEditor id="j-player" token={gmToken} value={draft.playerText} onChange={(playerText) => set({ playerText })}
               ariaLabel={BODY_LAYER.player.label} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder}
@@ -495,15 +343,10 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           : <CodexEditor id="j-gm" token={gmToken} value={draft.gmText} onChange={(gmText) => set({ gmText })}
               ariaLabel={BODY_LAYER.gm.label} placeholder="Notes hidden from players"
               pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} gmLayer rows={7} />}
-        {/* A deadline's date is not optional metadata, it is half the record — so say so where the button
-            will not arm, rather than letting the GM discover it as a save failure. The date now lives in
-            Details, so the sentence says where to go: a hint that names a control the GM cannot see is
-            worse than no hint. */}
+        {/* The date is in Details, so the hint says where to set it. */}
         {needsDate && !draft.dateYear.trim() && (
           <p className="codex-composer-hint">A deadline needs a date. Set the year, month and day under Details. It fires when your date passes it.</p>
         )}
-        {/* CT-10's payload. Its own row, sharing the meta row's column rules so the composer keeps one
-            grid rather than growing a second layout for three more fields. */}
         {!editingId && draft.kind === "downtime" && (
           <>
             <div className="codex-composer-meta">
@@ -511,16 +354,12 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
               <Field label="Activity" htmlFor="j-activity"><Input id="j-activity" maxLength={DOWNTIME_TEXT_MAX} value={draft.activity} placeholder="Forging a blade" onChange={(event) => set({ activity: event.target.value })} /></Field>
               <Field label="Days" htmlFor="j-days"><Input id="j-days" type="number" inputMode="numeric" min={0} max={DOWNTIME_DAYS_MAX} value={draft.days} placeholder="7" onChange={(event) => set({ days: event.target.value })} /></Field>
             </div>
-            {/* O-3 stated BEFORE the record exists, not only after: logging downtime proposes a date and
-                changes nothing. Without this the "Confirm" that appears on the row afterwards would be
-                the first the GM heard that the clock was involved at all. */}
+            {/* Say up front that logging proposes a date and moves nothing. */}
             {composerProposal && calendar && (
               <p className="codex-composer-hint">Logging this proposes moving your date to {formatWorldDate(calendar, composerProposal)}. Nothing moves until you confirm it on the record.</p>
             )}
           </>
         )}
-        {/* CT-8's payload, on downtime's terms exactly: its own row sharing the meta row's column rules,
-            so the composer keeps one grid rather than growing a third layout for two more fields. */}
         {!editingId && draft.kind === "milestone" && (
           <>
             <div className="codex-composer-meta">
@@ -533,22 +372,15 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                   onChange={(event) => set({ reason: event.target.value })} />
               </Field>
             </div>
-            {/* CT-8 is level HISTORY, not a level tracker: nothing here computes XP, and the record does
-                not change anyone's sheet. Said out loud so a GM does not go looking for the half that
-                is deliberately absent. */}
             <p className="codex-composer-hint">A milestone records the level the party reached and when. It changes no character sheet and counts no XP. Leave the date blank to record it at your current date.</p>
           </>
         )}
         <div className="codex-composer-foot">
-          {/* O-2 / P2: a deadline and a downtime hide by default exactly as an entry does, and are
-              revealed by this same switch. There is no kind-specific visibility anywhere. */}
           <RevealSwitch revealed={draft.revealed} onChange={(revealed) => set({ revealed })} ariaLabel="Show this entry to players" />
           <Button variant="primary" size="sm" disabled={!canSubmit} onClick={submit}>{editingId ? "Save entry" : COMPOSER_COPY[draft.kind].submit}</Button>
         </div>
 
-        {/* WHERE THIS RECORD IS FILED — the same panel, the same control and the same words as a page's
-            and a quest's. Held to the composer's own box rather than the viewport, so it reads as this
-            record's own detail and cannot collide with the shell's Session prep drawer. */}
+        {/* Filing details: the same panel as pages and quests, scoped to the composer rather than the viewport. */}
         {detailsOpen && (
         <aside id={JOURNAL_DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Entry details" tabIndex={-1} ref={detailsRef}
           onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
@@ -556,8 +388,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             <h3 className="codex-backlinks-title">Entry details</h3>
             <IconButton label="Close entry details" size="sm" onClick={() => showDetails(false)}><IconX /></IconButton>
           </div>
-          {/* D9: a session is chosen by RECORD, not by typing a number. Renumbering then relabels every
-              entry with no journal write at all, and a hidden session's number can no longer leak. */}
+          {/* Chosen by record, so renumbering a session relabels entries without a journal write. */}
           <Field label="Session" htmlFor="j-session">
             <Select id="j-session" value={draft.sessionId} onChange={(event) => set({ sessionId: event.target.value })}>
               <option value="">None</option>
@@ -575,30 +406,21 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             <Combobox id="j-page" options={pages.map((page) => ({ id: page.id, label: page.title }))} value={draft.attachPageId || null}
               onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Attach to page" placeholder="None" />
           </Field>
-          {/* The composer is also the edit surface, so this one control covers both the new-entry and the
-              edit path. */}
           <Field label="Tags" htmlFor="j-tags">
             <TagInput id="j-tags" ariaLabel="Tags" placeholder="session-recap, downtime" values={draft.tags}
               onChange={(next) => set({ tags: next })}
               max={24} maxReachedReason="An entry may carry at most 24 tags."
               suggestions={tagSuggestions}
-              /* DEFAULT slugify on purpose — it IS the server contract (`codex-store.ts` tags():
-                 /^[a-z0-9][a-z0-9-]*$/, which throws rather than sanitising). Overriding it here would
-                 let "Session Recap" through as a value the PATCH rejects with a generic save failure. */ />
+              /* Keep the default slugify: it matches the server's tag rule, which rejects rather than sanitises. */ />
           </Field>
         </aside>
         )}
       </Panel>
 
       {error && <Alert tone="danger">{error}</Alert>}
-      {/* Publishing's acknowledgement (see `publishDate`). `Notice` announces politely via `role="status"`,
-          so it reaches a screen reader without interrupting; `error` above stays the assertive channel. */}
       <Notice notice={notice} />
 
-      {/* CT-12: the lens toggle, and D10's in-place filters beside it. Above the timeline and outside
-          the groups, because both govern all of them. Filter state lives in the URL, so a dashboard card
-          can deep-link to "the Journal, deadlines only". Client-side over the records already fetched —
-          the chronicle is one read and filtering it is not a second one. */}
+      {/* Filters are client-side over the fetched records; their state lives in the URL. */}
       <div className="codex-timeline-lens">
         <SegmentedControl ariaLabel="Journal lens" value={lens} onChange={(next) => setLens(next as ChronicleLens)}
           options={CHRONICLE_LENSES.map((option) => ({ value: option.id, label: option.label }))} />
@@ -622,14 +444,8 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
         {!loading && records.length > 0 && filtered.length === 0 && <p className="codex-list-empty">Nothing in the Journal matches these filters.</p>}
         {groups.map((group) => {
           /**
-           * M9: a session heading opens the session — but ONLY when a session record actually exists
-           * for that number, and only under the session lens.
-           *
-           * Both halves matter. Under the date lens `group.key` is a calendar YEAR, so resolving it as
-           * a session number would open session 1492. And M9 ships with **no backfill**, so most
-           * numbered groups on an existing campaign have no record behind them: those must keep
-           * rendering exactly as they render today rather than becoming buttons that 404. The heading
-           * is only promoted to a control when there is something real on the other end of it.
+           * A session heading opens its session only under the session lens and only when a session record
+           * exists for that number (older numbered groups may have none). Under the date lens the key is a year.
            */
           const groupSession = lens === "session" && group.key !== "none" && onOpenSession
             ? sessionByNumber(sessions, Number(group.key))
@@ -637,38 +453,25 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           return (
           <section key={group.key} className="codex-timeline-group">
             {groupSession
-              /* §4 route 1 (grow the paint) — see `.codex-timeline-year.is-openable` in codex.css. */
               ? <button type="button" className="codex-timeline-year is-openable" onClick={() => onOpenSession!(groupSession.id)}>
                   {group.label}<span className="codex-timeline-year-open" aria-hidden="true">›</span>
                 </button>
               : <div className="codex-timeline-year">{group.label}</div>}
-            {/* The "Today" marker belongs to the in-world reading; under the session lens a calendar year
-                is not what the groups mean, so placing it there would be an answer to a question nobody asked. */}
+            {/* The Today marker belongs to the date lens only. */}
             {lens === "date" && nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today: {nowLabel}</div>}
             {group.records.map((record) => {
-              // R2: ONE row shape for every record; the kind reads by icon + label, never by colour alone.
               const meta = CHRONICLE_KIND_META[record.kind];
               const isEvent = record.kind === "event";
-              // M11: `fired` is the SERVER's derivation, read through the one client-side reader; the
-              // payload is present only on a downtime. A record that is neither answers null/false and
-              // renders exactly as it did before this milestone.
               const isDeadline = record.kind === "deadline";
               const fired = deadlineFired(record);
-              // M12: every payload is opened through its own kind gate (`chronicle.ts`), so a record's
-              // payload can only ever be rendered as the kind it actually is.
+              // Payloads are only opened through their kind gates (`chronicle.ts`).
               const downtime = downtimeOf(record);
               const milestone = milestoneOf(record);
               const standing = standingOf(record);
               const questEvent = questEventOf(record);
-              // The SERVER's proposed date, not a second local computation: Confirm says this date out
-              // loud and then the server decides where the clock actually lands, so only one of the two
-              // can be authoritative. `downtimeProposedDate` stays for the composer's preview, where no
-              // record exists yet for the server to answer about.
+              // The server's proposed date, since the server decides where the clock lands.
               const proposed = downtime && !downtime.applied ? record.proposedDate : null;
-              // OWNER DECISION (2026-07-30): say what the clock move would COST before the button that does
-              // it. Counted against the whole chronicle, not this group — a deadline sitting in next year's
-              // group is exactly the one the GM has forgotten about. Zero says nothing rather than "passes 0
-              // deadlines", which would be noise on every downtime in a campaign that has none.
+              // Counted against the whole chronicle, not this group. Zero says nothing.
               const passing = proposed ? deadlinesPassedBy(records, calendar, proposed) : 0;
               return (
               <article key={`${record.kind}-${record.id}`} id={`codex-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
@@ -677,13 +480,9 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                   <div className="codex-entry-meta">
                     <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-entry-kindglyph" />
                     <Badge tone={meta.tone}>{meta.label}</Badge>
-                    {/* CT-5: a deadline's state is a WORD beside its kind, never the row's colour — the
-                        badge tone is a scanning aid and nothing is said by it alone. */}
                     {isDeadline && <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>}
                     <span className="codex-entry-when">{chronicleWhenLabel(record)}</span>
-                    {/* D9 / ruling R2: render whatever the row carries, never a label built from a number.
-                        `sessionId` present → a link. `sessionId` null with a number → a deleted-but-once-
-                        revealed session's bare label, with nothing to navigate to. Both are real states. */}
+                    {/* `sessionId` present: a link. Null with a number: a deleted, once-revealed session's bare label. */}
                     {record.sessionId && onOpenSession
                       ? <button type="button" className="codex-entry-sessionlink" onClick={() => onOpenSession(record.sessionId!)}>
                           {record.sessionNumber !== null ? `Session ${record.sessionNumber}` : "This session"}
@@ -692,23 +491,16 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                   </div>
                   <RevealSwitch revealed={record.revealedToPlayers} onChange={(revealed) => reveal(record, revealed)} ariaLabel={isEvent ? "Show this event to players" : "Show this entry to players"} />
                 </header>
-                {/* An event page has a name; a journal entry does not. Same slot either way, so the row
-                    shape does not change - it is simply empty for the kind that has nothing to put in it. */}
                 {record.title && <h4 className="codex-entry-title">{record.title}</h4>}
                 {record.text.trim() && <div className="codex-entry-body"><CodexMarkdown text={record.text} token={gmToken} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
                 {record.gmText && <div className="codex-entry-gm"><GmOnlyTag /><CodexMarkdown text={record.gmText} token={gmToken} /></div>}
-                {/* Read-only on purpose. An entry's tags are otherwise invisible until you open Edit, but
-                    making them clickable would be the cross-type tag navigation that belongs to a later
-                    milestone — clicking a tag still filters Pages and nothing else. */}
+                {/* Read-only; tag navigation lives in Pages. */}
                 {record.tags.length > 0 && (
                   <ul className="codex-entry-tags" aria-label="Entry tags">
                     {record.tags.map((tag) => <li key={tag}><Badge>{tag}</Badge></li>)}
                   </ul>
                 )}
-                {/* CT-10 / O-3: what this downtime was, and — until the GM confirms it — what confirming
-                    would do, said in full BEFORE the button that does it. The button is deliberately the
-                    only thing on this row that moves the campaign clock, and it exists only while the
-                    record is unapplied: an applied downtime has no second confirmation to give. */}
+                {/* Confirm is the only control on this row that moves the clock, and only while unapplied. */}
                 {downtime && (
                   <div className="codex-downtime">
                     <p className="codex-downtime-what">{downtimeSummaryLabel(downtime)}</p>
@@ -717,31 +509,17 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                       : proposed && calendar
                       ? <div className="codex-downtime-apply">
                           <span className="codex-downtime-proposal">Move your date to {formatWorldDate(calendar, proposed)}{passing > 0 ? `. This passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>
-                          {/* §4 route 1: `Button` at its default size grows its own paint to 44px and
-                              has no `::after`, which is what a control stacked above the row's footer
-                              buttons needs — a route-2 overhang here would reach into their hit areas.
-                              SECONDARY, not primary: the row already states the consequence in words, and
-                              the view's one primary action is the composer's own submit (§5). */}
+                          {/* Default size: grows its own paint to 44px with no ::after overhang into the footer buttons below. */}
                           <Button variant="secondary" onClick={() => applyDowntime(record)}>Confirm</Button>
                         </div>
                       : <p className="codex-downtime-state">Set your date on the Calendar to move the clock from this downtime.</p>}
                   </div>
                 )}
-                {/* CT-8 / CT-6: what the record actually says, beyond its prose. Both are read-only — a
-                    milestone's level and a standing change's delta are history, and there is no route
-                    that rewrites a payload. A standing row names its faction where the page is known;
-                    where it is not, the shared label says "A faction" rather than inventing a name. */}
                 {milestone && <p className="codex-downtime-what">{milestoneSummaryLabel(milestone)}</p>}
-                {/* D11: a quest-history row carries no prose at all, so its whole sentence is this — the
-                    quest's title resolved against the shell's quest feed where we have one. */}
+                {/* A quest-history row has no prose; this sentence is the whole record. */}
                 {questEvent && <p className="codex-downtime-what">{questEventLabel(questEvent, null)}</p>}
                 {standing && <p className="codex-downtime-what">{standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null)}</p>}
-                {/* CI-6: the entry's two return edges sit beside the page edge it already had, so an
-                    entry reads as "here is what happened, here is where, here is the fight itself".
-                    §4: `Button size="sm"` is a `@vtt/ui` primitive and carries the 44px floor itself
-                    (route 2, `.nh-btn--sm`) — no new control and no new floor to argue about.
-                    An EVENT row's actions are deliberately just "Open page": the record is a wiki page,
-                    and editing or deleting it from a timeline row would be a second place to do both. */}
+                {/* Event rows only offer "Open page": edit and delete happen on the page. */}
                 <footer className="codex-entry-foot">
                   {isEvent && <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.id)}>Open page</Button>}
                   {!isEvent && record.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.attachPageId!)}>Open page</Button>}
@@ -760,9 +538,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
         })}
       </div>
 
-      {/* The editor answers with the calendar the PUT echoed, which carries the world's shape and the
-          GM's clock but says nothing about what the table is on — so the whole GM read is taken again
-          rather than trusted, or moving the clock here would leave the prep-clock row above stale. */}
+      {/* Reload the full GM calendar after a save: the PUT echo lacks the published date. */}
       {calendarOpen && calendar && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={() => { void load(); }} onClose={() => setCalendarOpen(false)} />}
       {confirmDialog}
     </div>

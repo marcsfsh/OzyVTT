@@ -3,9 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-// The atlas surface fetches an authorized image and does pointer geometry — neither is what CI-6 is
-// about, and jsdom can honestly render neither (see test/setup.ts). The mock keeps the two props that
-// ARE the contract under test: which map is on screen, and which pin is selected on it.
+// jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
 vi.mock("./MapSurface", () => ({
   MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) =>
     <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
@@ -15,7 +13,7 @@ const listPages = vi.fn();
 const listRelationships = vi.fn();
 const listLinks = vi.fn();
 const markersForPage = vi.fn();
-/** D15: the marker-by-id read that replaced the client-side scan of every map. */
+/** The marker-by-id read. */
 const markerById = vi.fn();
 const forPage = vi.fn();
 const listFolders = vi.fn();
@@ -61,24 +59,9 @@ import { CodexShell } from "./CodexShell";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
 
 /**
- * CI-6: **return edge — a journal entry back to its marker and to its combat replay.**
- *
- * The star topology the assessment named is that every surface points INTO Pages and nothing points
- * back out. A battle the combat bridge logs is the clearest case: the entry records where it happened
- * (`attachMarkerId`) and which encounter produced it (`sourceEncounterId`), and until now the GM could
- * read both facts and act on neither.
- *
- * What these pin, and why each is the interesting half:
- *
- * 1. the marker jump lands on the pin's OWN map with the pin selected — an entry stores only the pin,
- *    never its map, so this is the one edge in the suite whose destination has to be *resolved* before
- *    it can be prepared (R1). Two maps, target second, so a jump that skips the resolution fails loudly;
- * 2. a pin that no longer exists says so (R4) rather than dumping the GM on an arbitrary map;
- * 3. the replay edge runs the SAME `onOpenReplay` the page timeline already takes — one replay path;
- * 4. an entry with neither fact offers neither button, so the footer states what is actually there.
- *
- * The fixtures are typed as the real API rows on purpose: a fixture free to invent fields would let a
- * test pass against a shape the server never produces.
+ * A journal entry's jumps back to its pin and its combat replay. An entry stores only the pin, so the atlas
+ * must resolve the map first (two maps, target second); a vanished pin says so; the replay uses the same
+ * `onOpenReplay` as the page timeline; an entry with neither offers neither button.
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
@@ -89,7 +72,7 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
-/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape, not as raw entries. */
+/** The Journal reads the chronicle record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "A battle was fought here.", gmText: null, revealedToPlayers: false,
   sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
@@ -97,8 +80,7 @@ const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord 
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
-/** The atlas defaults to `maps[0]`, so the pin's map is deliberately SECOND: a jump that never resolves
-    the marker's map lands on Castle Ravenloft and every assertion below fails. */
+/** The atlas defaults to `maps[0]`, so the pin's map is second and a jump that skips resolving it fails. */
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
 const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
@@ -106,7 +88,7 @@ const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pi
 const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
   (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" onOpenReplay={onOpenReplay} /></ToastProvider>);
 
-/** Land on the Journal the way a GM does — via the mode bar — and wait for the chronicle to arrive. */
+/** Open the Journal from the nav and wait for the chronicle. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
   await user.click(screen.getByRole("button", { name: "Journal" }));
@@ -119,7 +101,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     listRelationships.mockResolvedValue([]);
     listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
-    // One read answers "which map is this pin on?" — the O(maps) scan is gone.
+    // One read resolves the pin's map.
     markerById.mockImplementation(async (_token: string, id: string) => (id === MARKER.id ? MARKER : Promise.reject(new Error("not found"))));
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
@@ -141,19 +123,18 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     await user.click(await screen.findByRole("button", { name: "Open pin" }));
 
     expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
-    // Half one — the pin's map is open, not the atlas's default first map.
+    // The pin's map, not the default.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })).toBeInTheDocument();
-    // Half two — the pin itself is selected: its inspector is open on the right marker, and the surface
-    // has been told which pin to mark.
+    // The pin is selected: its inspector is open.
     expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
 
   it("says the pin is gone rather than silently landing on some other map (R4)", async () => {
-    // The entry still names a pin the atlas no longer has — deleted since the battle was logged.
+    // The entry names a pin that has since been deleted.
     chronicle.mockResolvedValue([RECORD({ attachMarkerId: "vanished" })]);
     markerById.mockRejectedValue(new Error("The codex request failed (404)."));
     const user = userEvent.setup();
@@ -203,8 +184,7 @@ describe("Journal entry → its combat replay (CI-6)", () => {
 
     await user.click(await screen.findByRole("button", { name: "Open replay" }));
 
-    // The archive id off the entry, not a stand-in: a replay opened on the wrong encounter is worse
-    // than none at all.
+    // The archive id from the entry itself.
     expect(onOpenReplay).toHaveBeenCalledWith(7);
   });
 

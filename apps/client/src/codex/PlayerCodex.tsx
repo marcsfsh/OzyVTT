@@ -34,29 +34,18 @@ import { ENTITY_TYPE_LIST, entityDef, type EntityType } from "./entities";
 import "./codex.css";
 
 /**
- * D4/D14 — the player Codex: **a first-class surface, on the same sidebar and in the same words.**
+ * The player Codex: the GM's navigation minus the Tools group, at the same addresses.
  *
- * It used to be five tabs (one called "Lore") inside a modal the player opened from a button. It is now
- * a full view of the player app with the GM's own navigation minus the Tools group, at the same
- * addresses — so a player and their GM can say "look at the Atlas" and mean one thing.
- *
- * **Every read on this surface goes through `playerCodexApi` and nothing else.** `questApi`, `codexApi`,
- * `journalApi` and `sessionApi` are GM feeds and are not imported here. That is the whole of this
- * surface's viewer safety: everything it renders is a field of a row the server chose to send THIS
- * token, so there is no GM body to hide because there was never one to receive.
- *
- * Reading rules (`chronicleWhenLabel`, `CHRONICLE_KIND_META`, `groupChronicle`) are imported rather than
- * re-stated: the two readers are separate implementations, but they must not disagree about what a row
- * *says*.
+ * Viewer safety: every read goes through `playerCodexApi`, never the GM feeds, so everything rendered is
+ * a field the server chose to send this player's token. Reading rules come from `chronicle.ts` so both
+ * journals agree on what a row says.
  */
 const PLAYER_SIDEBAR_KEY = "codex-player-sidebar";
 
 export function PlayerCodex({ token, embedded = false }: Readonly<{ token: string; embedded?: boolean }>) {
   /**
-   * The GM's "Preview as player" mounts this component inside a modal, on a real minted player token.
-   * It must NOT drive the browser address — the GM is still on their own page — so an embedded instance
-   * runs on a local route instead. Same component, same reads, same projections; only the history
-   * mechanism differs, which is the one thing a preview must not share.
+   * The GM's "Preview as player" mounts this in a modal with a real player token. Embedded, it runs on a
+   * local route so it never drives the browser address.
    */
   const globalRoute = useRoute();
   const [localPath, setLocalPath] = useState("/codex");
@@ -78,10 +67,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   const segments = path.split("/").filter(Boolean);
   const section = codexSectionOf(segments);
   const recordId = recordIdOf(segments);
-  /**
-   * Invariant §3.2: a player asking for a GM-only address gets the **not-found view**, byte-identical to
-   * an unknown address. An address must never confirm that a surface exists.
-   */
+  /** A GM-only address renders the not-found view, identical to an unknown address, so it confirms nothing. */
   const gmOnly = section === "audit" || section === "backup" || section === "settings";
 
   const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
@@ -101,16 +87,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  /**
-   * D10 — **the filters are the player's too, and they live in the address like the GM's.**
-   *
-   * D10's "in-place search/filter on every list" landed on the GM's five lists and none of these: the
-   * kind filter was component state that only the dashboard could set (so a player who cleared it could
-   * not set it again), and Sessions, Quests and the Journal had no filter at all. Same controls, same
-   * words, same `?type=` / `?q=` / `?status=` / `?kind=` parameters, read through `query` so they survive
-   * a refresh here exactly as they do for the GM — and through `setQuery`, so the GM's embedded preview
-   * keeps its own local address rather than driving the browser's.
-   */
+  /** Filters live in the address like the GM's, via `setQuery` so the embedded preview keeps its own route. */
   const typeFilter = (query.get("type") as EntityType | null) ?? null;
   const textFilter = query.get("q") ?? "";
   const statusFilter = query.get("status");
@@ -126,13 +103,12 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
       const [nextPages, nextMaps, nextTimeline, nextConnections, nextCalendar, nextSessions, nextQuests, nextStanding, nextParty] = await Promise.all([
         playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.chronicle(token),
         playerCodexApi.listConnections(token),
-        // A missing calendar costs one chip; it must not cost the player the whole codex.
+        // A missing calendar shouldn't cost the player the whole codex.
         playerCodexApi.calendar(token).catch(() => null),
         playerCodexApi.sessions(token).catch(() => []),
         playerCodexApi.quests(token).catch(() => []),
         playerCodexApi.standing(token).catch(() => []),
-        // D15: null covers BOTH "no party pin" and "the party pin is hidden from you" — the server makes
-        // those indistinguishable on purpose, and so does this card.
+        // null covers both "no party pin" and "hidden from you", deliberately indistinguishable.
         playerCodexApi.party(token).catch(() => null)
       ]);
       setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setConnections(nextConnections);
@@ -165,7 +141,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     return () => { live = false; };
   }, [token, currentMapId]);
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
-  /** D10's Atlas filter, client-side over the pins already fetched for this map — it costs no read. */
+  /** Client-side over this map's pins. */
   const pinTags = useMemo(() => [...new Set(markers.flatMap((pin) => pin.tags))].sort(), [markers]);
   const dimmedPinIds = useMemo(() => {
     const needle = query.get("q")?.trim().toLowerCase() ?? "";
@@ -185,7 +161,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   }, [currentMap, maps]);
   const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
 
-  // ----- Pages: D10's in-place filters, client-side over the pages already fetched -----
+  // ----- Pages: client-side filters -----
   const playerPageTags = useMemo(() => [...new Set(pages.flatMap((summary) => summary.tags))].sort(), [pages]);
   const shownPages = useMemo(() => {
     const tag = query.get("tag");
@@ -208,9 +184,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   const campaignStanding = useMemo(
     () => standing
       .map((row) => ({ row, summary: pages.find((candidate) => candidate.id === row.factionPageId) }))
-      // A standing whose faction page has NOT been revealed is dropped rather than rendered nameless — a
-      // bar reading "Hunted" with no name tells the table something is hunting them that they have never
-      // heard of. The server's projection is the gate; this can only ever narrow.
+      // Drop standings whose faction page is unrevealed rather than showing a nameless bar.
       .filter((pair): pair is { row: PlayerCodexStanding; summary: PlayerCodexPageSummary } => Boolean(pair.summary))
       .map(({ row, summary }) => ({ factionPageId: row.factionPageId, name: summary.title, value: row.value })),
     [standing, pages]
@@ -218,16 +192,12 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 
   const openDrawer = () => { setDrawerOpen(true); if (!embedded) pushTransient("player-codex-nav", () => setDrawerOpen(false)); };
   const closeDrawer = () => { setDrawerOpen(false); if (!embedded) popTransient("player-codex-nav"); };
-  /**
-   * Same fix as the GM shell: `closeDrawer` goes BACK, which raced the push and lost the destination on
-   * every phone-drawer tap. Discard the entry and replace it with where we are going.
-   */
+  /** Discard the drawer's history entry and navigate with replace, as the GM shell does. */
   const goto = (next: string) => {
     const stranded = !embedded && discardTransient("player-codex-nav");
     setDrawerOpen(false);
     if (embedded) { setLocalPath(next); return; }
-    // A vetoed navigation leaves the released drawer entry on the stack with nothing to absorb it, so
-    // the next Back press would be swallowed. Same reasoning as the GM shell.
+    // A vetoed navigation leaves the drawer entry stranded; release it so Back still works.
     void navigate(next, { replace: stranded }).then((moved) => { if (!moved && stranded) releaseStrandedEntry(); });
   };
 
@@ -238,22 +208,9 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     return () => window.removeEventListener("keydown", onKey);
   }, [embedded]);
 
-  /**
-   * The same forced rail the GM shell uses. It matters MORE here: a player has no collapse control and
-   * no persisted preference, so before this an iPad in portrait gave them the crushed strip with no way
-   * out of it at all. The embedded preview is exempt — it renders inside a modal, not at the viewport.
-   */
+  /** The forced 761-849px icon rail. Players have no collapse there either; the embedded preview is exempt. */
   const railBand = useSidebarRailBand() && !embedded;
-  /**
-   * D1 says the sidebar is **collapsible**, and the player's mirrors the GM's "minus GM tools" — a
-   * collapse control is not a GM tool. The player had none: a laptop player got the full 220px rail with
-   * no way to reclaim the width, which is the same complaint in the opposite direction from the one the
-   * band fix answered. Same control, same words, same preference, its own storage key.
-   *
-   * **Never inside the embedded preview.** That instance renders in the GM's modal rather than at the
-   * viewport, so a rail there would describe nothing the player will see, and the preference it wrote
-   * would be the GM's rather than the player's.
-   */
+  /** The player's own collapse preference. Never in the embedded preview, which isn't at the viewport. */
   const [sidebarMode, setSidebarMode] = useState<"open" | "rail">(() => {
     try { return localStorage.getItem(PLAYER_SIDEBAR_KEY) === "rail" ? "rail" : "open"; } catch { return "open"; }
   });
@@ -273,28 +230,21 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   /* The aside is the only place the rail applies; the phone drawer (<=760px) is always expanded. */
   const nav = (asRail: boolean) => (
     <SidebarNav groups={PLAYER_SIDEBAR} activePath={path} collapsed={asRail} onNavigate={goto} header={sidebarHeader}
-      /* `railBand`, never `collapsed` — see `CodexShell`: gating this on the collapsed state is what made
-         the GM's collapse a one-way door, because the control that undoes it is the control being hidden. */
+      /* Gate on `railBand`, not `collapsed`, or the control that expands the rail would be hidden. */
       footer={railBand || drawerOpen || embedded ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />} />
   );
 
   return (
-    /* THE FRAME (§7), the GM shell's exactly — one chassis, two audiences. The scene tier is the one
-       thing the embedded instance does NOT take: inside the GM's preview sheet there is no pane to be
-       the sky of, and the sheet's body is the frame instead (`.codex-preview-modal`). */
+    /* The GM shell's frame. Embedded, there is no sky: the preview sheet's body is the frame. */
     <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : " pane-frame pane-scene scanlines anim-view"}${collapsed ? " is-rail" : ""}`}>
       {!embedded && <div className="pane-sky" aria-hidden="true" />}
       <aside className="codex-shell-side">{nav(collapsed)}</aside>
       <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">{nav(false)}</Drawer>
 
       <div className="codex-shell-main">
-        {/* The beam marks the frame's boundary against its region — §9's own use for it. */}
         <div className="codex-topbar neon-beam">
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}><CodexIcon iconId="menu" className="codex-navitem-icon" /></IconButton>
-          {/* Invariant §3.2, and the one place it leaked: a GM-only address must be INDISTINGUISHABLE from an
-              address the app does not answer. `gmOnly` gated the body but not the heading, so a player who
-              opened /codex/audit read "Reveal audit" above the not-found view while /codex/zzz read
-              "Codex" — three GM surfaces confirmed to exist, and named, by address alone. */}
+          {/* A GM-only address must not even show its section title. */}
           <h2 className="codex-topbar-title">{section && !gmOnly ? SECTION_TITLE[section] : "Codex"}</h2>
           <div className="codex-topbar-actions">
             <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}><CodexIcon iconId="search" className="codex-navitem-icon" /></IconButton>
@@ -303,14 +253,13 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 
         {error && <Alert tone="danger" title="Couldn't load the Codex">{error}</Alert>}
 
-        {/* THE REGION (§7): the one thing on this surface that scrolls, whichever section is on screen. */}
+        {/* The one scroll region. */}
         <div className="codex-shell-content scroll-y frame-fill">
           {(section === null || gmOnly) && <NotFoundView role="player" />}
 
           {section === "home" && !gmOnly && (
             <CampaignHome pages={pages} entries={dash.entries} maps={maps} today={dash.today} loading={loading} showReveal={false}
-              /* A player only ever sees a session whose recap has been revealed, which is by definition
-                 one that has already happened — so the heading is stated rather than inferred. */
+              /* Players only see revealed recaps, which are always past sessions. */
               session={(() => { const next = pickNextSession(sessions); return next && { ...next, heading: "Latest recap" }; })()}
               onOpenSession={(sessionId) => go(sessionPath(sessionId))}
               quests={quests}
@@ -323,8 +272,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               onOpenEntry={(entryId) => go(journalEntryPath(entryId))}
               onOpenMap={(mapId) => go(atlasPath(mapId))}
               onSeeAll={(target) => go(pathForSection(target === "recent" ? "pages" : target === "deadlines" ? "journal" : target === "atlas" ? "atlas" : target))}
-              /* The card sets the same `?type=` the Pages rail's own control sets — one filter, two
-                 doors, and the player can now change or clear it where they landed. */
+              /* Sets the same `?type=` filter as the Pages rail. */
               onPickType={(type) => go(withQuery(pathForSection("pages"), { type }))}
               onPickTag={(tag) => go(tagPath(tag))} />
           )}
@@ -336,7 +284,6 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                   <Input value={search} placeholder="Search pages" aria-label="Search the Codex"
                     onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
                 </div>
-                {/* D10, the same two controls the GM's Pages rail carries, in the same order and words. */}
                 {!search.trim() && (
                   <div className="codex-rail-tools">
                     <Select aria-label="Filter by kind" value={typeFilter ?? ""} onChange={(event) => setFilter({ type: event.target.value || null })}>
@@ -391,8 +338,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                         </dl>
                       )}
                       <div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={followLink} token={token} knownTitles={knownTitles} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div>
-                      {/* D14: the SAME connections panel the GM sees, over the revealed-edges-only feed
-                          and with no `write` prop — read-only by construction, not by a role check. */}
+                      {/* The GM's panel over the player feed, with no `write` prop: read-only by construction. */}
                       <div className="codex-reader-rels">
                         <ConnectionsPanel connections={pageConnections} onOpen={(kind, id) => go(
                           kind === "page" ? pagePath(id) : kind === "session" ? sessionPath(id) : kind === "quest" ? questPath(id) : journalEntryPath(id)
@@ -429,9 +375,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                   ))}
                 </nav>
               )}
-              {/* D10: the GM's pin filter, on the player's map. Non-matching pins DIM rather than
-                  disappearing, for the reason the GM's does — a map with pins removed is a different
-                  picture of the world, not a filtered list of one. */}
+              {/* Non-matching pins dim rather than disappear. */}
               {currentMap && markers.length > 0 && (
                 <div className="codex-atlas-filter">
                   <Input aria-label="Filter pins" placeholder="Filter pins" value={textFilter}
@@ -451,8 +395,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                       onMarkerClick={(markerId) => setQuery((params) => params.set("pin", markerId))}
                       onMarkerDragEnd={() => undefined} />
                   : <div className="codex-main-empty"><h3>No maps yet</h3><p>Maps your GM shares appear here.</p></div>}
-                {/* D14 / G24: a pin tap used to open its FIRST linked page and drop everything else. It
-                    now opens details: the label, the tags, and every revealed page it links to. */}
+                {/* A pin tap opens its details: label, tags and every revealed page it links. */}
                 {selectedPin && (
                   <PinDetails pin={selectedPin} pages={pages} maps={maps}
                     onOpenPage={(pageId) => go(pagePath(pageId))}
@@ -504,9 +447,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               onOpenEntry={(entryId) => go(journalEntryPath(entryId))} onOpenPage={(pageId) => go(pagePath(pageId))} />
           )}
 
-          {/* The player's real feeds, passed as they are. `TagView`'s row types make `revealedToPlayers`
-              optional, so this needs no cast and no invented field — and because the rows genuinely do
-              not carry a reveal state, the view is structurally unable to badge one. */}
+          {/* Player rows carry no reveal state, so `TagView` cannot badge one. */}
           {section === "tags" && (
             <TagView gmToken={token} player tag={decodeURIComponent(segments[2] ?? "")}
               pages={pages} maps={maps} records={timeline} sessions={sessions} quests={quests}
@@ -525,12 +466,12 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   );
 }
 
-/** D14: revealed sessions, recap rendered as markdown like every other body in the suite. */
+/** Revealed sessions, recaps rendered as markdown. */
 function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, knownTitles, onPickTag, filter, onFilterChange }: Readonly<{
   sessions: readonly PlayerCodexSession[]; loading: boolean; openId: string | null; token: string;
   onOpen: (id: string | null) => void; onNavigate: (target: string) => void; knownTitles: ReadonlySet<string>;
   onPickTag: (tag: string) => void;
-  /** D10: the same in-place filter the GM's Sessions rail has, over the fields a player actually gets. */
+  /** The GM's Sessions filter, over the fields a player gets. */
   filter: string;
   onFilterChange: (next: Readonly<Record<string, string | null>>) => void;
 }>) {
@@ -578,11 +519,10 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
   );
 }
 
-/** D14: quest bodies render as markdown now, the same as every other body in the suite. */
 function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPage, onNavigate, knownTitles, filter, statusFilter, onFilterChange }: Readonly<{
   quests: readonly PlayerCodexQuest[]; pages: readonly PlayerCodexPageSummary[]; loading: boolean; openId: string | null; token: string;
   onOpen: (id: string | null) => void; onOpenPage: (pageId: string) => void; onNavigate: (target: string) => void; knownTitles: ReadonlySet<string>;
-  /** D10: the GM's two quest filters, over the player's own feed. `status` is player-facing on a quest. */
+  /** The GM's quest filters over the player's feed; `status` is player-facing on a quest. */
   filter: string;
   statusFilter: string | null;
   onFilterChange: (next: Readonly<Record<string, string | null>>) => void;
@@ -636,7 +576,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
               {open.objectives.length > 0 && (
                 <div className="codex-quest-objectives">
                   <h4 className="codex-quest-subhead">Objectives</h4>
-                  {/* READ-ONLY: `onChange` omitted, so the primitive renders no checkbox and nothing focusable. */}
+                  {/* Read-only: without `onChange` the primitive renders nothing focusable. */}
                   <Checklist items={open.objectives} ariaLabel={`Objectives for ${open.title}`} />
                 </div>
               )}
@@ -659,14 +599,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
   );
 }
 
-/**
- * D14 — the player's Journal, with **the GM's grouping and the GM's Today marker.**
- *
- * The lens toggle used to be GM-only, on the argument that grouping by in-world year needed a sort key
- * the player projection did not carry. Ruling R3 put `calendarInstant` on the player row (a pure
- * function of already-projected data), so the same `groupChronicle` runs here unmodified — no client
- * date arithmetic, and no second chronology.
- */
+/** The player's Journal: the GM's year grouping and Today marker, using the server's `calendarInstant`. */
 function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate, knownTitles, quests, kindFilter, tagFilter, textFilter, onFilterChange }: Readonly<{
   records: readonly PlayerCodexChronicleRecord[];
   calendar: CodexCalendar | null;
@@ -676,7 +609,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
   onNavigate: (target: string) => void;
   knownTitles: ReadonlySet<string>;
   quests: readonly PlayerCodexQuest[];
-  /** D10: the GM's three Journal filters, over the player's own records. Same kinds, same order. */
+  /** The GM's Journal filters over the player's records. */
   kindFilter: string | null;
   tagFilter: string | null;
   textFilter: string;
@@ -687,7 +620,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
     document.getElementById(`codex-player-entry-${focusedId}`)?.scrollIntoView({ block: "center" });
   }, [focusedId, records]);
 
-  /** Filter BEFORE grouping, exactly as the GM's Journal does — otherwise a year keeps an empty heading. */
+  /** Filter before grouping so a year never keeps an empty heading. */
   const allTags = useMemo(() => [...new Set(records.flatMap((record) => record.tags))].sort(), [records]);
   const filtered = useMemo(() => {
     const needle = textFilter.trim().toLowerCase();
@@ -697,7 +630,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
       && (!needle || record.text.toLowerCase().includes(needle) || (record.title ?? "").toLowerCase().includes(needle)));
   }, [records, kindFilter, tagFilter, textFilter]);
 
-  /** Grouped by in-world YEAR, using the server's own instants — never a client re-derivation. */
+  /** Grouped by in-world year using the server's instants. */
   const groups = useMemo(() => {
     const buckets = new Map<number | null, PlayerCodexChronicleRecord[]>();
     const perYear = calendar ? calendar.months.reduce((sum, month) => sum + month.days, 0) || 1 : 1;
@@ -708,9 +641,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
     }
     return [...buckets.keys()]
       .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
-      // `formatWorldYear` rather than a fourth inline copy of "year plus era suffix": once eras lead the
-      // year (`5f`(iii)) an inline copy would head the player's timeline "1492 DR" while every date INSIDE
-      // it read "Third Age 1492 DR". One formatter, one answer.
+      // `formatWorldYear` so the heading matches the era formatting of the dates inside it.
       .map((key) => ({ key: key === null ? "none" : String(key), label: key === null ? "Undated" : calendar ? formatWorldYear(calendar, key) : String(key), records: buckets.get(key)! }));
   }, [filtered, calendar]);
   const todayYear = calendar?.currentDate
@@ -720,9 +651,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
 
   return (
     <div className="codex-journal">
-      {/* D10, the GM's own filter row: above the timeline and outside the groups, because all three
-          govern every group. In the address, so the dashboard's deadline card can deep-link to
-          "the Journal, deadlines only" for a player exactly as it does for their GM. */}
+      {/* Filters live in the address so the dashboard's deadline card can deep-link. */}
       {records.length > 0 && (
         <div className="codex-timeline-lens">
           <Select aria-label="Filter by kind" value={kindFilter ?? ""} onChange={(event) => onFilterChange({ kind: event.target.value || null })}>
@@ -767,9 +696,8 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
                   {downtime && <p className="codex-downtime-what">{downtimeSummaryLabel(downtime)}</p>}
                   {milestone && <p className="codex-downtime-what">{milestoneSummaryLabel(milestone)}</p>}
                   {standingChange && <p className="codex-downtime-what">{standingChangeLabel(standingChange, pages.find((summary) => summary.id === standingChange.factionPageId)?.title ?? null)}</p>}
-                  {/* D11: a quest-history row carries no prose, so this line IS the record. The title is
-                      resolved against the player's OWN quest feed; an id they cannot see falls back to
-                      the shared label's "A quest" rather than to a name they were never given. */}
+                  {/* A quest-history row has no prose. The title comes from the player's own quest feed;
+                      an unrevealed quest stays "A quest". */}
                   {questEvent && <p className="codex-downtime-what">{questEventLabel(questEvent, quests.find((quest) => quest.id === questEvent.questId)?.title ?? null)}</p>}
                 </article>
               );

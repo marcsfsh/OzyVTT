@@ -5,21 +5,10 @@ import { BODY_LAYER, type BodyLayer } from "./TwoLayerBodyTabs";
 import { newId } from "../lib/ids";
 
 /**
- * D16 — Backup: the download, the restore, and the "bring in notes" import, told apart.
- *
- * These were two ghost buttons in the old ops row labelled "Import" and "Export", and they did not mean
- * what a GM would guess: Export downloaded a full bundle that nothing could read back, and Import turned
- * markdown files into pages. Now the round trip is real, and the two are separate panels with separate
- * words — a full backup you can restore, and a way to bring outside notes in.
- *
- * **Restore is destructive by design.** The guardrails are the server's transactionality (a bad bundle
- * is a 400 with the codex completely untouched, so a retry is safe), the server's refusal of a bundle
- * that holds no recognised section at all, and a real-count confirm here — one that states every
- * section unconditionally, so "0 pages" is something the GM reads before they press the button rather
- * than something they discover after.
- *
- * The server's 400s name the section and the row ("That backup's \"pages\" entry 37 is not valid…"), so
- * `error.message` is rendered verbatim rather than replaced with a generic failure line.
+ * Backup: download, restore, and importing outside notes. Restore is destructive; the guardrails are the
+ * server's single transaction (a bad bundle changes nothing), its refusal of a bundle with no known section,
+ * and a confirm listing every section's count, zeros included. Server 400s name the bad row, so
+ * `error.message` is shown verbatim.
  */
 export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; onChanged: () => void }>) {
   const { toast } = useToast();
@@ -43,7 +32,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
     } catch (exportError) { setError(exportError instanceof Error ? exportError.message : "Couldn't download the backup."); }
   };
 
-  /** Parse the file for the confirm's counts only. The bytes POSTed back are the file's own, unedited. */
+  /** Parses the file for the confirm's counts only; the bytes posted back are the file's own. */
   const pickRestore = async (file: File | undefined) => {
     if (!file) return;
     setError(null); setIssues([]);
@@ -53,8 +42,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
       const codex = parsed.codex as Record<string, unknown>;
       const size = (key: string) => (Array.isArray(codex[key]) ? (codex[key] as unknown[]).length : undefined);
       setPending({
-        // Sent VERBATIM: `bundleVersion` is passed through as found — absent is legal (a backup taken
-        // before the feature existed restores) and a wrong version is the server's 400 to give, not ours.
+        // Sent verbatim: a missing `bundleVersion` is legal, and a wrong one is the server's 400 to give.
         bundle: { codex: parsed.codex, ...(parsed.exportedAt ? { exportedAt: parsed.exportedAt } : {}), ...(parsed.bundleVersion !== undefined ? { bundleVersion: parsed.bundleVersion } : {}), commandId: newId() },
         counts: { pages: size("pages"), maps: size("maps"), markers: size("markers"), journal: size("journal"), sessions: size("sessions"), quests: size("quests") },
         name: file.name
@@ -68,7 +56,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
     try {
       const result = await codexApi.importBundle(gmToken, pending.bundle);
       setPending(null);
-      // The toast echoes the SERVER's counts — the database's own post-import rows — not our parse.
+      // The server's own post-import counts.
       toast(`Codex restored: ${result.counts.pages} pages, ${result.counts.journal} journal entries, ${result.counts.maps} maps.`, { tone: "success" });
       onChanged();
     } catch (importError) {
@@ -88,8 +76,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         const title = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
         await codexApi.createPage(gmToken, {
           title: title || "Imported page",
-          // G23: the destination is a CHOICE now. It used to land silently on the player-facing side,
-          // which is the one place in the Codex where "secret by default" quietly did not hold.
+          // The GM picks the destination layer.
           ...(notesSide === "gm" ? { gmBody: text } : { playerBody: text }),
           commandId: newId()
         });
@@ -101,16 +88,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
     else toast(`Brought in ${imported} page${imported === 1 ? "" : "s"}.`, { tone: "success" });
   };
 
-  /**
-   * The inventory the GM confirms against — **every section, always, including the empty ones.**
-   *
-   * Two defects lived in one line here. It dropped any section the file did not carry, so the most
-   * dangerous file in the world ("no pages at all") described itself the most vaguely and fell through
-   * to the prose "its own records"; and its plural branch was `noun === "journal entry" ? "s" : "s"`,
-   * a dead ternary that printed "17 journal entrys" in the most destructive dialog in the app.
-   *
-   * A missing section is `0`, not silence, because `0` is exactly what the restore will leave behind.
-   */
+  /** Every section, always, including empty ones: a missing section is `0` because that's what the restore leaves. */
   const RESTORE_SECTIONS = [
     { key: "pages", one: "page", many: "pages" },
     { key: "maps", one: "map", many: "maps" },
@@ -141,15 +119,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         <p className="codex-composer-hint">Download a backup first. Restoring replaces everything in the Codex.</p>
         <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>Choose a backup file</Button>
         <input ref={restoreInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void pickRestore(event.target.files?.[0]); event.target.value = ""; }} />
-        {/**
-          * The shared `Modal`, not the inline panel this used to be and not `useConfirm` either.
-          *
-          * Inline, it was an `role="alertdialog"` div with no focus management, no Escape and nothing
-          * stopping the GM scrolling past it — the weakest confirmation in the app attached to the only
-          * irreversible act in it. `useConfirm` takes its body as a single string, which cannot carry an
-          * inventory the GM is meant to READ line by line. `Modal` gives the focus trap, the scrim and
-          * the Escape that every other destructive confirm inherits, and keeps the counts as markup.
-          */}
+        {/* `Modal` (focus trap, Escape, scrim) rather than `useConfirm`, whose single-string body can't hold the inventory. */}
         <Modal open={!!pending} onClose={() => setPending(null)} size="sm"
           title="Restore this backup?" ariaLabel="Restore this backup?"
           footer={<>
@@ -158,8 +128,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
           </>}>
           {pending && <>
             <p>It replaces your entire Codex with the contents of <strong>{pending.name}</strong>. This cannot be undone.</p>
-            {/* Stated as a list rather than a sentence: a GM about to destroy their campaign is checking
-                a number, and a zero in this list is the loudest thing on the screen. */}
+            {/* A list, so a zero stands out. */}
             <p className="codex-backup-inventory">That file contains {countLine(pending.counts)}.</p>
           </>}
         </Modal>
@@ -168,11 +137,8 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
       <Panel>
         <PanelHeader title="Bring in notes" />
         <p>Turns Markdown or text files into pages, one page per file. This adds pages and replaces nothing.</p>
-        {/* The seventh surface of the two-layer split, and the one that cannot use `TwoLayerBodyTabs`:
-            it names an import DESTINATION rather than the layer being written, so it offers the GM
-            option first (the default, and what a GM importing raw notes almost always wants) and lives
-            inside a `Field`. It shares the WORDS instead of the component, which is the part that was
-            drifting — this control used to be the only place that called the two layers "sides". */}
+        {/* Can't use `TwoLayerBodyTabs`: it chooses an import destination (GM first, the default) inside a
+            `Field`. It shares `BODY_LAYER`'s words instead. */}
         <Field label="Import into" htmlFor="codex-notes-side" help="New pages start hidden from players either way.">
           <SegmentedControl ariaLabel="Which layer to import into" value={notesSide} onChange={(value) => setNotesSide(value as BodyLayer)}
             options={[BODY_LAYER.gm, BODY_LAYER.player]} />

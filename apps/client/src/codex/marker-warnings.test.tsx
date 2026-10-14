@@ -11,12 +11,8 @@ import { MarkerInspector } from "./MarkerInspector";
 import type { CodexMap, CodexMarker } from "./api";
 
 /**
- * CD-6: **a shown pin on a secret map is invisible to players, and nothing said so.**
- *
- * Revealing a marker feels like it published it. It does not: the player never receives the map, so the
- * pin rides along in the dark. The GM had no way to notice — there was no warning, and the pin's own
- * reveal switch reads "on". These pin the warning and, just as importantly, pin that it stays quiet in
- * the three states where there is nothing wrong (a secret pin, a revealed map, both revealed).
+ * A revealed pin on a hidden map is invisible to players, so the inspector warns. It stays quiet for a
+ * hidden pin, a revealed map, or both revealed.
  */
 const MAP = (revealed: boolean): CodexMap => ({
   id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null,
@@ -59,7 +55,7 @@ describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
     expect(screen.queryByRole("button", { name: /show the map too/i })).not.toBeInTheDocument();
   });
 
-  // The quiet cases. A warning that fires when nothing is wrong is noise the GM learns to ignore.
+  // The quiet cases: a warning that fires when nothing is wrong gets ignored.
   it("stays quiet when the map is revealed", () => {
     renderInspector(true, true);
     expect(screen.queryByText(/is hidden from them/)).not.toBeInTheDocument();

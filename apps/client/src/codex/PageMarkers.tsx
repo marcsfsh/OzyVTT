@@ -5,28 +5,21 @@ import { codexApi, type CodexMarker } from "./api";
 import { CodexIcon } from "./icons";
 
 /**
- * CI-4 (return edge): **where this page sits on the atlas.** The Atlas has always been able to say
- * "this pin is that page"; nothing could say the reverse, so from an open location page the only way to
- * find its pin was to remember which map it was on and go looking.
- *
- * Reads the reverse-lookup route (`GET /codex/pages/{id}/markers`), which projects rather than bypasses
- * — this component adds no filter of its own and could not: it renders whatever the server chose to
- * send. The GM projection carries `mapId`, which is what lets the jump name BOTH halves of its
- * destination (R1) instead of leaving the Atlas to hunt for the pin's map.
+ * Where this page sits on the atlas, via `GET /codex/pages/{id}/markers`. Renders what the server sends;
+ * the GM projection includes `mapId`, so the jump can open the map and then select the pin.
  */
 export function PageMarkers({ gmToken, pageId, onOpenMarker }: Readonly<{
   gmToken: string;
   pageId: string;
-  /** R1: the pin's map AND the pin — the Atlas opens the first, then selects the second. */
+  /** The Atlas opens the map, then selects the pin. */
   onOpenMarker?: (markerId: string, mapId: string) => void;
 }>) {
   const [markers, setMarkers] = useState<CodexMarker[]>([]);
-  // R4: a fetch this small still needs both states — an empty list and a failed request look identical.
+  // An empty list and a failed request must look different.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Guarded on MOUNT, not per-call: `codex:changed` refreshes this list too, and a per-effect flag would
-  // leave those refreshes writing state into an unmounted editor after the GM has navigated away.
+  // Guarded on mount, not per call: `codex:changed` refreshes can resolve after the editor unmounts.
   const mountedRef = useRef(true);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const load = useCallback(() => {
@@ -51,8 +44,7 @@ export function PageMarkers({ gmToken, pageId, onOpenMarker }: Readonly<{
               <button type="button" className="codex-connections-item" onClick={() => onOpenMarker?.(marker.id, marker.mapId)} disabled={!onOpenMarker}>
                 <CodexIcon iconId="compass" className="codex-ent-icon" />
                 <span className="codex-list-title">{marker.label?.trim() || "Unlabelled pin"}</span>
-                {/* R5: the one GM-only vocabulary. A pin the party cannot see is worth knowing about
-                    from here — it is exactly the pin a GM forgets to reveal. */}
+                {/* An unrevealed pin is exactly the one a GM forgets to reveal. */}
                 {!marker.revealedToPlayers && <HiddenFromPlayers />}
               </button>
             </li>

@@ -4,22 +4,9 @@ import { codexApi, type CodexPage } from "./api";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { newId } from "../lib/ids";
 
-/**
- * D7 — **one quick-create, everywhere.**
- *
- * Seven doors used to create a page seven ways: a template menu, three untyped `createPage` calls, a
- * folder menu item, a pin's "new page", and — worst — clicking an unresolved `[[link]]`, which silently
- * created an untyped page with no dialog at all. All seven now open this: name + kind, one step.
- *
- * A page can therefore no longer start life untyped **by accident**. "Note" is still a kind, and still
- * the default; it is now a choice rather than a consequence of which button you happened to press.
- */
+/** The one quick-create dialog (name and kind) behind every way of creating a page, so no page starts untyped by accident. */
 
-/**
- * The per-kind prose scaffold. These were the template menu's payloads; they move here so a Character
- * created from a pin inspector gets the same "## Description / ## Secrets & hooks" a Character created
- * from the rail does.
- */
+/** Per-kind body scaffolds, the same wherever the page is created from. */
 const SCAFFOLDS: Readonly<Record<EntityType, Readonly<{ player: string; gm: string }>>> = {
   note: { player: "", gm: "" },
   character: { player: "## Description\n", gm: "## Secrets & hooks\n" },
@@ -33,13 +20,13 @@ const SCAFFOLDS: Readonly<Record<EntityType, Readonly<{ player: string; gm: stri
 
 /** What opened the dialog, and what it prefills. `null` means the dialog is closed. */
 export type QuickCreateRequest = Readonly<{
-  /** Prefilled name — a palette query, a pin's label, the text inside an unresolved `[[link]]`. */
+  /** Prefilled name: a palette query, a pin's label, or an unresolved `[[link]]`'s text. */
   title?: string;
   entityType?: EntityType;
   folder?: string | null;
-  /** Shown above the form when the launch context needs explaining (the unresolved-link door). */
+  /** Shown above the form when the launch context needs explaining (an unresolved link). */
   note?: string;
-  /** Ran with the new page once it exists, before navigation — e.g. linking it to the pin that made it. */
+  /** Run with the new page before navigation, e.g. to link it to the pin that made it. */
   onCreated?: (page: CodexPage) => void | Promise<void>;
 }>;
 
@@ -47,7 +34,7 @@ export type QuickCreateProps = Readonly<{
   gmToken: string;
   request: QuickCreateRequest;
   onClose: () => void;
-  /** Navigates to the new page. The caller owns the address, so this component knows no routes. */
+  /** Navigates to the new page. The caller owns the address. */
   onOpen: (pageId: string) => void;
   /** Refresh the page list so the new page appears in the rail before the editor mounts. */
   onChanged: () => Promise<void> | void;
@@ -71,8 +58,7 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
         title: name, entityType,
         ...(request.folder ? { folder: request.folder } : {}),
         playerBody: scaffold.player, gmBody: scaffold.gm,
-        // D19: a create is exactly the write worth an idempotency key — this button is double-tappable
-        // on a phone, and a retry after a flaky connection must not leave two pages behind.
+        // Idempotency key: the button can be double-tapped, and a retry must not create two pages.
         commandId: newId()
       });
       await request.onCreated?.(page);

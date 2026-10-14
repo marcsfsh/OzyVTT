@@ -3,9 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-// The atlas surface fetches an authorized image and does pointer geometry — neither is what CI-1 is
-// about, and jsdom can honestly render neither (see test/setup.ts). The mock keeps the two props that
-// ARE the contract under test: which map is on screen, and which pin is selected on it.
+// jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
 vi.mock("./MapSurface", () => ({
   MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) =>
     <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
@@ -57,8 +55,6 @@ vi.mock("./api", async (importOriginal) => {
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     playerCodexApi: {
       ...actual.playerCodexApi,
-      // M11: the player's own calendar read. It was `calendarApi.get` until O-1 split the two clocks;
-      // it is stubbed with the SAME mock, so what this file asserts about the date is unchanged.
       calendar: (...a: unknown[]) => getCalendar(...a),
       search: (...a: unknown[]) => playerSearch(...a),
       listPages: (...a: unknown[]) => playerListPages(...a),
@@ -78,20 +74,10 @@ import { PlayerCodex } from "./PlayerCodex";
 import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker, CodexSearchHit, PlayerCodexMap, PlayerCodexMarker } from "./api";
 
 /**
- * CI-1 (client): **suite-wide search — one box, one result list, every record kind.**
- *
- * The server half already returns `hits` over pages, journal entries, maps and markers, filtered per role.
- * These pin the client's side of that contract, which was previously pages-only in three separate places:
- *
- * 1. all four kinds reach the eye (R8) and each states its kind in TEXT, not colour alone (R2);
- * 2. every hit opens a *prepared* destination (R1) — and for a marker that means the map AND the pin,
- *    which is the one case that needs two fields off the hit and is therefore the one worth pinning hardest;
- * 3. a failed search says so (R4) instead of the old lie, "No notes match.";
- * 4. the rail and the palette are the same search — the milestone's A-6 bar names both;
- * 5. the player surface renders whatever kinds the SERVER hands it, rather than assuming pages.
- *
- * The fixtures below are typed as the real `CodexSearchHit`, deliberately: a fixture free to invent
- * fields would let a test pass against a shape the API never produces.
+ * Suite-wide search on the client: every kind reaches the list and states its kind in text; each hit
+ * opens a prepared destination (a marker opens its map and the pin); failures say so; the rail and
+ * palette are one search; the player renders whatever kinds the server sends. Fixtures use the real
+ * `CodexSearchHit` type.
  */
 const HIT_PAGE: CodexSearchHit = { kind: "page", id: "p1", title: "Strahd von Zarovich", tags: ["villain"], entityType: "character", mapId: null };
 const HIT_JOURNAL: CodexSearchHit = { kind: "journal", id: "j1", title: "The party crossed the mists.", tags: [], entityType: null, mapId: null };
@@ -99,14 +85,13 @@ const HIT_MAP: CodexSearchHit = { kind: "map", id: "m1", title: "Barovia", tags:
 const HIT_MARKER: CodexSearchHit = { kind: "marker", id: "k1", title: "Old Svalich Road", tags: ["road"], entityType: null, mapId: "m1" };
 const HITS: readonly CodexSearchHit[] = [HIT_PAGE, HIT_JOURNAL, HIT_MAP, HIT_MARKER];
 
-/** Two maps, and the TARGET is deliberately second: the atlas defaults to `maps[0]`, so a jump that
-    forgets to open `hit.mapId` lands on Castle Ravenloft and every marker assertion below fails. */
+/** The target map is second, so a jump ignoring `hit.mapId` lands on the default and fails. */
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
 const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
-/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
+/** The Journal reads the chronicle record shape. */
 const RECORD = (id: string, text: string): CodexChronicleRecord => ({
   kind: "entry", id, title: null, text, gmText: null, revealedToPlayers: false,
   sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
@@ -115,7 +100,6 @@ const RECORD = (id: string, text: string): CodexChronicleRecord => ({
 });
 
 const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
-/** Type into the rail's search box and wait for the result list to settle. */
 const searchInRail = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
   await user.type(screen.getAllByLabelText("Search the Codex")[0], query);
@@ -152,7 +136,7 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
     await searchInRail(user, "barovia");
 
     const results = within(await screen.findByRole("navigation", { name: "Campaign pages" }));
-    // A page reads as its entity type — the name the rest of the suite already calls it.
+    // A page reads as its entity type.
     expect(await results.findByText("Character")).toBeInTheDocument();
     expect(results.getByText("Journal")).toBeInTheDocument();
     expect(results.getByText("Map")).toBeInTheDocument();
@@ -166,7 +150,7 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
     await searchInRail(user, "barovia");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
-    // The old behaviour: catch → `setSearchHits([])` → an empty-state that asserts a fact it never learned.
+    // A failed search must not render an empty-results message.
     expect(within(railResults()).queryByText(/matches/i)).not.toBeInTheDocument();
   });
 
@@ -206,12 +190,11 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     await user.click(await screen.findByText("Old Svalich Road"));
 
     expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
-    // Half one — the pin's OWN map is open, not the atlas's default first map.
+    // The pin's own map, not the default.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })).toBeInTheDocument();
-    // Half two — the pin itself is selected: its inspector is open on the right marker, and the surface
-    // has been told which pin to mark.
+    // The pin is selected: its inspector is open.
     expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
     expect(surface).toHaveAttribute("data-selected", "k1");
@@ -275,8 +258,7 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
   const openPalette = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
-    // Two boxes carry the same name — the rail's and the palette's — because they are the same search.
-    // The palette's is the one inside the dialog.
+    // Rail and palette boxes share a name; the palette's is inside the dialog.
     const palette = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
     await user.type(palette.getByLabelText("Search the Codex"), query);
     return palette;
@@ -327,13 +309,13 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
 
   beforeEach(() => {
     playerListPages.mockResolvedValue([]);
-    // `m0` first, so a player jump that ignores `hit.mapId` lands on Castle Ravenloft instead.
+    // `m0` first, so ignoring `hit.mapId` lands on the wrong map.
     playerListMaps.mockResolvedValue([PLAYER_OTHER, PLAYER_MAP]);
     playerChronicle.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
     playerListLinks.mockResolvedValue(null);
     playerListMarkers.mockResolvedValue([PLAYER_MARKER]);
-    // The server has ALREADY dropped everything this player may not see; the client renders what arrives.
+    // Already filtered by the server; the client renders what arrives.
     playerSearch.mockResolvedValue({ hits: [HIT_MAP, HIT_MARKER], truncated: false });
   });
 
@@ -377,15 +359,8 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
 });
 
 /**
- * **One typed query is ONE request.** `useCodexSearch` re-ran its effect on every keystroke and fired
- * immediately, so a six-character query was six round trips against a search that spans pages, journal
- * entries, maps and markers — measured in the browser as six `/codex/search?q=` requests for "strahd", in
- * all three callers. The hook now debounces the fetch (`PageEditor`'s autosave is the precedent), and
- * because the hook is shared, fixing it once fixes the rail, the palette and the player Lore tab together —
- * which is why all three are pinned here rather than only the one that was measured.
- *
- * `delay: null` types the whole string without waiting between keys, which is what makes the assertion
- * about the number of calls meaningful: with no debounce these tests see one call per character.
+ * One settled query, one request (debounced in the shared hook, so all three callers are checked).
+ * `delay: null` types without pauses, so without the debounce each character would be a call.
  */
 describe("Suite-wide search — one settled query, one request", () => {
   const gmMocks = () => {
@@ -413,7 +388,7 @@ describe("Suite-wide search — one settled query, one request", () => {
 
     await waitFor(() => expect(search).toHaveBeenCalledWith("gm", "strahd"));
     expect(search).toHaveBeenCalledTimes(1);
-    // Named prefixes, so a regression reads as "it searched for 's'" rather than a bare count mismatch.
+    // Named prefixes, so a failure says which partial query was sent.
     for (const prefix of ["s", "st", "str", "stra", "strah"]) expect(search).not.toHaveBeenCalledWith("gm", prefix);
   });
 
@@ -458,8 +433,7 @@ describe("Suite-wide search — one settled query, one request", () => {
 
     search.mockClear();
     await user.clear(box);
-    // Immediately, not after the debounce: an empty box has no query to send and must not keep showing
-    // the previous one's hits for a quarter second.
+    // Cleared immediately, not after the debounce.
     expect(screen.queryByText("Strahd von Zarovich")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("No pages yet.")).toBeInTheDocument());
     expect(search).not.toHaveBeenCalled();

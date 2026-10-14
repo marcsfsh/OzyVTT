@@ -2,12 +2,10 @@ import { type ReactNode } from "react";
 import { CodexImage } from "./CodexImage";
 
 /**
- * The codex page renderer: a display-only, injection-safe markdown subset (headings, ***bold-italic***,
- * **bold**, *italic*, ~~strike~~, `code`, "- "/"1. " lists, "> " quotes, "---" rules, paragraphs, and
- * [[wiki-links]]). Like the SRD `RichText`, it never uses dangerouslySetInnerHTML and never executes
- * content - it only formats the GM's prose - and it normalizes em-dashes to " - " per house style.
- * `[[Title]]` / `[[Title#Section]]` render as clickable links that call `onNavigate` with the bare target;
- * `[[kind:ref]]` entity links render as inert chips for now (their targets resolve in a later milestone).
+ * The codex page renderer: a display-only, injection-safe markdown subset (headings, emphasis, strike,
+ * `code`, lists, quotes, rules, paragraphs and [[wiki-links]]). Never uses dangerouslySetInnerHTML.
+ * Normalizes em-dashes to " - " per house style. `[[Title]]`/`[[Title#Section]]` call `onNavigate` with
+ * the bare target; `[[kind:ref]]` entity links render as inert chips (not yet resolved).
  */
 
 const EMPHASIS = /\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|\*([^*]+)\*|~~([^~]+)~~/g;
@@ -65,8 +63,8 @@ function inline(text: string, keyBase: string, onNavigate?: (target: string) => 
     const section = sectionPart?.trim();
     const isEntity = ENTITY_PREFIX.test(target);
     const shown = section ? `${target.replace(ENTITY_PREFIX, "")} › ${section}` : target.replace(ENTITY_PREFIX, "");
-    // A plain [[Title]] is clickable only if it resolves. When knownTitles is provided (the player, who
-    // can't auto-create), an unresolved link renders inert ("redlink") instead of a live-looking dead end.
+    // A plain [[Title]] is clickable only if it resolves. With `knownTitles` (the player, who can't
+    // auto-create), an unresolved link renders inert as a redlink.
     const resolvable = !isEntity && !!onNavigate && (!knownTitles || knownTitles.has(target.toLowerCase()));
     if (resolvable) {
       nodes.push(<button key={`${keyBase}-w${index}`} type="button" className="codex-md-link" onClick={() => onNavigate!(target)}>{shown}</button>);
@@ -112,7 +110,7 @@ export function CodexMarkdown({ text, onNavigate, token, knownTitles }: Readonly
     const image = IMAGE_LINE.exec(line);
     if (image) {
       flush();
-      // Only ever render an app-served codex asset URL - the injection-safety guarantee (anything else falls through to text).
+      // Only app-served codex asset URLs render as images (injection safety); anything else stays text.
       if (token) blocks.push(<CodexImage key={key} assetId={image[2]} token={token} alt={image[1]} className="codex-md-img" />);
       else blocks.push(<p key={key} className="codex-md-p codex-preview-empty">[image: {image[1] || "image"}]</p>);
       index += 1;

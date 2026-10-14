@@ -4,23 +4,20 @@ import { calendarApi, formatWorldDate, type CodexCalendar, type CodexCalendarEra
 
 type EraDraft = Readonly<{ name: string; startYear: string }>;
 
-/** A month/era draft's numeric field back to a number, with the same clamping the server applies. */
+/** A numeric draft field back to an integer, as the server does. */
 const toYear = (raw: string) => Math.trunc(Number(raw) || 0);
 
 /**
- * Build the PUT body from parts. **Explicit keys, never a spread of the fetched calendar** — the GM's
- * calendar arrives as `GmCodexCalendar`, which carries `publishedDate`, and `CalendarSchema` on the server is
- * `.strict()`: echoing a fetched calendar straight back is a 400. The published date is written by exactly
- * one route and this is not it (D11-H).
+ * Build the PUT body from explicit keys, never by spreading the fetched calendar: it may carry
+ * `publishedDate`, which the strict `CalendarSchema` rejects.
  */
 function calendarBody(over: Readonly<{ yearName: string; eras: readonly CodexCalendarEra[]; months: CodexCalendar["months"]; weekdays: readonly string[]; currentDate: CodexCalendar["currentDate"] }>): CodexCalendar {
   return { yearName: over.yearName, eras: over.eras, months: over.months, weekdays: over.weekdays, currentDate: over.currentDate ?? null };
 }
 
-/** The GM defines the world's calendar: its months (name + length), weekday names, its eras, and "today". */
+/** The world's calendar: months, weekday names, eras and the GM's date. */
 export function CalendarEditor({ gmToken, calendar, onSaved, onClose }: Readonly<{ gmToken: string; calendar: CodexCalendar | null; onSaved: (calendar: CodexCalendar) => void; onClose: () => void }>) {
-  // A missing calendar is a legitimate first-run state (D17 gives the section a real empty state),
-  // so the editor seeds itself from the system default rather than refusing to open.
+  // No calendar yet is a legitimate first run, so seed a default.
   const seed: CodexCalendar = calendar ?? { yearName: "", eras: [], months: [{ name: "Month 1", days: 30 }], weekdays: [], currentDate: null };
   const [yearName, setYearName] = useState(seed.yearName);
   const [eras, setEras] = useState<readonly EraDraft[]>((seed.eras ?? []).map((era) => ({ name: era.name, startYear: String(era.startYear) })));
@@ -44,9 +41,7 @@ export function CalendarEditor({ gmToken, calendar, onSaved, onClose }: Readonly
     try {
       const calendarInput = calendarBody({
         yearName: yearName.trim(),
-        // A nameless row is dropped rather than saved as "Era": the Add button seeds an EMPTY name on
-        // purpose (there is no sensible default for what a GM is about to call an age), so an untouched row
-        // is an abandoned one, and the server's `?? "Era"` fallback would turn it into a real era nobody asked for.
+        // Drop nameless eras: an untouched Add row would otherwise become "Era" via the server's fallback.
         eras: eras.map((era) => ({ name: era.name.trim(), startYear: toYear(era.startYear) })).filter((era) => era.name !== ""),
         months: months.map((month) => ({ name: month.name.trim() || "Month", days: Math.max(1, Math.trunc(Number(month.days) || 1)) })),
         weekdays: weekdays.split(",").map((day) => day.trim()).filter(Boolean),
@@ -63,10 +58,7 @@ export function CalendarEditor({ gmToken, calendar, onSaved, onClose }: Readonly
       <div className="codex-calendar-editor">
         <div className="codex-cal-months">
           <div className="codex-cal-months-head"><strong>Eras</strong><Button variant="ghost" size="sm" onClick={addEra}><IconPlus /> Add era</Button></div>
-          {/* `5f`(iii). An era is DERIVED from the year, so this list is the whole feature: nothing is stored
-              on a date, and adding an era re-labels the campaign's existing history rather than rewriting it.
-              The sentence says that out loud because "when does this take effect?" is the first question a GM
-              asks of a control that changes dates they have already written. */}
+          {/* Eras are derived from the year, so adding one relabels existing history; the help says so. */}
           <p className="nh-field-help">A year belongs to the last era it has reached, so an era leads the year: <em>Third Age 1492</em>. Records already dated are re-labelled; their dates do not move.</p>
           {eras.length === 0
             ? <p className="codex-list-empty">No eras. Years read on their own.</p>
@@ -107,16 +99,8 @@ export function CalendarEditor({ gmToken, calendar, onSaved, onClose }: Readonly
 }
 
 /**
- * `5f`(i) — the GM's clock, on its own.
- *
- * The date used to be reachable only as the FOURTH field of the structure modal above, behind a ghost
- * "Edit calendar" button, which is why "Not set" on the Calendar read as a statement rather than a door. A
- * GM setting tonight's date is not editing the world's months, and asking them to open the world's months to
- * do it is what made the two clocks feel like one control.
- *
- * It writes through the same `PUT /codex/calendar` — there is no second route and there should not be, since
- * the calendar is one blob (D11-G) — so it carries the world's structure through UNCHANGED and touches only
- * `currentDate`. Publishing is not here: this moves the GM's clock and the party learns nothing (O-1).
+ * The GM's clock on its own. Writes through the same `PUT /codex/calendar`, carrying the structure through
+ * unchanged and touching only `currentDate`. Never publishes.
  */
 export function CampaignDateEditor({ gmToken, calendar, onSaved, onClose }: Readonly<{ gmToken: string; calendar: CodexCalendar; onSaved: (calendar: CodexCalendar) => void; onClose: () => void }>) {
   const [year, setYear] = useState(calendar.currentDate ? String(calendar.currentDate.year) : "");
@@ -147,14 +131,12 @@ export function CampaignDateEditor({ gmToken, calendar, onSaved, onClose }: Read
             <Input aria-label="Day" type="number" inputMode="numeric" placeholder="Day" value={day} onChange={(event) => setDay(event.target.value)} />
           </div>
         </Field>
-        {/* The preview is the point of a dedicated editor: three numeric boxes over a world with invented
-            months say nothing until they are read back as a date, era and weekday included. */}
+        {/* Read the typed numbers back as a date, era and weekday included. */}
         {parsed && <p className="codex-composer-hint">Reads as <strong>{formatWorldDate(calendar, parsed)}</strong>.</p>}
         {error && <Alert tone="danger">{error}</Alert>}
         <div className="codex-cal-foot">
           <Button variant="primary" size="sm" disabled={busy || parsed === null} onClick={() => void write(parsed)}>Set the date</Button>
-          {/* Unsetting is a real act — an undated campaign is a legitimate state, and the structure modal's
-              "clear the year" instruction is exactly the buried knowledge this editor exists to replace. */}
+          {/* An undated campaign is a legitimate state. */}
           {calendar.currentDate && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void write(null)}>Clear the date</Button>}
         </div>
       </div>

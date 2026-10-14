@@ -12,25 +12,16 @@ import { CodexIcon, EntityIcon } from "./icons";
 import { newId } from "../lib/ids";
 
 /**
- * D12 — the Downtime tracker: per-character totals, pending confirmations, and history in one place.
- *
- * **A lens over the Journal, never a second store** (invariant 7). Every row here is a `downtime`
- * chronicle record the Journal already carries; there is deliberately no aggregation endpoint, because
- * a server aggregate would be a second read path with its own per-audience visibility arms to keep in
- * step with the projections that already exist.
- *
- * Totals group by `characterPageId ?? who`, which is the point of D12's new field: before it, "Vex",
- * "vex" and "Vex the Bold" were three people. The **Edit** action on a history row is the adoption path
- * for everything recorded before the field existed — it is what lets a GM point an old free-text row at
- * a real character page.
+ * The Downtime tracker: per-character totals, pending confirmations and history. A lens over the Journal's
+ * `downtime` records, never a second store. Totals group by `characterPageId ?? who`; Edit on a history row
+ * links an old free-text row to a character page.
  */
 export type DowntimeViewProps = Readonly<{
   gmToken: string;
   records: readonly CodexChronicleRecord[];
   calendar: GmCodexCalendar | null;
   pages: readonly CodexPageSummary[];
-  /** `5e.3`: the table's roster, for the one thing a Codex page cannot say — whether a character is
-      archived. See `codex/characters.ts`; absent is a campaign with no table state, not an error. */
+  /** The table's roster, used only to tell whether a character is archived (see `characters.ts`). */
   actors?: readonly ArchivableActor[];
   loading: boolean;
   error: string | null;
@@ -42,22 +33,14 @@ export type DowntimeViewProps = Readonly<{
 type DowntimeRow = Readonly<{ record: CodexChronicleRecord; payload: CodexDowntimePayload }>;
 
 export function DowntimeView({ gmToken, records, calendar, pages, actors = [], loading, error, onChanged, onOpenEntry, onOpenPage }: DowntimeViewProps) {
-  /**
-   * ONE control, one state. "Who" used to be two text boxes bound to the same `who`: a Combobox that
-   * rendered while `who` was empty and a bare Input beside it that was always there. Typing a free-text
-   * name into the lower one made `who` truthy, which swapped the Combobox above it for a THIRD input
-   * carrying the same value — two boxes with identical text, one labelled "Who" and one "Or type a
-   * name", focus in the second, on the first control of D12's flagship surface. The Combobox's own
-   * `allowFreeText` mode exists for exactly this field (the styleguide names it), so it holds either a
-   * character page's id or the raw text, and the two are told apart by looking it up.
-   */
+  /** A Combobox with `allowFreeText`: holds a character page id or the typed name, told apart by lookup. */
   const [whoValue, setWhoValue] = useState<string | null>(null);
   const [activity, setActivity] = useState("");
   const [days, setDays] = useState(7);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  /** `5e.4`: a Confirm failure belongs to the row it was pressed on, not to the composer 450px above it. */
+  /** A Confirm failure shows on the row it was pressed on. */
   const [rowError, setRowError] = useState<Readonly<{ id: string; message: string }> | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editWho, setEditWho] = useState("");
@@ -71,15 +54,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
     [records]
   );
   const pending = useMemo(() => rows.filter((row) => !row.payload.applied), [rows]);
-  /**
-   * `5e.3` — the same list "Who played" offers, in the same order and with the same word for it:
-   * active characters first, archived ones last carrying a muted `Archived` suffix. The rule lives in
-   * `characters.ts` because "archived" is a TABLE flag that no Codex page has (see that file).
-   *
-   * `meta` rather than a grouped listbox: `Combobox` already renders a muted suffix per option, and a
-   * <details> fold would be new API on a control four lanes touched today for no reachability the
-   * ordering does not already give.
-   */
+  /** Same order and wording as "Who played": active characters first, archived last with a muted suffix. */
   const characterOptions = useMemo(
     () => charactersFor(pages, actors).map((option) => ({
       id: option.id, label: option.title, icon: <EntityIcon type="character" />,
@@ -87,22 +62,14 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
     })),
     [pages, actors]
   );
-  /**
-   * **The whole party is reachable, not the first eight of it.** `Combobox` pages at `limit = 8` by
-   * default and truncates SILENTLY (`Combobox.tsx:64`, `.slice(0, limit)` — no "8 of 13" line, no
-   * scroll cue), so a campaign with nine character pages simply lost the ninth: absent from the
-   * unfiltered list below, and on the edit row — which has no `allowFreeText` escape — a ninth
-   * character could not be linked at all. The same default truncated the thirteen damage types
-   * elsewhere; `TagInput` already defeats it exactly this way (`TagInput.tsx:153`), and
-   * `.nh-combobox-list` scrolls at 17rem, so a party-sized list is safe to offer whole.
-   */
+  /** `Combobox` silently truncates at 8 by default; offer the whole party (the list scrolls). */
   const characterLimit = Math.max(characterOptions.length, 1);
   const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
   /** A value that names a character page is a link; anything else is the free-text name the GM typed. */
   const whoPageId = whoValue && characterOptions.some((option) => option.id === whoValue) ? whoValue : null;
   const who = whoPageId ? "" : whoValue ?? "";
 
-  /** Totals by person. `characterPageId` wins, so a linked row totals with its page whatever `who` says. */
+  /** Totals by person. `characterPageId` wins over `who`. */
   const totals = useMemo(() => {
     const map = new Map<string, { key: string; name: string; pageId: string | null; days: number; last: string | null }>();
     for (const { record, payload } of rows) {
@@ -136,21 +103,8 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
     finally { setBusy(false); }
   };
   /**
-   * `5e.4` — Confirm either works or says why, **beside the row that was pressed**.
-   *
-   * The reported symptom was "Confirm does nothing". It was never a no-op: the click fired, the route was
-   * right, the store write was right, and the server answered with a reason. The reason rendered in the
-   * `formError` Alert at the TOP of this view — above a ~450px `Log downtime` section, and the Pending list
-   * is the section below it. From where the GM was looking, a correct 400 was indistinguishable from a dead
-   * button. Errors from a row belong to that row.
-   *
-   * TWO failure modes, and one branch is not enough. `applyDowntime` throws:
-   *  - **400** when the campaign has no current date — `proposedDateFor` returns null because there is
-   *    nothing to advance FROM. Handled before the click, by disabling Confirm and stating the fix inline.
-   *  - **409** when the record is already applied. That cannot come from this list (it renders only
-   *    `!applied` rows), so it means the PAGE IS STALE — someone confirmed it elsewhere, or this is a
-   *    double-submit. `onChanged()` is the actual repair, so it is called on failure as well as on success:
-   *    a refetch drops the row out of Pending and the message explains the row that just vanished.
+   * A 400 (no campaign date) is prevented by disabling Confirm. A 409 means this list is stale (applied
+   * elsewhere), so `onChanged()` runs on failure too: the refetch drops the row and the message explains it.
    */
   const confirmRow = async (row: DowntimeRow) => {
     setRowError(null);
@@ -177,15 +131,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
     const passes = deadlinesPassedBy(records, calendar, target);
     return `Move your date to ${formatWorldDate(calendar, target)}${passes > 0 ? ` (passes ${passes} deadline${passes === 1 ? "" : "s"})` : ""}`;
   };
-  /**
-   * `5e.4`, the first of the two branches: with no campaign date there is nothing to advance FROM, so the
-   * server refuses (`proposedDateFor` → null → 400). Both halves of the old symptom are this same null —
-   * the refusal AND the bare "Confirm" label, which is `confirmLabel`'s fallback above.
-   *
-   * Read from the CALENDAR rather than from `record.proposedDate`, even though the two agree here: the
-   * calendar is the cause, so it is what the sentence can name. `proposedDate` is null on an applied record
-   * too, and this list holds none of those.
-   */
+  /** No campaign date means nothing to advance from; read from the calendar since that's the cause to name. */
   const noCampaignDate = !calendar?.currentDate;
 
   if (loading && rows.length === 0) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
@@ -197,14 +143,9 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
 
       <section className="codex-downtime-section">
         <h3 className="codex-campaign-h">Log downtime</h3>
-        {/* The SAME write the Journal composer uses — one write path, two doors. */}
+        {/* The same write the Journal composer uses. */}
         <div className="codex-downtime-form">
-          {/* No help string. The control's own placeholder already says "Search characters, or type a
-              name", so the sentence below it was a second copy of the same instruction — and it cost
-              the row its alignment: this 3-row `.nh-field` set the grid row's height and its 2-row
-              neighbours stretched to match, which is what made Activity a visibly taller box than Who
-              and Days (5e.2). Measured at 1280px: Activity's input was 67.5px against everyone else's
-              44px, sitting 23.5px low. `align-content: start` in codex.css is the other half. */}
+          {/* No help string: a 3-row field would stretch its neighbours (see `align-content: start` in codex.css). */}
           <Field label="Who" htmlFor="codex-downtime-who">
             {characterOptions.length > 0
               ? <Combobox id="codex-downtime-who" options={characterOptions} value={whoValue} onChange={setWhoValue} allowFreeText limit={characterLimit}
@@ -213,10 +154,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
           </Field>
           <Field label="Activity" htmlFor="codex-downtime-activity"><Input id="codex-downtime-activity" value={activity} placeholder="Forging a blade" onChange={(event) => setActivity(event.target.value)} /></Field>
           <Field label="Days" htmlFor="codex-downtime-days"><NumberField id="codex-downtime-days" aria-label="Days" value={days} min={0} max={3650} onChange={(next) => setDays(next ?? 0)} /></Field>
-          {/* D13, one editor everywhere: this note becomes a journal record's player text, so it gets the
-              SAME writing surface the journal composer gives the same field — toolbar, `[[` autocomplete,
-              Edit/View. It was the last bare `Textarea` left in the suite, which meant typing `[[` here
-              silently did nothing while the identical write through the Journal linked pages properly. */}
+          {/* The note becomes the record's player text, so it gets the same editor (with `[[` links) as the Journal. */}
           <Field label="Note" htmlFor="codex-downtime-note" className="codex-field-wide">
             <CodexEditor id="codex-downtime-note" token={gmToken} value={note} onChange={setNote}
               ariaLabel="Note" placeholder="Notes about this downtime" pages={pages} onNavigate={() => undefined} rows={3} />
@@ -229,8 +167,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
       {pending.length > 0 && (
         <section className="codex-downtime-section">
           <h3 className="codex-campaign-h">Pending confirmations</h3>
-          {/* Once, above the list, not once per row: the cause is the campaign's, not any one record's, and
-              repeating it on five pending rows would say the same sentence five times. */}
+          {/* Shown once above the list: the cause is the campaign's, not any one record's. */}
           {noCampaignDate && (
             <Alert tone="warning">Set your date on the Calendar before passing time — confirming moves it forward, and there is nothing to move it from.</Alert>
           )}
@@ -239,8 +176,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
               <li key={row.record.id} className="codex-downtime-pendingrow">
                 <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{downtimeSummaryLabel(row.payload)}</span>
-                {/* Secondary, not primary: the row already states the consequence in words, and this view's
-                    one primary action is "Log downtime" above (§5, one primary per view). */}
+                {/* Secondary: "Log downtime" is this view's one primary action. */}
                 <Button variant="secondary" size="sm" disabled={noCampaignDate} onClick={() => void confirmRow(row)}>{confirmLabel(row.record.proposedDate)}</Button>
                 {rowError?.id === row.record.id && <Alert tone="danger">{rowError.message}</Alert>}
               </li>
@@ -313,10 +249,8 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
 }
 
 /**
- * D12/D14 — the player's Downtime, the same lens over their own chronicle.
- *
- * No Pending section, and by construction rather than by a role check: `applied` is on the GM payload
- * and has no field on the player's, so this component could not render one.
+ * The player's Downtime over their own chronicle. No Pending section: `applied` isn't on the player
+ * payload, so it couldn't render one.
  */
 export function PlayerDowntimeView({ records, pages, onOpenEntry, onOpenPage }: Readonly<{
   records: readonly PlayerCodexChronicleRecord[];

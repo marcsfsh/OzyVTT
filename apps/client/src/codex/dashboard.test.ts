@@ -2,16 +2,7 @@ import { describe, expect, it } from "vitest";
 import { campaignFeedProps, nextSessionCard, pendingDowntime, recordsOnInstant } from "./dashboard";
 import type { CodexChronicleRecord } from "./api";
 
-/**
- * D18's dashboard arithmetic, tested where it lives — as pure functions over rows.
- *
- * The heading branch is the reason this file exists. `nextSessionCard` computes "Next session" /
- * "This session" / "Last session" from the record itself, and D18 exists because the old card said
- * "Next session — Session 4" about a game already behind the table. Every fixture in the client suite
- * was `status: "planned"`, and the one heading assertion anywhere asserted the constant a mutant would
- * produce — so replacing the whole branch with `const heading = "Next session";` kept the suite green
- * and reinstated the exact lie. That mutation now fails here.
- */
+/** The dashboard's pure selection rules. The session card's heading must reflect the record, never a constant. */
 
 const SESSION = (over: Partial<{ id: string; sessionNumber: number | null; realDate: string | null; recapBody: string; status: "planned" | "played"; revealedToPlayers: boolean }> = {}) => ({
   id: "s1", sessionNumber: 1, realDate: null, recapBody: "", status: "planned" as const, ...over
@@ -30,7 +21,7 @@ describe("Which session the dashboard names, and what it calls it (D18)", () => 
   });
 
   it("says 'This session' about the played one the GM has pointed at", () => {
-    // "Active" and "played" together is a game in progress, which is neither next nor last.
+    // Active and played together is a game in progress: "This session".
     const card = nextSessionCard([SESSION({ id: "s3", sessionNumber: 3, status: "played" })], "s3");
     expect(card?.heading).toBe("This session");
   });
@@ -51,14 +42,13 @@ describe("Which session the dashboard names, and what it calls it (D18)", () => 
   });
 
   it("carries the recap's reveal state when the caller has one, and omits it when they do not", () => {
-    // The capability flag: a GM row carries `revealedToPlayers`, the player projection has no such
-    // field, and the card renders a badge only for the caller who can answer the question.
+    // Only a GM row carries `revealedToPlayers`, so only the GM card shows a badge.
     expect(nextSessionCard([SESSION({ revealedToPlayers: false })], null)?.revealed).toBe(false);
     expect(nextSessionCard([SESSION()], null)?.revealed).toBeUndefined();
   });
 });
 
-// ---- Downtime ----
+// ----- Downtime -----
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "e1", title: null, text: "An entry.", gmText: null, revealedToPlayers: false,
@@ -82,8 +72,7 @@ describe("Downtime waiting on the GM (D18 #5)", () => {
   });
 
   it("does not also leave a pending row in the feed — one record, one place on the dashboard", () => {
-    // It has a card of its own WITH the Confirm affordance on it; the feed copy could only be pressed
-    // to open the entry, so the duplicate was pure noise on the surface D18 exists to declutter.
+    // Pending downtime has its own card with Confirm, so it leaves the feed.
     const feed = campaignFeedProps({ records: [DOWNTIME("w1", false), DOWNTIME("w2", true), RECORD({ id: "e9" })], calendar: null });
     expect(feed.downtimePending.map((row) => row.id)).toEqual(["w1"]);
     expect(feed.entries.map((entry) => entry.id)).toEqual(["w2", "e9"]);

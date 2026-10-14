@@ -3,21 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /**
- * **D3 + D10 — every list filters in place, and its filters are part of its address.**
- *
- * Two halves of one claim, both of which shipped only partly.
- *
- * *D3.* Pages, Atlas and the Journal put their filters in the URL; **Sessions and Quests kept theirs in
- * component state**. So two of the five GM lists lost their filter on any navigation, and a filtered log
- * could be neither linked to nor refreshed back into — while the three beside them could.
- *
- * *D10.* "In-place search/filter on every list" reached the GM's five and **none of the player's**: their
- * kind filter was component state that only a dashboard card could set (a player who cleared it could
- * not set it again), and Sessions, Quests, the Journal and the Atlas had no filter at all.
- *
- * Each test asserts BOTH directions, because either alone leaves half the bug: **the address changes when
- * the control is used**, and **the control shows the address's filter when the view is opened cold** —
- * which is the linkable, refresh-proof half, and the half a `useState` implementation fails.
+ * Every list filters in place and keeps its filters in the address, for both GM and player. Each test
+ * checks both directions: using the control changes the address, and a cold open shows the address's filter.
  */
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -123,7 +110,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
 
-    // Cold open on a filtered address — the linkable, refresh-proof half. Component state cannot do this.
+    // Cold open on a filtered address.
     const sessions = await rail("Sessions");
     await waitFor(() => expect(sessions.queryByText("Session 1")).not.toBeInTheDocument());
     expect(sessions.getByText("Session 2")).toBeInTheDocument();
@@ -131,7 +118,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
 
     await user.type(screen.getByLabelText("Filter sessions"), "crypt");
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("crypt"));
-    // …and the two filters compose rather than replacing each other.
+    // The two filters compose.
     expect(new URLSearchParams(window.location.search).get("status")).toBe("planned");
   });
 
@@ -148,14 +135,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
     expect((await rail("Quests")).getByText("The Sunless Crown")).toBeInTheDocument();
   });
 
-  /**
-   * Opening a record from a filtered list drops the filter from the address — **and that is the
-   * behaviour of every list in the suite**, Pages included (`navigate(pagePath(id))` carries no query).
-   * Back still returns to the filtered list, because the filtered address is the previous history entry.
-   * Pinned here as the current, uniform answer rather than left for the next reader to discover: making
-   * the filter ride the record address is a change to all five lists and a design call about how long a
-   * filter should stick, not part of putting Sessions and Quests on the same footing as the other three.
-   */
+  /** Opening a record drops the filter from the address, as every list does; Back returns to the filtered list. */
   it("drops the filter from the address when a record is opened — uniformly, as Pages does", async () => {
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
@@ -228,8 +208,7 @@ describe("D10 — the player's lists filter in place too", () => {
     await waitFor(() => expect(screen.queryByText("Strahd")).not.toBeInTheDocument());
     expect(screen.getByText("Vallaki")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("type")).toBe("location");
-    // And it can be cleared from where they are standing, which the dashboard-only version could not do
-    // once the chip was dismissed.
+    // And it can be cleared where they are.
     await user.selectOptions(screen.getByLabelText("Filter by kind"), "");
     await waitFor(() => expect(screen.getByText("Strahd")).toBeInTheDocument());
   });

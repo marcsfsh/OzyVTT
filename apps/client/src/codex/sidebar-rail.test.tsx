@@ -50,21 +50,11 @@ import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 
 /**
- * **761–849px — the band nobody looked at.**
- *
- * `codex.css` pins the sidebar to a 56px grid track from 761px and only widens it at 850px, but the
- * components never knew: the GM's `collapsed` came from a localStorage preference that defaults to
- * "open" and the player passed none at all. At 768px — an iPad in portrait, a half-width laptop window —
- * thirteen labels, three group eyebrows and the ⌘K chip rendered into a 20px content box and spilled
- * over the main column, with the hamburger and the phone drawer both hidden so the broken strip was the
- * only navigation there was. Neither verification pass loaded a width in the band.
- *
- * jsdom loads no stylesheet and has no layout, so what is testable here is the half that CSS could never
- * have fixed anyway: **the markup agrees with the track.** Labels leave the accessibility tree, and each
- * icon gains the `title`/`aria-label` that is the only thing naming it once they have.
+ * 761-849px: CSS fixes the sidebar at a 56px track, so the markup must collapse to match. jsdom has no
+ * layout, so this checks that labels leave the accessibility tree and each icon gets `title`/`aria-label`.
  */
 
-/** Drive `matchMedia` from a real viewport width, since jsdom's own shim answers `false` to everything. */
+/** Drive `matchMedia` from a viewport width; jsdom's shim answers `false` to everything. */
 function setViewport(width: number): void {
   const listeners = new Set<() => void>();
   window.matchMedia = ((query: string) => {
@@ -104,7 +94,7 @@ beforeEach(() => {
 const realMatchMedia = window.matchMedia;
 afterEach(() => { window.matchMedia = realMatchMedia; localStorage.clear(); });
 
-/** The aside's nav — the drawer's copy is always expanded and is a second node with the same name. */
+/** The aside's nav; the drawer's always-expanded copy has the same name. */
 const asideNav = () => screen.getAllByRole("navigation", { name: "Codex sections" })[0];
 
 describe("The GM sidebar in the 761–849 band", () => {
@@ -115,12 +105,12 @@ describe("The GM sidebar in the 761–849 band", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
     const nav = within(asideNav());
-    // Rail: the item is named by its title/aria-label, and no visible label text remains.
+    // Rail: items are named by title/aria-label, with no visible label text.
     expect(nav.getByRole("button", { name: "Quests" })).toHaveAttribute("title", "Quests");
     expect(nav.queryByText("Quests")).not.toBeInTheDocument();
-    // The group eyebrows go with them — three unbreakable words that had no ellipsis rule at all.
+    // The group eyebrows go too.
     expect(nav.queryByText("World")).not.toBeInTheDocument();
-    // And the collapse toggle: there is nothing to expand into at this width.
+    // No collapse toggle: there is nothing to expand into at this width.
     expect(nav.queryByRole("button", { name: /the sidebar/ })).not.toBeInTheDocument();
   });
 
@@ -154,10 +144,7 @@ describe("The GM sidebar in the 761–849 band", () => {
 });
 
 describe("The player sidebar in the 761–849 band", () => {
-  /**
-   * Worse for the player than for the GM: they have no collapse control and no persisted preference, so
-   * before this the crushed strip was permanent for as long as the window was that wide.
-   */
+  /** Players have no collapse control here either. */
   it("renders the rail, with every icon named", async () => {
     setViewport(768);
     goTo("/codex");
@@ -179,20 +166,7 @@ describe("The player sidebar in the 761–849 band", () => {
   });
 });
 
-/**
- * **Collapsing the sidebar must not be a one-way door** — the bug a client found in minutes by using
- * the app, after 47 QA agents and two full browser passes missed it.
- *
- * The toggle was gated on `collapsed`, which is `railBand || sidebarMode === "rail"`. So the moment the
- * GM collapsed the sidebar, the only control that expands it again unmounted; and because the preference
- * persists to localStorage, a reload did not bring it back either. `setSidebarMode` has exactly one call
- * site, so nothing else in the app could recover it: the GM was in the rail until they cleared site
- * storage or resized past 850px.
- *
- * The lesson is bigger than the line. **Every check we owned verified that things are reachable; not one
- * collapsed a control and tried to get back.** So each test below drives the toggle in BOTH directions,
- * and the last one keeps the 761–849px gate that the fix must not undo.
- */
+/** Every test drives the toggle in both directions; collapsing must never hide the way back. */
 describe("Collapsing the sidebar is reversible (both directions)", () => {
   const renderGm = async () => {
     goTo("/codex");
@@ -208,9 +182,8 @@ describe("Collapsing the sidebar is reversible (both directions)", () => {
     const nav = () => within(asideNav());
     await user.click(nav().getByRole("button", { name: "Collapse the sidebar" }));
 
-    // The rail is on…
     await waitFor(() => expect(nav().getByRole("button", { name: "Quests" })).toHaveAttribute("title", "Quests"));
-    // …and the way back is ON SCREEN and operable. This is the whole bug: it used to be gone.
+    // The way back is on screen and operable.
     const expand = nav().getByRole("button", { name: "Expand the sidebar" });
     expect(expand).toHaveAttribute("aria-expanded", "false");
 
@@ -223,7 +196,7 @@ describe("Collapsing the sidebar is reversible (both directions)", () => {
   it("offers the way back after a RELOAD into the stored preference", async () => {
     setViewport(1280);
     const user = userEvent.setup();
-    // The preference persists, which is what turned a moment's mistake into a permanent state.
+    // The preference persists across reloads.
     localStorage.setItem("codex-sidebar", "rail");
     await renderGm();
 
@@ -236,9 +209,7 @@ describe("Collapsing the sidebar is reversible (both directions)", () => {
   });
 
   it("still hides the toggle in the forced 761-849 band, whatever the preference says", async () => {
-    // The regression guard on the fix: the gate is `railBand`, so a GM whose preference is "rail" gets no
-    // toggle here either — there is nothing to expand INTO at this width, and the button would write a
-    // preference whose effect they cannot see until they resize.
+    // In the forced band there is no toggle even with a "rail" preference: nothing to expand into.
     setViewport(800);
     localStorage.setItem("codex-sidebar", "rail");
     await renderGm();
@@ -264,7 +235,7 @@ describe("The player gets the same affordance, in the same words (D1)", () => {
     const nav = () => within(asideNav());
     await user.click(nav().getByRole("button", { name: "Collapse the sidebar" }));
     await waitFor(() => expect(nav().getByRole("button", { name: "Journal" })).toHaveAttribute("title", "Journal"));
-    // Its own key: a player's choice is not the GM's, and the two shells can be open on one machine.
+    // The player's own key, separate from the GM's.
     expect(localStorage.getItem("codex-player-sidebar")).toBe("rail");
     expect(localStorage.getItem("codex-sidebar")).toBeNull();
 
@@ -275,8 +246,7 @@ describe("The player gets the same affordance, in the same words (D1)", () => {
   it("offers no collapse inside the GM's embedded preview", async () => {
     setViewport(1280);
     await renderPlayer({ embedded: true });
-    // The preview is a modal, not a viewport: a rail there would describe nothing the player will see,
-    // and the preference it wrote would be the GM's.
+    // The preview is a modal, not the viewport, so no collapse toggle.
     expect(within(asideNav()).queryByRole("button", { name: /the sidebar/ })).not.toBeInTheDocument();
   });
 

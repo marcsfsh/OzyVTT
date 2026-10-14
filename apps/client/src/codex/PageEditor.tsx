@@ -12,32 +12,18 @@ import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 /**
- * Ruling 11 — **the context column is summonable, and so is everything else that is not the writing.**
- *
- * The ruling names connections, atlas pins and the journal as what moves behind a toggle. Measured, that
- * is not enough to deliver its second half ("writing gets full width and full height"): at 1280x900 with
- * the context column already hidden and the centre at its full 680px, a `location` page's own frontmatter
- * — banner 32 + kind/folder/tags 214 + typed fields 242 + the body tab bar 44 + the editor toolbar 44,
- * plus gaps — stands 636px tall inside a 659px frame. The writing surface would get 23px. So the panel
- * holds the page's PROPERTIES as well as its connections, and the centre column holds exactly one thing:
- * the body being written. That is what takes the textarea from 224px to the frame's height.
- *
- * The panel is an overlay inside the detail column, not a `Drawer`: it belongs to the page, not to the
- * app, and the shell already has a right-edge drawer (Session prep) that a second fixed panel would
- * fight. It is remembered per browser, closed by default, because the writing is the reason to be here.
+ * The page editor. The centre column holds only the body being written; properties and connections live
+ * in a summoned overlay panel (not a `Drawer`, which would fight the shell's Session prep drawer).
+ * The panel's open state is remembered per browser and starts closed.
  */
 const DETAILS_KEY = "codex-page-details";
 const DETAILS_ID = "codex-page-details";
 
-/**
- * `dateYear`/`dateMonth`/`dateDay` are the in-world date that puts an `event` page on the chronicle.
- * They are STRINGS here, exactly as the journal composer holds them, because a half-typed year is a
- * normal state of an input and coercing it every keystroke is how "1" becomes a saved year of 1.
- */
+/** In-world date parts are strings, as in the journal composer, so a half-typed year isn't coerced and saved. */
 type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tags: readonly string[]; playerBody: string; gmBody: string; bannerAssetId: string | null; dateYear: string; dateMonth: string; dateDay: string };
 
 function draftOf(page: CodexPage): Draft {
-  const date = page.inWorldDate; // the RAW date the GM typed - correct even if the calendar has since changed
+  const date = page.inWorldDate; // the raw date the GM typed, still valid if the calendar changed
   return {
     title: page.title, entityType: page.entityType, fields: { ...page.fields, ...page.gmFields }, folder: page.folder ?? "",
     tags: page.tags, playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId,
@@ -49,20 +35,20 @@ export type PageEditorProps = Readonly<{
   gmToken: string;
   page: CodexPage;
   pages: readonly CodexPageSummary[];
-  /** D8: one list, both directions, both origins. Replaces `backlinks` + `relationships`. */
+  /** One list, both directions, both origins. */
   connections: readonly CodexPageConnection[];
   autosave: CodexAutosaveSettings;
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
-  /** Follow a `[[link]]`. Unresolved targets open quick-create rather than creating silently (D7). */
+  /** Follow a `[[link]]`. Unresolved targets open quick-create rather than creating silently. */
   onNavigate: (target: string) => void;
   /** Jump to the archived fight an auto-logged battle came from. GM-only: archives carry GM narration. */
   onOpenReplay?: (archiveId: number) => void;
   onConnectionsChanged: () => void;
   onOpenConnection: (kind: CodexPageConnection["otherKind"], id: string) => void;
-  /** Open a pin on the Atlas — the page's "elsewhere" edge. Both halves travel (map, then pin). */
+  /** Open a pin on the Atlas (map, then pin). */
   onOpenMarker?: (markerId: string, mapId: string) => void;
-  /** Land the Graph ON this page's own node — the page's fourth return edge. */
+  /** Land the Graph on this page's node. */
   onShowInGraph?: (pageId: string) => void;
   onPickTag?: (tag: string) => void;
 }>;
@@ -86,25 +72,17 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
     setDetailsOpen(open);
     try { localStorage.setItem(DETAILS_KEY, open ? "open" : "closed"); } catch { /* private mode - fine */ }
   }, []);
-  // Summoning a panel that nothing focuses leaves a keyboard user where they were, with the controls they
-  // asked for somewhere behind them. Focus the panel itself rather than its first field: the heading is
-  // what tells them where they landed.
+  // Focus the summoned panel itself, so keyboard users land on its heading.
   useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
 
-  /**
-   * D6 — one autosave, the GM's cadence. Identical to the old hand-rolled behaviour when the setting is
-   * on; when it is off the same hook drives an explicit Save, an "Unsaved changes" readout, a navigation
-   * guard and a `beforeunload` handler.
-   */
+  /** Autosave at the GM's cadence; when off, the same hook drives Save, the dirty readout and the navigation guards. */
   const save = useCallback(async (next: Draft) => {
     const { fields, gmFields } = splitEntityFields(next.entityType, next.fields);
     const updated = await codexApi.updatePage(gmToken, page.id, {
       title: next.title.trim() || "Untitled", entityType: next.entityType, fields, gmFields,
       folder: next.folder.trim() || null, tags: next.tags,
       playerBody: next.playerBody, gmBody: next.gmBody, bannerAssetId: next.bannerAssetId,
-      // Only an `event` page has a date control, so only an `event` page states a date. On any other
-      // kind the key is OMITTED, and an omitted date leaves the stored one alone — which is what makes
-      // switching an event to a note and back lossless rather than a silent erase.
+      // Only `event` pages send a date. Omitting it leaves the stored date alone, so switching kinds is lossless.
       ...(next.entityType === "event"
         ? { inWorldDate: next.dateYear.trim() ? { year: Math.trunc(Number(next.dateYear) || 0), month: Number(next.dateMonth || 0), day: Math.max(1, Math.trunc(Number(next.dateDay) || 1)) } : null }
         : {}),
@@ -125,9 +103,8 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   });
 
   /**
-   * Adopt an EXTERNAL change to this same page (a folder move from the tree patches folder + rev out
-   * from under us). With no unsaved local edits we take the server copy, so the editor does not keep a
-   * stale folder and then 409 its next save. With unsaved edits the draft wins and our save lands.
+   * Adopt an external change to this page (e.g. a folder move bumps rev). With no local edits take the
+   * server copy so the next save doesn't 409; with unsaved edits the draft wins.
    */
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -156,15 +133,9 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   useEffect(() => { void codexApi.getSettings(gmToken).then(setSettings).catch(() => undefined); }, [gmToken]);
 
   /**
-   * D7 / director ruling R7 — **changing a page's kind always confirms.**
-   *
-   * Unconditional, not "only when fields would be lost": the two cases read the same to a GM mid-flow,
-   * and a conditional dialog is exactly the kind you learn to dismiss unread before the destructive one
-   * arrives. What differs is the copy — with populated foreign fields it names them.
-   *
-   * Recovery is a **hard guarantee**: a type-changing save forces a revision snapshot server-side,
-   * bypassing the coalescing window, so "restore them from History" is literally true. Unless the GM has
-   * switched version history off, in which case the copy softens rather than lying.
+   * Changing a page's kind always confirms, since a conditional dialog gets dismissed unread. A
+   * kind-changing save forces a revision server-side, so "restore them from History" is true unless the GM
+   * has turned history off, in which case the copy says so.
    */
   const changeKind = async (nextType: EntityType) => {
     if (nextType === draft.entityType) return;
@@ -184,9 +155,8 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
       confirmLabel: "Change kind"
     });
     if (!ok) return;
-    // Client and server prune identically. Leaving stripped values in the draft would show the GM a
-    // field the very next save deletes — the server prunes to the effective kind on every save that
-    // touches fields or the kind (the CD-2 viewer-safety decision), so the draft must agree.
+    // Prune the draft the same way the server prunes on save, so the GM never sees a field the next save
+    // deletes.
     setDraft((prev) => ({ ...prev, entityType: nextType, fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key))) }));
   };
 
@@ -231,13 +201,12 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
       <div className="codex-editor-head">
         <div className="codex-editor-titlewrap">
           {folderCrumbs.length > 0 && <nav className="codex-crumbs" aria-label="Folder path">{folderCrumbs.map((crumb, index) => <span key={index} className="codex-crumb-seg">{index > 0 && <span className="codex-crumb-sep">/</span>}{crumb}</span>)}</nav>}
-          {/* D25: the bespoke `.codex-title-input` becomes the primitive's title variant. */}
           <Input variant="title" className="codex-title-input" value={draft.title} placeholder="Untitled page" aria-label="Page title"
             onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
         </div>
         <div className="codex-editor-actions">
           <SaveState status={status} onRetry={() => void flush()} onReload={() => void flush()} />
-          {/* D6: with autosave off, saving is an explicit act — and this view's one primary action. */}
+          {/* With autosave off, saving is explicit and this view's one primary action. */}
           {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
           <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
           <Button variant="ghost" size="sm" aria-expanded={detailsOpen} aria-controls={DETAILS_ID} onClick={() => showDetails(!detailsOpen)}>Details</Button>
@@ -251,10 +220,7 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
         <div className="codex-editor-center">
           <TwoLayerBodyTabs value={tab} onChange={setTab} />
 
-          {/* D13: the ONE editor. Toolbar, `[[` autocomplete, image drop/paste and the Edit/View switch
-              are the primitive's; the Codex supplies its reader, its page list and its violet chrome.
-              `fill` is ruling 11's second half: the surface takes the frame's height instead of the
-              primitive's 14rem floor. */}
+          {/* `fill` makes the editor take the frame's height instead of the primitive's 14rem floor. */}
           <CodexEditor token={gmToken} value={body} onChange={setBody} fill
             ariaLabel={BODY_LAYER[tab].label}
             placeholder={tab === "player" ? "What players can read about this page…" : "Hidden from players: hooks, stats, the twist…"}
@@ -263,8 +229,7 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
 
         {detailsOpen && (
         <aside id={DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Page details" tabIndex={-1} ref={detailsRef}
-          /* Scoped, never global: a keypress that started inside the panel closes it, and one that started
-             in the body being written belongs to the body. Same contract as `Drawer`. */
+          /* Scoped: Escape closes the panel only for keypresses that started inside it. */
           onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
           <div className="codex-context-head">
             <h3 className="codex-backlinks-title">Page details</h3>
@@ -290,7 +255,6 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
             </Field>
           </div>
           {onPickTag && draft.tags.length > 0 && (
-            /* D10: a tag is a cross-type view, everywhere it appears. */
             <div className="codex-editor-tagjumps">
               {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
             </div>
@@ -328,15 +292,7 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
             </div>
           )}
 
-          {/**
-            * ONE region answering ONE question — *where else does this entity appear?* — with a
-            * sub-block per place it can: other records, the atlas, the journal, the graph.
-            *
-            * D8 folded the first two of those together: the separate Relationships panel and the
-            * "Linked from" backlink block below it were the same fact told twice, and are now one list
-            * with an `origin` attribute. The atlas and journal edges keep their own blocks because they
-            * are different relations, not different renderings of one.
-            */}
+          {/* Where else does this entity appear: connections, atlas pins, journal and graph. */}
           <section className="codex-connections" aria-labelledby="codex-connections-h">
             <div className="codex-connections-head">
               <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>

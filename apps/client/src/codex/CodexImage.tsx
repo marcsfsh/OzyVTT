@@ -2,10 +2,8 @@ import { Skeleton } from "@vtt/ui";
 import { useEffect, useState } from "react";
 
 /**
- * A codex media image. Bearer tokens can't ride an <img src>, so - like the map renderer - we fetch the
- * asset with the caller's token, turn it into an object URL, and render that. Used for page banners and
- * inline images; the same component serves GM and player (the server gates player access to media used
- * by revealed pages).
+ * A codex media image. Bearer tokens can't ride an <img src>, so the asset is fetched with the caller's
+ * token and rendered from an object URL. The server gates player access to media on revealed pages.
  */
 export function CodexImage({ assetId, token, alt, className }: Readonly<{ assetId: string; token: string; alt?: string; className?: string }>) {
   const [url, setUrl] = useState<string | null>(null);

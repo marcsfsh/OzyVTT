@@ -3,23 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /**
- * D17 — the Calendar as a real section, and the one owed test for it.
- *
- * Three things here are worth a test rather than a comment.
- *
- * **It is a lens, never a second chronology** (invariant 7). Every record is placed by the SERVER's
- * `calendarInstant`; no client date arithmetic touches a record. That is exactly why this view could not
- * ship before the clamp fix — the client's `dateToInstant` clamped only at the bottom, so "day 31 of a
- * 30-day month" landed one day later here than on the server. A test that placed records by re-deriving
- * their dates would re-introduce the very divergence the view was blocked on, so the fixtures below give
- * an instant and a raw date that DISAGREE, and assert the instant wins.
- *
- * **The two clocks are separate, and one of them is GM-only.** "Your date" is the prep clock and carries
- * the violet GM-only tag; "Players' date" is what has been published. Publishing is offered only while
- * they differ, because there is nothing to publish when they agree.
- *
- * **The month is an address.** `?y=`/`?m=` drive the grid, so a month is bookmarkable and the arrows
- * report through `onMonthChange` rather than holding local state.
+ * The Calendar section. Records are placed by the server's `calendarInstant`, never by client date maths,
+ * so fixtures give an instant and a raw date that disagree. The month is an address (`?y=`/`?m=`).
  */
 
 const publish = vi.fn();
@@ -31,7 +16,7 @@ vi.mock("./api", async (importOriginal) => {
 import { CalendarView, PlayerCalendarView } from "./CalendarView";
 import type { CodexChronicleRecord, GmCodexCalendar } from "./api";
 
-/** Two 10-day months and a 5-day week: small enough that every cell and every lead blank is countable. */
+/** Two 10-day months and a 5-day week, so every cell is countable. */
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
   months: [{ name: "Hammer", days: 10 }, { name: "Alturiak", days: 10 }],
@@ -39,7 +24,7 @@ const CALENDAR: GmCodexCalendar = {
   currentDate: { year: 1491, month: 0, day: 4 },
   publishedDate: { year: 1491, month: 0, day: 2 }
 };
-/** Hammer 1 of 1491 = 1491 × 20 = 29820, so day N of Hammer is 29819 + N. */
+/** Hammer 1 of 1491 = 1491 x 20 = 29820, so day N of Hammer is 29819 + N. */
 const HAMMER = (day: number) => 29819 + day;
 
 const record = (over: Partial<CodexChronicleRecord>): CodexChronicleRecord => ({
@@ -63,19 +48,16 @@ describe("The Calendar grid", () => {
     renderCalendar();
 
     const grid = screen.getByRole("grid", { name: "Hammer 1491 DR" });
-    // The GM's weekdays, not a real-world week.
     expect(within(grid).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["SulSu", "MolMo", "ZorZo", "ChesCh", "TarTa"]);
-    // Ten days, and one cell per day.
     expect(within(grid).getAllByRole("button")).toHaveLength(10);
-    // 29820 % 5 === 0, so Hammer 1 is the first weekday and the month needs no lead blanks.
+    // 29820 % 5 === 0, so Hammer 1 is the first weekday: no lead blanks.
     expect(grid.querySelectorAll(".codex-calendar-cell.is-blank")).toHaveLength(0);
   });
 
   it("marks your date and the players' date as different days", () => {
     renderCalendar();
 
-    // The two clocks have diverged by two days, and the grid says which is which — by name, in the cell's
-    // accessible label, not only by a colour.
+    // The cell labels name each clock, not only a colour.
     expect(screen.getByRole("button", { name: "Hammer 4, your date" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hammer 2, players' date" })).toBeInTheDocument();
   });
@@ -84,9 +66,8 @@ describe("The Calendar grid", () => {
     const user = userEvent.setup();
     const onOpenEntry = vi.fn();
     /**
-     * The raw date says day 31 of a 10-day month — reachable, because `normalizeCalendar` stores an
-     * over-long day verbatim — while the server's instant says Hammer 7. A view that re-derived the
-     * position would clamp to Hammer 10 and put the record on the wrong day.
+     * The raw date says day 31 of a 10-day month (stored verbatim) while the server's instant says Hammer 7.
+     * Re-deriving would clamp to Hammer 10.
      */
     renderCalendar({
       records: [record({ id: "j9", title: "The feast", kind: "deadline", inWorldDate: { year: 1491, month: 0, day: 31 }, calendarInstant: HAMMER(7) })],
@@ -124,7 +105,7 @@ describe("The Calendar grid", () => {
       ]
     });
 
-    // Three glyphs fit; the label still says four, so the cell never under-reports what is on it.
+    // Three glyphs fit; the label still counts four.
     const cell = screen.getByRole("button", { name: "Hammer 3, 4 records" });
     expect(within(cell).getByText("+1")).toBeInTheDocument();
   });
@@ -141,7 +122,7 @@ describe("The month is an address (D3/D17)", () => {
     const { props } = renderCalendar({ year: "1491", month: "1" });
 
     await user.click(screen.getByRole("button", { name: "Next month" }));
-    // Two months in this world, so the month after Alturiak 1491 is Hammer 1492.
+    // Two months per year, so after Alturiak 1491 comes Hammer 1492.
     expect(props.onMonthChange).toHaveBeenCalledWith(1492, 0);
 
     await user.click(screen.getByRole("button", { name: "Previous month" }));
@@ -159,21 +140,11 @@ describe("The two clocks (D17)", () => {
     renderCalendar();
     expect(screen.getByText("Your date")).toBeInTheDocument();
     expect(screen.getByText("Players' date")).toBeInTheDocument();
-    // The prep clock is GM information; the tag is the same violet mark every GM-only block carries.
+    // The prep clock is GM-only information.
     expect(screen.getByText("GM only")).toBeInTheDocument();
   });
 
-  /**
-   * **D6 (2026-08-09) reverses half of this test's premise.** It used to assert that Publish is RENDERED
-   * only while the clocks differ. That was the client half of the coupling the client reported: with the
-   * server auto-publishing a codex's first date (K7), setting a date made the clocks agree, so the control
-   * never appeared — from the unset state there was no visible publish act at all, and two clocks with no
-   * visible act between them read as one clock with two readouts.
-   *
-   * It is now always rendered and DISABLED when there is nothing to publish, which is the same protection
-   * against a no-op click and none of the concealment. The reason is on screen beside it, so a disabled
-   * control is not a puzzle either.
-   */
+  /** Always rendered, disabled with a visible reason when there is nothing to publish. */
   it("always offers publishing, and disables it only when the party is already on the GM's date", async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();
@@ -191,11 +162,7 @@ describe("The two clocks (D17)", () => {
     expect(screen.getByText(/The party is on your date/)).toBeInTheDocument();
   });
 
-  /**
-   * `5f`(i) / D6, the state the client actually reported: a GM sets their date and the party's does NOT
-   * move. Under K7 this state was unreachable — the server published the first date itself — so the fix is
-   * only observable here now that it is.
-   */
+  /** The reported case: the GM sets a date and the party's does not move until published. */
   it("offers the publish act from the unset state, where the party has no date at all", () => {
     renderCalendar({ calendar: { ...CALENDAR, publishedDate: null } });
     expect(screen.getByText("Not shared yet")).toBeInTheDocument();
@@ -203,11 +170,7 @@ describe("The two clocks (D17)", () => {
     expect(screen.getByText(/The party has no date yet/)).toBeInTheDocument();
   });
 
-  /**
-   * `5f`(i). "Not set" was a plain `<strong>`: the only door to the GM's clock was a ghost "Edit calendar"
-   * button opening the world's structure, where the date is the FOURTH field. A GM setting tonight's date
-   * is not editing the world's months.
-   */
+  /** The GM's clock is a button straight to the date; the players' clock has no editor. */
   it("makes the GM's own clock a door, and gives the players' clock none", async () => {
     const user = userEvent.setup();
     renderCalendar({ calendar: { ...CALENDAR, currentDate: null, publishedDate: null } });
@@ -216,8 +179,7 @@ describe("The two clocks (D17)", () => {
     await user.click(door);
     expect(await screen.findByRole("dialog", { name: "Your date" })).toBeInTheDocument();
 
-    // D11-H: the players' clock is a COPY, made by publish and by nothing else. It has no editor and must
-    // not grow one — a "set the players' date" control is a control that cannot exist.
+    // The players' clock is only ever a published copy; it must never get an editor.
     expect(screen.queryByRole("button", { name: /Not shared yet/ })).toBeNull();
   });
 
@@ -231,11 +193,7 @@ describe("The two clocks (D17)", () => {
   });
 });
 
-/**
- * `5f`(iii) — the client half of the era rule, which has to agree with the server's `formatWorldYear`
- * exactly: the server writes `in_world_label` into the database, this view labels the month bar and the
- * composer's preview, and a disagreement between them is the divergence D17 was blocked on once already.
- */
+/** Must agree with the server's `formatWorldYear`, which writes the stored `in_world_label`. */
 describe("Eras (5f)", () => {
   const ERAS = [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }];
 
@@ -258,7 +216,7 @@ describe("Eras (5f)", () => {
     expect(screen.getByRole("heading", { name: "Hammer 1491 DR" })).toBeInTheDocument();
   });
 
-  /** Structure, not secrets: the player's own calendar reads its dates with the same eras (projected on both). */
+  /** Eras are structure, not secrets: both projections carry them. */
   it("gives the player's calendar the same reading of the year", () => {
     render(<PlayerCalendarView calendar={{ yearName: "DR", eras: ERAS, months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: { year: 1491, month: 0, day: 2 } }}
       records={[]} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} />);
@@ -292,8 +250,7 @@ describe("The player's Calendar (D14)", () => {
   it("shows ONE clock — the published date — and no way to change the world", () => {
     render(<PlayerCalendarView calendar={PLAYER_CALENDAR} records={[]} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} />);
 
-    // The GM's prep clock has no name here and no cell: `currentDate` on the player's calendar IS the
-    // published date (the server projects it), so there is nothing to label "yours" against.
+    // A player's `currentDate` is the published date, so there is no "your date".
     expect(screen.queryByText("Your date")).toBeNull();
     expect(screen.queryByText("GM only")).toBeNull();
     expect(screen.queryByRole("button", { name: "Publish the date" })).toBeNull();

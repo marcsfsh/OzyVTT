@@ -5,21 +5,9 @@ import { SearchResultRow, searchHitKey, useCodexSearch } from "./SearchResults";
 import { GM_SIDEBAR, PLAYER_SIDEBAR, pathForSection } from "./routes";
 
 /**
- * D20 — the Codex quick-switcher: jump to any RECORD by name, go to any section, or start a create.
- *
- * **Codex-scoped, deliberately not app-global** (the client chose this explicitly). It is mounted only
- * inside `CodexShell` and the player shell, so Cmd-K means nothing on the Encounter tab — and a test
- * locks that, because "make it global" is the obvious next step and is out of scope.
- *
- * What the recut added: navigation verbs for **every** sidebar section (it knew five modes and now knows
- * twelve), create verbs that open the one quick-create dialog rather than making an untyped page, and
- * the truncation line. Its chrome is now the `Modal` primitive with the new top alignment, replacing the
- * bespoke scrim + panel it used to hand-roll (D25).
- *
- * **A verb here does the thing it is named for.** "New page…" opens quick-create; "New session" and "New
- * quest" run the same creates the rails run and land on the new record (D7 — one create habit, whichever
- * door starts it). The two "Log …" rows navigate, because a journal entry and a downtime record are
- * composed in a form and the form is what they are a door to; they are named accordingly.
+ * The Codex command palette: jump to a record, go to a section, or create. Codex-scoped, not app-global;
+ * a test locks that. Create verbs run the same creates as the rails and open the new record; the "Log ..."
+ * verbs navigate to the form that composes the record.
  */
 
 type Action =
@@ -31,14 +19,9 @@ type Action =
 export type CommandPaletteProps = Readonly<{
   gmToken: string;
   onOpenHit: (hit: CodexSearchHit) => void;
-  /** Opens quick-create prefilled with the typed name. Absent on the player palette — no create verbs. */
+  /** Opens quick-create prefilled with the typed name. Absent on the player palette. */
   onCreatePage?: (title: string) => void;
-  /**
-   * D7: **genuinely create**, then open the new record — the same call the Sessions rail's "New" makes
-   * (`creates.ts`). These rows used to navigate to the list, which is exactly what "Go to Sessions" does
-   * six rows below, so a GM who asked the palette for a new session got a list and still had to find the
-   * rail button. Supplied together with `onCreatePage`; absent on the player palette.
-   */
+  /** Creates a session and opens it (`creates.ts`). Absent on the player palette. */
   onCreateSession?: () => void;
   onCreateQuest?: () => void;
   onNavigate: (path: string) => void;
@@ -46,7 +29,7 @@ export type CommandPaletteProps = Readonly<{
   player?: boolean;
 }>;
 
-/** A quick-switcher stays a switcher: the full result list lives in the rail. */
+/** The full result list lives in the rail. */
 const MAX_HITS = 8;
 
 export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSession, onCreateQuest, onNavigate, onClose, player = false }: CommandPaletteProps) {
@@ -61,7 +44,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSessi
   );
   const state = useCodexSearch(query, runSearch);
 
-  /** Every sidebar destination, from the same table the sidebar renders — one list, never two. */
+  /** Every sidebar destination, from the table the sidebar renders. */
   const gotoVerbs = useMemo<Action[]>(
     () => (player ? PLAYER_SIDEBAR : GM_SIDEBAR)
       .flatMap((group) => group.items)
@@ -74,7 +57,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSessi
     const trimmed = query.trim();
     const hits = state.status === "ready" ? state.hits.slice(0, MAX_HITS) : [];
     const list: Action[] = hits.map((hit) => ({ kind: "hit" as const, hit }));
-    // Offer "new page" unless a page with exactly this title already came back — a page always matches its own title.
+    // Offer "new page" unless a page with exactly this title came back.
     if (trimmed && onCreatePage && !hits.some((hit) => hit.kind === "page" && hit.title.toLowerCase() === trimmed.toLowerCase())) {
       list.push({ kind: "create", label: `New page “${trimmed}”`, title: trimmed });
     }
@@ -82,9 +65,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSessi
       if (onCreatePage) {
         list.push(
           { kind: "create", label: "New page…", title: "" },
-          // D7: these two CREATE. The two below them do not, and are not labelled as though they do —
-          // a journal entry and a downtime record are both composed in a form, so their door is the
-          // surface that holds the form, and "Log …" is the honest name for going there.
+          // These two create; the "Log ..." rows below navigate to a form.
           ...(onCreateSession ? [{ kind: "verb" as const, label: "New session", run: onCreateSession }] : []),
           ...(onCreateQuest ? [{ kind: "verb" as const, label: "New quest", run: onCreateQuest }] : []),
           { kind: "verb", label: "Log a journal entry", run: () => onNavigate(pathForSection("journal")) },

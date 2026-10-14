@@ -6,20 +6,9 @@ import { NotebookTree, buildFolderTree } from "./NotebookTree";
 import type { CodexPageSummary } from "./api";
 
 /**
- * **The notebook folder row's actions — §4's touch floor, solved by removing UI rather than resizing it.**
- *
- * A folder row used to carry four bare icon buttons (new subfolder / new note / rename / delete), measured
- * 13–15px wide at a 375px viewport. Neither §4 route could rescue them: route 2 centres a 44px box on ~15px
- * of paint, a 14.5px overhang per side against ~8px of separation, so each button would steal its
- * neighbour's taps; route 1 needs 4 × 44 = 176px of actions inside a row measured at 223px on a ~343px rail.
- * The fix is that four controls do not belong on a tree row — they are one `Menu`, which carries the floor
- * itself.
- *
- * **What these tests can and cannot prove.** jsdom loads no stylesheet (see `test/setup.ts`), so the pixel
- * floor itself is a browser measurement, not something assertable here. What IS assertable — and what
- * actually keeps the fix from being undone — is the *structure* the floor rests on: one control on the row
- * instead of four, and every action living on a `role="menuitem"`, which is the element `.nh-menu-item`
- * gives `min-height: var(--tap-min)`. A future edit that re-adds a bare button to the row fails these.
+ * A folder row has one `Menu` trigger instead of four small icon buttons that couldn't meet the 44px tap
+ * floor. jsdom can't measure pixels, so this checks the structure: one control on the row, every action a
+ * `menuitem` (which carries the floor).
  */
 
 const PAGE = (id: string, title: string, folder: string | null): CodexPageSummary => ({
@@ -47,8 +36,7 @@ const handlers = () => ({
 const renderTree = (h: ReturnType<typeof handlers>) =>
   render(<NotebookTree node={buildFolderTree([PAGE("p1", "Strahd", "NPCs")], ["NPCs"])} {...h} />);
 
-/** The row's one action control, named for its folder. `Menu`'s trigger is a `<summary>`, whose implicit
-    role is not `button` in jsdom's mapping, so it is found by its accessible name rather than by role. */
+/** The row's action control. `Menu`'s trigger is a `<summary>` with no `button` role in jsdom, so find it by name. */
 const folderMenu = () => screen.getByLabelText("Actions for NPCs");
 
 describe("Notebook folder row — one action control, not four (§4)", () => {
@@ -56,16 +44,14 @@ describe("Notebook folder row — one action control, not four (§4)", () => {
     const user = userEvent.setup();
     renderTree(handlers());
 
-    // The ROW itself carries exactly two controls: the folder name (expand/collapse) and the ⋯ trigger.
-    // Anything inside the popover is not on the row — that is the entire point of the change.
+    // The row carries exactly two controls: the folder name and the ⋯ trigger.
     const row = folderMenu().closest(".codex-tree-folder-row") as HTMLElement;
     const onRow = [...row.querySelectorAll("button, summary")].filter((el) => !el.closest(".nh-menu-popover"));
     expect(onRow).toHaveLength(2);
 
     await user.click(folderMenu());
     const items = within(row).getAllByRole("menuitem").map((item) => item.textContent);
-    // Intake Mobile #5 added "Move to top level": a folder could only be moved by DRAGGING it, which
-    // is unreachable with a thumb. The menu is still one control, which is what this test guards.
+    // "Move to top level" is the touch-friendly way to move a folder; still one control on the row.
     expect(items).toEqual(["New subfolder", "New page here", "Rename folder", "Move to top level", "Delete folder"]);
   });
 
@@ -73,8 +59,7 @@ describe("Notebook folder row — one action control, not four (§4)", () => {
     const user = userEvent.setup();
     const { container } = renderTree(handlers());
 
-    // The four sub-floor buttons are gone by class as well as by count: the CSS rule that styled them at
-    // 13–15px went with them, so a re-introduction cannot quietly inherit it.
+    // The removed button class must not come back either.
     expect(container.querySelectorAll(".codex-tree-folder-btn")).toHaveLength(0);
 
     await user.click(folderMenu());

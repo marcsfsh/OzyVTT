@@ -9,65 +9,34 @@ import { DashCard } from "./DashCard";
 import type { CodexChronicleKind, CodexQuestStatus } from "./api";
 
 /**
- * D18 — Home: the Codex's mission control, on **one card chassis**.
- *
- * Every card is a `DashCard`: a heading, a bounded body, an honest empty state, and a way to the full
- * section. Before the recut each section wrote those four things itself, which is how the standing card
- * ended up unbounded while its neighbours sliced to five, and how "Next session" ended up heading a
- * session the group had already played.
- *
- * **Presentational and role-blind, unchanged.** Both audiences render this component, so it never
- * fetches and its prop types cannot carry a GM body, a prep body or (for the shared card types) a reveal
- * flag. The GM-only cards arrive through capability props the player caller simply does not pass — the
- * same mechanism `onAdjustStanding` has always used, extended to Downtime pending.
+ * Home: every card is a `DashCard` (heading, bounded body, empty state, link to the full section).
+ * Presentational and role-blind: both audiences render it, so it never fetches and its prop types cannot
+ * carry GM bodies. GM-only cards arrive through capability props the player caller doesn't pass.
  */
 
-/** The minimum an entity needs to appear here — satisfied by both the GM and player page summaries. */
+/** Satisfied by both the GM and player page summaries. */
 type CampaignEntity = Readonly<{ id: string; title: string; entityType: EntityType; tags: readonly string[]; updatedAt: string; revealedToPlayers?: boolean }>;
-/**
- * One journal row, in the shape BOTH projections can supply: a GM entry carries `playerText`/`gmText`
- * and a player entry carries a single already-projected `text`, so the caller flattens to this rather
- * than the dashboard branching on a role it should not know about.
- *
- * `revealed` is the GM-only capability field, optional and never passed by the player caller.
- */
+/** One journal row, flattened by the caller from either projection. `revealed` is GM-only and optional. */
 export type CampaignEntry = Readonly<{ id: string; summary: string; when: string; kind: CodexChronicleKind; revealed?: boolean }>;
-/** One atlas row. `revealedToPlayers` is GM-only knowledge and is simply absent from a player's maps. */
+/** `revealedToPlayers` is GM-only and absent from a player's maps. */
 export type CampaignMap = Readonly<{ id: string; name: string; revealedToPlayers?: boolean }>;
 /**
- * The session card, in the shape BOTH projections can supply.
- *
- * **There is deliberately no `prep` field, not even an optional one.** `prepBody` is the single most
- * secret thing on a session record and has no player-facing form; a shared type that could carry it
- * would put the GM's plan one careless `{...session}` away from a component that both audiences render.
- *
- * `heading` is D18's fix for the lie: the caller computes it (`nextSessionCard`) because only the caller
- * knows whether its own token was sent an active-session pointer. "Next session" / "This session" /
- * "Last session" — never "Next" about a game already played.
+ * No `prep` field, deliberately: a shared type that could carry `prepBody` would put the GM's plan one
+ * spread away from a component players render. The caller computes `heading` ("Next", "This" or "Last session").
  */
 export type CampaignSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string; heading?: string; revealed?: boolean }>;
-/**
- * The quest card's shape — a strict subset of the player projection, which is itself a strict subset of
- * the GM row. **No `gmBody` field and no `body` either**: the type not having them is the guarantee.
- */
+/** No `gmBody` or `body`: the type not having them is the guarantee. */
 export type CampaignQuest = Readonly<{ id: string; title: string; status: CodexQuestStatus; objectives: readonly ChecklistItem[]; revealed?: boolean }>;
-/** The deadlines card. **No `gmText` field**, for the reason `CampaignQuest` has no `gmBody`. */
+/** No `gmText`, for the same reason. */
 export type CampaignDeadline = Readonly<{ id: string; summary: string; when: string; fired: boolean; revealed?: boolean }>;
-/**
- * D12 — the downtime-pending card. **GM-only by construction**: `applied` is on the GM payload and has
- * no field on the player's, so a player caller cannot produce this list at all, and the card simply
- * never renders for them.
- */
+/** GM-only by construction: `applied` isn't on the player payload, so a player caller can't build this list. */
 export type CampaignDowntime = Readonly<{ id: string; who: string; activity: string; days: number; when: string; revealed?: boolean }>;
-/**
- * D15 — the party-location card. `null` covers both "no party pin" and, for a player, "the party pin is
- * hidden from you"; the server makes those deliberately indistinguishable, and so does this card.
- */
+/** `null` covers both "no party pin" and, for a player, "hidden from you". */
 export type CampaignParty = Readonly<{ label: string | null; mapId: string; mapName: string; markerId: string; revealed?: boolean }>;
-/** Where the party stands with one faction. **No `revealedToPlayers`** on the shared shape. */
+/** No `revealedToPlayers` on the shared shape. */
 export type CampaignStanding = Readonly<{ factionPageId: string; name: string; value: number; revealed?: boolean }>;
 
-/** The full sections a "See all" can reach. Names, never paths — the caller owns the addresses. */
+/** Section names for "See all"; the caller owns the addresses. */
 export type CampaignSeeAll = "pages" | "quests" | "journal" | "deadlines" | "downtime" | "sessions" | "atlas" | "recent";
 
 export function CampaignHome({
@@ -85,9 +54,9 @@ export function CampaignHome({
   quests?: readonly CampaignQuest[];
   deadlines?: readonly CampaignDeadline[];
   standing?: readonly CampaignStanding[];
-  /** D12, GM-only: the downtime the GM has not confirmed yet. */
+  /** GM-only: downtime not yet confirmed. */
   downtimePending?: readonly CampaignDowntime[];
-  /** D15: where the party pin is, or null. */
+  /** Where the party pin is, or null. */
   party?: CampaignParty | null;
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
@@ -99,7 +68,6 @@ export function CampaignHome({
   onAdjustStanding?: (factionPageId: string) => void;
   onOpenDowntime?: () => void;
   onOpenParty?: (mapId: string, markerId: string) => void;
-  /** D18: every bounded card has a way to its full section. */
   onSeeAll?: (section: CampaignSeeAll) => void;
   onCreate?: () => void;
   showReveal?: boolean;
@@ -122,11 +90,7 @@ export function CampaignHome({
   const openQuestList = useMemo(() => openQuests(quests).slice(0, 5), [quests]);
   const deadlineList = useMemo(() => deadlines.slice(0, 5), [deadlines]);
   const downtimeList = useMemo(() => downtimePending.slice(0, 5), [downtimePending]);
-  /**
-   * D18 / G13 — the standing card is now **bounded** like every other card: strongest feeling first,
-   * five rows, and "See all N factions" opens the rest in place. In place, and never a navigation:
-   * Home is still standing's only adjust surface, so sending the GM elsewhere would orphan the control.
-   */
+  /** Bounded to five rows, strongest first; "See all" expands in place because Adjust only exists here. */
   const standingSorted = useMemo(
     () => [...standing].sort((a, b) => Math.abs(b.value) - Math.abs(a.value) || a.name.localeCompare(b.name)),
     [standing]
@@ -171,10 +135,7 @@ export function CampaignHome({
                 ? <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenSession(session.id)}>
                     <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
                     <span className="codex-list-title">{sessionTitle(session)}</span>
-                    {/* D18: every dashboard row that names a RECORD states its reveal state. Six of the
-                        nine did; the session, the party pin and downtime did not, so the GM could not
-                        tell from Home whether tonight's recap was already published. The capability-flag
-                        pattern the other rows use: a player caller simply omits the field. */}
+                    {/* Every row naming a record states its reveal state; player callers omit the field. */}
                     {showReveal && session.revealed !== undefined && <VisibilityBadge revealed={session.revealed} />}
                     {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
                   </button>
@@ -189,23 +150,17 @@ export function CampaignHome({
           </DashCard>
         )}
 
-        {/* 2. D15 — where the party is. Renders only when a pin exists AND the reader may see it. */}
+        {/* 2. Where the party is: only when a pin exists and the reader may see it. */}
         {party && (
           <DashCard title="Party location" iconId="pin">
             <p className="codex-campaign-partyline">The party is at <strong>{party.label?.trim() || "an unlabelled pin"}</strong> on <strong>{party.mapName}</strong>.</p>
-            {/* The PIN's own state. The map gates it as well, which is why this says nothing about the
-                map — "Show the pin" opens the Atlas, where both switches live together. */}
+            {/* The pin's own state; the map's switch lives in the Atlas with it. */}
             {showReveal && party.revealed !== undefined && <p className="codex-campaign-partyreveal"><VisibilityBadge revealed={party.revealed} /></p>}
             {onOpenParty && <Button variant="secondary" size="sm" onClick={() => onOpenParty(party.mapId, party.markerId)}>Show the pin</Button>}
           </DashCard>
         )}
         {!party && showReveal && (
-          /* RULING 55 — the door goes where the action IS, which is why this one is honest. The line
-             already named the next step ("place a pin from a map's pin inspector") and left the
-             reader to find it; pins are placed in the Atlas, and `onSeeAll("atlas")` is the same
-             destination the Atlas card 150 lines down already offers. Making the instruction
-             clickable is not inventing a door — it is the difference between telling someone where
-             to go and taking them. */
+          /* The empty state links to the Atlas, where pins are placed. */
           <DashCard title="Party location" iconId="pin"
             empty="No party pin yet. Drop one from a map's pin inspector and the party shows up here."
             seeAll={onSeeAll ? { label: "Open the Atlas", onClick: () => onSeeAll("atlas") } : undefined} />
@@ -234,7 +189,7 @@ export function CampaignHome({
                           <span className="codex-list-title">{quest.title}</span>
                           {progress.total > 0 && <span className="codex-campaign-questprogress">{progress.label}</span>}
                         </div>}
-                    {/* READ-ONLY for BOTH audiences: `onChange` omitted renders no checkbox at all. */}
+                    {/* Read-only for both audiences: no `onChange`, no checkbox. */}
                     {quest.objectives.length > 0 && <Checklist items={quest.objectives} ariaLabel={`Objectives for ${quest.title}`} className="codex-campaign-questlist" />}
                   </div>
                 );
@@ -243,7 +198,7 @@ export function CampaignHome({
           ) : null}
         </DashCard>
 
-        {/* 4. Deadlines — passed ones KEPT, because the clock passing one is exactly when it matters. */}
+        {/* 4. Deadlines, passed ones kept. */}
         <DashCard title="Deadlines" iconId={CHRONICLE_KIND_META.deadline.iconId}
           count={{ shown: deadlineList.length, total: deadlines.length }}
           seeAll={onSeeAll ? { label: "See all deadlines", onClick: () => onSeeAll("deadlines") } : undefined}
@@ -263,7 +218,7 @@ export function CampaignHome({
           ) : null}
         </DashCard>
 
-        {/* 5. D12 — downtime waiting on the GM's confirmation. GM-only by construction. */}
+        {/* 5. Downtime awaiting confirmation (GM-only). */}
         {onOpenDowntime && (
           <DashCard title="Downtime pending" iconId="campfire"
             count={{ shown: downtimeList.length, total: downtimePending.length }}
@@ -307,7 +262,7 @@ export function CampaignHome({
           ) : null}
         </DashCard>
 
-        {/* 7. Faction standing — bounded, with the rest expanding IN PLACE (Adjust lives only here). */}
+        {/* 7. Faction standing, expanding in place (Adjust lives only here). */}
         {standingSorted.length > 0 && (
           <DashCard title="Faction standing" iconId={CHRONICLE_KIND_META.standing.iconId}
             count={{ shown: standingList.length, total: standingSorted.length }}
@@ -325,13 +280,10 @@ export function CampaignHome({
                     <Badge tone={standingTone(faction.value)}>{standingLabel(faction.value)}</Badge>
                     <span className="codex-campaign-standingvalue">{standingValueLabel(faction.value)}</span>
                     {showReveal && faction.revealed !== undefined && <VisibilityBadge revealed={faction.revealed} />}
-                    {/* §4 route 1: `Button` at DEFAULT size grows its own paint to 44px and has no
-                        `::after`, which matters because this row wraps at a narrow viewport and a
-                        route-2 overhang would land on the next faction's control. */}
+                    {/* Default-size Button (no ::after): this row wraps and an overhang would hit the next faction's control. */}
                     {onAdjustStanding && <Button variant="ghost" onClick={() => onAdjustStanding(faction.factionPageId)}>Adjust</Button>}
                   </div>
-                  {/* Decoration twice over: the word and the signed number already carry the meaning, and
-                      the bar's own `progressbar` value would announce the MAPPED pair ("140 of 200"). */}
+                  {/* Hidden from AT: the word and signed number carry the meaning, and the bar would announce shifted values. */}
                   <div className="codex-campaign-standingmeter" aria-hidden="true">
                     <Meter value={standingMeterValue(faction.value)} max={STANDING_METER_MAX} tone={standingMeterTone(faction.value)} />
                   </div>
@@ -392,16 +344,7 @@ export function CampaignHome({
           ) : null}
         </DashCard>
 
-        {/* 11. Tags. RULING 55 — "Nothing tagged yet." was the retired family exactly: an absence
-             reported and nothing offered. Tags are typed into a page's own Tags field while you edit
-             it (`PageEditor.tsx`'s `TagInput`), so the next step is a page, and `onSeeAll("recent")`
-             is the door the Recent card already uses for the same destination.
-
-             THE DOOR IS ON THE EMPTY STATE ONLY, and that is the chassis's rule rather than an
-             exception to it: `tags` is unbounded (no `.slice`), so a populated card IS the full list
-             and `DashCard`'s own contract says `seeAll` is "omitted when this card IS the full
-             list". An empty card is not the full list of anything — it is a dead end, which is the
-             one thing ruling 55 exists to stop. */}
+        {/* 11. Tags. The empty state links to pages, where tags are added; a populated card is already the full list. */}
         <DashCard title="Tags" iconId="flag"
           empty="No tags yet. Tags are added on a page while you write it, and every one you use collects here."
           seeAll={tags.length === 0 && onSeeAll ? { label: "See all pages", onClick: () => onSeeAll("recent") } : undefined}>
@@ -416,12 +359,7 @@ export function CampaignHome({
   );
 }
 
-/**
- * The standing card's in-place bound (D18 / G13). Five rows by default; "See all N factions" expands
- * here rather than navigating, because Home is the ONLY surface that adjusts standing and sending the
- * GM elsewhere would orphan the Adjust control. Clamped to the live total so a campaign that loses
- * factions cannot keep a stale expanded limit.
- */
+/** Five rows by default, expanded in place. Clamped to the live total so a stale expanded limit can't persist. */
 function useStandingLimit(total: number): [number, (next: number) => void] {
   const [limit, setLimit] = useState(5);
   return [Math.min(limit, Math.max(total, 5)), setLimit];

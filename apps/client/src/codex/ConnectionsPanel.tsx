@@ -6,24 +6,10 @@ import { CONNECTION_LABEL_SUGGESTIONS } from "./entities";
 import { newId } from "../lib/ids";
 
 /**
- * D8 — **one connection system**, one panel.
- *
- * Typed relationships and `[[wiki-links]]` used to be two features with two panels, two feeds and two
- * edge styles in the Graph. They are now one concept with an `origin` attribute: a connection the GM
- * declared and a connection derived from body text differ by where they came from, not by what they are.
- *
- * Three things this panel has to say out loud, because the server's model says them:
- *
- *  1. **A mention has no id** (`id === null`). It is derived from text, so it cannot be relabelled or
- *     deleted here — it is edited by editing the text that produced it, and the row says so instead of
- *     offering a delete button that would 404.
- *  2. **The label is free text**, not a slug from a fixed vocabulary. Migration v22 rewrote the twelve
- *     legacy slugs into the words a reader sees, so the stored value IS the label. There is therefore no
- *     translation table and — the accepted loss — **no inverse wording**: a free-text label cannot be
- *     inverted generically, so a row reads by its ARROW ("Barovia → rules → Strahd" one way, and the
- *     same edge read from Strahd's page as "Barovia → rules → Strahd" with the arrow pointing in).
- *  3. **The other end can be a session, quest or journal entry** (D13). Bodies join the graph, so a page
- *     can honestly answer "where else does this appear?" with "in Session 4's prep".
+ * One connection system, one panel. A declared connection and a `[[mention]]` differ only by `origin`.
+ * A mention has no id, so it can't be relabelled or deleted here; it is edited through its source text.
+ * Labels are free text with no inverse wording, so rows read by their arrow. The other end can be a page,
+ * session, quest or journal entry.
  */
 
 type AnyConnection = CodexPageConnection | PlayerCodexPageConnection;
@@ -37,23 +23,16 @@ const OTHER_KIND_LABEL: Readonly<Record<AnyConnection["otherKind"], string>> = {
 
 export type ConnectionsPanelProps = Readonly<{
   connections: readonly AnyConnection[];
-  /** Open the other end. The caller owns the addresses, so this panel knows no routes. */
+  /** Open the other end. The caller owns the addresses. */
   onOpen: (kind: AnyConnection["otherKind"], id: string) => void;
-  /**
-   * The GM's write half. Absent makes the panel read-only — the capability-flag pattern this codebase
-   * uses everywhere instead of a role check, so the player's page view renders the very same component.
-   */
+  /** The GM's write half. Absent makes the panel read-only, so players render the same component. */
   write?: Readonly<{
     gmToken: string;
     pageId: string;
     pages: readonly CodexPageSummary[];
     onChanged: () => void;
   }>;
-  /**
-   * `false` drops the panel's own heading and landmark, for the page editor — which wraps this together
-   * with "On the atlas" and "In the journal" under ONE "Connections" region, because they are one
-   * question ("where else does this appear?") and three headings would be three features again.
-   */
+  /** `false` drops the heading and landmark, for the page editor's combined Connections region. */
   standalone?: boolean;
 }>;
 
@@ -74,7 +53,7 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
       .map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} />, meta: undefined })),
     [write?.pages, write?.pageId]
   );
-  /** The twelve humanized legacy labels plus everything already in use — suggestions, never a vocabulary. */
+  /** Suggestions plus labels already in use; never a closed vocabulary. */
   const labelSuggestions = useMemo(() => {
     const used = new Set<string>(CONNECTION_LABEL_SUGGESTIONS);
     for (const row of connections) if (row.label) used.add(row.label);
@@ -113,8 +92,7 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
   };
 
   return (
-    /* A named region when it stands alone, so "where else does this appear?" is a landmark a reader can
-       jump to rather than a heading buried in a rail. */
+    /* A named region when standalone, so it is a landmark. */
     <Wrapper className="codex-connections-panel" {...(standalone ? { "aria-labelledby": "codex-connections-h" } : {})}>
       {standalone && <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>}
       {connections.length === 0 && <p className="codex-page-timeline-empty">Nothing is connected to this page yet.</p>}
@@ -136,11 +114,7 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                 </button>
                 {row.label && <Badge tone="info" className="codex-conn-label">{row.label}</Badge>}
                 {row.otherKind !== "page" && <span className="codex-conn-kind">{OTHER_KIND_LABEL[row.otherKind]}</span>}
-                {/* A mention has no row to delete, so it explains itself rather than offering a control
-                    that would 404: it is edited by editing the text that produced it. */}
-                {/* The reason this row has no Label or Remove, said in VISIBLE words. It used to be a
-                    native `title` tooltip, which a touch device never shows at all — so on the surface
-                    where the question is most likely to be asked, the answer did not exist. */}
+                {/* Why a mention has no Label or Remove, in visible words (touch devices never show `title`). */}
                 {row.origin === "mention" && (
                   <Badge className="codex-conn-origin">Mentioned{row.section ? ` · ${row.section}` : ""}</Badge>
                 )}
@@ -151,9 +125,6 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                     <Button variant="ghost" size="sm" onClick={() => void remove(declaredId)}>Remove</Button>
                   </span>
                 )}
-                {/* Design-language §5: a control that is absent owes the reader a reason, in words on the
-                    row. A mention has no row of its own to edit — it is written by the text and unwritten
-                    the same way — so this is where that is said. */}
                 {write && !declaredId && row.origin === "mention" && (
                   <span className="codex-conn-why">Written as a [[link]] in the text. Edit the text to change it.</span>
                 )}
@@ -179,8 +150,7 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
           <Combobox options={options} value={target} onChange={setTarget} ariaLabel="Connect to page" placeholder="Search pages" />
           <Input aria-label="Label (optional)" placeholder="ally of, located in" value={label} maxLength={CONNECTION_LABEL_MAX}
             list="codex-conn-labels" onChange={(event) => setLabel(event.target.value)} />
-          {/* Layer is the D13 semantics made visible: a GM-layer connection never travels to a player,
-              so it carries the violet mark that means exactly that everywhere else in the suite. */}
+          {/* A GM-layer connection never reaches players, so it carries the violet mark. */}
           <label className="codex-conn-gmswitch">
             <Switch checked={gmLayer} onChange={setGmLayer} label="GM only" aria-label="Keep this connection GM-only" />
             <GmOnlyTag />

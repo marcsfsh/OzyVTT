@@ -12,8 +12,7 @@ const forPage = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
-// CI-7 gave the Campaign mode three feeds of its own; they are stubbed here so entering the mode does
-// not reach a real `fetch`, but this file is still about navigation, not about what the dashboard says.
+// The dashboard's feeds are stubbed so entering Home doesn't reach `fetch`.
 const timeline = vi.fn();
 const listMaps = vi.fn();
 const getCalendar = vi.fn();
@@ -42,14 +41,7 @@ import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import type { CodexPage, CodexPageSummary } from "./api";
 
-/**
- * CF-5 coverage area 3 of 3: **cross-mode navigation**.
- *
- * The assessment's third root cause is that the suite is "a shell but not a system" — a star into Pages
- * with no return edges. M7 will add those edges, so these tests pin the shell's *current* contract:
- * which mode is active, that a Campaign type card sets the filter AND lands on Pages, and that a filter is
- * cleared rather than left stale. Without this, M7's navigation work has nothing to regress against.
- */
+/** Cross-section navigation: which section is active, a type card sets the filter and lands on Pages, and filters clear. */
 const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"], tags: string[] = []): CodexPageSummary => ({
   id, title, entityType, fields: {}, folder: null, tags, revealedToPlayers: false,
   bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
@@ -57,8 +49,7 @@ const summary = (id: string, title: string, entityType: CodexPageSummary["entity
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
-/** The app mounts inside a ToastProvider (`main.tsx:411`); `CodexShell` uses `useToast`, so a bare
-    render would throw. Rendering it the way the app does is the point of an integration-shaped test. */
+/** `CodexShell` uses `useToast`, so render it inside a ToastProvider as the app does. */
 const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 
 describe("Codex shell — cross-mode navigation", () => {
@@ -94,15 +85,13 @@ describe("Codex shell — cross-mode navigation", () => {
   });
 
   it("Campaign → Pages prepares its destination: picking a type filters the notebook AND lands on Pages", async () => {
-    // This handoff is the one the design calls the best transition in the suite; M7 makes every other
-    // jump match it, so its current behaviour is worth pinning.
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Home" }));
     await user.click(await screen.findByText(/character/i));
     expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
-    // The filter chip is visible and names the type, and the non-matching page is filtered out.
+    // The filter names the type, and the non-matching page is filtered out.
     expect(await screen.findByText(/Characters/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Barovia")).not.toBeInTheDocument());
     expect(screen.getByText("Strahd")).toBeInTheDocument();

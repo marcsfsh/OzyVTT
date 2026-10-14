@@ -51,17 +51,6 @@ import { navigate, registerNavigationGuard } from "../router";
 import { CodexShell } from "./CodexShell";
 import { GM_SIDEBAR } from "./routes";
 
-/**
- * D1 + D3 — the recut's central claim, tested end to end: **every surface is a sidebar destination with
- * a real address**, and the two agree.
- *
- * What this replaces was untestable by construction. The old shell had five mode tabs plus four
- * "destination" overlays that no tab listed and no URL named — the Calendar, the reveal audit, the
- * backup panel and the settings panel were reachable only by having pressed the right button on the
- * right mode. You could not deep-link to them, you could not bookmark them, and the tab bar lit
- * "Campaign" while you were looking at something else. The three tests below could not have been
- * written against it: there was no address to type, no back stack to walk, and no honest active state.
- */
 
 const PAGE = {
   id: "p1", title: "Strahd", entityType: "character" as const, fields: {}, folder: null, tags: ["villain"],
@@ -93,7 +82,7 @@ beforeEach(() => {
   getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", gmBody: "", gmFields: {} }, connections: [] });
 });
 
-/** Every sidebar item that navigates, as `[label, address]`. Read from the table the sidebar renders. */
+/** Every navigating sidebar item as `[label, address]`, from the table the sidebar renders. */
 const DESTINATIONS = GM_SIDEBAR.flatMap((group) => group.items)
   .filter((item): item is typeof item & { path: string } => Boolean(item.path))
   .map((item) => [item.label, item.path] as const);
@@ -108,8 +97,7 @@ describe("Every sidebar destination is reachable, and says so (D1/D3)", () => {
     await user.click(sidebar.getByRole("button", { name: label }));
 
     await waitFor(() => expect(window.location.pathname).toBe(path));
-    // "Exactly one" is the assertion that matters. The old tab bar lit Campaign over four different
-    // surfaces; a nav that lights two things, or nothing, is lying either way.
+    // Exactly one lit item: two, or none, is wrong either way.
     const lit = sidebar.getAllByRole("button").filter((button) => button.getAttribute("aria-current") === "page");
     expect(lit).toHaveLength(1);
     expect(lit[0]).toHaveAccessibleName(label);
@@ -141,7 +129,7 @@ describe("Every sidebar destination is reachable, and says so (D1/D3)", () => {
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     const preview = sidebar().getByRole("button", { name: "Preview as player" });
-    // No `aria-current` is possible for it, ever: it has no path, so it can never be "the page you are on".
+    // It has no path, so it can never be the current page.
     expect(preview).not.toHaveAttribute("aria-current");
   });
 });
@@ -160,8 +148,7 @@ describe("Deep links (D3)", () => {
   });
 
   it("shows the not-found view for a codex address that does not exist", async () => {
-    // Invariant §1: an unknown address and a GM-only address must be indistinguishable to a player, which
-    // is only possible if "unknown" has a real view of its own rather than falling back to Home.
+    // Unknown addresses need a real view so a player can't tell them from GM-only ones.
     renderShell("/codex/notebook");
     expect(await screen.findByRole("heading", { name: /Nothing lives at this address/i })).toBeInTheDocument();
     const sidebar = within(screen.getByRole("navigation", { name: "Codex sections" }));
@@ -200,11 +187,7 @@ describe("The browser's own buttons (D3)", () => {
 });
 
 describe("The phone nav drawer (D1, mobile parity)", () => {
-  /**
-   * ≤760px the sidebar is a Drawer. jsdom loads no stylesheet, so BOTH the aside and the drawer are in
-   * the tree here — the drawer carries `inert` and `aria-hidden` while closed, which is what keeps the
-   * accessibility tree honest and is why these queries can tell them apart at all.
-   */
+  /** jsdom loads no CSS, so aside and drawer are both in the tree; the closed drawer is `inert`/`aria-hidden`. */
   const drawerNav = () => screen.getAllByRole("navigation", { name: "Codex sections" });
 
   it("opens from the top bar and closes on choosing a destination", async () => {
@@ -216,28 +199,15 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await user.click(screen.getByRole("button", { name: "Codex sections" }));
     await waitFor(() => expect(drawerNav()).toHaveLength(2));
 
-    // Choosing from the drawer navigates AND closes it — a drawer left open over the destination is the
-    // single most common phone-nav bug, and it is invisible on a desktop viewport.
+    // Choosing from the drawer navigates and closes it.
     await user.click(within(drawerNav()[1]).getByRole("button", { name: "Atlas" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/atlas"));
     await waitFor(() => expect(drawerNav()).toHaveLength(1));
   });
 
   /**
-   * FOUND IN CHROMIUM, and **these two tests do not reproduce it** — stated plainly because a test whose
-   * comment claims a guard it does not provide is worse than no test.
-   *
-   * The bug: choosing a destination from the drawer ran `closeDrawer()` (→ `history.back()`) and then
-   * `navigate()`. In a real browser `back()` is a task while `navigate` pushes on a microtask, so the
-   * order was always push-then-go-back-off it, and **every tap in the phone nav drawer navigated
-   * nowhere**. On a laptop no transient entry is registered, `popTransient` is a no-op, and the same
-   * code path is correct — which is how it survived to a browser pass.
-   *
-   * jsdom sequences `history.back()` differently, so both of these passed against the broken code (I
-   * checked, by reverting the fix and re-running). They are kept anyway: they pin the BEHAVIOUR the fix
-   * establishes, so a future refactor that reintroduces a `closeDrawer()`-then-navigate shape has
-   * something to answer to on the "back is one press" half. The race itself is browser-only, and
-   * `scripts/browser-verify.mjs` is what actually catches it.
+   * The browser-only race (closing the drawer via `history.back()` undoing the navigation) doesn't
+   * reproduce in jsdom; `scripts/browser-verify.mjs` catches it. These pin the resulting behaviour.
    */
   it("navigating from the drawer lands on the destination", async () => {
     const user = userEvent.setup();
@@ -248,19 +218,14 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await waitFor(() => expect(drawerNav()).toHaveLength(2));
     await user.click(within(drawerNav()[1]).getByRole("button", { name: "Quests" }));
 
-    // The whole point: the address moved, and stayed moved.
     await waitFor(() => expect(window.location.pathname).toBe("/codex/quests"));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(window.location.pathname).toBe("/codex/quests");
   });
 
   /**
-   * The assertion here is the history DEPTH, not the pathname after one back().
-   *
-   * `pushTransient` pushes at the same href, so the stranded entry and the entry before it have the
-   * same pathname — one back() lands on "/codex" whether the destination replaced the transient or was
-   * pushed on top of it, and the obvious version of this test passed either way. Counting entries is
-   * the only thing that can tell the two apart.
+   * Counts history entries: `pushTransient` reuses the same href, so checking the pathname after one
+   * back() can't tell a replace from a push.
    */
   it("replaces the drawer's own history entry, so back from the destination is one press", async () => {
     const user = userEvent.setup();
@@ -273,19 +238,13 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await user.click(within(drawerNav()[1]).getByRole("button", { name: "Journal" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
 
-    // Exactly ONE new entry for one tap: the drawer's own entry was overwritten by the destination.
-    // Two would mean the GM has to press back twice to undo a single tap.
+    // One new entry per tap; two would mean pressing Back twice.
     expect(window.history.length).toBe(depth + 1);
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/codex"));
   });
 
-  /**
-   * D6 meets the drawer. `goto` releases the drawer's history entry *before* the guard has answered,
-   * because it expects the destination to overwrite it. When the GM answers "stay", nothing overwrites
-   * it — and the released entry sits on the stack with nothing registered to absorb its pop, so the next
-   * Back press is spent closing a drawer that is already closed and appears to do nothing.
-   */
+  /** When the guard refuses, the released drawer entry must not swallow the next Back. */
   it("does not swallow the next Back when the guard refuses a destination chosen from the drawer", async () => {
     const user = userEvent.setup();
     renderShell("/codex");
@@ -298,13 +257,12 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await waitFor(() => expect(drawerNav()).toHaveLength(2));
     await user.click(within(drawerNav()[1]).getByRole("button", { name: "Journal" }));
 
-    // Vetoed: the drawer closed and the GM stayed put.
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(window.location.pathname).toBe("/codex/quests");
     await waitFor(() => expect(drawerNav()).toHaveLength(1));
     release();   // the GM saves, so the guard goes away
 
-    // ONE press must now leave the section. If the drawer's entry is still on the stack it is spent here.
+    // One press must now leave the section.
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/codex"));
   });
@@ -319,7 +277,6 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
 
     window.history.back();
     await waitFor(() => expect(drawerNav()).toHaveLength(1));
-    // The address is untouched: back closed the drawer, it did not navigate.
     expect(window.location.pathname).toBe("/codex/quests");
   });
 
@@ -333,8 +290,7 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(drawerNav()).toHaveLength(1));
 
-    // If the transient entry were left behind, this back would be swallowed closing an already-closed
-    // drawer, and the GM would have to press back twice to leave Quests.
+    // A leftover transient entry would swallow this Back.
     window.history.back();
     await waitFor(() => expect(window.location.pathname).not.toBe("/codex/quests"));
   });

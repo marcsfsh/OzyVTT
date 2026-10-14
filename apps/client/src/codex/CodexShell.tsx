@@ -40,15 +40,9 @@ import { campaignFeedProps } from "./dashboard";
 import "./codex.css";
 
 /**
- * The GM Codex, D1's single sidebar over D3's real addresses.
- *
- * This is the navigation half of the old `CodexWorkspace` recut: the 5-mode tab bar, the 9-button ops
- * row and the four hidden "destination" overlays are gone, and every surface is an address the sidebar
- * lists. The FEED half is unchanged and deliberately so — one owner per feed, handed down, which is what
- * keeps two surfaces from disagreeing about which sessions exist or which one is active.
- *
- * `codex:changed` handling stays a coarse refetch; this client never reads the ping's payload (D22 made
- * it content-free, and every listener here was already payload-blind).
+ * The GM Codex: one sidebar over real addresses. Each feed has one owner here and is handed down, so two
+ * surfaces never disagree about, say, which session is active. `codex:changed` triggers a coarse refetch;
+ * the ping carries no payload.
  */
 
 const CONSOLE_KEY = "codex-session-console";
@@ -56,11 +50,7 @@ const SIDEBAR_KEY = "codex-sidebar";
 const DRAWER_TRANSIENT = "codex-nav";
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
-/**
- * `archived` and `kind` are optional because the Atlas half of this prop never needed them and a caller
- * with no table state is legitimate — but the two character pickers (`5a`, `5e.3`) read them, and
- * `codex/characters.ts` explains why they cannot come from a Codex page instead.
- */
+/** `archived` and `kind` are optional; the character pickers read them (see `characters.ts`). */
 type WorkspaceActor = Readonly<{ id: string; name: string; archived?: boolean; kind?: string }>;
 
 export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {}, onOpenReplay }: Readonly<{
@@ -77,29 +67,25 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [quickCreate, setQuickCreate] = useState<QuickCreateRequest | null>(null);
-  // "What do players actually see?" — mounts the REAL player Codex against a short-lived PLAYER token
-  // minted by the server, so the preview walks the same projection a player does. Never the GM token.
+  // "What do players see?": mounts the real player Codex on a short-lived player token minted by the
+  // server, so the preview walks the player projection. Never the GM token.
   const [previewToken, setPreviewToken] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [adjustingFactionId, setAdjustingFactionId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // ----- The sidebar's own state (C2's ladder: expanded / rail / drawer) -----
+  // ----- Sidebar state: expanded / rail / drawer -----
   const [sidebarMode, setSidebarMode] = useState<"open" | "rail">(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === "rail" ? "rail" : "open"; } catch { return "open"; }
   });
   useEffect(() => { try { localStorage.setItem(SIDEBAR_KEY, sidebarMode); } catch { /* private mode - fine */ } }, [sidebarMode]);
-  /**
-   * 761-849px is a 56px grid track whatever the GM prefers, so the rail is forced there rather than
-   * chosen. The PREFERENCE is untouched by the band — leaving the band restores whatever they picked.
-   */
+  /** 761-849px forces the rail (a 56px track). The stored preference is untouched and returns outside the band. */
   const railBand = useSidebarRailBand();
   const collapsed = railBand || sidebarMode === "rail";
   const [drawerOpen, setDrawerOpen] = useState(false);
   const openDrawer = useCallback(() => {
     setDrawerOpen(true);
-    // The Android back gesture closes the drawer instead of leaving the section — the single worst phone
-    // back-trap this shell would otherwise have.
+    // The Android back gesture closes the drawer instead of leaving the section.
     pushTransient(DRAWER_TRANSIENT, () => setDrawerOpen(false));
   }, []);
   const closeDrawer = useCallback(() => { setDrawerOpen(false); popTransient(DRAWER_TRANSIENT); }, []);
@@ -109,10 +95,10 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   });
   useEffect(() => { try { localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed"); } catch { /* private mode - fine */ } }, [consoleOpen]);
 
-  // ----- Feeds. One owner each, exactly as before the recut. -----
+  // ----- Feeds, one owner each -----
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
-  /** D8: ONE edge list for the whole graph, replacing the typed-relationship and wiki-link feeds. */
+  /** One edge list for the whole graph. */
   const [connections, setConnections] = useState<CodexConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,10 +139,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   }, [gmToken]);
   useEffect(() => { void loadQuests(); }, [loadQuests]);
 
-  /**
-   * D6: the autosave preference, read once by the shell and handed to every editor. A per-editor read
-   * would let two open editors run on two different cadences after the GM changed it.
-   */
+  /** The autosave preference, read once here and handed to every editor so they share one cadence. */
   const [settings, setSettings] = useState<CodexSettings | null>(null);
   const loadSettings = useCallback(async () => {
     try { setSettings(await codexApi.getSettings(gmToken)); } catch { /* the editors fall back to the default cadence */ }
@@ -165,9 +148,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   const autosave = settings?.autosave ?? AUTOSAVE_DEFAULT;
 
   /**
-   * The campaign feed — chronicle, atlas, calendar, standing and D15's party pin. Four sections read it
-   * (Home, Calendar, Downtime and the Atlas's party card), and it stays lazy for the same reason it
-   * always was: a GM working in Pages should not pay five round-trips for surfaces they have not opened.
+   * The campaign feed (chronicle, maps, calendar, standing, party pin). Loaded lazily, only for the
+   * sections that read it.
    */
   const [campaign, setCampaign] = useState<{ records: readonly CodexChronicleRecord[]; maps: readonly CodexMap[]; calendar: GmCodexCalendar | null; party: { marker: CodexMarker; mapName: string } | null }>({ records: [], maps: [], calendar: null, party: null });
   const [standing, setStanding] = useState<readonly CodexStanding[]>([]);
@@ -177,9 +159,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     try {
       const [records, maps, calendar, nextStanding, party] = await Promise.all([
         journalApi.chronicle(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken), standingApi.list(gmToken),
-        // D15: one read for "where is the party?", replacing the O(maps) client-side scan. Uncaught with
-        // the rest — a dashboard that silently dropped a card is the failure the shared error Alert exists
-        // to prevent — but null-tolerant, because "no party pin" is the ordinary state.
+        // Not caught separately: a silently missing card is worse than the shared error Alert.
         codexApi.party(gmToken)
       ]);
       setCampaign({ records, maps, calendar, party }); setStanding(nextStanding); setCampaignError(null);
@@ -195,16 +175,14 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     return () => { socket.off("codex:changed", onChanged); };
   }, [needsCampaign, loadCampaign]);
 
-  // Live refresh: any codex write pings every client. D22 made the ping content-free; this listener was
-  // already payload-blind, so nothing here reads it.
+  // Any codex write pings every client.
   useEffect(() => {
     const onChanged = () => { void refreshList(); void loadSessions(); void loadQuests(); };
     socket.on("codex:changed", onChanged);
     return () => { socket.off("codex:changed", onChanged); };
   }, [refreshList, loadSessions, loadQuests]);
 
-  // Cmd/Ctrl-K opens the palette. Mounted ONLY inside this shell (D20 is explicit that the palette is
-  // Codex-scoped and deliberately not app-global), so the shortcut leaves with the section.
+  // Cmd/Ctrl-K opens the palette. Codex-scoped by design, so the shortcut leaves with the section.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); } };
     window.addEventListener("keydown", onKey);
@@ -222,27 +200,19 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   }, [gmToken]);
 
   /**
-   * Navigating FROM the drawer cannot use `closeDrawer`: that calls `history.back()`, which is a task,
-   * while `navigate` pushes on a microtask — so the destination was pushed and then immediately gone
-   * back off, and every tap in the phone nav drawer went nowhere. Discard the transient entry instead
-   * and `replace` it with the destination, so back from there returns to where the drawer was opened.
+   * Navigating from the drawer can't use `closeDrawer`: its `history.back()` runs after `navigate`'s push
+   * and would undo it. Discard the transient entry and replace it with the destination instead.
    */
   const goto = useCallback((path: string) => {
     const stranded = discardTransient(DRAWER_TRANSIENT);
     setDrawerOpen(false);
     void navigate(path, { replace: stranded }).then((moved) => {
-      // The guard can say stay (D6, autosave off, dirty draft). The entry was released on the assumption
-      // the destination would overwrite it, so if we did not move it is still on the stack with nothing
-      // registered to absorb it — and the GM's next Back would silently do nothing.
+      // The unsaved-changes guard may veto; then release the stranded entry so the next Back works.
       if (!moved && stranded) releaseStrandedEntry();
     });
   }, []);
 
-  /**
-   * D3/D10: a list's filters are part of its ADDRESS, so a filtered log is linkable and survives a
-   * refresh. One writer for every list that has filters — the Journal already used this exact shape,
-   * and Sessions and Quests were the two holding theirs in component state.
-   */
+  /** A list's filters are part of its address, so a filtered list is linkable and survives a refresh. */
   const setListFilter = useCallback((next: Readonly<Record<string, string | null>>) => {
     replaceQuery((query) => {
       for (const [key, value] of Object.entries(next)) { if (value) query.set(key, value); else query.delete(key); }
@@ -250,11 +220,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   }, []);
 
   /**
-   * D7: create-and-open, for the doors that are not on the record's own rail — today the palette.
-   *
-   * The create itself is `creates.ts`, shared with the rail buttons, so there is one answer to "what does
-   * creating a session do". Failure surfaces on the shell's own Alert: the palette closes on the verb, so
-   * an error raised inside it would have nowhere to render.
+   * Create-and-open for the palette, sharing `creates.ts` with the rail buttons. Errors go to the shell's
+   * Alert, since the palette closes on the verb.
    */
   const newSession = useCallback(async () => {
     try {
@@ -291,8 +258,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
 
   const sidebarHeader = (
     <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K"
-      /* Collapsed, the glyph is the whole button — without these it has no accessible name at all,
-         the same reason every rail nav item carries them. */
+      /* Collapsed, the glyph is the whole button, so it needs an accessible name. */
       title={collapsed ? "Search" : undefined} aria-label={collapsed ? "Search" : undefined}>
       <CodexIcon iconId="search" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
       {!collapsed && <><span className="codex-navitem-label">Search</span><Kbd>⌘K</Kbd></>}
@@ -308,40 +274,24 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
       onAction={() => { closeDrawer(); void openPlayerPreview(); }}
       header={sidebarHeader}
       /**
-       * **Gated on `railBand`, never on `collapsed` — collapsing must not be a one-way door.**
-       *
-       * `collapsed` is `railBand || sidebarMode === "rail"`, so gating on it meant the toggle unmounted
-       * the instant the GM used it: collapse, and the only control that expands again is gone. The
-       * preference persists, so a reload did not help either — the GM was in the rail until they cleared
-       * site storage or resized past 850px. Found by the client in minutes, by testing the app.
-       *
-       * The intent behind the gate is still right and still here: in the forced 761–849px band there is
-       * nothing to expand INTO, and offering the toggle would write a preference whose effect the GM
-       * cannot see until they resize. That is `railBand`, and only `railBand`. `SidebarCollapseToggle`
-       * has always rendered both states ("Expand the sidebar", `aria-expanded`, the `is-rail` variant);
-       * it simply never got the chance.
-       *
-       * The phone drawer is excluded on its own terms: it is always expanded and has no rail to collapse
-       * into. Note the parameter above is `asRail`, not `collapsed` — the shadowing is what made this
-       * line read as though it said what it meant.
+       * Gate on `railBand`, never `collapsed`: otherwise collapsing hides the only control that expands.
+       * In the forced band there is nothing to expand into. The phone drawer is always expanded.
        */
       footer={railBand || drawerOpen ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />}
     />
   );
 
   return (
-    /* THE FRAME (§7). The shell IS the pane: a rail column beside a column of chrome rows over one
-       scrolling region, standing on the scene sky. Nothing outside `.codex-shell-content` moves. */
+    /* The shell is the pane: a rail column beside chrome rows over one scrolling region. */
     <div className={`codex-root codex-shell pane-frame pane-scene scanlines anim-view${collapsed ? " is-rail" : ""}`}>
       <div className="pane-sky" aria-hidden="true" />
-      {/* ≥761px: the sidebar is in the layout. ≤760px it is a Drawer, opened from the top bar. */}
+      {/* >=761px the sidebar is in the layout; <=760px it is a Drawer opened from the top bar. */}
       <aside className="codex-shell-side">{nav(collapsed)}</aside>
       <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">
         {nav(false)}
       </Drawer>
 
       <div className="codex-shell-main">
-        {/* The beam marks the frame's boundary against its region — §9's own use for it. */}
         <div className="codex-topbar neon-beam">
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}>
             <CodexIcon iconId="menu" className="codex-navitem-icon" />
@@ -351,17 +301,15 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
             <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}>
               <CodexIcon iconId="search" className="codex-navitem-icon" />
             </IconButton>
-            {/* D24: the session console survives as a right-side prep drawer, renamed into the Sessions
-                vocabulary family, reachable from every section exactly as it always was. */}
+            {/* The session prep drawer, reachable from every section. */}
             <Button variant="ghost" size="sm" aria-expanded={consoleOpen} onClick={() => setConsoleOpen((open) => !open)}>Session prep</Button>
           </div>
         </div>
 
-        {/* One error surface for the whole shell, whichever section is on screen. */}
         {error && <Alert tone="danger" title="Couldn't load the Codex">{error}</Alert>}
         {previewError && <Alert tone="danger">{previewError}</Alert>}
 
-        {/* THE REGION (§7): the one thing on this surface that scrolls, whichever section is on screen. */}
+        {/* The one scroll region. */}
         <div className="codex-shell-content scroll-y frame-fill">
           {section === null && <NotFoundView role="gm" />}
 
@@ -376,10 +324,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
               deadlines={dash.deadlines}
               downtimePending={dash.downtimePending}
               onOpenDowntime={() => navigate(pathForSection("downtime"))}
-              /* D18: the party card states the PIN's reveal state. Deliberately the pin's own flag and
-                 not a computed "can players see this": the map gates it too, and a card that folded the
-                 two together would say "hidden" about a shown pin and give the GM nothing to act on.
-                 The Atlas is where the map's own switch lives, one tap away via "Show the pin". */
+              /* The pin's own reveal flag, not a computed visibility: the map gates it too, and the Atlas
+                 is where that switch lives. */
               party={campaign.party ? { label: campaign.party.marker.label, mapId: campaign.party.marker.mapId, mapName: campaign.party.mapName, markerId: campaign.party.marker.id, revealed: campaign.party.marker.revealedToPlayers } : null}
               onOpenParty={(mapId, markerId) => navigate(atlasPath(mapId, markerId))}
               standing={standingRows}
@@ -484,8 +430,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
         </div>
       </div>
 
-      {/* D24. Always mounted, open or not: `Drawer` is non-modal and stays in the tree so the slide plays
-          both ways. It reads the SAME session feed the Sessions section edits. */}
+      {/* Always mounted so the non-modal Drawer's slide plays both ways. Reads the same session feed Sessions edits. */}
       <SessionConsole open={consoleOpen} onClose={() => setConsoleOpen(false)} gmToken={gmToken}
         session={sessions.find((session) => session.id === activeSessionId) ?? null}
         loading={sessionsLoading} error={sessionsError}
@@ -496,8 +441,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
         <CommandPalette gmToken={gmToken}
           onOpenHit={(hit) => navigate(pathForHit(hit))}
           onCreatePage={(title) => setQuickCreate({ title })}
-          /* D7: the palette's create verbs run the SAME creates the rails do (`creates.ts`) and land on
-             the new record — they used to navigate to the list and leave the GM to find the button. */
+          /* Palette create verbs share `creates.ts` with the rails and land on the new record. */
           onCreateSession={() => void newSession()}
           onCreateQuest={() => void newQuest()}
           onNavigate={navigate}
@@ -511,16 +455,13 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
           onChanged={refreshList} />
       )}
 
-      {/* `codex-preview-modal` makes the sheet's body a FRAME rather than a document, so the embedded
-          shell inside it gets a real height and behaves exactly like the player's own pane — including
-          the atlas, whose map fills its region and would otherwise have nothing to fill. */}
+      {/* `codex-preview-modal` gives the embedded shell a real height, so the atlas map has something to fill. */}
       <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="full" title="What players see" ariaLabel="Player Codex preview" className="codex-preview-modal">
         <p className="codex-inspector-hint">This is the real player Codex, read through a player session. Anything hidden from players is absent here, not dimmed.</p>
         {previewToken && <PlayerCodex token={previewToken} embedded />}
       </Modal>
 
-      {/* The GM's write control for standing. It lives HERE and never inside `CampaignHome`, which the
-          player's Codex also renders — the dashboard card only asks for it by id. */}
+      {/* The GM's standing write control lives here, never in `CampaignHome`, which the player Codex also renders. */}
       {adjustingFaction && (
         <StandingAdjuster key={adjustingFaction.page.id} gmToken={gmToken}
           factionPageId={adjustingFaction.page.id} factionName={adjustingFaction.page.title}

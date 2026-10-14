@@ -8,10 +8,8 @@ import { socket } from "../socket";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
- * The marker inspector: edit a pin's icon/color/label, wire its links, reveal it, or delete it. A pin can
- * link to MANY pages (open each) and MANY prepared scenes (launch each), plus one drill-down sub-map. The
- * launch/open actions live inline on each linked item - the GM taps a pin mid-prep to open a page or run
- * the fight staged there. All writes go through the atlas REST surface; the parent refreshes from the result.
+ * The marker inspector: a pin's icon, colour, label and tags, its links (many pages, many scenes, one
+ * sub-map, one actor), reveal and delete. Writes go through the atlas REST surface.
  */
 type MarkerScene = Readonly<{ id: string; name: string }>;
 type MarkerActor = Readonly<{ id: string; name: string }>;
@@ -19,7 +17,6 @@ type MarkerInspectorProps = Readonly<{
   gmToken: string;
   marker: CodexMarker;
   pages: readonly CodexPageSummary[];
-  /** D6's setting, handed down by the shell like every other editor gets it. */
   autosave: CodexAutosaveSettings;
   maps: readonly CodexMap[];
   scenes: readonly MarkerScene[];
@@ -27,17 +24,13 @@ type MarkerInspectorProps = Readonly<{
   activeSceneId: string | null;
   onUpdated: (marker: CodexMarker) => void;
   onDeleted: (markerId: string) => void;
-  /**
-   * CT-7 / M12-C: the party flag moved. The caller re-reads the map's pins, because setting this one
-   * cleared whichever pin held it before — and that pin may not be on the map currently open, so there
-   * is no single row to patch. Optional so a caller with nothing to refresh still compiles.
-   */
+  /** The party flag changed; the caller re-reads, since the previous party pin may be on another map. */
   onPartyChanged?: () => void | Promise<void>;
   onOpenMap: (mapId: string) => void;
   onOpenPage: (pageId: string) => void;
   onCreatePage: () => void;
   onRevealPage: (pageId: string) => void;
-  /** CD-6: reveal the map this pin sits on. Optional so a caller without a map-reveal path still compiles. */
+  /** Reveal the map this pin sits on. */
   onRevealMap?: () => void;
   onActivateScene: (sceneId: string) => void;
   /** Jump to the archived fight a combat entry came from. GM-only: archives carry GM narration. */
@@ -51,8 +44,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const [tags, setTags] = useState<readonly string[]>(marker.tags);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // This pin's campaign history — including the battles the combat bridge auto-logs here. Mirrors
-  // `PageTimeline`'s use of `journalApi.forPage`, which until now had no marker-side counterpart.
+  // This pin's journal history, including auto-logged battles.
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const loadEntries = useCallback(() => { void journalApi.forMarker(gmToken, marker.id).then(setEntries).catch(() => setEntries([])); }, [gmToken, marker.id]);
   useEffect(() => { loadEntries(); }, [loadEntries]);
@@ -65,16 +57,8 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     finally { setBusy(false); }
   };
   /**
-   * D6, the arm this panel never had. The inspector wrote through on every control in BOTH modes, so a
-   * GM who turned autosave off — and was told in that very panel that "editors show a Save button and
-   * warn you before you leave with unsaved changes" — got the one editor that behaved the opposite way.
-   *
-   * Scoped to the two fields a GM TYPES. The pickers below (link a page, choose a sub-map, a scene, an
-   * actor, the icon, the colour) stay immediate in both modes, which is D6's own recorded scope call:
-   * choosing from a list is a discrete act, not an edit in progress, exactly like the reveal switch and
-   * the party toggle. Selecting a DIFFERENT pin used to skip the router guard, because the atlas held the
-   * selection in local state and nothing navigated; it is an address now (`AtlasView`'s `selectPin`), so
-   * leaving this draft by any route — another pin, another map, Back, Close — asks first.
+   * The typed fields (label, tags) follow the autosave setting. Pickers stay immediate in both modes, like
+   * reveal and the party toggle. Selecting another pin navigates, so the guard protects this draft.
    */
   const draft = useMemo(() => ({ label: label.trim(), tags }), [label, tags]);
   const saveDetails = useCallback(async (next: { label: string; tags: readonly string[] }) => {
@@ -87,11 +71,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     try { onUpdated(await atlasApi.revealMarker(gmToken, marker.id, revealed)); }
     catch { setError("Couldn't change who can see this pin."); }
   };
-  /**
-   * CT-7 / M12-C: mark this pin as the party's position. There is exactly ONE party pin for the whole
-   * atlas, so setting this one clears whichever pin held it before — possibly on a different map, which
-   * is why this reports through `onPartyChanged` (the caller re-reads) instead of patching one row.
-   */
+  /** One party pin per atlas; setting this clears the previous one, possibly on another map, so the caller re-reads. */
   const setParty = async (isParty: boolean) => {
     setBusy(true); setError(null);
     try { onUpdated(await atlasApi.setPartyMarker(gmToken, marker.id, isParty)); await onPartyChanged(); }
@@ -104,14 +84,13 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     catch { setError("Couldn't delete the pin."); }
   };
 
-  // Hint from the tags already in use on pages and on the atlas, so one vocabulary spans the suite.
+  // Suggest tags already in use on pages and the atlas.
   const tagSuggestions = useMemo(
     () => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(),
     [pages, maps]
   );
   const subMaps = maps.filter((map) => map.id !== marker.mapId);
-  // CD-6: revealing a pin does nothing if the map it sits on is still secret — players never see the
-  // map, so they never see the pin. Nothing said so, so the GM believed the reveal had taken effect.
+  // A revealed pin on a hidden map is still invisible to players, so the inspector says so.
   const markerMap = maps.find((map) => map.id === marker.mapId) ?? null;
   const shownOnHiddenMap = marker.revealedToPlayers && markerMap !== null && !markerMap.revealedToPlayers;
   const linkedPages = marker.pageIds.map((id) => pages.find((page) => page.id === id)).filter((page): page is CodexPageSummary => Boolean(page));
@@ -120,8 +99,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const availableScenes = scenes.filter((scene) => !marker.sceneIds.includes(scene.id));
   const danglingScenes = marker.sceneIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
   const secretLinkedPages = linkedPages.filter((page) => marker.revealedToPlayers && !page.revealedToPlayers);
-  // A linked actor that has since been removed from the roster would otherwise render as "None"
-  // while the id quietly persists on the marker — same honesty the scene links already get.
+  // A linked actor removed from the roster would otherwise show "None" while the id persists.
   const danglingActor = marker.actorId !== null && !actors.some((actor) => actor.id === marker.actorId);
 
   return (
@@ -141,24 +119,17 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           onChange={(event) => setLabel(event.target.value)} />
       </Field>
 
-      {/* Sits with Label because both describe the pin itself, above the link wiring. Both ride the
-          shared autosave hook: with it on they save shortly after the last edit, with it off they wait
-          for the Save button below and say so until it is pressed. */}
+      {/* Label and tags follow the autosave setting. */}
       <Field label="Tags" htmlFor="marker-tags">
         <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={tags}
           onChange={setTags}
           max={24} maxReachedReason="A pin may carry at most 24 tags."
           suggestions={tagSuggestions}
-          /* DEFAULT slugify — it is the server's own contract (`tags()` throws on a non-slug rather
-             than cleaning it up), so normalising here is what keeps a typed "Old Mill" saveable. */ />
+          /* Default slugify matches the server's tag rule. */ />
       </Field>
 
-      {/* CT-7: the party's position. Sits with Label and Tags because it describes the pin itself, above
-          the link wiring. `Switch` is the `@vtt/ui` primitive (R9) and carries its own 44px floor.
-          The hint is R2's other half — the map draws a ring, but a ring is shape, and shape alone may
-          never carry a state. It also says the two things a GM has to know: there is only one, and it
-          is moved by moving the pin. There is deliberately no coordinate field and no "move the party"
-          button here — a second way to move one marker is exactly what CT-7 must not grow. */}
+      {/* The party flag. The hint says there is only one and that it moves with the pin; there is
+          deliberately no second way to move it. */}
       <div className="codex-marker-party">
         <Switch checked={marker.isParty} disabled={busy} onChange={setParty}
           aria-label="This pin is the party's position"
@@ -180,8 +151,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           ))}
           <Combobox options={unlinkedPages.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
             value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page" />
-          {/* D7: opens the ONE quick-create dialog, prefilled with the pin's label, and links the new
-              page to this pin on success — it no longer creates an untyped page behind the GM's back. */}
+          {/* Opens quick-create prefilled with the pin's label, and links the new page on success. */}
           <Button variant="ghost" size="sm" onClick={onCreatePage}><IconPlus /> New page{marker.label ? ` “${marker.label}”` : ""}</Button>
         </div>
       </Field>
@@ -255,10 +225,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             </ul>}
       </div>
 
-      {/* D25 / G16 — the icon-and-colour grid is ~500px tall and used to sit directly under the label,
-          burying every functional control (links, sub-map, scenes, actor, journal) below the fold. It is
-          the least-used half of this panel, so it moves last and starts collapsed, with the current
-          icon in the summary so the GM can see what they have without opening it. */}
+      {/* The icon and colour grid is tall and least used, so it comes last and starts collapsed. */}
       <details className="codex-marker-appearance">
         <summary className="codex-marker-appearance-summary">
           <CodexIcon iconId={marker.iconId} className="codex-ent-icon" style={{ color: pinSwatchVar(marker.iconColor) }} />

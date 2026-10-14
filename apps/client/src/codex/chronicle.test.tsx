@@ -10,8 +10,7 @@ const getCalendar = vi.fn();
 const revealEntry = vi.fn();
 const revealPage = vi.fn();
 const updatePage = vi.fn();
-// The editor's Connections area reads a page's entries and pins on mount; neither is what this file is
-// about, and an unstubbed read would put its own error Alert on screen.
+// The editor's Connections area reads entries and pins on mount; stub them so no error Alert appears.
 const markersForPage = vi.fn();
 const forPage = vi.fn();
 
@@ -35,16 +34,8 @@ import { groupChronicle } from "./chronicle";
 import type { CodexCalendar, CodexChronicleRecord, CodexPage } from "./api";
 
 /**
- * CT-11 / CT-12 on the client: **one** timeline carrying journal entries and dated `event` pages, read
- * through two lenses.
- *
- * What these are actually for, stated so a later reader does not soften them:
- *  - **R2** — one row shape for every record, and the kind readable by icon + label rather than colour.
- *    The colour assertion is the one that matters: it is the accessibility rule, and it is the one a
- *    "tidy-up" would quietly break by dropping the kind badge as redundant.
- *  - **CT-12** — the lens toggle is a REGROUPING. It must not refetch (two fetches are two answers that
- *    can disagree) and must not write (a lens is a way of looking, not an edit).
- *  - **Non-regression** — an ordinary entry still renders its text, its date and its Edit/Delete actions.
+ * One timeline of journal entries and dated `event` pages. Kinds read by icon and label, not colour; the
+ * lens toggle regroups without refetching or writing.
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: [] };
 
@@ -70,12 +61,11 @@ const renderJournal = async (records: CodexChronicleRecord[], onOpenPage = vi.fn
   return onOpenPage;
 };
 
-// The lens persists in sessionStorage (it is a reading preference), so a test that toggles it would
-// otherwise decide the starting lens of every test after it.
+// The lens persists in sessionStorage, so clear it between tests.
 beforeEach(() => sessionStorage.clear());
 
 const rowOf = (id: string) => document.getElementById(`codex-entry-${id}`)!;
-/** The timeline's group headings, in order — the only honest read of "how is this grouped right now". */
+/** The group headings, in order. */
 const headings = () => [...document.querySelectorAll(".codex-timeline-year")].map((node) => node.textContent);
 
 describe("The chronicle is ONE timeline (CT-11)", () => {
@@ -91,9 +81,7 @@ describe("The chronicle is ONE timeline (CT-11)", () => {
 
   it("R2: a record's kind reads without any colour at all", async () => {
     await renderJournal([ENTRY, EVENT]);
-    // The rule is "icon + label, never colour alone". Colour lives entirely in CSS classes, so the proof
-    // is that the *text* of each row already distinguishes the kinds: strip every stylesheet and a reader
-    // still knows which row is which. A row whose only kind signal were its accent fails this.
+    // Colour is CSS-only, so each row's text must distinguish its kind.
     expect(rowOf("p9").textContent).toContain("Event");
     expect(rowOf("j1").textContent).toContain("Entry");
     expect(rowOf("p9").querySelector(".codex-entry-kindglyph")).not.toBeNull();
@@ -101,7 +89,7 @@ describe("The chronicle is ONE timeline (CT-11)", () => {
   });
 
   it("offers an event row its page, and never the entry composer's Edit/Delete", async () => {
-    // An event is a wiki page: editing it from a timeline row would be a second place to edit one record.
+    // An event is a wiki page and is edited there, not from the row.
     const onOpenPage = await renderJournal([EVENT]);
     const user = userEvent.setup();
     const event = within(rowOf("p9"));
@@ -113,8 +101,7 @@ describe("The chronicle is ONE timeline (CT-11)", () => {
   });
 
   it("reveals an event through the PAGE route, not the journal route", async () => {
-    // One record has one reveal state. Flipping the row's switch must flip the page's own flag, or the
-    // chronicle becomes a second, disagreeing copy of it.
+    // One record, one reveal state: the row's switch flips the page's own flag.
     await renderJournal([EVENT]);
     revealPage.mockResolvedValue({});
     const user = userEvent.setup();
@@ -142,17 +129,15 @@ describe("Two lenses over the same records (CT-12)", () => {
     const user = userEvent.setup();
     expect(chronicle).toHaveBeenCalledTimes(1);
 
-    // By in-world date: one group per year, and the event's year is its own.
+    // By date: one group per year.
     expect(headings()).toEqual(["1492 DR", "1493 DR"]);
 
     await user.click(screen.getByRole("button", { name: "By session" }));
 
-    // By session: the entry under its session, the event under "No session yet" (sessions arrive in M9).
-    // Read the GROUP HEADINGS, not any text on the page — the entry's own row also says "Session 3", and
-    // a looser query would pass on that alone while the grouping did nothing.
+    // By session: the event goes under "No session yet". Read the headings, since the entry row also says "Session 3".
     expect(headings()).toEqual(["Session 3", "No session yet"]);
     expect(screen.queryByText("1493 DR")).not.toBeInTheDocument();
-    // The two properties that make this a LENS: same data, no server round-trip, no mutation.
+    // Same data, no refetch, no write.
     expect(chronicle).toHaveBeenCalledTimes(1);
     expect(revealEntry).not.toHaveBeenCalled();
     expect(revealPage).not.toHaveBeenCalled();
@@ -161,8 +146,7 @@ describe("Two lenses over the same records (CT-12)", () => {
   });
 
   it("groups by year ascending with undated last, and by session with the unsessioned last", () => {
-    // The grouping rule on its own, below the component: a UI test can only show one arrangement, and the
-    // ordering contract is what the two lenses actually promise.
+    // The grouping contract on its own, below the component.
     const undated: CodexChronicleRecord = { ...ENTRY, id: "j0", sessionId: null, sessionNumber: null, calendarInstant: null, inWorldDate: null, inWorldLabel: null };
     const records = [ENTRY, EVENT, undated];
 
@@ -170,7 +154,7 @@ describe("Two lenses over the same records (CT-12)", () => {
       .toEqual([["1492 DR", ["j1"]], ["1493 DR", ["p9"]], ["Undated", ["j0"]]]);
     expect(groupChronicle(records, "session", CALENDAR).map((group) => [group.label, group.records.map((record) => record.id)]))
       .toEqual([["Session 3", ["j1"]], ["No session yet", ["p9", "j0"]]]);
-    // Neither lens invents or drops a record: both partitions cover exactly the same set.
+    // Both lenses cover exactly the same records.
     for (const lens of ["date", "session"] as const) {
       expect(groupChronicle(records, lens, CALENDAR).flatMap((group) => group.records.map((record) => record.id)).sort())
         .toEqual(["j0", "j1", "p9"]);
@@ -179,10 +163,8 @@ describe("Two lenses over the same records (CT-12)", () => {
 });
 
 /**
- * Dating a page in the editor (CT-11). The editor autosaves the WHOLE draft on a debounce, so the
- * question that matters is not only "does a date reach the server" but "what does a save say about the
- * date when the page has no date control at all" — because `inWorldDate: null` on that path would erase
- * an event's date the moment it were demoted to a note and edited.
+ * The editor autosaves the whole draft, so a page with no date control must omit `inWorldDate` (sending
+ * `null` would erase an event's date once it was demoted and edited).
  */
 describe("An event page is dated in the editor (CT-11)", () => {
   const PAGE: CodexPage = {
@@ -198,9 +180,7 @@ describe("An event page is dated in the editor (CT-11)", () => {
   );
 
   beforeEach(() => {
-    // Ruling 11: a page's properties and its connections live in the summonable Details panel.
-    // These tests are about what the panel holds, not about summoning it, so the remembered
-    // preference is seeded open.
+    // These tests are about the Details panel's contents, so its remembered state is seeded open.
     localStorage.setItem("codex-page-details", "open");
     updatePage.mockResolvedValue({ ...PAGE, rev: 4 });
     markersForPage.mockResolvedValue([]);
@@ -227,15 +207,13 @@ describe("An event page is dated in the editor (CT-11)", () => {
     await waitFor(() => expect(updatePage).toHaveBeenCalled(), { timeout: 3000 });
     const payload = updatePage.mock.calls.at(-1)![2];
     expect(payload.inWorldDate).toEqual({ year: 1492, month: 0, day: 2 });
-    // The sort key and the label are the server's to derive; a client that sent either would be a second
-    // authority on where this record sits, and it would go stale the next time the calendar changed.
+    // The sort key and label are derived server-side; the client never sends them.
     expect(payload).not.toHaveProperty("calendarInstant");
     expect(payload).not.toHaveProperty("inWorldLabel");
   });
 
   it("says nothing about the date when the page is not an event", async () => {
-    // A `location` page has no date control, so a save must OMIT the key. Sending `null` here is what
-    // would silently un-date an event the moment it was demoted and its body touched.
+    // A `location` page has no date control, so the save omits the key.
     const user = userEvent.setup();
     renderEditor({ ...PAGE, entityType: "location" });
     await user.type(await screen.findByLabelText("Page title"), "!");
