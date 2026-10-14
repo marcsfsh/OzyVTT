@@ -195,7 +195,7 @@ function toStoredRow(row: LogRow): StoredFeedRow {
       ...(row.actor_id !== null ? { actorId: row.actor_id } : {}),
       ...(roll ? { roll } : {})
     },
-    visibility: (row.visibility as RollVisibility | null) ?? null,
+    visibility: row.visibility as RollVisibility | null,
     initiatorSessionId: row.initiator_session_id
   };
 }
