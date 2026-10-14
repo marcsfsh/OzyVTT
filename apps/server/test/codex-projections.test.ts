@@ -11,15 +11,11 @@ import {
   projectPlayerStanding,
   projectRevealAudit
 } from "../src/codex-projections.js";
-import type {
-  CodexCalendar,
-  CodexDowntimePayload,
-  CodexInWorldDate,
-  CodexJournalKind,
-  CodexJournalRow,
-  CodexMarkerRow,
-  CodexStandingRow
-} from "../src/codex-store.js";
+import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
+import type { CodexMarkerRow } from "../src/codex/atlas.js";
+import type { CodexDowntimePayload, CodexJournalKind } from "../src/codex/journal-kinds.js";
+import type { CodexJournalRow } from "../src/codex/journal.js";
+import type { CodexStandingRow } from "../src/codex/standing.js";
 
 // Codex projection gates on literal rows, so a bug cannot hide behind a store that never returned a
 // dangerous row. SQL and HTTP layers are covered in `codex-store.test.ts` and `codex-http.test.ts`.

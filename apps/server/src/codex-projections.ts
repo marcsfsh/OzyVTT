@@ -1,27 +1,19 @@
-import { deadlineFired } from "./codex-store.js";
 import type {
   CodexCalendar,
   CodexCalendarEra,
   CodexCalendarMonth,
-  CodexChronicleRecord,
-  CodexConnectionRow,
-  CodexConnectionSourceKind,
   CodexEntityType,
-  CodexInWorldDate,
-  CodexJournalKind,
-  CodexJournalRow,
-  CodexMapRow,
-  CodexMarkerRow,
-  CodexPageRow,
-  CodexPageSummaryRow,
-  CodexQuestObjective,
-  CodexQuestRow,
-  CodexQuestStatus,
-  CodexPageConnectionRow,
-  CodexRecordKind,
-  CodexSessionRow,
-  CodexStandingRow
-} from "./codex-store.js";
+  CodexInWorldDate
+} from "@vtt/domain";
+import type { CodexMapRow, CodexMarkerRow } from "./codex/atlas.js";
+import type { CodexConnectionRow, CodexConnectionSourceKind, CodexPageConnectionRow } from "./codex/connections.js";
+import { deadlineFired, type CodexJournalKind } from "./codex/journal-kinds.js";
+import type { CodexChronicleRecord, CodexJournalRow } from "./codex/journal.js";
+import type { CodexPageRow, CodexPageSummaryRow } from "./codex/pages.js";
+import type { CodexQuestObjective, CodexQuestRow, CodexQuestStatus } from "./codex/quests.js";
+import type { CodexRecordKind } from "./codex/search.js";
+import type { CodexSessionRow } from "./codex/sessions.js";
+import type { CodexStandingRow } from "./codex/standing.js";
 
 /**
  * The Codex viewer-safety boundary: every player-facing Codex read projects through here. Player shapes are

@@ -149,11 +149,12 @@ off, with per-family exceptions (`rules-families.ts`). A player blocked by a rul
 
 ## Codex
 
-The worldbuilding Codex has its own store (`codex-store.ts`), router (`codex-http.ts`) and
-projection module, and does not go through the game command pipeline. Every record has a
-player half, a GM half and a reveal flag. The GM can preview the player view through
-`POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar
-and the GM calendar are separate clocks; a date reaches players only when it is published.
+The worldbuilding Codex has its own store (`codex-store.ts`, a facade over one module per
+aggregate in `apps/server/src/codex/`), router (`codex-http.ts`) and projection module, and does
+not go through the game command pipeline. Every record has a player half, a GM half and a
+reveal flag. The GM can preview the player view through `POST /api/v1/codex/preview-session`,
+which mints a real player session. The player calendar and the GM calendar are separate clocks;
+a date reaches players only when it is published.
 
 ## Public HTTP API
 

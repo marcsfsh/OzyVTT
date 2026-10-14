@@ -1,19 +1,14 @@
 import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  CodexRevisionConflictError,
-  CodexStore,
-  MIGRATIONS,
-  deadlineFired,
-  downtimePayloadOf,
-  questEventPayloadOf,
-  parseWikiLinks,
-  pageLinkKey
-} from "../src/codex-store.js";
+import { pageLinkKey } from "@vtt/domain";
+import { CodexStore } from "../src/codex-store.js";
+import { deadlineFired, downtimePayloadOf, questEventPayloadOf } from "../src/codex/journal-kinds.js";
+import { parseWikiLinks } from "../src/codex/links.js";
+import { CodexRevisionConflictError } from "../src/codex/validate.js";
+import { LegacyDatabaseError } from "../src/database.js";
 import {
   projectGmConnections,
   projectPlayerConnections,
@@ -54,11 +49,22 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-// The session context the player journal/chronicle projections take, resolved as `codex-http.ts` does per
-// request. A function, not a constant: reveal state changes mid-test and a captured context would go stale.
-const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionIds: from.unrevealedSessionIds() });
+/** The sessions a player may not see, as the router resolves them per request. */
+const hiddenSessionIds = (from: CodexStore) =>
+  new Set(
+    from
+      .listSessions()
+      .filter((session) => !session.revealedToPlayers)
+      .map((session) => session.id)
+  );
 
-// The `PlayerConnectionContext` `codex-http.ts` resolves per request. Fixtures here have page sources only,
+// The session context the player journal/chronicle projections take. A function, not a constant: reveal
+// state changes mid-test and a captured context would go stale.
+const playerSessionNumbers = (from: CodexStore = store) => ({
+  unrevealedSessionIds: hiddenSessionIds(from)
+});
+
+// The `PlayerConnectionContext` the router resolves per request. Fixtures here have page sources only,
 // so `revealedSourceIds` is empty. A function because reveal state changes mid-test.
 const playerConnectionContext = (from: CodexStore = store) => ({
   revealedPageIds: new Set(
@@ -71,7 +77,7 @@ const playerConnectionContext = (from: CodexStore = store) => ({
 });
 
 describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
-  // Player search is gated in SQL (`PLAYER_VISIBLE_SQL`) and again by `projectPlayerSearchHit`; these call
+  // Player search is gated in SQL (`PLAYER_SEARCH_VISIBLE_SQL`) and again by `projectPlayerSearchHit`; these call
   // `searchAll` directly so each kind's SQL gate is verified on its own.
   it("does not return an unrevealed MAP to a player", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Castle Ravenloft", kind: "regional" });
@@ -87,7 +93,7 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
     expect(store.searchAll("player", "vistani").hits.some((hit) => hit.id === entry.id)).toBe(false);
   });
 
-  // The quest arm of `PLAYER_VISIBLE_SQL`, both directions: weakening it (`THEN 1`) surfaces the secret
+  // The quest arm of `PLAYER_SEARCH_VISIBLE_SQL`, both directions: weakening it (`THEN 1`) surfaces the secret
   // quest, and deleting it (falling to `ELSE 0`) hides a findable one.
   it("does not return an UNREVEALED quest to a player, and does return a revealed one (M10, at the SQL layer)", () => {
     const quest = store.createQuest({ title: "The Wyrmwood Contract", playerBody: "Recover the ledger." });
@@ -289,102 +295,9 @@ describe("CodexStore tags on every record type (CI-2)", () => {
     expect(() => store.updateMap(map.id, { tags: ["Not A Slug"] })).toThrow();
     expect(() => store.updateMap(map.id, { tags: Array.from({ length: 25 }, (_, i) => `t${i}`) })).toThrow();
   });
-
-  it("backfills existing rows to an empty tag list rather than null (migration v10)", () => {
-    // Rows written before the tags column have no value of their own; the column default must read as [].
-    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Legacy", kind: "world" });
-    expect(map.tags).toEqual([]);
-    expect(store.getMap(map.id)!.tags).toEqual([]);
-    expect(MIGRATIONS.some((migration) => migration.version === 10)).toBe(true);
-  });
 });
 
 describe("CodexStore suite-wide search (CI-1)", () => {
-  // The unified search index migration on a populated pre-migration database built from the shipped SQL;
-  // a fresh database cannot catch a bad backfill.
-  it("migration v11 backfills existing pages, maps, markers and journal entries, keeping the two layers apart", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v10-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-      database.exec(
-        "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-      );
-      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 10)) {
-        database.exec(migration.sql);
-        database
-          .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-          .run(migration.version);
-      }
-      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
-      const pageId = crypto.randomUUID(),
-        mapId = crypto.randomUUID(),
-        markerId = crypto.randomUUID(),
-        entryId = crypto.randomUUID();
-      database
-        .prepare(
-          "INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Ravenloft', 'location', '{}', '{}', NULL, '[]', 'a gothic castle', 'the crypt of Strahd', 1, NULL, 1, '', '')"
-        )
-        .run(pageId);
-      // The pages-only index rows as earlier versions wrote them, which the backfill must carry forward.
-      database
-        .prepare("INSERT INTO codex_fts_player (page_id, title, body) VALUES (?, 'Ravenloft', 'a gothic castle\n')")
-        .run(pageId);
-      database
-        .prepare(
-          "INSERT INTO codex_fts_gm (page_id, title, body) VALUES (?, 'Ravenloft', 'a gothic castle\nthe crypt of Strahd\n\n')"
-        )
-        .run(pageId);
-      database
-        .prepare(
-          "INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, 'Barovia', 'regional', NULL, 1, 1, '[\"gloomy\"]', '', '')"
-        )
-        .run(mapId, crypto.randomUUID());
-      database
-        .prepare(
-          "INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, tags_json, created_at, updated_at) VALUES (?, ?, 0.5, 0.5, 'pin', '#FF2E9A', 'Svalich Road', 1, '[\"waypoint\"]', '', '')"
-        )
-        .run(markerId, mapId);
-      database
-        .prepare(
-          "INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, sort_key, tags_json, created_at, updated_at) VALUES (?, 'The mists parted.', 'Strahd was watching.', 1, 'note', 1, '[\"arrival\"]', '', '')"
-        )
-        .run(entryId);
-      database.close();
-
-      upgraded = new CodexStore(path);
-      await upgraded.initialize();
-
-      expect(upgraded.searchAll("gm", "Ravenloft").hits).toEqual([{ kind: "page", id: pageId }]);
-      expect(upgraded.searchAll("player", "Barovia").hits).toEqual([{ kind: "map", id: mapId }]);
-      expect(upgraded.searchAll("player", "Svalich").hits).toEqual([{ kind: "marker", id: markerId }]);
-      expect(upgraded.searchAll("player", "mists").hits).toEqual([{ kind: "journal", id: entryId }]);
-      expect(upgraded.searchAll("player", "gloomy").hits).toEqual([{ kind: "map", id: mapId }]);
-      expect(upgraded.searchAll("player", "waypoint").hits).toEqual([{ kind: "marker", id: markerId }]);
-      expect(upgraded.searchAll("player", "arrival").hits).toEqual([{ kind: "journal", id: entryId }]);
-
-      // The backfill kept the layers apart: GM-only text landed only in the GM index.
-      expect(upgraded.searchAll("player", "crypt").hits).toEqual([]);
-      expect(upgraded.searchAll("gm", "crypt").hits).toEqual([{ kind: "page", id: pageId }]);
-      expect(upgraded.searchAll("player", "watching").hits).toEqual([]);
-      expect(upgraded.searchAll("gm", "watching").hits).toEqual([{ kind: "journal", id: entryId }]);
-
-      // ...and the pages-only tables are gone, so there is one index and one sync path.
-      const reopened = new DatabaseSync(path);
-      const tables = (
-        reopened.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>
-      ).map((row) => row.name);
-      reopened.close();
-      expect(tables).not.toContain("codex_fts_player");
-      expect(tables).not.toContain("codex_fts_gm");
-      expect(tables).toContain("codex_search_player");
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
-  });
-
   it("keeps the index in step with writes, including markers swept away by a map delete", () => {
     const map = store.createMap({
       assetId: crypto.randomUUID(),
@@ -840,79 +753,6 @@ describe("CodexStore entities + relationships", () => {
     expect(bundle.sessions.find((session) => session.id === next.id)!.prepBody).toBe(
       "The vault opens for a sacrifice."
     );
-  });
-
-  it("migration v8 backfills a legacy marker's single page/scene id into one-element arrays", () => {
-    // A database from before markers linked many pages/scenes: single page_id/scene_id columns.
-    const database = new DatabaseSync(":memory:");
-    database.exec("CREATE TABLE codex_markers (id TEXT PRIMARY KEY, page_id TEXT, scene_id TEXT)");
-    const insert = database.prepare("INSERT INTO codex_markers (id, page_id, scene_id) VALUES (?, ?, ?)");
-    insert.run("both", "page-1", "scene-1");
-    insert.run("page-only", "page-2", null);
-    insert.run("neither", null, null);
-    const v8 = MIGRATIONS.find((migration) => migration.version === 8);
-    expect(v8).toBeDefined();
-    database.exec(v8!.sql);
-    const rowOf = (id: string) =>
-      database.prepare("SELECT page_ids_json, scene_ids_json FROM codex_markers WHERE id = ?").get(id) as {
-        page_ids_json: string;
-        scene_ids_json: string;
-      };
-    expect(JSON.parse(rowOf("both").page_ids_json)).toEqual(["page-1"]);
-    expect(JSON.parse(rowOf("both").scene_ids_json)).toEqual(["scene-1"]);
-    expect(JSON.parse(rowOf("page-only").page_ids_json)).toEqual(["page-2"]);
-    // A null must become an empty array, never [null] - the projection filters by membership.
-    expect(JSON.parse(rowOf("page-only").scene_ids_json)).toEqual([]);
-    expect(JSON.parse(rowOf("neither").page_ids_json)).toEqual([]);
-    expect(JSON.parse(rowOf("neither").scene_ids_json)).toEqual([]);
-    database.close();
-  });
-
-  it("migration v9 promotes the folder paths implied by existing pages into folder records", () => {
-    // Before the folders table, a folder existed only while a page referenced it. The backfill must capture
-    // every distinct real path once and invent no record for null/empty.
-    const database = new DatabaseSync(":memory:");
-    database.exec("CREATE TABLE codex_pages (id TEXT PRIMARY KEY, folder TEXT)");
-    const insert = database.prepare("INSERT INTO codex_pages (id, folder) VALUES (?, ?)");
-    insert.run("a", "NPCs");
-    insert.run("b", "NPCs"); // duplicate path -> one record
-    insert.run("c", "NPCs/Villains");
-    insert.run("d", null); // no folder -> no record
-    insert.run("e", ""); // empty string -> no record
-    const v9 = MIGRATIONS.find((migration) => migration.version === 9);
-    expect(v9).toBeDefined();
-    database.exec(v9!.sql);
-    const paths = (
-      database.prepare("SELECT path FROM codex_folders ORDER BY path").all() as Array<{ path: string }>
-    ).map((row) => row.path);
-    expect(paths).toEqual(["NPCs", "NPCs/Villains"]);
-    database.close();
-  });
-
-  it("migration v7 backfills pre-existing secret fields out of the public map (the pillar-1 legacy fix)", () => {
-    // Simulate a database from before the seal: `goals` sitting in the public fields_json.
-    const database = new DatabaseSync(":memory:");
-    database.exec("CREATE TABLE codex_pages (id TEXT PRIMARY KEY, fields_json TEXT, gm_fields_json TEXT DEFAULT '{}')");
-    database
-      .prepare("INSERT INTO codex_pages (id, fields_json, gm_fields_json) VALUES (?, ?, ?)")
-      .run("leaky", JSON.stringify({ race: "Vampire", goals: "usurp the throne" }), "{}");
-    database
-      .prepare("INSERT INTO codex_pages (id, fields_json, gm_fields_json) VALUES (?, ?, ?)")
-      .run("clean", JSON.stringify({ race: "Human" }), "{}");
-    const v7 = MIGRATIONS.find((migration) => migration.version === 7);
-    expect(v7).toBeDefined();
-    database.exec(v7!.sql);
-    const leaky = database.prepare("SELECT fields_json, gm_fields_json FROM codex_pages WHERE id = 'leaky'").get() as {
-      fields_json: string;
-      gm_fields_json: string;
-    };
-    expect(JSON.parse(leaky.fields_json)).toEqual({ race: "Vampire" }); // goals removed from the player-facing map
-    expect(JSON.parse(leaky.gm_fields_json)).toEqual({ goals: "usurp the throne" }); // moved into the GM-only map
-    const clean = database.prepare("SELECT fields_json FROM codex_pages WHERE id = 'clean'").get() as {
-      fields_json: string;
-    };
-    expect(JSON.parse(clean.fields_json)).toEqual({ race: "Human" }); // rows without goals untouched
-    database.close();
   });
 
   it("declares connections, resolves both directions, dedupes, and cascades on page delete", () => {
@@ -1861,8 +1701,7 @@ describe("CodexStore sessions (M9)", () => {
     const updated = sessions.updateSession(
       created.id,
       { recapBody: "The party crossed, one short.", status: "played" },
-      created.rev,
-      "gm"
+      created.rev
     );
     expect(updated.rev).toBe(2);
     expect(updated.recapBody).toBe("The party crossed, one short.");
@@ -1879,10 +1718,10 @@ describe("CodexStore sessions (M9)", () => {
 
   it("rejects a stale expectedRev with a conflict, and accepts an omitted one", () => {
     const session = sessions.createSession({ sessionNumber: 1, prepBody: "v1" });
-    sessions.updateSession(session.id, { prepBody: "v2" }, session.rev, "gm");
-    expect(() => sessions.updateSession(session.id, { prepBody: "v3" }, 1, "gm")).toThrow(CodexRevisionConflictError);
+    sessions.updateSession(session.id, { prepBody: "v2" }, session.rev);
+    expect(() => sessions.updateSession(session.id, { prepBody: "v3" }, 1)).toThrow(CodexRevisionConflictError);
     // An omitted expectedRev is the "I know I might be behind" path and must still write.
-    expect(sessions.updateSession(session.id, { prepBody: "v3" }, undefined, "gm").prepBody).toBe("v3");
+    expect(sessions.updateSession(session.id, { prepBody: "v3" }, undefined).prepBody).toBe("v3");
   });
 
   it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision (CI-9)", () => {
@@ -1905,9 +1744,7 @@ describe("CodexStore sessions (M9)", () => {
     // rejection with a message a GM can act on.
     expect(() => sessions.createSession({ sessionNumber: 7 })).toThrow(/Session 7 already exists/);
     const other = sessions.createSession({ sessionNumber: 8 });
-    expect(() => sessions.updateSession(other.id, { sessionNumber: 7 }, other.rev, "gm")).toThrow(
-      /Session 7 already exists/
-    );
+    expect(() => sessions.updateSession(other.id, { sessionNumber: 7 }, other.rev)).toThrow(/Session 7 already exists/);
     expect(sessions.getSession(other.id)!.sessionNumber).toBe(8); // the rejected write rolled back whole
 
     // An unnumbered session is a legitimate state, so many may coexist. SQLite treats NULLs as distinct in
@@ -1929,15 +1766,15 @@ describe("CodexStore sessions (M9)", () => {
     const shown = sessions.createSession({ sessionNumber: 5 });
     sessions.setSessionRevealed(shown.id, true);
     const unnumbered = sessions.createSession({});
-    expect([...sessions.unrevealedSessionIds()].sort()).toEqual([hidden.id, unnumbered.id].sort());
+    expect([...hiddenSessionIds(sessions)].sort()).toEqual([hidden.id, unnumbered.id].sort());
 
     // Revealing them empties the set, so the ids above are the reveal flag being read.
     sessions.setSessionRevealed(hidden.id, true);
     sessions.setSessionRevealed(unnumbered.id, true);
-    expect([...sessions.unrevealedSessionIds()]).toEqual([]);
+    expect([...hiddenSessionIds(sessions)]).toEqual([]);
     // ...and hiding 5 again puts a different id in, so this is a per-row read rather than a constant.
     sessions.setSessionRevealed(shown.id, false);
-    expect([...sessions.unrevealedSessionIds()]).toEqual([shown.id]);
+    expect([...hiddenSessionIds(sessions)]).toEqual([shown.id]);
   });
 
   it("orders numbered sessions by number, with the unnumbered ones below them", () => {
@@ -1983,13 +1820,13 @@ describe("CodexStore sessions (M9)", () => {
     expect(entry.sessionNumber).toBe(0);
 
     expect(
-      projectPlayerJournalEntry(entry, { unrevealedSessionIds: sessions.unrevealedSessionIds() })!.sessionNumber
+      projectPlayerJournalEntry(entry, { unrevealedSessionIds: hiddenSessionIds(sessions) })!.sessionNumber
     ).toBeNull();
     // Revealed: the number survives, and 0 is not mistaken for "no session".
     sessions.setSessionRevealed(zero.id, true);
-    expect(
-      projectPlayerJournalEntry(entry, { unrevealedSessionIds: sessions.unrevealedSessionIds() })!.sessionNumber
-    ).toBe(0);
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionIds: hiddenSessionIds(sessions) })!.sessionNumber).toBe(
+      0
+    );
   });
 
   /** With a session active, editing an entry must not re-file it under the running session. */
@@ -2062,7 +1899,7 @@ describe("CodexStore sessions (M9)", () => {
     });
 
     // ...and numbering that session gives every already-filed entry its label, retroactively.
-    sessions.updateSession(draft.id, { sessionNumber: 1 }, draft.rev, "gm");
+    sessions.updateSession(draft.id, { sessionNumber: 1 }, draft.rev);
     expect(sessions.getEntry(midDraft.id)!.sessionNumber).toBe(1);
     expect(sessions.createEntry({ playerText: "Numbered now." }).sessionNumber).toBe(1);
     expect(bystander.sessionNumber).toBe(9);
@@ -2413,7 +2250,7 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
 
   it("refuses an UNREVEALED quest at the SEARCH projection too — gate 3, on its own", () => {
     const quest = seed();
-    // Called directly with no SQL in front; over HTTP `PLAYER_VISIBLE_SQL` would already have dropped this row.
+    // Called directly with no SQL in front; over HTTP `PLAYER_SEARCH_VISIBLE_SQL` would already have dropped this row.
     expect(projectPlayerSearchHit({ kind: "quest", quest }, playerSessionNumbers())).toBeNull();
     expect(projectGmSearchHit({ kind: "quest", quest })).toMatchObject({
       kind: "quest",
@@ -2437,232 +2274,17 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
   });
 });
 
-// Joining journal entries to sessions by id, on a real legacy database. Numbers with no session record get a
-// synthesized hidden session with empty prep, recap and attendees, so nothing is invented or orphaned.
-describe("CodexStore migration v19 — journal entries join their session by identity (D9)", () => {
-  it("synthesizes a hidden played session per orphan number, joins every entry to it, and keeps the display numbers identical", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v18-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      // A pre-migration database: entries whose number matches a session, entries whose number matches nothing,
-      // an unnumbered entry, and both a numbered and an unnumbered session.
-      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-      database.exec(
-        "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-      );
-      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 18)) {
-        database.exec(migration.sql);
-        database
-          .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-          .run(migration.version);
-      }
-      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+// The status CHECKs are asserted in SQL because a repair script could bypass `sessionStatus()` and
+// `questStatus()`, and the readers would coerce a bad value rather than fail.
+describe("CodexStore schema constraints", () => {
+  const raw = () => new DatabaseSync(join(directory, "vtt.sqlite"));
 
-      const existingSession = crypto.randomUUID();
-      const unnumberedSession = crypto.randomUUID();
-      database
-        .prepare(
-          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, 1, '2026-01-01', '[\"Ana\"]', 'Ambush at the bridge.', 'They crossed.', 1, 'played', 1, '', '')"
-        )
-        .run(existingSession);
-      database
-        .prepare(
-          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', 'Nothing yet.', '', 0, 'planned', 1, '', '')"
-        )
-        .run(unnumberedSession);
-
-      // Fixtures for the connections migration: two pages with a wiki link, two relationship rows (one known
-      // slug, one unknown), and prose in a session/quest/journal body for the startup reconcile to find.
-      const linkedPage = crypto.randomUUID(),
-        targetPage = crypto.randomUUID(),
-        harpers = crypto.randomUUID(),
-        zhents = crypto.randomUUID();
-      const insertPage = database.prepare(
-        "INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, '{}', '{}', NULL, '[]', ?, '', 1, NULL, 1, '', '')"
-      );
-      insertPage.run(targetPage, "Vallaki", "location", "A walled town.");
-      insertPage.run(linkedPage, "Barovia", "location", "Ruled from [[Vallaki]].");
-      insertPage.run(harpers, "The Harpers", "faction", "Meddlers.");
-      insertPage.run(zhents, "The Zhentarim", "faction", "Rivals.");
-      database
-        .prepare(
-          "INSERT INTO codex_links (source_page_id, layer, target_kind, target_ref, section) VALUES (?, 'player', 'page', 'vallaki', NULL)"
-        )
-        .run(linkedPage);
-      const insertRel = database.prepare(
-        "INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, '')"
-      );
-      insertRel.run(crypto.randomUUID(), harpers, zhents, "ally");
-      insertRel.run(crypto.randomUUID(), zhents, harpers, "owes-a-debt-to");
-      database
-        .prepare("UPDATE codex_sessions SET prep_body = ? WHERE id = ?")
-        .run("The ambush at [[Vallaki]].", existingSession);
-      database
-        .prepare(
-          "INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Find the Sunsword', 'active', 'Search [[Vallaki]].', '', '[]', '[]', 0, 1, '', '')"
-        )
-        .run(crypto.randomUUID());
-
-      const matched = crypto.randomUUID(),
-        orphanA = crypto.randomUUID(),
-        orphanB = crypto.randomUUID(),
-        loose = crypto.randomUUID();
-      const insert = database.prepare(
-        "INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, ?, 'note', ?, ?, '[]', '', '')"
-      );
-      insert.run(matched, "We arrived in [[Vallaki]].", 1, 1, 1);
-      insert.run(orphanA, "The wolves came.", 1, 7, 2); // number 7 names no session record
-      insert.run(orphanB, "And came again.", 0, 7, 3); // ...twice, so synthesis must not duplicate
-      insert.run(loose, "Undated lore.", 1, null, 4);
-      database.close();
-
-      upgraded = new CodexStore(path);
-      await upgraded.initialize();
-
-      // One synthesized record for the one orphan number.
-      const sessions = upgraded.listSessions();
-      expect(sessions).toHaveLength(3);
-      const synthesized = sessions.find((session) => session.sessionNumber === 7)!;
-      expect(synthesized, "an orphan number gets a record rather than being dropped").toBeDefined();
-      expect(synthesized.status, "the master plan's ruling: played").toBe("played");
-      expect(synthesized.revealedToPlayers, "...and unrevealed, so nothing changes for players").toBe(false);
-      // Nothing is invented.
-      expect(synthesized.prepBody).toBe("");
-      expect(synthesized.recapBody).toBe("");
-      expect(synthesized.attendees).toEqual([]);
-      // The id passes the store's own id regex, so it round-trips through every route that validates one.
-      expect(synthesized.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-      expect(upgraded.getSession(synthesized.id)).not.toBeNull();
-      // The pre-existing record is untouched, not replaced. (Its prep was rewritten above to seed a wiki link,
-      // so only the recap is compared.)
-      expect(upgraded.getSession(existingSession)).toMatchObject({ sessionNumber: 1, recapBody: "They crossed." });
-
-      expect(upgraded.getEntry(matched)).toMatchObject({ sessionId: existingSession, sessionNumber: 1 });
-      expect(upgraded.getEntry(matched)!.playerText).toBe("We arrived in [[Vallaki]].");
-      expect(upgraded.getEntry(orphanA)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
-      expect(upgraded.getEntry(orphanB)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
-      expect(upgraded.getEntry(loose)).toMatchObject({ sessionId: null, sessionNumber: null });
-
-      // The post-migration invariant, in raw SQL below the store: no row keeps a bare number.
-      const raw = new DatabaseSync(path);
-      const bare = raw.prepare("SELECT COUNT(*) AS n FROM codex_journal WHERE session_number IS NOT NULL").get() as {
-        n: number;
-      };
-      expect(bare.n, "the bare-number column is empty after v19 - it is now the LABEL store").toBe(0);
-      // The rebuilt CHECK admits the seventh kind and still rejects an eighth.
-      const probe = (kind: string) =>
-        raw
-          .prepare(
-            "INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, sort_key, tags_json, created_at, updated_at) VALUES (?, '', NULL, 0, ?, 99, '[]', '', '')"
-          )
-          .run(crypto.randomUUID(), kind);
-      expect(() => probe("quest"), "v19 widened the CHECK for D11's quest history").not.toThrow();
-      expect(() => probe("bogus"), "...and the CHECK still discriminates").toThrow();
-      // Every index survived the rebuild, plus the new join index. DROP TABLE takes its indexes with it, so a
-      // forgotten CREATE INDEX silently turns the timeline's ORDER BY into a full scan.
-      const indexes = (
-        raw
-          .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_journal'")
-          .all() as Array<{ name: string }>
-      ).map((row) => row.name);
-      for (const name of [
-        "codex_journal_order",
-        "codex_journal_marker",
-        "codex_journal_page",
-        "codex_journal_session"
-      ]) {
-        expect(indexes, `index ${name}`).toContain(name);
-      }
-      const sessionTags = raw.prepare("SELECT tags_json FROM codex_sessions").all() as Array<{ tags_json: string }>;
-      for (const row of sessionTags) expect(row.tags_json).toBe("[]");
-      raw.close();
-      expect(upgraded.listSessions().every((session) => session.tags.length === 0)).toBe(true);
-
-      // The session search backfill keeps the layers apart: the GM finds a legacy session by its prep text, and
-      // a player never can, even for a revealed session.
-      expect(
-        upgraded.searchAll("gm", "ambush").hits.some((hit) => hit.kind === "session" && hit.id === existingSession)
-      ).toBe(true);
-      expect(upgraded.searchAll("player", "ambush").hits.some((hit) => hit.id === existingSession)).toBe(false);
-      expect(
-        upgraded
-          .searchAll("player", "crossed")
-          .hits.some((hit) => hit.kind === "session" && hit.id === existingSession),
-        "a revealed session's RECAP is findable"
-      ).toBe(true);
-      expect(
-        upgraded.searchAll("player", "crossed").hits.some((hit) => hit.id === synthesized.id),
-        "...and a hidden one is not"
-      ).toBe(false);
-
-      // The links rebuild carried every existing row over as a page source, the relationships table gained its
-      // layer, and the legacy slugs became the labels a reader sees.
-      const raw2 = new DatabaseSync(path);
-      const linkRows = raw2
-        .prepare(
-          "SELECT source_kind, source_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY target_ref"
-        )
-        .all() as Array<{ source_kind: string; source_id: string; layer: string; target_ref: string }>;
-      expect(linkRows.length, "the legacy page links survived the rebuild").toBeGreaterThanOrEqual(2);
-      // The legacy row is still a page source with its layer intact. (The non-page rows beside it come from
-      // the startup reconcile, asserted below.)
-      expect(linkRows.find((row) => row.source_id === linkedPage)).toMatchObject({
-        source_kind: "page",
-        target_ref: "vallaki",
-        layer: "player"
-      });
-      const rels = raw2.prepare("SELECT type, layer FROM codex_relationships ORDER BY type").all() as Array<{
-        type: string;
-        layer: string;
-      }>;
-      // "ally" -> "ally of" from the known vocabulary; an unknown slug falls back to dashes-into-spaces.
-      expect(rels.map((row) => row.type)).toEqual(["ally of", "owes a debt to"]);
-      expect(
-        rels.every((row) => row.layer === "player"),
-        "every migrated edge is on the player layer - today's behaviour"
-      ).toBe(true);
-      raw2.close();
-
-      // The startup reconcile ran once on open and re-extracted session, quest and journal bodies, which no SQL
-      // migration could do since SQL cannot parse `[[...]]`.
-      const reconciled = upgraded.listAllConnections().filter((edge) => edge.origin === "mention");
-      expect(
-        reconciled.find((edge) => edge.fromKind === "session"),
-        "a legacy session's PREP link, on the GM layer"
-      ).toMatchObject({ fromId: existingSession, layer: "gm" });
-      expect(
-        reconciled.find((edge) => edge.fromKind === "journal"),
-        "a legacy entry's player-text link"
-      ).toMatchObject({ fromId: matched, layer: "player" });
-      const allyA = upgraded.listPages().find((page) => page.title === "The Harpers")!;
-      const allyB = upgraded.listPages().find((page) => page.title === "The Zhentarim")!;
-      expect(
-        upgraded.createConnection(allyB.id, { toPageId: allyA.id, label: "ally of" }).fromPageId,
-        "the reverse direction is the SAME edge"
-      ).toBe(allyA.id);
-
-      // Renumbering the session moves every joined entry's display number in one write, with no journal work.
-      upgraded.updateSession(existingSession, { sessionNumber: 42 }, undefined, "gm");
-      expect(upgraded.getEntry(matched)!.sessionNumber).toBe(42);
-
-      expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionId).toBeNull();
-      expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionId).toBeNull();
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
-  });
-
-  // The CHECK is asserted in SQL because a repair script could bypass `sessionStatus()`, and `toSession` would
-  // coerce the bad value to "planned" rather than failing.
-  it("the status CHECK rejects a value the TS gate would never produce", () => {
-    const database = new DatabaseSync(":memory:");
-    for (const migration of MIGRATIONS) database.exec(migration.sql);
+  it("the session status CHECK rejects a value the TS gate would never produce", () => {
+    const database = raw();
     const insert = (status: string) =>
       database
         .prepare(
-          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', '', '', 0, ?, 1, '', '')"
+          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, tags_json, scene_ids_json, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', '', '', 0, ?, '[]', '[]', 1, '', '')"
         )
         .run(`id-${status}`, status);
 
@@ -2672,241 +2294,36 @@ describe("CodexStore migration v19 — journal entries join their session by ide
     expect(() => insert("played")).not.toThrow();
     database.close();
   });
-});
 
-// The quests table migration has nothing to backfill, so the claims are that the table and its status
-// index ship and that the CHECK discriminates.
-describe("CodexStore migration v14 — quests arrive with nothing to back-fill (M10)", () => {
-  it("creates the quest table and its status index, and back-fills nothing", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v13-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      // A pre-quests database built from the shipped SQL, with a page and a numbered session: the rows most
-      // plausibly mistaken for quests to promote.
-      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-      database.exec(
-        "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-      );
-      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 13)) {
-        database.exec(migration.sql);
-        database
-          .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-          .run(migration.version);
-      }
-      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
-      database
-        .prepare(
-          "INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Ireena', 'character', '{}', '{}', NULL, '[]', 'Escort her to Vallaki.', '', 1, NULL, 1, '', '')"
-        )
-        .run(crypto.randomUUID());
-      database
-        .prepare(
-          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, 1, NULL, '[]', 'Find the ledger.', '', 0, 'planned', 1, '', '')"
-        )
-        .run(crypto.randomUUID());
-      database.close();
-
-      upgraded = new CodexStore(path);
-      await upgraded.initialize();
-
-      expect(upgraded.listQuests()).toEqual([]); // nothing was promoted into a quest
-      expect(upgraded.listSessions()).toHaveLength(1); // ...and the existing rows are untouched
-      expect(upgraded.listPages()).toHaveLength(1);
-
-      // The status index makes the dashboard's open-quest count a query rather than a scan.
-      const reopened = new DatabaseSync(path);
-      const indexes = (
-        reopened
-          .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_quests'")
-          .all() as Array<{ name: string }>
-      ).map((row) => row.name);
-      reopened.close();
-      expect(indexes).toContain("codex_quests_status");
-
-      expect(upgraded.createQuest({ title: "The Wyrmwood Contract" }).status).toBe("not-started");
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
-  });
-
-  // The CHECK is asserted in SQL because a repair script could bypass `questStatus()`, and `toQuest` would
-  // coerce the bad value to "active" rather than failing.
-  it("the status CHECK rejects a value the TS gate would never produce", () => {
-    const database = new DatabaseSync(":memory:");
-    for (const migration of MIGRATIONS) database.exec(migration.sql);
+  it("the quest status CHECK rejects a value the TS gate would never produce", () => {
+    const database = raw();
     const insert = (status: string) =>
       database
         .prepare(
-          "INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Q', ?, '', '', '[]', '[]', 0, 1, '', '')"
+          "INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, tags_json, rev, created_at, updated_at) VALUES (?, 'Q', ?, '', '', '[]', '[]', 0, '[]', 1, '', '')"
         )
         .run(`id-${status}`, status);
 
     expect(() => insert("abandoned")).toThrow();
-    // All five legal values insert, so the throw above is the CHECK discriminating, and `not-started` and
-    // `canceled` prove the rebuilt CHECK ran.
+    // All five legal values insert, so the throws are the CHECK discriminating.
     for (const status of ["not-started", "active", "completed", "failed", "canceled"])
       expect(() => insert(status), status).not.toThrow();
     expect(() => insert("cancelled")).toThrow();
     database.close();
   });
-});
 
-// Adding two quest statuses rebuilds `codex_quests` (SQLite cannot widen a CHECK). This upgrades a seeded
-// pre-migration database and compares every column of every row.
-describe("CodexStore migration v26 — two more quest statuses, no quest touched (5d)", () => {
-  /** A pre-migration database on disk, ready for a CodexStore to upgrade. */
-  const v25Database = (path: string): DatabaseSync => {
-    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-    database.exec(
-      "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-    );
-    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 25)) {
-      database.exec(migration.sql);
+  it("the journal kind CHECK admits every kind and nothing else", () => {
+    const database = raw();
+    const insert = (kind: string) =>
       database
-        .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-        .run(migration.version);
-    }
-    return database;
-  };
-
-  it("v26 is the next version, and the file really is at 25 before it", () => {
-    // The migration count this was written against; a second migration 26 would collide and fail here first.
-    expect(MIGRATIONS.map((migration) => migration.version)).toEqual(
-      Array.from({ length: 26 }, (_, index) => index + 1)
-    );
-  });
-
-  it("preserves every column of every pre-existing quest — status, id and both bodies byte-identical", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v25-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      const database = v25Database(path);
-      database.prepare("INSERT INTO codex_meta (id, codex_revision, links_backfilled) VALUES (1, 7, 1)").run();
-      // One quest per pre-existing status, plus the shapes with something to lose: a GM body, an ordered
-      // objective list, linked page ids, tags, and a revealed row.
-      const insert = database.prepare(
-        "INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      );
-      const live = crypto.randomUUID(),
-        done = crypto.randomUUID(),
-        lost = crypto.randomUUID();
-      const linked = crypto.randomUUID();
-      insert.run(
-        live,
-        "The Wyrmwood Contract",
-        "active",
-        "Deliver the ledger to Vallaki.",
-        "The ledger is a forgery.",
-        JSON.stringify([
-          { text: "Find the ledger", done: true },
-          { text: "Reach Vallaki", done: false }
-        ]),
-        JSON.stringify([linked]),
-        1,
-        4,
-        "2026-01-04T00:00:00.000Z",
-        "2026-01-09T00:00:00.000Z",
-        '["travel","barovia"]'
-      );
-      insert.run(
-        done,
-        "Free Ireena",
-        "completed",
-        "She is safe.",
-        "Strahd is not finished.",
-        JSON.stringify([{ text: "Escort her", done: true }]),
-        "[]",
-        0,
-        2,
-        "2026-01-05T00:00:00.000Z",
-        "2026-01-06T00:00:00.000Z",
-        "[]"
-      );
-      insert.run(
-        lost,
-        "The Missing Caravan",
-        "failed",
-        "",
-        "Nobody survived the pass.",
-        "[]",
-        "[]",
-        0,
-        1,
-        "2026-01-06T00:00:00.000Z",
-        "2026-01-06T00:00:00.000Z",
-        '["caravan"]'
-      );
-
-      // Raw SQL, not `toQuest`: a projection that drops a column reads as null on both sides. `SELECT *` is
-      // right here because the test wants whatever columns actually exist.
-      const before = database.prepare("SELECT * FROM codex_quests ORDER BY id").all();
-      const beforeColumns = (
-        database.prepare("PRAGMA table_info(codex_quests)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      expect(before).toHaveLength(3);
-      // The old file refuses the new statuses, so the widening below is a real change.
-      expect(() =>
-        database
-          .prepare(
-            "INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Probe', 'not-started', '', '', '[]', '[]', 0, 1, '', '')"
-          )
-          .run(crypto.randomUUID())
-      ).toThrow();
-      database.close();
-
-      upgraded = new CodexStore(path);
-      await upgraded.initialize(); // migration 26 runs here
-
-      const reopened = new DatabaseSync(path);
-      const after = reopened.prepare("SELECT * FROM codex_quests ORDER BY id").all() as Array<Record<string, unknown>>;
-      const afterColumns = (
-        reopened.prepare("PRAGMA table_info(codex_quests)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      const indexes = (
-        reopened
-          .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_quests'")
-          .all() as Array<{ name: string }>
-      ).map((row) => row.name);
-      reopened.close();
-
-      expect(after).toHaveLength(before.length); // nothing dropped, nothing duplicated
-      // Every column of every row, value for value. The migration adds no column, so nothing is excused,
-      // including the status strings the rebuild's copying SELECT could have mangled.
-      expect(after).toEqual(before);
-      expect([...after.map((row) => row.status)].sort()).toEqual(["active", "completed", "failed"]);
-      // The rebuilt table matches the old one: columns, order, types, NOT-NULLs and defaults, including
-      // `tags_json`'s DEFAULT '[]', which a DDL reconstructed from memory would drop.
-      expect(afterColumns).toEqual(beforeColumns);
-      // A rebuild drops the table's indexes; `codex_quests_status` keeps the dashboard's open-quest filter cheap.
-      expect(indexes).toContain("codex_quests_status");
-
-      const carried = upgraded.getQuest(live)!;
-      expect(carried.status).toBe("active");
-      expect(carried.title).toBe("The Wyrmwood Contract");
-      expect(carried.playerBody).toBe("Deliver the ledger to Vallaki.");
-      expect(carried.gmBody).toBe("The ledger is a forgery.");
-      expect(carried.objectives).toEqual([
-        { text: "Find the ledger", done: true },
-        { text: "Reach Vallaki", done: false }
-      ]);
-      expect(carried.entityIds).toEqual([linked]);
-      expect(carried.tags).toEqual(["travel", "barovia"]);
-      expect(carried.revealedToPlayers).toBe(true);
-      expect(carried.rev).toBe(4);
-      expect(upgraded.getQuest(done)!.status).toBe("completed");
-      expect(upgraded.getQuest(lost)!.status).toBe("failed");
-      expect(upgraded.listQuests().map((quest) => quest.id)).toEqual([live, done, lost]); // oldest-first, unchanged
-
-      expect(upgraded.updateQuest(lost, { status: "canceled" }, undefined).status).toBe("canceled");
-      expect(upgraded.getQuest(lost)!.status).toBe("canceled");
-      expect(upgraded.createQuest({ title: "A rumour in Vallaki" }).status).toBe("not-started");
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
+        .prepare(
+          "INSERT INTO codex_journal (id, kind, player_text, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, '', 0, 1, '[]', '', '')"
+        )
+        .run(crypto.randomUUID(), kind);
+    for (const kind of ["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"])
+      expect(() => insert(kind), kind).not.toThrow();
+    expect(() => insert("bogus")).toThrow();
+    database.close();
   });
 });
 
@@ -3180,8 +2597,8 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
   });
 
   it("lets a bare LABEL with no session through - director ruling R2's stamp-back, and nothing else reaches this arm", () => {
-    // The only bare labels left after migration: `deleteSession` stamps a revealed session's number onto its
-    // entries. That number was already player-visible and names no remaining record, so it travels.
+    // A bare label comes from `deleteSession` stamping a revealed session's number onto its entries. That
+    // number was already player-visible and names no remaining record, so it travels.
     const revealed = store.createSession({ sessionNumber: 4 });
     store.setSessionRevealed(revealed.id, true);
     const entry = revealedEntry(revealed.id);
@@ -3270,13 +2687,13 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
     const untouchedStamp = store.getEntry(first.id)!.updatedAt;
     expect([first, second].map((entry) => entry.sessionNumber)).toEqual([4, 4]);
 
-    store.updateSession(session.id, { sessionNumber: 9 }, undefined, "gm");
+    store.updateSession(session.id, { sessionNumber: 9 }, undefined);
 
     expect(store.getEntry(first.id)!.sessionNumber).toBe(9);
     expect(store.getEntry(second.id)!.sessionNumber).toBe(9);
     expect(store.getEntry(first.id)!.updatedAt).toBe(untouchedStamp);
     // Clearing the number leaves the join intact: the entry is still filed under that session.
-    store.updateSession(session.id, { sessionNumber: null }, undefined, "gm");
+    store.updateSession(session.id, { sessionNumber: null }, undefined);
     expect(store.getEntry(first.id)).toMatchObject({ sessionId: session.id, sessionNumber: null });
   });
 
@@ -3307,29 +2724,12 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
     store.setActiveSession(unnumbered.id);
     const filed = store.createEntry({ playerText: "before it was numbered" });
     expect(filed).toMatchObject({ sessionId: unnumbered.id, sessionNumber: null });
-    store.updateSession(unnumbered.id, { sessionNumber: 12 }, undefined, "gm");
+    store.updateSession(unnumbered.id, { sessionNumber: 12 }, undefined);
     expect(store.getEntry(filed.id)!.sessionNumber, "...and the number appears the moment the GM sets one").toBe(12);
   });
 });
 
-// Deadlines and downtime required rebuilding `codex_journal` (SQLite cannot widen a CHECK); the rebuild is
-// tested on a pre-migration database built from the shipped SQL.
 describe("CodexStore deadlines + downtime (M11)", () => {
-  /** A pre-migration database on disk, seeded by the caller, ready for a CodexStore to upgrade. */
-  const legacyDatabase = (path: string): DatabaseSync => {
-    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-    database.exec(
-      "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-    );
-    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 14)) {
-      database.exec(migration.sql);
-      database
-        .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-        .run(migration.version);
-    }
-    return database;
-  };
-
   // The new kinds insert and read back as themselves; without a real `kind` parse a deadline would silently
   // read back as a note.
   it("stores a deadline and a downtime as THEMSELVES — the widened CHECK, and a kind that is parsed rather than collapsed", () => {
@@ -3390,293 +2790,6 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     // A deadline with no structured date is rejected: prose cannot be compared to a clock.
     expect(() => store.createDeadline({ playerText: "Someday, probably" })).toThrow(/in-world date/);
     expect(() => store.createDeadline({ playerText: "Soon", inWorldLabel: "next spring" })).toThrow(/in-world date/);
-  });
-
-  // Seeds a pre-migration database with every row shape that has something to lose, upgrades it, and compares
-  // every column in raw SQL (`SELECT *`), since a dropped column would read null on both sides via `toEntry`.
-  it("migration v15 preserves every column of every pre-existing journal row (K7)", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v14-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      const database = legacyDatabase(path);
-      database.prepare("INSERT INTO codex_meta (id, codex_revision, calendar_json) VALUES (1, 3, ?)").run(
-        JSON.stringify({
-          yearName: "DR",
-          months: [
-            { name: "Hammer", days: 30 },
-            { name: "Alturiak", days: 30 }
-          ],
-          weekdays: ["First"],
-          currentDate: { year: 1492, month: 1, day: 17 }
-        })
-      );
-      const mapId = crypto.randomUUID(),
-        markerId = crypto.randomUUID(),
-        pageId = crypto.randomUUID();
-      database
-        .prepare(
-          "INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, 'Barovia', 'regional', NULL, 1, 1, '[]', '', '')"
-        )
-        .run(mapId, crypto.randomUUID());
-      database
-        .prepare(
-          "INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, tags_json, page_ids_json, scene_ids_json, created_at, updated_at) VALUES (?, ?, 0.5, 0.5, 'pin', '#FF2E9A', 'Svalich Road', 1, '[]', '[]', '[]', '', '')"
-        )
-        .run(markerId, mapId);
-      database
-        .prepare(
-          "INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Ravenloft', 'location', '{}', '{}', NULL, '[]', 'a castle', 'the crypt', 0, NULL, 1, '', '')"
-        )
-        .run(pageId);
-
-      const insert = database.prepare(
-        "INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      );
-      const pinnedToMarker = crypto.randomUUID(),
-        pinnedToPage = crypto.randomUUID(),
-        dated = crypto.randomUUID(),
-        tagged = crypto.randomUUID(),
-        fight = crypto.randomUUID();
-      insert.run(
-        pinnedToMarker,
-        "The mists parted.",
-        "Strahd watched.",
-        1,
-        markerId,
-        null,
-        "note",
-        null,
-        2,
-        "2026-01-04",
-        null,
-        null,
-        null,
-        null,
-        null,
-        1,
-        "[]",
-        "2026-01-04T00:00:00.000Z",
-        "2026-01-04T00:00:00.000Z"
-      );
-      insert.run(
-        pinnedToPage,
-        "We entered the castle.",
-        null,
-        0,
-        null,
-        pageId,
-        "note",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        2,
-        "[]",
-        "2026-01-05T00:00:00.000Z",
-        "2026-01-05T00:00:00.000Z"
-      );
-      insert.run(
-        dated,
-        "The siege begins.",
-        null,
-        1,
-        null,
-        null,
-        "note",
-        null,
-        3,
-        null,
-        "First, Alturiak 17, 1492 DR",
-        537_376,
-        1492,
-        1,
-        17,
-        3,
-        "[]",
-        "2026-01-06T00:00:00.000Z",
-        "2026-01-06T00:00:00.000Z"
-      );
-      insert.run(
-        tagged,
-        "The wolves circled.",
-        "They are Strahd's.",
-        0,
-        null,
-        null,
-        "note",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        4,
-        '["travel","wolves"]',
-        "2026-01-07T00:00:00.000Z",
-        "2026-01-07T00:00:00.000Z"
-      );
-      insert.run(
-        fight,
-        "The battle at the gate.",
-        null,
-        1,
-        markerId,
-        pageId,
-        "combat",
-        41,
-        3,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        5,
-        '["combat"]',
-        "2026-01-08T00:00:00.000Z",
-        "2026-01-08T00:00:00.000Z"
-      );
-
-      const before = database.prepare("SELECT * FROM codex_journal ORDER BY id").all();
-      const beforeColumns = (
-        database.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      expect(before).toHaveLength(5);
-      database.close();
-
-      upgraded = new CodexStore(path);
-      await upgraded.initialize(); // the rebuild runs here
-
-      const reopened = new DatabaseSync(path);
-      const after = reopened.prepare("SELECT * FROM codex_journal ORDER BY id").all() as Array<Record<string, unknown>>;
-      const afterColumns = (
-        reopened.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      reopened.close();
-
-      expect(after).toHaveLength(before.length); // nothing dropped, nothing duplicated
-      for (const [index, original] of before.entries()) {
-        const {
-          payload_json: payload,
-          session_id: sessionId,
-          session_number: sessionNumber,
-          ...carried
-        } = after[index];
-        // Every pre-existing column, value for value, except the two later migrations touched (checked below).
-        const { session_number: originalNumber, ...originalCarried } = original as Record<string, unknown>;
-        expect(carried).toEqual(originalCarried);
-        expect(payload).toBeNull(); // the new column starts empty
-        // A numbered row's number moved into the join and the bare column was emptied; an unnumbered row is
-        // untouched on both.
-        if (originalNumber === null) {
-          expect(sessionId).toBeNull();
-          expect(sessionNumber).toBeNull();
-        } else {
-          expect(sessionId, "a legacy number resolved to a session record").not.toBeNull();
-          expect(sessionNumber, "and the bare column is now the LABEL store, empty").toBeNull();
-        }
-      }
-      // The rebuilt table is the old table plus the two new columns, in the same order with the same types,
-      // NOT-NULLs and defaults, including `tags_json`'s DEFAULT '[]'.
-      expect(afterColumns.slice(0, -2)).toEqual(beforeColumns);
-      expect(afterColumns.at(-2)).toEqual(["payload_json", "TEXT", 0, null]);
-      expect(afterColumns.at(-1)).toEqual(["session_id", "TEXT", 0, null]);
-
-      expect(upgraded.getEntry(fight)!.kind).toBe("combat");
-      expect(upgraded.getEntry(fight)!.sourceEncounterId).toBe(41);
-      expect(upgraded.getEntry(tagged)!.tags).toEqual(["travel", "wolves"]);
-      expect(upgraded.getEntry(pinnedToMarker)!.attachMarkerId).toBe(markerId);
-      expect(upgraded.getEntry(pinnedToPage)!.attachPageId).toBe(pageId);
-      expect(upgraded.getEntry(dated)!.inWorldDate).toEqual({ year: 1492, month: 1, day: 17 });
-      expect(
-        upgraded
-          .listEntriesFor({ markerId })
-          .map((entry) => entry.id)
-          .sort()
-      ).toEqual([pinnedToMarker, fight].sort());
-
-      // The published date is backfilled from the calendar's `currentDate`, so the two clocks start in agreement.
-      expect(upgraded.getPublishedDate()).toEqual({ year: 1492, month: 1, day: 17 });
-      expect(upgraded.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 17 });
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
-  });
-
-  // `json_extract` throws on malformed JSON and SQLite's `AND` does not short-circuit, so the backfill must
-  // survive a hand-edited `calendar_json`. Each case opening a real store is the assertion.
-  it("migration v15 backfills NULL rather than dying when the stored calendar has no usable currentDate", async () => {
-    for (const calendarJson of [
-      null,
-      "not json at all",
-      '{"months":[]}',
-      '{"currentDate":null}',
-      '{"currentDate":{"year":"1492","month":0,"day":1}}'
-    ]) {
-      const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v14-odd-"));
-      const path = join(legacyDirectory, "vtt.sqlite");
-      let upgraded: CodexStore | undefined;
-      try {
-        const database = legacyDatabase(path);
-        database
-          .prepare("INSERT INTO codex_meta (id, codex_revision, calendar_json) VALUES (1, 0, ?)")
-          .run(calendarJson);
-        database.close();
-        upgraded = new CodexStore(path);
-        await upgraded.initialize();
-        expect(upgraded.getPublishedDate()).toBeNull();
-      } finally {
-        upgraded?.close();
-        await rm(legacyDirectory, { recursive: true, force: true });
-      }
-    }
-    // A fractional part truncates: `codex_meta` is STRICT and rejects a non-integral REAL, and truncation
-    // matches `normalizeCalendar`'s `Math.trunc`.
-    const floatDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v14-float-"));
-    const floatPath = join(floatDirectory, "vtt.sqlite");
-    let floats: CodexStore | undefined;
-    try {
-      const database = legacyDatabase(floatPath);
-      database
-        .prepare("INSERT INTO codex_meta (id, codex_revision, calendar_json) VALUES (1, 0, ?)")
-        .run('{"currentDate":{"year":1492.0,"month":0.0,"day":9.7}}');
-      database.close();
-      floats = new CodexStore(floatPath);
-      await floats.initialize();
-      expect(floats.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 9 });
-    } finally {
-      floats?.close();
-      await rm(floatDirectory, { recursive: true, force: true });
-    }
-  });
-
-  // `DROP TABLE` drops its indexes and a missing one fails silently, so the definitions are asserted, not
-  // just the names.
-  it("recreates all three codex_journal indexes, over the same columns, after the rebuild", () => {
-    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
-    const indexes = new Map(
-      (
-        raw
-          .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_journal'")
-          .all() as Array<{ name: string; sql: string | null }>
-      ).map((row) => [row.name, row.sql])
-    );
-    raw.close();
-    expect(indexes.get("codex_journal_order")).toBe(
-      "CREATE INDEX codex_journal_order ON codex_journal (calendar_instant, session_number, created_at)"
-    );
-    expect(indexes.get("codex_journal_marker")).toBe(
-      "CREATE INDEX codex_journal_marker ON codex_journal (attach_marker_id)"
-    );
-    expect(indexes.get("codex_journal_page")).toBe("CREATE INDEX codex_journal_page ON codex_journal (attach_page_id)");
   });
 
   // Creating downtime does not move the clock, `applyDowntime` does, and applying twice is rejected and
@@ -4051,236 +3164,9 @@ describe("CodexStore deadlines + downtime (M11)", () => {
   });
 });
 
-// Standing, party marker and milestones at the store layer, including the additive migration on a real
-// pre-migration database.
+// Standing, party marker and milestones at the store layer.
 describe("CodexStore standing, party marker + milestones (M12)", () => {
-  /** A pre-migration database on disk, seeded by the caller, ready for a CodexStore to upgrade. */
-  const legacyV15Database = (path: string): DatabaseSync => {
-    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-    database.exec(
-      "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-    );
-    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 15)) {
-      database.exec(migration.sql);
-      database
-        .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-        .run(migration.version);
-    }
-    return database;
-  };
   const faction = (title: string) => store.createPage({ title, entityType: "faction" });
-
-  // Every existing marker and journal row survives untouched and `is_party` arrives as 0. The journal half
-  // guards against an unnecessary `codex_journal` rebuild.
-  it("migration v16 adds is_party and codex_standing without disturbing a single existing row (K7, T-1)", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v15-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      const database = legacyV15Database(path);
-      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 7)").run();
-      const mapId = crypto.randomUUID(),
-        pageId = crypto.randomUUID();
-      database
-        .prepare(
-          "INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, 'Barovia', 'regional', NULL, 1, 1, '[]', '', '')"
-        )
-        .run(mapId, crypto.randomUUID());
-      database
-        .prepare(
-          "INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'The Harpers', 'faction', '{}', '{}', NULL, '[]', 'a network', 'they are compromised', 0, NULL, 1, '', '')"
-        )
-        .run(pageId);
-
-      // Three markers with everything a marker can carry, so a rebuilt-instead-of-altered table would show.
-      const insertMarker = database.prepare(
-        "INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      );
-      const plain = crypto.randomUUID(),
-        linked = crypto.randomUUID(),
-        hidden = crypto.randomUUID();
-      insertMarker.run(
-        plain,
-        mapId,
-        0.5,
-        0.5,
-        "pin",
-        "#FF2E9A",
-        "Svalich Road",
-        1,
-        "[]",
-        null,
-        "[]",
-        null,
-        "[]",
-        "2026-01-01T00:00:00.000Z",
-        "2026-01-01T00:00:00.000Z"
-      );
-      insertMarker.run(
-        linked,
-        mapId,
-        12,
-        34,
-        "castle",
-        "#2DE2FF",
-        "Castle Ravenloft",
-        1,
-        JSON.stringify([pageId]),
-        null,
-        JSON.stringify([crypto.randomUUID()]),
-        crypto.randomUUID(),
-        '["landmark"]',
-        "2026-01-02T00:00:00.000Z",
-        "2026-01-02T00:00:00.000Z"
-      );
-      insertMarker.run(
-        hidden,
-        mapId,
-        1,
-        2,
-        "town",
-        "#A45CFF",
-        null,
-        0,
-        "[]",
-        null,
-        "[]",
-        null,
-        "[]",
-        "2026-01-03T00:00:00.000Z",
-        "2026-01-03T00:00:00.000Z"
-      );
-
-      const insertEntry = database.prepare(
-        "INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      );
-      const note = crypto.randomUUID(),
-        downtime = crypto.randomUUID();
-      insertEntry.run(
-        note,
-        "The mists parted.",
-        "Strahd watched.",
-        1,
-        plain,
-        pageId,
-        "note",
-        null,
-        2,
-        "2026-01-04",
-        null,
-        null,
-        null,
-        null,
-        null,
-        1,
-        '["travel"]',
-        null,
-        "2026-01-04T00:00:00.000Z",
-        "2026-01-04T00:00:00.000Z"
-      );
-      insertEntry.run(
-        downtime,
-        "Vex brews poison.",
-        null,
-        0,
-        null,
-        null,
-        "downtime",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        2,
-        "[]",
-        JSON.stringify({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null }),
-        "2026-01-05T00:00:00.000Z",
-        "2026-01-05T00:00:00.000Z"
-      );
-
-      const markersBefore = database.prepare("SELECT * FROM codex_markers ORDER BY id").all();
-      const journalBefore = database.prepare("SELECT * FROM codex_journal ORDER BY id").all();
-      const journalColumnsBefore = (
-        database.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      expect(markersBefore).toHaveLength(3);
-      expect(journalBefore).toHaveLength(2);
-      database.close();
-
-      upgraded = new CodexStore(path);
-      await upgraded.initialize(); // the migration runs here
-
-      const reopened = new DatabaseSync(path);
-      const markersAfter = reopened.prepare("SELECT * FROM codex_markers ORDER BY id").all() as Array<
-        Record<string, unknown>
-      >;
-      const journalAfter = reopened.prepare("SELECT * FROM codex_journal ORDER BY id").all();
-      const journalColumnsAfter = (
-        reopened.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      const markerColumns = (
-        reopened.prepare("PRAGMA table_info(codex_markers)").all() as Array<Record<string, unknown>>
-      ).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
-      const standingColumns = (
-        reopened.prepare("PRAGMA table_info(codex_standing)").all() as Array<Record<string, unknown>>
-      ).map((column) => column.name);
-      reopened.close();
-
-      expect(markersAfter).toHaveLength(markersBefore.length); // nothing dropped, nothing duplicated
-      for (const [index, original] of markersBefore.entries()) {
-        const { is_party: isParty, ...carried } = markersAfter[index];
-        expect(carried).toEqual(original); // every pre-existing column, value for value
-        expect(isParty).toBe(0); // ...and the new one defaults to "not the party"
-      }
-      // This migration must not touch `codex_journal`. A later migration on this upgrade path does (the
-      // session join), so the comparison excludes the columns it owns.
-      expect(journalColumnsAfter.slice(0, -1)).toEqual(journalColumnsBefore);
-      expect(journalColumnsAfter.at(-1)).toEqual(["session_id", "TEXT", 0, null]);
-      expect(journalAfter).toHaveLength(journalBefore.length);
-      for (const [index, original] of (journalBefore as Array<Record<string, unknown>>).entries()) {
-        const {
-          session_id: sessionId,
-          session_number: sessionNumber,
-          ...carried
-        } = journalAfter[index] as Record<string, unknown>;
-        const { session_number: originalNumber, ...originalCarried } = original;
-        expect(carried).toEqual(originalCarried);
-        if (originalNumber === null) {
-          expect(sessionId).toBeNull();
-          expect(sessionNumber).toBeNull();
-        } else {
-          expect(sessionId).not.toBeNull();
-          expect(sessionNumber).toBeNull();
-        }
-      }
-
-      // The new column is last with the declared type/NOT NULL/DEFAULT, so an existing codex needs no backfill.
-      expect(markerColumns.at(-1)).toEqual(["is_party", "INTEGER", 1, "0"]);
-      expect(standingColumns).toEqual(["id", "faction_page_id", "value", "revealed", "created_at", "updated_at"]);
-
-      expect(upgraded.getMarker(linked)!.pageIds).toEqual([pageId]);
-      expect(upgraded.getMarker(linked)!.tags).toEqual(["landmark"]);
-      expect(upgraded.getMarker(hidden)!.revealedToPlayers).toBe(false);
-      expect(upgraded.listMarkers(mapId).every((marker) => marker.isParty === false)).toBe(true);
-      expect(upgraded.partyMarker()).toBeNull();
-      expect(upgraded.getEntry(downtime)!.payload).toEqual({
-        who: "Vex",
-        activity: "Brewing poison",
-        days: 30,
-        applied: true,
-        characterPageId: null
-      });
-      expect(upgraded.getEntry(note)!.tags).toEqual(["travel"]);
-      // An empty standing table is the complete upgrade: there was never a standing to backfill from.
-      expect(upgraded.listStanding()).toEqual([]);
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
-  });
 
   // One party marker atlas-wide (pins on different maps): `setPartyMarker` clears before it sets, and the
   // partial unique index holds even for raw SQL writes around the store.
@@ -5082,88 +3968,6 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     clock.updatePage(page.id, { entityType: "location" }, undefined, "gm");
     expect(clock.listRevisions(page.id)).toHaveLength(before);
   });
-
-  // The settings migration on a real pre-migration database holding a page and two revision rows as the old
-  // code wrote them (new-state snapshots, `authored_at` from `updated_at`).
-  it("upgrades a REAL v16 database: the defaults land, and every existing revision survives", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v16-"));
-    const path = join(legacyDirectory, "vtt.sqlite");
-    let upgraded: CodexStore | undefined;
-    try {
-      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
-      database.exec(
-        "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-      );
-      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 16)) {
-        database.exec(migration.sql);
-        database
-          .prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')")
-          .run(migration.version);
-      }
-      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 4)").run();
-      const pageId = crypto.randomUUID();
-      const legacyStamp = new Date(EPOCH - 30 * 60_000).toISOString(); // authored half an hour before "now"
-      database
-        .prepare(
-          "INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Vistani camp', 'location', '{}', '{}', NULL, '[]', 'v2', 'the secret', 0, NULL, 2, ?, ?)"
-        )
-        .run(pageId, legacyStamp, legacyStamp);
-      const insertRevision = database.prepare(
-        "INSERT INTO codex_page_revisions (page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, 'Vistani camp', 'location', '{}', '{}', ?, 'the secret', NULL, '[]', ?, 'gm')"
-      );
-      insertRevision.run(pageId, 1, "v1", new Date(EPOCH - 120 * 60_000).toISOString());
-      insertRevision.run(pageId, 2, "v2", legacyStamp);
-      expect(
-        (database.prepare("PRAGMA table_info(codex_meta)").all() as Array<{ name: string }>).map((row) => row.name)
-      ).not.toContain("revision_window_minutes");
-      database.close();
-
-      at(0);
-      upgraded = new CodexStore(path, () => now);
-      await upgraded.initialize();
-
-      // The migration applied and its defaults landed on the existing meta row: history stays on and gains the
-      // 90-minute window.
-      const applied = new DatabaseSync(path);
-      expect(
-        (
-          applied.prepare("SELECT version FROM codex_schema_migrations ORDER BY version").all() as Array<{
-            version: number;
-          }>
-        ).map((row) => row.version)
-      ).toEqual(MIGRATIONS.map((migration) => migration.version));
-      expect(
-        applied
-          .prepare(
-            "SELECT revision_history_enabled AS enabled, revision_window_minutes AS window FROM codex_meta WHERE id = 1"
-          )
-          .get()
-      ).toMatchObject({ enabled: 1, window: 90 });
-      applied.close();
-      expect(upgraded.getSettings().revisionHistory).toMatchObject({ enabled: true, windowMinutes: 90 });
-      expect(upgraded.getSettings().revisionHistory.versionCount).toBe(2);
-      expect(upgraded.getSettings().revisionHistory.versionBytes).toBeGreaterThan(0);
-
-      // Every pre-existing revision survives untouched, in order.
-      expect(upgraded.listRevisions(pageId).map((row) => ({ rev: row.rev, playerBody: row.playerBody }))).toEqual([
-        { rev: 2, playerBody: "v2" },
-        { rev: 1, playerBody: "v1" }
-      ]);
-      const oldest = upgraded.listRevisions(pageId)[1];
-      expect(upgraded.restoreRevision(pageId, oldest.id, "gm").playerBody).toBe("v1");
-
-      // The window applies immediately against the legacy rows' `authored_at`: the newest was authored 30
-      // minutes ago, so the restore above (a save) coalesced into it...
-      expect(upgraded.listRevisions(pageId)).toHaveLength(2);
-      at(120);
-      upgraded.updatePage(pageId, { playerBody: "v4" }, undefined, "gm");
-      expect(upgraded.listRevisions(pageId)).toHaveLength(3);
-      expect(upgraded.listRevisions(pageId)[0].playerBody).toBe("v1"); // the state the restore left behind
-    } finally {
-      upgraded?.close();
-      await rm(legacyDirectory, { recursive: true, force: true });
-    }
-  });
 });
 
 // The revision usage figures and the delete, tested together because they are one loop in use (read the
@@ -5476,7 +4280,7 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
       session = store.createSession({ sessionNumber: 2 });
     });
     bumps("updateSession", () => {
-      store.updateSession(session.id, { recapBody: "we survived" }, undefined, "gm");
+      store.updateSession(session.id, { recapBody: "we survived" }, undefined);
     });
     bumps("setSessionRevealed", () => {
       store.setSessionRevealed(session.id, true);
@@ -5614,7 +4418,7 @@ describe("CodexStore search — sessions join the one index (D10, three gates)",
       expect(ids, audience).toContain(quest.id);
     }
     // Editing the tags keeps the index in step; the reindex is in the same transaction as the write.
-    store.updateSession(session.id, { tags: ["arc-two"] }, undefined, "gm");
+    store.updateSession(session.id, { tags: ["arc-two"] }, undefined);
     expect(store.searchAll("gm", "arc-one").hits.map((hit) => hit.id)).not.toContain(session.id);
     expect(store.searchAll("gm", "arc-two").hits.map((hit) => hit.id)).toContain(session.id);
     store.deleteSession(session.id);
@@ -5740,19 +4544,19 @@ describe("CodexStore downtime — the character link (D12)", () => {
     ).toBe(npc.id);
   });
 
-  it("reads a payload written before the field existed as `characterPageId: null` — the parser IS the migration", () => {
+  it("reads a payload without the key as `characterPageId: null`, so the wire shape always carries it", () => {
     const entry = store.createDowntime({
       playerText: "Old row.",
       downtime: { who: "Vex", activity: "Brewing", days: 5 }
     });
-    // Rewrite the blob to the shape without `characterPageId`, as an upgraded database holds it.
+    // Rewrite the blob without `characterPageId`, as a hand-edited row might hold it.
     const database = new DatabaseSync(join(directory, "vtt.sqlite"));
     database
       .prepare("UPDATE codex_journal SET payload_json = ? WHERE id = ?")
       .run(JSON.stringify({ who: "Vex", activity: "Brewing", days: 5, applied: false }), entry.id);
     database.close();
 
-    // The wire promises the key is always present; the defensive reader supplies it, so old payloads need no sweep.
+    // The wire promises the key is always present; the defensive reader supplies it.
     expect(downtimePayloadOf(store.getEntry(entry.id)!)).toEqual({
       who: "Vex",
       activity: "Brewing",
@@ -6236,12 +5040,12 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
     });
   });
 
-  it("restores a PRE-VERSIONING bundle — the backups a GM already has (director ruling R1)", () => {
-    // An older export shape: no `settings`, no `tags` on sessions or quests, no `layer` on a relationship, a
-    // slug `type` rather than a label, and journal rows with a bare `sessionNumber` instead of a `sessionId`.
+  it("restores a bundle that leaves keys out, giving each its default", () => {
+    // No `settings`, no `tags` on sessions, no `layer` on a relationship, and journal rows with a bare
+    // `sessionNumber` and no `sessionId`.
     const pageId = crypto.randomUUID(),
       otherId = crypto.randomUUID();
-    const legacy = {
+    const sparse = {
       pages: [
         {
           id: pageId,
@@ -6327,7 +5131,7 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
         }
       ],
       relationships: [
-        { id: crypto.randomUUID(), fromPageId: otherId, toPageId: pageId, type: "located-in", createdAt: "" }
+        { id: crypto.randomUUID(), fromPageId: otherId, toPageId: pageId, label: "located in", createdAt: "" }
       ],
       sessions: [
         {
@@ -6354,26 +5158,19 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
       revisions: []
     };
 
-    const counts = store.importBundle(legacy);
-    // The orphan number 9 synthesized a session, the same rule the migration applies, rather than orphaning
-    // the entry's number.
-    expect(counts.sessions).toBe(2);
-    const synthesized = store.listSessions().find((session) => session.sessionNumber === 9)!;
-    expect(synthesized).toMatchObject({ status: "played", revealedToPlayers: false, prepBody: "", recapBody: "" });
+    const counts = store.importBundle(sparse);
+    // A number with no session id is a label, as a deleted session leaves one: no session is minted for it.
+    expect(counts.sessions).toBe(1);
     expect(
       store
         .listTimeline()
         .map((entry) => entry.sessionNumber)
         .sort()
     ).toEqual([4, 9]);
-    expect(
-      store.listTimeline().every((entry) => entry.sessionId !== null),
-      "every legacy number became a real join"
-    ).toBe(true);
+    expect(store.listTimeline().every((entry) => entry.sessionId === null)).toBe(true);
 
     // Missing keys defaulted: no tags, a `player` layer, and the settings untouched.
     expect(store.listSessions().every((session) => session.tags.length === 0)).toBe(true);
-    expect(store.searchAll("gm", "Session 9").hits.map((hit) => hit.id)).toEqual([synthesized.id]);
     const edge = store.listAllConnections().find((row) => row.origin === "declared")!;
     expect(edge.layer).toBe("player");
     expect(edge.label).toBe("located in");
@@ -6401,42 +5198,43 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
   });
 });
 
-// A codex created today has nothing to backfill, so it reports revision 0 before its first write. The
-// revision is what every ETag and `codex:changed` ping derives from.
-describe("a fresh codex does not run the D13 link backfill", () => {
-  it("reports revision 0 before its first write, and still backfills a database that predates D13", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-codex-fresh-"));
-    const fresh = new CodexStore(join(directory, "vtt.sqlite"));
-    await fresh.initialize();
-    expect(fresh.revision, "nothing has happened yet").toBe(0);
-    // Reopening does not sweep either: the flag is durable.
-    fresh.close();
-    const reopened = new CodexStore(join(directory, "vtt.sqlite"));
-    await reopened.initialize();
-    expect(reopened.revision).toBe(0);
-    reopened.close();
+// The revision is what every ETag and `codex:changed` ping derives from, so opening a codex must not move it.
+describe("opening a codex", () => {
+  it("reports revision 0 before its first write, and reopening moves nothing", async () => {
+    const freshDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-fresh-"));
+    try {
+      const fresh = new CodexStore(join(freshDirectory, "vtt.sqlite"));
+      await fresh.initialize();
+      expect(fresh.revision, "nothing has happened yet").toBe(0);
+      fresh.close();
+      const reopened = new CodexStore(join(freshDirectory, "vtt.sqlite"));
+      await reopened.initialize();
+      expect(reopened.revision).toBe(0);
+      reopened.close();
+    } finally {
+      await rm(freshDirectory, { recursive: true, force: true });
+    }
+  });
 
-    // A real pre-backfill codex (flag 0) does sweep, and finds wiki links in a session recap that no page
-    // save ever extracted.
+  it("refuses a file written before the migration history was reset, and leaves it alone", async () => {
     const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-legacy-"));
-    const seeded = new CodexStore(join(legacyDirectory, "vtt.sqlite"));
-    await seeded.initialize();
-    const page = seeded.createPage({ title: "Vallaki" });
-    const session = seeded.createSession({ recapBody: "We reached [[Vallaki]]." });
-    seeded.close();
-    const raw = new DatabaseSync(join(legacyDirectory, "vtt.sqlite"));
-    raw.exec("DELETE FROM codex_links; UPDATE codex_meta SET links_backfilled = 0;");
-    raw.close();
-    const migrated = new CodexStore(join(legacyDirectory, "vtt.sqlite"));
-    await migrated.initialize();
-    expect(
-      migrated.listAllConnections().find((edge) => edge.fromId === session.id),
-      "the sweep re-extracted the recap's link"
-    ).toMatchObject({ toPageId: page.id, origin: "mention" });
-    expect(migrated.revision, "...and it told every client to refetch").toBeGreaterThan(0);
-    migrated.close();
-    await rm(directory, { recursive: true, force: true });
-    await rm(legacyDirectory, { recursive: true, force: true });
+    const path = join(legacyDirectory, "vtt.sqlite");
+    try {
+      const legacy = new DatabaseSync(path);
+      legacy.exec(
+        "CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
+      );
+      legacy.close();
+      await expect(new CodexStore(path).initialize()).rejects.toBeInstanceOf(LegacyDatabaseError);
+      const after = new DatabaseSync(path);
+      const tables = (
+        after.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>
+      ).map((row) => row.name);
+      after.close();
+      expect(tables).toEqual(["codex_schema_migrations"]);
+    } finally {
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -6485,7 +5283,6 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "listEntriesFor",
     "getSession",
     "listSessions",
-    "unrevealedSessionIds",
     "getQuest",
     "listQuests",
     "listStanding",
@@ -6632,7 +5429,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
       s.createSession({ sessionNumber: 1 });
     },
     updateSession: (s) => {
-      s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined, "gm");
+      s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined);
     },
     setSessionRevealed: (s) => {
       s.setSessionRevealed(s.createSession({ sessionNumber: 1 }).id, true);
@@ -6668,15 +5465,12 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
   const seedMarker = (from: CodexStore) =>
     from.createMarker(from.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, MARKER);
 
-  // Read from source because `private` is erased at runtime: members at two-space indent starting with
-  // `identifier(`. The floor assertion catches a regex that stops matching.
+  // The store keeps its internals in `#private` members, so its prototype lists exactly its public surface.
   it("classifies every public method, so a write added tomorrow cannot slip past this", () => {
-    const source = readFileSync(new URL("../src/codex-store.ts", import.meta.url), "utf8");
-    const classBody = source.slice(source.indexOf("export class CodexStore {"));
-    const surface = [...classBody.matchAll(/^ {2}(?:get |async )?([a-zA-Z][A-Za-z0-9_]*)\s*\(/gm)]
-      .map((match) => match[1]!)
-      .filter((name) => !["if", "for", "while", "switch", "catch", "return"].includes(name));
-    expect(surface.length, "the source scan found nothing - the regex, not the store, is broken").toBeGreaterThan(50);
+    const surface = Object.getOwnPropertyNames(CodexStore.prototype);
+    expect(surface.length, "the prototype lists nothing - the reflection, not the store, is broken").toBeGreaterThan(
+      50
+    );
 
     const declared = new Set([...NOT_WRITES, ...Object.keys(WRITES)]);
     expect(

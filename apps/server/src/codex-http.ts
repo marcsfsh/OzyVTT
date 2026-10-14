@@ -3,14 +3,10 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
-import {
-  CODEX_BUNDLE_VERSION,
-  CodexNotFoundError,
-  CodexRevisionConflictError,
-  CodexValidationError,
-  type CodexSearchRef,
-  type CodexStore
-} from "./codex-store.js";
+import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
+import type { CodexSearchRef } from "./codex/search.js";
+import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } from "./codex/validate.js";
+import type { CodexStore } from "./codex-store.js";
 import {
   projectGmCalendar,
   projectGmChronicleRecord,
@@ -513,7 +509,12 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
   // payload can name (standing factions, downtime characters); anything else fails closed.
   const downtimePages = store.downtimeCharacterPageIds();
   return {
-    unrevealedSessionIds: store.unrevealedSessionIds(),
+    unrevealedSessionIds: new Set(
+      store
+        .listSessions()
+        .filter((session) => !session.revealedToPlayers)
+        .map((session) => session.id)
+    ),
     // Every quest is a candidate, since any may appear in history; unlisted quests fail closed.
     revealedQuestIds: new Set(
       store
@@ -655,7 +656,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const fingerprint = `${request.method} ${request.baseUrl}${request.path}`;
     const replay = store.recallCommand(supplied);
     if (replay) {
-      if (replay.fingerprint !== null && replay.fingerprint !== fingerprint) {
+      if (replay.fingerprint !== fingerprint) {
         failure(
           response,
           400,
@@ -1369,7 +1370,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const { expectedRev, commandId, ...fields } = SessionUpdateSchema.parse(request.body);
       void commandId;
-      const session = store.updateSession(pathParam(request, "id"), fields, expectedRev, "gm");
+      const session = store.updateSession(pathParam(request, "id"), fields, expectedRev);
       options.notifyChanged();
       return envelope(response, 200, { session: projectGmSession(session) });
     } catch (error) {
