@@ -1,23 +1,9 @@
 /**
- * The selected record's detail pane: identity, the state cluster, and the editor.
+ * The selected record's detail pane: the state cluster (draft/publish/visibility, remove and
+ * restore, autosave) in the head, and `SchemaForm` with the bespoke components below.
  *
- * Two halves that never mix. Everything *about* the record — the draft/publish/
- * visibility machine, remove and restore, the autosave — lives in the head here.
- * Everything *inside* it is `SchemaForm` over one of nine data schemas, with four
- * bespoke components wired in below. There is no per-type branch in this file beyond
- * choosing which of those four to mount.
- *
- * **No type switcher, ever.** The Codex's `PageEditor` silently drops field values not
- * in the new type's schema when the entity type changes. Type is chosen at creation and
- * fixed thereafter, so that bug cannot arise — and no one may add a switcher without
- * solving it first.
- *
- * **The six states are words, never colour alone** (design-language §2 — violet is
- * reserved for GM-only and `--caution` shares its hue family):
- *   Draft · Published + GM only · Published + Shown to players · invalid (a sentence
- *   at the Publish button) · Removed · in use (a count).
- * The vocabulary is fixed and must not gain synonyms — never "hidden" (ambiguous
- * between GM-only and removed), never "live", never "active".
+ * Type is fixed at creation, with no type switcher: switching would drop field values the new
+ * type's schema lacks. States are always shown as words, not colour.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -41,13 +27,11 @@ type Body = Readonly<Record<string, unknown>>;
 
 const nameOf = (record: Body): string => (typeof record.name === "string" ? record.name : "");
 
-/** How many checklist lines are printed before the tail collapses into a count. Six fills the
-    region without pushing the form off a phone screen, and a record with more than six outstanding
-    requirements is one whose next fix will re-shorten the list anyway. */
+/** Checklist lines shown before the rest collapse into a count. */
 const CHECKLIST_SHOWN = 6;
 
-/** One requirement: the sentence, then its section as a control. The section is NEVER in the
-    words — see the "one copy template" note in `validate.ts`. */
+/** One requirement: the sentence, then its section as a jump control. The sentence never names
+    the section (see `validate.ts`). */
 function ChecklistLine({
   reason,
   type,
@@ -83,26 +67,24 @@ export function RecordDetail({
   records: readonly HomebrewRecordSummary[];
   usageCount: number;
   onChanged: (record: HomebrewRecordDocument) => void;
-  /** Opens another record — the jump control on the removal consequence below. */
+  /** Opens another record, from the jump controls in the removal warning. */
   onSelect?: (id: string) => void;
 }>) {
   const { confirm, dialog } = useConfirm();
   const [doc, setDoc] = useState(initial);
-  // Filled in from `defaults.ts` on the way in, so the renderer never writes `?? []` at
-  // every call site — and so a record created before this schema existed, duplicated
-  // from an SRD record, or imported from a pack all arrive complete.
+  // Missing keys are filled from `defaults.ts`, so older, duplicated and imported records arrive complete.
   const [draft, setDraft] = useState<Body>(() => withDefaults(initial.type, initial.record));
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  /** What removing this record just did to OTHER records. See `remove()`. */
+  /** Other records this removal just invalidated. See `remove()`. */
   const [brokeOthers, setBrokeOthers] = useState<readonly HomebrewRecordSummary[]>([]);
   const reasonId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { ctx, spells } = useSchemaContext(initial.id, initial.type, records);
   const schema = SCHEMAS[initial.type];
 
-  // `docRef` shadows `doc` because publish/visibility read the revision immediately
-  // after `await flush()`, in the same closure — React has not re-rendered yet.
+  // `docRef` shadows `doc` because publish/visibility read the revision right after
+  // `await flush()`, before React re-renders.
   const docRef = useRef(doc);
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -116,8 +98,7 @@ export function RecordDetail({
     [onChanged]
   );
 
-  // The pane mounts with `key={record.id}`, so selecting a record lands focus on its
-  // name — the keyboard and screen-reader equivalent of the pane having appeared.
+  // The pane is keyed by record id, so focusing the title on mount announces the new record.
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
@@ -125,12 +106,10 @@ export function RecordDetail({
   const autosave = useAutosave<Body>({
     draft,
     rev: initial.rev,
-    // What the SERVER holds, not what the form shows: the defaults `withDefaults` filled
-    // in above have to be dirty, or they never reach the store.
+    // What the server holds, so filled-in defaults count as unsaved and reach the store.
     baseline: initial.record,
     save: async (body, expectedRev) => {
-      // `forStorage` drops the row ids the editor mints for `RowEditor`. They are UI identity, and
-      // the rider unions are `.strict()`, so shipping one fails the whole record to parse.
+      // `forStorage` drops editor-only row ids; the `.strict()` rider unions would reject them.
       const next = await homebrewApi.update(gmToken, docRef.current.id, forStorage(body), expectedRev);
       adopt(next);
       return next.rev;
@@ -139,8 +118,8 @@ export function RecordDetail({
     isConflict: (error) => error instanceof HomebrewRequestError && error.isConflict
   });
 
-  /** "Changed elsewhere" → take the server's copy. The draft is replaced wholesale,
-      which is the only honest answer: we cannot merge two authored bodies. */
+  /** Conflict reload: replace the draft with the server copy wholesale, since two authored bodies
+      cannot be merged. */
   const reload = async () => {
     try {
       const next = await homebrewApi.get(gmToken, docRef.current.id);
@@ -154,33 +133,16 @@ export function RecordDetail({
     }
   };
 
-  /**
-   * What is left before this can be published — **everything outstanding, in one place, beneath
-   * the button it blocks.** Still never a red asterisk, never a red border, never a per-field
-   * message: **drafts show no errors at all**, because a draft is allowed to be invalid and "this
-   * requirement is not met yet" is a different thing from "this field is wrong now". (The second
-   * thing — a malformed dice formula — still shows inline, on its own field, because that IS
-   * wrong now.)
-   *
-   * It is a LIST rather than one sentence, and that is the D19 repair. One sentence turned a
-   * half-filled item into a serial dead-end: fix "Fill in range", get "Fill in long range", get
-   * another, with no way to see how deep it went — the shape of the "items cannot be published"
-   * report. `publishIssues` runs the record's own server schema, so the list is complete and
-   * cannot be looser than the store.
-   *
-   * Two sources, one region: this list, plus the server's 409 for the tiers a schema cannot
-   * express (identity, cross-references). Never a second error region.
-   */
+  /** Everything outstanding before publish, listed in one place beneath the button. Drafts show no
+      per-field errors because a draft may be incomplete. `publishIssues` runs the record's server
+      schema, so the list is complete and no looser than the store. */
   const issues = useMemo(
     () => publishIssues(doc.type, draft, ctx, doc.id),
     [doc.type, doc.id, draft, ctx]
   );
-  /**
-   * The server's own outstanding issues, for the tiers the shared schema does NOT cover: identity
-   * (tier 2) and cross-record references (tiers 3-4, "no subclass names this class yet"). Shown
-   * only once the local list is empty — while the body still fails its own schema, the stored
-   * record's cross-reference verdict is about a body that has already moved on.
-   */
+  /** The server's issues for what the shared schema cannot check: identity and cross-record
+      references. Shown only once the local list is empty, because until then the stored verdict
+      describes an outdated body. */
   const serverIssues = useMemo(
     () =>
       issues.length > 0 || doc.validity.valid
@@ -191,8 +153,7 @@ export function RecordDetail({
   const checklist = issues.length > 0 ? issues : serverIssues;
   const blockedReason = checklist[0]?.text ?? null;
 
-  /** Scroll to the section a reason names and focus it — one control per line, no restatement,
-      and it removes the hunt. */
+  /** Scroll to and focus the section a reason names. */
   const jumpToSection = (sectionId: string) => {
     const element = document.getElementById(sectionDomId(doc.type, sectionId));
     if (!element) return;
@@ -202,7 +163,7 @@ export function RecordDetail({
 
   const nameNote = duplicateNameNote(doc.type, nameOf(draft), ctx);
 
-  /* The four bespoke components. Everything else on all nine types is data. */
+  /* The bespoke components; everything else is schema data. */
   const custom: Readonly<Record<string, CustomRenderer>> = {
     levelTable: () => <LevelTableEditor draft={draft} onDraft={setDraft} classId={doc.id} />,
     features: ({ field }) => (
@@ -213,7 +174,7 @@ export function RecordDetail({
         featuresKey={field.key}
         // Only class and subclass place a feature at a level.
         levelAware={doc.type === "class" || doc.type === "subclass"}
-        // A feat IS one `FeatureRecord` under a singular `feature` key, not a list.
+        // A feat is one `FeatureRecord` under a singular `feature` key.
         single={doc.type === "feat"}
         singular={doc.type === "species" ? "trait" : "feature"}
         idPrefix={`hb-${doc.type}`}
@@ -223,18 +184,11 @@ export function RecordDetail({
       <RiderEditor
         value={draft}
         onChange={setDraft}
-        // An item gets everything except `choice` — it never asks a question at character
-        // creation, and there is no code path from an item to the wizard. `grants` IS included:
-        // an item's grants are layered over the sheet and removed when the item comes off.
-        // (This comment used to say `grants` was deliberately absent, which `ITEM_RIDERS` one
-        // import away had already contradicted. See the table at the top of RiderEditor.tsx.)
+        // An item gets every rider except `choice` (items never prompt at character creation).
+        // Item grants are layered over the sheet and removed when the item comes off.
         enabled={doc.type === "equipment" ? ITEM_RIDERS : doc.type === "monster" ? ["actions", "tags"] : undefined}
-        // THE SAME three-way branch as the line above it. It used to collapse to two, handing a
-        // monster `"feature"` — and a feature's attack names an ability while a stat block's needs
-        // a flat `bonus`, so the form wrote a key `ActorDefinitionSchema` has no place for and the
-        // publish gate answered `actions[].attack.bonus: Required`. A monster action with an attack
-        // roll could not be published at all. Two branches for one decision is what let them drift;
-        // now `RiderScope` is three-valued and the compiler holds them together.
+        // A monster attack needs a flat `bonus` rather than an ability, so scope is three-way
+        // like `enabled` above.
         scope={doc.type === "equipment" ? "item" : doc.type === "monster" ? "statblock" : "feature"}
         ctx={ctx}
         idPrefix={`hb-${doc.type}`}
@@ -243,9 +197,7 @@ export function RecordDetail({
     spellListContents: () => <SpellListContents draft={draft} onDraft={setDraft} ctx={ctx} listId={doc.id} spells={spells} />
   };
 
-  /** Every state change bumps the revision server-side, so each one re-baselines the
-      autosave. Without that the very next keystroke would 409 against a revision the
-      row left behind. */
+  /** Every state change bumps the revision server-side, so each re-baselines the autosave. */
   const runStateChange = async (action: () => Promise<HomebrewRecordDocument>) => {
     setBusy(true);
     setActionError(null);
@@ -257,9 +209,8 @@ export function RecordDetail({
       autosave.markSaved(next.rev, draftRef.current);
     } catch (error) {
       if (error instanceof HomebrewRequestError) {
-        // A publish the stored state refuses arrives as a 409 carrying every blocking
-        // issue. It renders in the SAME sentence slot as the local reason — one message
-        // surface, two sources, never a second error region.
+        // A refused publish is a 409 carrying every blocking issue; it shares the local
+        // reason's message slot.
         setActionError(error.invalidIssues[0]?.message ?? error.message);
       } else {
         setActionError(error instanceof Error ? error.message : "That didn't work.");
@@ -275,24 +226,14 @@ export function RecordDetail({
   const restore = () => runStateChange(() => homebrewApi.restore(gmToken, docRef.current.id));
 
   /**
-   * **Removing one record can invalidate another, and the demotion that follows used to be
-   * silent.** A published class whose only subclass is removed stays published and becomes
-   * invalid on the spot; the next unrelated write to it hits `stillPublishable`, fails, and
-   * the class quietly drops to Draft — surfacing minutes later, on a record the GM was not
-   * looking at, as a state change nothing on screen explains. The demotion is right. The
-   * silence is the defect.
-   *
-   * So the consequence is reported at the moment it is caused, from the SERVER's own
-   * answer rather than a client guess: every list row carries a freshly computed `valid`,
-   * so re-listing after the delete and diffing against what was published-and-valid a
-   * moment ago names exactly the records this removal broke — for any relation, not just
-   * subclass-to-class, and without the client re-implementing half the validator
-   * (CLAUDE.md rule 2). One extra request, on the rarest path in the feature.
+   * Removing a record can invalidate another (e.g. a published class losing its only subclass),
+   * which the server then demotes to Draft on its next write. To report this when it happens,
+   * re-list after the delete and diff the server-computed `valid` against what was
+   * published-and-valid before.
    */
   const remove = async () => {
     const name = nameOf(draft).trim() || `this ${typeLabel(doc.type)}`;
-    // `danger: false` on purpose: nothing is lost, so this is caution, not danger.
-    // Rose-red is reserved for actual destruction.
+    // `danger: false`: archiving is reversible, so it is a caution, not destruction.
     const confirmed = await confirm({
       title: "Archive this?",
       body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
@@ -310,7 +251,6 @@ export function RecordDetail({
       await autosave.flush();
       await homebrewApi.remove(gmToken, docRef.current.id);
       // Best-effort: a failed re-list must not turn a successful removal into an error.
-      // Losing the warning is a smaller harm than claiming the removal did not happen.
       try {
         const rows = await listAllHomebrew(gmToken);
         setBrokeOthers(rows.filter((row) => wereFine.has(row.id) && row.state === "published" && !row.valid && !row.deletedAt));
@@ -318,14 +258,8 @@ export function RecordDetail({
         setBrokeOthers([]);
       }
       const next = await homebrewApi.get(gmToken, docRef.current.id);
-      // `adopt` patches the rail row in place, so the row picks up its Removed state and
-      // leaves the default view — and NOTHING ELSE MOVES. Removing one record used to
-      // flip the library's status filter to "Removed", which hid the other ten behind a
-      // count line that still read "10 records" above a list of one. The GM did not ask
-      // to change the view. The feedback is already here and already sufficient: this
-      // pane keeps the record selected, shows the Removed badge and offers Restore, and
-      // the rail foots with "N removed records are hidden. Show them" — a filter change
-      // the GM makes, which is the difference that matters.
+      // `adopt` patches the rail row in place; the status filter is left alone so the rest of
+      // the library stays in view.
       adopt(next);
       autosave.markSaved(next.rev, draftRef.current);
     } catch (error) {
@@ -347,10 +281,7 @@ export function RecordDetail({
 
         <div className="hb-state">
           {removed ? <Badge tone="neutral">Archived</Badge> : published ? <Badge tone="neutral">Published</Badge> : <Badge tone="caution">Draft</Badge>}
-          {/* No `GmOnlyTag` here, deliberately: the `RevealSwitch` a few inches to the
-              right already renders the literal words "GM only", and stamping the pill
-              beside it puts the same constraint on one line twice (readiness rule 4).
-              The tag belongs in the RAIL row, where there is no switch to say it. */}
+          {/* No `GmOnlyTag` here: the `RevealSwitch` beside it already says "GM only". */}
           <SaveState status={autosave.status} onReload={() => void reload()} onRetry={autosave.retry} />
 
           <div className="hb-state-actions">
@@ -380,18 +311,9 @@ export function RecordDetail({
           </div>
         </div>
 
-        {/* ONE region, shared by the checklist and by an action's error. Each line owns its
-            `{Section}` CONTROL, which is the only place the section is named — the sentence never
-            repeats it (`validate.ts`, "one copy template"). `secondary` with the system's own jump
-            chevron, not a `ghost`: a ghost at `--text-dim` beside a `--caution-hi` sentence was
-            dimmer than the words it followed and did not read as a button at all. `.tap-target`
-            because `.nh-btn--sm` paints 32px (design-language §4, route 2) and the only things it
-            can steal taps from here are the words either side of it.
-
-            A single outstanding requirement renders as the bare sentence it always did — a
-            one-item bulleted list would be ceremony around one line. Two or more become a list,
-            capped, because at some point a raw imported record has thirty and a wall of them is
-            no more actionable than one at a time was. */}
+        {/* One region shared by the checklist and an action's error. Each line's section control
+            is the only place the section is named. A single requirement renders as a bare
+            sentence; two or more become a capped list. */}
         {actionError && !removed && (
           <p className="hb-blocked" id={reasonId} role="alert">
             {actionError}
@@ -405,10 +327,8 @@ export function RecordDetail({
               </p>
             ) : (
               <>
-                {/* A PUBLISHED record with outstanding issues is a different sentence and a more
-                    urgent one: it is still live and still visible, and the store demotes it to an
-                    invisible draft on the next write that re-validates. Saying "before this can be
-                    published" there would be flatly wrong — it already is. */}
+                {/* A published record with outstanding issues is still live, and the store demotes
+                    it to Draft on the next re-validating write. */}
                 <p className="hb-blocked-count">
                   {published
                     ? `${checklist.length} things need fixing, or the next edit puts this back to Draft.`
@@ -429,8 +349,7 @@ export function RecordDetail({
           </div>
         )}
 
-        {/* "In use" is the sixth state and it is a count, not a badge — a badge would
-            claim a status where this is a fact about other records. */}
+        {/* "In use" is a count, not a badge: it is a fact about other records. */}
         {usageCount > 0 && !removed && (
           <p className="hb-usage">Used by {usageCount} {usageCount === 1 ? "character" : "characters"}.</p>
         )}
@@ -443,10 +362,8 @@ export function RecordDetail({
         </Alert>
       )}
 
-      {/* The consequence this removal had somewhere else, stated where and when it
-          happened. `warning`, not `error`: nothing failed, and Restore above undoes it.
-          The record is NAMED BY THE CONTROL and not by the sentence, which is the same
-          rule the publish blocker keeps — say the thing once. */}
+      {/* The removal's consequence for other records. `warning`, not `error`: nothing failed,
+          and Restore undoes it. */}
       {brokeOthers.length > 0 && (
         <Alert tone="warning" title={brokeOthers.length === 1 ? "This broke another record" : "This broke other records"}>
           <p>
@@ -473,8 +390,7 @@ export function RecordDetail({
       )}
 
       <div className="hb-detail-body">
-        {/* Annotated, never blocked: the name is the identity the GM sees, and ids are
-            the system's problem. No error tone, no block. */}
+        {/* A duplicate name is annotated, never blocked. */}
         {nameNote && <p className="hb-name-note">{nameNote}</p>}
 
         {schema ? (

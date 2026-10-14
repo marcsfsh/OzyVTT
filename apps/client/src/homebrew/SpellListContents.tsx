@@ -1,19 +1,10 @@
 /**
- * A spell list's membership, as spells ON or OFF.
+ * A spell list's membership as on/off toggles. The GM never sees `basedOn`/`add`/`remove`:
+ * this resolves `union(basedOn) ∪ add \ remove` live, and a toggle writes (or reverses) the
+ * one field that produces the change.
  *
- * **The GM never sees `basedOn` / `add` / `remove`.** Same discipline as the
- * auto-generated ids: the mechanism is not the interface. This component resolves
- * `union(basedOn) ∪ add \ remove` live and writes back to whichever field is correct —
- * turning off a spell that came from `basedOn` writes `remove`; turning on a spell that
- * did not writes `add`; turning either back reverses exactly that write rather than
- * leaving a redundant entry behind.
- *
- * **The trap this closes.** A spell can join a list two ways: the list adds it, or the
- * *spell* names the list in its own `classes` field. The overlay unions both, so
- * `remove` cannot remove a self-tagged spell — turning it off would appear to work and
- * then not. Such a spell therefore renders **on, with its toggle disabled and the reason
- * in place**. Annotated, never dropped from the list (rule 1), and an unfixable "I
- * turned it off and it's still there" bug becomes unauthorable.
+ * A spell that names this list in its own `classes` is unioned in regardless of `remove`,
+ * so it renders on with its toggle disabled and the reason shown.
  */
 
 import { useMemo, useState } from "react";
@@ -51,7 +42,7 @@ export function SpellListContents({
     const on = new Set<string>();
     for (const id of inherited) if (!remove.includes(id)) on.add(id);
     for (const id of add) on.add(id);
-    // A self-tagged spell is on no matter what `remove` says — so it is shown that way.
+    // A self-tagged spell is on regardless of `remove`.
     for (const id of selfTagged) on.add(id);
     return { inherited, selfTagged, on };
   }, [spells, basedOn, add, remove, listId]);
@@ -93,7 +84,6 @@ export function SpellListContents({
   return (
     <div className="hb-field">
       <span className="nh-field-label">Spells</span>
-      {/* Derived, stated once, and it makes the overlay legible without naming its fields. */}
       <p className="nh-field-help">
         <strong className="tabular">{resolved.on.size}</strong> {resolved.on.size === 1 ? "spell" : "spells"} —{" "}
         {inheritedCount} from {basedOn.length === 0 ? "no other list" : basedOn.length === 1 ? "one list" : `${basedOn.length} lists`}, {add.length} added, {remove.length} removed.
@@ -109,8 +99,6 @@ export function SpellListContents({
         searchable
         searchPlaceholder="Search spells…"
         searchDelay={160}
-        /* Arrives faceted to "In this list", so the opening state is the small current
-           membership rather than several hundred cards. */
         facets={[
           { value: "in", label: "In this list" },
           { value: "out", label: "Everything else" },

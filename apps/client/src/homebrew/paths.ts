@@ -1,15 +1,6 @@
-/**
- * Immutable dot-path read/write over the authored record body.
- *
- * The renderer addresses fields by path (`"range.distance"`, `"spellcasting.progression"`)
- * because a `FieldDef` is DATA — it cannot close over a setter. Every write copies only
- * the containers on the path, so React sees a new identity for the draft and for every
- * object between the root and the edited leaf, and nothing else.
- *
- * A numeric segment addresses an array index (`"grants.0.values"`). Arrays are copied
- * with `slice()`, objects with a spread, so a `rows` editor holding onto a row object
- * never sees it mutated under it.
- */
+/** Immutable dot-path read/write over the authored record body. A numeric segment addresses
+    an array index (`"grants.0.values"`). Writes copy only the containers on the path, so every
+    object between the root and the edited leaf gets a new identity and nothing else does. */
 
 const segments = (path: string): readonly string[] => path.split(".");
 
@@ -31,12 +22,8 @@ export function getAt(source: unknown, path: string): unknown {
   return cursor;
 }
 
-/**
- * Returns a copy of `source` with `path` set to `value`. Missing containers are
- * created — an object, unless the NEXT segment is numeric, in which case an array,
- * so `setAt(draft, "grants.0.kind", …)` on an absent `grants` mints `[{ kind }]`
- * rather than `{ "0": { kind } }`.
- */
+/** Returns a copy of `source` with `path` set to `value`. Missing containers are created as an
+    array when the next segment is numeric, otherwise as an object. */
 export function setAt<T>(source: T, path: string, value: unknown): T {
   const keys = segments(path);
 
@@ -59,8 +46,7 @@ export function setAt<T>(source: T, path: string, value: unknown): T {
   return write(source, 0) as T;
 }
 
-/** `setAt` for several paths at once, so one edit that touches two fields is ONE
-    draft identity and therefore one autosave, not two racing ones. */
+/** `setAt` for several paths in one draft identity, so one edit triggers one autosave. */
 export function setAll<T>(source: T, entries: ReadonlyArray<readonly [string, unknown]>): T {
   return entries.reduce<T>((draft, [path, value]) => setAt(draft, path, value), source);
 }

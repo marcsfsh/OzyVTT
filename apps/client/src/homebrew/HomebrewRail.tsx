@@ -1,26 +1,12 @@
-/**
- * The homebrew library rail: search, two filters, and the grouped record list.
- *
- * **Type is a filter, not a nav axis.** Nine tab labels is roughly 810px of content in
- * a 343px viewport with no scroll cue, and it would make "everything I've homebrewed"
- * — the question the library exists to answer — unaskable. One `Select`, same control
- * as the create modal's, and the group headings do the work a tab bar would have.
- *
- * **Group headings are derived and conditional.** They render only while the type
- * filter is "All types". With a type selected every heading would say the same thing,
- * which is restating a constraint once per row.
- *
- * **Removed records are annotated, not silently dropped.** When the status filter
- * excludes them and some exist, the rail foots with one plain line and a control that
- * switches the filter — "annotate options; never filter them" (decision-log 2026-07-27).
- */
+/** The homebrew library rail: search, kind and status filters, and the record list.
+    Group headings render only while the kind filter is "All types". Removed records are
+    never silently hidden: a footer line counts them and offers a control to show them. */
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { Badge, Button, Field, GmOnlyTag, Input, Select } from "@vtt/ui";
 import type { HomebrewRecordSummary } from "./api";
 import { HOMEBREW_TYPES, STATUS_FILTERS, isHomebrewType, typePlural, type HomebrewType, type StatusFilter } from "./types";
 
-/** `ChoiceGrid`'s figure. The Codex's undebounced search is the mistake the styleguide calls out. */
 const SEARCH_DEBOUNCE_MS = 160;
 
 export type RailFilters = Readonly<{ type: HomebrewType | "all"; status: StatusFilter; query: string }>;
@@ -28,13 +14,9 @@ export type RailFilters = Readonly<{ type: HomebrewType | "all"; status: StatusF
 export const EMPTY_FILTERS: RailFilters = { type: "all", status: "all", query: "" };
 
 /**
- * The one place the filter rules live, so the rail's list, its empty state and the
- * "removed are hidden" line can never disagree about what is shown.
- *
- * `status` is a VIEW over two orthogonal server fields: "Removed" is a soft-deleted row
- * of either state, so it can never be a `state` value. Drafts and published both hide
- * removed rows; only the Removed filter shows them.
- */
+/** The single source of the filter rules, shared by the list, its empty state and the
+    hidden-removed line. "Removed" means soft-deleted in either state; the other status
+    filters exclude removed rows. */
 export function applyFilters(records: readonly HomebrewRecordSummary[], filters: RailFilters): readonly HomebrewRecordSummary[] {
   const needle = filters.query.trim().toLowerCase();
   return records.filter((record) => {
@@ -47,9 +29,7 @@ export function applyFilters(records: readonly HomebrewRecordSummary[], filters:
   });
 }
 
-/** The rail-row echo of the record's state. Every state is a WORD — the palette is
-    heavy in the red-pink-magenta band and reserves violet for GM-only, so hue can
-    never be the thing that carries the meaning. */
+/** Each state is a word, not just a hue, because colour alone cannot carry the meaning. */
 function StateBadge({ record }: Readonly<{ record: HomebrewRecordSummary }>) {
   if (record.deletedAt) return <Badge tone="neutral">Archived</Badge>;
   if (record.state === "draft") return <Badge tone="caution">Draft</Badge>;
@@ -76,29 +56,26 @@ export function HomebrewRail({
   const typeId = useId();
   const statusId = useId();
 
-  // The input is uncontrolled by the committed query on purpose: typing must feel
-  // instant, while the (potentially few-hundred-row) list re-filters on a 160ms rest.
+  // Local typed value so input feels instant; the list re-filters after a debounce.
   const [typed, setTyped] = useState(filters.query);
   useEffect(() => {
     if (typed === filters.query) return;
     const timer = setTimeout(() => onFilters({ ...filters, query: typed }), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [typed, filters, onFilters]);
-  // A filter reset from an empty state has to pull the box back with it.
+  // A filter reset from an empty state must clear the box too.
   useEffect(() => {
     if (filters.query === "") setTyped("");
   }, [filters.query]);
 
   const shown = useMemo(() => applyFilters(records, filters), [records, filters]);
 
-  // Derived, never stored. Grouping only earns its keep when the type filter is open.
   const groups = useMemo(() => {
     if (filters.type !== "all") return null;
     return HOMEBREW_TYPES.map((type) => ({ type, rows: shown.filter((record) => record.type === type) })).filter((group) => group.rows.length > 0);
   }, [shown, filters.type]);
 
-  // How many removed records the current filter is hiding — the sentence is a lie if
-  // the removed rows were never fetched, which is why the panel reads them all.
+  // The panel fetches removed rows too, so this count is accurate.
   const hiddenRemoved = filters.status === "removed" ? 0 : records.filter((record) => record.deletedAt).length;
 
   const row = (record: HomebrewRecordSummary) => (
@@ -156,9 +133,6 @@ export function HomebrewRail({
         <Button variant="primary" onClick={onNew}>New</Button>
       </div>
 
-      {/* auto-fit + minmax(min(150px, 100%), 1fr) resolves to ONE column in a 260px
-          desktop rail and TWO in the full-width mobile column, with no media query and
-          no one having to think about which way round it goes. */}
       <div className="hb-rail-filters">
         <Field label="Kind" htmlFor={typeId} className="hb-filter">
           <Select

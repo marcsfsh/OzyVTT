@@ -1,21 +1,8 @@
 /**
- * The Homebrew tab: one master-detail library over all nine content types.
- *
- * **No second nav axis.** The Codex's answer to "where do the library-wide operations
- * go" is a modebar (`.codex-modebar-ops`), and homebrew mirrors that structure with no
- * level-2 tab bar at all. A two-item tab bar where one tab holds two buttons is
- * redundancy; packs are stateless files, not a place you navigate to. The modebar's
- * left side carries a derived count line so the bar is informative rather than empty.
- *
- * **The panel is conditionally mounted** (`main.tsx` renders it only while the tab is
- * active), so a tab switch destroys this component and all of its state. That is
- * exactly why every change is parked on the server as it is made (`useAutosave`)
- * rather than held as an in-memory draft.
- *
- * **Honest degradation.** The authoring store is not mounted on the server yet. A
- * failed read renders a named condition with a Retry, never a blank library — an empty
- * grid would be indistinguishable from "you have not made anything", which is the one
- * thing this screen must never be ambiguous about.
+ * The Homebrew tab: one master-detail library over all content types, with library-wide
+ * status in a modebar rather than a second tab bar. The panel is conditionally mounted, so a
+ * tab switch destroys its state; edits are parked on the server as they are made (`useAutosave`).
+ * A failed load shows a named condition with Retry, never an empty library.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -51,8 +38,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       setLoad("ready");
       setLoadMessage(null);
     } catch (error) {
-      // 404 means the router isn't mounted; 501 would mean it is but the store isn't.
-      // Both are "not built yet", and both deserve a different sentence from "it broke".
+      // 404 (router not mounted) or 501 (store not mounted) means "not available", not "broken".
       const status = error instanceof HomebrewRequestError ? error.status : 0;
       setLoad(status === 404 || status === 501 ? "unavailable" : "error");
       setLoadMessage(error instanceof Error ? error.message : "Couldn't load your homebrew.");
@@ -63,14 +49,9 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     void refresh();
   }, [refresh]);
 
-  /**
-   * `homebrew:changed` is a content-free ping carrying only a revision, so it can never
-   * leak an unpublished record to anyone — every recipient refetches its own
-   * audience-filtered view over HTTP. It refreshes **the list only**: `selected` is
-   * deliberately untouched, so a refresh can never clobber an open editor out from
-   * under the GM's cursor. The summary row is patched in place by the editor itself
-   * (`patchRow`), which is the other half of the same rule.
-   */
+  /** `homebrew:changed` is a content-free ping, so it cannot leak an unpublished record; each
+      recipient refetches its own filtered view. It refreshes the list only, never `selected`, so an
+      open editor is never clobbered; the editor patches its own row via `patchRow`. */
   useEffect(() => {
     const onChanged = () => void refresh();
     socket.on("homebrew:changed", onChanged);
@@ -79,8 +60,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     };
   }, [refresh]);
 
-  // A summary row is patched IN PLACE by the detail pane rather than triggering a list
-  // reload, so an open editor is never clobbered by a refresh it did not ask for.
+  // Patch a summary row in place rather than reloading the list under an open editor.
   const patchRow = useCallback((next: HomebrewRecordDocument) => {
     setRecords((rows) => {
       const name = typeof next.record.name === "string" ? next.record.name : "";
@@ -117,22 +97,10 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   );
 
   /**
-   * The records that have to be copied WITH a class for the copy to stand up.
-   *
-   * `homebrew-srd-copy.ts` re-points the copy's subclass pick from `fighter-subclasses`
-   * to `<newId>-subclasses` — it must, or the copy would offer FIGHTER's subclasses and
-   * `character-build.ts` would hard-reject every build made from it. But that family
-   * matches nothing until a subclass names the copy, so "duplicate Fighter" landed a
-   * record whose Publish was disabled before the GM had touched anything. The route the
-   * create modal itself calls "the only tractable one for a class" failed on first use.
-   *
-   * So the copy brings them: duplicate each subclass through the same endpoint, then
-   * re-point its `classId` at the new class. Two calls per subclass and no new server
-   * surface. The count was already stated in the modal before Create was pressed.
-   *
-   * Partial failure is reported, never swallowed: a class with three of its four
-   * subclasses is still publishable and still correct, and the GM is told which one is
-   * missing rather than discovering the gap at the table.
+   * Copies a duplicated class's subclasses. The server re-points the copy's subclass pick to
+   * `<newId>-subclasses`, which matches nothing until a subclass names the copy, so each subclass
+   * is duplicated and its `classId` re-pointed. Failures are returned so the GM is told which
+   * subclass is missing.
    */
   const copyCompanions = async (
     classId: string,
@@ -142,8 +110,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     for (const companion of companions) {
       try {
         const copy = await homebrewApi.duplicate(gmToken, companion.id);
-        // The server keeps `classId` verbatim — correctly, since it names a SEPARATE
-        // record that usually still exists. Here it must follow the copy instead.
+        // The server keeps `classId` verbatim; here it must follow the new class.
         await homebrewApi.update(gmToken, copy.id, { ...copy.record, classId }, copy.rev);
       } catch {
         failed.push(companion.name);
@@ -157,15 +124,9 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     try {
       const created =
         request.mode === "duplicate"
-          ? // No name is sent: the server already derives "{source} (copy)". Passing one
-            // ourselves produced "Fireball (copy) (copy)" — naming is the server's job,
-            // and doing it in both places is how the two get to disagree.
+          ? // No name: the server derives "{source} (copy)".
             await homebrewApi.duplicate(gmToken, request.sourceId)
-          : // A blank record is created WITH its type's blank draft, not with a bare
-            // `{type, name}` the editor then quietly PATCHes on first open. A draft is
-            // allowed to be invalid — that is the whole point of the state — so this does
-            // not have to satisfy the type's schema; it just has to be the same body the
-            // form is about to show, or opening the record is itself a write.
+          : // Create with the type's blank draft so opening the record is not itself a write.
             await homebrewApi.create(gmToken, {
               ...blankDraft(request.type),
               type: request.type,
@@ -178,18 +139,14 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       setCreateOpen(false);
       await refresh();
       setSelectedId(created.id);
-      // Re-read after the companions land: the class's validity is the SERVER's answer
-      // and it was computed before its subclasses existed. Without this the record opens
-      // with a stale "no subclass names this class yet" that is no longer true.
+      // Re-read after the companions land: the class's validity was computed before they existed.
       setSelected(companions.length > 0 ? await homebrewApi.get(gmToken, created.id) : created);
 
       const name = typeof created.record.name === "string" ? created.record.name : "";
       const made = name || `New ${typeLabel(request.type)}`;
       const copied = companions.length - failed.length;
       if (failed.length > 0) {
-        // `info`, not `error`: the record the GM asked for DID get made, and a class with
-        // some of its subclasses is still correct. The sentence names what is missing and
-        // what to do; the tone says nothing failed outright, because nothing did.
+        // `info`, not `error`: the requested record was created.
         toast(`${made} created, but ${failed.join(" and ")} couldn't be copied. Add a subclass before publishing.`, { tone: "info" });
       } else {
         toast(copied > 0 ? `${made} created, with ${copied} ${copied === 1 ? "subclass" : "subclasses"}.` : `${made} created.`, { tone: "success" });
@@ -201,8 +158,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     }
   };
 
-  // Derived, never stored. "12 records · 4 drafts" — removed rows are excluded from
-  // both counts, because a removed record is not part of the library you have.
+  // Removed rows are excluded from both counts.
   const counts = useMemo(() => {
     const live = records.filter((record) => !record.deletedAt);
     return {
@@ -219,7 +175,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     return (
       <div className="hb-root">
         <div className="hb-modebar"><Skeleton width="12rem" /></div>
-        {/* Mirrors the real layout so the pane doesn't jump when the data lands. */}
+        {/* Mirrors the real layout so the pane doesn't jump when data lands. */}
         <div className="hb-workspace">
           <aside className="hb-rail">
             <Skeleton variant="block" height="2.75rem" />
@@ -248,13 +204,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   }
 
   return (
-    /* THE FRAME (§7): the modebar is chrome that never moves, the workspace below it is the fill, and
-       the library stands on the scene sky. Its two panes each scroll themselves. */
     <div className="hb-root pane-frame pane-scene scanlines frame-col anim-view">
       <div className="pane-sky" aria-hidden="true" />
-      {/* Ops (Export / Import) land here next to the count line, Codex-style. Nothing
-          is rendered for them yet: a disabled button that never becomes enabled is a
-          worse answer than an honest gap. */}
       <div className="hb-modebar">
         <p className="hb-count">
           {counts.total} {counts.total === 1 ? "record" : "records"}
@@ -262,13 +213,6 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         </p>
       </div>
 
-      {/* The catalog merge has landed: a published record reaches the GM's own builder and
-          pickers at once, and a published + shown one reaches the players' too (measured —
-          publishing and revealing one spell took /content/spells from 339 to 340). The
-          caveat that used to stand here said the opposite, so it came out rather than
-          being reworded: the two states already say this in words on the record itself
-          (Draft / Published / Shown to players), and repeating it as a library-wide banner
-          would state the same constraint a second time for no new information. */}
 
       <div className={`hb-workspace frame-fill${hasSelection ? " has-selection" : ""}`}>
         <HomebrewRail
@@ -281,9 +225,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         />
 
         <section className="hb-main">
-          {/* Single-pane swap at ≤760px: the rail hides and this returns to it. The
-              quarter-turned disclosure caret is the system's own back shape — no bare
-              glyph, no drawn arrow (WizardShell.tsx:124-129). */}
+          {/* Single-pane layout only (≤760px): returns to the rail. */}
           {hasSelection && (
             <Button
               variant="ghost"

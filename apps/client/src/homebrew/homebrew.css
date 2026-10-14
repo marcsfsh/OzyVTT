@@ -1,19 +1,11 @@
-/* Homebrew authoring surfaces. LAYOUT ONLY — no control is painted here.
-   Every interactive thing on this screen is a `@vtt/ui` primitive; this file places
-   them and nothing more. Design-system tokens via var(--*), no hardcoded colour.
+/* Homebrew authoring layout. Controls are @vtt/ui primitives; this file only places them.
+   Breakpoints match the Codex: 760px is the master-detail single-pane swap. */
 
-   The breakpoint ladder is the Codex's, deliberately: 760px is the master-detail
-   single-pane swap and 900px is "no hover on touch". Homebrew is the second surface
-   using the same two numbers, so they stay two numbers rather than four. */
-
-/* THE HOMEBREW FRAME (design-language §7). `.pane-frame` / `.pane-scene` / `.frame-col` are on this
-   element in the markup: the modebar is the chrome row that never moves and the workspace below it is
-   the fill. Nothing here scrolls — the rail's list and the detail pane each scroll themselves. */
+/* The modebar is the fixed chrome row and the workspace fills the rest. The rail's list and
+   the detail pane each scroll themselves. */
 .hb-root { display: flex; flex-direction: column; gap: 0; }
 
-/* ---- Modebar: derived counts on the left, library-wide ops on the right.
-   A distinct register from the GM tab bar directly above it, so the two levels don't
-   read as one long tab list. Same shape as `.codex-modebar`. ---- */
+/* ---- Modebar: derived counts on the left, library-wide ops on the right ---- */
 .hb-modebar {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-3); flex-wrap: wrap;
@@ -25,11 +17,7 @@
 
 .hb-unavailable-text { margin: 0 0 var(--space-3); }
 
-/* ---- Master-detail ----
-   `.frame-fill` in the markup: the workspace takes what the modebar leaves rather than asking for
-   64vh of a viewport it cannot see (measured 691px inside a 1036px pane, 461px inside a 676px one).
-   The bottom padding is the frame's breathing room, not §9's horizon reserve — both panes below are
-   opaque `--surface-1` cards that cover the band edge to edge, so nothing bare stands in it. */
+/* ---- Master-detail ---- */
 .hb-workspace {
   display: grid;
   grid-template-columns: minmax(220px, 300px) 1fr;
@@ -39,8 +27,7 @@
   align-items: stretch;
 }
 
-/* `min-height: 0`: a grid item's automatic minimum size is its content's, so without it the list
-   below could not shrink and the rail would stretch the workspace instead of scrolling inside it. */
+/* min-height: 0 lets the list shrink and scroll instead of stretching the workspace. */
 .hb-rail {
   display: flex; flex-direction: column; gap: var(--space-3);
   min-width: 0; min-height: 0;
@@ -50,16 +37,8 @@
 .hb-rail-head { display: flex; gap: var(--space-2); align-items: center; }
 .hb-rail-head > :first-child { flex: 1 1 auto; min-width: 0; }
 
-/* auto-fit over `minmax(min(165px, 100%), 1fr)`: the two filters arrange themselves,
-   with no media query, and `min(…, 100%)` is what stops a track overflowing its
-   container at 320px.
-
-   The figure is 165, not the 150 first drafted, and it was measured: at 375px the rail
-   is full width, so the content box is ~319px and 150 resolved to TWO columns of
-   ~155px — in which a native <select> clips its longest value to "Drafts and publi".
-   165 needs 338px for two columns, so 375px gets one full-width column (nothing
-   clipped) while a 480px phone or any wider rail still gets two. Do not "tidy" it back
-   to 150. */
+/* 165px so a 375px phone stacks the filters one per row: two ~155px columns clip the longest
+   <select> value. min(…, 100%) stops a track overflowing at 320px. */
 .hb-rail-filters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
@@ -67,14 +46,10 @@
 }
 .hb-filter { min-width: 0; }
 
-/* THE RAIL'S REGION (`.scroll-y` in the markup). `flex: 1` is the half that was missing: with
-   `min-height: 0` alone the list hugged its content — measured 274x67 inside a 461px rail — so a long
-   library scrolled the page rather than the list. */
+/* flex: 1 with min-height: 0 makes a long library scroll the list, not the page. */
 .hb-list { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-height: 0; position: relative; }
 .hb-group { display: flex; flex-direction: column; gap: 2px; }
-/* Never a bare <h3>: `h1,h2,h3 { font-weight: 400 }` in the app global would
-   synthesise faux-bold on the single-weight display face. The full `font:`
-   shorthand carries its own weight, so nothing is synthesised. */
+/* Full font shorthand: the global h3 weight would otherwise synthesise faux-bold. */
 .hb-group-head {
   margin: 0;
   font: 400 var(--fs-2xs) / 1.3 var(--font-display);
@@ -83,15 +58,9 @@
   padding: var(--space-1) var(--space-2);
 }
 
-/* A rail row is a plain selection target — no nested controls, because an interactive
-   element inside a <button> is not addressable by keyboard or assistive tech. Every
-   per-record operation lives in the detail pane's ⋯ menu, in one place. */
-/* RULING 47 — LIST ROWS ARE HAIRLINE RULES, NO FILL. A filled `--surface-2` block per row put a
-   second rectangle inside the rail's own, and stacked twenty of them under the rail's scanline:
-   zebra was rejected for exactly that reason and a per-row fill is the same interference with a
-   period of one. The row is now separated by a 1px rule and nothing else; the SELECTED row takes
-   ruling 7's leading tick, the same `--cue-mark` wedge the segmented on-state uses, in the
-   selection hue. `::before`, never `::after` — `::after` is `.tap-target`'s 44px hit area. */
+/* A rail row has no nested controls (a control inside a <button> is unreachable); per-record
+   actions live in the detail pane's menu. Rows are hairline rules with no fill. The selected
+   row's tick uses ::before because ::after is .tap-target's hit area. */
 .hb-row {
   position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
@@ -105,10 +74,8 @@
 }
 .hb-group > .hb-row:last-child { border-bottom: 0; }
 .hb-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Specificity note: `apps/client/src/styles.css` carries a bare
-   `button:hover:not(:disabled)` at (0,2,1). `.hb-row.is-active` is (0,2,0) and would
-   LOSE to it, so the active row is stated at (0,3,0) — the class twice — and its
-   hover is excluded from the global's reach by matching the same shape. */
+/* The global `button:hover:not(:disabled)` is (0,2,1), so the active row doubles its class to
+   reach (0,3,0). */
 .hb-row:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--line-hover); }
 .hb-row.is-active.is-active { background: none; color: var(--text); font-weight: 700; }
 .hb-row.is-active::before {
@@ -125,9 +92,7 @@
 
 .hb-rail-foot { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
-/* The detail COLUMN is a frame: the back link (single-pane only) is its chrome row and `.hb-detail`
-   below is the region. `scroll-padding` moved off this element and onto `.hb-detail` with the scroll
-   itself — a scroll-padding on a box that does not scroll nudges nothing. */
+/* The detail column: the back link (single-pane only) above the scrolling .hb-detail region. */
 .hb-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; min-height: 0; }
 
 /* The back control only exists in the single-pane layout. */
@@ -135,21 +100,14 @@
 .hb-back-icon { display: inline-flex; transform: rotate(90deg); font-size: 1.05em; }
 
 /* ---- Detail ----
-   THE DETAIL PANE'S REGION (`.scroll-y` in the markup). A class editor is ~4,900px of form; it scrolls
-   inside its own card now, so the rail beside it stays put and the frame never grows. The
-   scroll-padding is what keeps a keyboard-focused field off this region's own top and bottom edges —
-   it belongs to the thing that scrolls, which used to be neither this nor `.hb-main`. */
+   Scrolls inside itself; scroll-padding keeps a focused field off its edges. */
 .hb-detail {
   display: flex; flex-direction: column; gap: var(--space-4);
   border: 1px solid transparent;
   padding: var(--space-4);
   min-width: 0; min-height: 0; flex: 1 1 auto;
-  /* `position: relative` is load-bearing, not tidy: `.pane-scene` on `.hb-root` makes the surface a
-     positioned ancestor, so an unpositioned region is NOT the containing block for its own
-     absolutely-positioned descendants — and a box is only clipped by a scroll container its
-     containing block sits inside. MEASURED in the Codex, whose regions have the same shape:
-     `@vtt/ui`'s 1x1 `.nh-sr-only` span escaped the region, was placed against the surface instead,
-     and grew the document by 4,735px. */
+  /* position: relative makes this region the containing block for absolutely-positioned
+     descendants (such as .nh-sr-only), so they are clipped here instead of growing the document. */
   position: relative;
   overscroll-behavior: contain;
   scroll-padding-top: var(--space-6); scroll-padding-bottom: var(--space-6);
@@ -167,46 +125,28 @@
 .hb-state { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .hb-state-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
 
-/* The ONE sentence slot: why publishing is blocked, or why the server refused.
-   `--caution-hi` at full strength — never dimmed by a group `opacity`, because the
-   reason is the one thing that must stay readable when its control is disabled.
-   Never `--text-muted` (3.61:1, fails AA). */
+/* Why publishing is blocked or the server refused. Never dimmed or --text-muted: it must stay
+   readable (AA) while its control is disabled. */
 .hb-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }
-/* The jump control is a `Button variant="secondary" size="sm"` and paints itself; the
-   only thing owed here is the chevron's direction and a baseline that sits with the
-   sentence rather than above it. `.hb-back-icon` turns 90deg for "back", so forward is
-   the same glyph the other way — one shape, two rotations, no second icon. */
+/* The forward chevron is the back icon rotated the other way. */
 .hb-blocked-jump { vertical-align: middle; }
 .hb-blocked-jump-icon { display: inline-flex; transform: rotate(-90deg); font-size: 1.05em; }
-/* The checklist. One outstanding requirement stays a bare sentence; two or more become a list
-   under a count, so "how much is left" is readable before any of it is read. No bullet glyph —
-   at `--fs-sm` in the caution tone a marker column costs an indent that a phone cannot spare, and
-   each line already begins with an imperative verb. */
+/* Two or more outstanding requirements become an unbulleted list under a count. */
 .hb-blocked-list { margin: var(--space-1) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
 .hb-blocked-line { margin: 0; }
 .hb-blocked-count { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .hb-usage { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-/* The create modal's consequence line: a fact, not a warning — the quiet register. */
 .hb-create-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 .hb-detail-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-/* Annotated, never blocked — so it is a quiet line, not an error tone. */
 .hb-name-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* ---- The schema form ---- */
 .hb-form { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
 .hb-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .hb-section:focus-visible { outline: 2px solid var(--cyan); outline-offset: 6px; border-radius: var(--radius-md); }
-/* Never a bare <h3>: the app global's `h1,h2,h3 { font-weight: 400 }` would synthesise
-   faux-bold on the single-weight display face. The full shorthand carries its weight.
-
-   `--fs-h2` (20px), not `--fs-h3` (16px), and a 2px `--line` rule above it. At h3 a
-   section heading was ONE PIXEL larger than the 15px body at the same weight with no
-   rule and no background, so the class editor's seven sections — Basics through Advanced,
-   including a 20-row table — read as seven equal blocks down a 4,900px scroll with no
-   sense of where you were. The 2px top hairline is §5's own "this labels a kind" device,
-   borrowed from the panel; `--line` rather than an accent, because a section is a
-   division and not a state (§8.1: one glowing thing per region). */
+/* Full font shorthand so the global h3 weight cannot synthesise faux-bold. The h2 size and top
+   rule keep sections distinguishable down a long editor. */
 .hb-section-title {
   margin: 0;
   padding-top: var(--space-3);
@@ -214,7 +154,7 @@
   font: 400 var(--fs-h2) / var(--lh-tight) var(--font-display);
   color: var(--text);
 }
-/* The first section opens the form; there is nothing above it to divide it from. */
+/* No divider above the first section. */
 .hb-form > .hb-section:first-child > .hb-section-title { padding-top: 0; border-top: 0; }
 .hb-section-blurb { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); max-width: 60ch; }
 
@@ -230,18 +170,14 @@
 .hb-section-summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: var(--radius-sm); }
 
 .hb-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-/* The honesty line for a field nothing reads yet. Dim, never muted (3.61:1 fails AA). */
+/* Note for a field nothing reads yet. --text-dim, since --text-muted fails AA. */
 .hb-note { color: var(--text-dim); font-style: italic; }
 
 .hb-chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-/* 20 level chips: narrow, uniform, and still over the 44px floor via `.nh-chip`'s own
-   min-height. The gap is the (44 − paint) / 2 budget for adjacent small targets. */
+/* Level chips stay above the 44px target floor via .nh-chip's own min-height. */
 .hb-levels > * { min-width: 2.75rem; justify-content: center; }
-/* LOCKED, not unavailable. A class feature's last level can't be cleared, so its chip is
-   genuinely `disabled` — but it is the chip that is ON, and the primitive's
-   `:disabled { opacity: .6 }` says the opposite of the truth AND drags the label under
-   AA (measured 3.55:1). Full contrast here; the reason is the sentence beneath the group,
-   which is where every other state in this editor is stated too. */
+/* A class feature's last level is disabled but on; the primitive's disabled opacity would
+   misstate that and fail AA, so keep full contrast. */
 .hb-levels .nh-chip--pressable[aria-pressed="true"]:disabled { opacity: 1; cursor: default; }
 
 .hb-fieldset {
@@ -258,10 +194,7 @@
 /* ---- Riders, features, choices ---- */
 .hb-riders { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .hb-riders-when { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-/* The derived "+1 to hit · 1d8 slashing + 1d4 lightning" line. `--text`, not `--text-dim`:
-   it is the ANSWER, not an aside, and it is the only place the four inputs above it are
-   shown assembled. It wraps rather than scrolling — a phone gets two lines, not a
-   sideways drag, and the page must never scroll horizontally because of it. */
+/* The derived attack/damage line. Wraps rather than forcing horizontal scroll. */
 .hb-riders-readout {
   margin: 0;
   min-width: 0;
@@ -270,32 +203,25 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
-/* One jump control per broken record. Wraps, because at 320px two names do not share a
-   line and a row that cannot wrap is a row that widens the document. */
+/* Wraps so two names at 320px cannot widen the document. */
 .hb-broke-list { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--space-2); margin-top: var(--space-2); }
 .hb-feature { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .hb-choice {
   display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
   border-left: 2px solid var(--line-strong); padding-left: var(--space-3);
 }
-/* One block's header when a feature asks SEVERAL choices — the count and its Remove.
-   Wraps at narrow widths rather than squeezing the button under the 44px floor. */
+/* Header for one of several choice blocks; wraps to keep Remove above the 44px floor. */
 .hb-choice-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 .hb-choice-add { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
-/* The `choose × grants` readout. Words, not a colour: it is arithmetic, not a state. */
 .hb-picks { margin: 0; color: var(--text); font-size: var(--fs-sm); }
 
 /* ---- Catalog picker ----
-   No cap and no scroller: this sits in a `Modal`, whose body IS the declared region
-   (`.nh-modal-body.scroll-y`) inside a surface already capped at min(88vh, 48rem). */
+   No cap or scroller: the Modal body is already the scrolling region. */
 .hb-catalog-grid { min-width: 0; }
 .hb-catalog-foot { margin-top: var(--space-3); }
 
 /* ---- Level table ----
-   Seven columns, of which the Slots cell replaces NINE: `4 3 3 3 2 – – – –` in one
-   `.tabular` cell with an aria-label spelling it out. That single decision removes
-   eight columns and ~160 DOM nodes per table, and is why this reads as a table rather
-   than a spreadsheet. */
+   One Slots cell (with an aria-label) holds all nine slot levels instead of nine columns. */
 .hb-lt { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .hb-lt-summary { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 /* The table scrolls inside itself so the page body never scrolls sideways. */
@@ -308,12 +234,7 @@
   gap: var(--space-2);
   align-items: center;
 }
-/* A non-caster renders four columns, not seven: the component drops Spell slots,
-   Cantrips and Prepared entirely rather than filling 60 cells with "—" and empty inputs
-   (see LevelTableEditor's `casts`). The track list has to follow, or the four remaining
-   cells would sit in the first four of seven tracks and leave a third of the row blank.
-   Features and Resources take the freed width — Resources also carries the row's edit
-   button here, since it is the last cell. */
+/* Non-casters render four columns (no slots, cantrips or prepared), so the tracks follow. */
 .hb-lt-table--nocast .hb-lt-head,
 .hb-lt-table--nocast .hb-lt-row {
   grid-template-columns: 3.5rem 3rem minmax(10rem, 1.5fr) minmax(10rem, 1fr);
@@ -323,7 +244,7 @@
   font: 400 var(--fs-2xs) / 1.3 var(--font-display);
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
 }
-/* Ruling 47 again: twenty level rows are the densest list in this file. A rule, not a card. */
+/* Rows are hairline rules, not cards. */
 .hb-lt-row {
   padding: var(--space-2);
   border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
@@ -333,28 +254,20 @@
 .hb-lt-table > .hb-lt-row:last-child { border-bottom: 0; }
 .hb-lt-cell { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .hb-lt-wrapcell { overflow-wrap: anywhere; }
-/* Derived cells are plain text at --text-dim with no input affordance. A disabled input
-   would claim an interactivity it does not have. */
+/* Derived cells are plain text; a disabled input would imply interactivity. */
 .hb-lt-derived { color: var(--text-dim); }
 .hb-lt-level { font-variant-numeric: tabular-nums; }
 .hb-lt-slots { flex-wrap: wrap; }
 .hb-lt-edit { margin-left: auto; }
-/* Micro-labels live in the DOM at every width and turn on only in the card fold.
-   `overflow-wrap: normal` undoes the `anywhere` its wrapping `.hb-lt-wrapcell` sets: that
-   rule exists so a long FEATURE NAME can break rather than widen the row, but it was
-   inherited by the label too and broke it mid-word — "FEATUR / ES", "RESOURCE / S" — in
-   the mobile card fold. The value wants `anywhere`; its label never does. */
+/* Micro-labels show only in the mobile card fold. overflow-wrap: normal undoes the parent
+   cell's `anywhere` so labels never break mid-word. */
 .hb-lt-micro {
   display: none; color: var(--text-dim); font-size: var(--fs-2xs);
   text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
   overflow-wrap: normal; white-space: nowrap;
 }
 
-/* `min-width: 0` is load-bearing, not tidy-up. A grid item defaults to `min-width: auto`,
-   so this strip — which holds a nested RowEditor with an intrinsically wide Add button —
-   refused to shrink below its content and pushed the document 8px sideways at 375px.
-   Measured, not guessed: `document.documentElement.scrollWidth` was 383 against a 375
-   viewport until this landed. */
+/* min-width: 0 so the nested RowEditor's wide Add button cannot push the document sideways. */
 .hb-lt-strip {
   grid-column: 1 / -1;
   min-width: 0;
@@ -363,29 +276,17 @@
   border-top: 1px solid var(--line);
 }
 .hb-lt-slotstrip { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-/* Nine adjacent number fields: 3.5rem paint + var(--space-3) gap keeps every one of them
-   over the 44px floor with room either side. */
+/* Wide enough to keep nine adjacent number fields above the 44px floor. */
 .hb-lt-slotfield { display: flex; flex-direction: column; gap: var(--space-1); width: 3.75rem; }
 .hb-lt-resources { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 
 /* ---- Create modal ---- */
 .hb-create-body { display: flex; flex-direction: column; gap: var(--space-4); }
-/* The `Create` button lives in `.nh-modal-foot`, OUTSIDE the modal's scrolling body, so it never
-   leaves the sheet whatever this grid does — which is what makes the 40vh/50dvh cap that used to sit
-   here unnecessary rather than merely convertible. The body is the region; this is content in it. */
+/* Create sits in the modal footer outside the scrolling body, so the grid needs no height cap. */
 .hb-create-grid { min-width: 0; }
 
-/* (The off-ladder 900px query that stood here is gone — written without its `@media (…)` spelling
-   on purpose, because check (f) parses this file for breakpoints and does not strip comments, so
-   naming the rung in prose would re-declare the very rung being retired. Its one rule dressed
-   `[data-hover-reveal]`, an attribute this repo has never used on any element — the block was written
-   for a later slice that never came, and an unused rule is not worth an off-ladder rung. Homebrew's
-   row actions are a menu in the detail pane, which needs no hover to reach.) */
-
 @media (max-width: 760px) {
-  /* THE SINGLE-PANE SWAP, unchanged in what it does and re-stated in the frame's terms: a grid with a
-     fixed height would give two auto rows a share each, so the column is a FLEX one here and the
-     visible pane takes the fill. */
+  /* Single-pane swap: a flex column so the visible pane takes the fill. */
   .hb-workspace { display: flex; flex-direction: column; }
   .hb-rail { flex: 1 1 auto; }
   .hb-main { flex: 0 1 auto; }
@@ -393,22 +294,14 @@
   .hb-workspace.has-selection .hb-main { flex: 1 1 auto; }
   .hb-workspace.has-selection .hb-back { display: inline-flex; }
 
-  /* ---- Level table: one card per level.
-     Folds at 760, not the allocator's 650, and the arithmetic is why: seven columns of
-     which two are wide (Features, Resources) need ~103px each at 720px of content, which
-     truncates both. 760 is already on the breakpoint ladder, so no new number is
-     introduced. Do not "tidy" this back to 650. */
+  /* ---- Level table: one card per level. Folds here rather than narrower because seven
+     columns truncate Features and Resources below this width. */
   .hb-lt-head { display: none; }
-  /* `.hb-lt-table--nocast .hb-lt-row` is (0,2,0) and this rule is (0,1,0), so the
-     four-column non-caster track list would WIN here despite being declared earlier —
-     specificity does not care which side of a media query a rule sits on. Measured: the
-     card fold still turned its micro-labels on at 375px while the row kept four tracks,
-     so a non-caster class scrolled sideways inside `.hb-lt-scroll`. Both selectors are
-     stated at the same weight so the fold wins for every class, caster or not. */
+  /* Stated at the non-caster selector's specificity as well, or its four-column tracks would
+     win over this rule. */
   .hb-lt-row,
   .hb-lt-table--nocast .hb-lt-row {
-    /* minmax(0, 1fr), never a bare 1fr: an implicit `auto` minimum lets a wide child
-       (the nested resources RowEditor) widen the track past the viewport. */
+    /* minmax(0, 1fr): a bare 1fr's auto minimum lets a wide child widen the track. */
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
     padding: var(--space-3);
@@ -416,27 +309,13 @@
   .hb-lt-cell { justify-content: space-between; }
   .hb-lt-micro { display: inline; }
   .hb-lt-slotfield { width: 4rem; }
-  /* The state cluster wraps to its own line rather than squeezing the Publish button
-     under the 44px floor. */
+  /* The state cluster wraps to its own line, keeping Publish above the 44px floor. */
   .hb-state-actions { margin-left: 0; width: 100%; }
 }
 
-/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
-   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
-   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
-   because `clip-path` clips hit-testing and every one of these panels is full of tap targets.
-   `inset: -1px` spans the border box, so the rim lands where the 1px border used to and nothing
-   reflows. All values are shared tokens, so ruling 29's daybreak translation arrives for free.
-
-   RULING 28 — SCANLINES ON THE OUTERMOST PANEL ONLY. `.hb-rail` and `.hb-detail` are the two
-   panels standing on the scene, so they carry the texture; `.hb-section--advanced` and
-   `.hb-fieldset` nest inside `.hb-detail` and take rim + bezel over a flat plate. The modebar is
-   a 44px chrome strip: a scanline tile on a strip that shallow is noise, not material, so it
-   takes the plate too (and the tab bar directly above it, ruling 26, is likewise unglowed).
-
-   NO REST GLOW anywhere here. Ruling 2 spends it on hero surfaces; Homebrew is a workbench with
-   several controls sharing one region, which is exactly the restraint case the split protects.
-   Stated last in the file so it wins on source order over the layout rules above. */
+/* Material: the chamfer, rim and fill go on a ::before backing layer, not the element, because
+   clip-path also clips hit-testing. Scanlines only on the outermost panels (rail and detail);
+   nested panels and the modebar get the flat plate. Last in the file so it wins on source order. */
 .hb-modebar,
 .hb-rail,
 .hb-main,
@@ -470,36 +349,11 @@
 .hb-rail, .hb-main { --material-fill: var(--material-scanline), var(--material-plate); }
 .hb-modebar, .hb-section--advanced, .hb-fieldset { --material-fill: var(--material-plate); }
 
-/* THE ISOLATE TRAPS AN OPEN LIST, AND THIS IS THE THIRD SURFACE IT HAS DONE IT ON.
-   The `isolation: isolate` above is load-bearing — it is what keeps each backing layer at
-   `z-index: -1` inside its own panel, the escape `Button.css` documents at length — but it is
-   also a stacking context, so `.nh-combobox-list`'s `z-index: 40` is resolved INSIDE one
-   fieldset and never above it. Everything positioned that paints after the fieldset therefore
-   covers the list's tail, and it needs no z-index of its own to do it: neither `.nh-switch` nor
-   `.nh-numberfield` declares one, they simply come later.
-   Measured at 375×667 with touch on 2026-08-10, on `fromPicks.offer` ("Answers to" — the one
-   `pick` box in this editor that sits inside a fieldset): the box is 44×257 and all ten rows are
-   44×247, yet the LAST row answered `elementFromPoint` with something else and a real `.tap()`
-   on it timed out at 7,004 ms leaving the chooser empty. WHICH thief varies with what the choice
-   renders below the fieldset, which is exactly what hid it — `kind: subclass-feature` gave
-   `button.nh-switch--labeled` ("The same option can be chosen more than once"), `kind: spell`
-   gave `div.nh-numberfield` (the spell window). "What kind of choice" escapes only because it
-   has no fieldset ancestor.
-   Same fix as the sheet's (`encounter-panel.css`, `.sheet-vital:has(.nh-combobox-list)`, and
-   `.scene-gallery-hub .nh-card:has(details[open])` before it): the isolate STAYS and the
-   fieldset is LIFTED, only while a list is open. `1` and not the sheet's `3` because nothing
-   inside this panel declares a positive z-index at all — the thieves win on source order alone,
-   so the smallest lift that beats `auto` is the whole of the fix.
-   After: 10 of 10 rows own their centre in both states, and the last row taps through in both. */
+/* `isolation: isolate` keeps each backing layer inside its panel but also confines
+   .nh-combobox-list's z-index to the fieldset, so later siblings cover the list's tail.
+   Lift the fieldset only while a list is open. */
 .hb-fieldset:has(.nh-combobox-list) { z-index: 1; }
 
-/* THE SCROLLER RULE, and it is the one mechanical trap in this whole job. `.hb-detail` is the
-   pane's declared region (`.scroll-y` in the markup) and AN ABSOLUTELY-POSITIONED CHILD OF A
-   SCROLL CONTAINER IS LAID OUT AGAINST THE SCROLLED BOX — so a backing layer on the scroller
-   itself rides the scroll and takes the rim with it. Measured, not reasoned: at scrollTop 500 on
-   a 1,283px item editor the rim's bottom edge sat 380px up the pane with bare sky under it.
-   The material therefore goes on `.hb-main`, the non-scrolling column that owns the same box
-   (`.hb-back` is `display: none` until the single-pane rung, where the back control belongs
-   inside the detail frame anyway), and `.hb-detail` stays a plain region inside it. Every panel
-   in this lane that scrolls is treated the same way: frame the region, never the scroller. */
+/* An absolutely-positioned child of a scroll container scrolls with it, so the material goes
+   on the non-scrolling .hb-main and .hb-detail stays plain. */
 .hb-detail { background: none; }

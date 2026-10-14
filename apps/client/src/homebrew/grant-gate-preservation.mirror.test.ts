@@ -1,38 +1,13 @@
 /**
- * **THE HOMEBREW EDITOR MUST NOT DELETE `grants.when`.**
+ * The homebrew editor must not delete `grants.when`. `GrantsEditor` rebuilds the grants bag from
+ * `GRANT_KINDS` on every edit, so any key without a row must be carried through; otherwise editing a
+ * duplicated Berserker's `mindless-rage` would turn "immune to Charmed and Frightened while raging"
+ * into a permanent immunity, and `FeatureGrantsSchema` would accept the ungated block.
  *
- * `FeatureGrantsSchema` gained one optional `when` on 2026-08-13 so that a grant the SRD prints
- * under a condition could be authored as printed instead of as an over-grant. `GrantsEditor`
- * rebuilds the whole grants bag from `GRANT_KINDS` on every keystroke, and `GRANT_KINDS` names the
- * eleven id lists and nothing else - so before this file existed, an ordinary edit to any grant row
- * DELETED the gate and turned "Immunity to Charmed and Frightened *while your Rage is active*" into
- * permanent immunity. The field that was added to end the over-grant reintroduced it through the
- * GM's own UI.
- *
- * It is reachable from SHIPPED content, in three gestures:
- *
- *   1. `/duplicate` `structuredClone`s `path-of-the-berserker` into an editable draft, and
- *      `rewriteForNewId` only rewrites ids - so `mindless-rage` arrives carrying its gate;
- *   2. the GM opens that feature and touches one grant row;
- *   3. `validateForPublish` parses the result through `FeatureGrantsSchema`, which accepts an
- *      UNGATED block perfectly happily, because an ungated block is what most records are.
- *
- * Nothing downstream would have refused it. So the far end below is the whole road, ending where
- * the table reads it: a level-6 Barbarian who is NOT raging must still be Frightenable.
- *
- * ## Why a `.mirror.test.ts` in the CLIENT workspace
- *
- * The defect is in a client function and the proof is a server outcome, so the test has to hold both
- * ends. `vitest.config.ts`'s `node` project exists for exactly that (see its comment), and
- * `vocabulary-parity.mirror.test.ts` already imports `RiderEditor` and the server's own modules side
- * by side. The editor half is driven through `grantRowsOf` / `grantsFromRows` - the component's OWN
- * read and write, not a parallel path (`GrantsEditor` has no `FieldDef` for a harness to look up).
- * The RENDERED gesture - a GM adding a value to a grant row with the mouse - is
- * `pick-fields.test.tsx`, which is where the DOM lives.
- *
- * **Not driven here: the HTTP router.** `POST /duplicate`, `PUT /content/:id` and `POST /publish`
- * carry the body through unchanged - the store, the validator and the copy helper below are the
- * three things on that road that touch it, and all three are the real functions.
+ * The editor half uses `grantRowsOf`/`grantsFromRows` (the component's own read and write); the far
+ * end is a level-6 Barbarian who is not raging and can still be frightened. The rendered gesture is
+ * in `pick-fields.test.tsx`. The HTTP router is not driven; the store, validator and copy helper are
+ * the real functions.
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -59,20 +34,12 @@ const SOURCE_ID = "path-of-the-berserker";
 const GATE = [{ type: "while-effect-tag", tags: ["raging"] }] as const;
 
 // -------------------------------------------------------------------------------------------------
-// THE ENUMERATION: every key the schema accepts, against every key the rebuild emits.
+// Every key the schema accepts, against every key the rebuild emits.
 // -------------------------------------------------------------------------------------------------
 
-/**
- * A grants bag with EVERY key the grants vocabulary has populated, parsed through the schema itself
- * rather than hand-listed - so a twelfth key added tomorrow is in this fixture the moment it exists,
- * and the partition below has to account for it.
- *
- * `FeatureGrantsFieldsSchema` (the object BEFORE the one cross-field refusal) rather than
- * `FeatureGrantsSchema`, and the difference is the point of this fixture: `spells` beside a `when`
- * is refused at authoring, because a granted spell is baked into the sheet at build time and no gate
- * is ever read again. This census is over KEYS - what the editor may silently delete - so it must
- * hold every key at once, including the one pair a GM may not save together.
- */
+/** A grants bag with every key populated, parsed through the schema so a new key appears here
+    automatically. Uses `FeatureGrantsFieldsSchema`, which lacks the cross-field refusal of `spells`
+    beside `when`, so every key can be held at once. */
 const EVERY_KEY = FeatureGrantsFieldsSchema.parse({
   skills: ["athletics"], expertise: ["athletics"], tools: ["thieves-tools"], languages: ["giant"],
   armor: ["heavy-armor"], weapons: ["martial-weapons"], saves: ["str"],
@@ -82,9 +49,9 @@ const EVERY_KEY = FeatureGrantsFieldsSchema.parse({
 }) as Record<string, unknown>;
 
 describe("the partition: every key is either a row the GM edits or a key the editor carries", () => {
-  /** What `grantRowsOf` offers as an editable row, in the order `GRANT_KINDS` declares them. */
+  /** What `grantRowsOf` offers as editable rows, in `GRANT_KINDS` order. */
   const editable = grantRowsOf(EVERY_KEY).map((row) => row.kind);
-  /** Everything else the schema accepts - what a rebuild deletes unless it is carried across. */
+  /** Every other accepted key: deleted by a rebuild unless carried. */
   const carried = Object.keys(EVERY_KEY).filter((key) => !editable.includes(key));
 
   it("accounts for every key of the grants vocabulary exactly once", () => {
@@ -92,9 +59,7 @@ describe("the partition: every key is either a row the GM edits or a key the edi
       "skills", "expertise", "tools", "languages", "armor", "weapons", "saves",
       "damageResistances", "damageImmunities", "conditionImmunities", "spells"
     ]);
-    // THE ANSWER TO "IS `when` THE ONLY ONE": yes, today, and this line is what says so tomorrow. A
-    // second dropped key would be the same bug wearing a different name, so a new schema key lands
-    // here and fails until someone decides whether it gets a row or gets carried.
+    // A new schema key fails here until it gets a row or is carried.
     expect(carried, "a key the editor neither edits nor carries is silently deleted by every edit").toEqual(["when"]);
     expect([...editable, ...carried].sort()).toEqual(Object.keys(FeatureGrantsFieldsSchema.shape).sort());
   });
@@ -107,11 +72,10 @@ describe("the partition: every key is either a row the GM edits or a key the edi
 });
 
 // -------------------------------------------------------------------------------------------------
-// THE PAIR: a gate in, a row EDITED, the gate still there.
+// A gate in, a row edited, the gate still there.
 // -------------------------------------------------------------------------------------------------
 
-/** `mindless-rage`'s block exactly as `subclasses.v1.json` ships it - raw, not schema-parsed, because
-    raw is what `/duplicate` clones out of the bundle and what the editor is handed. */
+/** `mindless-rage`'s block raw from `subclasses.v1.json`, as `/duplicate` clones it. */
 const MINDLESS_RAGE_GRANTS = { conditionImmunities: ["charmed", "frightened"], when: GATE } as Record<string, unknown>;
 
 describe("the editor's own read/write pair carries the gate across an edit", () => {
@@ -119,7 +83,7 @@ describe("the editor's own read/write pair carries the gate across an edit", () 
     const rows = grantRowsOf(MINDLESS_RAGE_GRANTS);
     expect(rows).toEqual([{ rowId: "conditionImmunities", kind: "conditionImmunities", values: ["charmed", "frightened"] }]);
 
-    // THE EDIT. One row touched, the way `GrantsEditor`'s `replace` touches it.
+    // One row edited, as `GrantsEditor`'s `replace` does it.
     const edited: GrantRow[] = rows.map((row) => ({ ...row, values: [...row.values, "paralyzed"] }));
     expect(grantsFromRows(edited, MINDLESS_RAGE_GRANTS)).toEqual({
       conditionImmunities: ["charmed", "frightened", "paralyzed"],
@@ -128,15 +92,14 @@ describe("the editor's own read/write pair carries the gate across an edit", () 
   });
 
   it("keeps the block alive on its gate alone when the last row is removed", () => {
-    // Deliberate: a gate with no lists grants nothing, while dropping the gate on the way through
-    // zero rows would leave the over-grant one "add a row" away.
+    // A gate with no lists grants nothing; dropping it here would leave the over-grant one row away.
     expect(grantsFromRows([], MINDLESS_RAGE_GRANTS)).toEqual({ when: GATE });
     expect(grantsFromRows([], {}), "an empty edit over an empty bag still writes no grants at all").toBeUndefined();
   });
 });
 
 // -------------------------------------------------------------------------------------------------
-// THE REACHABLE PATH: duplicate the Berserker, touch a row, publish, sit down at the table.
+// The reachable path: duplicate the Berserker, edit a row, publish, play.
 // -------------------------------------------------------------------------------------------------
 
 const srdView = new ContentLibrary().forAudience("gm");
@@ -155,7 +118,7 @@ async function emptyStore() {
 type Body = Record<string, unknown>;
 type Feature = Record<string, unknown>;
 
-/** `POST /duplicate`, minus the router: the same two functions the route calls, in the same order. */
+/** `POST /duplicate` without the router: the same two functions the route calls, in order. */
 function duplicateBerserker() {
   const source = findCatalogRecord(srdView, SOURCE_ID)!;
   const copied = copyName(String((source.body as Body).name));
@@ -163,9 +126,8 @@ function duplicateBerserker() {
   return { id: mintedId, body: rewriteForNewId(source.type, { ...source.body, name: copied }, SOURCE_ID, mintedId) as unknown as Body };
 }
 
-/** The GM's gesture: open `mindless-rage` and add ONE condition to its condition-immunities row,
-    through the component's own write. `preserve: false` is the control - the rebuild `GrantsEditor`
-    used to do, reproduced by handing the write no memory of the body it is writing into. */
+/** Adds one condition to `mindless-rage`'s condition-immunities row through the component's write.
+    `preserve: false` is the control: the write is given no memory of the existing bag. */
 function touchOneGrantRow(body: Body, preserve = true): Body {
   const features = (body.features as Feature[]).map((feature) => {
     if (feature.id !== "mindless-rage") return feature;
@@ -177,7 +139,7 @@ function touchOneGrantRow(body: Body, preserve = true): Body {
   return { ...body, features };
 }
 
-/** `PUT /content/:id` then `POST /publish`: store the edited draft, validate it, promote it. */
+/** `PUT /content/:id` then `POST /publish`: store, validate, promote. */
 async function publish(body: Body, id: string) {
   const store = await emptyStore();
   store.importRecord(id, "subclass", body as never, false, "homebrew:duplicate");
@@ -191,8 +153,7 @@ async function publish(body: Body, id: string) {
   return { store, validity, view: merged.forAudience("gm") };
 }
 
-/** A Halfling Berserker 6, on the duplicated subclass. Halfling because it is the one SRD species
-    with no bonus, no modifier and no choice of its own, so nothing but the subclass is in play. */
+/** A Halfling Berserker 6 on the duplicated subclass; Halfling adds no bonus, modifier or choice. */
 const berserker = (subclassId: string): CharacterCreateRequestInput => ({
   name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level: 6,
   subclassId, abilityMethod: "standard-array",
@@ -218,16 +179,14 @@ const berserker = (subclassId: string): CharacterCreateRequestInput => ({
   ]
 } as unknown as CharacterCreateRequestInput);
 
-/** The sheet on the table, seated by the SAME importer the roster uses - which is what copies a
-    definition's baked `conditionImmunities` onto the actor, and therefore the only honest way to
-    show what the control's over-grant costs. */
+/** The sheet seated by the roster's own importer, which copies baked `conditionImmunities` onto the actor. */
 function tableWith(definition: ActorDefinition, catalog: ReturnType<typeof equipmentCatalogOf>): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1, actors: [] }) as GameState;
   importActorDefinition(state, definition, HERO, "public", catalog);
   return state;
 }
 
-/** Enter Rage as the shipped `rage` action does: one effect carrying the tag the gate reads. */
+/** Enters Rage as the shipped `rage` action does: one effect with the tag the gate reads. */
 const rage = (state: GameState) => addEffect(state, HERO, EffectInstanceSchema.parse({
   id: "rage-1", name: "Rage", tags: ["raging"], duration: { type: "encounter" }
 }));
@@ -239,9 +198,7 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
   it("carries the gate out of the SRD bundle and through `/duplicate` - the first two links", () => {
     const { body } = duplicateBerserker();
     const feature = (body.features as Feature[]).find((entry) => entry.id === "mindless-rage")!;
-    // `toMatchObject`, not `toEqual`: the catalog hands back a PARSED record, so the ten lists the
-    // Berserker does not use are present and empty - which is also why an edit here reads eleven
-    // rows and rebuilds eleven keys, with `when` the only thing outside that rebuild.
+    // `toMatchObject`: the parsed record has the unused lists present and empty.
     expect(feature.grants).toMatchObject({ conditionImmunities: ["charmed", "frightened"], when: GATE });
   });
 
@@ -251,14 +208,14 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     const { validity, view } = await publish(edited, id);
     expect(validity, "a body the editor produced must publish - the gate is not what makes it invalid").toEqual({ valid: true, issues: [] });
 
-    // The published record, read back through the merged catalog the builder actually consults.
+    // Read back through the merged catalog the builder consults.
     const published = view.featureRecord({ kind: "subclass", sourceId: id, id: "mindless-rage" })!;
     expect(published.grants).toMatchObject({
       conditionImmunities: ["charmed", "frightened", "paralyzed"],
       when: GATE
     });
 
-    // THE FAR END, on a real sheet. The gate is `while-effect-tag: raging`, and this Barbarian is not.
+    // The gate is `while-effect-tag: raging`, and this Barbarian is not raging.
     const definition = buildCharacterDefinition(berserker(id), view, BuilderPolicySchema.parse({}));
     const catalog = equipmentCatalogOf(view);
     expect(definition.conditionImmunities ?? [], "a gated grant must never be baked into the sheet").not.toContain("frightened");
@@ -267,27 +224,25 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     expect(frighten(calm, definition, catalog), "no refusal: the gate fails, so the condition lands").toEqual([]);
     expect(calm.actors[0].conditions.map((condition) => condition.id)).toEqual(["frightened"]);
 
-    // ...and the immunity is REAL, not merely absent: the same sheet, one Rage later, refuses it.
+    // The immunity is real: the same sheet refuses the condition once raging.
     const raging = tableWith(definition, catalog);
     rage(raging);
     expect(frighten(raging, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened - not applied.");
     expect(raging.actors[0].conditions).toEqual([]);
-    // The condition the GM ADDED in the edit is gated by the same one `when`, which is the whole
-    // point of one gate over the block rather than one per list.
+    // The condition added in the edit is gated by the same `when`.
     expect(setCondition(raging, HERO, "paralyzed", true, undefined, { role: "gm" }, { resolveDefinition: () => definition, catalog })[0]!.text)
       .toBe("Ozar is immune to Paralyzed - not applied.");
   });
 
   it("CONTROL: the same road with the gate dropped makes that Barbarian permanently immune", async () => {
-    // This is the shipped behaviour before this fix, reproduced exactly by passing an empty bag to
-    // the write - the rebuild with no memory of the body it is writing into.
+    // Reproduces the bug by giving the write an empty bag.
     const { id, body } = duplicateBerserker();
     const { validity, view } = await publish(touchOneGrantRow(body, false), id);
     expect(validity.valid, "nothing downstream refuses the over-grant - that is why the editor must not create it").toBe(true);
     expect((view.featureRecord({ kind: "subclass", sourceId: id, id: "mindless-rage" })!.grants as Body).when).toBeUndefined();
 
     const definition = buildCharacterDefinition(berserker(id), view, BuilderPolicySchema.parse({}));
-    // Ungated, so the builder BAKES it: the immunity is now a fact about the sheet, and no Rage ends it.
+    // Ungated, so the builder bakes the immunity into the sheet.
     expect(definition.conditionImmunities ?? []).toContain("frightened");
     const catalog = equipmentCatalogOf(view);
     const calm = tableWith(definition, catalog);

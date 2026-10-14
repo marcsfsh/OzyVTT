@@ -1,32 +1,15 @@
 /**
- * The class level table — 20 rows, up to 14 columns, and **~270 of the ~280 cells
- * deleted rather than shrunk.**
+ * The class level table. Most cells are derived rather than typed:
+ * - Proficiency bonus is always `2 + floor((level - 1) / 4)` and is never an input.
+ * - The features column projects each feature's "Granted at levels" (`FeatureEditor`).
+ * - Spell and pact slots come from one progression pick via `spellSlotsForClass` /
+ *   `pactSlotsForLevel`.
+ * Free-form columns: `cantripsKnown`, `preparedCount`, `classResources`.
  *
- * A naive editor is 20 × 14 inputs. Three of the four column families are already
- * derivable and the repo owns every derivation:
- *
- *  - **Proficiency bonus** is exactly `2 + floor((level - 1) / 4)` — zero deviations
- *    across all twelve SRD classes, and `character-build.ts:389` recomputes it and
- *    ignores the authored column anyway. It is never an input here.
- *  - **The features column** is a projection of each feature's own "Granted at levels"
- *    control (`FeatureEditor`), which writes `levelTable[].features[]` directly. Shown,
- *    never typed.
- *  - **All nine slot columns plus pact slots** come from ONE None/Full/Half/Third/Pact
- *    pick, through `spellSlotsForClass` / `pactSlotsForLevel` — both of which take a
- *    `progression` override precisely so a homebrew class needs no table entry.
- *
- * What is genuinely free-form: `cantripsKnown`, `preparedCount`, `classResources`. So
- * the GM edits five progression settings, a feature list and two numeric columns.
- *
- * **Override is per row, not per cell**, and — the load-bearing bit — it is **derived,
- * never stored**: `ClassLevelRowSchema` is `.strict()`, so there is nowhere to put an
- * `overridden: true` flag, and there does not need to be. A row is overridden iff its
- * stored slots differ from what the current settings generate. Reset writes the
- * generated value back and the badge disappears on its own.
- *
- * Changing the progression must not silently discard an override, so reconciliation
- * compares each row against what the PREVIOUS settings generated: a row that was
- * following the pattern is regenerated, a row that had diverged is left alone.
+ * Slot overrides are per row and derived, not stored (`ClassLevelRowSchema` is `.strict()`):
+ * a row is overridden iff its slots differ from what the current settings generate. On a
+ * progression change, rows that matched the previous settings are regenerated and overridden
+ * rows are left alone.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -52,8 +35,8 @@ type LevelRow = Readonly<{
   classResources?: readonly ClassResource[];
 }>;
 
-/** `undefined` is the fifth option — "None", which is the ABSENCE of a spellcasting
-    block rather than a `progression: "none"` value the schema has no room for. */
+/** `undefined` means "None": no spellcasting block at all, since the schema has no
+    `progression: "none"`. */
 export type Progression = CasterProgression | undefined;
 
 export function progressionOf(draft: Draft): Progression {
@@ -65,9 +48,8 @@ export function progressionOf(draft: Draft): Progression {
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
 
-/** The derived half of one row. `undefined` means the column is absent — the schema is
-    `.strict()` with `.optional()` columns, so a non-caster row must carry NO
-    `spellSlots` key rather than a null or an array of zeros. */
+/** The derived half of one row. `undefined` means the column is absent: the schema is `.strict()`
+    with `.optional()` columns, so a non-caster row carries no `spellSlots` key at all. */
 function generateFor(level: number, progression: Progression, classId: string) {
   const proficiencyBonus = proficiencyBonusForLevel(level);
   if (progression === undefined) return { proficiencyBonus, spellSlots: undefined, pactSlots: undefined };
@@ -83,8 +65,7 @@ const sameSlots = (a: readonly number[] | undefined, b: readonly number[] | unde
 const samePact = (a: PactSlots | undefined, b: PactSlots | undefined) =>
   a === b || (!!a && !!b && a.level === b.level && a.slots === b.slots);
 
-/** "1st: 4, 2nd: 3, 3rd: 2, 4th–9th: none" — the collapsed cell's accessible name, so
-    the nine columns it replaces are still readable one by one. */
+/** Accessible text for the collapsed slots cell, e.g. "1st: 4, 2nd: 3, 4th–9th: none". */
 function describeSlots(slots: readonly number[]): string {
   const parts: string[] = [];
   let runStart = -1;
@@ -105,9 +86,8 @@ function describeSlots(slots: readonly number[]): string {
   return parts.join(", ");
 }
 
-/** Narrow-viewport detection. The fold genuinely needs JavaScript: CSS can hide the
-    other nineteen cards, but only a component can decide which ONE to show, and the
-    `Stepper` that picks it has no CSS-only equivalent. 760 matches the CSS. */
+/** Narrow-viewport detection; the one-level-at-a-time fold needs JS to pick which row to
+    show. 760 matches the CSS. */
 function useNarrow(): boolean {
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches);
   useEffect(() => {
@@ -147,10 +127,8 @@ export function LevelTableEditor({
     [progression, classId]
   );
 
-  /* Reconciliation. Runs on mount (healing a short table and the always-derived
-     proficiency bonus) and whenever the progression changes. `previous` is what the
-     LAST settings generated, which is the only way to tell "this row was following the
-     pattern" from "the GM overrode this row" without a stored flag. */
+  /* Reconciliation, on mount and when the progression changes. `previous` is what the last
+     settings generated, which tells a row following the pattern from an overridden one. */
   const previous = useRef(progression);
   useEffect(() => {
     const wasProgression = previous.current;
@@ -160,7 +138,7 @@ export function LevelTableEditor({
       const stored = rows[index];
       const row: Record<string, unknown> = stored && typeof stored === "object" ? { ...stored } : blankLevelRow(value);
       row.level = value;
-      // Never an input, never trusted from the wire: exactly 2 + floor((L-1)/4).
+      // Always derived, never trusted from the wire.
       row.proficiencyBonus = proficiencyBonusForLevel(value);
       if (!Array.isArray(row.features)) row.features = [];
       if (!Array.isArray(row.classResources)) row.classResources = [];
@@ -169,7 +147,7 @@ export function LevelTableEditor({
       const now = generated[index];
       const followed = sameSlots(stored?.spellSlots, before.spellSlots) && samePact(stored?.pactSlots, before.pactSlots);
       if (followed) {
-        // Omit, never null: the row schema is `.strict()` with `.optional()` columns.
+      // Omit, never null: the row schema is `.strict()` with `.optional()` columns.
         if (now.spellSlots) row.spellSlots = now.spellSlots;
         else delete row.spellSlots;
         if (now.pactSlots) row.pactSlots = now.pactSlots;
@@ -179,8 +157,7 @@ export function LevelTableEditor({
     });
 
     if (JSON.stringify(next) !== JSON.stringify(rows)) onDraft(setAt(draft, "levelTable", next));
-    // `draft`/`onDraft` are deliberately absent: this must run when the SETTINGS change,
-    // not on every keystroke anywhere else in the record, or it would fight the editor.
+    // Omits `draft`/`onDraft` so this runs only when the settings change, not on every edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progression, classId, generated, rows]);
 
@@ -226,19 +203,8 @@ export function LevelTableEditor({
     return ids.map((id) => featureName.get(id) ?? id).join(", ");
   };
 
-  /**
-   * **What CHANGES at this level**, not the whole pool restated twenty times.
-   *
-   * `classResources` is cumulative, so printing the row printed
-   * `Second Wind ×3, Weapon Mastery ×4, Action Surge ×1` on all twenty rows with one
-   * digit moving — the densest thing on the screen, read-only, and 19/20 of it already
-   * said on the row above. That is the pattern the readiness pass deleted at source
-   * (decision-log 2026-07-27 rule 4: state a constraint once per group, not once per
-   * option). The delta says the same table in the cells that carry information.
-   *
-   * A resource that stops appearing is a change too, and a silent disappearance is the
-   * one thing a delta must not do — so it is named rather than dropped.
-   */
+  /** What changes at this level. `classResources` is cumulative, so each row shows only new or
+      changed amounts, and names any resource that disappears. */
   const resourceText = (index: number) => {
     const list = rows[index]?.classResources ?? [];
     const before = index === 0 ? [] : rows[index - 1]?.classResources ?? [];
@@ -263,7 +229,6 @@ export function LevelTableEditor({
   }, [rows]);
 
   const shown = narrow && !showAll ? [level - 1] : LEVELS.map((_, index) => index);
-  /** Derived, never stored: the three slot columns are a function of the progression. */
   const casts = progression !== undefined;
 
   const renderRow = (index: number) => {
@@ -287,23 +252,13 @@ export function LevelTableEditor({
           <span className="hb-lt-micro">Features</span>
           {featureText(index)}
         </span>
-        {/* THE THREE SPELLCASTING COLUMNS EXIST ONLY FOR A CASTER. On a class the editor
-            already knows has none, they were 20 rows of "—" plus 40 permanently-empty
-            number inputs: 60 cells that could never mean anything and 40 of them
-            claiming to be editable. The summary line above already says "no
-            spellcasting", so the fact is stated once and the columns are simply gone —
-            and they come back the moment a progression is picked, because this is
-            derived from `progressionOf(draft)` and nothing is stored. */}
+        {/* Spellcasting columns render only for a caster; derived from the progression. */}
         {casts && (
           <>
             <span className="hb-lt-cell hb-lt-slots">
               <span className="hb-lt-micro">Spell slots</span>
-              {/* `4 3 3 2 – – – – –` is nine columns collapsed into one, so the spelled-out
-                  reading is the only one a screen reader can use. It is REAL TEXT in a
-                  visually hidden span, not an `aria-label`: an aria-label on a roleless
-                  <span> is ignored by the accessible-name computation entirely (name from
-                  author is only honoured on elements that take one), so the label was being
-                  dropped and the announcement was the glyph row. */}
+              {/* Real visually-hidden text, not `aria-label`: an aria-label on a roleless
+                  <span> is ignored by the accessible-name computation. */}
               <span className="tabular hb-lt-derived" aria-hidden="true">{slots.text}</span>
               <span className="nh-sr-only">{slots.label}</span>
               {overridden && <Badge tone="caution">Overridden</Badge>}
@@ -333,10 +288,8 @@ export function LevelTableEditor({
         <span className="hb-lt-cell hb-lt-derived hb-lt-wrapcell">
           <span className="hb-lt-micro">Resources</span>
           {resourceText(index)}
-          {/* The row's edit control, at the END of the row rather than inside the Spell
-              slots cell it used to live in. It opens the whole level — slots AND class
-              resources — so a non-caster losing the slots column must not lose the only
-              way into its own resources. */}
+          {/* Opens the whole level (slots and class resources), so it sits outside the
+              slots column that non-casters do not render. */}
           <IconButton
             label={`Edit level ${value}`}
             size="sm"
@@ -353,10 +306,8 @@ export function LevelTableEditor({
             {progression === undefined ? (
               <p className="nh-field-help">This class has no spellcasting, so it has no slots to override. Turn on a caster progression above first.</p>
             ) : progression === "pact" ? (
-              /* Both halves fall back to the GENERATED value, not to zero. Clearing one
-                 field used to write `{ level: 1, slots: 0 }` — a silently zeroed row that
-                 still read as an override. Recovering to the derived number is the only
-                 answer that can't quietly break a class. */
+              /* Each half falls back to the generated value, not zero, so clearing one field
+                 never silently zeroes the row. */
               <FieldGrid min="8rem">
                 <label className="nh-field">
                   <span className="nh-field-label">Pact slot level</span>
@@ -417,8 +368,6 @@ export function LevelTableEditor({
 
             <div className="hb-lt-resources">
               <span className="nh-field-label">Class resources</span>
-              {/* Shown on the level table only. For a pool the game tracks, give a
-                  feature limited uses instead. */}
               <p className="nh-field-help">
                 <em className="hb-note">Shown on the level table only. For a pool the game tracks, give a feature limited uses instead.</em>
               </p>
@@ -453,8 +402,7 @@ export function LevelTableEditor({
                         value={String((resource as ClassResource).amount ?? "")}
                         onChange={(event) => {
                           const raw = event.target.value;
-                          // A resource amount is a number OR a dice string ("3d6"), so
-                          // the field stays text and only coerces when it is all digits.
+                          // An amount is a number or a dice string ("3d6"); coerce only all-digit input.
                           const amount = /^\d+$/.test(raw) ? Number(raw) : raw;
                           const list = (row.classResources ?? []).map((entry, i) => (i === resourceIndex ? { ...entry, amount } : entry));
                           writeRow(index, { classResources: list });
@@ -476,8 +424,6 @@ export function LevelTableEditor({
 
   return (
     <div className="hb-lt">
-      {/* The constraints, stated ONCE for the whole table rather than once per derived
-          cell — including the one that lets the Resources column stop repeating itself. */}
       <p className="nh-field-help">
         Proficiency bonus, features and spell slots are calculated. Override a row if your class breaks the pattern.
         Resources list what changes at that level.

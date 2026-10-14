@@ -1,28 +1,14 @@
 /**
- * **`pick`: an open slug that a GM can SEE the list of — the client's issue `3a`.**
+ * `pick` fields render a visible chooser over an open slug. A `<datalist>` has no visible cue and
+ * renders nothing on iOS Safari, so these tests assert what a GM sees and what lands in the published
+ * body:
+ * - every value is listed by its printed name without typing;
+ * - picking "Very Rare" writes `"very-rare"`;
+ * - typing "unique" writes `"unique"` (the slug stays open);
+ * - clearing removes the key rather than writing `null` (`rarity` is `.optional()`).
  *
- * The reported defect was "item rarity is free-form". The diagnosis it deserved is narrower and
- * changes the fix: rarity was never free-form. `schemas.ts` has declared `suggestions: RARITY_IDS`
- * for as long as the field has existed, and `vocabularies.test.ts` already proved the list was
- * complete. What it did not prove — because no assertion in this repo could — is that the list was
- * *reachable*. `kind: "text"` + `suggestions` renders `<input list>` + `<datalist>`, which has no
- * arrow, no border cue and no hint of any kind that a list exists, and which iOS Safari renders as
- * **nothing at all**. A complete vocabulary, shipped invisible.
- *
- * So `pick` is a renderer flag (`schema.ts`'s standing rule: a flag before a `kind`), and these are
- * its far ends. Not "the flag is set" and not "the value survived derivation" — the assertions below
- * are **what a GM sees on the screen** and **what lands in the body that gets published**:
- *
- *   - every rung is rendered, by its printed name, without typing anything;
- *   - picking "Very Rare" writes the slug `"very-rare"`;
- *   - typing "unique" writes `"unique"` — the open slug is still open, which is the half
- *     `vocabularies.test.ts` deliberately pins and a closed `<select>` would have broken;
- *   - clearing removes the key rather than writing `null`, because `rarity` is `.optional()` and
- *     `null` is the 409 that made four ordinary authoring gestures unpublishable.
- *
- * **What these tests CANNOT prove**, per `test/setup.ts`: the 44px touch floor. No stylesheet is
- * loaded in jsdom, so `min-height: var(--tap-min)` on `.nh-combobox-option` is real paint that
- * nothing here measures. That floor is `Combobox.css` route 1 and `scripts/tap-audit.mjs`'s job.
+ * jsdom loads no stylesheet, so the 44px touch floor is left to `Combobox.css` and
+ * `scripts/tap-audit.mjs`.
  */
 
 import { useState } from "react";
@@ -37,7 +23,7 @@ import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, pickValue, suggestionLabel, type Draft } from "./schema";
 import type { HomebrewType } from "./types";
 
-/** The real form, driven the way `RecordDetail` drives it: one draft, one `onDraft`. */
+/** The real form, driven as `RecordDetail` drives it: one draft, one `onDraft`. */
 function RecordForm({ type, seed, onBody }: { type: HomebrewType; seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);
   return (
@@ -50,7 +36,7 @@ function RecordForm({ type, seed, onBody }: { type: HomebrewType; seed: Draft; o
   );
 }
 
-/** The last body the form wrote, through the save path's own shaping — what would be PUT. */
+/** Mounts the form; `body()` is the last write after the save path's shaping. */
 function mount(type: HomebrewType = "equipment", seed: Draft = { name: "Mace of Storms", isMagic: true }) {
   let body: Draft = {};
   render(<RecordForm type={type} seed={seed} onBody={(next) => { body = next; }} />);
@@ -58,13 +44,10 @@ function mount(type: HomebrewType = "equipment", seed: Draft = { name: "Mace of 
   return {
     chooser,
     rarity: () => chooser("Rarity"),
-    /** Scoped to the chooser's OWN listbox: these forms have real `<select>`s in them, so a bare
-        `getAllByRole("option")` counts the slot list and the weapon categories too. */
+    /** Scoped to the chooser's own listbox: these forms also contain real `<select>`s. */
     options: (name: string) => within(screen.getByRole("listbox", { name })).getAllByRole("option").map((option) => option.textContent),
     rungs: () => within(screen.getByRole("listbox", { name: "Rarity" })).getAllByRole("option"),
-    // `forStorage` is what `useAutosave` sends, and it is where `emptyValue: "omit"` actually takes
-    // effect (`setAt` writes `undefined`; this drops the key). Asserting the raw draft instead would
-    // be the "it survived derivation" non-proof.
+    // `forStorage` is what `useAutosave` sends and where `emptyValue: "omit"` drops the key.
     body: () => forStorage(body)
   };
 }
@@ -74,13 +57,11 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     const user = userEvent.setup();
     const form = mount();
 
-    // The bug, stated as an assertion: with a `<datalist>` there is no `combobox` role, no listbox,
-    // and nothing on screen reads "Very Rare" until the GM has already guessed the word.
+    // A datalist has no `combobox` role or listbox, so this would fail on the old control.
     await user.click(form.rarity());
     const shown = form.rungs().map((option) => option.textContent);
     expect(shown).toEqual(["Common", "Uncommon", "Rare", "Very Rare", "Legendary", "Artifact", "Varies"]);
-    // ...and the names are the LIST's, derived rather than retyped, so a new rung reads correctly
-    // the day it lands in `RARITY_IDS` with nothing to remember.
+    // Names are derived from `RARITY_IDS`, not retyped.
     expect(shown).toEqual(RARITY_IDS.map(suggestionLabel));
   });
 
@@ -91,9 +72,9 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     await user.click(form.rarity());
     await user.click(screen.getByRole("option", { name: "Very Rare" }));
 
-    // THE FAR END: the body that gets published carries the slug the engine and the bundle spell.
+    // The published body carries the slug.
     expect(form.body().rarity).toBe("very-rare");
-    // ...and the GM reads the printed name back, not the slug — the chip, where the box used to be.
+    // The GM reads back the printed name on the chip.
     expect(screen.getByText("Very Rare")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Rarity" })).toBeNull();
   });
@@ -102,9 +83,7 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     const user = userEvent.setup();
     const form = mount();
 
-    // The reason `vocabularies.test.ts` pins `equipment.rarity` to `kind: "text"`: closing the enum
-    // would have been the inverse bug. A GM's own rung has to survive the fix that makes the six
-    // printed ones visible.
+    // An open slug: a GM's own value must survive alongside the printed ones.
     await user.type(form.rarity(), "unique{Enter}");
 
     expect(form.body().rarity).toBe("unique");
@@ -115,10 +94,7 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     const user = userEvent.setup();
     const form = mount();
 
-    // Measured in a real browser at 375px before this was fixed: typed text was discarded on blur,
-    // so a GM who typed a custom rung and tapped the next field kept nothing, with no error. That
-    // is a regression the `<input>` this replaced did not have, and it would have made "still
-    // accepts a custom value" true only for people who press Enter.
+    // Typed text must be kept on blur, not only on Enter.
     await user.type(form.rarity(), "unique");
     await user.click(screen.getByLabelText("Name"));
 
@@ -129,9 +105,8 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     const user = userEvent.setup();
     const form = mount();
 
-    // "Very Rare" typed rather than picked used to produce exactly that string, which
-    // `ContentIdSchema` (/^[a-z0-9-]+$/) refuses — an unpublishable record from a gesture that looks
-    // right on screen. `pickValue` makes the typed case the same shape as the picked one.
+    // Typed "Very Rare" must become `very-rare`; the raw string fails `ContentIdSchema`. `pickValue`
+    // makes typed and picked values the same shape.
     await user.type(form.rarity(), "Very Rare{Enter}");
 
     expect(form.body().rarity).toBe("very-rare");
@@ -148,35 +123,20 @@ describe("3a — the rarity control is a visible chooser that still takes a word
 
     await user.click(screen.getByRole("button", { name: "Clear Legendary" }));
 
-    // `emptyValue: "omit"` — the key goes away. `null` here is the 409 reading "Required" that named
-    // nothing, which is the whole of `FieldDef.emptyValue`.
+    // `emptyValue: "omit"`: the key goes away rather than holding `null`.
     expect("rarity" in form.body()).toBe(false);
     expect(form.rarity()).toBeInTheDocument();
   });
 });
 
 /**
- * **`3d` — the same defect, nine times, and two thirds of them are LISTS.**
- *
- * The client reported "damage type is an unconstrained field". Same correction as `3a`: it never was.
- * `vocabularies.test.ts` has asserted since it was written that all thirteen SRD types are offered at
- * every site — and offered them into an `<input list>` or a `TagInput`'s `<datalist>`, which is to say
- * into nothing a GM can see and nothing at all on iOS Safari.
- *
- * What differs from `3a` is the shape of the fix. Rarity is one value on one field; damage types are
- * nine sites across **three control kinds**, so the far ends below are one per kind rather than one
- * per site — the census in `vocabularies.test.ts` is what holds the other six, and it holds them by
- * count so a tenth cannot land unflagged:
- *
- *   1. `kind: "text"` + `pick` → `Combobox` — `weapon.damageType`, the client's own mace;
- *   2. `kind: "tags"` + `pick` → `TagInput` wearing that same `Combobox` — a monster's resistances;
- *   3. `GrantsEditor`'s bespoke "Which" box, which has **no `FieldDef` at all** and is therefore
- *      invisible to every census in this repo. It is here precisely because nothing else can see it.
- *
- * Each proves the same four things: the list renders unprompted, a listed value lands as its slug, a
- * word the SRD has never heard of survives, and the value reaches the body that gets published.
- * `DamageTypeIdSchema` stays an open max-40 string throughout — a homebrew "void" damage type is the
- * point, and a closed control over an open slug is the inverse bug.
+ * Every damage-type site is a visible chooser that still accepts a homebrew type. One test per
+ * control kind (the census in `vocabularies.test.ts` covers every site by count):
+ * 1. `kind: "text"` + `pick` → `Combobox` (`weapon.damageType`);
+ * 2. `kind: "tags"` + `pick` → `TagInput` with the same `Combobox` (monster resistances);
+ * 3. `GrantsEditor`'s bespoke "Which" box, which no census can see.
+ * Each checks: the list renders unprompted, a listed value lands as its slug, an unknown word
+ * survives, and the value reaches the published body. `DamageTypeIdSchema` stays an open string.
  */
 describe("3d — every damage-type control is a visible chooser that still takes a homebrew type", () => {
   const NAMES = DAMAGE_TYPE_IDS.map(suggestionLabel);
@@ -187,10 +147,7 @@ describe("3d — every damage-type control is a visible chooser that still takes
 
     await user.click(form.chooser("Damage type"));
 
-    // ALL THIRTEEN, unprompted. Not a rhetorical number: `Combobox`'s own default is a page of 8,
-    // which rarity never noticed because there are only 7 rungs — so a list-paging bug would have
-    // reproduced "ten of the thirteen damage types" at the renderer having just fixed it at the
-    // constant, and the three it dropped would have been the last three alphabetically.
+    // All thirteen: `Combobox` defaults to a page of 8, which would silently drop the last five.
     expect(form.options("Damage type")).toEqual(NAMES);
     expect(form.options("Damage type")).toContain("Thunder");
   });
@@ -202,9 +159,7 @@ describe("3d — every damage-type control is a visible chooser that still takes
     await user.click(form.chooser("Damage type"));
     await user.click(screen.getByRole("option", { name: "Lightning" }));
 
-    // THE FAR END: the body that gets published, and the whole `weapon` container seeded around it —
-    // `inContainer` is what stops a first touch here producing `weapon: { damageType: "lightning" }`
-    // and three `Required` refusals.
+    // `inContainer` seeds the whole weapon container around the first touched field.
     expect(form.body().weapon).toMatchObject({ damageType: "lightning", rangeFeet: null, longRangeFeet: null });
     expect(screen.getByText("Lightning")).toBeInTheDocument();
   });
@@ -213,9 +168,7 @@ describe("3d — every damage-type control is a visible chooser that still takes
     const user = userEvent.setup();
     const form = mount();
 
-    // The half a closed `<select>` would have broken, and the reason `DamageTypeIdSchema` is an open
-    // max-40 string rather than an enum. Tab-out rather than Enter, because leaving a field is the
-    // gesture people actually make and it is the one that used to discard what was typed.
+    // An open slug: a homebrew type survives. Tab out rather than Enter, the common gesture.
     await user.type(form.chooser("Damage type"), "void");
     await user.click(screen.getByLabelText("Name"));
 
@@ -232,13 +185,11 @@ describe("3d — every damage-type control is a visible chooser that still takes
     await user.click(screen.getByRole("option", { name: "Fire" }));
     expect(form.body().damageResistances).toEqual(["fire"]);
 
-    // A chosen entry leaves the menu: `TagInput` refuses a duplicate anyway, so offering one again
-    // would be offering a tap that does nothing.
+    // A chosen entry leaves the menu; `TagInput` refuses duplicates anyway.
     await user.click(form.chooser("Damage resistances"));
     expect(form.options("Damage resistances")).not.toContain("Fire");
 
-    // ...and the list is still open at the far end. "Fire" or "flame" typed into this box used to
-    // store a value the typed-defence pass never matches — silently, at play time.
+    // The list stays open to unknown words.
     await user.type(form.chooser("Damage resistances"), "void{Enter}");
     expect(form.body().damageResistances).toEqual(["fire", "void"]);
   });
@@ -247,8 +198,7 @@ describe("3d — every damage-type control is a visible chooser that still takes
     const user = userEvent.setup();
     const form = mount("monster", { ...blankDraft("monster"), name: "Storm Herald" });
 
-    // `TagInput`'s own `slugify` is what normalises here — the same job `pickValue` does on the text
-    // branch, spelled once per control rather than once per call site.
+    // `TagInput`'s own `slugify` normalises here, as `pickValue` does on the text branch.
     await user.type(form.chooser("Damage immunities"), "Necrotic{Enter}");
     expect(form.body().damageImmunities).toEqual(["necrotic"]);
   });
@@ -271,25 +221,20 @@ describe("3d — every damage-type control is a visible chooser that still takes
     }
     render(<Harness />);
 
-    /**
-     * Sites 6 and 7 are the only two that render **inside a `RowEditor` row**, and one of them is
-     * nested two deep (a gating condition on a modifier). Everything above drives a top-level field,
-     * so nothing else here would notice a chooser that works on the record and not in a row — which
-     * is a live risk in this renderer, where a row's fields are re-keyed by position and handed a
-     * different `idPrefix` per row.
-     */
+    /** Sites inside `RowEditor` rows: the `extra-damage` rider one row deep and the `damage-type-is`
+        gate two deep. Row fields are re-keyed by position with a per-row `idPrefix`, so they need
+        their own check. */
     await user.click(screen.getByRole("button", { name: "Add a modifier" }));
     await user.selectOptions(screen.getByLabelText("What it changes"), "extra-damage");
 
-    // Site 7 — the mace's "+1d6 lightning", one row deep.
+    // The `extra-damage` rider, one row deep.
     await user.click(screen.getByRole("combobox", { name: "Damage type" }));
     expect(within(screen.getByRole("listbox", { name: "Damage type" })).getAllByRole("option").map((option) => option.textContent))
       .toEqual(NAMES);
     await user.click(screen.getByRole("option", { name: "Lightning" }));
     expect((value.modifiers as Array<Record<string, unknown>>)[0]).toMatchObject({ type: "extra-damage", damageType: "lightning" });
 
-    // Site 6 — the `damage-type-is` gate, two rows deep, and the one where a mistyped slug is
-    // completely silent: the rider simply never fires.
+    // The `damage-type-is` gate, two rows deep; a mistyped slug here means the rider never fires.
     await user.click(screen.getByRole("button", { name: "Add a condition" }));
     await user.selectOptions(screen.getByLabelText("Condition"), "damage-type-is");
     await user.click(screen.getByRole("combobox", { name: "Damage types" }));
@@ -320,9 +265,7 @@ describe("3d — every damage-type control is a visible chooser that still takes
     const { container } = render(<Harness />);
 
     await user.click(screen.getByRole("button", { name: "Grant something" }));
-    // `GrantsEditor` is eleven parallel arrays behind one `[What ▾][Which…]` row and has no `FieldDef`
-    // anywhere, so its "What" select carries no id to be labelled by — queried through the DOM for
-    // that reason, and it is the same reason `authoring-harness.ts` still exempts `grants`.
+    // `GrantsEditor` has no `FieldDef`, so its "What" select has no labelled id; query the DOM directly.
     const what = container.querySelector("select")!;
     await user.selectOptions(what, "damageResistances");
 
@@ -357,9 +300,8 @@ describe("3d — every damage-type control is a visible chooser that still takes
     await user.click(screen.getByRole("button", { name: "Grant something" }));
     await user.selectOptions(container.querySelector("select")!, "languages");
 
-    // `pick` is set for the CONTROL rather than per grant kind — one box must not teach two things
-    // about itself as the select beside it changes. `TagInput` falls back to the plain input when
-    // there is no vocabulary to show, so "show the list when there is one" stays true either way.
+    // `pick` is set for the control, not per kind; `TagInput` falls back to a plain input for kinds
+    // with no vocabulary.
     expect(screen.queryByRole("combobox", { name: "Which languages" })).toBeNull();
     await user.type(screen.getByLabelText("Which languages"), "elvish{Enter}");
     expect((value.grants as { languages?: readonly string[] }).languages).toEqual(["elvish"]);
@@ -367,19 +309,9 @@ describe("3d — every damage-type control is a visible chooser that still takes
 });
 
 describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id cannot be typed", () => {
-  /**
-   * The other ten grant kinds are slug sets a GM can reasonably type — six skills, four armour
-   * families, a handful of damage types. A spell id is one of 339, and one character wrong is a
-   * grant that hands out nothing, silently, forever. So this "Which" is not a `TagInput` at all: it
-   * is the `CatalogPicker` the item's cast row already uses, plus removable chips for what has been
-   * picked.
-   *
-   * Driven through the RENDERED form for the same reason the damage-type grant test above is:
-   * `GrantsEditor` has no `FieldDef` anywhere, so no census in this repo can see it and
-   * `authoring-harness.ts` still exempts `grants`. The body half — that the picked ids become
-   * `{id, alwaysPrepared}` and reach a prepared spell on a real sheet — is
-   * `vocabulary-parity.mirror.test.ts`.
-   */
+  /** A spell id can't be typed reliably, so the spells grant kind uses `CatalogPicker` plus removable
+      chips. Driven through the rendered form because `GrantsEditor` has no `FieldDef`. The body half
+      (ids become `{id, alwaysPrepared}` and reach a sheet) is in `vocabulary-parity.mirror.test.ts`. */
   const SPELL_CTX = {
     ...EMPTY_CONTEXT,
     spells: [
@@ -417,9 +349,7 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
   });
 
   it("...and it is NOT offered on an item, because nothing on that road reads it", async () => {
-    // `EquipmentReferenceSchema` spreads `featureRiders`, so an item's body PARSES `grants.spells`
-    // and `takeGrants` folds nine grant arrays without it. Offering the kind here would store a
-    // value the fight never sees. The other ten stay.
+    // The item body parses `grants.spells`, but `takeGrants` never reads it for equipped items.
     const user = userEvent.setup();
     let value: Draft = {};
     function Harness() {
@@ -449,7 +379,7 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
     await user.click(screen.getByRole("button", { name: "Grant something" }));
     await user.selectOptions(container.querySelector("select")!, "spells");
 
-    // Not a text box: there is nothing to type into, and that is the point of the row.
+    // No text box to type into.
     expect(screen.queryByRole("combobox", { name: "Which spells" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Add a spell" }));
     await user.click(screen.getByRole("radio", { name: /^Bless/ }));
@@ -469,7 +399,7 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
     await user.click(screen.getByRole("radio", { name: /^Cure Wounds/ }));
     expect(grants()?.spells?.map((spell) => spell.id)).toEqual(["bless", "cure-wounds"]);
 
-    // The chips ARE the value, so removing one is how a grant is taken back.
+    // The chips are the value, so removing one revokes the grant.
     await user.click(screen.getByRole("button", { name: "Remove Bless" }));
     expect(grants()?.spells).toEqual([{ id: "cure-wounds", alwaysPrepared: true }]);
   });
@@ -488,24 +418,11 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
   });
 });
 
-/**
- * **A grant's GATE survives an edit to the grant — through the GM's own hands.**
- *
- * `FeatureGrantsSchema.when` is one optional condition over the whole block, and `GrantsEditor`
- * exposes no control for it: it rebuilds the bag from its eleven kinds on every keystroke, so a gate
- * it does not carry across is a gate an ordinary edit DELETES. Losing it turns "Immunity to Charmed
- * and Frightened *while your Rage is active*" into permanent immunity — the exact over-grant the
- * field exists to end, arriving through the editor.
- *
- * The body half of this — duplicating `path-of-the-berserker`, publishing the edit, and a level-6
- * Barbarian who is still Frightenable when he is not raging — is
- * `grant-gate-preservation.mirror.test.ts`. What lives HERE is the gesture: a real mount, a real tap
- * on the chooser, and the `onChange` payload `RecordDetail` would autosave. The two halves are
- * needed for the reason this whole file exists — a model that round-trips through a control nobody
- * can reach is not a control.
- */
+/** `GrantsEditor` exposes no control for `grants.when` but rebuilds the bag on every edit, so it must
+    carry the gate across. This drives the gesture (a real mount and tap, and the `onChange` payload
+    `RecordDetail` would autosave); the body half is `grant-gate-preservation.mirror.test.ts`. */
 describe("a gate the editor cannot show is a gate the editor must not drop", () => {
-  /** `mindless-rage` as `subclasses.v1.json` ships it, seeded as the body the GM opened. */
+  /** `mindless-rage` as `subclasses.v1.json` ships it, as the opened body. */
   const GATED = {
     grants: {
       conditionImmunities: ["charmed", "frightened"],
@@ -536,7 +453,7 @@ describe("a gate the editor cannot show is a gate the editor must not drop", () 
     const user = userEvent.setup();
     const { grants } = mountGated();
 
-    // The stored block renders as its one row, already open, with the two conditions on it.
+    // The stored block renders as one open row with its two conditions.
     await user.click(screen.getByRole("combobox", { name: "Which condition immunities" }));
     await user.click(screen.getByRole("option", { name: "Paralyzed" }));
 
@@ -547,19 +464,10 @@ describe("a gate the editor cannot show is a gate the editor must not drop", () 
 });
 
 /**
- * **C3 — the weapon block's sixth row, on screen.**
- *
- * `weapon-properties.mirror.test.ts` proves the row reaches the ENGINE: a GM-authored Finesse weapon
- * swings off Dexterity. It drives the form MODEL, though, and the model is not the screen — the whole
- * point of `pick` is that a complete vocabulary shipped invisible is a vocabulary a GM does not have,
- * which is exactly what `<datalist>` did to rarity and to damage types before `3a`/`3d`. So the
- * assertions here are what a GM SEES and TAPS.
- *
- * The one that is specific to this unit is the SECOND: the chooser must offer the nine weapon
- * PROPERTIES and must not offer the eight masteries. `ctx.weaponProperties` is the union of both
- * families — right for the `weapon-property-is` trigger, which matches either — and offering `topple`
- * here would suggest a value the weapon column cannot mean, silently inert at play time. That is the
- * hardest homebrew failure to diagnose, and it is a one-word mistake to make.
+ * The weapon `properties` row on screen. The chooser must list the weapon properties and not the
+ * masteries: `ctx.weaponProperties` is the union (right for `weapon-property-is`), but a mastery slug
+ * like `topple` means nothing in this column and would be silently inert. The engine half is
+ * `weapon-properties.mirror.test.ts`.
  */
 describe("C3 — a homebrew weapon's Properties row is a visible chooser over the properties alone", () => {
   const PROPERTY_NAMES = WEAPON_PROPERTY_IDS.map(suggestionLabel);
@@ -572,7 +480,7 @@ describe("C3 — a homebrew weapon's Properties row is a visible chooser over th
 
     expect(form.options("Properties")).toEqual(PROPERTY_NAMES);
     expect(form.options("Properties")).toContain("Two Handed");
-    // The union guard, named per slug so a regression says WHICH family leaked.
+      // Checked per slug so a failure names the leaked mastery.
     for (const mastery of WEAPON_MASTERY_IDS) {
       expect(form.options("Properties"), `${mastery} is a mastery, not a property`)
         .not.toContain(suggestionLabel(mastery));
@@ -586,11 +494,9 @@ describe("C3 — a homebrew weapon's Properties row is a visible chooser over th
     await user.click(form.chooser("Properties"));
     await user.click(screen.getByRole("option", { name: "Finesse" }));
 
-    // THE FAR END for this file: the body that gets published. `inContainer` seeds the rest of the
-    // weapon block around it, so a first touch here cannot produce `weapon: { properties: [...] }`
-    // alone and the three `Required` refusals that used to follow.
+    // `inContainer` seeds the rest of the weapon block around the first touch.
     expect(form.body().weapon).toMatchObject({ properties: ["finesse"], rangeFeet: null, longRangeFeet: null });
-    // A chosen property leaves the menu — offering it again would be offering a tap that does nothing.
+    // A chosen property leaves the menu.
     await user.click(form.chooser("Properties"));
     expect(form.options("Properties")).not.toContain("Finesse");
   });
@@ -599,8 +505,7 @@ describe("C3 — a homebrew weapon's Properties row is a visible chooser over th
     const user = userEvent.setup();
     const form = mount();
 
-    // The half a closed enum would have broken. `WEAPON_PROPERTY_IDS` is what the chooser SHOWS; the
-    // column is `z.array(z.string().regex(/^[a-z0-9-]+$/))`, so a GM's own word is a legal value.
+    // The column is an open slug (`z.array(z.string().regex(/^[a-z0-9-]+$/))`), so a GM's own word is legal.
     await user.type(form.chooser("Properties"), "Duelling{Enter}");
     expect((form.body().weapon as { properties?: string[] }).properties).toEqual(["duelling"]);
   });

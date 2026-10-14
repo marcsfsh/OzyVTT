@@ -1,15 +1,6 @@
-/**
- * Sections → a `FieldGrid` of fields. The whole editor body for all nine types.
- *
- * `advanced` sections are native `<details>`, so the disclosure's keyboard and
- * screen-reader behaviour comes from the platform rather than a hand-rolled
- * `aria-expanded` dance — the same call `FeatureList` made.
- *
- * Section headings are never a bare `<h3>`: the app global sets
- * `h1,h2,h3 { font-weight: 400 }`, which synthesises faux-bold on the single-weight
- * display face. `.hb-section-title` carries the full `font:` shorthand, weight included,
- * so nothing is synthesised.
- */
+/** Renders schema sections as field grids; `advanced` sections are native `<details>`.
+    Headings use `.hb-section-title` (full `font:` shorthand) because the global
+    `h3 { font-weight: 400 }` would otherwise synthesise faux-bold on the display face. */
 
 import { FieldGrid } from "@vtt/ui";
 import { FieldRenderer, type CustomRenderer } from "./FieldRenderer";

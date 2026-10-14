@@ -1,61 +1,13 @@
 /**
- * **THE BOTH-PATHS GUARD, on one row, end to end — and the census of everything it currently
- * refuses.**
+ * Both-paths guard for the rider vocabulary. Each row has a fixture and three tests: (1) the editor
+ * authors it through the real controls to a publishable body; (2) SRD content authors the same
+ * shape, with a minimum count asserted; (3) one assertion body runs over both and ends at an engine
+ * outcome (a rolled number, a spent counter, a refusal, rendered text).
  *
- * The rule the whole class/homebrew phase is held to is:
+ * A `.mirror.test.ts` so it runs in the node project that may import server modules.
  *
- * > one unit of work = an engine reader + SRD content authoring it + a homebrew editor control +
- * > a test through BOTH paths. Ship vocabulary complete, or don't ship it.
- *
- * It exists because **built-but-unwired keeps shipping**. Eight times in one session a mechanism
- * landed that was exercised through exactly one consumer — an engine reader with no control, a
- * control with no SRD author — and a green suite plus a clean typecheck saw none of them. Parity is
- * not a property of either side; it is a property of the JOIN, and nothing in this repo used to
- * assert the join.
- *
- * ## Why this file is a `.mirror.test.ts`
- *
- * `vitest.config.ts` already declares a second, node-environment project for `*.mirror.test.ts`
- * whose stated purpose is that "these tests import the SERVER's own modules", and
- * `src/builder/server-offers.mirror.test.ts` already imports `../../../server/src/character-build.js`
- * by relative path. So the join needs no shared package, no cross-workspace helper module and no
- * server-side import of client code: the editor helpers stay in `authoring-harness.ts` beside the
- * form they drive, and the server modules are imported the way the precedent imports them.
- *
- * ## The shape, and what makes it not theatre
- *
- * One fixture per row of vocabulary, and three tests over it:
- *
- *   1. the **editor** can author it, through the real controls, to a publishable body;
- *   2. **SRD content** authors the same shape, and it is **not a lone record** — a count is asserted;
- *   3. **one assertion body** runs over both and ends at an engine outcome.
- *
- * Test 3 is the only one that matters, and 1 and 2 are what stop it being satisfiable by a fixture
- * literal. A far end is mandatory: the bar for every unit in this phase is a rolled number, a spent
- * counter, a refusal or rendered text — never "the value survived into the struct".
- *
- * Seven rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
- * monster actions), **a monster's to-hit bonus** (U10 — 423 monster actions, and until that unit the
- * shape could not be published at all), **a two-band range** (U11 — 45 records, ending at the
- * long-range disadvantage die), **what an effect DOES** (U6 — and it is the one that crosses
- * carriers: the editor half authors an ITEM's effect, the SRD half reads a FEATURE's, and the two
- * reach the same kept die down two entirely different roads), **an always-prepared spell grant**
- * (U9 — 41 records, ending at a row on the character's own spell list), **uses read off the
- * class table's own column** (U7 — 19 records, ending at a count that moves 2 → 3 with the level
- * while the authored line never changes), and **a recharging action** (U8 — 86 records, ending at a
- * d6 the table watches and the two sentences it narrates).
- *
- * ## The census, and the standing warning about what it does NOT prove
- *
- * `unauthorable` below is the harness's own honest output: every key a later unit needs and the
- * editor cannot author today. It is asserted as an EXACT set, so the unit that closes a row deletes
- * its line here in the same commit.
- *
- * **A key existing is not parity, and U7 is the worked example.** `uses.scaling.type` had a control
- * — the "Uses are" select wrote it — while `class-resource` stayed unauthorable, because that
- * select had no such OPTION. No census over keys could have seen it. Key existence is what the
- * census can see; value round-tripping is what tests 1–3 see. Both halves are needed and neither
- * substitutes for the other — that is the audit's §N3 finding restated as code.
+ * The `unauthorable` census lists every key a later change needs that the editor cannot author yet,
+ * as an exact set. It sees keys, not values: a select missing an option is caught by the row tests.
  */
 
 import { describe, expect, it } from "vitest";
@@ -80,9 +32,7 @@ import { SCHEMAS } from "./schemas";
 import type { Draft, FieldDef } from "./schema";
 import type { HomebrewType } from "./types";
 
-/** The values a `select` offers, whether its list is a literal or a function of the context. An
-    option MISSING is what "the key exists and the value is still unauthorable" looks like — the
-    census sees keys, and this is the other half of that sentence. */
+/** The values a `select` offers, whether its options are a literal or a function of the context. */
 const optionValues = (field: FieldDef | undefined): readonly string[] =>
   (typeof field?.options === "function" ? field.options(EMPTY_CONTEXT, {}) : field?.options ?? []).map((option) => option.value);
 
@@ -99,11 +49,8 @@ const RECORD_ID = "hb-parity-a1b2c3";
 
 /* ---------------------------------------------------------------- the fixture ---- */
 
-/**
- * ONE row of vocabulary, named once and spelled once: an action that forces a saving throw and rolls
- * typed damage. Five keys — `activation`, `save.ability`, `save.dc`, `damage[].formula`,
- * `damage[].type` — and the SRD's Aboleth authors exactly these five.
- */
+/** An action that forces a saving throw and rolls typed damage (`activation`, `save.ability`,
+    `save.dc`, `damage[].formula`, `damage[].type`), as the SRD Aboleth authors it. */
 const FIXTURE = {
   actionId: "consume-memories",
   actionName: "Consume Memories",
@@ -113,15 +60,14 @@ const FIXTURE = {
   saveDc: 16,
   formula: "3d6",
   damageType: "psychic",
-  /** 4 + 5 + 6 — three faces fed to the resolver, so the far end is an exact number, not a range. */
+  /** Faces fed to the resolver, so the far end is an exact number. */
   faces: [4, 5, 6],
   total: 15
 } as const;
 
 /* ------------------------------------------------------ path 1: the editor ------- */
 
-/** The monster a GM builds in `/homebrew`, through the real form: `blankDraft`, each field's own
-    `write`, `forStorage` on the way out, `bodyForPublish` into the body the save path sends. */
+/** The monster a GM builds through the real form, as the body the save path sends. */
 function authoredMonster(): Draft {
   const damagePart = authoredRow("monster", ["actions", "damage"], [
     ["formula", FIXTURE.formula],
@@ -135,8 +81,7 @@ function authoredMonster(): Draft {
     ["save.ability", FIXTURE.saveAbility],
     ["save.dc", FIXTURE.saveDc]
   ]);
-  // The action's id is minted by `newRow`; the fixture's far end looks it up by name-derived id, so
-  // pin it to the SRD's own slug rather than a random one.
+  // `newRow` mints a random id; pin the SRD's slug so the far end can find the action.
   const withId = { ...action, id: FIXTURE.actionId };
   return authored("monster", "Memory Eater", [
     ["abilityScores.str", 21], ["abilityScores.dex", 9], ["abilityScores.con", 15],
@@ -150,8 +95,7 @@ function authoredMonster(): Draft {
 
 /* --------------------------------------------------------- path 2: the SRD ------- */
 
-/** The same shape, read out of the shipped bundle through the server's own content view — not a
-    fixture, not a hand-copied literal. */
+/** The same shape read from the shipped bundle through the server's content view. */
 const srdMonster = (): ActorDefinition => {
   const definition = new ContentLibrary().forAudience("gm").monster("aboleth");
   if (!definition) throw new Error("The SRD bundle no longer ships an Aboleth — this fixture needs a new carrier.");
@@ -160,11 +104,8 @@ const srdMonster = (): ActorDefinition => {
 
 /* -------------------------------------------------- the one assertion body ------- */
 
-/**
- * Given a definition from EITHER path, resolve the fixture's action in a real fight and report what
- * the table would see. This is the whole point of the file: one body, two callers, and a far end
- * neither path can fake.
- */
+/** Resolves the fixture's action in a real fight for a definition from either path and reports what
+    the table would see. */
 function resolveTheFixture(definition: ActorDefinition) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
@@ -175,8 +116,7 @@ function resolveTheFixture(definition: ActorDefinition) {
   });
   startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
 
-  // Through the server's own action list, never `definition.actions` directly: that list is what the
-  // table rolls from, and it is where a rider would fold in.
+  // Through the server's action list, which is what the table rolls from and where riders fold in.
   const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === FIXTURE.actionId);
   if (!action) throw new Error(`${definition.name} has no "${FIXTURE.actionId}" action.`);
 
@@ -209,8 +149,7 @@ describe("a saving-throw action that rolls typed damage — through both paths",
     expect(verdict.why).toBe("");
     expect(verdict.publishable).toBe(true);
 
-    // The five keys, in the body the save path sends. `authoredRow` already refuses a key with no
-    // control; this is the second half — the value the control WROTE survived the round trip.
+    // `authoredRow` already refuses keys with no control; this checks the written values survive.
     const body = storedBody("monster", draft, RECORD_ID) as { actions: Array<Record<string, unknown>> };
     expect(body.actions).toHaveLength(1);
     expect(body.actions[0]).toMatchObject({
@@ -231,8 +170,7 @@ describe("a saving-throw action that rolls typed damage — through both paths",
       damage: [{ formula: FIXTURE.formula, type: FIXTURE.damageType }]
     });
 
-    // A row with one author is a row that can regress unnoticed everywhere else. Measured at the
-    // time of writing: 123 bundled monster actions carry a save AND damage AND no attack roll.
+    // More than one SRD author, so a regression shows up across content.
     const carriers = new ContentLibrary().forAudience("gm").monsterSummaries()
       .flatMap((summary) => new ContentLibrary().forAudience("gm").monster(summary.id)?.actions ?? [])
       .filter((entry) => entry.save !== undefined && entry.attack === undefined && entry.damage.length > 0);
@@ -249,7 +187,7 @@ describe("a saving-throw action that rolls typed damage — through both paths",
     for (const [label, definition] of paths) {
       const { resolution, pendingSaves } = resolveTheFixture(definition);
 
-      // The far end: 3d6 rolled as 4/5/6, and a save the target now owes at the authored DC.
+      // 3d6 rolled as 4/5/6, and a save owed at the authored DC.
       expect(resolution.damage, label).toEqual([{ formula: FIXTURE.formula, type: FIXTURE.damageType, total: FIXTURE.total }]);
       expect(resolution.damageTotal, label).toBe(FIXTURE.total);
       expect(resolution.save, label).toEqual({
@@ -268,22 +206,10 @@ describe("a saving-throw action that rolls typed damage — through both paths",
   });
 });
 
-/* ------------------------------ U10: a monster's to-hit bonus, through both paths -- */
+/* -------------------------------- a monster's to-hit bonus, through both paths -- */
 
-/**
- * The row: `attack.bonus`, the flat printed to-hit a stat block carries.
- *
- * It is the sharpest carrier bug the audit found. `actionsField` served three carriers and wrote
- * `attack.ability` at all of them — the FEATURE shape, where the builder derives the number from the
- * character's own scores. `ActionSchema.attack` has no `ability` key and REQUIRES `bonus`, so a GM
- * who filled in "Uses: Strength" on a monster's Scimitar got `actions[].attack.bonus: Required` from
- * the publish gate, with no control anywhere in the form that could satisfy it. **A monster action
- * with an attack roll could not be published at all**, while 423 bundled monster actions author the
- * key.
- *
- * The Bandit is the carrier because it is the plainest one in the bundle: +3 to hit, reach 5, one
- * damage part, and no riders, multiattack or on-hit conditions to confuse the far end.
- */
+/** `attack.bonus`, the flat printed to-hit a stat block carries (`ActionSchema.attack` requires it
+    and has no `ability`). The Bandit is the plainest carrier: +3 to hit, one damage part, no riders. */
 const BANDIT = {
   monsterId: "bandit",
   actionId: "scimitar",
@@ -293,7 +219,7 @@ const BANDIT = {
   reachFeet: 5,
   formula: "1d6 + 1",
   damageType: "slashing",
-  /** The d20, then the d6. Both exact, so the far end is a number and not a range. */
+  /** The d20, then the d6; both exact. */
   attackFace: 15,
   damageFace: 4,
   attackTotal: 18,
@@ -311,8 +237,6 @@ function authoredBandit(): Draft {
     ["activation", "action"],
     ["description", BANDIT.description],
     ["damage", [damagePart]],
-    // THE ROW. `authoredRow` throws when a key has no control, so before U10 this line — not an
-    // assertion below it — is what failed, which is the honest place for the failure to be.
     ["attack.bonus", BANDIT.bonus],
     ["attack.reachFeet", BANDIT.reachFeet]
   ]);
@@ -332,8 +256,7 @@ const srdBandit = (): ActorDefinition => {
   return definition;
 };
 
-/** Swing the fixture's melee attack at a dummy and report the roll. No `distanceFeet`, so the range
-    rules stay out of it entirely — this row is about the to-hit number and nothing else. */
+/** Swings the fixture's melee attack at a dummy. No `distanceFeet`, so range rules stay out of it. */
 function swing(definition: ActorDefinition) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
@@ -370,7 +293,6 @@ describe("a monster's to-hit bonus — through both paths", () => {
   it("1. the editor can author it: `attack.bonus` goes through a real control, and the body publishes", () => {
     const draft = authoredBandit();
     const verdict = publishVerdict("monster", draft, RECORD_ID);
-    // Before U10 this read `actions[].attack.bonus: Required` — and no control could answer it.
     expect(verdict.why).toBe("");
     expect(verdict.publishable).toBe(true);
 
@@ -379,8 +301,7 @@ describe("a monster's to-hit bonus — through both paths", () => {
       id: BANDIT.actionId,
       attack: { bonus: BANDIT.bonus, reachFeet: BANDIT.reachFeet }
     });
-    // The FEATURE key must not ride along. `ActionSchema` would strip `ability` in silence, which is
-    // the failure mode this form exists to avoid — so a stat block is offered `bonus` INSTEAD.
+    // The feature-shaped `ability` must not be offered: `ActionSchema` would strip it silently.
     expect(hasControl("monster", "attack.ability", ["actions"])).toBe(false);
     expect(hasControl("equipment", "attack.bonus", ["actions"])).toBe(false);
     expect(hasControl("equipment", "attack.ability", ["actions"])).toBe(true);
@@ -392,7 +313,6 @@ describe("a monster's to-hit bonus — through both paths", () => {
       damage: [{ formula: BANDIT.formula, type: BANDIT.damageType }]
     });
 
-    // Measured at the time of writing: 423 bundled monster actions carry an attack bonus.
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library.monsterSummaries()
       .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
@@ -409,8 +329,7 @@ describe("a monster's to-hit bonus — through both paths", () => {
 
     for (const [label, definition] of paths) {
       const resolution = swing(definition);
-      // The far end: a natural 15 plus the AUTHORED +3 is 18, which beats AC 12, and the hit rolls
-      // its damage. Change the bonus and this number changes — it is the value, not a proxy for it.
+      // A natural 15 plus the authored +3 is 18, beating AC 12, so the hit rolls damage.
       expect(resolution.attack, label).toMatchObject({
         naturalRoll: BANDIT.attackFace,
         total: BANDIT.attackTotal,
@@ -422,22 +341,11 @@ describe("a monster's to-hit bonus — through both paths", () => {
   });
 });
 
-/* ------------------------- U11: the normal-range band, through both paths ---------- */
+/* --------------------------- the normal-range band, through both paths ---------- */
 
-/**
- * The row: `attack.rangeNormalFeet` — the 80 in a printed "range 80/320".
- *
- * The reader already shipped and had no author but the bundle: `attackRollSources` in
- * `action-resolution.ts` pushes a `Long range (beyond N ft)` disadvantage when the measured distance
- * passes it, and `Range` alone only ever produces a REFUSAL ("beyond the 320 ft maximum range"). So
- * this is the one number in the attack group that the engine turns into a die, and a GM had no way
- * to say it. 45 bundled records author it.
- *
- * **The far end is the die, and it is proved by contrast.** The same shot is resolved twice from one
- * definition — inside the band and past it — and the second one rolls `2d20` keeping the lower, which
- * turns a natural 17 into a natural 6 and a hit into a miss. A test that only fired at long range
- * would pass on any disadvantage from any source; the near shot is what pins it to this value.
- */
+/** `attack.rangeNormalFeet`, the 80 in "range 80/320". Past it the engine adds a long-range
+    disadvantage die (`attackRollSources`). Proved by contrast: the same shot inside and past the band,
+    where only the far one rolls `2d20` keeping the lower. */
 const CROSSBOW = {
   actionId: "light-crossbow",
   actionName: "Light Crossbow",
@@ -449,11 +357,11 @@ const CROSSBOW = {
   damageType: "piercing",
   nearFeet: 50,
   farFeet: 200,
-  /** Inside the band: one d20 shows 17, +3 is 20, which beats AC 12 and rolls a 5 on the d8. */
+  /** Inside the band: 17 + 3 = 20 beats AC 12, and the d8 shows 5. */
   nearFaces: [17, 5],
   nearTotal: 20,
   nearDamage: 6,
-  /** Past it: 2d20kl1 sees 17 and 6, keeps the 6, and +3 is 9 — a miss, so nothing is rolled after. */
+  /** Past it: 2d20kl1 sees 17 and 6, keeps 6, and 6 + 3 = 9 misses. */
   farFaces: [17, 6],
   farNatural: 6,
   farTotal: 9,
@@ -472,7 +380,6 @@ function authoredCrossbow(): Draft {
     ["damage", [damagePart]],
     ["attack.bonus", CROSSBOW.bonus],
     ["attack.rangeFeet", CROSSBOW.rangeFeet],
-    // THE ROW.
     ["attack.rangeNormalFeet", CROSSBOW.rangeNormalFeet]
   ]);
   return authored("monster", "Road Bandit", [
@@ -485,8 +392,7 @@ function authoredCrossbow(): Draft {
   ]);
 }
 
-/** Shoot from `feet` away. The distance is what makes this row readable at all, so unlike `swing`
-    this one hands the resolver a real `distanceFeet`. */
+/** Shoots from `feet` away, passing a real `distanceFeet` to the resolver. */
 function shoot(definition: ActorDefinition, feet: number, faces: readonly number[]) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
@@ -531,7 +437,7 @@ describe("a two-band range — through both paths", () => {
     expect(body.actions[0]).toMatchObject({
       attack: { bonus: CROSSBOW.bonus, rangeFeet: CROSSBOW.rangeFeet, rangeNormalFeet: CROSSBOW.rangeNormalFeet }
     });
-    // The key is on both attack schemas, so every carrier that mounts an action can say it.
+    // The key exists on both attack schemas, so every action carrier can author it.
     for (const type of ["monster", "equipment", "class"] as const) {
       expect(hasControl(type, "attack.rangeNormalFeet", ["actions"]), type).toBe(true);
     }
@@ -542,7 +448,6 @@ describe("a two-band range — through both paths", () => {
       attack: { bonus: CROSSBOW.bonus, rangeFeet: CROSSBOW.rangeFeet, rangeNormalFeet: CROSSBOW.rangeNormalFeet }
     });
 
-    // Measured at the time of writing: 45 bundled monster actions carry a normal-range band.
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library.monsterSummaries()
       .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
@@ -558,15 +463,13 @@ describe("a two-band range — through both paths", () => {
     ];
 
     for (const [label, definition] of paths) {
-      // Inside 80 ft: a plain d20. Nothing contributed, so the resolution carries no `rollMode` at
-      // all, and the 17 stands.
+      // Inside the band: one d20, no `rollMode`, and the 17 stands.
       const near = shoot(definition, CROSSBOW.nearFeet, CROSSBOW.nearFaces);
       expect(near.rollMode, label).toBeUndefined();
       expect(near.attack, label).toMatchObject({ naturalRoll: 17, total: CROSSBOW.nearTotal, outcome: "hit" });
       expect(near.damageTotal, label).toBe(CROSSBOW.nearDamage);
 
-      // Past 80 ft and inside 320: the SAME action, the SAME first face, and a second die the near
-      // shot never rolled. The lower is kept, so 17 becomes 6 and a hit becomes a miss.
+      // Past it: the same first face plus a second die; the lower is kept, so the hit becomes a miss.
       const far = shoot(definition, CROSSBOW.farFeet, CROSSBOW.farFaces);
       expect(far.rollMode?.mode, label).toBe("disadvantage");
       expect(far.rollMode?.disadvantage, label).toContain(`Long range (beyond ${CROSSBOW.rangeNormalFeet} ft)`);
@@ -576,52 +479,33 @@ describe("a two-band range — through both paths", () => {
   });
 });
 
-/* ---------- U6: what an effect DOES — an ITEM effect and a FEATURE effect --------- */
+/* ------------ what an effect does: an item effect and a feature effect ------------ */
 
 /**
- * The row: `EffectGrant.modifiers` — **the highest-value gap in the phase, and the one that
- * crosses carriers.**
- *
- * Until this unit, every effect a GM authored was a name, some tags, a duration and nothing that
- * changes a number: `effectsField` offered no control for `modifiers` at all, while the engine read
- * it in two places and the SRD authored it twice. Both SRD carriers are FEATURES — Reckless Attack
- * and Superior Defense, the only two records in the whole bundle set that carry `effects[].modifiers`
- * — and `equipment.v1.json` carries none, so this row cannot be proved on one carrier.
- *
- * **The two paths reach the same die down two genuinely different roads**, which is the point:
- *
- *  - the FEATURE road: `character-build.ts` synthesises an activation carrying `feature.effects[0]`,
- *    resolving it writes a live `EffectInstance` on the actor, and `attackRollSources` reads
- *    `attacker.effects[].modifiers` through `toRollModes`;
- *  - the ITEM road: nothing is written to the actor at all. `takeEffects` in
- *    `equipment-derivation.ts` reads the equipped item's effects as STANDING riders, normalising
- *    `attack-advantage` into `roll-mode` on the way, and `attackRollSources` collects them from
- *    `moment.attacker.carriers`.
- *
- * One sheet, one greataxe, one pair of faces, one assertion body: the swing rolls two d20s and keeps
- * the higher, 3 becomes 15, and a single-die roll would have kept the 3.
+ * `EffectGrant.modifiers`. The SRD authors it only on features (Reckless Attack, Superior Defense),
+ * so the editor half is an item and the SRD half a feature, and they reach the same die by different
+ * roads: a feature's effect becomes a live `EffectInstance` read through `toRollModes`, while an
+ * equipped item's effect is read as standing riders (`takeEffects`). Either way the swing keeps the
+ * higher of two d20s.
  */
 const RECKLESS = {
   classId: "barbarian",
   featureId: "reckless-attack",
-  /** The pair the SRD authors on ONE effect: the benefit and the cost, in one sentence. */
+  /** The SRD pair on one effect: the benefit and the cost. */
   srdModifiers: ["attack-advantage", "incoming-attack-advantage"],
   itemId: "hb-bracers-a1b2c3",
   itemName: "Bracers of the Headlong Rush",
   swingId: "item-greataxe",
-  /** Two d20s then the greataxe's d12. The low face is FIRST, so "kept the higher" is visible. */
+  /** Two d20s then the d12, low face first so "kept the higher" is visible. */
   advantageFaces: [3, 15, 8],
-  /** The same swing with nothing helping it: one d20, and the 3 stands. */
+  /** The same swing with nothing helping: one d20, and the 3 stands. */
   plainFaces: [3, 8],
   natural: 15,
   plainNatural: 3
 } as const;
 
-/**
- * A Halfling Barbarian 2 — the lowest level that has Reckless Attack, and Halfling because it is the
- * one SRD species with no ability bonus, no modifier and no choice of its own, so nothing below can
- * be blamed on the species. Built through the REAL builder against the REAL bundles.
- */
+/** A Halfling Barbarian 2: the lowest level with Reckless Attack, and a species with no bonus,
+    modifier or choice of its own. Built through the real builder against the real bundles. */
 const BARBARIAN: CharacterCreateRequestInput = {
   name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level: 2,
   abilityMethod: "standard-array",
@@ -643,8 +527,7 @@ const BARBARIAN: CharacterCreateRequestInput = {
 
 type Table = Readonly<{ definition: ActorDefinition; state: GameState; hero: Actor; catalog: ReturnType<typeof equipmentCatalogOf> }>;
 
-/** The Barbarian, on a map, with the hero first in the order — `attack-advantage` is gated to the
-    bearer's OWN turn, so the order is part of the fixture rather than decoration. */
+/** The Barbarian on a map, first in the order: `attack-advantage` applies only on the bearer's own turn. */
 function barbarianTable(homebrew?: HomebrewContentSource): Table {
   const view = new ContentLibrary(homebrew).forAudience("gm");
   const catalog = equipmentCatalogOf(view);
@@ -685,13 +568,12 @@ function resolveOn(table: Table, actionId: string, faces: readonly number[], tar
   );
 }
 
-/** THE assertion body. Swing the greataxe at the dummy and report the d20 the engine kept. */
+/** Swings the greataxe at the dummy. */
 const swingGreataxe = (table: Table, faces: readonly number[]) => resolveOn(table, RECKLESS.swingId, faces, [IDS.target]);
 
-/** The item a GM builds in `/homebrew`: an effect whose ONE modifier is the row this unit adds. */
+/** An item whose effect carries one `attack-advantage` modifier, authored through the real form. */
 function authoredBracers(): Draft {
-  // THE ROW, and it is nested two containers deep. `authoredRow` throws when a key has no control,
-  // so before U6 this line — not an assertion below it — is what failed.
+  // Nested two containers deep.
   const modifier = authoredRow("equipment", ["effects", "modifiers"], [["type", "attack-advantage"]]);
   const effect = authoredRow("equipment", ["effects"], [
     ["name", "Headlong Rush"],
@@ -708,8 +590,7 @@ function authoredBracers(): Draft {
   ]);
 }
 
-/** The Barbarian again, wearing the authored bracers — a real `ContentLibrary` with a real homebrew
-    slice, so the item reaches the fight through the same merge a published record does. */
+/** The Barbarian wearing the authored bracers, merged through a real homebrew slice. */
 function barbarianWearingBracers(): Table {
   const record = HOMEBREW_BODY_SCHEMAS.equipment.parse(storedBody("equipment", authoredBracers(), RECKLESS.itemId));
   const table = barbarianTable({
@@ -721,7 +602,7 @@ function barbarianWearingBracers(): Table {
   return table;
 }
 
-/** The SRD's own carrier, read out of the shipped bundle through the server's content view. */
+/** The SRD carrier, read from the shipped bundle through the server's content view. */
 const srdRecklessAttack = () => {
   const record = new ContentLibrary().forAudience("gm").classRecord(RECKLESS.classId);
   const feature = record?.features.find((entry) => entry.id === RECKLESS.featureId);
@@ -744,13 +625,11 @@ describe("what an effect DOES — through both paths, across two carriers", () =
       modifiers: [{ type: "attack-advantage" }]
     });
 
-    // The row is looked up in the EFFECT's own fields, never the record's. A flat lookup would have
-    // resolved it against the top-level `modifiersField` — the 21-variant FEATURE union, which an
-    // effect cannot hold — and called the row authorable while it was not.
+    // Looked up in the effect's own fields: a flat lookup would resolve the feature-scope
+    // `modifiersField` and falsely report the row authorable.
     expect(hasControl("equipment", "modifiers", ["effects"])).toBe(true);
     expect(hasControl("equipment", "damageTypes", ["effects", "modifiers"])).toBe(true);
-    // ...and the two unions really are different, which is why this is its own list: `armor-class` is
-    // a `FeatureModifier` and NOT an `EffectModifier`, so it is offered one level up and not here.
+    // The two unions differ: `armor-class` is a feature modifier, not an effect modifier.
     const offered = (kind: string) =>
       (applyField("equipment", { rowId: "r" }, "type", kind, ["effects", "modifiers"]) as { type?: string }).type;
     expect(offered("attack-advantage")).toBe("attack-advantage");
@@ -762,10 +641,7 @@ describe("what an effect DOES — through both paths, across two carriers", () =
     expect(feature.effects[0]).toMatchObject({ tags: ["reckless-attack"], modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }] });
     expect(feature.effects[0].modifiers.map((modifier) => modifier.type)).toEqual([...RECKLESS.srdModifiers]);
 
-    // Measured at the time of writing: exactly TWO records in the whole bundle set author
-    // `effects[].modifiers`, Reckless Attack and Superior Defense, and both are Barbarian class
-    // features. `equipment.v1.json` authors none — which is why this unit's editor half has to be an
-    // ITEM and its SRD half a FEATURE, and why the assertion below has to run over both.
+    // Only two bundled records (both Barbarian features) author `effects[].modifiers`.
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library.classSummaries()
       .flatMap((summary) => library.classRecord(summary.id)?.features ?? [])
@@ -775,54 +651,36 @@ describe("what an effect DOES — through both paths, across two carriers", () =
 
   it("3. one assertion body over both: the swing rolls two d20s and keeps the higher", () => {
     const paths: ReadonlyArray<readonly [string, () => Table]> = [
-      // The FEATURE carrier: enter Reckless Attack first, which writes the live effect.
+      // Feature carrier: entering Reckless Attack writes the live effect.
       ["SRD content", () => { const table = barbarianTable(); resolveOn(table, RECKLESS.featureId, []); return table; }],
-      // The ITEM carrier: nothing is entered. Wearing the bracers IS the effect.
+      // Item carrier: wearing the bracers is the effect.
       ["the homebrew editor", barbarianWearingBracers]
     ];
 
     for (const [label, tableOf] of paths) {
       const table = tableOf();
       const swung = swingGreataxe(table, RECKLESS.advantageFaces);
-      // The far end: the die. Two d20s offered, the higher kept, and the roll card says why.
+      // Two d20s, the higher kept, and the roll card says why.
       expect(swung.rollMode?.mode, label).toBe("advantage");
       expect(swung.attack?.naturalRoll, label).toBe(RECKLESS.natural);
       expect(swung.attack?.outcome, label).toBe("hit");
     }
 
-    // THE NEGATIVE CONTROL, and it is what makes the two above mean anything: the same sheet, the
-    // same greataxe and the same first face, with neither carrier contributing. One die, and the 3
-    // stands — so a test that only ever swung under advantage would have passed on advantage from
-    // any source at all.
+    // Negative control: same sheet and faces with no carrier contributing, so one die and the 3 stands.
     const bare = swingGreataxe(barbarianTable(), RECKLESS.plainFaces);
     expect(bare.rollMode).toBeUndefined();
     expect(bare.attack?.naturalRoll).toBe(RECKLESS.plainNatural);
   });
 });
 
-/* ------------- U9: `grants.spells` — the eleventh of eleven grant arrays ---------- */
+/* --------------- `grants.spells`: always-prepared spell grants ---------------- */
 
 /**
- * The row: `FeatureGrantsSchema.spells` — "you always have this spell prepared".
- *
- * Ten of the eleven arrays `GrantsEditor` writes reached parity long ago. This one did not, and it
- * failed in the quietest possible way: the component **preserved** whatever `grants.spells` was
- * already in the body on its way past, so a duplicated SRD record kept its domain spells and a GM
- * could not add, remove or even see one. Preserving is not a control. 41 SRD records author it —
- * 19 class features, 14 species traits, 8 subclass features — and `character-build.ts` turns each
- * into a spell that is on the sheet, prepared, and uncharged against the prepared cap.
- *
- * **Two things measured here that the plan had wrong, and both change the control:**
- *
- *  1. the authored shape is `FeatureGrantsSchema.spells` — `{id, level?, alwaysPrepared, ability?}` —
- *     NOT `SpellcastingSchema.spells` (`{id, name, level, prepared, alwaysPrepared, actionId?,
- *     classId?}`), which is the BUILT sheet's shape and the reader's output rather than its input;
- *  2. `grants.spells` is read on the FEATURE road only. `takeGrants` in `equipment-derivation.ts`
- *     folds nine grant arrays for an equipped item and `spells` is not among them, so an item's
- *     spell grant would parse, store and do nothing. The carrier here is a FEAT.
- *
- * One sheet carries both paths: a Human Paladin 1 whose class feature grants Divine Smite (the SRD
- * half) and whose Human origin-feat pick is a homebrew feat granting Bless (the editor half).
+ * `FeatureGrantsSchema.spells` (`{id, level?, alwaysPrepared, ability?}`): the builder puts each
+ * granted spell on the sheet, prepared and not counted against the prepared cap. Read on the feature
+ * road only (`takeGrants` ignores it for items), so the editor carrier is a feat. One sheet carries
+ * both paths: a Human Paladin whose class feature grants Divine Smite (SRD) and whose origin feat is
+ * a homebrew feat granting Bless (editor).
  */
 const GRANTED = {
   srdFeatureId: "paladins-smite",
@@ -832,18 +690,9 @@ const GRANTED = {
   featSpellId: "bless"
 } as const;
 
-/** The feat a GM builds in `/homebrew`: the record shell through the real form, and the grant
-    through `GrantsEditor`'s OWN write path.
-
-    Why not `applyField`: `grants` is the one key still on `RIDER_EXEMPT`, because all eleven kinds
-    are bespoke JSX inside `GrantsEditor` with no `FieldDef` to look up — writing through the
-    exemption would be this test hand-building the body and proving nothing. `grantsFromRows` is the
-    function the component itself calls, and the rendered affordance (a `CatalogPicker` over the
-    merged spell catalog, not a `TagInput`) is driven in `pick-fields.test.tsx`.
-
-    The `{}` second argument is the bag the rows are rebuilt OVER — the keys `GrantsEditor` has no
-    row for and carries through rather than deleting. A fixture built from nothing has none, so `{}`
-    is the honest value here; `grant-gate-preservation.mirror.test.ts` is where it is not empty. */
+/** A feat built through the real form, with the grant written through `GrantsEditor`'s own
+    `grantsFromRows` (`grants` has no `FieldDef`). The `{}` is the bag rebuilt over: nothing to carry
+    here; see `grant-gate-preservation.mirror.test.ts` for the non-empty case. */
 function authoredFeat(withGrant = true): Draft {
   const shell = authored("feat", GRANTED.featName, [
     ["category", "origin"],
@@ -851,21 +700,15 @@ function authoredFeat(withGrant = true): Draft {
     ["description", "You always have the Bless spell prepared."]
   ]);
   const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }], {}) : undefined;
-  // The feature's own name and description used to be hand-set here, because `FeatureEditor` had no
-  // `FieldDef` anywhere and was invisible to the harness. R1 mounted its fields as the row shape of
-  // the `custom: "features"` field, so they go through the real control at the feature's OWN scope —
-  // `["feature"]`, singular, because a feat IS one `FeatureRecord` and not a list.
+  // A feat's single feature is addressed at `["feature"]`.
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", GRANTED.featName, ["feature"]);
   feature = applyField("feat", feature, "description", "You always have the Bless spell prepared.", ["feature"]);
   return { ...shell, feature: { ...feature, grants } };
 }
 
-/**
- * A Human Paladin 2 — level 2 because that is where `paladins-smite` sits, and Human because its
- * Versatile trait is the origin-feat slot the homebrew feat is taken in. Neither granted spell is
- * chosen anywhere in this ledger: both arrive as grants, which is the whole claim.
- */
+/** A Human Paladin 2 (where `paladins-smite` sits); Human's Versatile trait is the origin-feat slot.
+    Neither granted spell is chosen anywhere in the ledger. */
 const paladinInput = (): CharacterCreateRequestInput => ({
   name: "Sera", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
   abilityMethod: "standard-array",
@@ -890,8 +733,7 @@ const paladinInput = (): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/** The sheet, built by the REAL builder against the REAL bundles, with the authored feat merged in
-    through a real homebrew slice — the same merge a published record takes. */
+/** The sheet from the real builder, with the authored feat merged through a real homebrew slice. */
 function paladinSheet({ withGrant }: { withGrant: boolean }): ActorDefinition {
   const record = HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", authoredFeat(withGrant), GRANTED.featId));
   const homebrew: HomebrewContentSource = {
@@ -902,7 +744,7 @@ function paladinSheet({ withGrant }: { withGrant: boolean }): ActorDefinition {
   return buildCharacterDefinition(paladinInput(), new ContentLibrary(homebrew).forAudience("gm"), BuilderPolicySchema.parse({}));
 }
 
-/** THE assertion body: is this spell on the sheet, and is it there the way a GRANT puts it there? */
+/** Whether the spell is on the sheet the way a grant puts it there. */
 const preparedSpell = (definition: ActorDefinition, id: string) =>
   (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
 
@@ -916,16 +758,12 @@ describe("an always-prepared spell grant — through both paths", () => {
     const body = storedBody("feat", draft, GRANTED.featId) as { feature: { grants?: { spells?: unknown } } };
     expect(body.feature.grants?.spells).toEqual([{ id: GRANTED.featSpellId, alwaysPrepared: true }]);
 
-    // The round trip, through the component's own read: what was written comes back as the ids the
-    // picker shows, so re-opening the record does not lose the grant (which is what "preserved on
-    // write" looked like from the outside, right up until a GM tried to change one).
+    // Round trip through the component's own read, so reopening the record keeps the grant.
     expect(grantRowsOf(body.feature.grants as Record<string, unknown>)).toEqual([
       { rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }
     ]);
 
-    // And the standing warning, stated where it applies: this key is NOT visible to the harness, so
-    // the census cannot see it and `applyField` would wave it through. `grants` stays exempt because
-    // all eleven kinds are bespoke JSX — U9 made the eleventh EDITABLE, not declarative.
+    // `grants` is invisible to the harness (bespoke JSX), so it stays exempt.
     expect(RIDER_EXEMPT).toEqual(["grants"]);
     expect(hasControl("feat", "grants")).toBe(false);
   });
@@ -945,9 +783,7 @@ describe("an always-prepared spell grant — through both paths", () => {
     for (const summary of library.speciesSummaries()) walk(library.speciesRecord(summary.id));
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
 
-    // Measured at the time of writing: 41 — 19 class features, 14 species traits, 8 subclass
-    // features. The Paladin's own carrier is one of them and is named, so the fixture below cannot
-    // drift silently away from the bundle.
+    // 41 at the time of writing; the Paladin's own carrier is named so the fixture can't drift.
     expect(carriers.length).toBeGreaterThanOrEqual(40);
     expect(carriers).toContain(GRANTED.srdFeatureId);
   });
@@ -961,83 +797,55 @@ describe("an always-prepared spell grant — through both paths", () => {
 
     for (const [label, spellId] of paths) {
       const spell = preparedSpell(definition, spellId);
-      // The far end: a row on the character's own spell list, ready to cast without preparing it.
+      // A row on the character's own spell list, castable without preparing it.
       expect(spell, label).toMatchObject({ id: spellId, prepared: true, alwaysPrepared: true });
-      // The name is resolved from the catalog rather than from the grant, so a picked id is a real
-      // spell on the sheet and not a slug the player has to decode.
+      // The name is resolved from the catalog, not the grant.
       expect(spell?.name, label).not.toBe(spellId);
     }
 
-    // THE NEGATIVE CONTROL, and it drops the VALUE rather than the carrier: the same Paladin, taking
-    // the same homebrew feat, whose only difference is that the GM picked no spell. Divine Smite is
-    // still there — it is the class's — and Bless is gone, so it is the GRANT that put it on the
-    // sheet and not the feat, the species, or any other part of the build.
+    // Negative control: the same feat with no spell picked. Divine Smite (the class's) remains and
+    // Bless is gone, so the grant is what put it there.
     const without = paladinSheet({ withGrant: false });
     expect(preparedSpell(without, GRANTED.srdSpellId)).toBeDefined();
     expect(preparedSpell(without, GRANTED.featSpellId)).toBeUndefined();
   });
 });
 
-/* ---------- U7: `uses.scaling: class-resource` — the class table's own column ----- */
+/* ------- `uses.scaling: class-resource`: the class table's own column ----- */
 
 /**
- * The row: `FeatureUsesSchema.scaling` variant `class-resource` — *"you can Rage the number of
- * times shown in the Rages column of the Barbarian Features table."*
- *
- * It is the highest-count single gap in the `uses` family and the schema half has shipped all
- * along: `character-content.ts` declares the fourth discriminator, `character-build.ts`'s
- * `resolvedUseLimit` reads the printed column off `classResources` at the character's own level,
- * and **19 SRD features stand on it** — 16 class features and 3 subclass features. The select that
- * writes `uses.scaling.type` simply had no such option, so the one thing a homebrew class most
- * needs to say was the one thing it could not: without it a GM must re-type the printed column into
- * a `by-level` list sitting beside the printed column it copies, which is the second copy that
- * drifts.
- *
- * **The far end is a count that MOVES with the level, from one authored record.** Rage prints 2 at
- * level 1 and 3 at level 3, and neither number is anywhere in the feature — the feature names a
- * column. A test at one level would pass on a hard-coded 3.
- *
- * **The control is offered at FEATURE scope only, and that is a measurement rather than a
- * shortcut.** `scaledLimit` in `equipment-derivation.ts` answers `undefined` for `class-resource`
- * in writing — a built definition no longer carries a class table — so an item authored this way
- * grants no charges however the GM fills it in. The census row this unit deletes named `equipment`;
- * the 19 authors are class and subclass features, and the carrier the census named is the one
- * carrier that can never read it.
+ * `FeatureUsesSchema.scaling` variant `class-resource` ("Rage the number of times shown in the Rages
+ * column"): `resolvedUseLimit` reads the column at the character's level. The far end is a count
+ * that moves with level (2 at level 1, 3 at level 3) from one authored record. Feature scope only:
+ * `scaledLimit` cannot resolve it on an item.
  */
 const RAGES = {
   classId: "barbarian",
   featureId: "rage",
   resourceId: "rage",
-  /** The Rages column, straight off `classes.v1.json`: 2 at levels 1-2, 3 at level 3. */
+  /** The Rages column in `classes.v1.json`: 2 at levels 1-2, 3 at level 3. */
   atLevel1: 2,
   atLevel3: 3,
   featId: "hb-bottled-fury-a1b2",
   featName: "Bottled Fury",
-  /** A column the BARBARIAN's table does not print — the Sorcerer's. The negative control. */
+  /** A column the Barbarian table doesn't print (the Sorcerer's), for the negative control. */
   wrongResourceId: "sorcery-points"
 } as const;
 
-/** The feat a GM builds in `/homebrew`, through the real controls: `RiderEditor` is mounted by
-    `FeatureEditor` with the FEATURE itself as its value, so the `uses` block is written against the
-    feature draft exactly the way the form writes it. `applyField` throws when a key has no control,
-    so before U7 the `uses.scaling.id` line — not an assertion below it — is what failed. */
+/** A feat built through the real controls; `RiderEditor` is mounted with the feature as its value, so
+    the `uses` block is written against the feature draft as the form writes it. */
 function authoredFuryFeat(resourceId: string): Draft {
   const shell = authored("feat", RAGES.featName, [
     ["category", "origin"],
     ["summary", "Fury you can keep in a bottle."],
     ["description", "You can bottle your fury as often as you can Rage."]
   ]);
-  // Addressed INSIDE the `uses` group, and it has to be: `usesField`'s "Uses are" and
-  // `modifiersField`'s "Which way" are both keyed `mode`, and the flat `fieldsOf` lookup finds the
-  // modifier's first — which has no `write`, so it would `setAt` a literal `mode` key on the
-  // feature and the publish gate would answer `Unrecognized key(s): 'mode'`. That is the same false
-  // pass `fieldsWithin` exists for, met on a GROUP rather than a row.
+  // Addressed inside the `uses` group: `modifiersField` also has a `mode` key, and a flat lookup would
+  // find that one first and write a stray `mode` key.
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "mode", "class-resource", ["uses"]);
   feature = applyField("feat", feature, "uses.scaling.id", resourceId, ["uses"]);
   feature = applyField("feat", feature, "uses.per", "long-rest", ["uses"]);
-  // Name and description go through the feature's OWN controls since R1 — `["feature"]` is the
-  // feat's singular container, the same scope the `uses` block above is addressed at.
   feature = applyField("feat", feature, "name", RAGES.featName, ["feature"]);
   feature = applyField("feat", feature, "description", "You can bottle your fury as often as you can Rage.", ["feature"]);
   return { ...shell, feature };
@@ -1045,9 +853,7 @@ function authoredFuryFeat(resourceId: string): Draft {
 
 const furyFeatureId = (draft: Draft) => String((draft.feature as { id?: unknown }).id ?? "");
 
-/** A Human Barbarian at the level asked for. Human because its Versatile trait is the origin-feat
-    slot the homebrew feat is taken in; Berserker at 3 because every 2024 class picks a subclass
-    there. Built by the REAL builder against the REAL bundles. */
+/** A Human Barbarian (Versatile is the origin-feat slot), Berserker at 3, from the real builder. */
 const barbarianInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput => ({
   name: "Ozar", speciesId: "human", backgroundId: "soldier", classId: "barbarian", level,
   ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
@@ -1073,8 +879,7 @@ const barbarianInput = (level: 1 | 3, featId?: string): CharacterCreateRequestIn
   ]
 } as CharacterCreateRequestInput);
 
-/** The sheet, with the authored feat merged in through a real homebrew slice — the same merge a
-    published record takes. */
+/** The sheet with the authored feat merged through a real homebrew slice. */
 function barbarianSheet(level: 1 | 3, feat?: Draft): ActorDefinition {
   const homebrew: HomebrewContentSource | undefined = feat
     ? {
@@ -1090,7 +895,7 @@ function barbarianSheet(level: 1 | 3, feat?: Draft): ActorDefinition {
   );
 }
 
-/** THE assertion body: how many uses did the builder resolve for this action? */
+/** How many uses the builder resolved for this action. */
 const useLimit = (definition: ActorDefinition, actionId: string) =>
   definition.actions.find((entry) => entry.id === actionId)?.uses?.limit;
 
@@ -1104,14 +909,12 @@ describe("uses read off the class table's own column — through both paths", ()
     const body = storedBody("feat", draft, RAGES.featId) as { feature: { uses?: unknown } };
     expect(body.feature.uses).toEqual({ scaling: { type: "class-resource", id: RAGES.resourceId }, per: "long-rest" });
 
-    // The mode select reads its own answer back out of the shape, so re-opening the record shows
-    // "A column on the class table" rather than "Not set" — `3b`(a)'s repair, on the fifth option.
+    // The mode select reads its value back from the shape, so reopening shows the right option.
     const mode = fieldsWithin("feat", ["uses"]).find((field) => field.key === "mode");
     expect(mode?.read?.(draft.feature as Draft)).toBe("class-resource");
     expect(optionValues(mode)).toContain("class-resource");
 
-    // ...and an ITEM is not offered it, because `scaledLimit` can never resolve it there. The key
-    // exists at item scope (the other three scalings share it); the OPTION does not.
+    // Not offered on an item: the key exists there, but the option does not.
     expect(hasControl("equipment", "uses.scaling.id")).toBe(false);
     expect(optionValues(fieldsWithin("equipment", ["uses"]).find((field) => field.key === "mode"))).not.toContain("class-resource");
   });
@@ -1133,8 +936,7 @@ describe("uses read off the class table's own column — through both paths", ()
     for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
 
-    // Measured at the time of writing: 19 — 16 in `classes.v1.json`, 3 in `subclasses.v1.json`.
-    // Four of them are named, so the fixture below cannot drift silently away from the bundle.
+    // 19 at the time of writing (16 class, 3 subclass); four are named so the fixture can't drift.
     expect(carriers.length).toBeGreaterThanOrEqual(15);
     for (const id of ["rage", "wild-shape", "channel-divinity", "font-of-magic"]) expect(carriers).toContain(id);
   });
@@ -1150,17 +952,13 @@ describe("uses read off the class table's own column — through both paths", ()
     const level1 = barbarianSheet(1, feat);
     const level3 = barbarianSheet(3, feat);
     for (const [label, actionId] of paths) {
-      // The far end: a use count neither record states. 2 at level 1, 3 at level 3, off the same
-      // authored line — which is what a `by-level` table beside the printed table would have had to
-      // restate, and what an option-less select made unsayable.
+      // A count neither record states: 2 at level 1, 3 at level 3, from the same authored line.
       expect(useLimit(level1, actionId), label).toBe(RAGES.atLevel1);
       expect(useLimit(level3, actionId), label).toBe(RAGES.atLevel3);
     }
 
-    // THE NEGATIVE CONTROL, and it drops the VALUE rather than the carrier: the same Barbarian
-    // taking the same feat, whose only difference is that the column named is the SORCERER's. An
-    // unmatched column resolves to 0 uses, so the feature carries no pool at all — while Rage,
-    // reading a column this table really prints, still says 3.
+    // Negative control: the same feat naming the Sorcerer's column resolves to 0 uses, while Rage
+    // still reads 3.
     const wrongFeat = authoredFuryFeat(RAGES.wrongResourceId);
     const wrong = barbarianSheet(3, wrongFeat);
     expect(useLimit(wrong, RAGES.featureId)).toBe(RAGES.atLevel3);
@@ -1168,48 +966,29 @@ describe("uses read off the class table's own column — through both paths", ()
   });
 });
 
-/* --------------- U8: `recharge` — the d6 at the start of the creature's turn ------ */
+/* ---------------- `recharge`: the d6 at the start of the creature's turn ------ */
 
 /**
- * The row: `ActionUsesSchema.per: "recharge"` and its `recharge` threshold — the *(Recharge 5–6)*
- * every printed breath weapon carries.
+ * `ActionUsesSchema.per: "recharge"` with its threshold, the "(Recharge 5–6)" on breath weapons.
+ * `encounter.ts` rolls a d6 at the start of the owner's turn, re-arms on a roll at or above the
+ * threshold and narrates both outcomes; `rests.ts` clears recharge pools on a short rest.
  *
- * **The reader is the best-proved in the wave and it had no author but the bundle.** `encounter.ts`
- * rolls a d6 at the start of the owner's turn, clears the pool on a roll at or above the threshold,
- * and narrates BOTH outcomes by name — *"recharges (rolled 6)"* and *"stays spent (rolled 5, needs
- * 6+)"*; `rests.ts` clears recharge pools on a short rest and a fresh fight re-arms them.
- * `ActionUsesSchema` has carried the fifth `per` value, the threshold and a refinement PAIR
- * enforcing them together for as long as any of it shipped. 86 bundled monster actions author it
- * (67 at 5, 14 at 6, 5 at 4). **And no carrier had a control at all** — `actionsField` had no `uses`
- * block at any scope, so an action's own uses were unsayable on a monster, an item and a feature
- * alike.
+ * The control is on the action's `uses`, not the record-level `FeatureUsesSchema`: an item's record
+ * uses are not read, and a feature's are folded into actions without a threshold, which would make
+ * the bearer unbuildable.
  *
- * **Where the control went, and why not where the census said.** The census row named
- * `equipment.uses.recharge`, which is the ITEM's record-level `uses` — `FeatureUsesSchema`, whose
- * `per` has four values and no threshold key. Widening THAT was measured and rejected twice over:
- * an item's record-level `uses` is read by nothing at all today (`usesOf` has exactly two call
- * sites, an action's uses and a cast's, and the equipped loop never reads `record.uses` — that is
- * U24), and the same schema is shared with FEATURES, where `character-build.ts` folds a feature's
- * uses into an action at two sites and neither forwards a threshold. A feature authoring
- * `per: "recharge"` would build `{limit, per: "recharge"}`, which `ActionUsesSchema` refuses with
- * *"Recharge uses need the d6 threshold"* — a schema-valid record that makes its own bearer
- * unbuildable. So the control went to the ACTION's `uses`, which is the schema the engine actually
- * reads, on every carrier that mounts an action.
- *
- * The Ankheg is the carrier because it is the plainest recharge in the bundle: two actions, a
- * save-only Acid Spray at **Recharge 6**, so exactly one face on the die re-arms it and a test
- * cannot pass on a lucky range.
+ * The Ankheg's Acid Spray (Recharge 6) is the carrier: exactly one face re-arms it.
  */
 const RECHARGE = {
   monsterId: "ankheg",
   srdActionId: "acid-spray",
-  /** 6, so `5` is a miss by one and `6` is the only re-arm. */
+  /** 6, so a 5 misses by one and only 6 re-arms. */
   threshold: 6,
   saveAbility: "dex",
   saveDc: 12,
   formula: "4d6",
   damageType: "acid",
-  /** 4d6, all fours — the resolver needs the faces before anything below can look at the counter. */
+  /** 4d6, all fours; the resolver consumes these before the counter is checked. */
   damageFaces: [4, 4, 4, 4],
   drakeActionId: "ember-breath",
   drakeActionName: "Ember Breath (Recharge 6)"
@@ -1227,9 +1006,7 @@ function authoredDrake(): Draft {
     ["damage", [damagePart]],
     ["save.ability", RECHARGE.saveAbility],
     ["save.dc", RECHARGE.saveDc],
-    // THE ROW, authored the way a GM meets it: the count, then how it comes back, then the die.
-    // `authoredRow` throws when a key has no control, so before U8 the first of these three lines —
-    // not an assertion below it — is what failed, on every carrier.
+    // The count, then how it comes back, then the die.
     ["uses.limit", 1],
     ["uses.per", "recharge"],
     ["uses.recharge", RECHARGE.threshold]
@@ -1253,12 +1030,8 @@ const srdAnkheg = (): ActorDefinition => {
 
 type Narration = NonNullable<Parameters<typeof nextInitiativeTurn>[1]>;
 
-/**
- * THE assertion body. Spend the action in a real fight, then hand the creature its next turn twice
- * — once with a die one short of the threshold and once with the threshold itself — and report what
- * the table would see. Four far ends in one pass: a spent counter, a rolled die, a narrated refusal
- * and a re-armed pool.
- */
+/** Spends the action in a real fight, then gives the creature its next turn twice (a die one short of
+    the threshold, then the threshold) and reports the spent counter, rolls, narration and re-armed pool. */
 function spendThenRecharge(definition: ActorDefinition, actionId: string) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
@@ -1292,7 +1065,7 @@ function spendThenRecharge(definition: ActorDefinition, actionId: string) {
   const actor = state.actors.find((entry) => entry.id === IDS.caster)!;
   const spent = actor.actionUses[actionId] ?? 0;
 
-  /** Give the creature its next turn with a fixed d6. Two advances: the dummy, then back round. */
+  /** The creature's next turn with a fixed d6: two advances, the dummy then back round. */
   const roundWith = (face: number): Narration => {
     const events: Narration = [];
     const deps = { resolveDefinition: () => definition, rollDie: () => face };
@@ -1319,8 +1092,7 @@ describe("a recharging action — through both paths", () => {
     const body = storedBody("monster", draft, RECORD_ID) as { actions: Array<Record<string, unknown>> };
     expect(body.actions[0]).toMatchObject({ id: RECHARGE.drakeActionId, uses: { limit: 1, per: "recharge", recharge: RECHARGE.threshold } });
 
-    // The control is an ACTION's, on every carrier that mounts one — and it is NOT the record's
-    // `uses` block, whose `FeatureUsesSchema` has no `recharge` key to write into.
+    // An action's control on every carrier, not the record-level `uses` (no `recharge` key there).
     for (const type of ["monster", "equipment", "class"] as const) {
       expect(hasControl(type, "uses.recharge", ["actions"]), type).toBe(true);
     }
@@ -1329,18 +1101,15 @@ describe("a recharging action — through both paths", () => {
   });
 
   it("1b. the two halves of one authored fact are held together by the form and by the schema", () => {
-    // Picking the die SEEDS the SRD's commonest threshold rather than leaving the pair half-said —
-    // so the ordinary path never reaches the refusal at all.
+    // Choosing recharge seeds the SRD's commonest threshold.
     const seeded = authoredRow("monster", ["actions"], [["uses.limit", 1], ["uses.per", "recharge"]]);
     expect(seeded.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
 
-    // ...and switching away DELETES it, so the schema's other refusal — "the recharge threshold only
-    // applies when per is recharge" — cannot be reached from the form either.
+    // Switching away deletes it, so the "threshold only with recharge" refusal is unreachable.
     const backToRest = applyField("monster", seeded, "uses.per", "long-rest", ["actions"]);
     expect(backToRest.uses).toEqual({ limit: 1, per: "long-rest" });
 
-    // The refinement is still load-bearing, because emptying the number is one keystroke away on a
-    // real form. The refusal a GM meets there is the schema's own sentence, named.
+    // Emptying the number is one keystroke away; the refusal is the schema's own sentence.
     const emptied = applyField("monster", seeded, "uses.recharge", undefined, ["actions"]);
     const drake = authoredDrake();
     const half = { ...drake, actions: [{ ...emptied, id: RECHARGE.drakeActionId, name: RECHARGE.drakeActionName, description: "Half-said." }] };
@@ -1353,14 +1122,11 @@ describe("a recharging action — through both paths", () => {
     const spray = srdAnkheg().actions.find((entry) => entry.id === RECHARGE.srdActionId);
     expect(spray?.uses).toEqual({ limit: 1, per: "recharge", recharge: RECHARGE.threshold });
 
-    // Measured at the time of writing: 86 bundled monster actions come back on a die.
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library.monsterSummaries()
       .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
       .filter((entry) => entry.uses?.per === "recharge");
     expect(carriers.length).toBeGreaterThanOrEqual(80);
-    // Every one of them carries the threshold, which is the refinement pair doing its job on real
-    // content rather than on a fixture.
     expect(carriers.every((entry) => typeof entry.uses?.recharge === "number")).toBe(true);
   });
 
@@ -1374,17 +1140,16 @@ describe("a recharging action — through both paths", () => {
     for (const [label, definition, actionId] of paths) {
       const seen = spendThenRecharge(definition, actionId);
 
-      // 1. a spent counter — the use was really taken by the resolver, not set by this test.
+      // 1. The use was really spent by the resolver.
       expect(seen.spent, label).toBe(1);
 
-      // 2. a rolled die and 3. a narration that says why, in the table's own words. One short of
-      //    the threshold is the contrast that makes the re-arm mean something: without it, an
-      //    action that came back every turn regardless would pass.
+      // 2-3. A rolled die and its narration. One short of the threshold is the contrast that proves
+      //      the re-arm is conditional.
       expect(seen.short.map((event) => event.text), label)
         .toContain(`${definition.name}'s ${seen.actionName} stays spent (rolled ${RECHARGE.threshold - 1}, needs ${RECHARGE.threshold}+).`);
       expect(seen.stillSpent, label).toBe(1);
 
-      // 4. a re-armed pool, and the line the table reads when it happens.
+      // 4. A re-armed pool and its narration.
       expect(seen.hit.map((event) => event.text), label)
         .toContain(`${definition.name}'s ${seen.actionName} recharges (rolled ${RECHARGE.threshold}).`);
       expect(seen.armed, label).toBe(true);
@@ -1392,46 +1157,28 @@ describe("a recharging action — through both paths", () => {
   });
 });
 
-/* -------------- U12: several picks on ONE record (`choices`) — through both paths -- */
+/* --------------- several picks on one record (`choices`), through both paths -- */
 
 /**
- * The row: `FeatureRecordSchema.choices` — one feature that asks MORE THAN ONE question.
- *
- * The purest built-but-unwired case of the session: `featurePicks` has read the plural spelling on
- * both consumers since Magic Initiate shipped (`character-build.ts` builds one offer per pick,
- * `build-payload.ts` mirrors it), three feat records author it, the wire type carries it, the
- * class-mechanics overlay accepts it — and the census's own worked example was that
- * `applyField("class", draft, "choices", …)` THREW, because the panel edited exactly one `choice`.
- * A homebrew Magic Initiate was unauthorable: its level-1 spell had nowhere to go.
- *
- * **The `choice`/`choices` relationship, taken from the reader.** `featurePicks` reads the pair as
- * ONE list with two spellings — `choices` wins when non-empty — and the schema's `oneChoiceForm`
- * refinement REFUSES a record carrying both. So the panel never asks the GM to pick a spelling:
- * every write funnels through `writeChoiceBlocks`, which spells the list canonically from its
- * length (one block → `choice`, several → `choices`, zero → neither). That is what the SRD itself
- * authors — every one-pick record is singular, all three plural records have two picks, none has
- * both keys — and it makes the refused both-keys shape unauthorable rather than merely caught.
- *
- * **The far end is the SECOND pick reaching a built character's sheet.** The first pick was always
- * reachable through `choice`; the plural read is what makes pick 2 exist at all, so the negative
- * control drops the second block and watches the same ledger row be REFUSED by name.
+ * `FeatureRecordSchema.choices`: one feature asking more than one question (Magic Initiate).
+ * `featurePicks` reads `choice`/`choices` as one list (`choices` wins), the schema refuses both, and
+ * the panel spells the list from its length via `writeChoiceBlocks`. The far end is the second pick
+ * reaching a built sheet; the negative control drops the second block and the same ledger row is
+ * refused by name.
  */
 const SEVERAL = {
   srdFeatId: "magic-initiate-cleric",
-  /** The SRD's own two-pick shape: two cantrips and one level-1 spell, both off one list. */
+  /** The SRD's two-pick shape: two cantrips and one level-1 spell from one list. */
   srdRows: [
     { kind: "cantrip", id: "guidance" },
     { kind: "cantrip", id: "thaumaturgy" },
     { kind: "spell", id: "bless" }
   ],
   hbFeatId: "hb-twin-disciplines-a1b2",
-  /** The feature's own id, pinned the way U10's fixture pins an action id: the ledger tags its
-      answers with the FEATURE id (`feature:<id>` is the offer key), and a random minted id would
-      put the tag out of reach of the fixture. */
+  /** Pinned because the ledger tags answers with the feature id (`feature:<id>`). */
   hbFeatureId: "twin-disciplines",
   hbFeatName: "Twin Disciplines",
-  /** The editor half drives `from` lists — `fromCatalog` is the bespoke pair, unreachable from
-      `applyField` by R1's standing ruling — so the options are named ids off the same real spells. */
+  /** The editor half uses `from` lists (`fromCatalog` is unreachable from `applyField`). */
   hbCantrips: ["guidance", "sacred-flame"],
   hbSpells: ["bless", "cure-wounds"],
   hbRows: [
@@ -1441,10 +1188,8 @@ const SEVERAL = {
   ]
 } as const;
 
-/** The feat a GM builds in `/homebrew`: TWO choice blocks, each authored through the block's own
-    controls at the `choices` row scope, then the list written through the field's own write —
-    which is where the canonical spelling lives. `withSecondPick: false` is the negative control's
-    version: the same feat whose plural list holds only the cantrip block. */
+/** A feat with two choice blocks, each authored at the `choices` row scope, then written through the
+    field's own write. `withSecondPick: false` keeps only the cantrip block (negative control). */
 function authoredTwinFeat(withSecondPick = true): Draft {
   const shell = authored("feat", SEVERAL.hbFeatName, [
     ["category", "origin"],
@@ -1454,7 +1199,7 @@ function authoredTwinFeat(withSecondPick = true): Draft {
   const cantrips = authoredRow("feat", ["feature", "choices"], [
     ["kind", "cantrip"],
     ["choose", 2],
-    // Typed the way a GM types it: one box of commas. The block's own `write` splits and slugs.
+    // One comma-separated box; the block's `write` splits and slugs it.
     ["from", SEVERAL.hbCantrips.join(", ")]
   ]);
   const spell = authoredRow("feat", ["feature", "choices"], [
@@ -1469,10 +1214,8 @@ function authoredTwinFeat(withSecondPick = true): Draft {
   return { ...shell, feature: { ...feature, id: SEVERAL.hbFeatureId } };
 }
 
-/** A Human Paladin 2 taking `featId` in the Human Versatile slot, answering `rows` against the
-    feat's FEATURE (`tagId` — offers are keyed `feature:<feature id>`, and the SRD's initiates name
-    feat and feature identically) — the same carrier shape U9 proved, because Versatile is the one
-    slot that takes any origin feat. */
+/** A Human Paladin 2 taking `featId` in the Versatile slot, answering `rows` against the feat's
+    feature (`tagId`, since offers are keyed `feature:<feature id>`). */
 const initiateInput = (featId: string, tagId: string, rows: ReadonlyArray<{ kind: string; id: string }>): CharacterCreateRequestInput => ({
   name: "Sera", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
   abilityMethod: "standard-array",
@@ -1498,7 +1241,7 @@ const initiateInput = (featId: string, tagId: string, rows: ReadonlyArray<{ kind
   ]
 } as CharacterCreateRequestInput);
 
-/** The sheet, with the authored feat merged in through a real homebrew slice when one is given. */
+/** The sheet, with the authored feat merged through a real homebrew slice when given. */
 function initiateSheet(featId: string, tagId: string, rows: ReadonlyArray<{ kind: string; id: string }>, feat?: Draft): ActorDefinition {
   const homebrew: HomebrewContentSource | undefined = feat
     ? {
@@ -1517,9 +1260,7 @@ describe("several picks on one record (`choices`) — through both paths", () =>
     expect(verdict.why).toBe("");
     expect(verdict.publishable).toBe(true);
 
-    // TWO blocks → the plural spelling, and never both keys: `featurePicks` reads `choices` first
-    // and the schema refuses a record carrying both, so the form derives the spelling from the
-    // count instead of asking the GM to know it.
+    // Two blocks: plural spelling only, never both keys.
     const body = storedBody("feat", draft, SEVERAL.hbFeatId) as { feature: { choice?: unknown; choices?: unknown } };
     expect(body.feature.choice).toBeUndefined();
     expect(body.feature.choices).toEqual([
@@ -1527,20 +1268,17 @@ describe("several picks on one record (`choices`) — through both paths", () =>
       { kind: "spell", choose: 1, from: [...SEVERAL.hbSpells], repeatable: false }
     ]);
 
-    // ONE block → the singular spelling, which is how every existing draft already reads. The
-    // panel's own seed (the switch) and a one-element `choices` write land on the same body.
+    // One block: the singular spelling.
     const oneBlock = storedBody("feat", authoredTwinFeat(false), SEVERAL.hbFeatId) as { feature: { choice?: unknown; choices?: unknown } };
     expect(oneBlock.feature.choices).toBeUndefined();
     expect(oneBlock.feature.choice).toEqual({ kind: "cantrip", choose: 2, from: [...SEVERAL.hbCantrips], repeatable: false });
 
-    // The `choice.*` keys stay live as the FIRST block's controls — R1's surface, un-stranded:
-    // editing through them reaches block 0 of a plural feature and keeps the plural spelling.
+    // The `choice.*` aliases edit block 0 of a plural feature and keep the plural spelling.
     const feature = (draft.feature ?? {}) as Draft;
     const edited = applyField("feat", feature, "choice.choose", 3, ["feature"]);
     expect((edited.choices as Array<{ choose?: number }>)[0]?.choose).toBe(3);
     expect(edited.choice).toBeUndefined();
 
-    // ...and the switch is the whole question, however it is spelled: off removes BOTH keys.
     const off = applyField("feat", feature, "choice", false, ["feature"]);
     expect("choice" in off).toBe(false);
     expect("choices" in off).toBe(false);
@@ -1553,7 +1291,7 @@ describe("several picks on one record (`choices`) — through both paths", () =>
       .filter((feat) => feat !== undefined && (feat.feature.choices?.length ?? 0) > 0)
       .map((feat) => feat!.id)
       .sort();
-    // Measured at the time of writing: exactly three, each authoring two picks and no `choice` key.
+    // Exactly three at the time of writing, each with two picks and no `choice` key.
     expect(carriers).toEqual(["magic-initiate-cleric", "magic-initiate-druid", "magic-initiate-wizard"]);
 
     const initiate = library.featRecord(SEVERAL.srdFeatId)!.feature;
@@ -1571,61 +1309,45 @@ describe("several picks on one record (`choices`) — through both paths", () =>
     for (const [label, definition, rows] of paths) {
       for (const row of rows) {
         const spell = preparedSpell(definition, row.id);
-        // The far end: a row on the character's own spell list. The cantrips arrive always-prepared,
-        // the level-1 spell as an ordinary prepared spell — and neither is anywhere else in the build.
+        // The cantrips arrive always-prepared and the level-1 spell as an ordinary prepared spell.
         expect(spell, `${label}: ${row.id}`).toMatchObject({ id: row.id, prepared: true });
         expect(spell?.name, `${label}: ${row.id}`).not.toBe(row.id);
       }
     }
 
-    // THE NEGATIVE CONTROL, and it is the census's old throw inverted: the same feat authored with
-    // only its FIRST block, the same ledger. The spell row now targets a pick that does not exist,
-    // and the build refuses it BY NAME — the second pick exists exactly when the plural list says so.
+    // Negative control: only the first block. The spell row now targets a missing pick and the build
+    // refuses it by name.
     expect(() => initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat(false)))
       .toThrow(`No feature "${SEVERAL.hbFeatureId}" offers a "spell" choice.`);
   });
 });
 
-/* --------- U13: a budget raised past the printed row (`extraPicks`) — both paths --- */
+/* ---------- a budget raised past the printed row (`extraPicks`), both paths --- */
 
 /**
- * The row: `extraPicks` — a feature (or a chosen option) that RAISES a pick budget instead of
- * granting an outcome. **This is the extra-cantrip case that started the whole area**: Divine
- * Order's Thaumaturge is `extraPicks: [{offer: "class-cantrips", amount: 1}]`, authored 8 times in
- * the SRD (6 features, 2 inline options), read by `grantExtraPicks` on the server and
- * `addExtraPicks` in the wizard through ONE shared resolver (`extraPickAmount`) — and unauthorable
- * from the editor.
- *
- * **The far end is a capacity, never a surviving field.** A flat grant is proved at the cantrip
- * cap: a Cleric prints 3 cantrips at level 1, the raise makes a fourth LEGAL, and the negative
- * control watches the same fourth cantrip be refused by the cap's own sentence when nothing raises
- * it. The scaling form (`class-resource-growth`, 3 SRD authors — so it is part of this unit, not
- * held back) is proved at `computeServerOffers`: an offer's `capacity` follows the printed column
- * while the authored line never changes, which is U7's "moves with the level" bar applied to a
- * budget.
- *
- * **The two paths cross carriers**, the way U6's do: the SRD half is an inline OPTION
- * (Thaumaturge, folded after pass A2) and the editor half is a chosen FEAT's feature (folded after
- * pass A), so one assertion body covers both fold points.
+ * `extraPicks`: a feature or chosen option that raises a pick budget (Divine Order's Thaumaturge:
+ * `{offer: "class-cantrips", amount: 1}`), resolved by the shared `extraPickAmount`. The far end is a
+ * capacity: a fourth cantrip becomes legal for a Cleric 1, and the negative control sees it refused
+ * by the cap. The scaling form (`class-resource-growth`) is proved via `computeServerOffers`, where
+ * capacity follows the printed column. The SRD half is an inline option, the editor half a feat's
+ * feature, so both fold points are covered.
  */
 const RAISED = {
-  /** Cleric 1: the printed row. Guidance/Sacred Flame/Thaumaturgy fill it; Light is the FOURTH. */
+  /** Cleric 1 prints 3 cantrips; Light is the fourth. */
   printedCantrips: 3,
   cantrips: ["guidance", "sacred-flame", "thaumaturgy", "light"],
   capSentence: "Cleric knows 3 cantrips at level 1; got 4.",
   featId: "hb-whispered-lore-a1b2",
   featName: "Whispered Lore",
-  /** The scaling half's editor carrier: a feat whose skill budget grows with the Rages column. */
+  /** A feat whose skill budget grows with the Rages column. */
   scaleFeatId: "hb-bottled-instinct-a1b2",
   scaleFeatName: "Bottled Instinct",
-  /** Barbarian class-skills: 2 printed; at level 3 Primal Knowledge adds 1 and the Rages column
-      (2 → 3) has grown by 1, so the offer reads 2 at level 1 and 4 at level 3 with the feat. */
+  /** Barbarian class-skills: 2 printed; at level 3 Primal Knowledge adds 1 and the Rages column grows
+      by 1, so the offer reads 2 at level 1 and 4 at level 3 with the feat. */
   scaleColumn: "rage"
 } as const;
 
-/** The feat a GM builds in `/homebrew`: ONE `extraPicks` row through the row's own controls —
-    Thaumaturge's shape verbatim. `newRow` seeds the flat form at 1, so naming the budget is the
-    whole edit. */
+/** A feat with one `extraPicks` row in Thaumaturge's shape; `newRow` seeds the flat amount at 1. */
 function authoredLoreFeat(): Draft {
   const shell = authored("feat", RAISED.featName, [
     ["category", "origin"],
@@ -1640,8 +1362,7 @@ function authoredLoreFeat(): Draft {
   return { ...shell, feature };
 }
 
-/** The scaling form, through the same controls: the mode select swaps the flat amount for the
-    column rule, and the column id goes through its own box. */
+/** The scaling form: the mode select swaps the flat amount for the column rule. */
 function authoredInstinctFeat(): Draft {
   const shell = authored("feat", RAISED.scaleFeatName, [
     ["category", "origin"],
@@ -1672,16 +1393,13 @@ function raisedView(featId?: string, feat?: Draft) {
   return new ContentLibrary(homebrew).forAudience("gm");
 }
 
-/**
- * A Human Cleric 1 with FOUR cantrips in the ledger. `order` decides what raises the cap:
- * Thaumaturge (the SRD's option-level grant), Protector plus the authored feat (the editor's
- * feature-level grant), or Protector alone — the negative control, which the cap refuses.
- */
+/** A Human Cleric 1 with four cantrips in the ledger. `order` decides what raises the cap: Thaumaturge
+    (SRD option), Protector plus the authored feat (editor), or Protector alone (negative control). */
 const clericInput = (order: "protector" | "thaumaturge", featId?: string): CharacterCreateRequestInput => ({
   name: "Sister Ael", speciesId: "human", backgroundId: "soldier", classId: "cleric", level: 1,
   abilityMethod: "standard-array",
   baseScores: { str: 10, dex: 12, con: 14, int: 8, wis: 15, cha: 13 },
-  // Soldier spreads STR/DEX/CON; the scores play no part in a capacity, so legality is all.
+  // Scores play no part in capacity.
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
@@ -1699,8 +1417,7 @@ const clericInput = (order: "protector" | "thaumaturge", featId?: string): Chara
   ]
 } as CharacterCreateRequestInput);
 
-/** A Human Barbarian at `level`, holding the scaling feat when given — `computeServerOffers`' own
-    input shape, so the capacity read below is the server's own offer computation. */
+/** A Human Barbarian at `level`, with the scaling feat when given, as `computeServerOffers` input. */
 const instinctInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput => ({
   name: "Ozar", speciesId: "human", backgroundId: "soldier", classId: "barbarian", level,
   ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
@@ -1713,7 +1430,7 @@ const instinctInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInp
   ]
 } as CharacterCreateRequestInput);
 
-/** THE capacity read: one offer's `capacity`, straight off `computeServerOffers`. */
+/** One offer's `capacity` from `computeServerOffers`. */
 const capacityOf = (input: CharacterCreateRequestInput, key: string, featId?: string, feat?: Draft): number | undefined =>
   computeServerOffers(input, raisedView(featId, feat), BuilderPolicySchema.parse({}))
     .offers.find((offer) => offer.key === key)?.capacity;
@@ -1725,29 +1442,26 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     expect(verdict.why).toBe("");
     expect(verdict.publishable).toBe(true);
     const body = storedBody("feat", draft, RAISED.featId) as { feature: { extraPicks?: unknown } };
-    // Thaumaturge's shape, byte for byte — and no `scaling` key beside it.
+    // Thaumaturge's shape, with no `scaling` key.
     expect(body.feature.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
 
     const scaled = storedBody("feat", authoredInstinctFeat(), RAISED.scaleFeatId) as { feature: { extraPicks?: unknown } };
-    // The scaling form — and no `amount` key beside it. The schema demands exactly one of the
-    // pair, and the mode select's write is what makes the both-keys shape unauthorable.
+    // The scaling form, with no `amount` key: the mode select keeps them exclusive.
     expect(scaled.feature.extraPicks).toEqual([{ offer: "class-skills", scaling: { type: "class-resource-growth", id: RAISED.scaleColumn } }]);
 
-    // Switching the mode back deletes the column rule and re-seeds the flat amount, so the
-    // refinement's refusal cannot be reached from the form...
+    // Switching back deletes the column rule and re-seeds the flat amount.
     const grant = authoredRow("feat", ["feature", "extraPicks"], [
       ["offer", "class-skills"], ["mode", "column-growth"], ["scaling.id", RAISED.scaleColumn]
     ]);
     expect(applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toMatchObject({ offer: "class-skills", amount: 1 });
     expect("scaling" in applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toBe(false);
 
-    // ...while the seeded-EMPTY column id keeps the publish gate honest: a half-said scaling is
-    // refused by name rather than silently pointed at nothing.
+    // The column id is seeded empty, so a half-set scaling is refused by name.
     const half = authoredRow("feat", ["feature", "extraPicks"], [["offer", "class-skills"], ["mode", "column-growth"]]);
     const feature = applyField("feat", (authoredInstinctFeat().feature ?? {}) as Draft, "extraPicks", [half], ["feature"]);
     expect(publishVerdict("feat", { ...authoredInstinctFeat(), feature }, RAISED.scaleFeatId).publishable).toBe(false);
 
-    // The OPTION mounts the same factory — Divine Order's Thaumaturge is authorable as authored.
+    // Inline options mount the same factory.
     expect(hasControl("class", "extraPicks", ["features", "choice.options"])).toBe(true);
     const option = authoredRow("feat", ["feature", "choice.options"], [
       ["name", "Thaumaturge"],
@@ -1771,13 +1485,10 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     };
     for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
 
-    // Measured at the time of writing: 8 — weapon-mastery (×2, Barbarian and Fighter),
-    // primal-knowledge, deft-explorer, thieves-cant, eldritch-invocations on features;
-    // thaumaturge and magician on inline options.
+    // 8 at the time of writing: six features and two inline options (thaumaturge, magician).
     expect(carriers.length).toBe(8);
     expect(carriers.find((entry) => entry.id === "thaumaturge")?.grant).toEqual({ offer: "class-cantrips", amount: 1 });
-    // Three of the eight scale off a printed column, which is why the scaling form is part of
-    // this unit rather than held back as editor-only.
+    // Three of the eight scale off a printed column.
     const scaled = carriers.filter((entry) => entry.grant.scaling !== undefined);
     expect(scaled.map((entry) => entry.id).sort()).toEqual(["eldritch-invocations", "weapon-mastery", "weapon-mastery"]);
     expect(carriers.find((entry) => entry.id === "eldritch-invocations")?.grant).toEqual({
@@ -1788,48 +1499,40 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
 
   it("3. one assertion body over both: the raised cap makes a fourth cantrip legal, and nothing else does", () => {
     const paths: ReadonlyArray<readonly [string, "protector" | "thaumaturge", string, Draft | undefined]> = [
-      // The SRD's grant rides the CHOSEN OPTION: Thaumaturge, folded after pass A2. Versatile is
-      // spent on Alert, which asks for nothing and raises nothing.
+      // SRD: the grant rides the chosen option (Thaumaturge); Alert raises nothing.
       ["SRD content", "thaumaturge", "alert", undefined],
-      // The editor's rides a CHOSEN FEAT's feature, folded after pass A — Protector on purpose,
-      // so the only thing raising the cap is the authored grant.
+      // Editor: the grant rides a chosen feat; Protector raises nothing.
       ["the homebrew editor", "protector", RAISED.featId, authoredLoreFeat()]
     ];
     for (const [label, order, featId, feat] of paths) {
       const definition = buildCharacterDefinition(clericInput(order, featId), raisedView(feat ? featId : undefined, feat), BuilderPolicySchema.parse({}));
-      // The far end: all four cantrips on the sheet, prepared — the fourth is the raise.
+      // All four cantrips on the sheet, prepared.
       for (const id of RAISED.cantrips) {
         expect(preparedSpell(definition, id), `${label}: ${id}`).toMatchObject({ id, prepared: true });
       }
     }
 
-    // THE NEGATIVE CONTROL: the same Cleric, the same four cantrips, and nothing raising the cap —
-    // Protector and Alert, no grant anywhere. The fourth cantrip is refused by the cap's own
-    // sentence, so the two builds above passed BECAUSE of the grant, not because the cap is loose.
+    // Negative control: nothing raises the cap, so the fourth cantrip is refused by the cap itself.
     expect(() => buildCharacterDefinition(clericInput("protector", "alert"), raisedView(), BuilderPolicySchema.parse({})))
       .toThrow(RAISED.capSentence);
   });
 
   it("4. the scaling form: an offer's capacity follows the printed column, from both paths", () => {
-    // SRD: Eldritch Invocations. The Warlock table prints 1 at level 1 and 3 at level 2; the
-    // feature's own `choose` covers the first, and the grant adds the GROWTH — so the offer the
-    // server computes reads 1, then 3, off one authored line.
+    // SRD: Eldritch Invocations. The table prints 1 at level 1 and 3 at level 2.
     expect(capacityOf(warlockInput(1), "feature:eldritch-invocations")).toBe(1);
     expect(capacityOf(warlockInput(2), "feature:eldritch-invocations")).toBe(3);
 
-    // The editor: the authored feat's skill budget grows with the Rages column (2 at level 1,
-    // 3 at level 3). At level 1 the growth is ZERO — the grant reads the column, not a flat —
-    // and at level 3 it composes by ADDITION over Primal Knowledge's own +1: 2 + 1 + 1.
+    // Editor: the skill budget grows with the Rages column (0 growth at level 1); at level 3 it adds
+    // to Primal Knowledge's +1: 2 + 1 + 1.
     const feat = authoredInstinctFeat();
     expect(capacityOf(instinctInput(1, RAISED.scaleFeatId), "class-skills", RAISED.scaleFeatId, feat)).toBe(2);
     expect(capacityOf(instinctInput(3, RAISED.scaleFeatId), "class-skills", RAISED.scaleFeatId, feat)).toBe(4);
-    // Without the feat the level-3 offer is Primal Knowledge's 3 — the +1 above was the grant's.
+    // Without the feat the level-3 offer is 3.
     expect(capacityOf(instinctInput(3), "class-skills")).toBe(3);
   });
 });
 
-/** A Warlock at `level` with an empty ledger — `computeServerOffers` needs identity and scores,
-    not answers, which is exactly what makes it the right far end for a capacity. */
+/** A Warlock at `level` with an empty ledger; `computeServerOffers` needs identity and scores only. */
 const warlockInput = (level: 1 | 2): CharacterCreateRequestInput => ({
   name: "Vex", speciesId: "human", backgroundId: "soldier", classId: "warlock", level,
   abilityMethod: "standard-array",
@@ -1839,35 +1542,18 @@ const warlockInput = (level: 1 | 2): CharacterCreateRequestInput => ({
   choices: []
 } as CharacterCreateRequestInput);
 
-/* ------- U14: a settled pick re-opened (`replaces`, `replacesFeatureId`) — both paths --- */
+/* ---- a settled pick re-opened (`replaces`, `replacesFeatureId`), both paths --- */
 
 /**
- * The rows: `FeatureRecordSchema.replaces` — *"choose one damage type whenever you finish a Short
- * or Long Rest"* — and `replacesFeatureId`, the feature that takes an earlier one's place.
+ * `FeatureRecordSchema.replaces` ("choose one damage type whenever you finish a Short or Long Rest")
+ * and `replacesFeatureId` (a feature superseding an earlier one). `replaces` is validated against the
+ * offer-key namespace, turned into rest-time permissions by `replaceableOffers`, written by
+ * `actor.rechoose`, cleared by `rests.ts` and read at damage time by `choiceOverrideDefenses`.
  *
- * **The sharpest case in the audit: wired end to end and a GM could not author one.** `replaces` is
- * validated at build time against the same offer-key namespace `extraPicks` uses
- * (`character-build.ts` reuses `namesARealBudget` and says so), turned into rest-time permissions by
- * `replaceableOffers`, written by the `actor.rechoose` command, cleared by `rests.ts` on the matching
- * rest, read back at damage time by `choiceOverrideDefenses`, and projected to the owning player
- * under the same gate as `actionUses`. Five consumers, two SRD authors, and no control anywhere.
- *
- * **This unit is control-only, and the server was not touched.** The command already validates and
- * authorises (owner-or-GM, legality decided from the CONTENT on the GM audience so a player gets the
- * same answer), and the projection already carries `choiceOverrides` behind `resourcesVisible` — so
- * an authored clause reaches exactly the surface the SRD's own clauses reach, and nothing new is
- * disclosed to anybody.
- *
- * **The far end is a SETTLED ROW ANSWERED AGAIN**, never a surviving field: the build bakes the
- * character's own answer into `damageResistances`, `replaceableOffers` says that answer may be taken
- * back and with which options, and re-answering it moves the resistance — the new type in, the old
- * one suppressed, and the feature named as the reason. The negative control drops only the CLAUSE:
- * the same sheet, the same pick, and nothing on it is re-choosable at all.
- *
- * The two paths cross carriers the way U6's and U13's do: the SRD half is a SUBCLASS feature
- * (Fiendish Resilience, twelve inline options) and the editor half is a homebrew SPECIES trait —
- * because a feat is recorded on `character.feats` rather than `character.features`, and
- * `replaceableOffers` walks the latter. A `replaces` clause on a feat is read by nothing.
+ * The far end is a settled row answered again: the resistance moves to the new type and the feature
+ * is named as the reason. The negative control drops only the clause. The SRD half is a subclass
+ * feature (Fiendish Resilience); the editor half is a species trait, because `replaceableOffers`
+ * walks `character.features` and a feat is recorded on `character.feats`.
  */
 const REOPENED = {
   srcSubclassId: "fiend-patron",
@@ -1875,15 +1561,14 @@ const REOPENED = {
   srdOffer: "feature:fiendish-resilience",
   speciesId: "hb-emberkin-a1b2",
   speciesName: "Emberkin",
-  /** Pinned the way U12 pins its feature id: the ledger tags its answer with the FEATURE id, and a
-      minted uuid would put the `feature:<id>` offer key out of the fixture's reach. */
+  /** Pinned because the ledger tags its answer with the feature id. */
   traitId: "ember-ward",
   traitName: "Ember Ward",
   offer: "feature:ember-ward",
-  /** The build's answer, and the one the rest-time re-choice replaces it with. */
+  /** The build's answer, and the re-choice that replaces it. */
   built: "fire",
   rechosen: "cold",
-  /** `replacesFeatureId`'s carriers: the Fighter's own second attack tier, and an authored class. */
+  /** `replacesFeatureId` carriers: the Fighter's second attack tier, and an authored class. */
   fighterReplaced: "extra-attack",
   fighterReplacing: "two-extra-attacks",
   classId: "hb-warden-a1b2",
@@ -1891,10 +1576,8 @@ const REOPENED = {
   greaterWardId: "greater-ward"
 } as const;
 
-/** One inline option of the authored trait: a name, a description, and the resistance it grants.
-    The grant goes through `GrantsEditor`'s own write (`grantsFromRows`) for the reason U9 states —
-    `grants` is the one key with no `FieldDef` to look up, and writing through the exemption would
-    prove nothing. Everything else on the row is the option row's own control. */
+/** One inline option of the authored trait. The resistance goes through `grantsFromRows` (`grants`
+    has no `FieldDef`); everything else is the option row's own control. */
 const wardOption = (id: string, name: string): Draft => ({
   ...authoredRow("species", ["traits", "choice.options"], [
     ["name", name],
@@ -1904,8 +1587,8 @@ const wardOption = (id: string, name: string): Draft => ({
   grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }], {})
 });
 
-/** The species a GM builds in `/homebrew`: one trait that asks a question, and the clause saying the
-    answer may be taken back on a short rest. `withClause: false` is the negative control. */
+/** A species with one choice-asking trait and a short-rest `replaces` clause. `withClause: false` is
+    the negative control. */
 function authoredEmberkin(withClause = true): Draft {
   let trait = authoredRow("species", ["traits"], [
     ["name", REOPENED.traitName],
@@ -1916,8 +1599,6 @@ function authoredEmberkin(withClause = true): Draft {
   ]);
   trait = { ...trait, id: REOPENED.traitId };
   if (withClause) {
-    // THE ROW. `authoredRow` throws when a key has no control, so before U14 this line — not an
-    // assertion below it — is what failed.
     const clause = authoredRow("species", ["traits", "replaces"], [
       ["offer", REOPENED.offer],
       ["when", "short-rest"]
@@ -1933,7 +1614,7 @@ function authoredEmberkin(withClause = true): Draft {
   ]);
 }
 
-/** A merged view carrying the authored species, the same merge a published record takes. */
+/** A merged view carrying the authored species. */
 const emberkinView = (species: Draft) => {
   const record = HOMEBREW_BODY_SCHEMAS.species.parse(storedBody("species", species, REOPENED.speciesId));
   return new ContentLibrary({
@@ -1943,7 +1624,7 @@ const emberkinView = (species: Draft) => {
   }).forAudience("gm");
 };
 
-/** An Emberkin Fighter 1 who has ALREADY answered the ward — the settled row this unit re-opens. */
+/** An Emberkin Fighter 1 who has already answered the ward. */
 const emberkinInput = (): CharacterCreateRequestInput => ({
   name: "Ash", speciesId: REOPENED.speciesId, backgroundId: "soldier", classId: "fighter", level: 1,
   abilityMethod: "standard-array",
@@ -1964,8 +1645,7 @@ const emberkinInput = (): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/** A Human Acolyte Fiend-Patron Warlock 10 — the level Fiendish Resilience arrives at — whose
-    damage type is already chosen. The SRD's own carrier, built by the real builder. */
+/** A Fiend-Patron Warlock 10 (where Fiendish Resilience arrives) with the damage type already chosen. */
 const resilientWarlock = (damageType: string): CharacterCreateRequestInput => ({
   name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 10,
   subclassId: REOPENED.srcSubclassId, abilityMethod: "standard-array",
@@ -1977,7 +1657,7 @@ const resilientWarlock = (damageType: string): CharacterCreateRequestInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
-    // The Acolyte's own origin feat is Magic Initiate (Cleric), which asks for three picks.
+    // The Acolyte's origin feat, Magic Initiate (Cleric), asks for three picks.
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
@@ -1988,7 +1668,7 @@ const resilientWarlock = (damageType: string): CharacterCreateRequestInput => ({
     { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
     { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
     { level: 3, classId: "warlock", kind: "subclass", id: REOPENED.srcSubclassId },
-    // THE SETTLED ROW.
+    // The settled row.
     { level: 10, kind: "damage-type", id: damageType, payload: { featureId: REOPENED.srdFeatureId } },
     ...[4, 8].flatMap((at) => [
       { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
@@ -2006,14 +1686,9 @@ const resilientWarlock = (damageType: string): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/**
- * THE assertion body. Given a built sheet and the view it was built against: what does the build
- * say the character resists, what may they take back on a rest, and what happens when they do?
- *
- * `choiceOverrideDefenses` is handed the override `actor.rechoose` would have written — the command
- * itself is a socket/HTTP operation over a live store, and what this unit adds is the CONTENT half
- * it validates against, so the seam driven here is exactly the one an authored clause reaches.
- */
+/** What the build says the character resists, what they may take back on a rest, and the result of
+    re-answering. `choiceOverrideDefenses` gets the override `actor.rechoose` would write; the command
+    itself needs a live store. */
 function reopen(definition: ActorDefinition, view: ReturnType<ContentLibrary["forAudience"]>, offer: string, rechosen: string) {
   const offers = replaceableOffers(definition, view);
   const overrides = { [offer]: { id: rechosen, per: "short-rest" as const } };
@@ -2029,37 +1704,31 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     expect(verdict.publishable).toBe(true);
 
     const body = storedBody("species", draft, REOPENED.speciesId) as { traits: Array<Record<string, unknown>> };
-    // Fiendish Resilience's shape, byte for byte — the `when` seeded by the row, the `offer` typed.
+    // Fiendish Resilience's shape: `when` seeded by the row, `offer` typed.
     expect(body.traits[0].replaces).toEqual([{ offer: REOPENED.offer, when: "short-rest", amount: 1 }]);
-    // ...and no row means no key: `replacesField` writes the list the form holds, and an empty one
-    // is dropped on the way out rather than shipped as `[]` (`FeatureRecordSchema` defaults it back).
+    // No rows means no key; an empty list is dropped rather than shipped as `[]`.
     const noRows = storedBody("species", authoredEmberkin(false), REOPENED.speciesId) as { traits: Array<Record<string, unknown>> };
     expect("replaces" in noRows.traits[0]).toBe(false);
 
-    // The clause is a FEATURE's, on every carrier that mounts one...
+    // The clause is offered on every feature carrier...
     for (const [type, within] of [["class", ["features"]], ["subclass", ["features"]], ["species", ["traits"]], ["feat", ["feature"]]] as const) {
       expect(hasControl(type, "replaces", within), `${type}: ${within.join(" > ")} > replaces`).toBe(true);
     }
-    // ...and NOT an inline option's, deliberately. `FeatureOptionSchema` carries the key and ZERO
-    // SRD records author it; the option row inherits U14's reader for free the day one does, and a
-    // dedicated control today would mint an editor-only row. Same ruling as `FeatureOption.choices`.
+    // ...but not on inline options: no SRD record authors it there.
     expect(hasControl("feat", "replaces", ["feature", "choice.options"])).toBe(false);
   });
 
   it("1b. `replacesFeatureId` is offered where it is READ, and nowhere else", () => {
-    // The reader is `grantedClassFeatures`, which walks a CLASS's own level table. `subclassFeatures`
-    // is a plain level filter with no supersession step, so the key is inert on the other four
-    // carriers — and the SRD proves it rather than assuming it: Champion's `superior-critical`
-    // authors `replacesFeatureId: "improved-critical"` and a level-15 Champion holds both records,
-    // which `class-mechanics/fighter.ts` writes down at the record itself.
+    // Read only by `grantedClassFeatures` from a class's own level table; inert on other carriers
+    // (Champion's `superior-critical` authors it and a level-15 Champion keeps both features).
     const gate = (type: HomebrewType, within: readonly string[]) =>
       fieldsWithin(type, within).find((field) => field.key === "replacesFeatureId");
     expect(gate("class", ["features"])?.visibleWhen?.({}, blankDraft("class"))).toBe(true);
     for (const [type, within] of [["subclass", ["features"]], ["species", ["traits"]], ["background", ["features"]], ["feat", ["feature"]]] as const) {
       expect(gate(type, within)?.visibleWhen?.({}, blankDraft(type)), `${type} shows "Supersedes"`).toBe(false);
     }
-    // A feature naming ITSELF would make the class delete the very feature that arrived. The select's
-    // options are handed the RECORD and never the row, so the illegal answer is named as it is made.
+    // A feature naming itself would delete itself; `options` gets the record, not the row, so
+    // `validate` names it.
     const field = gate("class", ["features"])!;
     expect(field.validate?.("f1", { id: "f1" }, EMPTY_CONTEXT)).toContain("cannot supersede itself");
     expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
@@ -2083,17 +1752,14 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id));
 
-    // Measured at the time of writing: exactly two `replaces` clauses, both on subclass features,
-    // one per rest length — and each names its OWN feature's pick, which is the open half of the
-    // offer-key namespace the box suggests.
+    // Two clauses at the time of writing, both on subclass features, each naming its own feature's pick.
     expect(clauses.map((entry) => entry.id).sort()).toEqual(["circle-of-the-land-spells", "fiendish-resilience"]);
     expect(clauses.find((entry) => entry.id === REOPENED.srdFeatureId)?.clause)
       .toEqual({ offer: REOPENED.srdOffer, when: "short-rest", amount: 1 });
     expect(clauses.find((entry) => entry.id === "circle-of-the-land-spells")?.clause)
       .toMatchObject({ when: "long-rest" });
 
-    // ...and three superseding features. Two are the Fighter's attack tiers, which the builder reads;
-    // the third is Champion's, which it does not (see 1b) — so the count is 3 and the carriers differ.
+    // Three superseding features: two Fighter attack tiers (read by the builder) and Champion's (not read; see 1b).
     expect(supersedes.map((entry) => `${entry.id} → ${entry.replaced}`).sort()).toEqual([
       "superior-critical → improved-critical",
       "three-extra-attacks → two-extra-attacks",
@@ -2112,28 +1778,24 @@ describe("a settled pick the character may re-make (`replaces`) — through both
 
     for (const [label, definition, view, offer, featureName] of paths) {
       const { built, offers, after } = reopen(definition, view, offer, REOPENED.rechosen);
-      // The row really was settled: the build baked the character's own answer onto the sheet.
+      // The build baked the character's own answer onto the sheet.
       expect(built, label).toContain(REOPENED.built);
 
-      // THE FAR END, part one — the settled row is answerable again, on the rest the clause names,
-      // over exactly the options the original pick had. Nothing here is a client's list.
+      // The settled row is answerable again, on the named rest, over the original pick's options.
       const reopened = offers.find((candidate) => candidate.offer === offer);
       expect(reopened, `${label}: ${offer} should be re-choosable`).toBeTruthy();
       expect(reopened!.per, label).toBe("short-rest");
       expect(reopened!.label, label).toBe(featureName);
       expect(reopened!.options, label).toEqual(expect.arrayContaining([REOPENED.built, REOPENED.rechosen]));
 
-      // Part two — re-answering it MOVES the resistance: the new type in force, the build's own
-      // answer suppressed, and the feature named as the reason the table sees on the damage line.
+      // Re-answering moves the resistance, with the feature named as the reason.
       expect(after.resistances, label).toContain(REOPENED.rechosen);
       expect([...after.suppressed], label).toContain(REOPENED.built);
       expect(after.sources.get(REOPENED.rechosen), label).toBe(featureName);
     }
 
-    // THE NEGATIVE CONTROL, and it drops the CLAUSE rather than the carrier: the same species, the
-    // same trait, the same answered pick — with no `replaces` row. The build still stands and fire
-    // is still on the sheet, and NOTHING is re-choosable, so the two passes above passed because of
-    // the authored clause and not because a rest re-opens everything.
+    // Negative control: the same species and answered pick with no `replaces` row. Fire stays and
+    // nothing is re-choosable.
     const bare = authoredEmberkin(false);
     const bareView = emberkinView(bare);
     const bareSheet = buildCharacterDefinition(emberkinInput(), bareView, BuilderPolicySchema.parse({}));
@@ -2145,8 +1807,7 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     const classFeatureIds = (definition: ActorDefinition, sourceId: string) =>
       (definition.character?.features ?? []).filter((ref) => ref.kind === "class" && ref.sourceId === sourceId).map((ref) => ref.id);
 
-    // SRD: the Fighter's own attack tiers. At 5 the sheet lists Extra Attack; at 11 it lists Two
-    // Extra Attacks and NOT Extra Attack — one line rather than two contradicting ones.
+    // SRD: at 11 the sheet lists Two Extra Attacks and not Extra Attack.
     const srdView = new ContentLibrary().forAudience("gm");
     const fighter5 = classFeatureIds(buildCharacterDefinition(fighterInput(5), srdView, BuilderPolicySchema.parse({})), "fighter");
     const fighter11 = classFeatureIds(buildCharacterDefinition(fighterInput(11), srdView, BuilderPolicySchema.parse({})), "fighter");
@@ -2154,38 +1815,26 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     expect(fighter11).toContain(REOPENED.fighterReplacing);
     expect(fighter11).not.toContain(REOPENED.fighterReplaced);
 
-    // The editor: an authored class whose level-2 feature supersedes its level-1 one. Level 1 grants
-    // the first; level 2 grants the second ALONE.
+    // Editor: level 2 grants the second feature alone.
     const view = wardenView(authoredWarden());
     const level1 = classFeatureIds(buildCharacterDefinition(wardenInput(1), view, BuilderPolicySchema.parse({})), REOPENED.classId);
     const level2 = classFeatureIds(buildCharacterDefinition(wardenInput(2), view, BuilderPolicySchema.parse({})), REOPENED.classId);
     expect(level1).toEqual([REOPENED.wardId]);
     expect(level2).toEqual([REOPENED.greaterWardId]);
 
-    // THE NEGATIVE CONTROL, dropping the VALUE rather than the carrier: the same class, the same two
-    // features on the same two rows, with the "Supersedes" box left at "Nothing". Level 2 now grants
-    // BOTH — so the line that vanished above vanished because of the authored id.
+    // Negative control: "Supersedes" left at "Nothing", so level 2 grants both.
     const bare = wardenView(authoredWarden(false));
     expect(classFeatureIds(buildCharacterDefinition(wardenInput(2), bare, BuilderPolicySchema.parse({})), REOPENED.classId))
       .toEqual([REOPENED.wardId, REOPENED.greaterWardId]);
   });
 });
 
-/**
- * The class a GM builds in `/homebrew`: two features, the second superseding the first.
- *
- * **The grant is written through the `levelTable` field itself, and that is R1's ruling met rather
- * than dodged.** The level chips are the one control that writes `feature.level` AND
- * `levelTable[].features[]` in a single edit, and they stay `custom` precisely because a `FieldDef`
- * cannot express a two-target write — so a test cannot press them. What it can drive is the key they
- * write, which is the class form's own `levelTable` field: the rows below are what the chips would
- * have produced, and every other control on both features is the feature panel's own.
- */
+/** A class with two features, the second superseding the first. Grants are written through the
+    class's own `levelTable` field: the level chips are bespoke (a two-target write a `FieldDef` can't
+    express), so the rows below are what the chips would produce. */
 function authoredWarden(supersede = true): Draft {
   const ward = { ...authoredRow("class", ["features"], [["name", "Ward"], ["description", "A ward against harm."]]), id: REOPENED.wardId };
   let greater: Draft = { ...authoredRow("class", ["features"], [["name", "Greater Ward"], ["description", "A better ward against harm."]]), id: REOPENED.greaterWardId };
-  // THE ROW. `applyField` throws when a key has no control, so before U14 this line — not an
-  // assertion below it — is what failed.
   if (supersede) greater = applyField("class", greater, "replacesFeatureId", REOPENED.wardId, ["features"]);
   const draft = authored("class", "Warden", [
     ["summary", "A warden of the deep wood."],
@@ -2193,7 +1842,7 @@ function authoredWarden(supersede = true): Draft {
     ["hitDie", "d10"],
     ["primaryAbilities", ["str"]],
     ["savingThrows", ["str", "con"]],
-    // No subclass before 20, so a level-2 build asks no question this fixture does not answer.
+    // No subclass before 20, so a level-2 build asks nothing unanswered.
     ["subclassLevel", 20],
     ["skillChoices.choose", 2],
     ["skillChoices.from", ["athletics", "survival", "perception"]],
@@ -2230,8 +1879,7 @@ const wardenInput = (level: 1 | 2): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/** A Halfling Champion at `level` — the SRD's own `replacesFeatureId` carrier. The mastery column
-    and the ASI ladder are the only things that move with the level here. */
+/** A Halfling Champion at `level`, the SRD's `replacesFeatureId` carrier. */
 const fighterInput = (level: 5 | 11): CharacterCreateRequestInput => ({
   name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level,
   subclassId: "champion", abilityMethod: "standard-array",
@@ -2259,35 +1907,20 @@ const fighterInput = (level: 5 | 11): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/* ---- U15: the spell window and the ASI ceiling — three numbers, through both paths ---- */
+/* ---- the spell window and the ASI ceiling, through both paths ---- */
 
 /**
- * The rows: `FeatureChoiceSchema.maxSpellLevel` / `minSpellLevel` — the ceiling and floor a spell
- * pick is answered inside — and `maximum`, the score an ability-score pick may raise a score TO.
+ * `FeatureChoiceSchema.maxSpellLevel`/`minSpellLevel` (the window a spell pick is answered inside)
+ * and `maximum` (the score an ability-score pick may reach).
  *
- * **The schema half of all three already shipped in full**, which is what makes this unit small and
- * what makes it a parity gap rather than a feature: the columns, the cross-field refinement, both
- * consumers (`character-build.ts` `withinSpellWindow` and `matchRow`'s clamp,
- * `build-payload.ts`'s own filter), the wire type, the OpenAPI property, twenty SRD records and a
- * named server test — and no control anywhere. The panel could say what kind of pick and how many,
- * and nothing about what an answer is allowed to BE.
- *
- * **Both bounds are compared against the option's own SPELL level, and only a catalog carries one.**
- * `optionLevels` is built from `resolveCatalogChoice`; a hand-typed `from` list produces none, and a
- * missing level reads as 0. Measured, at HEAD: all 20 SRD authors of the window draw on a `*-spells`
- * catalog, a ceiling authored over a typed list therefore never refuses anything, and a floor above 0
- * refuses everything. R1's standing ruling is that `fromCatalog` is unreachable from `applyField`
- * (two controls over one composed slug held in React state), so the editor half of the window drives
- * the FLOOR — a bound that really does refuse over a typed list — while the SRD half proves both
- * bounds against real spell levels. The control's own help says where the levels come from, so the
- * trap is named on the form rather than discovered from a build refusal.
- *
- * The ASI ceiling has no such asymmetry: all seven epic boons author it over a plain `from` list of
- * ability slugs, which is exactly what the panel writes, so the editor's half is the SRD's shape
- * byte for byte and both end at the same score.
+ * Bounds compare against an option's spell level, which only a catalog carries (`optionLevels` comes
+ * from `resolveCatalogChoice`; a typed `from` list reads as level 0). `fromCatalog` is unreachable
+ * from `applyField`, so the editor half proves the floor (which does refuse over a typed list) and the
+ * SRD half proves both bounds. The ASI ceiling has no such asymmetry: epic boons use a plain `from`
+ * list of abilities.
  */
 const WINDOW = {
-  /** The SRD's exact-level pick: `minSpellLevel` and `maxSpellLevel` both 6 over `warlock-spells`. */
+  /** The SRD's exact-level pick: min and max both 6 over `warlock-spells`. */
   arcanumFeatureId: "mystic-arcanum-level-6-spell",
   arcanumLabel: "Mystic Arcanum Level 6 Spell",
   belowFloor: "hex",
@@ -2297,9 +1930,9 @@ const WINDOW = {
   featId: "hb-borrowed-mystery-a1b2",
   featureId: "borrowed-mystery",
   featName: "Borrowed Mystery",
-  /** The editor's authored floor. Five, so the refusal names a number nothing else in the build has. */
+  /** The authored floor; 5 so the refusal names a number unique in the build. */
   authoredFloor: 5,
-  /** The ASI ceiling: one 20 the boon pushes past, and the score it stops at without one. */
+  /** The ASI ceiling: one score the boon pushes past 20. */
   boonFeatId: "hb-boon-of-the-keen-mind-a1b2",
   boonFeatureId: "boon-of-the-keen-mind",
   boonFeatName: "Boon of the Keen Mind",
@@ -2310,7 +1943,7 @@ const WINDOW = {
   withoutCeiling: 20
 } as const;
 
-/** The feat a GM builds in `/homebrew`: one spell pick with the window the GM typed on it. */
+/** A feat with one spell pick and the given window. */
 function authoredMystery(window: { min?: number; max?: number }): Draft {
   const shell = authored("feat", WINDOW.featName, [
     ["category", "origin"],
@@ -2322,8 +1955,6 @@ function authoredMystery(window: { min?: number; max?: number }): Draft {
     ["choose", 1],
     ["from", "bless, cure-wounds"]
   ];
-  // THE ROWS. `authoredRow` throws when a key has no control, so before U15 these lines — not an
-  // assertion below them — is what failed.
   if (window.max !== undefined) edits.push(["maxSpellLevel", window.max]);
   if (window.min !== undefined) edits.push(["minSpellLevel", window.min]);
   const block = authoredRow("feat", ["feature", "choices"], edits);
@@ -2334,9 +1965,8 @@ function authoredMystery(window: { min?: number; max?: number }): Draft {
   return { ...shell, feature: { ...feature, id: WINDOW.featureId } };
 }
 
-/** The epic boon a GM builds: the SRD's own boon shape — one ability-score pick over the six
-    abilities, with the ceiling that makes the point worth taking. `ceiling: undefined` is the
-    negative control, and it is the bug the column was added for. */
+/** An epic boon in the SRD's shape: one ability-score pick with a ceiling. `ceiling: undefined` is the
+    negative control. */
 function authoredBoon(ceiling?: number): Draft {
   const shell = authored("feat", WINDOW.boonFeatName, [
     ["category", "epic-boon"],
@@ -2363,14 +1993,8 @@ const featView = (draft: Draft, recordId: string) => new ContentLibrary({
   monsterForInstance: () => undefined
 }).forAudience("gm");
 
-/**
- * A Halfling Warrior of the Open Hand 19 — the level an Epic Boon arrives at — whose Wisdom is
- * already 20 when the boon lands.
- *
- * The arithmetic is the fixture: Wis 15, +2 at 4, +2 at 8, +1 at 12 = **20**, which is where the
- * SRD's own ASI clamp stops. Every remaining point goes to Dex, so nothing but the boon can move Wis
- * one more.
- */
+/** A Halfling Open Hand Monk 19 (where an Epic Boon arrives) with Wisdom already 20: 15, +2 at 4, +2
+    at 8, +1 at 12. Remaining points go to Dex, so only the boon can raise Wisdom further. */
 const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput => ({
   name: "Shan", speciesId: "halfling", backgroundId: "criminal", classId: "monk", level: 19,
   subclassId: "warrior-of-the-open-hand", abilityMethod: "standard-array",
@@ -2388,8 +2012,7 @@ const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput =>
       { level: at, kind: "ability-score", id: first, payload: { featureId: "ability-score-improvement" } },
       { level: at, kind: "ability-score", id: second, payload: { featureId: "ability-score-improvement" } }
     ]),
-    // The Epic Boon slot, and the point it spends. `tagId` is the FEATURE's id, which is what the
-    // offer key is built from — the SRD's boons name feat and feature identically.
+    // The Epic Boon slot; `tagId` is the feature id the offer key is built from.
     { level: 19, classId: "monk", kind: "feat", id: boonId, payload: { featureId: "epic-boon" } },
     { level: 19, kind: "ability-score", id: WINDOW.raised, payload: { featureId: tagId } },
     { level: 1, kind: "equipment", id: "monk-a" },
@@ -2397,8 +2020,7 @@ const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput =>
   ]
 } as CharacterCreateRequestInput);
 
-/** A Human Acolyte Fiend-Patron Warlock 11 — the level the first Mystic Arcanum arrives at — whose
-    arcanum is `arcanum`. The SRD's only exact-level pick, and the one carrier of BOTH bounds. */
+/** A Fiend-Patron Warlock 11 (first Mystic Arcanum) with the given arcanum: the SRD's exact-level pick. */
 const arcanumWarlock = (arcanum: string): CharacterCreateRequestInput => ({
   ...resilientWarlock(REOPENED.built),
   level: 11,
@@ -2415,17 +2037,15 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     const body = storedBody("feat", draft, WINDOW.featId) as { feature: { choice?: Record<string, unknown> } };
     expect(body.feature.choice).toMatchObject({ kind: "spell", choose: 1, minSpellLevel: WINDOW.authoredFloor });
 
-    // The census's two rows, inverted: both keys resolve from the CLASS form, which is the form the
-    // census asks its questions of, and from a feat's singular container as well.
+    // Each key resolves on the class form and on a feat's singular container...
     for (const key of ["maxSpellLevel", "minSpellLevel", "maximum"]) {
       expect(hasControl("class", key), `class.${key}`).toBe(true);
       expect(hasControl("feat", key, ["feature", "choices"]), `feat: feature > choices > ${key}`).toBe(true);
-      // ...and as the FIRST block's alias, the surface R1 built and U12 kept live.
+      // ...and as the first block's alias.
       expect(hasControl("feat", `choice.${key}`, ["feature"]), `feat: feature > choice.${key}`).toBe(true);
     }
 
-    // EVERY BLOCK, not just block 0 — U12's standing requirement for anything added to this panel.
-    // Magic Initiate's own shape: cantrips at 0, the level-1 spell at 1, on one record.
+    // Every block, not just block 0 (Magic Initiate's shape: cantrips at 0, the spell at 1).
     const initiate = ((): Draft => {
       const cantrips = authoredRow("feat", ["feature", "choices"], [["kind", "cantrip"], ["choose", 2], ["from", "guidance, light"], ["maxSpellLevel", 0]]);
       const spell = authoredRow("feat", ["feature", "choices"], [["kind", "spell"], ["choose", 1], ["from", "bless"], ["maxSpellLevel", 1]]);
@@ -2436,14 +2056,12 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     })();
     const plural = storedBody("feat", initiate, WINDOW.featId) as { feature: { choices?: Array<Record<string, unknown>> } };
     expect(plural.feature.choices?.map((block) => block.maxSpellLevel)).toEqual([0, 1]);
-    // ...and the first-block alias still reaches block 0 of that same plural record, unchanged.
+    // The first-block alias still reaches block 0 of the plural record.
     expect((applyField("feat", initiate.feature as Draft, "choice.maxSpellLevel", 3, ["feature"]).choices as Array<{ maxSpellLevel?: number }>)
       .map((block) => block.maxSpellLevel)).toEqual([3, 1]);
 
-    // The window draws for the two kinds whose options carry a level, and for any block already
-    // holding a bound (a duplicated SRD record must never hide its own numbers). The ceiling draws
-    // for the kind its reader filters for. `kind` is an open slug, so these are visibility rules and
-    // never gates: an authored value survives on any kind.
+    // The window shows for spell kinds and for any block already holding a bound; the ceiling for the
+    // ability-score kind. Visibility rules only: an authored value survives on any kind.
     const blockField = (key: string) => fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === key)!;
     for (const key of ["maxSpellLevel", "minSpellLevel"]) {
       expect(blockField(key).visibleWhen?.({ kind: "spell" }, {}), key).toBe(true);
@@ -2455,8 +2073,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(blockField("maximum").visibleWhen?.({ kind: "spell" }, {})).toBe(false);
     expect(blockField("maximum").visibleWhen?.({ kind: "spell", maximum: 25 }, {})).toBe(true);
 
-    // The two numbers are ONE window, and the form's own pair can say something no spell satisfies —
-    // so the schema's cross-field refinement is the far end of authoring them together, by name.
+    // An inverted window is refused by the schema's cross-field refinement.
     const upsideDown = publishVerdict("feat", authoredMystery({ min: 6, max: 2 }), WINDOW.featId);
     expect(upsideDown.publishable).toBe(false);
     expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
@@ -2465,8 +2082,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
   it("2. SRD content authors the same shapes — 17 ceilings, 6 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{ id: string; kind: string; max?: number; min?: number; maximum?: number; fromCatalog?: string }> = [];
-    // A choice block carries no id of its own, so the nearest enclosing one travels with the walk —
-    // which for every hit here is the FEATURE that owns the pick.
+    // Choice blocks have no id, so the enclosing feature's id travels with the walk.
     const walk = (node: unknown, owner: string) => {
       if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
       if (!node || typeof node !== "object") return;
@@ -2486,21 +2102,8 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     carriers(library.subclassSummaries(), (id) => library.subclassRecord(id));
     carriers(library.featSummaries(), (id) => library.featRecord(id));
 
-    // Measured 2026-08-11, and the numbers MOVED — this is the census catching content that changed
-    // shape, which is the whole reason it counts rather than samples.
-    //
-    // Was: 16 ceilings (9 class, 6 feat, 1 subclass) and 4 floors, all four Mystic Arcana. Now 17
-    // and 6, both from ONE record. C4 split the Wizard's Spell Mastery from a single
-    // `{choose: 2, maxSpellLevel: 2}` — one pick of two under one ceiling, which let a Wizard take
-    // two level-1 spells — into the printed "a level 1 AND a level 2 spell": two blocks, each
-    // `choose: 1`, each floored and capped at its own level. So one ceiling became two, and two
-    // floors arrived where there were none.
-    //
-    // The Mystic Arcanum invariant SURVIVES the arrival, and that is the load-bearing part: every
-    // floor in this list still has `min === max`. A floor exists to make a pick EXACT — "a level 6
-    // Warlock spell" is 6, not "6 or lower" — and both Spell Mastery blocks are exact in the same
-    // sense. The first block's floor is what makes that true: without it the block read
-    // `{maxSpellLevel: 1}` and a level-0 CANTRIP satisfied the printed "a level 1 spell".
+    // Every floor has `min === max`: a floor exists to make a pick exact ("a level 6 spell", not
+    // "6 or lower").
     const ceilings = found.filter((entry) => entry.max !== undefined);
     const floors = found.filter((entry) => entry.min !== undefined);
     const maxima = found.filter((entry) => entry.maximum !== undefined);
@@ -2514,10 +2117,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(maxima).toHaveLength(7);
     expect(maxima.every((entry) => entry.maximum === WINDOW.ceiling && entry.kind === "ability-score")).toBe(true);
 
-    // The measurement the unit's shape rests on, asserted rather than asserted-about: every window
-    // author draws on a spell CATALOG (which is what carries the level the bounds compare against),
-    // and every ceiling author draws on a hand-written list of ability slugs (which is what the
-    // panel's own `from` box writes).
+    // Every window author draws on a spell catalog, and every ceiling author on a typed list of abilities.
     expect(ceilings.every((entry) => (entry.fromCatalog ?? "").endsWith("-spells"))).toBe(true);
     expect(maxima.every((entry) => entry.fromCatalog === undefined)).toBe(true);
   });
@@ -2527,10 +2127,10 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     const editorView = featView(authoredMystery({ min: WINDOW.authoredFloor }), WINDOW.featId);
     const mysteryRows = [{ kind: "spell", id: "bless" }];
     const paths: ReadonlyArray<readonly [string, () => unknown, RegExp]> = [
-      // SRD: an eleventh-level Warlock's level-6 arcanum, spent on a level-1 spell.
+      // SRD: a level-6 arcanum spent on a level-1 spell.
       ["SRD content", () => buildCharacterDefinition(arcanumWarlock(WINDOW.belowFloor), srdView, BuilderPolicySchema.parse({})),
         new RegExp(`"${WINDOW.belowFloor}" is level 1, below the minimum spell level \\(${WINDOW.windowLevel}\\)`)],
-      // The editor: the authored floor, refusing the answer the GM's own list offers.
+      // Editor: the authored floor refuses an answer from the GM's own list.
       ["the homebrew editor", () => buildCharacterDefinition(initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows), editorView, BuilderPolicySchema.parse({})),
         new RegExp(`"bless" is level 0, below the minimum spell level \\(${WINDOW.authoredFloor}\\)`)]
     ];
@@ -2538,18 +2138,13 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
       expect(build, label).toThrowError(message);
     }
 
-    // THE NEGATIVE CONTROL, dropping the VALUE rather than the carrier: the same feat, the same
-    // ledger, no window at all. The spell lands on the sheet — so the refusal above was the floor's
-    // and not the pick's.
+    // Negative control: no window, so the spell lands on the sheet.
     const open = featView(authoredMystery({}), WINDOW.featId);
     const sheet = buildCharacterDefinition(initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows), open, BuilderPolicySchema.parse({}));
     expect(preparedSpell(sheet, "bless")).toMatchObject({ id: "bless", prepared: true });
 
-    // The SRD's carrier proves the CEILING on the same reader, which the editor's cannot: `hex` broke
-    // the floor above, `power-word-kill` breaks the ceiling, and the level-6 spell the arcanum really
-    // prints lands on the sheet AT level 6. A hand-written list has no levels for either bound to
-    // compare against, which is the measurement in this section's header and the reason the control's
-    // help names the catalog.
+    // The SRD carrier also proves the ceiling: `power-word-kill` breaks it, and the real level-6
+    // spell lands at level 6.
     expect(() => buildCharacterDefinition(arcanumWarlock(WINDOW.aboveCeiling), srdView, BuilderPolicySchema.parse({})))
       .toThrowError(new RegExp(`"${WINDOW.aboveCeiling}" is level 9, above the maximum spell level \\(${WINDOW.windowLevel}\\)`));
     const arcanum = preparedSpell(buildCharacterDefinition(arcanumWarlock(WINDOW.inWindow), srdView, BuilderPolicySchema.parse({})), WINDOW.inWindow);
@@ -2567,15 +2162,11 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
       )]
     ];
     for (const [label, definition] of paths) {
-      // The far end: a score the SRD's own ASI clamp cannot reach. Wisdom is 20 the moment before
-      // the boon lands, and the authored ceiling is what lets the point be spent at all.
+      // A score past the ASI clamp: Wisdom was 20 before the boon.
       expect(definition.abilityScores[WINDOW.raised], label).toBe(WINDOW.withCeiling);
     }
 
-    // THE NEGATIVE CONTROL, and it IS the bug the column was added for: the same boon, the same
-    // sheet, the same spent point — with the ceiling left empty. The clamp falls back to 20 and the
-    // point vanishes in silence, which is precisely what all seven epic boons did for the level-19
-    // character who has one.
+    // Negative control: no ceiling, so the clamp falls back to 20 and the point is lost.
     const uncapped = buildCharacterDefinition(
       boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
       featView(authoredBoon(), WINDOW.boonFeatId),
@@ -2585,45 +2176,27 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
   });
 });
 
-/* ---- U16: `fromPicks` — the options ARE the character's own earlier answers ---- */
+/* ---- `fromPicks`: the options are the character's own earlier answers ---- */
 
 /**
- * The row: `FeatureChoiceSchema.fromPicks` — `{offer, where?}`, the FOURTH way a choice states its
- * list and the only one that is not a list at all.
+ * `FeatureChoiceSchema.fromPicks` (`{offer, where?}`): the options are the ledger, narrowed by a
+ * closed predicate ("one of your known Warlock cantrips that deals damage"). Resolved by the shared
+ * `resolvePickChoice`.
  *
- * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast), "…that has a
- * range of 10+ feet" (Eldritch Spear), "…that requires an attack roll" (Repelling Blast). No
- * `fromCatalog` slug can say that and no `from` list can either: the options are the LEDGER,
- * narrowed by a closed predicate, and every Warlock's list is a different list. The schema, both
- * consumers (`character-build.ts` `featurePickOffer` and `build-payload.ts` `resolveChoice`, through
- * one shared `resolvePickChoice`), the wire type and three SRD records all shipped — and the panel
- * offered three sources where the engine reads four.
- *
- * **The far end is the LIST, and it is proved by contrast rather than by presence.** One ledger of
- * three cantrips answers the three predicates three different ways, and a fourth damaging cantrip
- * the character really has — Sacred Flame, off the Acolyte's Magic Initiate — is in NONE of them,
- * because it is not one of their known WARLOCK cantrips. A test that only asserted "the list is
- * non-empty" would pass on any source at all.
- *
- * **And it is the one member of this family that carries spell LEVELS from the editor end.** U15
- * measured and wrote down that `optionLevels` is built only by `resolveCatalogChoice`, so a window
- * authored over a hand-typed `from` list can never refuse anything and R1's ruling leaves
- * `fromCatalog` unreachable from `applyField`. `resolvePickChoice` builds them too — it looks every
- * answer up in the spell catalog — so an authored floor over `fromPicks` really does bite, which is
- * the case U15 could not reach and said so.
+ * Proved by contrast: one ledger answers the three predicates three ways, and Sacred Flame (a
+ * damaging cantrip from Magic Initiate, not a Warlock cantrip) is in none of them. `resolvePickChoice`
+ * also looks up spell levels, so an authored floor over `fromPicks` really refuses.
  */
 const LEDGER = {
-  /** The three Warlock cantrips this fixture knows. Chosen so the three predicates disagree:
-      Chill Touch is Touch range, True Strike has damage types but no attack roll, and only
-      Eldritch Blast answers all three. */
+  /** Chosen so the predicates disagree: Chill Touch is Touch range, True Strike makes no attack roll,
+      and only Eldritch Blast satisfies all three. */
   cantrips: ["eldritch-blast", "chill-touch", "true-strike"],
   dealsDamage: ["chill-touch", "eldritch-blast", "true-strike"],
   attackRoll: ["chill-touch", "eldritch-blast"],
   ranged: ["eldritch-blast"],
-  /** Tagged to Magic Initiate, so NOT a class cantrip: a damaging cantrip the character really
-      has and no invocation may point at. This is the line no catalog can draw. */
+  /** A damaging cantrip from Magic Initiate, not the class, so no invocation may target it. */
   otherSource: "sacred-flame",
-  /** The three SRD invocations, and the predicate each one asks. */
+  /** The three SRD invocations and the predicate each asks. */
   srdOffers: [
     ["feature:agonizing-blast", "deals-damage"],
     ["feature:repelling-blast", "attack-roll"],
@@ -2633,7 +2206,7 @@ const LEDGER = {
   featId: "hb-borrowed-blast-a1b2",
   featureId: "borrowed-blast",
   featName: "Borrowed Blast",
-  /** The prepared spells the same ledger holds, for the spell-level half. */
+  /** Prepared spells in the same ledger, for the spell-level half. */
   spells: [["hex", 1], ["hold-person", 2], ["fly", 5]],
   spellLevels: { hex: 1, "hold-person": 2, fly: 3 },
   floor: 2,
@@ -2641,12 +2214,8 @@ const LEDGER = {
   inWindow: "fly"
 } as const;
 
-/**
- * The feat a GM builds in `/homebrew`: one pick over answers the character already gave.
- *
- * `from` is the alternative source, so passing it is the negative control that keeps `fromPicks`
- * from being a decoration — the same feat, the same carrier, a list typed by hand instead.
- */
+/** A feat with one pick over answers the character already gave. Passing `from` is the negative
+    control: the same feat with a typed list instead. */
 function authoredBorrowedBlast(over: Readonly<{ where?: string; offer?: string; kind?: string; min?: number; from?: string }> = {}): Draft {
   const shell = authored("feat", LEDGER.featName, [
     ["category", "origin"],
@@ -2656,8 +2225,6 @@ function authoredBorrowedBlast(over: Readonly<{ where?: string; offer?: string; 
   const edits: Array<readonly [string, unknown]> = [["kind", over.kind ?? "cantrip"], ["choose", 1]];
   if (over.from !== undefined) edits.push(["from", over.from]);
   else {
-    // THE ROW. `authoredRow` throws when a key has no control, so before U16 these lines — not an
-    // assertion below them — is what failed.
     edits.push(["fromPicks.offer", over.offer ?? "class-cantrips"]);
     if (over.where) edits.push(["fromPicks.where", over.where]);
   }
@@ -2670,14 +2237,8 @@ function authoredBorrowedBlast(over: Readonly<{ where?: string; offer?: string; 
   return { ...shell, feature: { ...feature, id: LEDGER.featureId } };
 }
 
-/**
- * A Human Acolyte Fiend-Patron Warlock 10 whose known cantrips are the fixture's three, holding
- * `featId` in the Human origin-feat slot when one is given.
- *
- * Level 10 because the Invocations column is at 7 there, which is room for the three that ask a
- * `fromPicks` question plus four that do not. Every invocation pick is answered, so the same input
- * both surveys and builds.
- */
+/** A Fiend-Patron Warlock 10 knowing the fixture's cantrips, with `featId` in the origin-feat slot when
+    given. At 10 the Invocations column has room for the three `fromPicks` invocations plus four others. */
 const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cantrips): CharacterCreateRequestInput => ({
   name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 10,
   subclassId: "fiend-patron", abilityMethod: "standard-array",
@@ -2689,27 +2250,26 @@ const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cant
     { level: 1, kind: "language", id: "giant" },
     { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: featId ?? "alert", payload: { featureId: "human-versatile" } },
-    // The Acolyte's own origin feat is Magic Initiate (Cleric) — where Sacred Flame comes from.
+    // The Acolyte's origin feat, Magic Initiate (Cleric), is where Sacred Flame comes from.
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: LEDGER.otherSource, payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
     ...LEDGER.invocations.map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })),
-    // THE ANSWERS THE INVOCATIONS THEMSELVES ASK. Eldritch Blast for all three, because it is the
-    // one cantrip that satisfies every predicate — so swapping the ledger below never invalidates
-    // an answer and the lists are the only thing that moves.
+    // Each invocation's own answer is Eldritch Blast, which satisfies every predicate, so swapping
+    // the ledger below never invalidates an answer.
     ...["agonizing-blast", "repelling-blast", "eldritch-spear"]
       .map((featureId) => ({ level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId } })),
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
-    // Fiendish Resilience arrives at 10 and asks its own question; unanswered, the BUILD refuses.
+    // Fiendish Resilience arrives at 10 and must be answered, or the build refuses.
     { level: 10, kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } },
     ...[4, 8].flatMap((at) => [
       { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
       { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
       { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
     ]),
-    // THE LEDGER the picks above are drawn from: untagged rows, which is what a NAMED budget is.
+    // The ledger: untagged rows, which is what a named budget reads.
     ...cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
     ...LEDGER.spells.map(([id, level]) => ({ level, kind: "spell", id })),
     { level: 1, kind: "equipment", id: "warlock-a" },
@@ -2717,8 +2277,7 @@ const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cant
   ]
 } as CharacterCreateRequestInput);
 
-/** One offer's option list, off the SERVER's own computation. Sorted, because a Set has no order
-    and the assertion is about membership. */
+/** One offer's option ids from the server's computation, sorted (membership is what matters). */
 function offeredIds(survey: ReturnType<typeof computeServerOffers>, key: string): readonly string[] {
   const offer = survey.offers.find((candidate) => candidate.key === key);
   if (!offer) throw new Error(`No offer "${key}" in this build — the fixture no longer asks that question.`);
@@ -2736,19 +2295,17 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     expect(verdict.publishable).toBe(true);
 
     const body = storedBody("feat", draft, LEDGER.featId) as { feature: { choice?: Record<string, unknown> } };
-    // Agonizing Blast's shape, byte for byte — bar the predicate this feat asks for instead.
+    // Agonizing Blast's shape, with this feat's predicate.
     expect(body.feature.choice).toMatchObject({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } });
-    // ...and no other source key beside it. The reader tests `fromPicks` FIRST, so a block carrying
-    // both would silently answer with one and drop the other.
+    // No other source key: the reader tests `fromPicks` first and would silently drop the other.
     for (const key of ["from", "fromCatalog", "options"]) {
       expect(key in (body.feature.choice ?? {}), `choice.${key} rode along`).toBe(false);
     }
-    // The budget alone is a complete source: `where` is optional and omitting it offers every answer.
+    // `where` is optional; the budget alone offers every answer.
     const open = storedBody("feat", authoredBorrowedBlast({}), LEDGER.featId) as { feature: { choice?: { fromPicks?: unknown } } };
     expect(open.feature.choice?.fromPicks).toEqual({ offer: "class-cantrips" });
 
-    // The census's row, inverted: the clause resolves from the CLASS form — the form the census asks
-    // its questions of — at the block's own scope, and as the FIRST block's alias.
+    // Resolves on the class form at the block's scope, and as the first block's alias.
     for (const key of ["fromPicks", "fromPicks.offer", "fromPicks.where"]) {
       expect(hasControl("class", key), `class.${key}`).toBe(true);
       expect(hasControl("feat", key, ["feature", "choices"]), `feat: feature > choices > ${key}`).toBe(true);
@@ -2756,12 +2313,11 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     for (const key of ["choice.fromPicks", "choice.fromPicks.offer", "choice.fromPicks.where"]) {
       expect(hasControl("feat", key, ["feature"]), `feat: feature > ${key}`).toBe(true);
     }
-    // ...and the group's children are RE-ALIASED rather than leaked: `fieldsWithin` flattens groups,
-    // so an un-aliased row would offer `fromPicks.offer` at FEATURE scope — a key that writes
-    // `feature.fromPicks.offer`, which no form produces and no reader reads.
+    // Group children are re-aliased, not leaked: `fromPicks.offer` at feature scope would write a key
+    // no reader reads.
     expect(hasControl("feat", "fromPicks.offer", ["feature"])).toBe(false);
 
-    // EVERY BLOCK, not just block 0 — U12's standing requirement for anything added to this panel.
+    // Every block, not just block 0.
     const twinned = ((): Draft => {
       const first = authoredRow("feat", ["feature", "choices"], [["kind", "cantrip"], ["choose", 1], ["fromPicks.offer", "class-cantrips"], ["fromPicks.where", "deals-damage"]]);
       const second = authoredRow("feat", ["feature", "choices"], [["kind", "spell"], ["choose", 1], ["fromPicks.offer", "class-spells"]]);
@@ -2774,17 +2330,14 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     expect(plural.feature.choices?.map((block) => block.fromPicks))
       .toEqual([{ offer: "class-cantrips", where: "deals-damage" }, { offer: "class-spells" }]);
 
-    // THE EXCLUSIVITY, driven both ways round through the fields themselves: writing the ledger
-    // source clears a hand-typed list, and writing a hand-typed list clears the ledger source. The
-    // schema permits the pair and the ENGINE silently prefers one, so the form must refuse to make it.
+    // Exclusivity both ways: the ledger source clears a typed list and vice versa.
     const listed = applyField("feat", { kind: "cantrip", choose: 1 }, "from", "guidance, light", ["feature", "choices"]);
     const swapped = applyField("feat", listed, "fromPicks.offer", "class-cantrips", ["feature", "choices"]);
     expect(swapped).toEqual({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips" } });
     expect(applyField("feat", swapped, "from", "guidance", ["feature", "choices"]))
       .toEqual({ kind: "cantrip", choose: 1, from: ["guidance"] });
 
-    // `where` is the one CLOSED control in this panel, and it is closed because the schema is: three
-    // slugs, each a spell fact the resolver reads by name, so a homebrew word would match nothing.
+    // `where` is closed because the schema is: three slugs the resolver reads by name.
     const whereField = fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === "fromPicks.where");
     expect(optionValues(whereField)).toEqual(["deals-damage", "attack-roll", "ranged"]);
   });
@@ -2804,8 +2357,7 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id), "?");
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id), "?");
 
-    // Measured at the time of writing: exactly three, all Warlock invocations, all over ONE budget
-    // and each asking a different question of it.
+    // Exactly three at the time of writing: Warlock invocations over one budget, each asking a different question.
     expect(found.map((entry) => `${entry.id}: ${entry.source.offer} where ${entry.source.where}`).sort()).toEqual([
       "agonizing-blast: class-cantrips where deals-damage",
       "eldritch-spear: class-cantrips where ranged",
@@ -2818,140 +2370,107 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     const editorView = featView(authoredBorrowedBlast({ where: "attack-roll" }), LEDGER.featId);
 
     const paths: ReadonlyArray<readonly [string, ReturnType<typeof computeServerOffers>, string, readonly string[]]> = [
-      // SRD: Repelling Blast, whose "requires an attack roll" is the same predicate the feat asks.
+      // SRD: Repelling Blast, whose "requires an attack roll" matches the feat's predicate.
       ["SRD content", surveyOf(blastWarlock(), srdView), "feature:repelling-blast", LEDGER.attackRoll],
-      // The editor: the authored feat, over the SAME ledger, reaching the same list.
+      // Editor: the authored feat over the same ledger.
       ["the homebrew editor", surveyOf(blastWarlock(LEDGER.featId), editorView), `feature:${LEDGER.featureId}`, LEDGER.attackRoll]
     ];
     for (const [label, survey, key, expected] of paths) {
-      // THE FAR END: not "an option list", but THIS character's, narrowed. Sacred Flame deals damage
-      // and rolls no attack — and even under `deals-damage` it is absent, because it is not one of
-      // their known WARLOCK cantrips. No catalog slug can draw that line, which is the whole row.
+      // Sacred Flame deals damage and makes no attack roll, yet it is absent from every list because it
+      // is not a known Warlock cantrip.
       const offered = offeredIds(survey, key);
       expect(offered, label).toEqual([...expected]);
       expect(offered, label).not.toContain(LEDGER.otherSource);
     }
 
-    // THE SAME LEDGER, THREE PREDICATES, THREE LISTS — the contrast that makes the assertion above
-    // mean the predicate rather than "a list came back". All three read the same three cantrips.
+    // Same ledger, three predicates, three lists.
     const srd = surveyOf(blastWarlock(), srdView);
     expect(offeredIds(srd, "feature:agonizing-blast")).toEqual([...LEDGER.dealsDamage]);
     expect(offeredIds(srd, "feature:repelling-blast")).toEqual([...LEDGER.attackRoll]);
     expect(offeredIds(srd, "feature:eldritch-spear")).toEqual([...LEDGER.ranged]);
 
-    // ...and it is the LEDGER and not the class: change which cantrips this Warlock took and every
-    // one of the three lists moves with them, without a content record changing.
+    // Change the known cantrips and every list moves, with no content record changing.
     const other = surveyOf(blastWarlock(undefined, ["eldritch-blast", "mage-hand", "minor-illusion"]), srdView);
     expect(offeredIds(other, "feature:agonizing-blast")).toEqual(["eldritch-blast"]);
     expect(offeredIds(other, "feature:eldritch-spear")).toEqual(["eldritch-blast", "mage-hand", "minor-illusion"]);
 
-    // THE NEGATIVE CONTROLS, dropping the VALUE rather than the carrier. Same feat, same ledger:
-    // with the predicate gone the list widens to every class cantrip...
+    // Negative controls: without the predicate the list widens to every class cantrip...
     const wide = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({}), LEDGER.featId));
     expect(offeredIds(wide, `feature:${LEDGER.featureId}`)).toEqual([...LEDGER.cantrips].sort());
-    // ...and with the source made a hand-typed list, the ledger stops being read at all — the GM's
-    // two slugs are offered to a Warlock who knows neither.
+    // ...and with a typed list the ledger is not read at all.
     const typed = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({ from: "guidance, light" }), LEDGER.featId));
     expect(offeredIds(typed, `feature:${LEDGER.featureId}`)).toEqual(["guidance", "light"]);
   });
 
   it("4. the editor end can finally prove a SPELL LEVEL — the hole U15 measured and left open", () => {
-    /**
-     * U15's standing measurement: both spell bounds are compared against `optionLevels`, which is
-     * built only by `resolveCatalogChoice`; a hand-typed `from` list produces none and a missing
-     * level reads as 0, so a ceiling authored over one can never refuse anything. R1's ruling leaves
-     * `fromCatalog` unreachable from `applyField`, so U15's editor half could drive only the FLOOR
-     * and said as much.
-     *
-     * `resolvePickChoice` builds `optionLevels` too — it looks every answer up in the spell catalog
-     * — so `fromPicks` is the one source an authored window really bites over from the editor end.
-     */
+    /** Spell bounds compare against `optionLevels`. A typed `from` list has none, but
+        `resolvePickChoice` looks every answer up in the spell catalog, so a window over `fromPicks`
+        really applies from the editor end. */
     const view = featView(authoredBorrowedBlast({ kind: "spell", offer: "class-spells", min: LEDGER.floor }), LEDGER.featId);
     const survey = surveyOf(blastWarlock(LEDGER.featId), view);
     const offer = survey.offers.find((candidate) => candidate.key === `feature:${LEDGER.featureId}`)!;
-    // The levels are THERE, off the catalog, for a list no catalog holds.
+    // The levels are present for a list no catalog holds.
     expect(offer.optionLevels).not.toBeNull();
     expect(Object.fromEntries([...offer.optionLevels!].sort())).toEqual(LEDGER.spellLevels);
 
-    // ...and they refuse. The character's own level-1 spell is below the authored floor, named by
-    // the number the catalog carries rather than by the 0 a typed list would have produced.
+    // A level-1 spell is below the authored floor, named by its real level.
     const below = { ...blastWarlock(LEDGER.featId) };
     below.choices = [...below.choices, { level: 10, kind: "spell", id: LEDGER.belowFloor, payload: { featureId: LEDGER.featureId } }] as typeof below.choices;
     expect(() => buildCharacterDefinition(below, view, BuilderPolicySchema.parse({})))
       .toThrowError(new RegExp(`"${LEDGER.belowFloor}" is level 1, below the minimum spell level \\(${LEDGER.floor}\\)`));
 
-    // THE NEGATIVE CONTROL: the same floor over a hand-typed list of the same two spells. Every
-    // option reads as level 0, so the floor refuses the answer the GM's own list offers — which is
-    // exactly the trap U15's help text names, still standing, and still not this unit's to fix.
+    // Negative control: the same floor over a typed list reads every option as level 0, so it refuses
+    // the GM's own options.
     const listed = featView(authoredBorrowedBlast({ kind: "spell", from: "hex, fly", min: LEDGER.floor }), LEDGER.featId);
     const listedOffer = surveyOf(blastWarlock(LEDGER.featId), listed).offers.find((candidate) => candidate.key === `feature:${LEDGER.featureId}`)!;
     expect(listedOffer.optionLevels).toBeNull();
 
-    // ...and the character's own level-3 spell is INSIDE the window when the levels are real.
+    // A level-3 spell is inside the window when levels are real.
     const inside = { ...blastWarlock(LEDGER.featId) };
     inside.choices = [...inside.choices, { level: 10, kind: "spell", id: LEDGER.inWindow, payload: { featureId: LEDGER.featureId } }] as typeof inside.choices;
     expect(() => buildCharacterDefinition(inside, view, BuilderPolicySchema.parse({}))).not.toThrow();
   });
 });
 
-/* ---- U16: `FeatureOption.requires` — an option gated on an earlier answer ---- */
+/* ---- `FeatureOption.requires`: an option gated on an earlier answer ---- */
 
 /**
- * The row: `FeatureOptionSchema.requires` — `{offer, id}`, the clause that says an inline option is
- * legal only for a character whose ledger already holds one particular answer.
+ * `FeatureOptionSchema.requires` (`{offer, id}`): an inline option is legal only if the ledger holds
+ * a particular earlier answer (Improved Blessed Strikes, Nature's Ward). Both consumers gate on it.
  *
- * "The option you chose for Blessed Strikes grows more powerful" (Improved Blessed Strikes),
- * Improved Elemental Fury, Nature's Ward's Resistance "associated with your current land choice".
- * Each is one later feature whose mechanics were DECIDED levels earlier, and before the key they
- * were prose because nothing in the vocabulary could read an earlier row. Eight SRD options author
- * it — four class, four subclass — both consumers gate on it (`character-build.ts` `featurePickOffer`
- * and `build-payload.ts` `featurePickOffer`, in the same two steps), and the option row had a name,
- * a description and no way to say when it applies.
- *
- * **The far end is the OPTION LIST, and gating collapses it twice over.** An option whose gate is
- * unmet leaves the offer entirely; and when the survivors exactly FILL the capacity the answer is a
- * consequence rather than a choice, so both consumers ADOPT it and render no card at all — a pick
- * with one option on it is worse than the prose it replaces. So the list is read where it ends up:
- * `survey.granted`, whose option-origin entries ARE the survivors, against the same feature's
- * ungated offer of two.
- *
- * The two paths cross carriers again: the SRD half is a SUBCLASS feature (Nature's Ward, whose four
- * options each name a different land) and the editor half a homebrew SPECIES with two traits — the
- * cheapest carrier that can hold both halves of the read-back, because `feature:<id>` has to name a
- * pick the same record asks.
+ * The far end is the option list: unmet gates remove options, and when the survivors exactly fill
+ * the capacity they are adopted with no pick shown. So the survivors are read from `survey.granted`.
+ * The SRD half is Nature's Ward (a subclass feature); the editor half is a species with two traits,
+ * since `feature:<id>` must name a pick on the same record.
  */
 const GATED = {
   srdFeatureId: "natures-ward",
   srdOffer: "feature:natures-ward",
   srdGate: "feature:circle-of-the-land-spells",
-  /** The SRD's own table: which land answer grants which Resistance. */
+  /** The SRD table: which land grants which resistance. */
   lands: [["arid", "fire"], ["polar", "cold"], ["temperate", "lightning"], ["tropical", "poison"]],
   speciesId: "hb-echokin-a1b2",
   speciesName: "Echokin",
-  /** Pinned rather than minted, for U12's reason: the ledger tags its answer with the FEATURE id,
-      and the gate names that id back. */
+  /** Pinned because the ledger tags its answer with the feature id, which the gate names. */
   heritageId: "echo-heritage",
   wardId: "echo-ward",
   gate: "feature:echo-heritage",
   answers: [["emberborn", "ember-ward", "fire"], ["frostborn", "frost-ward", "cold"]]
 } as const;
 
-/** One gated option of the authored ward trait. `requires` goes through the option row's own
-    controls; the resistance it grants goes through `GrantsEditor`'s own write, for U9's reason. */
+/** One gated option. `requires` uses the option row's controls; the resistance goes through `grantsFromRows`. */
 const echoOption = (id: string, name: string, gate: string | null, resistance: string): Draft => ({
   ...authoredRow("species", ["traits", "choice.options"], [
     ["name", name],
     ["description", `Your heritage answered this for you, so you have Resistance to ${resistance} damage.`],
-    // THE ROW. `authoredRow` throws when a key has no control, so before U16 these lines — not an
-    // assertion below them — is what failed.
     ...(gate ? ([["requires.offer", GATED.gate], ["requires.id", gate]] as Array<readonly [string, unknown]>) : [])
   ]),
   id,
   grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }], {})
 });
 
-/** The species a GM builds in `/homebrew`: one trait that asks which heritage, and a second whose
-    two options are each legal for exactly one answer to it. `gated: false` is the negative control. */
+/** A species with a heritage-asking trait and a second trait whose two options are each gated on one
+    answer. `gated: false` is the negative control. */
 function authoredEchokin(gated = true): Draft {
   const heritage = {
     ...authoredRow("species", ["traits"], [
@@ -2989,7 +2508,7 @@ const echokinView = (species: Draft) => new ContentLibrary({
   monsterForInstance: () => undefined
 }).forAudience("gm");
 
-/** An Echokin Fighter 1 who has answered the heritage — the earlier answer the ward reads back. */
+/** An Echokin Fighter 1 who has answered the heritage. */
 const echokinInput = (heritage: string): CharacterCreateRequestInput => ({
   name: "Ash", speciesId: GATED.speciesId, backgroundId: "soldier", classId: "fighter", level: 1,
   abilityMethod: "standard-array",
@@ -2997,7 +2516,7 @@ const echokinInput = (heritage: string): CharacterCreateRequestInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
-    // THE EARLIER ANSWER. Everything the ward does follows from this one row.
+    // The earlier answer the ward reads.
     { level: 1, kind: "heritage", id: heritage, payload: { featureId: GATED.heritageId } },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
     { level: 1, classId: "fighter", kind: "skill", id: "survival" },
@@ -3009,8 +2528,7 @@ const echokinInput = (heritage: string): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/** A Human Acolyte Circle-of-the-Land Druid 10 — the level Nature's Ward arrives at — whose land was
-    answered at 3. The SRD's own carrier, read through the real bundles. */
+/** A Circle-of-the-Land Druid 10 (where Nature's Ward arrives) whose land was answered at 3. */
 const landDruid = (land: string): CharacterCreateRequestInput => ({
   name: "Rowan", speciesId: "human", backgroundId: "acolyte", classId: "druid", level: 10,
   subclassId: "circle-of-the-land", abilityMethod: "standard-array",
@@ -3029,7 +2547,7 @@ const landDruid = (land: string): CharacterCreateRequestInput => ({
     { level: 1, classId: "druid", kind: "skill", id: "perception" },
     { level: 1, kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
     { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
-    // THE EARLIER ANSWER, seven levels before the feature that reads it back.
+    // The earlier answer, seven levels before the feature that reads it.
     { level: 3, kind: "land", id: land, payload: { featureId: "circle-of-the-land-spells" } },
     { level: 7, kind: "elemental-fury", id: "primal-strike", payload: { featureId: "elemental-fury" } },
     ...[4, 8].flatMap((at) => [
@@ -3044,9 +2562,8 @@ const landDruid = (land: string): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
-/** THE assertion body: which of a feature's inline options SURVIVED the gate, read off the server's
-    own survey. An adopted option joins `granted` with `origin.kind === "option"` and its parent's id
-    as the source — so this is the narrowed list itself, not a proxy for it. */
+/** Which inline options survived the gate: adopted options join `granted` with `origin.kind ===
+    "option"` and the parent's id as source. */
 const survivorsOf = (survey: ReturnType<typeof computeServerOffers>, parentId: string): readonly string[] =>
   survey.granted
     .filter((entry) => entry.origin?.kind === "option" && entry.origin.sourceId === parentId)
@@ -3061,33 +2578,27 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     expect(verdict.publishable).toBe(true);
 
     const body = storedBody("species", draft, GATED.speciesId) as { traits: Array<{ choice?: { options?: Array<Record<string, unknown>> } }> };
-    // Nature's Ward's shape, byte for byte: one gate per option, each naming a different answer to
-    // the same earlier pick.
+    // Nature's Ward's shape: one gate per option, each naming a different answer to the same pick.
     expect(body.traits[1].choice?.options?.map((option) => option.requires)).toEqual([
       { offer: GATED.gate, id: "emberborn" },
       { offer: GATED.gate, id: "frostborn" }
     ]);
-    // ...and no gate means no key. `requires` is `.optional()`, so a half-cleared clause must not
-    // survive as `{}` and refuse the record for a question the GM answered "no" to.
+    // No gate means no key; a half-cleared clause must not survive as `{}`.
     const open = storedBody("species", authoredEchokin(false), GATED.speciesId) as typeof body;
     expect(open.traits[1].choice?.options?.every((option) => !("requires" in option))).toBe(true);
     expect(applyField("species", { id: "o1", requires: { offer: GATED.gate } }, "requires.offer", "", ["traits", "choice.options"]))
       .toEqual({ id: "o1" });
 
-    // The census's standing assertion, inverted: an option can finally say which earlier answer
-    // legalises it. Looked up in the OPTION's own fields, never the feature's — `choice.kind` is
-    // still not reachable there, which is the guard that stops a flat lookup calling this a pass.
+    // Looked up in the option's own fields; `choice.kind` is unreachable there.
     for (const key of ["requires", "requires.offer", "requires.id"]) {
       expect(hasControl("feat", key, ["feature", "choice.options"]), `feat: option > ${key}`).toBe(true);
       expect(hasControl("species", key, ["traits", "choice.options"]), `species: option > ${key}`).toBe(true);
     }
     expect(hasControl("feat", "choice.kind", ["feature", "choice.options"])).toBe(false);
-    // It is an OPTION's key and not a feature's: `FeatureRecordSchema` has no `requires` at all, so
-    // offering one beside the level chips would be an editor-only row on every carrier.
+    // Not a feature key: `FeatureRecordSchema` has no `requires`.
     expect(hasControl("feat", "requires", ["feature"])).toBe(false);
 
-    // The "Which answer" box suggests the record's OWN option ids and the ids of its typed lists —
-    // which for the SRD's four gated features is exactly where the answer comes from.
+    // "Which answer" suggests the record's own option ids and typed-list ids.
     const idField = fieldsWithin("species", ["traits", "choice.options"]).find((field) => field.key === "requires.id")!;
     const suggested = typeof idField.suggestions === "function" ? idField.suggestions(EMPTY_CONTEXT, forStorage(draft)) : idField.suggestions ?? [];
     expect([...suggested].sort()).toEqual(["ember-ward", "emberborn", "frost-ward", "frostborn"]);
@@ -3096,9 +2607,7 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
   it("2. SRD content authors the same shape — 8 gated options over 4 features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const gates: Array<{ owner: string; option: string; offer: string; id: string }> = [];
-    // An option carries an id of its own, so the OWNER is tracked explicitly: it is the last object
-    // with an id that was not itself an option, which for every hit here is the feature that owns
-    // the pick (a `choice` block has no id at all, so it passes the feature's id through).
+    // Track the owner explicitly: the last non-option object with an id (choice blocks have none).
     const walk = (node: unknown, owner: string) => {
       if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
       if (!node || typeof node !== "object") return;
@@ -3117,13 +2626,12 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id), "?");
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id), "?");
 
-    // Measured at the time of writing: eight, over four features — and every one names a
-    // `feature:<id>` pick of its OWN record, which is the open half of the offer-key namespace.
+    // Eight at the time of writing over four features, each naming a `feature:<id>` pick of its own record.
     expect(gates).toHaveLength(8);
     expect([...new Set(gates.map((gate) => gate.owner))].sort())
       .toEqual(["improved-blessed-strikes", "improved-elemental-fury", "natures-ward"]);
     expect(gates.every((gate) => gate.offer.startsWith("feature:"))).toBe(true);
-    // Nature's Ward is the fixture's carrier: four options, four different lands, one budget.
+    // Nature's Ward: four options, four lands, one budget.
     expect(gates.filter((gate) => gate.owner === GATED.srdFeatureId).map((gate) => `${gate.id} → ${gate.option}`))
       .toEqual(GATED.lands.map(([land]) => `${land} → natures-ward-${land}`));
   });
@@ -3140,16 +2648,15 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
 
     for (const [label, survey, build, parentId, survivor, resistance] of paths) {
       const computed = survey();
-      // THE FAR END: the list, narrowed to the one option the earlier answer legalises...
+      // The list narrowed to the one legal option...
       expect(survivorsOf(computed, parentId), label).toEqual([survivor]);
-      // ...and it is not a pick at all, so nothing is asked a second time.
+      // ...which is adopted, so nothing is asked...
       expect(computed.offers.map((offer) => offer.key), label).not.toContain(`feature:${parentId}`);
-      // ...and what the survivor grants is on the sheet, which is where an option list has to end.
+      // ...and its grant reaches the sheet.
       expect(build().damageResistances, label).toContain(resistance);
     }
 
-    // IT IS THE ANSWER AND NOT THE RECORD: the same content, a different earlier row, a different
-    // survivor and a different number. All four SRD lands, and both authored heritages.
+    // The answer drives it: a different earlier row gives a different survivor.
     for (const [land, resistance] of GATED.lands) {
       const built = buildCharacterDefinition(landDruid(land), srdView, BuilderPolicySchema.parse({}));
       expect(survivorsOf(surveyOf(landDruid(land), srdView), GATED.srdFeatureId), land).toEqual([`natures-ward-${land}`]);
@@ -3161,10 +2668,8 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
       expect(built.damageResistances, heritage).toEqual([resistance]);
     }
 
-    // THE NEGATIVE CONTROL, dropping the CLAUSE rather than the carrier: the same species, the same
-    // two options, the same answered heritage — with no gate on either. The list is no longer
-    // narrowed, so both options are offered as a REAL pick the character now owes, nothing is
-    // adopted, and no resistance reaches the sheet until they answer it.
+    // Negative control: no gates, so both options are offered as a real pick, nothing is adopted, and
+    // no resistance reaches the sheet yet.
     const ungated = echokinView(authoredEchokin(false));
     const survey = surveyOf(echokinInput("frostborn"), ungated);
     expect(survivorsOf(survey, GATED.wardId)).toEqual([]);
@@ -3178,41 +2683,23 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
-  /**
-   * **R1's far end, and it is the only one a refactor with no user-visible change can have.**
-   *
-   * `fieldsOf` walks the form schema. `FeatureEditor` is mounted as a `custom` field, so before R1
-   * it had no fields to walk and **every control in the choice panel was invisible to `applyField`
-   * in both directions** — `extraPicks`, `choices`, `replaces`, `fromPicks`, the spell window and
-   * the ASI ceiling all live in that panel, and each of the five units behind this refactor would
-   * have had to ship with the fourth part of the rule ("a test through BOTH paths") structurally
-   * unavailable. Converting is what puts the pick family under the guard.
-   *
-   * Asserted in two halves, because a presence check on its own proves nothing: the KEY is
-   * reachable from the class form (the form the census below asks its questions of), and the VALUE
-   * a control writes survives `forStorage` + `bodyForPublish` into the body the save path sends —
-   * through the field's own `write`, including the slugging a GM's typing goes through.
-   */
+  /** `FeatureEditor` is a custom field, so its choice-panel controls are visible to `fieldsOf` only
+      through `featureFields()`. Asserted in two halves: the keys resolve on the class form, and the
+      values a control writes reach the body the save path sends. */
   it("R1: the choice panel is reachable from `fieldsOf`, and what it writes reaches the wire", () => {
-    // Half one. Every one of these threw `No field "…" in the class form` before R1, and the three
-    // that stay bespoke are named beside `featureFields()` with the reason: the level chips write
-    // two draft keys in one edit, and the source switcher and the catalog pair are driven by a UI
-    // mode held in React state that no `read` can recover from the draft.
+    // The three bespoke controls (level chips, source switcher, catalog pair) are excluded; see
+    // `featureFields()`.
     for (const key of ["name", "description", "choice", "choice.kind", "choice.choose", "choice.from", "choice.repeatable"]) {
       expect(hasControl("class", key, ["features"]), `class: features > ${key}`).toBe(true);
     }
     expect(hasControl("class", "choice.fromCatalog", ["features"])).toBe(false);
 
-    // Half two, on a FEAT: the cheapest publishable carrier of a `FeatureRecord`, because a feat IS
-    // one feature and needs no level table to grant it. `authoredRow` mints the row with the field's
-    // own `newRow` and refuses any key with no control, so the reduce below is the assertion.
+    // On a feat, the cheapest publishable `FeatureRecord` carrier. `authoredRow` refuses keys with no control.
     const feature = authoredRow("feat", ["feature"], [
       ["name", "Divine Order"],
       ["description", "You gain one of the following options of your choice."],
       ["choice", true],
-      // Typed the way a GM types it, not the way the column stores it — `ContentIdSchema` is
-      // `/^[a-z0-9-]+$/`, and the slugging lives in the field's `write` where the panel's own
-      // handler used to keep it.
+      // Typed as a GM types it; the field's `write` slugs it (`ContentIdSchema`).
       ["choice.kind", "ASI or Feat"],
       ["choice.choose", 2],
       ["choice.from", "Protector, thaumaturge"],
@@ -3239,28 +2726,18 @@ describe("the guard itself refuses what the editor cannot author", () => {
       repeatable: true
     });
 
-    // The switch is the SHAPE and not a flag — `FeatureRecordSchema.choice` is `.optional()` and
-    // has no "off" value to hold, so turning it off has to remove the key rather than write one.
+    // Turning the switch off removes the key; `choice` is optional with no "off" value.
     expect("choice" in applyField("feat", feature, "choice", false, ["feature"])).toBe(false);
 
-    // ...and a choice key written on a feature that has none seeds the same three the switch does,
-    // so the harness cannot build a half-made shape no form could produce.
+    // A choice key on a feature with none seeds the same shape the switch does.
     expect(applyField("feat", { id: "f1" }, "choice.choose", 3, ["feature"]).choice)
       .toEqual({ kind: "feat", choose: 3, repeatable: false });
 
-    // R1 made the lookup possible and U12 made `choices` real: the census's old worked example —
-    // this exact call throwing — is inverted in U12's own section above, and the key resolves at
-    // the feature scope the census asks its questions of.
     expect(hasControl("feat", "choices", ["feature"])).toBe(true);
   });
 
-  /**
-   * The other half of R1's reach: an inline option — the third way a choice states its list, and
-   * the depth `FeatureOption` lives at. It matters for U16, whose control half is "the option row
-   * already mounts `RiderEditor`; these need the choice panel too": the option row is now a real
-   * row scope, so `FeatureOption.requires` lands as one `FieldDef` beside `name` and `description`
-   * rather than as more hand-written JSX invisible to this file.
-   */
+  /** An inline option is a real row scope, so `FeatureOption.requires` is a `FieldDef` beside `name`
+      and `description`. */
   it("R1: an inline option is a real row scope inside a bespoke component", () => {
     const option = authoredRow("feat", ["feature", "choice.options"], [
       ["name", "Thaumaturge"],
@@ -3290,21 +2767,15 @@ describe("the guard itself refuses what the editor cannot author", () => {
       description: "You know one extra cantrip from the Cleric spell list."
     });
 
-    // The row is looked up in the OPTION's own fields, never the feature's — the same guard the
-    // effect-`modifiers` row above relies on. An option carries no level and no `choice.kind`.
+    // Looked up in the option's own fields: an option has no level and no `choice.kind`.
     expect(hasControl("feat", "name", ["feature", "choice.options"])).toBe(true);
     expect(hasControl("feat", "choice.kind", ["feature", "choice.options"])).toBe(false);
-    // U16's own row, and it landed here: an option can say which earlier answer legalises it, as a
-    // `FieldDef` beside `name` and `description` rather than as JSX this file cannot see.
     expect(hasControl("feat", "requires", ["feature", "choice.options"])).toBe(true);
   });
 
   it("a row scope is looked up in the ROW's own fields, not the whole form's", () => {
-    // The second face of the same hole, and it used to be shown on the EFFECT row — which U6 closed
-    // with a control of its own. An ACTION row is the case that remains and it is the same shape: an
-    // action carries a name, a cost, damage, an attack and a save, and no `modifiers` of its own. A
-    // flat lookup would resolve it against the record's top-level `modifiersField` and wave the row
-    // through, which is a false pass rather than a missing test.
+    // An action row has no `modifiers` of its own; a flat lookup would resolve it against the
+    // record's `modifiersField` and falsely pass.
     expect(hasControl("equipment", "modifiers")).toBe(true);
     expect(hasControl("equipment", "modifiers", ["actions"])).toBe(false);
     expect(() => applyField("equipment", {}, "modifiers", [], ["actions"])).toThrow(
@@ -3313,29 +2784,14 @@ describe("the guard itself refuses what the editor cannot author", () => {
   });
 
   it("`grants` is the ONLY key still waved through, and it is waved through with a reason", () => {
-    // `GrantsEditor` writes eleven parallel arrays whole-body and has no `FieldDef` to look up. Every
-    // other member of the old six-key escape hatch is now a real control on every carrier that mounts
-    // riders — which is the whole repair: effect `modifiers`, `uses.*`, `recharge` and `attack.bonus`
-    // all live inside those six, so the harness would have passed in silence on its own headline rows.
+    // `GrantsEditor` has no `FieldDef`; every other rider key is a real control.
     expect(RIDER_EXEMPT).toEqual(["grants"]);
     const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
     expect(carriers).toEqual(["class", "subclass", "species", "background", "feat", "equipment", "monster"]);
 
-    /**
-     * **A STAT BLOCK CARRIES TWO OF THE FIVE, and this test used to claim it carried all five.**
-     *
-     * `RecordDetail` enables exactly `["actions", "tags"]` on a monster and that is not a UI
-     * preference: `ActorDefinitionSchema` has no record-level `modifiers`, `uses` or `effects`, and
-     * being a plain `z.object` it drops them in silence. `riderFieldsForTest("statblock")` built all
-     * six anyway, so `hasControl("monster", "uses")` answered `true` for a key no stat block can
-     * hold — a false PASS on the harness's own question, left standing because `usesField`'s comment
-     * said U8 would make it true. **U8 measured the opposite and narrowed the claim instead.**
-     */
-    // Asked of the RECORD's own fields, not of the flat lookup. `hasControl(type, key)` answers "is
-    // this key reachable anywhere in the form", which is the right question for the census and the
-    // wrong one here: an action row carries a `uses` block of its own now, so the flat walk finds
-    // `uses` on a monster while no monster RECORD mounts one. `fieldsWithin(type, [])` flattens
-    // through groups and not through rows, which is exactly the record scope.
+    /** A stat block carries only `actions` and `tags`: `ActorDefinitionSchema` has no record-level
+        `modifiers`, `uses` or `effects`. Asked of the record's own fields via `fieldsWithin(type, [])`,
+        because an action row has its own `uses` and the flat lookup would find it. */
     const onTheRecord = (type: HomebrewType, key: string) => fieldsWithin(type, []).some((field) => field.key === key);
     const RECORD_RIDERS = ["modifiers", "uses", "actions", "effects", "tags"];
     for (const type of carriers) {
@@ -3346,9 +2802,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
       expect(hasControl(type, "grants"), `${type}.grants`).toBe(false);
     }
 
-    // ...and a creature's uses are not missing, they are one level down — on its ACTIONS, which is
-    // where `ActionSchema.uses` really lives and where all 86 recharge authors are. Every carrier
-    // that mounts an action mounts them, because every carrier's actions read the same schema.
+    // A creature's uses live on its actions (`ActionSchema.uses`), mounted on every action carrier.
     for (const type of carriers) {
       for (const key of ["uses.limit", "uses.per", "uses.recharge", "uses.pool"]) {
         expect(hasControl(type, key, ["actions"]), `${type}: actions > ${key}`).toBe(true);
@@ -3358,22 +2812,10 @@ describe("the guard itself refuses what the editor cannot author", () => {
 
   it("every damage-type key is authorable, at its own scope, on every carrier that mounts riders", () => {
     /**
-     * **`3d`'s half of the guard.** The census in `vocabularies.test.ts` asks whether each control
-     * offers the whole vocabulary and shows it; this asks the harness's own question — *can a GM
-     * reach the key at all* — at the SCOPE each one really lives at, so a false pass off the flat
-     * lookup is impossible (that is what `fieldsWithin` is for, and the effect-`modifiers` case above
-     * is the same hole this avoids).
-     *
-     * The three rider sites are asserted on **every carrier**, not just on equipment: the rider
-     * vocabulary is one vocabulary mounted by items, class features, species traits, feats and
-     * monsters alike, so a damage-type control that regressed there would regress on all of them at
-     * once and a single-carrier check would notice on none.
-     *
-     * **What this cannot see, stated rather than left implied:** the ninth site is `GrantsEditor`'s
-     * "Which" box for the `damageResistances` and `damageImmunities` grant kinds, and `grants` is the
-     * one key still on `RIDER_EXEMPT` because that component has no `FieldDef` to look up. The
-     * harness would wave it through, so `pick-fields.test.tsx` drives it through the rendered form
-     * instead. U9 is what retires the exemption.
+     * Whether a GM can reach each damage-type key at its own scope, on every rider carrier (the rider
+     * vocabulary is shared, so a regression would hit all of them). `vocabularies.test.ts` checks the
+     * offered list. The `GrantsEditor` damage kinds are exempt here and covered by
+     * `pick-fields.test.tsx`.
      */
     const recordSites: ReadonlyArray<readonly [HomebrewType, string]> = [
       ["spell", "damage.types"],
@@ -3387,14 +2829,12 @@ describe("the guard itself refuses what the editor cannot author", () => {
     }
 
     const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
-    // Every carrier that mounts an action mounts its damage parts, stat blocks included.
+    // Every action carrier mounts damage parts, stat blocks included.
     for (const type of carriers) {
       expect(hasControl(type, "type", ["actions", "damage"]), `${type}: actions > damage > type`).toBe(true);
     }
 
-    // The record's OWN modifier list, which is six carriers and not seven: a stat block does not
-    // mount `modifiersField` (see the narrowing above — `ActorDefinitionSchema` has nowhere to put
-    // one), so asserting it here would be asserting a control that never renders.
+    // A stat block has no record-level `modifiersField`, so this is six carriers, not seven.
     const riderSites: ReadonlyArray<readonly [string, readonly string[]]> = [
       ["damageType", ["modifiers"]],         // the `extra-damage` rider — the mace's +1d6 lightning
       ["damageTypes", ["modifiers", "when"]] // the `damage-type-is` gate
@@ -3405,28 +2845,18 @@ describe("the guard itself refuses what the editor cannot author", () => {
       }
     }
 
-    // ...and the value a control writes reaches the body the save path sends. Key existence is what
-    // the census can see; a round trip is the other half, and neither substitutes for the other.
+    // The written value reaches the save body too.
     const weapon = applyField("equipment", { name: "Mace of Storms" }, "weapon.damageType", "lightning");
     expect((storedBody("equipment", weapon, RECORD_ID).weapon as { damageType?: string }).damageType).toBe("lightning");
-    // An open slug stays open all the way to the wire: a homebrew "void" type is the reason
-    // `DamageTypeIdSchema` is a max-40 string and not an enum, and closing it would have been the
-    // inverse of the bug the client reported.
+    // An open slug stays open to the wire: `DamageTypeIdSchema` is a string, so "void" is valid.
     const homebrewType = authoredRow("equipment", ["actions", "damage"], [["formula", "1d6"], ["type", "void"]]);
     expect(homebrewType).toMatchObject({ formula: "1d6", type: "void" });
   });
 
   it("the census: every key a later unit needs and the editor cannot author today", () => {
-    /**
-     * **This list is scope, not decoration.** Each entry is a row the phase plan already owns; the
-     * unit that ships the control deletes its line here in the same commit, and a control that
-     * appears without a unit fails this test on the way in.
-     *
-     * Read with the standing warning in the header: this sees KEYS, and a key can be reachable
-     * while a VALUE of it is not. `uses.scaling.type` was never on this list — the "Uses are"
-     * select always wrote it — and `class-resource` was unauthorable all the same, for want of an
-     * option. U7's own test is what caught that, and no row here could have.
-     */
+    /** Keys a planned change needs that the editor cannot author yet. Delete a line when its control
+        lands; a control appearing without one fails this test. Keys only: an unreachable value of a
+        reachable key is caught by the row tests above. */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],

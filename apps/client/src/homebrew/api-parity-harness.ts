@@ -1,36 +1,15 @@
 /**
- * **The API↔editor parity guard's machinery — unit A1, batch 2 of the remaining program.**
+ * Machinery for the API-to-editor parity guard (`api-parity.mirror.test.ts`): walks the
+ * `HOMEBREW_BODY_SCHEMAS` into editor-addressable keys, asks the real form (`hasControl`) whether a
+ * GM can author each, and checks the uncovered set against a reasoned exemption table in both
+ * directions. Vitest-free, like `authoring-harness.ts`.
  *
- * An HTTP caller can author capabilities the homebrew editor cannot reach, and until this file
- * nothing measured that asymmetry: `packages/api-contract`'s parity gate holds *editor-written keys*
- * to the published document, but the reverse direction — a key the nine body schemas accept that no
- * control can author — was unguarded (~80 engine-read capabilities at the last hand count). This
- * module walks the nine `HOMEBREW_BODY_SCHEMAS` into editor-addressable questions, asks each of the
- * real form (`authoring-harness.ts`'s `hasControl`), and hands `api-parity.mirror.test.ts` an
- * uncovered set to hold against a reasoned exemption table — exactly, in both directions, the same
- * census discipline `vocabulary-parity.mirror.test.ts` uses for its owed rows.
+ * The walk sees keys, not values (a missing enum option is invisible here; the round trip in the
+ * test catches that). A `z.record(...)` is opaque, so nothing inside
+ * `ActorDefinitionSchema.extensions` is addressed.
  *
- * Vitest-free, like `authoring-harness.ts` beside it, so `src` can import it — the test imports it,
- * and so does the generator that writes `docs/product/vocabulary-parity-audit.md` (ruling 19: that
- * document is regenerated from this guard, never hand-edited).
- *
- * ## What the walk sees, and what it cannot
- *
- * The census sees KEYS; the round trip in the test sees VALUES; neither substitutes for the other
- * (`uses.scaling.type` had a control while `class-resource` stayed unauthorable — no key census can
- * see a missing OPTION). And a `z.record(...)` is a wall: `ActorDefinitionSchema.extensions` is
- * `z.record(z.string(), z.unknown())`, so the walk finds *no addresses inside it* — which is exactly
- * where `extensions["open5e.srd-2024"].savingThrows` lives. That blind spot is structural and is
- * declared as such below; unit B0's hand-declared statblock-extension contract is the answer to it,
- * not a cleverer walk.
- *
- * ## The canonicaliser fails loudly
- *
- * The editor's scope model is not isomorphic to the Zod path (container keys have no `FieldDef`;
- * riders are mounted at record scope, so `ActionSchema`'s keys answer at `["actions"]`, never at
- * `["features", "actions"]`). Every rewrite this file performs is validated: a rider restart whose
- * target container `fieldsWithin` cannot resolve throws rather than silently widening the
- * uncovered set. A stale rule is a red build, never a quiet pass.
+ * Every canonicalising rewrite is validated: a rider restart whose container `fieldsWithin` cannot
+ * resolve throws rather than silently widening the uncovered set.
  */
 
 import { createServer, type Server } from "node:http";
@@ -51,14 +30,11 @@ import type { HomebrewType } from "./types";
 
 /* ================================================================ the schema walk ==== */
 
-/**
- * One question the walk asks of the editor: "at this container, can a GM author this key?"
- * `within` is the editor-canonical rows chain (each segment a dotted `FieldDef` key); `key` is the
- * dotted leaf under that container — the exact vocabulary `hasControl` speaks.
- */
+/** One question for the editor: can a GM author `key` in this container? `within` is the
+    editor-canonical rows chain; `key` is the dotted leaf, as `hasControl` takes them. */
 export type ParityAddress = Readonly<{ type: HomebrewBodyType; within: readonly string[]; key: string }>;
 
-/** `a.b[].c`-style rendering, used by the exemption table, failure messages and the generated audit. */
+/** `a.b[].c` rendering, used by the exemption table, failure messages and the audit. */
 export const addressId = (address: ParityAddress): string =>
   `${address.type}.${address.within.map((segment) => `${segment}[].`).join("")}${address.key}`;
 
@@ -99,20 +75,16 @@ function objectOptions(schema: unknown): readonly unknown[] {
   return isObjectSchema(schema) ? [schema] : [];
 }
 
-/** The two schema-intrinsic counts the plan pins (162 / 709 at plan time) — measured off the same
-    walk that produces the addresses, so the pin and the census cannot drift apart. */
+/** Schema-intrinsic counts from the same walk that produces the addresses, so the pins cannot drift. */
 export type WalkStats = Readonly<{ objectSchemas: number; declaredKeys: number }>;
 
 /**
- * Expand the nine body schemas into the full raw address set. Rules, from the plan and verified
- * against the form model:
- *
- *   - a nested OBJECT extends the dotted key (`token.footprint.width` is one record-scope key);
- *   - an ARRAY OF OBJECTS starts a rows container (`actions`, `damage`) — its children restart
- *     their dotted path inside it, and the container key itself is not an address (a container
- *     either resolves for its children or the children are unreachable, which the probe reports);
- *   - an array of primitives, a record bag, a tuple and every scalar are leaves;
- *   - a UNION of objects contributes every arm's keys at the same address.
+ * Expands the body schemas into the full address set:
+ * - a nested object extends the dotted key (`token.footprint.width`);
+ * - an array of objects starts a rows container whose children restart their path; the container
+ *   key itself is not an address;
+ * - arrays of primitives, records, tuples and scalars are leaves;
+ * - a union of objects contributes every arm's keys at the same address.
  */
 export function walkBodySchemas(): { addresses: readonly ParityAddress[]; stats: WalkStats } {
   const addresses: ParityAddress[] = [];
@@ -160,23 +132,14 @@ export function walkBodySchemas(): { addresses: readonly ParityAddress[]; stats:
 
 /* ==================================================== canonicalisation and probing ==== */
 
-/**
- * The rider surface is mounted at RECORD scope by `fieldsOf`/`fieldsWithin`, wherever the Zod path
- * hangs it — so a chain that reaches one of these segments (bare, or as the dotted suffix of a
- * segment like `feature.actions`) restarts there. Only the ROWS-shaped riders are chain segments:
- * `uses` is a group (its children are dotted record-scope keys, and the walk dots them the same
- * way), `tags` is an array of strings (a leaf), and `grants` has no `FieldDef` at all
- * (`RIDER_EXEMPT`), so no restart could make it resolve.
- */
+/** Rider segments: the rider surface is mounted at record scope, so a chain reaching one of these
+    (bare, or as a dotted suffix like `feature.actions`) restarts there. Only rows-shaped riders
+    qualify: `uses` is a group, `tags` a leaf, and `grants` has no `FieldDef`. */
 const RIDER_SEGMENTS: readonly string[] = ["actions", "effects", "modifiers"];
 
-/**
- * The feature-carrier containers, derived from the forms the way `riderScopeOf` derives its answer
- * — every `custom: "features"` field's key (`features`, `traits`, `lineages`, feat's singular
- * `feature`) — so a sixth carrier is covered the day it lands. `FeatureEditor` mounts the rider
- * surface once per feature, which the harness represents at RECORD scope; a chain that enters a
- * carrier therefore also answers with the carrier segment dropped.
- */
+/** The feature-carrier container keys (every `custom: "features"` field), derived from the forms.
+    `FeatureEditor` mounts the rider surface per feature, which the harness represents at record
+    scope, so a chain entering a carrier also answers with the carrier segment dropped. */
 function featureCarrierKeys(type: HomebrewBodyType): readonly string[] {
   const keys: string[] = [];
   const walk = (fields: readonly { key: string; custom?: string; rows?: readonly unknown[] }[]) => {
@@ -197,19 +160,14 @@ const containerResolves = (type: HomebrewBodyType, within: readonly string[]): b
 type Candidate = Readonly<{ within: readonly string[]; key: string }>;
 
 /**
- * The ordered candidate list for one raw address — the canonicalisation, spelled as data:
- *
- *   1. the address as the walk produced it;
- *   2. the RIDER RESTART — the chain re-rooted at its last rider segment (`…features[].actions[]`
- *      answers at `["actions"]`), including a rider that arrived dotted (`feature.actions`);
- *   3. the CARRIER DROP — a chain entering a feature carrier also answers with the carrier
- *      removed, because the per-feature rider mount is represented at record scope;
- *   4. KEY-PREFIX PROMOTION — a dotted prefix of the key that resolves as a rows container is
- *      entered (`feature.choice.type` at feat's record scope answers inside `["feature"]`,
- *      because the editor models the singular feature as rows the schema spells as an object).
- *
- * Expansion is breadth-first over 1–4 until closed, so combinations compose (promote `feature`,
- * then drop it as a carrier). Deduplicated; order preserved so `via` names the most literal hit.
+ * Ordered candidate addresses for one raw address:
+ * 1. as walked;
+ * 2. rider restart: re-rooted at the last rider segment (`…features[].actions[]` → `["actions"]`);
+ * 3. carrier drop: a chain entering a feature carrier, with the carrier removed;
+ * 4. key-prefix promotion: a dotted key prefix that resolves as a rows container is entered (the
+ *    feat's singular `feature` object is modelled as rows).
+ * Expanded breadth-first until closed, deduplicated, order preserved so `via` names the most
+ * literal hit.
  */
 function candidatesFor(type: HomebrewBodyType, address: Candidate): readonly Candidate[] {
   const carriers = featureCarrierKeys(type);
@@ -223,7 +181,7 @@ function candidatesFor(type: HomebrewBodyType, address: Candidate): readonly Can
     seen.add(id);
     out.push(current);
     const { within, key } = current;
-    // 2 — rider restart, from the LAST segment that is (or dot-ends with) a rider name.
+    // 2: rider restart, from the last segment that is (or dot-ends with) a rider name.
     for (let index = within.length - 1; index >= 0; index -= 1) {
       const segment = within[index];
       const rider = RIDER_SEGMENTS.find((name) => segment === name || segment.endsWith(`.${name}`));
@@ -232,9 +190,9 @@ function candidatesFor(type: HomebrewBodyType, address: Candidate): readonly Can
         break;
       }
     }
-    // 3 — carrier drop.
+    // 3: carrier drop.
     if (within.length > 0 && carriers.includes(within[0])) queue.push({ within: within.slice(1), key });
-    // 4 — key-prefix promotion, longest prefix first.
+    // 4: key-prefix promotion, longest prefix first.
     const segments = key.split(".");
     for (let take = segments.length - 1; take >= 1; take -= 1) {
       const prefix = segments.slice(0, take).join(".");
@@ -247,16 +205,9 @@ function candidatesFor(type: HomebrewBodyType, address: Candidate): readonly Can
   return out;
 }
 
-/**
- * A dotted key is covered when it — or any dotted ANCESTOR of it — has a control at a resolvable
- * candidate address. The ancestor fallback is for composite controls only: a field with its own
- * `write` (the "Uses are" select seeding `uses.scaling`, the extension-bag fields) authors a whole
- * subtree, so it covers its children as KEYS — whether it can author every VALUE of them is
- * exactly what the census cannot see and the round trip can. A bare `kind: "group"` container key
- * does NOT count: a group renders its children and authors nothing itself, so crediting it would
- * report a schema key its `rows` never enumerate as covered — `class.skillChoices.fromCatalog`
- * was exactly that false green, found by this batch's adversarial review.
- */
+/** A dotted key is covered when it, or a dotted ancestor, has a control at a resolvable candidate.
+    Ancestors count only for composite controls with their own `write` (they author a whole subtree);
+    a bare `group` container authors nothing itself and does not count. */
 export type ProbeResult = Readonly<{
   address: ParityAddress;
   covered: boolean;
@@ -269,18 +220,14 @@ const controlAt = (type: HomebrewBodyType, key: string, within: readonly string[
   return fields.find((field) => field.key === key);
 };
 
-/**
- * Keys a control authors although its OWN key is not the key and not an ancestor of it — the
- * "Uses are" select is a field named `mode` whose `write` sets `uses.scaling.type` (U7's worked
- * example: "the select always wrote it"). A key-addressed probe cannot see that, so each claim is
- * declared here and PROVED at probe time by running the real write and checking the key arrives —
- * a renamed writer or a changed seed shape flips the address to open instead of lying covered.
- */
+/** Keys a control authors under a different key (e.g. the "Uses are" `mode` select writes
+    `uses.scaling.type`). Each claim is proved at probe time by running the real write, so a renamed
+    writer leaves the address open instead of falsely covered. */
 const SIDE_EFFECT_WRITERS: ReadonlyArray<{
   key: string;
   writer: string;
   sample: unknown;
-  /** Real writes run first so the writer has the container it expects (`mode` edits `scope.uses`). */
+  /** Writes run first so the writer has the container it expects (`mode` edits `scope.uses`). */
   prepare: ReadonlyArray<readonly [string, unknown]>;
   proves: (written: unknown) => boolean;
 }> = [
@@ -300,10 +247,8 @@ function sideEffectCovers(type: HomebrewBodyType, candidate: Candidate): string 
     if (candidate.key !== entry.key) continue;
     const cacheKey = `${type}¦${entry.key}`;
     if (!sideEffectProofs.has(cacheKey)) {
-      // The writer is looked up in the RIDER MOUNT itself, not through the key-addressed flat
-      // list: a bare key like `mode` is shadowed there by same-named schema fields (measured —
-      // the flat lookup wrote `amount: 1` through an unrelated field), and the claim under proof
-      // is about the rider's own control, so its own `write` is what runs.
+      // Look the writer up in the rider mount itself: a bare key like `mode` is shadowed by
+      // same-named schema fields in the flat list.
       type LooseField = { key: string; write?: unknown; rows?: readonly LooseField[] };
       let writer: LooseField | undefined;
       const scope = riderScopeOf(type as HomebrewType);
@@ -356,12 +301,8 @@ export function probeAddress(address: ParityAddress): ProbeResult {
   return { address, covered: false, via: sawContainer ? "no control" : "container unreachable" };
 }
 
-/**
- * The rider-restart rewrite, validated as the module header promises: every ROWS-bearing field the
- * type's rider mount declares at record scope must resolve as a container, and every restart target
- * in `RIDER_SEGMENTS` must be one of them somewhere. A rename in `RiderEditor` breaks this loudly
- * instead of silently flooding the uncovered set.
- */
+/** Validates the rider-restart rewrite: every rows-bearing rider field must resolve as a container,
+    and every `RIDER_SEGMENTS` target must exist, so a `RiderEditor` rename fails loudly. */
 export function assertCanonicaliserSound(): void {
   const resolvableSomewhere = new Set<string>();
   for (const type of Object.keys(HOMEBREW_BODY_SCHEMAS) as readonly HomebrewBodyType[]) {
@@ -385,25 +326,17 @@ export function assertCanonicaliserSound(): void {
 /* ============================================================== the exemption table ==== */
 
 /**
- * One reasoned row per uncovered address GROUP — 1,611 open addresses is a fact, but 1,611
- * hand-written rows would bury the gaps the table exists to surface, so a row names a subtree and
- * the types it is open on. The census in `api-parity.mirror.test.ts` still holds the RAW open set
- * to these rows in both directions: every open address must land on a row (first match wins, so
- * order specific rows before general ones), every row must still match something, and the total
- * counts are pinned — a control landing on even one type moves a pinned number and goes red.
- *
- * `owner` is the unit that closes the group (from the four committed program plans),
- * `permanent: <why>` for a group no unit will ever cover, or `unowned: <why>` for a real gap no
- * plan owns yet — recorded honestly rather than dressed as permanent.
+ * One reasoned row per uncovered address group (a subtree plus the types it is open on). The test
+ * holds the raw open set to these rows in both directions: every open address matches a row (first
+ * match wins, so specific rows come first), every row still matches something, and totals are
+ * pinned. `owner` names who closes the group; `permanent:` or `unowned:` give the reason otherwise.
  */
 export type ExemptionRow = Readonly<{
   /**
-   * The path after the type, in `addressId` spelling. Three forms:
-   *   - exact:            `spellcasting.saveDc` — matches that path alone;
-   *   - subtree:          `actions[].grants.**` — the prefix before `**` matches at the path start
-   *                       or at any `.`-boundary inside it (`features[].actions[].grants.name`);
-   *   - anchored subtree: `^grants.**` — the prefix matches at the path start only, for a
-   *                       record-scope subtree whose name recurs deeper in other rows' territory.
+   * The path after the type, in `addressId` spelling:
+   * - exact: `spellcasting.saveDc`;
+   * - subtree: `actions[].grants.**` matches at the path start or any `.` boundary inside it;
+   * - anchored subtree: `^grants.**` matches at the path start only.
    */
   at: string;
   /** The record types the row exempts, or `"*"` for every type the walk finds the path on. */
@@ -421,8 +354,7 @@ export function rowMatches(row: ExemptionRow, address: ParityAddress): boolean {
   const path = pathOf(address);
   const anchored = row.at.startsWith("^");
   const pattern = anchored ? row.at.slice(1) : row.at;
-  // An exact row floats to any `.`-boundary suffix unless anchored, the same way a subtree row
-  // floats its prefix — `actions[].legendary.cost` is one gap wherever a carrier mounts actions.
+  // An exact row also matches at any `.` boundary suffix unless anchored.
   if (!pattern.endsWith("**")) return path === pattern || (!anchored && path.endsWith(`.${pattern}`));
   const prefix = pattern.slice(0, -2);
   if (path.startsWith(prefix)) return true;
@@ -433,12 +365,9 @@ export function rowMatches(row: ExemptionRow, address: ParityAddress): boolean {
   return false;
 }
 
-/**
- * The census's two directions, as data the test asserts empty: `unmatched` (an open address no row
- * carries — a new gap arrived un-reasoned) and `stale` (a row whose group no longer exists — a
- * control landed and the row must be deleted in the same commit). Assignment is first-match-wins
- * over the table's order, and `matched` reports each row's live count for the generated audit.
- */
+/** The census in both directions: `unmatched` (an open address no row covers) and `stale` (a row
+    whose group no longer exists). First match wins in table order; `matched` gives each row's live
+    count. */
 export function censusVerdict(open: readonly ProbeResult[], rows: readonly ExemptionRow[]): {
   unmatched: readonly string[];
   stale: readonly string[];
@@ -463,15 +392,9 @@ const ACTION_CARRIERS: readonly HomebrewBodyType[] =
 const FEATURE_CARRIERS: readonly HomebrewBodyType[] =
   ["background", "class", "equipment", "feat", "species", "subclass"];
 
-/**
- * THE TABLE. Measured against the walk on 2026-08-11 (the day this guard was written, per the
- * plan's own instruction to pin what the canonicaliser produces). Order matters: first match wins,
- * so the specific rows sit above the general ones. Owners cite
- * `docs/product/plan-api-program.md` (§3 units, §4 exclusions, §4.1 the C7 hand-off) unless named
- * otherwise; `docs/product/plan-engine-program.md` owns the U-numbered rows.
- */
+/** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
-  // ---- the action rider surface (shared by every carrier that mounts actions) ----
+  // ---- action rider surface (every carrier that mounts actions) ----
   { at: "actions[].onHit[].**", types: ACTION_CARRIERS,
     reason: "a hit that lands a condition — no rows control on the action row", owner: "C1" },
   { at: "actions[].legendary.cost", types: ACTION_CARRIERS,
@@ -501,7 +424,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   { at: "actions[].targetRules", types: ACTION_CARRIERS,
     reason: "one SRD author (§4, lone record)", owner: "permanent: lone SRD record" },
 
-  // ---- the effect rider surface ----
+  // ---- effect rider surface ----
   { at: "effects[].onEnd[].**", types: FEATURE_CARRIERS,
     reason: "what happens when an effect ends — no program unit authors it", owner: "unowned: recorded by this census, owned by no plan" },
   { at: "effects[].endsWithTag", types: FEATURE_CARRIERS,
@@ -513,16 +436,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   { at: "modifiers[].**", types: FEATURE_CARRIERS,
     reason: "the modifier rows beyond U6's type control — neither union's per-key internals (appliesTo/damageTypes on effects; the feature union's filters) have fields", owner: "unowned: recorded by this census, owned by no plan" },
 
-  // ---- feature-scope machinery shared by the five feature carriers ----
+  // ---- feature-scope machinery shared by the feature carriers ----
   { at: "choice.options[].**", types: "*",
     reason: "an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper", owner: "unowned: the panel's depth-1 boundary, recorded by this census" },
   { at: "choices[].**", types: "*",
     reason: "the plural choices list — the panel writes the singular choice; the list shape has no control at all", owner: "unowned: recorded by this census, owned by no plan" },
   { at: "choice.**", types: "*",
     reason: "the parts of a feature's choice beyond the panel's fields", owner: "unowned: the panel's field set, recorded by this census" },
-  // The GrantsEditor territory, spelled per mount rather than as a catch-all — a bare `grants.**`
-  // would also float under `actions[].grants.` and silently absorb C4's group if C4's row were
-  // deleted, which is exactly the rot T3's control probe checks for (measured while writing it).
+  // GrantsEditor territory, spelled per mount: a bare `grants.**` would also match under
+  // `actions[].grants.` and absorb that group.
   { at: "grants.spells[].**", types: "*",
     reason: "GrantsEditor writes the spells array whole (grantsFromRows, U9); the per-row keys have no FieldDef the probe can see", owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)" },
   { at: "features[].grants.**", types: "*",
@@ -584,7 +506,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   { at: "^remove", types: ["spell-list"],
     reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see", owner: "permanent: bespoke editor, probe-blind" },
 
-  // ---- the monster statblock's shared-schema tail ----
+  // ---- the monster stat block's shared-schema tail ----
   { at: "^extensions", types: ["monster"],
     reason: "the opaque bag itself — the census's structural blind spot; B0 declares the key contract the walk cannot see", owner: "B0" },
   { at: "proficiencies.**", types: ["monster"],
@@ -601,11 +523,8 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
 
 /* ============================================================ the round-trip compare ==== */
 
-/**
- * The keys `normalizeBody` (`apps/server/src/homebrew-store.ts:791-800`) forces after a POST —
- * stripped from BOTH sides before the deep-equal, exactly the plan's list: `type`, `id`, and a
- * monster's `source.externalId`.
- */
+/** Strips the keys `normalizeBody` (`homebrew-store.ts`) forces after a POST from a body before the
+    deep-equal: `type`, `id`, and a monster's `source.externalId`. */
 export function comparableBody(type: HomebrewBodyType, body: Record<string, unknown>): Record<string, unknown> {
   const { type: _type, id: _id, ...rest } = body;
   if (type === "monster" && rest.source && typeof rest.source === "object") {
@@ -615,11 +534,8 @@ export function comparableBody(type: HomebrewBodyType, body: Record<string, unkn
   return rest;
 }
 
-/**
- * The first path at which two bodies differ, or null when they are deep-equal — so a T2 failure
- * names the field, not two multi-kilobyte JSON dumps. Arrays compare by index; objects by the
- * union of their keys, sorted, so a key present on one side alone is named too.
- */
+/** The first path at which two bodies differ, or null when deep-equal. Arrays compare by index,
+    objects by the sorted union of their keys. */
 export function firstDifference(api: unknown, editor: unknown, path = ""): { path: string; api: unknown; editor: unknown } | null {
   if (Object.is(api, editor)) return null;
   const bothArrays = Array.isArray(api) && Array.isArray(editor);
@@ -645,18 +561,13 @@ export function firstDifference(api: unknown, editor: unknown, path = ""): { pat
   return null;
 }
 
-/**
- * Keys the system stamps that no GM ever authors by hand. These are subtracted STRUCTURALLY (with
- * one standing reason) rather than row-by-row, because listing ~140 forced-key rows would bury the
- * real gaps the table exists to surface.
- */
+/** Keys the system stamps and no GM authors, subtracted structurally rather than as exemption rows. */
 export const SYSTEM_FORCED = Object.freeze({
-  /** Record identity and provenance: forced by `normalizeBody` / the row, never authored. */
+  /** Record identity and provenance, forced by `normalizeBody` or the row. */
   recordKeys: ["id", "type", "schemaId", "schemaVersion",
-    // The feat's SINGULAR feature is one row spelled as a record-scope object, so its id is the
-    // same newRow/bodyForPublish stamp as any row's — the dotted spelling of the rule below.
+    // The feat's singular feature is a record-scope object, so its id is a row-id stamp.
     "feature.id"] as readonly string[],
-  /** The provenance bag and everything inside it (`source.externalId` is forced to the row id). */
+  /** The provenance bag (`source.externalId` is forced to the row id). */
   recordPrefixes: ["source."] as readonly string[],
   reason: "system-forced: stamped by the store, the row, or a rows editor's newRow — never authored by hand"
 });
@@ -666,19 +577,14 @@ export const isSystemForced = (address: ParityAddress): boolean => {
     return SYSTEM_FORCED.recordKeys.includes(address.key)
       || SYSTEM_FORCED.recordPrefixes.some((prefix) => address.key === prefix.slice(0, -1) || address.key.startsWith(prefix));
   }
-  // A row's own `id` is minted by the rows editor's `newRow` (and backfilled by `bodyForPublish`),
-  // so it is the row-scope spelling of the same stamp.
+  // A row's own `id` is minted by `newRow` (and backfilled by `bodyForPublish`).
   return address.key === "id";
 };
 
 /* ================================================================= the API fixture ==== */
 
-/**
- * The real router over the real store, publish gate included — `apps/server/test/homebrew-http.test.ts`'s
- * fixture lifted whole, minus its vitest lifecycle: callers own `close()`. One boot per test FILE
- * (`beforeAll`), because `ContentLibrary` loads the full SRD bundle and per-test boot would dominate
- * the run.
- */
+/** The real homebrew router over the real store, publish gate included. Callers own `close()`; boot
+    once per test file, since `ContentLibrary` loads the full SRD bundle. */
 export type ApiFixture = Readonly<{ base: string; store: HomebrewStore; close: () => Promise<void> }>;
 
 export async function bootHomebrewApi(): Promise<ApiFixture> {

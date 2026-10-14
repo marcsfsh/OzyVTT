@@ -1,16 +1,6 @@
-/**
- * Single-select over a catalog too big for a `<select>` — 339 spells, ~240 pieces of
- * equipment. A button showing the current value opens a modal holding the searchable
- * `ChoiceGrid` the builder already uses.
- *
- * **Not a primitive.** It composes `Button` + `Modal` + `ChoiceGrid` and adds no design
- * vocabulary of its own, so it does not belong in `@vtt/ui` — and every component that
- * stays out is a styleguide entry not owed.
- *
- * The facets appear only when both origins are present, and a badge is stamped only on
- * the minority side: badge the exception, not the rule. A grid where every card carries
- * the same badge has distinguished nothing and spent ~46px of every title row at 375px.
- */
+/** Single-select over a catalog too big for a `<select>`: a button opens a modal with a
+    searchable `ChoiceGrid`. Origin facets appear only when both SRD and homebrew entries
+    are present, and only the minority origin gets a badge. */
 
 import { useMemo, useState } from "react";
 import { Badge, Button, ChoiceGrid, Modal, type ChoiceOption, type SegmentedOption } from "@vtt/ui";
@@ -46,8 +36,7 @@ export function CatalogPicker({
     const hasSrd = entries.some((entry) => entry.origin === "srd");
     const hasHomebrew = entries.some((entry) => entry.origin === "homebrew");
     const both = hasSrd && hasHomebrew;
-    // The minority side is the one worth marking. With only one origin present,
-    // nothing is marked at all.
+    // Mark only the minority origin; with one origin present nothing is marked.
     const minority: CatalogEntry["origin"] | null = both
       ? entries.filter((entry) => entry.origin === "homebrew").length <= entries.length / 2
         ? "homebrew"

@@ -1,28 +1,10 @@
 /**
- * **THE API↔EDITOR PARITY GUARD — unit A1, and the reason the capability units land under a red
- * light instead of a promise.**
- *
- * The client ruled the guard must be an HTTP round-trip (decision log 2026-08-10): the real router,
- * the real store, the real publish gate, and a deep-equal between the API-stored body and the
- * editor-reproduced one. `docs/product/plan-api-program.md` §2 is the spec this file implements;
- * `api-parity-harness.ts` beside it holds the machinery so the audit generator can import it too.
- *
- * Three tests, exactly as planned:
- *
- *   - **T1, the census.** Walk the nine `HOMEBREW_BODY_SCHEMAS` into 4,660 editor-addressable
- *     questions, probe each against the real form model, and hold the 1,737 open answers to the
- *     exemption table in both directions — a gap with no reasoned row fails, a row whose gap closed
- *     fails, and the counts are pinned so a control landing on even one type moves a number.
- *   - **T2, the round trip.** For each type: author a record through the REAL controls, POST it
- *     over the wire, run the four-tier publish gate, read back the stored body, and assert the
- *     editor reproduces it field for field. Eight types round-trip today; `background` cannot —
- *     that is D3's measured defect, pinned here until its unit lands.
- *   - **T3, the guard's own non-vacuity.** Negative cases built locally: a deleted exemption row
- *     must fail the census naming the address; a value the editor did not write must fail the
- *     comparison naming the path. A guard that cannot fail is decoration.
- *
- * Plus the freshness pin ruling 19 demands: `docs/product/vocabulary-parity-audit.md` is GENERATED
- * from this guard's census (`npm run docs`), and this file fails when the two disagree.
+ * API-to-editor parity guard, over the real router, store and publish gate.
+ * - T1: every key the body schemas accept that no editor control can author must match a reasoned
+ *   exemption row, and every row must still match something. Counts are pinned.
+ * - T2: per type, a record authored through the real controls is POSTed, published, read back, and
+ *   must deep-equal the editor's own body. `background` cannot round-trip yet (pinned below).
+ * - T3: the guard can fail: a removed row or a mangled value is reported.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -47,60 +29,22 @@ const open = results.filter((result) => !result.covered && !isSystemForced(resul
 
 describe("T1 — the census: every API-authorable key the editor cannot reach, held to a reasoned row", () => {
   it("pins the walk — the plan's two schema-intrinsic counts, and this file's own expansion", () => {
-    // 162/709 are properties of the schemas (plan §2.3); the other four are properties of THIS
-    // canonicaliser, pinned on the day it was written so the next agent measures the same thing.
-    //
-    // **162 → 163 schemas / 710 → 714 keys, 2026-08-14 (C9 batch).** The feature-side `damage-bonus`
-    // variant landed (the "+1 weapon"'s damage half, C7a's limit (A)): one new object schema carrying
-    // `type`/`amount`/`when`/`scope`. All four key NAMES already exist on sibling variants with live
-    // controls, so the walk grows and the open set does not.
-    //
-    // **163 → 164 / 714 → 718, same day, same batch.** C9's eligibility column: `ItemAppliesToSchema`
-    // ({label, baseIds}) plus its `appliesTo` mount on the equipment record. Both leaf addresses have
-    // controls in the editor's Magic section (the template pair), so the open set again does not move
-    // - the census's first red run on this key is what forced the controls to land in the same
-    // commit, which is the guard doing the exact job ruling 10 bought it for.
-    //
-    // **164 → 165 / 718 → 720, 2026-08-23 (U18).** The RUNTIME `speed` effect modifier landed:
-    // `EffectModifierSchema` grew a thirteenth variant ({type, amount}), and its reader landed in the
-    // same commit — `effectiveSpeedFeet` sums it off `actor.effects`, so the feet in the movement
-    // refusal move with it. Both key NAMES already exist on sibling variants with live controls, and
-    // the row itself is mounted in `effectModifiersField`, so the walk grows and the open set does not.
+    // `objectSchemas`/`declaredKeys` are properties of the schemas; the counts below are properties
+    // of the canonicaliser. When a schema or control change moves them, re-pin in the same change.
     expect(stats).toEqual({ objectSchemas: 165, declaredKeys: 720 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    // **2817 → 2818 / 1737 → 1736, 2026-08-11 (`C3`).** The weapon block's `properties` row landed,
-    // so `equipment.weapon.properties` moved from open to covered and its exemption row was deleted
-    // in the same commit — which is precisely the "re-pin the counts above" the row's own direction-2
-    // failure demands. One address, because the key is a leaf: the array's members have no schema of
-    // their own for the walk to descend into.
-    //
-    // **709 → 710 keys / 4660 → 5078 asked / 1736 → 2154 open, 2026-08-13 (`W3`).** ONE declared key
-    // landed — `FeatureGrantsSchema.when`, the condition a granted resistance, immunity or
-    // proficiency applies under — and it costs 418 addresses because the walk descends the whole
-    // `RiderTrigger` union at every one of the five `grants` mounts. Every one of the 418 is OPEN and
-    // every one lands inside an exemption row that already existed: `GrantsEditor` is the bespoke
-    // eleven-arrays component with no `FieldDef` anywhere, so the probe is blind to the entire block
-    // and always has been (`RIDER_EXEMPT`). The test below proves that in both directions, which is
-    // why no row was added here — the editor's gate control is a client unit, not this one's.
-    // **5078 → 5081 asked / 2818 → 2820 covered / 2154 → 2155 open, 2026-08-14 (C9).** Three new
-    // addresses: `appliesTo.label` and `appliesTo.baseIds` probe COVERED (the Magic section's
-    // template pair landed in the same commit), and the `appliesTo` container itself lands open
-    // inside an already-reasoned exemption group, as container keys with no `FieldDef` of their own
-    // do (§2.3 cause 1).
     }).toEqual({ asked: 5081, covered: 2820, forced: 106, open: 2155 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {
     const verdict = censusVerdict(open, EXEMPTIONS);
-    // Direction 1: a key the schemas accept, the editor cannot author, and no row carries — the
-    // failure this guard exists to produce. The message names the address and how the probe failed.
+    // Direction 1: an open key no row covers.
     expect(verdict.unmatched, "open addresses with no exemption row").toEqual([]);
-    // Direction 2: a row whose group no longer exists — the control landed, delete the row in the
-    // same commit (and re-pin the counts above).
+    // Direction 2: a row whose group no longer exists; delete it and re-pin the counts.
     expect(verdict.stale, "exemption rows matching nothing").toEqual([]);
   });
 });
@@ -109,11 +53,8 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
 
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };
 
-/**
- * One representative record per type, authored through the REAL controls — `authored`/`authoredRow`
- * throw on any key with no control, so a fixture line failing is itself a parity failure. Kept
- * deliberately covered-fields-only: what the editor cannot author is T1's census, not T2's body.
- */
+/** One record per type, authored through the real controls (`authored`/`authoredRow` throw on a key
+    with no control). Covered fields only; uncovered keys are T1's concern. */
 const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
   monster: () => {
     const damage = authoredRow("monster", ["actions", "damage"], [["formula", "3d6"], ["type", "psychic"]]);
@@ -127,8 +68,7 @@ const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
     ]);
     return authored("monster", "Memory Eater", [
       ["size", "large"],
-      // The two statblock-extension keys the publish gate hard-requires (F2's defect measures the
-      // CONTRACT's silence about them; the editor's controls exist and are exercised here).
+      // The two stat-block extension keys the publish gate requires.
       ["type", "aberration"],
       ["challengeRating", 10],
       ["speedFeet", 30],
@@ -194,9 +134,7 @@ const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
     const draft = authored("spell-list", "Warden Spells", [
       ["description", "The warden list."]
     ]);
-    // The membership write `SpellListContents.tsx:88` performs on a tap: `{ ...draft, add, remove }`.
-    // The component is bespoke (its `^add`/`^remove` exemption rows say so), so this line IS its
-    // write path, cited rather than re-invented.
+    // The write `SpellListContents` performs on a tap; the component is bespoke.
     return { ...draft, add: ["fire-bolt"] };
   }
 };
@@ -220,7 +158,7 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
       expect(created.status, `${type} create`).toBe(201);
       const record = (await created.json()).data.record as { id: string };
 
-      // Stronger than a Zod parse: identity and referential tiers included (plan §2.2 step 3).
+      // Stronger than a Zod parse: the identity and referential tiers run too.
       const published = await fetch(`${api.base}${HOMEBREW_PATHS.contentById.replace("{id}", record.id)}/publish`, {
         method: "POST", headers: GM
       });
@@ -238,25 +176,20 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
   }
 
   it("background: CANNOT round-trip today — D3's measured defect, pinned until its unit lands", () => {
-    // There is no editor path to a publishable background AT ALL, for two stacked reasons this pin
-    // holds apart. This is the honest T2 for the type: when D3 lands, both halves fail, and the
-    // unit replaces them with the real round trip in the same commit.
+    // No editor path reaches a publishable background yet, for the two reasons below. When that is
+    // fixed, replace this with a real round trip.
     const bare = authored("background", "Lamplighter", [
       ["summary", "You kept the streets lit."],
       ["description", "Every alley knows your ladder and your flame."]
     ]);
 
-    // Half 1 — the requirement: `abilityOptions.spreads` is schema-required non-empty, so leaving
-    // it alone is already unpublishable.
+    // 1: `abilityOptions.spreads` is required non-empty, so the untouched record is unpublishable.
     const untouched = publishVerdict("background", bare, "hb-a1-probe");
     expect(untouched.publishable).toBe(false);
     expect(untouched.why).toContain("Fix spreads — array must contain at least 1");
 
-    // Half 2 — D3's own mechanism ("Tapping 'Add a spread' makes a background unpublishable"):
-    // the ONLY control for the required key mints `{ amounts, label }`, a shape the schema
-    // refuses. So satisfying half 1 through the real control swaps the refusal for the minted
-    // shape's own — the regression target D3's implementer needs. `authoredRow` goes through the
-    // row field's real `newRow`/writes.
+    // 2: the only control for that key ("Add a spread") mints `{ amounts, label }`, a shape the
+    // schema refuses.
     const spread = authoredRow("background", ["abilityOptions.spreads"], [["label", "Standard"]]);
     const tapped = applyField("background", bare, "abilityOptions.spreads", [spread]);
     const verdict = publishVerdict("background", tapped, "hb-a1-probe");
@@ -272,10 +205,7 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
   it("(control) removing an exemption row whose addresses still have no control fails the census, naming them", () => {
     const withoutGrants = EXEMPTIONS.filter((row) => row.at !== "actions[].grants.**");
     const verdict = censusVerdict(open, withoutGrants);
-    // The exact failure a later agent would see. Not all of C4's addresses orphan — the
-    // `modifiers[].**` row legitimately floats under `actions[].grants.modifiers[].` and keeps
-    // that slice (`EffectGrantSchema` has no `spells`, so nothing else intersects) — but the
-    // grant's own keys have nowhere to go, and the census names them.
+    // `modifiers[].**` still covers the nested modifiers slice, but the grant's own keys orphan.
     expect(verdict.unmatched.length).toBe(111);
     expect(verdict.unmatched.some((line) => line.includes("monster.actions[].grants.name"))).toBe(true);
   });
@@ -293,11 +223,8 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
     const mangled = { ...editor, armorClass: (editor.armorClass as number) + 1 };
     const difference = firstDifference(comparableBody("monster", mangled), comparableBody("monster", editor));
     expect(difference).toEqual({ path: "armorClass", api: 18, editor: 17 });
-    // And a key present on one side alone is named too, not swallowed by a values-only walk.
+    // A key present on one side only is named too.
     const extra = firstDifference(comparableBody("monster", { ...editor, sneaky: true }), comparableBody("monster", editor));
     expect(extra).toEqual({ path: "sneaky", api: true, editor: undefined });
   });
 });
-
-// The open set is scope, not decoration: a unit that lands a control deletes its exemption row and
-// re-pins the counts IN THE SAME COMMIT (see `EXEMPTIONS` in `api-parity-harness.ts`).
