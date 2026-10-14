@@ -28,10 +28,10 @@ single JSON blob the server persists and projects per role.
 ## Commands
 
 The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the
-listed integration scope (`GAME_COMMAND_SCOPES` in `packages/api-contract`). Adding one walks the
-pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map + an OpenAPI
-operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`
-route -> projection decision.
+listed integration scope. Adding one: its typed socket event in domain `ClientToServerEvents`, its
+schema in `game-commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`) with an
+OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
+register from. Then the projection decision.
 
 Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `token`, `turn`.
 
@@ -332,7 +332,7 @@ Curated pointers (verify line numbers before relying on them - code moves):
 - **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`.
 - **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.
 - **Command Zod schemas:** `apps/server/src/game-commands.ts`.
-- **Command handlers + registry:** `apps/server/src/game-operations.ts`.
+- **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).
 - **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.
 - **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.
 - **Public viewer projection:** `apps/server/src/viewer-encounter.ts`, `viewer-presentation.ts`.

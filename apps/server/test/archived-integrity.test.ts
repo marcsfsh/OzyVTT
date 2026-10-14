@@ -149,7 +149,7 @@ describe("archived characters cannot be claimed", () => {
     claimCharacter(game, IDS.active, IDS.player);
     game.actors.find((actor) => actor.id === IDS.retired)!.archived = false;
     expect(() => claimCharacter(game, IDS.retired, IDS.player)).toThrow(/Release your current character/);
-    forceReleaseCharacter(game, IDS.active, "gm");
+    forceReleaseCharacter(game, IDS.active);
     expect(() => claimCharacter(game, IDS.retired, IDS.player)).not.toThrow();
   });
 });

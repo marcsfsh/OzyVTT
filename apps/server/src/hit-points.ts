@@ -12,6 +12,7 @@ import {
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import type { ActorDefinition } from "@vtt/schemas";
+import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
   applyConditionDirect,
@@ -29,20 +30,16 @@ import {
   type EquipmentDerivation
 } from "./equipment-derivation.js";
 
-/** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
-export type ActorScope = { role: "gm" } | { role: "player"; sessionId: string };
-
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
   return hp.current * 2 <= hp.maximum ? "bloodied" : "healthy";
 }
 
 /** Shared by hp and condition commands: resolve the target if the caller may adjust it. */
-export function adjustableActor(state: GameState, actorId: string, scope: ActorScope): Actor {
+export function adjustableActor(state: GameState, actorId: string, initiator: Initiator): Actor {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (scope.role === "player" && actor.ownerSessionId !== scope.sessionId)
-    throw new CommandRejectedError("You can only track your own character.");
+  requireActorAccess(initiator, state, actorId, "track", "You can only track your own character.");
   return actor;
 }
 
@@ -135,7 +132,7 @@ export function applyDamageDetailed(
   state: GameState,
   actorId: string,
   input: DamageInput,
-  scope: ActorScope,
+  scope: Initiator,
   deps?: DamageDeps
 ): DamageOutcome {
   const actor = adjustableActor(state, actorId, scope);
@@ -365,12 +362,12 @@ export function applyDamageDetailed(
 }
 
 /** 5e order: temporary hit points absorb damage first; current never drops below 0. Untyped legacy path. */
-export function applyDamage(state: GameState, actorId: string, amount: number, scope: ActorScope) {
+export function applyDamage(state: GameState, actorId: string, amount: number, scope: Initiator) {
   applyDamageDetailed(state, actorId, { amount }, scope);
 }
 
 /** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). */
-export function healActor(state: GameState, actorId: string, amount: number, scope: ActorScope): EffectNarration[] {
+export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);
@@ -384,14 +381,14 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 }
 
 /** Temporary hit points replace rather than stack (choosing the higher is left to the table). */
-export function setTemporaryHp(state: GameState, actorId: string, amount: number, scope: ActorScope) {
+export function setTemporaryHp(state: GameState, actorId: string, amount: number, scope: Initiator) {
   const actor = adjustableActor(state, actorId, scope);
   actor.hp.temporary = amount;
 }
 
 /** GM correction: set current HP (clamped), running the same zero-HP transitions. */
-export function setCurrentHp(state: GameState, actorId: string, current: number, scope: ActorScope): EffectNarration[] {
-  if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can set hit points directly.");
+export function setCurrentHp(state: GameState, actorId: string, current: number, scope: Initiator): EffectNarration[] {
+  requireGm(scope, "Only the GM can set hit points directly.");
   const actor = adjustableActor(state, actorId, scope);
   const before = actor.hp.current;
   actor.hp.current = Math.max(0, Math.min(actor.hp.maximum, current));

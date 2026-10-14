@@ -2,35 +2,29 @@ import { randomUUID } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import {
   API_VERSION,
-  CONTENT_PATHS,
   ENCOUNTER_ARCHIVE_PATHS,
   GAME_PATHS,
+  GAME_COMMANDS,
   GameCommandEnvelopeSchema,
   SESSION_PATHS,
   type ApiErrorCode,
   type IntegrationScope
 } from "@vtt/api-contract";
+import type { EncounterArchiveSummary } from "./game-store.js";
 import {
-  CommandRejectedError,
-  RevisionConflictError,
-  RulesBlockedError,
-  TimelineConfirmationRequired,
-  type EncounterArchiveSummary
-} from "./game-store.js";
-import {
-  GameAccessDeniedError,
-  GameInputError,
+  describeFailure,
   isGmGrade,
-  type GameCommandDescriptor,
-  type GameOperations,
-  type GamePrincipal
-} from "./game-operations.js";
+  type AnyCommand,
+  type GameCommands,
+  type GamePrincipal,
+  type GameReply
+} from "./commands/index.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { projectPlayerReplay } from "./replay-projection.js";
 
 /**
- * The public HTTP adapter over the shared game operations (ADR-0016): every write runs the same
- * operation as the Socket.IO handlers, so REST cannot fork from table behaviour.
+ * The public HTTP adapter over the game commands (ADR-0016): every write and read runs the same
+ * table entry as the Socket.IO handlers, so REST cannot fork from table behaviour.
  *
  * Principals (all `Authorization: Bearer`): GM session, player session, or a GM-minted integration
  * credential, checked against each route's scope and acting with GM authority. Players keep the table's
@@ -42,8 +36,7 @@ import { projectPlayerReplay } from "./replay-projection.js";
  */
 
 export type GameApiRouterOptions = Readonly<{
-  operations: GameOperations;
-  registry: ReadonlyMap<string, GameCommandDescriptor>;
+  game: GameCommands;
   gmSession: (token: string) => Readonly<{ sessionId: string }> | null;
   playerSession: (token: string) => Readonly<{ sessionId: string }> | null;
   verifyIntegration: (token: string, scope: IntegrationScope) => Readonly<{ id: string; name: string }> | null;
@@ -93,7 +86,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     status: number,
     code: ApiErrorCode,
     message: string,
-    details?: Record<string, unknown>,
+    details?: Readonly<Record<string, unknown>>,
     currentRevision?: number
   ) {
     return res.status(status).json({
@@ -109,29 +102,16 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     });
   }
 
-  /** One mapping for every operation failure, so REST semantics stay uniform. */
   function sendOperationError(res: Response, error: unknown) {
-    if (error instanceof GameInputError)
-      return sendError(
-        res,
-        400,
-        "validation_failed",
-        error.message,
-        error.issues ? { issues: error.issues } : undefined
-      );
-    if (error instanceof GameAccessDeniedError) return sendError(res, 403, "forbidden", error.message);
-    if (error instanceof TimelineConfirmationRequired)
-      return sendError(res, 409, "conflict", error.message, { needsConfirm: error.confirm });
-    if (error instanceof RevisionConflictError)
-      return sendError(res, 409, "conflict", error.message, undefined, options.revision());
-    // Rules-mode rejections stay 409 but carry machine-readable details so integrations can resend with
-    // `override: {reason}` (ADR-0020).
-    if (error instanceof RulesBlockedError)
-      return sendError(res, 409, "conflict", error.message, {
-        blocked: { rule: error.rule, message: error.message, overridable: error.overridable }
-      });
-    if (error instanceof CommandRejectedError) return sendError(res, 409, "conflict", error.message);
-    return sendError(res, 500, "internal_error", "The command could not be processed.");
+    const failure = describeFailure(error);
+    return sendError(
+      res,
+      failure.status,
+      failure.code,
+      failure.message,
+      failure.details,
+      failure.stale ? options.revision() : undefined
+    );
   }
 
   function sendData(res: Response, data: unknown) {
@@ -161,35 +141,24 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     next();
   };
 
-  /** Builds a command payload from the JSON body plus path fields. A missing commandId is minted (and
-   *  echoed) so plain curl calls work; clients wanting safe retries supply their own. Path params win. */
-  function commandPayload(req: Request, extras: Record<string, unknown> = {}) {
-    const body = (req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {}) as Record<
-      string,
-      unknown
-    >;
-    return { commandId: newId(), ...body, ...extras };
+  /** Runs a command for the request's principal and answers with the reply, or the failure mapping. */
+  async function sendCommand(
+    res: Response,
+    principal: GamePrincipal,
+    command: AnyCommand,
+    payload: { commandId: unknown },
+    echo: GameReply = {}
+  ) {
+    try {
+      const data = await options.game.dispatch(command.type, principal, payload);
+      return sendData(res, { commandId: payload.commandId, ...echo, ...data });
+    } catch (error) {
+      return sendOperationError(res, error);
+    }
   }
 
-  /** A typed route for one cataloged command; scope and handler come from the same registry as the tunnel. */
-  const command = (type: string, extras?: (req: Request) => Record<string, unknown>) => {
-    const descriptor = options.registry.get(type);
-    if (!descriptor) throw new Error(`game-http route references an uncataloged command type: ${type}`);
-    return [
-      authorize(descriptor.scope),
-      async (req: Request, res: Response) => {
-        const payload = commandPayload(req, extras?.(req));
-        try {
-          const data = await descriptor.run(res.locals.principal as GamePrincipal, payload);
-          sendData(res, { commandId: payload.commandId, ...data });
-        } catch (error) {
-          sendOperationError(res, error);
-        }
-      }
-    ] as const;
-  };
-
-  const ops = options.operations;
+  const { game } = options;
+  const commandsByType = new Map(game.commands.map((command) => [command.type as string, command]));
 
   // ---------- Game state reads ----------
 
@@ -202,7 +171,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
             ? undefined
             : null;
       if (requested === null) return sendError(res, 400, "validation_failed", 'view must be "gm" or "player".');
-      const projected = ops.view(res.locals.principal as GamePrincipal, requested);
+      const projected = game.view(res.locals.principal as GamePrincipal, requested);
       const revision = (projected.game as { revision: number }).revision;
       // Weak because presence and timed-annotation expiry can change content without a revision bump.
       const etag = `W/"game-r${revision}-${projected.view}"`;
@@ -214,35 +183,23 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     }
   });
 
-  // Action availability: the same evaluation strict-mode resolution runs, as a read.
-  router.get(expressPath(GAME_PATHS.actorAvailableActions), authorize("combat:read"), (req, res) => {
-    try {
-      return sendData(
-        res,
-        ops.actorAvailableActions(res.locals.principal as GamePrincipal, { actorId: req.params.actorId })
-      );
-    } catch (error) {
-      if (error instanceof CommandRejectedError) return sendError(res, 404, "not_found", error.message);
-      return sendOperationError(res, error);
-    }
-  });
-
-  router.get(expressPath(GAME_PATHS.log), authorize("combat:read"), (req, res) => {
-    const rawLimit = req.query.limit;
-    let limit: number | undefined;
-    if (rawLimit !== undefined) {
-      limit = Number(rawLimit);
-      if (!Number.isInteger(limit) || limit < 1 || limit > 1000)
-        return sendError(res, 400, "validation_failed", "limit must be an integer between 1 and 1000.");
-    }
-    return sendData(res, { entries: ops.logEntries(res.locals.principal as GamePrincipal, limit) });
-  });
+  // The reads the socket serves too (content catalogs, action availability, the combat log), from one table.
+  for (const read of game.reads)
+    router.get(expressPath(read.path), authorize(read.scope), (req, res) => {
+      try {
+        const params = req.params as Record<string, string>;
+        const input = read.httpInput ? read.httpInput({ params, query: req.query }) : params;
+        return sendData(res, game.read(read, res.locals.principal as GamePrincipal, input));
+      } catch (error) {
+        return sendOperationError(res, error);
+      }
+    });
 
   // ---------- Generic command tunnel + catalog ----------
 
   router.get(expressPath(GAME_PATHS.commands), authorize("system:read"), (_req, res) => {
-    const commands = [...options.registry.values()]
-      .map(({ type, scope, summary }) => ({ type, scope, summary }))
+    const commands = game.commands
+      .map(({ type, summary }) => ({ type, scope: GAME_COMMANDS[type].scope, summary }))
       .sort((a, b) => a.type.localeCompare(b.type));
     return sendData(res, { commands });
   });
@@ -253,153 +210,37 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       return sendError(res, 400, "validation_failed", "The command envelope is malformed.", {
         issues: envelope.error.issues.map((issue) => ({ path: issue.path, message: issue.message }))
       });
-    const descriptor = options.registry.get(envelope.data.type);
-    if (!descriptor)
+    const command = commandsByType.get(envelope.data.type);
+    if (!command)
       return sendError(res, 404, "not_found", "That command type is not available over the integration API.", {
-        availableTypes: [...options.registry.keys()].sort()
+        availableTypes: [...commandsByType.keys()].sort()
       });
-    const principal = resolvePrincipal(req, res, descriptor.scope);
+    const principal = resolvePrincipal(req, res, GAME_COMMANDS[command.type].scope);
     if (!principal) return;
-    const payload: Record<string, unknown> = {
+    const payload = {
       commandId: envelope.data.commandId ?? newId(),
       ...envelope.data.payload,
       ...(envelope.data.expectedRevision !== undefined ? { expectedRevision: envelope.data.expectedRevision } : {})
     };
-    try {
-      const data = await descriptor.run(principal, payload);
-      return sendData(res, { commandId: payload.commandId, type: descriptor.type, ...data });
-    } catch (error) {
-      return sendOperationError(res, error);
-    }
+    return sendCommand(res, principal, command, payload, { type: command.type });
   });
 
-  // ---------- Typed command routes (same operations the socket handlers call) ----------
+  // ---------- Typed command routes ----------
 
-  const actorIdParam = (req: Request) => ({ actorId: req.params.actorId });
-  const saveIdParam = (req: Request) => ({ saveId: req.params.saveId });
-  const idParam = (req: Request) => ({ id: req.params.id });
-  router.post(expressPath(GAME_PATHS.encounterStart), ...command("encounter.start"));
-  router.post(expressPath(GAME_PATHS.encounterEnd), ...command("encounter.end"));
-  router.post(expressPath(GAME_PATHS.encounterCombatants), ...command("encounter.add-combatant"));
-  router.post(expressPath(GAME_PATHS.initiativeSet), ...command("initiative.set"));
-  router.post(expressPath(GAME_PATHS.initiativeRollSelf), ...command("initiative.roll-self"));
-  router.post(expressPath(GAME_PATHS.initiativeRollRemaining), ...command("initiative.roll-remaining"));
-  router.post(expressPath(GAME_PATHS.initiativeNext), ...command("initiative.next"));
-  router.post(expressPath(GAME_PATHS.initiativePrevious), ...command("initiative.previous"));
-  router.post(expressPath(GAME_PATHS.turnEnd), ...command("turn.end"));
-  router.post(expressPath(GAME_PATHS.turnUse), ...command("turn.use"));
-  router.post(expressPath(GAME_PATHS.turnReaction), ...command("turn.use-reaction"));
-  router.post(expressPath(GAME_PATHS.turnLegendary), ...command("turn.use-legendary"));
-  router.post(expressPath(GAME_PATHS.tokenMove), ...command("token.move", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actors), ...command("actor.add-from-definition"));
-  router.delete(expressPath(GAME_PATHS.actorById), ...command("actor.remove", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorDamage), ...command("actor.apply-damage", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorHeal), ...command("actor.heal", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorTempHp), ...command("actor.set-temp-hp", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorHp), ...command("actor.set-hp", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorConditions), ...command("actor.set-condition", actorIdParam));
-  router.post(expressPath(GAME_PATHS.definitionsImport), ...command("actor.import-definition"));
-  router.post(expressPath(GAME_PATHS.characterImports), ...command("character.submit-import"));
-  router.post(
-    expressPath(GAME_PATHS.characterImportResolve),
-    ...command("character.resolve-import", (req: Request) => ({ importId: req.params.importId }))
-  );
-  router.post(expressPath(GAME_PATHS.rolls), ...command("dice.roll"));
-  router.post(expressPath(GAME_PATHS.actionResolve), ...command("action.resolve"));
-  router.post(expressPath(GAME_PATHS.saveAnswer), ...command("save.answer", saveIdParam));
-  router.post(expressPath(GAME_PATHS.saveDismiss), ...command("save.dismiss", saveIdParam));
-  router.post(
-    expressPath(GAME_PATHS.reactionAnswer),
-    ...command("reaction.answer", (req: Request) => ({ reactionId: req.params.reactionId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.reactionDismiss),
-    ...command("reaction.dismiss", (req: Request) => ({ reactionId: req.params.reactionId }))
-  );
-  router.post(expressPath(GAME_PATHS.damageResolve), ...command("damage.resolve"));
-  router.post(expressPath(GAME_PATHS.effects), ...command("effect.add", actorIdParam));
-  router.post(
-    expressPath(GAME_PATHS.effectEnd),
-    ...command("effect.end", (req: Request) => ({ actorId: req.params.actorId, effectId: req.params.effectId }))
-  );
-  router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));
-  router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
-  router.post(expressPath(GAME_PATHS.playerDamageMode), ...command("encounter.set-player-damage-mode"));
-  router.post(expressPath(GAME_PATHS.playerInitiativeMode), ...command("encounter.set-player-initiative-mode"));
-  router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
-  router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
-  router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorRechoose), ...command("actor.rechoose", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSpendHitDice), ...command("actor.spend-hit-dice", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetSlot), ...command("character.set-slot", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetPrepared), ...command("character.set-prepared", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetInventory), ...command("character.set-inventory", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetCurrency), ...command("character.set-currency", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
-  router.post(
-    expressPath(GAME_PATHS.characterSetProficiencies),
-    ...command("character.set-proficiencies", actorIdParam)
-  );
-  router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
-  router.post(expressPath(GAME_PATHS.charactersRandom), ...command("character.generate"));
-  router.post(
-    expressPath(GAME_PATHS.characterRebuild),
-    ...command("character.rebuild", (req) => ({ actorId: req.params.actorId }))
-  );
-  router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
-  router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));
-  router.post(expressPath(GAME_PATHS.rulesPolicy), ...command("rules.set-policy"));
-  router.post(expressPath(GAME_PATHS.actionUse), ...command("action.use"));
-  router.post(expressPath(GAME_PATHS.saveRoll), ...command("save.roll"));
-  router.post(expressPath(GAME_PATHS.rulesAsk), ...command("rules.ask"));
-  router.post(expressPath(GAME_PATHS.rulesAnswer), ...command("rules.answer"));
-  router.post(expressPath(GAME_PATHS.stagingDefaults), ...command("table.set-staging-defaults"));
-  router.post(expressPath(GAME_PATHS.partyVisibility), ...command("table.set-party-visibility"));
-  // Literal segments (ping/clear) are registered before the {id} routes.
-  router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
-  router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));
-  router.post(expressPath(GAME_PATHS.annotations), ...command("annotation.add"));
-  router.delete(expressPath(GAME_PATHS.annotationById), ...command("annotation.remove", idParam));
-  router.post(expressPath(GAME_PATHS.annotationMove), ...command("annotation.move", idParam));
-  router.post(expressPath(GAME_PATHS.annotationColor), ...command("annotation.set-color", idParam));
-  router.post(expressPath(GAME_PATHS.annotationVisibility), ...command("annotation.set-visibility", idParam));
-  router.post(expressPath(GAME_PATHS.annotationMovable), ...command("annotation.set-movable", idParam));
-  router.post(expressPath(GAME_PATHS.claims), ...command("character.claim"));
-  router.post(expressPath(GAME_PATHS.claimsRelease), ...command("character.release"));
-  router.post(expressPath(GAME_PATHS.claimForceRelease), ...command("character.force-release", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorTokenImage), ...command("actor.set-token-image", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorVisibility), ...command("actor.set-visibility", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorArchived), ...command("actor.set-archived", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSheetPreview), ...command("actor.set-sheet-preview", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorHealthDisplay), ...command("actor.set-health-display", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
-  router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
-  // Literal /scenes/reorder is registered before the {sceneId} routes so the segment can't be captured as an id.
-  router.post(expressPath(GAME_PATHS.sceneReorder), ...command("scene.reorder"));
-  router.delete(
-    expressPath(GAME_PATHS.sceneById),
-    ...command("scene.remove", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneRename),
-    ...command("scene.rename", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneActivate),
-    ...command("scene.activate", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneCombatants),
-    ...command("scene.set-combatants", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneDuplicate),
-    ...command("scene.duplicate", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(expressPath(GAME_PATHS.fogEnabled), ...command("fog.set-enabled"));
-  router.post(expressPath(GAME_PATHS.fogPaint), ...command("fog.paint"));
-  router.post(expressPath(GAME_PATHS.fogReset), ...command("fog.reset"));
+  // Each command's route comes from GAME_COMMANDS. The JSON body plus path parameters is the payload; a
+  // missing commandId is minted (and echoed) so plain curl calls work, and path parameters win.
+  for (const command of game.commands) {
+    const route = GAME_COMMANDS[command.type];
+    router[route.method](expressPath(route.path), authorize(route.scope), (req, res) => {
+      const body = (req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {}) as Record<
+        string,
+        unknown
+      >;
+      const params = req.params as Record<string, string>;
+      const payload = { commandId: newId(), ...body, ...(command.pathParams ? command.pathParams(params) : params) };
+      return sendCommand(res, res.locals.principal as GamePrincipal, command, payload);
+    });
+  }
 
   // ---------- Player sessions (headless / alternate player clients) ----------
 
@@ -408,67 +249,6 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     if (!issued) return sendError(res, 409, "conflict", "The host must complete GM setup before players join.");
     return res.status(201).json({ ok: true, apiVersion: API_VERSION, data: issued });
   });
-
-  // ---------- Bundled content reads ----------
-
-  /** Content misses are 404s here (resource semantics), keeping the operation's message text. */
-  function sendContent(res: Response, read: () => unknown) {
-    try {
-      return sendData(res, read());
-    } catch (error) {
-      if (error instanceof CommandRejectedError) return sendError(res, 404, "not_found", error.message);
-      return sendOperationError(res, error);
-    }
-  }
-
-  router.get(expressPath(CONTENT_PATHS.monsters), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentMonsters(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.monsterById), authorize("game:read"), (req, res) =>
-    sendContent(res, () =>
-      ops.contentMonsterSheet(res.locals.principal as GamePrincipal, { definitionId: req.params.definitionId })
-    )
-  );
-  router.get(expressPath(CONTENT_PATHS.monsterActions), authorize("game:read"), (req, res) =>
-    sendContent(res, () =>
-      ops.contentMonsterActions(res.locals.principal as GamePrincipal, { definitionId: req.params.definitionId })
-    )
-  );
-  router.get(expressPath(CONTENT_PATHS.conditions), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentConditions(res.locals.principal as GamePrincipal))
-  );
-  // Rules catalogs are public SRD reference, so player sessions may read them (the operations enforce
-  // that). The bestiary is the GM-only exception.
-  router.get(expressPath(CONTENT_PATHS.skills), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentSkills(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.languages), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentLanguages(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.spells), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentSpells(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.equipment), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentEquipment(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.classes), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentClasses(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.subclasses), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentSubclasses(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.species), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentSpecies(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.backgrounds), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentBackgrounds(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.feats), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentFeats(res.locals.principal as GamePrincipal))
-  );
-  router.get(expressPath(CONTENT_PATHS.names), authorize("game:read"), (_req, res) =>
-    sendContent(res, () => ops.contentNames(res.locals.principal as GamePrincipal))
-  );
 
   // ---------- Encounter archives ----------
 
@@ -525,12 +305,6 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       .type("application/json")
       .send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
-
-  /** Launch-from-here; scope and handler come from the registry like every typed route. */
-  router.post(
-    expressPath(ENCOUNTER_ARCHIVE_PATHS.launch),
-    ...command("replay.launch", (req) => ({ archiveId: Number(req.params.id) }))
-  );
 
   /** Per-replay sharing: GM-grade only, storing the GM's decision. */
   router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.visibility), authorize("combat:write"), (req, res) => {

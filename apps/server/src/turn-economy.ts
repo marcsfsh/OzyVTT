@@ -1,14 +1,23 @@
 import type { GameState } from "@vtt/domain";
+import {
+  canInitiateForActor,
+  GameAccessDeniedError,
+  requireActorAccess,
+  requireGm,
+  type Initiator
+} from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import { nextInitiativeTurn, type TurnAdvanceDeps } from "./encounter.js";
 import type { EffectNarration } from "./effects.js";
-import type { ActorScope } from "./hit-points.js";
 
 /** Manual economy toggles stay free (ADR-0020): marking a slot is bookkeeping the GM may always correct.
  *  Enforcement lives in structured action resolution, so these toggles are the manual escape hatch. */
 
-function claimedActorId(state: GameState, sessionId: string): string | null {
-  return state.actors.find((actor) => actor.ownerSessionId === sessionId)?.id ?? null;
+/** A player's slots and End Turn belong to their own character's turn. */
+function requireOwnTurn(state: GameState, initiator: Initiator) {
+  const turnActorId = state.combat.turnActorId;
+  if (turnActorId === null || !canInitiateForActor(initiator, state, turnActorId, "track").ok)
+    throw new GameAccessDeniedError("It isn't your character's turn.");
 }
 
 function requireActiveCombat(state: GameState) {
@@ -18,10 +27,9 @@ function requireActiveCombat(state: GameState) {
 /** Action/bonus belong to the current turn; a player may mark them only on their own character's turn.
  *  Un-marking the action also clears the open compound-action instance, so the toggle never strands
  *  "attack 2 of 2". */
-export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", used: boolean, scope: ActorScope) {
+export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", used: boolean, initiator: Initiator) {
   requireActiveCombat(state);
-  if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId))
-    throw new CommandRejectedError("It isn't your character's turn.");
+  requireOwnTurn(state, initiator);
   const clearInstance = slot === "action" && !used;
   state.combat = {
     ...state.combat,
@@ -34,20 +42,19 @@ export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", u
 }
 
 /** Reactions are off-turn resources: any combatant, any time; a player only their own character. */
-export function setReactionUsed(state: GameState, actorId: string, used: boolean, scope: ActorScope) {
+export function setReactionUsed(state: GameState, actorId: string, used: boolean, initiator: Initiator) {
   requireActiveCombat(state);
   if (!state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That combatant is not in this encounter.");
-  if (scope.role === "player" && actorId !== claimedActorId(state, scope.sessionId))
-    throw new CommandRejectedError("You can only track your own character.");
+  requireActorAccess(initiator, state, actorId, "track", "You can only track your own character.");
   const remaining = state.combat.reactionsUsed.filter((id) => id !== actorId);
   state.combat = { ...state.combat, reactionsUsed: used ? [...remaining, actorId] : remaining };
 }
 
 /** Legendary actions are GM knowledge: only the GM sets the spent count by hand. Zero clears the entry, like the refresh at the creature's turn start. */
-export function setLegendaryUsed(state: GameState, actorId: string, spent: number, scope: ActorScope) {
+export function setLegendaryUsed(state: GameState, actorId: string, spent: number, initiator: Initiator) {
   requireActiveCombat(state);
-  if (scope.role === "player") throw new CommandRejectedError("Only the GM tracks legendary actions.");
+  requireGm(initiator, "Only the GM tracks legendary actions.");
   if (!state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That combatant is not in this encounter.");
   const { [actorId]: _cleared, ...rest } = state.combat.legendaryUsed;
@@ -55,9 +62,8 @@ export function setLegendaryUsed(state: GameState, actorId: string, spent: numbe
 }
 
 /** Player-facing End Turn: same advance as the GM's Next, gated to the claimed character's own turn. */
-export function endTurn(state: GameState, scope: ActorScope, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
+export function endTurn(state: GameState, initiator: Initiator, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   requireActiveCombat(state);
-  if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId))
-    throw new CommandRejectedError("It isn't your character's turn.");
+  requireOwnTurn(state, initiator);
   nextInitiativeTurn(state, events, deps);
 }

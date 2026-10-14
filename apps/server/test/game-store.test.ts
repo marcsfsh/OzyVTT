@@ -199,11 +199,8 @@ describe("SQLite GameStore", () => {
       store = new GameStore(databasePath);
       await store.initialize();
       expect(store.snapshot.actors[0].ownerSessionId).toBe(sessionId);
-      const unauthorizedState = store.snapshot;
-      expect(() => forceReleaseCharacter(unauthorizedState, actor.id, "player")).toThrow("Only the GM");
-      expect(unauthorizedState.actors[0].ownerSessionId).toBe(sessionId);
       await store.execute({ id: "gm-force-release", type: "character.force-release", actorId: actor.id }, (state) =>
-        forceReleaseCharacter(state, actor.id, "gm")
+        forceReleaseCharacter(state, actor.id)
       );
       expect(store.snapshot.actors[0].ownerSessionId).toBeNull();
       expect(store.snapshot.revision).toBe(2);

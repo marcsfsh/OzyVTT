@@ -23,7 +23,6 @@ import {
 
 // Wire schemas for every game command, shared by the socket handlers and the HTTP API. `commandId` is
 // the idempotency key; `expectedRevision` the optimistic-concurrency guard.
-export { GAME_COMMAND_SCOPES, type GameCommandType } from "@vtt/api-contract";
 
 /** A GM override of a rules block. The reason is optional so an override is one tap; audit lines fall back to "GM override". */
 export const RulesOverrideSchema = z.object({ reason: z.string().trim().min(1).max(300).optional() }).strict();

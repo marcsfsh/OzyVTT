@@ -54,13 +54,6 @@ export function encounterTokenAppearance(geometry: TokenMapGeometry, sizeCells =
   };
 }
 
-function actorSizeCells(state: GameState, actorId: string) {
-  return state.actors.find((actor) => actor.id === actorId)?.sizeCells ?? 1;
-}
-function actorSize(state: GameState, actorId: string): CreatureSize | undefined {
-  return state.actors.find((actor) => actor.id === actorId)?.size as CreatureSize | undefined;
-}
-
 export function createEncounterTokens(
   entries: ReadonlyArray<{ actorId: string; sizeCells?: number; size?: CreatureSize }>,
   geometry: TokenMapGeometry
@@ -70,29 +63,6 @@ export function createEncounterTokens(
     position: null,
     ...encounterTokenAppearance(geometry, sizeCells ?? 1, size)
   }));
-}
-
-/** Adds tokens when upgrading a persisted active encounter created before tokens existed. */
-export function ensureEncounterTokens(state: GameState, geometry: TokenMapGeometry) {
-  if (!state.combat.active) return false;
-  const existing = new Set(state.combat.tokens.map((token) => token.actorId));
-  const missing = state.combat.initiative.map((entry) => entry.actorId).filter((actorId) => !existing.has(actorId));
-  if (!missing.length) return false;
-  state.combat = {
-    ...state.combat,
-    tokens: [
-      ...state.combat.tokens,
-      ...createEncounterTokens(
-        missing.map((actorId) => ({
-          actorId,
-          sizeCells: actorSizeCells(state, actorId),
-          size: actorSize(state, actorId)
-        })),
-        geometry
-      )
-    ]
-  };
-  return true;
 }
 
 function bounded(point: EncounterTokenPosition, radius: number, geometry: TokenMapGeometry) {

@@ -2,7 +2,8 @@ import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { adjustableActor, type ActorScope } from "./hit-points.js";
+import type { Initiator } from "./authorization.js";
+import { adjustableActor } from "./hit-points.js";
 import {
   applyExhaustionDeath,
   endConcentrationSustainedBy,
@@ -27,7 +28,7 @@ export function setCondition(
   conditionId: string,
   active: boolean,
   level: number | undefined,
-  scope: ActorScope,
+  scope: Initiator,
   options?: Readonly<{
     override?: { reason?: string } | null;
     resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;

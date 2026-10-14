@@ -4,7 +4,6 @@ import {
   activateScene,
   createScene,
   duplicateScene,
-  migrateToScene,
   removeScene,
   renameScene,
   reorderScenes,
@@ -13,7 +12,6 @@ import {
 import { startEncounter, nextInitiativeTurn } from "../src/encounter.js";
 import { moveEncounterToken, moveSceneToken } from "../src/token-placement.js";
 import { removeActor } from "../src/actor-roster.js";
-import { projectPlayerCombat } from "../src/projections.js";
 
 const IDS = {
   alpha: "10000000-0000-4000-8000-000000000001",
@@ -276,39 +274,6 @@ describe("scene park and resume", () => {
     activateScene(game, IDS.sceneB, IDS.implicit);
     expect(game.actors.find((actor) => actor.id === IDS.alpha)!.hp.current).toBe(4);
     expect(() => activateScene(game, IDS.sceneB, IDS.implicit)).toThrow(/already live/i);
-  });
-});
-
-describe("scene migration and projections", () => {
-  it("binds a pre-scenes encounter to one implicit active scene, leaving the player projection unchanged", () => {
-    const game = state();
-    startEncounter(
-      game,
-      {
-        mapAssetId: IDS.map1,
-        entries: [
-          { actorId: IDS.alpha, score: 12 },
-          { actorId: IDS.beta, score: 6 }
-        ]
-      },
-      () => 10,
-      GEOMETRY
-    );
-    const before = projectPlayerCombat(game);
-    migrateToScene(game, IDS.sceneA);
-    expect(game.combat.scenes).toHaveLength(1);
-    expect(game.combat.activeSceneId).toBe(IDS.sceneA);
-    expect(game.combat.scenes[0]).toMatchObject({ id: IDS.sceneA, mapAssetId: IDS.map1 });
-    // The active scene's own slot is empty; the live copy stays top-level.
-    expect(game.combat.scenes[0].combat.initiative).toEqual([]);
-    // Players never see scenes: the projection is byte-identical and carries no scene keys.
-    const after = projectPlayerCombat(game);
-    expect(after).toEqual(before);
-    expect("scenes" in after).toBe(false);
-    expect("activeSceneId" in after).toBe(false);
-    // Migration is one-shot: nothing to do once a scene exists.
-    migrateToScene(game, IDS.sceneB);
-    expect(game.combat.scenes).toHaveLength(1);
   });
 });
 

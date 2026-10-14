@@ -2,7 +2,8 @@ import type { ActionResolution, DamageApplication, GameState } from "@vtt/domain
 import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { adjustableActor, applyDamageDetailed, type ActorScope } from "./hit-points.js";
+import { requireGm, type Initiator } from "./authorization.js";
+import { adjustableActor, applyDamageDetailed } from "./hit-points.js";
 import type { EffectNarration } from "./effects.js";
 import { resolveDefinitionAction } from "./action-resolution.js";
 import { builtinAction } from "./builtin-actions.js";
@@ -64,7 +65,7 @@ export function answerReaction(
   reactionId: string,
   use: boolean,
   actionId: string | undefined,
-  scope: ActorScope,
+  scope: Initiator,
   deps: ReactionAnswerDependencies,
   attackOptions: OpportunityAttackOptions = {}
 ): ReactionOutcome {
@@ -223,8 +224,8 @@ export function answerReaction(
 }
 
 /** Drop a reaction prompt without applying its damage (GM housekeeping - e.g. the damage was applied manually). */
-export function dismissReaction(state: GameState, reactionId: string, scope: ActorScope) {
-  if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can dismiss a reaction prompt.");
+export function dismissReaction(state: GameState, reactionId: string, scope: Initiator) {
+  requireGm(scope, "Only the GM can dismiss a reaction prompt.");
   if (!state.combat.pendingReactions.some((entry) => entry.id === reactionId))
     throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   state.combat = {
