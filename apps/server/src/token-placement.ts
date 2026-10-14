@@ -7,7 +7,7 @@ export type TokenMapGeometry = Readonly<{
   width: number;
   height: number;
   calibration: SquareGridCalibration | null;
-  /** Gridless real-world scale from the map catalog, when saved - lets movement narration measure distances on uncalibrated maps. Optional so geometry literals in tests stay small. */
+  /** Gridless real-world scale from the map catalog, when saved, so narration can measure on uncalibrated maps. Optional to keep test literals small. */
   scale?: MapDistanceScale | null;
 }>;
 
@@ -100,11 +100,9 @@ export type CreatureSize = "tiny" | "small" | "medium" | "large" | "huge" | "gar
 /** D&D size → square-grid footprint. Tiny/Small/Medium all occupy one 5-ft cell; larger sizes scale up. */
 export const SIZE_CELLS: Readonly<Record<CreatureSize, number>> = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
 
-/**
- * Sets a combatant's creature size (Tiny … Gargantuan). The size drives the token footprint (sizeCells);
- * if the actor already has a token in the live encounter, its appearance is recomputed and its position
- * re-snapped. Works with no active map too (just records the size for the next encounter). GM-only.
- */
+/** Sets a combatant's creature size (Tiny … Gargantuan). The size drives the token footprint (sizeCells);
+ *  if the actor already has a token in the live encounter, its appearance is recomputed and its position
+ *  re-snapped. Works with no active map too (just records the size for the next encounter). GM-only. */
 export function setActorSize(state: GameState, actorId: string, size: CreatureSize, geometry: TokenMapGeometry | null) {
   const sizeCells = SIZE_CELLS[size];
   if (sizeCells === undefined) throw new CommandRejectedError("Choose a creature size from Tiny to Gargantuan.");
@@ -119,11 +117,8 @@ export function setActorSize(state: GameState, actorId: string, size: CreatureSi
   }
 }
 
-/**
- * Moves a combatant between the shared layer (public) and the GM-only layer. On the GM layer the actor,
- * its token, and its rolls stay hidden from players and the viewer - the projections already filter by
- * this flag, so flipping it is all that's needed. GM-only at the command layer.
- */
+/** Moves a combatant between the shared (public) and GM-only layers. The projections filter by this flag,
+ *  so flipping it hides the actor, token and rolls from players and the viewer. GM-only. */
 export function setActorVisibility(state: GameState, actorId: string, visibility: "public" | "gm-only") {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -131,11 +126,9 @@ export function setActorVisibility(state: GameState, actorId: string, visibility
   state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, visibility } : candidate);
 }
 
-/**
- * Moves a token within a PREPARED (non-live) scene while the GM stages it privately - players and the
- * viewer never see this scene until it goes live. Snaps against that scene's own map. Rejects the
- * active scene (that one is edited through the normal live token move). GM-only at the command layer.
- */
+/** Moves a token within a prepared (non-live) scene while the GM stages it privately; players and the
+ *  viewer don't see the scene until it goes live. Snaps against that scene's map. Rejects the active
+ *  scene. GM-only. */
 export function moveSceneToken(state: GameState, sceneId: string, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");

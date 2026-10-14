@@ -5,12 +5,9 @@ type SessionRecord = { role: ClientRole; connectionCount: number; status: Presen
 const DEFAULT_GRACE_MS = 8000;
 const OFFLINE_ENTRY_TTL_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Server-authoritative presence keyed only by verified session IDs; never stores a token, socket ID, or address.
- * A session can hold several concurrent connections (multiple tabs/devices sharing one remembered token); it only
- * leaves "online" once its last connection drops, and then only after a short grace period, so a page reload or a
- * brief network blip does not flicker straight to "offline".
- */
+/** Server-authoritative presence keyed only by verified session ids; never stores a token, socket id or
+ *  address. A session may hold several connections; it leaves "online" only after its last connection
+ *  drops and a short grace period passes, so a reload doesn't flicker to "offline". */
 export class PresenceRegistry {
   private readonly sessions = new Map<string, SessionRecord>();
 
@@ -29,10 +26,8 @@ export class PresenceRegistry {
     this.sessions.set(sessionId, { role, connectionCount: 1, status: "online", lastChangedAt: Date.now() });
   }
 
-  /**
-   * `immediate` skips the grace period and removes the session outright; use it only when the session itself is no
-   * longer valid (expired or revoked), never for an ordinary connection drop that a remembered token could still recover.
-   */
+  /** `immediate` skips the grace period; use it only when the session itself is invalid (expired or
+   *  revoked), never for an ordinary disconnect. */
   disconnect(sessionId: string, immediate: boolean) {
     const record = this.sessions.get(sessionId);
     if (!record) return;

@@ -7,11 +7,8 @@ export type FogRectInput = Readonly<{ x: number; y: number; width: number; heigh
 
 const MAX_FOG_SHAPES = 200;
 
-/**
- * Manual fog of war (AboveVTT-inspired, design study only): the GM paints reveal/hide rects over a
- * per-scene mask folded from "all hidden". All mutation goes through here so the live table and a
- * parked scene's GM-private prep (`sceneId`, the token-move pattern) share one implementation.
- */
+/** Manual fog of war: the GM paints reveal/hide rects over a per-scene mask that starts all hidden. The
+ *  live table and a parked scene's private prep (`sceneId`) share this one implementation. */
 
 /** The combat slice a fog edit targets: the live table, or a parked scene's stored combat. */
 function fogSlice(state: GameState, sceneId: string | undefined): { fog: SceneCombat["fog"]; write: (fog: SceneCombat["fog"]) => void } {
@@ -20,7 +17,7 @@ function fogSlice(state: GameState, sceneId: string | undefined): { fog: SceneCo
   }
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  // The active scene's stored combat must stay empty (single source of truth) - edit the live fog instead.
+  // The active scene's stored combat must stay empty (single source of truth); edit the live fog instead.
   if (scene.id === state.combat.activeSceneId) throw new CommandRejectedError("That scene is live - edit its fog on the table.");
   return {
     fog: scene.combat.fog,
@@ -33,17 +30,14 @@ export function setFogEnabled(state: GameState, sceneId: string | undefined, ena
   slice.write({ ...slice.fog, enabled });
 }
 
-/** Everything hidden again (= the "Hide all" tool: enabled fog with no reveals covers the whole map). */
+/** Everything hidden again ("Hide all": enabled fog with no reveals covers the whole map). */
 export function resetFog(state: GameState, sceneId: string | undefined) {
   const slice = fogSlice(state, sceneId);
   slice.write({ ...slice.fog, shapes: [] });
 }
 
-/**
- * Snap a dragged rect to whole grid cells on a calibrated, unrotated map (rotated grids keep the
- * raw pixel rect - axis-aligned snapping would distort against a rotated lattice; documented
- * simplification), then clamp to the map bounds. Gridless maps always keep raw pixels.
- */
+/** Snaps a dragged rect to whole cells on a calibrated, unrotated map, then clamps to the map bounds.
+ *  Rotated grids and gridless maps keep the raw pixel rect. */
 function normalizedRect(geometry: FogMapGeometry, rect: FogRectInput): { x: number; y: number; width: number; height: number } {
   let { x, y, width, height } = rect;
   const calibration = geometry.calibration;
@@ -69,8 +63,7 @@ function normalizedRect(geometry: FogMapGeometry, rect: FogRectInput): { x: numb
 export function paintFog(state: GameState, sceneId: string | undefined, geometry: FogMapGeometry, input: Readonly<{ id: string; op: "reveal" | "hide"; rect: FogRectInput }>) {
   const slice = fogSlice(state, sceneId);
   const rect = normalizedRect(geometry, input.rect);
-  // A stroke covering the whole map supersedes everything before it ("Reveal all" / re-covering
-  // from scratch) - compact instead of accumulating toward the cap.
+  // A stroke covering the whole map supersedes everything before it, so compact instead of accumulating.
   const coversMap = rect.x <= 0 && rect.y <= 0 && rect.x + rect.width >= geometry.width && rect.y + rect.height >= geometry.height;
   const kept = coversMap ? [] : slice.fog.shapes;
   if (kept.length >= MAX_FOG_SHAPES) throw new CommandRejectedError("The fog has too many strokes - Reset it and reveal again.");

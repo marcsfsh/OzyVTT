@@ -66,11 +66,9 @@ export function validateSquareGridCalibration(calibration: SquareGridCalibration
   return calibration;
 }
 
-/**
- * Wizard step: the user draws across known grid intersections and enters how many
- * cells the segment spans. The first point remains an exact grid intersection so
- * the next UI step only needs small origin/scale nudges.
- */
+/** Wizard step: the user draws across known grid intersections and enters how many
+ *  cells the segment spans. The first point remains an exact grid intersection so
+ *  the next UI step only needs small origin/scale nudges. */
 export function deriveSquareGridFromSegment(input: SegmentCalibrationInput): SquareGridCalibration {
   const mapWidthPx = positive(input.mapWidthPx, "Map width");
   const mapHeightPx = positive(input.mapHeightPx, "Map height");
@@ -88,14 +86,9 @@ export function deriveSquareGridFromSegment(input: SegmentCalibrationInput): Squ
   return validateSquareGridCalibration({ kind: "square", origin: { ...input.start }, cellSizePx, rotationRadians, distancePerCell: input.distancePerCell ?? 5 });
 }
 
-/**
- * Derives a square grid from opposite corners of a known rectangular grid area.
- * The normal UI uses a fixed 3-by-3 area: one press-drag-release gesture yields
- * origin and cell size without asking the GM for pixel math or axis. The area is
- * always treated as axis-aligned (rotation locked to 0): a hand-drawn drag is
- * never a perfect diagonal, and inferring rotation from small drag imprecision
- * would rotate the grid when the GM never intended a rotated map.
- */
+/** Derives a square grid from opposite corners of a known rectangular grid area (the UI uses 3x3), so
+ *  one drag yields origin and cell size. Rotation is locked to 0: a hand drag is never a perfect
+ *  diagonal, and inferring rotation from it would tilt maps the GM never meant to rotate. */
 export function deriveSquareGridFromArea(input: AreaCalibrationInput): SquareGridCalibration {
   const mapWidthPx = positive(input.mapWidthPx, "Map width");
   const mapHeightPx = positive(input.mapHeightPx, "Map height");

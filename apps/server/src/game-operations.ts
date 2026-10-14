@@ -59,29 +59,18 @@ import {
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
-/**
- * Transport-agnostic game capabilities. Both adapters - the Socket.IO handlers in `server.ts` and
- * the public HTTP API in `game-http.ts` - validate, authorize, execute, and narrate through these
- * exact functions, so the two surfaces can never fork on behavior (CLAUDE.md rule 2 / ADR-0016).
- *
- * Every operation takes the RAW wire payload and parses it itself with the shared command schemas,
- * performs the same role checks the socket handlers historically performed (same message text),
- * dispatches through the store's serialized command queue, and runs the same side effects
- * (projection publish, combat-log lines, table toasts) on acceptance.
- */
+/** Transport-agnostic game capabilities. The socket handlers and the HTTP API both validate, authorize,
+ *  execute and narrate through these functions, so the two cannot fork (ADR-0016). */
 
 /** A request that failed schema validation. Adapters map it to the transport's "malformed" shape. */
 export class GameInputError extends Error {
   constructor(message: string, public readonly issues?: ReadonlyArray<{ path: ReadonlyArray<string | number>; message: string }>) { super(message); }
 }
-/** The principal's role may not perform this operation (message text matches the historical socket denials). */
+/** The principal's role may not perform this operation. */
 export class GameAccessDeniedError extends Error {}
 
-/**
- * Who is acting. GM sessions and GM-minted integration credentials both act with GM authority -
- * an integration is the GM's own trusted automation (ADR-0016); player sessions keep exactly the
- * player limits the socket enforces. The public table viewer never reaches these operations at all.
- */
+/** Who is acting. Integration credentials are the GM's own automation and act with GM authority
+ *  (ADR-0016); players keep player limits. The public viewer never reaches these operations. */
 export type GamePrincipal =
   | Readonly<{ kind: "gm"; sessionId: string }>
   | Readonly<{ kind: "player"; sessionId: string }>
@@ -96,7 +85,7 @@ function sessionIdOf(principal: GamePrincipal): string { return principal.kind =
 /** The reduced initiator the authorization seam reads: GM-grade acts on anyone, a player on their own claimed actor. */
 function initiatorOf(principal: GamePrincipal): { role: "gm" } | { role: "player"; sessionId: string } { return isGmGrade(principal) ? { role: "gm" } : { role: "player", sessionId: principal.sessionId }; }
 function annotationActorOf(principal: GamePrincipal): AnnotationActor { return { sessionId: sessionIdOf(principal), role: isGmGrade(principal) ? "gm" : "player" }; }
-/** Journal attribution tag (Time Machine v2). */
+/** Journal attribution tag. */
 function principalTag(principal: GamePrincipal): string {
   switch (principal.kind) {
     case "gm": return `gm:${principal.sessionId}`;
@@ -111,21 +100,7 @@ function requireGmGrade(principal: GamePrincipal, message: string) {
   if (!isGmGrade(principal)) throw new GameAccessDeniedError(message);
 }
 
-/**
- * GM-only audit line for a party-visibility tier. The GM-FACING words on the settings page are the
- * client's (Off · Name and class · Full sheet · Sheet + resources); this is the log's own sentence, so
- * the two read naturally in their own places without either owning the other's copy. `off` says what
- * players KEEP as well as what they lose, because "nothing" would misdescribe it - a character is
- * still on the map and in the turn order at every tier.
- *
- * THE `off` LINE USED TO CONTRADICT THE SENTENCE ABOVE IT. It read "nothing ... beyond the tokens on
- * the map", which omits the turn order - the one thing this very docblock says the tier keeps, and a
- * surface that names every character in the fight. A GM reading it would have set `off` believing it
- * hid more than it does. The tier is right and was always right (`projections.ts` argues the case:
- * strip the entry and a player gets a name in the turn order and an empty square where their
- * teammate was standing); the SENTENCE was wrong. What `off` actually removes is the SHEET - no
- * party list, nothing to open, no resources - so that is what it now says.
- */
+// GM-only audit line per party-visibility tier. `off` removes the sheet, not the map or turn order.
 const PARTY_VISIBILITY_LOG: Readonly<Record<PartyVisibility, string>> = {
   off: "Players no longer read anything of each other's sheets. Each other's characters stay on the map and in the turn order.",
   "name-and-class": "Players now see each other's name and class.",
@@ -143,8 +118,8 @@ function parse<Schema extends z.ZodTypeAny>(schema: Schema, raw: unknown, malfor
   const result = schema.safeParse(raw);
   if (result.success) return result.data;
   const issues = result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
-  // action:resolve and save:answer historically surfaced the first zod issue (their refinements carry
-  // the actually-helpful text); everything else kept a stable per-command "malformed" line.
+  // action:resolve and save:answer surface the first zod issue (their refinements carry useful text);
+  // everything else uses a stable per-command "malformed" line.
   const message = preferIssueMessage ? (issues[0]?.message ?? malformedMessage) : malformedMessage;
   throw new GameInputError(message, issues);
 }
@@ -157,19 +132,11 @@ export type GameOperationsContext = Readonly<{
   tokenCatalog: Readonly<{ get: (assetId: string) => unknown; touchLastUsed: (assetId: string) => void; rememberForDefinition: (definitionId: string, assetId: string) => void }>;
   tokenGeometryFor: (mapAssetId: string) => Promise<TokenMapGeometry>;
   publishGameState: (state: GameState) => Promise<void>;
-  /** Bridge: present a newly-live scene's map on the shared screen (best-effort; a viewer hiccup must not undo the scene switch). */
+  /** Presents a newly-live scene's map on the shared screen; best-effort, a viewer failure must not undo the switch. */
   presentSceneMap: (mapAssetId: string) => Promise<void>;
-  /**
-   * Fire a transient toast. It is ALSO written to the feed by default (every toast has always been a
-   * durable line); pass `logged: false` when the durable record is a richer feed row already being
-   * written - an initiative toast beside its own roll row would say the same thing twice.
-   */
+  /** Fires a transient toast, also written to the feed unless `logged: false` (a richer row is written). */
   broadcastTableEvent: (event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; logged?: boolean }>) => void;
-  /**
-   * Append one line to THE TABLE FEED (D11). `actorId` attributes the line to a character or monster
-   * (what the feed's "just mine" filter reads); `roll` makes it a `kind: "roll"` row carrying the whole
-   * roll, and its visibility - not `gmOnly` alone - decides who receives it.
-   */
+  /** Appends a feed line; `actorId` attributes it, and a `roll` row's own visibility decides who receives it. */
   appendLog: (entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; actorId?: string | null; roll?: RollRecord | null }>) => void;
   logTurnBegin: (state: GameState) => void;
   logTimelineOutcome: (outcome: TimelineOutcome, state: GameState) => void;
@@ -179,13 +146,9 @@ export type GameOperationsContext = Readonly<{
   /** Uniform die: an integer in [1, sides]. */
   random: (sides: number) => number;
   newId: () => string;
-  /** Best-effort hook fired after an encounter is archived, so the worldbuilding codex can log a combat-history entry against its location. Implementations MUST swallow their own errors - a codex hiccup can never affect ending a fight. */
+  /** Best-effort hook after an encounter is archived, for the codex's combat history. Must swallow its own errors. */
   onEncounterArchived?: (info: Readonly<{ mapAssetId: string | null; sceneId: string | null; turnCount: number }>) => void;
-  /**
-   * Reads one stored encounter-archive document (the raw JSON string), so `replay.launch` can make an
-   * archived moment live. Optional because the archives live in the game store's own table rather
-   * than in GameState: a context assembled without them simply cannot launch replays, and says so.
-   */
+  /** Reads one stored archive document (raw JSON) for `replay.launch`; without it replays can't launch. */
   archiveDocument?: (id: number) => string | null;
 }>;
 
@@ -194,27 +157,8 @@ export type GameMutationResult = { revision: number; duplicate: boolean } & Reco
 
 export type GameOperations = ReturnType<typeof createGameOperations>;
 
-/**
- * THE ACK'S OWN GATE on the table's lines, and the reason it exists even though nothing gets through
- * it today.
- *
- * A resolution goes two places: into the feed through `appendTableNarration`, which hands each row's
- * `actorIds` to `appendLog`'s live re-derivation, and STRAIGHT BACK to whoever sent the command as
- * the socket acknowledgement. The feed half has a gate. The ack half had none - the whole
- * `resolution` was returned verbatim, `gmOnly: true` rows included, to a player principal.
- *
- * It is not exploitable today, and that is precisely the argument for the gate rather than against
- * it: the reason is that TWO OTHER checks happen to make a player's own resolve name only public
- * combatants (`canPlayerTarget` forces a player's resolved targets public, `canInitiateForActor`
- * forces the attacker to be their own claimed character). Both live in a different concern; either
- * could be relaxed for a good reason by someone who never reads this line, and the day one is, the
- * ack starts shipping rows the feed refuses. `appendLog` does not trust the resolver's verdict
- * either - it re-derives. This is that same second read, on the other door.
- *
- * GM-GRADE IS UNTOUCHED, deliberately: the GM console legitimately shows every line, and an
- * integration is the GM's own automation (ADR-0016). Absent-when-empty matches how the resolver
- * builds the field, so a filtered-to-nothing list reads as "no lines", not "an empty list".
- */
+/** Strips gm-only table narration from a non-GM principal's ack. Other checks already keep a player's
+ *  resolve to public combatants; this is an independent second gate, like `appendLog`'s. */
 function withoutGmOnlyNarration<T extends Readonly<{ tableNarration?: readonly ActionTableNarration[] }>>(principal: GamePrincipal, resolution: T): T {
   const lines = resolution.tableNarration;
   if (isGmGrade(principal) || lines === undefined) return resolution;
@@ -229,54 +173,16 @@ export function createGameOperations(context: GameOperationsContext) {
   const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
   const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
 
-  /**
-   * THE TABLE'S OWN LINE, drained into the feed - the ONE place a resolution's `tableNarration` is
-   * written, so both resolve paths (`actionResolve` and the off-turn `reactionAnswer`) narrate a
-   * rider the same way and neither can quietly stop.
-   *
-   * This is verbatim how `tokenMove` appends `narrateTokenMove`'s public half: `appendLog` with the
-   * named combatants and NO `gmOnly` of our own, which lets the feed's own gate decide from live
-   * state whether a player may read it. The resolver's structural verdict rides as `line.gmOnly` and
-   * is a strict OR on top of that gate (`appendLog` in `server.ts`), never a replacement for it - two
-   * independent reads of the same question, because this is the row that crosses to players.
-   *
-   * `appendLog` rather than `broadcastTableEvent` for the same reason a drag narrates that way: these
-   * are feed rows, and a toast for every shove would out-shout the damage numbers beside it.
-   *
-   * NAMED ABSENCE - THE PUBLIC SECOND SCREEN STILL SAYS NOTHING. `appendLog` reaches GM and player
-   * sockets only; the shared viewer holds no game socket at all (`viewer-coordinator.ts` drives it
-   * over SSE with `ViewerPresentationProjection`), so a table watching the big screen still sees the
-   * token jump ten feet unexplained. This is not a line that can be forwarded: that projection has no
-   * narration field, and adding one is a viewer-safety change with its own surface - the viewer would
-   * need a bounded, self-expiring caption strip, because a feed there is a permanent record on a
-   * screen a room full of non-players can read. THE UNIT THAT WOULD CLOSE IT: a `caption` on
-   * `ViewerPresentationProjection` (`viewer-presentation.ts`), fed from the same lines below through
-   * `viewer-coordinator.ts`, plus the strip that renders it in `ViewerApp.tsx` - and its own entry in
-   * the pinned invariant list in `docs/ai-context/viewer-mode.md`. Half of that (a field with no
-   * renderer, or a renderer fed by nothing) is worse than this absence.
-   */
+  /** Drains a resolution's `tableNarration` into the feed (the one writer, for both resolve paths).
+   *  `appendLog` re-derives visibility from live state; the resolver's `gmOnly` only adds to it. */
   const appendTableNarration = (resolution: Readonly<{ tableNarration?: readonly ActionTableNarration[] }>) => {
     for (const line of resolution.tableNarration ?? []) {
       context.appendLog({ kind: line.kind, text: line.text, actorIds: line.actorIds, ...(line.gmOnly === true ? { gmOnly: true } : {}) });
     }
   };
 
-  /**
-   * Which merged catalog this principal may READ. GM-grade covers the GM's own session and the GM's
-   * minted integration credentials (an integration is the GM's trusted automation, ADR-0016); a
-   * player session sees only player-visible records.
-   *
-   * Every content read below derives its audience here rather than taking the whole library, because
-   * the catalogs are about to stop being SRD-only: the moment homebrew merges in, a read that
-   * ignored its principal would serve every GM-only record to every player - and it would do so far
-   * away from `projections.ts`, where a viewer-safety audit looks.
-   */
-  /**
-   * D13's two abuse guards, both bounded and in-memory (the viewer pairing-limit idiom): a restart
-   * forgives, which is right for limits whose job is to stop a runaway loop, not to punish anyone.
-   * `MAX_STORED_DEFINITIONS` mirrors `GameStateSchema`'s own cap so the refusal is a sentence rather
-   * than a Zod failure mid-transaction.
-   */
+  // Player character-creation abuse guards, in-memory (a restart forgives). The definitions cap mirrors
+  // `GameStateSchema`'s so the refusal is a sentence rather than a Zod failure mid-transaction.
   const MAX_STORED_DEFINITIONS = 100;
   const CREATES_PER_DAY = 5;
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -289,36 +195,20 @@ export function createGameOperations(context: GameOperationsContext) {
     return true;
   }
 
+  // The catalog a principal may read: GM-grade sees everything, a player only player-visible records.
   const audienceOf = (principal: GamePrincipal): ContentAudience => isGmGrade(principal) ? "gm" : "player";
   const catalogFor = (principal: GamePrincipal) => contentLibrary.forAudience(audienceOf(principal));
-  /**
-   * PLAY-TIME item catalog - where magic-item riders live (never on the inventory row, so a cursed
-   * item's mechanics cannot reach the player through their own projection). Deliberately the GM
-   * audience and NOT `catalogFor(principal)`: a player must be able to roll their own GM-authored
-   * cursed sword, and a player-audience view would resolve it to nothing and silently make the item
-   * mundane. What a player may BROWSE stays gated on the catalog read, not on the rules engine.
-   */
+  /** Play-time item catalog (riders live here, never on the inventory row). GM audience so a player can
+   *  still roll their own GM-authored item; browsing is gated on the catalog reads. */
   const equipmentCatalog = () => equipmentCatalogOf(contentLibrary.forAudience("gm"));
 
-  /**
-   * PLAY-TIME definition lookup, hoisted so the ten transaction-scoped copies of this expression
-   * cannot drift apart. Imported stat blocks take precedence over the bundle so sheets/actions
-   * resolve for both, and `monsterForInstance` deliberately ignores a homebrew record's
-   * draft/published/deleted status: a live actor's actions, typed defences and recharge behaviour
-   * are read from the definition per use, so anything narrower would silently disarm every token of
-   * a creature the GM soft-deleted mid-fight.
-   */
+  /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
+   *  a soft-deleted creature's live tokens keep working. */
   const resolveDefinitionIn = (state: GameState, definitionId: string) => storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
   /** The same lookup against the current snapshot, for reads that run outside a command transaction. */
   const resolveDefinition = (definitionId: string) => resolveDefinitionIn(store.snapshot, definitionId);
 
-  /**
-   * Initiative joins the feed as an ordinary roll (D11). Every initiative die the server throws - the
-   * `encounter.start` auto-rolls, a player's own `initiative.roll-self`, the GM's roll-for-the-rest, and
-   * a mid-fight add - lands in `state.rolls` through the ONE writer, attributed to the combatant and
-   * labelled "Initiative", so the dice tray, the sheet's "Mine" filter and the feed all agree it happened.
-   * Hidden combatants keep their monster-roll rule: the roll is GM-only, exactly like a stat-block attack.
-   */
+  // Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only.
   const initiativeRollSink = (state: GameState, commandId: string, principal: GamePrincipal): InitiativeRollSink =>
     (roll) => {
       const actor = state.actors.find((candidate) => candidate.id === roll.actorId);
@@ -335,12 +225,7 @@ export function createGameOperations(context: GameOperationsContext) {
       });
     };
 
-  /**
-   * THE feed side of a roll (D11): after a command commits, every roll it produced becomes a
-   * `kind: "roll"` feed row - attributed to its character, carrying the whole `RollRecord`, gated on the
-   * roll's own visibility. Called only on a non-duplicate result, because a replayed command never
-   * re-rolled: the receipt returns the stored outcome and the feed must not gain a second copy.
-   */
+  // Each committed roll becomes a feed row; skipped for duplicates, which never re-rolled.
   const publishRolls = (state: GameState, commandId: string) => {
     for (const roll of rollsForCommand(state, commandId)) {
       context.appendLog({
@@ -365,7 +250,7 @@ export function createGameOperations(context: GameOperationsContext) {
   const operations = {
     // ---------- Reads ----------
 
-    /** The projection for this principal. GM-grade principals get the full GM view unless they explicitly ask for the player-safe one; players only ever get theirs. */
+    /** The projection for this principal. GM-grade principals get the GM view unless they ask for the player one; players only ever get theirs. */
     view(principal: GamePrincipal, requested?: "gm" | "player"): { view: "gm" | "player"; game: GmView | PlayerView } {
       const state = store.snapshot;
       if (!isGmGrade(principal) || requested === "player") {
@@ -374,18 +259,13 @@ export function createGameOperations(context: GameOperationsContext) {
       return { view: "gm", game: context.gmView(state) };
     },
 
-    /**
-     * The table feed for THIS reader (D11). The player's session id rides along because it is the only
-     * thing that unlocks their own `self-only` rolls - the store decides, not the caller.
-     */
+    /** The table feed for this reader; the player's session id is what unlocks their own `self-only` rolls. */
     logEntries(principal: GamePrincipal, limit?: number): readonly CombatLogEntry[] {
       return context.combatLog.list(isGmGrade(principal), limit, principal.kind === "player" ? principal.sessionId : undefined);
     },
 
-    // Every content read below scopes its catalog to the CALLING principal through `catalogFor`.
-    // Which of them a player may call at all is unchanged - the bestiary and stat blocks stay
-    // GM-only, the rules catalogs stay open - but "may call it" and "sees everything in it" are now
-    // separate questions, and the second is answered once, structurally, by the audience.
+    // Every content read below scopes its catalog to the calling principal through `catalogFor`, so a
+    // homebrew GM-only record never reaches a player. Which reads a player may call at all is separate.
 
     contentMonsters(principal: GamePrincipal) {
       requireGmGrade(principal, "Only the GM can browse bundled content.");
@@ -394,45 +274,37 @@ export function createGameOperations(context: GameOperationsContext) {
     },
 
     contentConditions(principal: GamePrincipal) {
-      // Reference text is public information: any joined session (GM or player) may read it.
-      // Attribution rides along like every other catalog: ADR-0015 requires the BUNDLE's canonical
-      // statement (author, source URL, license URI) on any surface that displays this content, and a
-      // client that has to hand-write a substitute always writes a weaker one.
+      // Reference text is public: any joined session may read it. Attribution rides along (ADR-0015).
       const catalog = catalogFor(principal);
       return { conditions: catalog.conditionSummaries(), attribution: catalog.attribution };
     },
 
     contentSkills(principal: GamePrincipal) {
-      // The skill catalog (reference text + the ability each check uses) is public reference like
-      // conditions: any joined session reads it, and the sheet/builder derive skill modifiers from
-      // it instead of a hardcoded client table.
+      // Public reference like conditions; the sheet and builder derive skill modifiers from it.
       const catalog = catalogFor(principal);
       return { skills: catalog.skillSummaries(), attribution: catalog.attribution };
     },
 
     contentLanguages(principal: GamePrincipal) {
-      // The language catalog is public reference exactly like skills: the builder's species step
-      // offers "Common plus two languages" from it, and the sheet renders what a character knows.
+      // Public reference like skills; the builder's species step offers languages from it.
       const catalog = catalogFor(principal);
       return { languages: catalog.languageSummaries(), attribution: catalog.attribution };
     },
 
     contentSpells(principal: GamePrincipal) {
-      // Spell rules are public reference text (the CC-BY SRD), like conditions - any joined session may read them.
+      // Spell rules are public reference text (CC-BY SRD).
       const catalog = catalogFor(principal);
       return { spells: catalog.spellSummaries(), attribution: catalog.attribution };
     },
 
     contentEquipment(principal: GamePrincipal) {
-      // The SRD equipment catalog is public reference (like spells); the sheet's browse-and-add picker reads it.
-      // Attribution rides along so any surface that displays the gear can show the required CC-BY line.
+      // Public reference; attribution rides along for the required CC-BY line.
       const catalog = catalogFor(principal);
       return { equipment: catalog.equipmentSummaries(), attribution: catalog.attribution };
     },
 
-    // The six character-builder catalogs. Deliberately NOT gated like the bestiary: a player builds
-    // their own character, so any joined session reads them (the same audience as conditions, spells
-    // and equipment). Attribution rides on every one - ADR-0015 requires the wizard to display it.
+    // The character-builder catalogs: not gated like the bestiary, since players build their own
+    // characters. Attribution rides on every one (ADR-0015).
     contentClasses(principal: GamePrincipal) {
       const catalog = catalogFor(principal);
       return { classes: catalog.classSummaries(), attribution: catalog.attribution };
@@ -468,15 +340,13 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(ContentActionsSchema, raw, "The action lookup is malformed.");
       const catalog = catalogFor(principal);
       const imported = storedDefinition(store.snapshot, request.definitionId);
-      // Browse, so the catalog's own lookup (which honours draft/published/deleted) rather than the
-      // play-time resolver: a stat block the GM has not published is not a stat block to browse.
+      // Browse uses the catalog's own lookup (honours draft/published/deleted), not the play-time resolver.
       const definition = imported ?? catalog.monster(request.definitionId);
       const actions = imported
         ? imported.actions.map(actionSummaryOf)
         : catalog.monsterActionSummaries(request.definitionId);
       if (!actions) throw new CommandRejectedError("That stat block is not in the bundled content.");
-      // The SRD generic actions (Dodge, Dash, Help, Unarmed Strike, ...) every combatant can take
-      // ride along after the stat block's own; a declared id shadows its builtin.
+      // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = BUILTIN_ACTIONS
         .filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id))
         .map((candidate) => ({ ...actionSummaryOf(candidate), builtin: true, targeting: BUILTIN_TARGETING[candidate.id] ?? "none" as const }));
@@ -486,9 +356,8 @@ export function createGameOperations(context: GameOperationsContext) {
     contentMonsterSheet(principal: GamePrincipal, raw: unknown) {
       requireGmGrade(principal, "Only the GM can read stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The stat-block lookup is malformed.");
-      // GM-only, and reached from a LIVE token as often as from the bestiary, so this one uses the
-      // play-time resolver on purpose: the GM must still be able to read the sheet of a creature
-      // that is on the table but has since been soft-deleted from the library.
+      // GM-only and often reached from a live token, so it uses the play-time resolver: a soft-deleted
+      // creature still on the table must stay readable.
       const definition = resolveDefinition(request.definitionId);
       if (!definition) throw new CommandRejectedError("That stat block is not in the bundled content.");
       return { definition };
@@ -503,21 +372,17 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!encounterMap || encounterMap.kind !== "battlemap") throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
       const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, expectedRevision } = request;
       const tokenGeometry = await context.tokenGeometryFor(mapAssetId);
-      // Omitted `entries` means "start the fight that is already staged here": the server derives the
-      // combatants from the LIVE scene rather than trusting the client's copy of the staged list.
-      // Derived INSIDE the transaction, against the state the command actually commits against - and
-      // deliberately without a refusal of its own, so `startEncounter`'s own guards keep their order
-      // and their wording (an already-running fight is told to end it, not to pick combatants).
+      // Omitted `entries` means "start the fight staged here", derived from live state rather than the client.
+      // No refusal here, so `startEncounter`'s own guards keep their order and wording.
       const stagedEntries = (state: GameState): readonly EncounterStartEntry[] => {
-        // The ACTIVE scene's own slot is empty by invariant - its live copy is the top-level combat -
-        // so the staged list IS the top-level initiative; the scene lookup only proves one is live.
+        // The active scene's own slot is empty by invariant (its live copy is the top-level combat), so the
+        // staged list is the top-level initiative.
         const live = state.combat.activeSceneId !== null && state.combat.scenes.some((candidate) => candidate.id === state.combat.activeSceneId);
         return live ? state.combat.initiative.map((entry) => ({ actorId: entry.actorId })) : [];
       };
       const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         const entries = request.entries ?? stagedEntries(state);
-        // A fresh fight starts from the TABLE's standing rules policy (D7) unless this command names
-        // its own; the previous fight's mid-combat re-tune does not silently become the new normal.
+        // A fresh fight starts from the table's standing rules policy unless this command names its own.
         startEncounter(state, {
           mapAssetId,
           entries,
@@ -525,8 +390,7 @@ export function createGameOperations(context: GameOperationsContext) {
           ruleExceptions: ruleExceptions ?? { ...state.rulesPolicy.exceptions },
           playersRollInitiative
         }, () => context.random(20), tokenGeometry, (definitionId) => resolveDefinitionIn(state, definitionId), Date.now(), equipmentCatalog(), initiativeRollSink(state, commandId, principal));
-        // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
-        // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
+        // Fresh fight: clear prior snapshots and record this start as the rewind baseline.
         timeline.truncateAll();
         // The previous fight's journal goes with it; this very command stays as the new fight's first entry.
         timeline.clearJournal(commandId);
@@ -558,18 +422,16 @@ export function createGameOperations(context: GameOperationsContext) {
         const finalState = structuredClone(state);
         endedSceneId = finalState.combat.activeSceneId;
         endedMapAssetId = finalState.combat.mapAssetId;
-        // The fight's effects end with it (onEnd fires - Frenzy's Exhaustion lands now); scoped to
-        // this fight's combatants so a parked scene's effects survive untouched (ADR-0020).
+        // The fight's effects end with it (onEnd fires), scoped to its combatants so parked scenes' effects survive.
         effectEvents = endEncounterEffects(state, state.combat.initiative.map((entry) => entry.actorId));
         endEncounter(state); // rejects while rewound
-        // Auto-archive the whole fight permanently BEFORE wiping the live buffers - same transaction,
-        // so an ended encounter's record can never be lost. Skip a fight that captured no boundaries.
+        // Archive the fight in the same transaction, before wiping live buffers, so it can never be lost.
+        // A fight that captured no boundaries is skipped.
         const entries = timeline.entries();
         if (entries.length > 0) {
           const endedAt = new Date().toISOString();
           const journal = timeline.journalEntries();
-          // This end command's own journal row is written after the plan's clear wipes the table, so
-          // append it to the document explicitly - the archive then covers the fight end-to-end.
+          // The end command's own journal row is written after the clear, so append it here explicitly.
           const endEntry: JournalEntry = { seq: (journal[journal.length - 1]?.seq ?? 0) + 1, commandId, type: "encounter.end", actorId: null, principal: tag, payload: request, revision: state.revision + 1, at: endedAt };
           const document = buildEncounterArchive({
             entries,
@@ -578,13 +440,10 @@ export function createGameOperations(context: GameOperationsContext) {
             log: context.combatLog.exportSince(entries[0].revision),
             journal: [...journal, endEntry],
             finalState,
-            // The state AFTER the end command's own work (effect sweeps, their on-end grants -
-            // Frenzy's Exhaustion) - the fight's true aftermath, which finalState predates.
+            // State after the end command's own work (effect sweeps and their on-end grants), which finalState predates.
             postEncounterState: structuredClone(state),
             endedAt,
-            // Archiving the fight that just ended is a play-time read, not a browse: the archive
-            // must snapshot the definition every combatant actually fought with, whatever the
-            // library has since done with the record.
+            // Play-time read: the archive snapshots the definition each combatant actually fought with.
             resolveBundledDefinition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
             attribution: contentLibrary.attribution
           });
@@ -640,8 +499,7 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         publishRolls(result.state, commandId);
-        // The toast stays (it is the transient "X rolled 14" everyone glances at); the durable line is
-        // now the roll row itself, so this no longer writes a second, dice-less feed sentence.
+        // The durable line is the roll row itself; the toast is only the transient announcement.
         if (score !== undefined) context.broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} rolled ${score} for initiative.`, actorIds: [actorId], logged: false });
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -659,9 +517,8 @@ export function createGameOperations(context: GameOperationsContext) {
     async initiativeNext(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can advance Initiative.");
       const request = parse(InitiativeNextSchema, raw, "The Initiative command is malformed.");
-      // Live: record the boundary and advance. Rewound and unchanged: step forward through history
-      // (reaching the return-point resumes live). Rewound and changed: rewrite history - but only
-      // once the GM confirms, which the plan demands by throwing TimelineConfirmationRequired.
+      // Live: record the boundary and advance. Rewound and unchanged: step forward through history.
+      // Rewound and changed: rewrite history only after GM confirmation (TimelineConfirmationRequired).
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
       const result = await store.executeTimeline({ id: request.commandId, type: "initiative.next", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
@@ -678,8 +535,8 @@ export function createGameOperations(context: GameOperationsContext) {
     async initiativePrevious(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can move Initiative backward.");
       const request = parse(InitiativePreviousSchema, raw, "The Initiative command is malformed.");
-      // From live, park a return-point and restore the last boundary; while rewound, step further
-      // back - unless the GM changed things here, where confirming discards those changes in place.
+      // From live, park a return-point and restore the last boundary; while rewound, step further back,
+      // unless the GM changed things here, in which case confirming discards those changes.
       let outcome: TimelineOutcome | undefined;
       const result = await store.executeTimeline({ id: request.commandId, type: "initiative.previous", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         outcome = planPreviousTurn(state, timeline, request.confirmDiscard === true);
@@ -691,8 +548,7 @@ export function createGameOperations(context: GameOperationsContext) {
     async turnEnd(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(CommandIdentitySchema, raw, "The end-turn command is malformed.");
       const scope = actorScopeOf(principal);
-      // End Turn is a live forward step (same as the GM's Next): record the boundary, then advance.
-      // While the GM has the table rewound, players can't quietly push initiative past the review.
+      // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
       const result = await store.executeTimeline({ id: request.commandId, type: "turn.end", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         if (state.combat.historyCursor !== null) throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
@@ -713,8 +569,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "turn.use", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setTurnSlot(state, slot, used, scope));
       if (!result.duplicate) {
         await context.publishGameState(result.state);
-        // Marking a slot spent narrates like reactions do - bonus actions were previously invisible
-        // to the rest of the table. Un-marking (a correction) stays silent.
+        // Marking a slot spent is narrated like reactions; un-marking (a correction) stays silent.
         const turnActorId = result.state.combat.turnActorId;
         if (used && turnActorId) context.broadcastTableEvent({ kind: "action", text: `${actorName(turnActorId)} used ${slot === "bonus-action" ? "a bonus action" : "an action"}.`, actorIds: [turnActorId], gmOnly: actorHidden(turnActorId) });
       }
@@ -734,7 +589,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(TurnLegendarySchema, raw, "The legendary-action command is malformed.");
       const scope = actorScopeOf(principal);
       const { commandId, actorId, spent, expectedRevision } = request;
-      // Silent GM bookkeeping - the pool is GM knowledge; structured legendary resolves narrate the action itself.
+      // Silent: the legendary pool is GM knowledge; structured legendary resolves narrate the action itself.
       const result = await store.execute({ id: commandId, type: "turn.use-legendary", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setLegendaryUsed(state, actorId, spent, scope));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -771,11 +626,9 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         moveEncounterToken(state, actorId, position, geometry);
-        // Time Machine: narrate the move (distance + old → new range to every placed combatant)
-        // from the post-mutation state so the logged numbers are the snapped, authoritative ones.
+        // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
         movement = narrateTokenMove({ state, actorId, from, geometry });
-        // Movement budget + opportunity attacks (SRD) - see movement-rules.ts; runs after the snap
-        // so measured distances are authoritative, and a strict rejection discards the draft.
+        // Movement budget and opportunity attacks (SRD), after the snap; a strict rejection discards the draft.
         const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
         const outcome = applyMovementRules(state, {
           actorId,
@@ -819,18 +672,13 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorAddFromDefinition(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can add combatants.");
       const request = parse(ActorAddFromDefinitionSchema, raw, "The add-combatant command is malformed.");
-      // A browse-driven add, so the GM's catalog: a creature that is still a draft is not yet
-      // something to drop on the map. (Library state and TABLE visibility stay independent - a
-      // published, player-invisible monster is perfectly addable as a public token; players fight
-      // it, they just cannot browse its statblock.)
+      // Browse-driven, so the GM's catalog: a draft creature cannot be added. Library status and table
+      // visibility are independent.
       const definition = catalogFor(principal).monster(request.definitionId);
       if (!definition) throw new CommandRejectedError("That monster is not in the bundled content.");
-      // Like annotation:add, the commandId doubles as the new entity id so a duplicate
-      // delivery acks the same actorId instead of minting a fresh unused one.
+      // The commandId doubles as the entity id so a duplicate delivery acks the same actorId.
       const actorId = request.commandId;
-      // `joinEncounter` closes the mid-fight two-step trap: the "add monsters" browser used to put a
-      // creature on the ROSTER only, and joining the fight was a second trip through a different menu.
-      // One command, one revision - roster row, initiative entry and tray token together.
+      // `joinEncounter` adds the roster row, initiative entry and tray token in one revision.
       const mapAssetId = store.snapshot.combat.mapAssetId;
       const geometry = request.joinEncounter === true && mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
       const result = await store.execute({ id: request.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
@@ -857,19 +705,8 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
 
-    /**
-     * D13 - PLAYERS BUILD THEIR OWN. The gate is the table's stored `builderPolicy.playerBuilder`
-     * (GM-set, projected so the wizard can grey itself out), plus the one-character rule the claim
-     * system already enforces, plus two abuse guards a GM-only command never needed:
-     *
-     *   - a per-session daily CREATE CAP, because a create-then-release loop would otherwise let one
-     *     phone mint actors until the roster cap stopped it;
-     *   - a definitions HEADROOM pre-check, so a full sheet library refuses in a sentence a person
-     *     can act on instead of failing mid-transaction on a Zod max().
-     *
-     * On success the new character is AUTO-CLAIMED by its creator: "players build their own" made
-     * structural rather than a convention the next command has to remember.
-     */
+    /** Players build their own characters: gated by `builderPolicy.playerBuilder`, the one-character rule, a
+     *  daily create cap and a definitions headroom check. Auto-claimed by its creator. */
     async characterCreate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(CharacterCreateSchema, raw, "The character-create command is malformed.");
       const isPlayer = !isGmGrade(principal);
@@ -885,19 +722,12 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: request.commandId, type: "character.create", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         // Headroom first, in a sentence the person can act on (the cap itself throws a blunter one).
         if (state.definitions.length >= MAX_STORED_DEFINITIONS) throw new CommandRejectedError("The table's sheet library is full - ask your GM to delete old characters.");
-        // Assemble INSIDE the command so validation reads the CURRENT builder policy, then land the
-        // definition through the same import path as every other sheet (`import-<actorId>` keying).
-        // The builder gets the CALLER's catalog, never the whole library: a player must not be able
-        // to name a GM-only homebrew class id they were never shown. GM-only today, so the audience
-        // is always "gm" - passing it anyway is what keeps phase 3's player path correct by default.
-        // The table's level cap is enforced HERE, inside the command, against the policy the state
-        // actually holds - not against a copy the caller sent. The sheet's shallow identity edit
-        // carries the same check (`character-edit.ts`), so neither door can exceed the cap.
+        // Validated inside the command against the stored policy and level cap; the caller's catalog keeps
+        // GM-only homebrew out of a player's build.
         if (request.level > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
         const definition = buildCharacterDefinition(request, catalogFor(principal), state.builderPolicy);
         importActorDefinition(state, definition, actorId, "public", equipmentCatalog());
-        // Auto-claim: the character a player built is theirs from the first tick, so no window
-        // exists in which someone else can take it.
+        // Auto-claim so no window exists in which someone else can take it.
         if (isPlayer) {
           const created = state.actors.find((actor) => actor.id === actorId);
           if (created) created.ownerSessionId = principal.sessionId;
@@ -910,25 +740,9 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
 
-    /**
-     * ROLL A WHOLE CHARACTER (issue `2d`) - a complete, playable, single-class character at a named
-     * level, with every decision but the ability spread drawn at random.
-     *
-     * SERVER-SIDE IS THE WHOLE POINT. The dice are `context.random`, the same authority every other
-     * roll comes from, and they are thrown INSIDE the command against the CURRENT catalog and the
-     * CURRENT policy - so a caller cannot pre-roll a character and send it in. That is CLAUDE.md
-     * rule 2, and D14 already moved the builder's own six dice for exactly this reason.
-     *
-     * The gate is `builderPolicy.playerRandom`, which mirrors `characterCreate`'s `playerBuilder`
-     * gate line for line - the same one-character rule, the same per-session create cap, the same
-     * definitions headroom pre-check, the same auto-claim - with one deliberate difference: it is
-     * DENY BY DEFAULT. A guided builder is eight considered steps; a generator is one tap that fills
-     * a roster slot, which is a different kind of thing to hand out.
-     *
-     * The generated character lands through `character.create`'s own path: same assembler, same
-     * import, same `import-<actorId>` keying, same choice ledger. It is a hand-built character that
-     * nobody had to sit through - not a second species of sheet.
-     */
+    /** Rolls a complete character with `context.random` inside the command, so a caller can't pre-roll.
+     *  Gated by `builderPolicy.playerRandom` (deny by default) plus the same checks and auto-claim as
+     *  `characterCreate`; lands through the same path. */
     async characterGenerate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(CharacterGenerateSchema, raw, "The character-generate command is malformed.");
       const isPlayer = !isGmGrade(principal);
@@ -948,8 +762,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: request.commandId, type: "character.generate", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         if (state.definitions.length >= MAX_STORED_DEFINITIONS) throw new CommandRejectedError("The table's sheet library is full - ask your GM to delete old characters.");
         if (request.level > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
-        // The CALLER's catalog, exactly as `characterCreate` does: a player must not roll up a
-        // GM-only homebrew class they were never shown.
+        // The caller's catalog, as in `characterCreate`.
         const generated = generateCharacterRequest(request, catalogFor(principal), state.builderPolicy, (sides) => context.random(sides));
         ({ summary, hitPointRolls: rolls, hitDieFaces: faces } = generated);
         const definition = buildCharacterDefinition(generated.request, catalogFor(principal), state.builderPolicy);
@@ -958,8 +771,7 @@ export function createGameOperations(context: GameOperationsContext) {
           const created = state.actors.find((actor) => actor.id === actorId);
           if (created) created.ownerSessionId = principal.sessionId;
         }
-        // The hit-point dice land in the table feed like any other roll (D11/D14): a character
-        // rolled up at the table is a table event, not a private one. Level 1 throws none.
+        // Hit-point dice land in the table feed like any roll. Level 1 throws none.
         if (rolls.length > 0) {
           rollId = context.newId();
           recordRoll(state, {
@@ -979,12 +791,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
 
-    /**
-     * D13/D14 - LEVEL UP, LEVEL DOWN, RESPEC: one command, because they are one motion. The client
-     * prefills the whole request from the stored choice ledger; the server re-runs the identical
-     * build and re-validates every part of it (it never trusts a prefill), then updates the live
-     * character in place through `rebuildActorDefinition`, whose header states exactly what survives.
-     */
+    /** Level up/down and respec: re-runs and re-validates the full build, then `rebuildActorDefinition`. */
     async characterRebuild(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(CharacterRebuildSchema, raw, "The character-rebuild command is malformed.");
       const { commandId, actorId, expectedRevision } = request;
@@ -998,7 +805,7 @@ export function createGameOperations(context: GameOperationsContext) {
         if (request.level > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
         const actor = state.actors.find((entry) => entry.id === actorId);
         if (!actor) throw new CommandRejectedError("That character no longer exists.");
-        // The NAME stays the live actor's: a rebuild changes what a character can do, never who they are.
+        // The name stays the live actor's: a rebuild changes what a character can do, not who they are.
         const definition = buildCharacterDefinition({ ...request, name: actor.name }, catalogFor(principal), state.builderPolicy);
         rebuildActorDefinition(state, actorId, definition, equipmentCatalog());
       });
@@ -1009,16 +816,8 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
 
-    /**
-     * D14 - the builder's dice move SERVER-SIDE. The client used to call `Math.random` six times,
-     * which is the oldest rule-2 violation in the ledger. The roll now runs through `context.random`
-     * and the same dice grammar every other roll uses, and it lands in the table feed like any other
-     * roll: character creation is a table event, not a private browser event.
-     *
-     * `character.create` keeps its BOUND CHECK rather than binding scores to this roll's id -
-     * physical dice at the table are a supported path and always have been (see
-     * `validateAbilityScores`). What is closed here is client-generated randomness.
-     */
+    /** Rolls builder ability scores server-side into the table feed. `character.create` still only
+     *  bound-checks scores, since physical dice are supported. */
     async builderRollAbilities(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(BuilderRollAbilitiesSchema, raw, "The ability-roll command is malformed.");
       const policy = store.snapshot.builderPolicy;
@@ -1057,7 +856,7 @@ export function createGameOperations(context: GameOperationsContext) {
     async builderSetPolicy(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can set the character-builder policy.");
       const request = parse(BuilderSetPolicySchema, raw, "The builder-policy command is malformed.");
-      // A supplied formula must clear the SAME validator the roll path uses - never stored unvetted.
+      // A supplied formula must pass the same validator the roll path uses.
       if (typeof request.customFormula === "string") {
         const check = validateAbilityFormula(request.customFormula);
         if (!check.ok) throw new GameInputError(check.message);
@@ -1068,7 +867,7 @@ export function createGameOperations(context: GameOperationsContext) {
           allowedAbilityMethods: [...allowedAbilityMethods],
           // Omitted = keep the stored formula; null = clear; a string = the validated new formula.
           customFormula: request.customFormula === undefined ? state.builderPolicy.customFormula : request.customFormula,
-          // Same tri-state spirit for the two additive fields: omitted keeps what is stored.
+          // Omitted keeps what is stored.
           maxLevel: request.maxLevel ?? state.builderPolicy.maxLevel,
           playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder,
           playerRandom: request.playerRandom ?? state.builderPolicy.playerRandom
@@ -1117,15 +916,14 @@ export function createGameOperations(context: GameOperationsContext) {
       });
       if (!result.duplicate && outcome) {
         await context.publishGameState(result.state);
-        // Typed damage narrates its adjustments ("17 bludgeoning → 8, resistance: Rage") so the
-        // table sees WHY the applied number differs - never a silent reduction (ADR-0020).
+        // Typed damage narrates its adjustments ("17 bludgeoning → 8, resistance: Rage") so the table sees
+        // why the number differs (ADR-0020).
         const detail = damageAdjustmentDetail(outcome.application);
         const attribution = sourceName ? `${sourceName} hit ${actorName(actorId)} for` : `${actorName(actorId)} took`;
         context.broadcastTableEvent({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
         if (detail.length > 0 || sourceName) context.appendLog({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
-        // A hand-typed type the SRD does not know is legal (homebrew is an open vocabulary) but is
-        // almost always a typo, and a typo here is silently inert - the hardest homebrew failure to
-        // diagnose. The GM hears about it once, on their own line, and the damage still lands.
+        // An unknown damage type is legal (homebrew) but usually a typo that silently does nothing, so the
+        // GM gets a private warning and the damage still lands.
         if (damageType !== undefined && !isSrdDamageType(damageType) && damageType.trim().toLowerCase() !== UNTYPED_DAMAGE) {
           context.appendLog({ kind: "damage", text: `"${damageType}" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.`, actorIds: [actorId], gmOnly: true });
         }
@@ -1202,12 +1000,8 @@ export function createGameOperations(context: GameOperationsContext) {
       catch (error) { throw new CommandRejectedError(error instanceof Error ? error.message : "The roll failed."); }
       const rollId = context.newId();
       const result = await store.execute({ id: commandId, type: "dice.roll", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        // ATTRIBUTION (D11: "every roll is attributed to its character"). A player's loose tray roll used
-        // to arrive with no actorId at all, so it vanished from the sheet's "Mine" filter and from the
-        // feed's per-character view - the roll happened and then belonged to nobody. The server knows who
-        // claimed what, so it fills the blank itself rather than waiting for every client to remember:
-        // exactly one claimed, non-archived character, or it stays unattributed (an ambiguous claim must
-        // not guess). An explicit actorId always wins and is still authorized below.
+        // A player's roll with no actorId is attributed to their single claimed character (ambiguous claims
+        // stay unattributed). An explicit actorId wins and is still authorized below.
         const claimed = principal.kind === "player" ? state.actors.filter((candidate) => candidate.ownerSessionId === initiatorSessionId && !candidate.archived) : [];
         const attributedActorId = actorId ?? (claimed.length === 1 ? claimed[0].id : null);
         if (actorId && principal.kind === "player") {
@@ -1240,10 +1034,8 @@ export function createGameOperations(context: GameOperationsContext) {
     async actionResolve(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ActionResolveSchema, raw, "The action command is malformed.", true);
       const { commandId, actorId, actionId, targetIds, template, conditionId, rollMode, override, commit, attackNatural, attackTotal, critical, expectedRevision } = request;
-      // A player may resolve actions only for their own claimed character (re-checked against live state
-      // inside the mutation). GM-only inputs - area templates (map calibration + a GM-authored annotation),
-      // strict-mode overrides, cover, and applied conditions/notes - are refused or stripped for players,
-      // who act through explicit target ids only.
+      // A player resolves only for their own claimed character (re-checked inside the mutation); GM-only
+      // inputs (templates, overrides, cover, applied conditions/notes) are refused or stripped.
       const initiator = initiatorOf(principal);
       const isPlayer = initiator.role === "player";
       if (isPlayer && template) throw new GameAccessDeniedError("Your GM places area templates.");
@@ -1252,29 +1044,25 @@ export function createGameOperations(context: GameOperationsContext) {
       const effectiveCover = isPlayer ? null : (request.cover ?? null);
       const effectiveNote = isPlayer ? null : (request.note ?? null);
       if (effectiveConditionId !== null && !catalogFor(principal).hasCondition(effectiveConditionId)) throw new CommandRejectedError("That condition is not in the bundled reference.");
-      // The map grid is fetched up front (async) so template containment AND token-distance rules
-      // (prone within 5 ft, unconscious auto-crit) can run inside the synchronous mutation.
+      // The grid is fetched up front (async) so template containment and token-distance rules can run
+      // inside the synchronous mutation.
       const mapAssetId = store.snapshot.combat.mapAssetId;
       const geometry = mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
       if (template && !geometry?.calibration) throw new CommandRejectedError("Calibrate this map before placing an area template.");
       const gmSessionId = sessionIdOf(principal);
       let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
-      // A player's confirmed hit in "direct" mode applies server-side (GM-scoped) inside the mutation;
-      // captured here so its damage narrates to the table after the state publishes (like actor:apply-damage).
+      // A player's confirmed hit in "direct" mode applies server-side inside the mutation; captured for narration.
       let playerDamageApplied: AppliedDamage | undefined;
       const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const attacker = state.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
-        // Authorize against live state (mirrors diceRoll): a player acts only on their own claimed
-        // character; the GM (and integrations) may act on anyone. The seam is the intended per-table
-        // policy hook (ADR-0021), so pass the action kind even though it is not read yet.
+        // Authorize against live state: a player acts only on their own claimed character. The action kind
+        // is passed for the per-table policy hook (ADR-0021).
         const verdict = canInitiateForActor(initiator, state, actorId, "attack");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
         const definition = attacker.definitionId ? resolveDefinitionIn(state, attacker.definitionId) : undefined;
-        // The stat block wins on id collision; the builtin catalog (Dodge, Dash, Unarmed Strike, ...)
-        // covers every combatant - including one without a definition.
-        // EFFECTIVE actions: an item's derived action id (`item-<itemId>`) is otherwise unresolvable,
-        // and a stat-block action's item-raised numbers would be read at their base values.
+        // Effective actions, so `item-<itemId>` ids resolve and item-raised numbers apply. A stat-block
+        // action wins on id collision; builtins cover every combatant.
         const statBlockAction = effectiveActions(definition, attacker, equipmentCatalog()).find((candidate) => candidate.id === actionId);
         const action = statBlockAction ?? builtinAction(actionId);
         if (!action) throw new CommandRejectedError("That action is not on the stat block.");
@@ -1292,60 +1080,38 @@ export function createGameOperations(context: GameOperationsContext) {
         } else {
           resolvedTargetIds = targetIds ?? [];
         }
-        // A player may target only PUBLIC combatants. The runner offers only public targets, but the
-        // server must not trust client input: resolving against a hidden (gm-only) actor id would leak
-        // its name/AC/outcome back through the resolve ack (and, in direct mode, apply damage to it),
-        // bypassing the player projection. Mirrors the attacker-ownership gate above (viewer safety).
+        // A player may target only public combatants: resolving against a hidden actor would leak its
+        // name/AC/outcome through the ack (and in direct mode damage it).
         if (isPlayer) {
           for (const targetId of resolvedTargetIds) {
             if (!canPlayerTarget(state, targetId)) throw new CommandRejectedError("You can only target combatants you can see.");
           }
         }
-        // Footprint-aware (SRD Creature Size): a Medium attacker adjacent to a Large creature is
-        // 5 ft away - center-to-center would read 10 and wrongly block the melee swing.
+        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null => {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        // SRD forced movement (the Push mastery): the resolver has no geometry and must not grow any,
-        // so the token write is built HERE, where the grid was already fetched for `distanceFeet`, and
-        // runs through `moveEncounterToken`'s snapping like the GM's own drag. It takes no client
-        // input - the direction is derived from the two token positions and the distance is the
-        // rule's - and it degrades to null (which the resolver narrates) rather than throwing.
-        //
-        // NO EXTRA AUTHORIZATION LIVES HERE, and that is not an omission. Only `targets[0]` of an
-        // attack that already hit can be pushed, and a player's target ids were cleared by
-        // `canPlayerTarget` above - so a player can never move a hidden combatant's token, and the
-        // one they CAN move is the creature the rules just said they may shove.
-        //
-        // THE GRID WAS FETCHED BEFORE THIS MUTATION OPENED (`tokenGeometryFor` is real file I/O), so a
-        // scene switch that committed inside that window would snap and bound-clamp this token against
-        // a map the fight no longer stands on - the departed map's lattice, the departed map's bounds,
-        // and a narrated distance measured on it. Every other token-position WRITE in this file spends
-        // a rejection on that hazard (`tokenMove`, and the template branch above), but forced movement
-        // never throws: a swing that already hit must not be undone because the map moved. So the
-        // stale case degrades to null, which the resolver narrates as the same "move the token"
-        // sentence an unmeasurable map already earns.
+        // SRD forced movement (Push), snapped like a GM drag; takes no client input. Only `targets[0]` of a hit
+        // is pushed, already restricted to public combatants for players. If the map changed since the grid
+        // was fetched, degrade to null ("move the token") rather than throw.
         const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
           state.combat.mapAssetId === mapAssetId ? pushTokenAway(state, input, geometry) : null;
         resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog(), pushToken });
-        // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
-        // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
-        // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.
+        // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
+        // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer) playerDamageApplied = settlePlayerHit(state, resolution, attacker.name, actorId, state.combat.playerDamageMode, { resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), newId: context.newId, now: () => Date.now(), catalog: equipmentCatalog() }) ?? undefined;
-        // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
+        // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
       if (!result.duplicate && resolution) {
-        // A preview recorded only the attack die - publish it so the table sees the roll, but hold every
-        // narration/broadcast until the resolve is confirmed (nothing was actually used yet).
+        // A preview recorded only the attack die: publish the roll, but hold narration until the resolve is confirmed.
         await context.publishGameState(result.state);
         publishRolls(result.state, commandId);
         if (!resolution.preview) {
         const hidden = actorHidden(actorId);
         context.broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId], gmOnly: hidden });
-        // Rules-engine narration (ADR-0020): overrides are loudly audited, warnings reach the GM,
-        // applied rider effects and granted self effects reach the whole table.
+        // Rules-engine narration (ADR-0020): overrides are audited, warnings reach the GM, applied effects reach the table.
         if (resolution.overridden) context.appendLog({ kind: "override", text: `OVERRIDE (${resolution.overridden.rule}): ${actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`, actorIds: [actorId] });
         for (const warning of resolution.warnings ?? []) context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
         appendTableNarration(resolution);
@@ -1355,14 +1121,13 @@ export function createGameOperations(context: GameOperationsContext) {
         if (resolution.effectGranted) {
           context.broadcastTableEvent({ kind: "effect", text: `${actorName(actorId)} gains ${resolution.effectGranted.name}.`, actorIds: [actorId], gmOnly: hidden });
         }
-        // A reaction window opened: the rolled damage waits on the answer, so the whole table hears why nothing landed yet.
+        // A reaction window opened: the rolled damage waits on the answer, so the table hears why nothing landed yet.
         for (const prompt of resolution.reactionPrompts ?? []) {
           const promptHidden = hidden || actorHidden(prompt.actorId);
           context.appendLog({ kind: "reaction", text: `${prompt.actorName} may use ${prompt.actionName} - the damage waits on their answer.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
           context.broadcastTableEvent({ kind: "reaction", text: `${prompt.actorName} may use ${prompt.actionName}.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
         }
-        // Builtin check rolls (Hide, Influence, Search, Study, Escape) and rule-consequence endings
-        // (attacking revealed Hiding; an off-turn action released a Ready) narrate to the table.
+        // Builtin check rolls and rule-consequence endings narrate to the table.
         if (resolution.check) {
           const verdict = resolution.check.success === null ? "" : resolution.check.success ? " - success" : " - failure";
           context.appendLog({ kind: "action", text: `${actorName(actorId)} rolled ${resolution.check.total} on ${resolution.check.skill}${resolution.check.dc !== null ? ` vs DC ${resolution.check.dc}` : ""}${verdict}.`, actorIds: [actorId], gmOnly: hidden });
@@ -1371,9 +1136,7 @@ export function createGameOperations(context: GameOperationsContext) {
           context.broadcastTableEvent({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
         }
         if (playerDamageApplied) {
-          // Direct-mode auto-apply narrates its damage exactly like actor:apply-damage (with any typed-defense
-          // breakdown). Both actors ride actorIds so gm-only-ness is re-derived correctly - the label names the
-          // attacker, so a hidden attacker (unusual for a PC) must gate the line too.
+          // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const { outcome, targetId, sourceActorId, label } = playerDamageApplied;
           const detail = damageAdjustmentDetail(outcome.application);
           context.broadcastTableEvent({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
@@ -1382,8 +1145,7 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         }
       }
-      // The ack carries the resolution back to whoever sent the command - through the gate a
-      // non-GM principal's copy owes (see `withoutGmOnlyNarration`), never verbatim.
+      // The ack passes through the non-GM filter (see `withoutGmOnlyNarration`), never verbatim.
       return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution: withoutGmOnlyNarration(principal, resolution) } : {}) };
     },
 
@@ -1410,8 +1172,7 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         publishRolls(result.state, commandId);
         if (outcome && outcome.committed && pending) {
-          // The save path narrated a bare total for as long as it existed - so a fire-resistant
-          // target's halved damage arrived unexplained. Same formatter as every other damage line.
+          // Same damage-adjustment formatter as every other damage line.
           const detail = damageAdjustmentDetail({ parts: outcome.parts ?? [], ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) });
           context.broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
         }
@@ -1429,7 +1190,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    // ---------- Reaction prompts (ADR-0020 amendment) ----------
+    // ---------- Reaction prompts (ADR-0020) ----------
 
     async reactionAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ReactionAnswerSchema, raw, "The reaction answer is malformed.");
@@ -1451,8 +1212,7 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         publishRolls(result.state, commandId);
         const hidden = actorHidden(outcome.actorId);
-        // Both reaction paths kept only the total; the breakdown now rides the outcome, so all three
-        // lines below explain a number the defences changed instead of just printing it.
+        // The breakdown explains numbers the defences changed.
         const detail = damageAdjustmentDetail({ parts: outcome.parts ?? [], ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) });
         if (outcome.kind === "leaves-reach") {
           if (outcome.used && outcome.resolution) {
@@ -1460,21 +1220,12 @@ export function createGameOperations(context: GameOperationsContext) {
             const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : "resolved";
             const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} - ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage${detail}` : ""}.`;
             context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
-            // The off-turn swing runs the SAME resolver the on-turn one does, so it produces the same
-            // rules notes - and this was the one resolve path that dropped them on the floor. That
-            // matters most for a mastery the reaction path cannot fully honour: Push resolves here
-            // WITHOUT the geometry callback by design, so its "move the token" sentence is the whole
-            // of what it does off-turn, and Topple's DC line is how the GM learns a save was parked.
-            // Dropping them turned a named absence into a silent skip. Same shape as `actionResolve`'s
-            // drain: GM-only, because the GM is who moves tokens and reads DCs out. `used` excludes
-            // the preview (`reactions.ts` returns `used: false` there), so nothing is said twice.
+            // The off-turn swing runs the same resolver, so its rules notes (Push's "move the token", Topple's DC)
+            // go to the GM too. `used` excludes the preview, so nothing is said twice.
             for (const warning of outcome.resolution.warnings ?? []) {
               context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [outcome.actorId], gmOnly: true });
             }
-            // The table's own lines drain here for the same reason the rules notes do: the off-turn
-            // swing runs the SAME resolver, so a quarterstaff that Topples on an opportunity attack
-            // owes the table the sentence naming what forced that Constitution save. (Push produces
-            // none here - `reactions.ts` resolves without the geometry callback, so no token moves.)
+            // The off-turn swing's table lines drain here too (Push moves no token here: no geometry callback).
             appendTableNarration(outcome.resolution);
           }
         } else if (outcome.used) {
@@ -1486,8 +1237,7 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         publishNarrations(outcome.events);
       }
-      // Same gate as `actionResolve`'s ack: the off-turn swing runs the SAME resolver, so it carries
-      // the same table lines and owes a non-GM principal the same filter.
+      // Same non-GM ack filter as `actionResolve`.
       return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: withoutGmOnlyNarration(principal, outcome.resolution) } : {}), ...(outcome.parts ? { parts: outcome.parts } : {}), ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) } } : {}) };
     },
 
@@ -1500,11 +1250,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * Server-computed action availability (read-only): per stat-block action, whether strict mode
-     * would allow it right now and every violated rule - the same evaluation resolution runs, so the
-     * report can never drift from enforcement. GM-grade any combatant; a player their claimed one.
-     */
+    /** Read-only action availability (same evaluation as resolution). GM-grade any combatant; a player their own. */
     actorAvailableActions(principal: GamePrincipal, raw: unknown) {
       const request = parse(ActorAvailableActionsSchema, raw, "The availability lookup is malformed.");
       const state = store.snapshot;
@@ -1513,9 +1259,7 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!isGmGrade(principal) && actor.ownerSessionId !== principal.sessionId) throw new GameAccessDeniedError("You can only check your own character's actions.");
       const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new CommandRejectedError("That combatant's stat block is unavailable.");
-      // Stat-block rows first, then the builtin generic actions (a stat block shadows a builtin id).
-      // The actor's EFFECTIVE list, so an item's derived actions appear in the runner and a
-      // pool whose limit an item raised reports the right number remaining.
+      // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
       const available = effectiveActions(definition, actor, equipmentCatalog());
       const builtins = BUILTIN_ACTIONS.filter((candidate) => !available.some((declared) => declared.id === candidate.id));
       return {
@@ -1524,10 +1268,8 @@ export function createGameOperations(context: GameOperationsContext) {
           ...actionAvailability(state, actor, available, definition, false, available),
           ...actionAvailability(state, actor, builtins, definition, true, available)
         ],
-        // The sheet's own numbers, computed AFTER the gate above - so they are never derived for an
-        // actor this caller may not see. This is why the block rides a request instead of the
-        // broadcast projection: one authorization already written, instead of two strips that must
-        // both stay right forever (see `actor-derived.ts`).
+        // Derived numbers are computed only after the authorization gate above, which is why they ride a
+        // request rather than the broadcast projection (see `actor-derived.ts`).
         derived: deriveActorSheet(actor, definition, deriveEquipment(actor, definition, equipmentCatalog()), catalogFor(principal).skillSummaries())
       };
     },
@@ -1575,8 +1317,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, actorId, effectId, expectedRevision } = request;
       let events: EffectNarration[] = [];
       const result = await store.execute({ id: commandId, type: "effect.end", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        // A player may end effects only on their own claimed character (the GM anyone) - same
-        // boundary as hp/condition commands; ending fires onEnd and clears linked conditions.
+        // A player may end effects only on their own claimed character; ending fires onEnd and clears linked conditions.
         if (scope.role === "player") {
           const actor = state.actors.find((candidate) => candidate.id === actorId);
           if (!actor || actor.ownerSessionId !== scope.sessionId) throw new CommandRejectedError("You can only track your own character.");
@@ -1602,8 +1343,7 @@ export function createGameOperations(context: GameOperationsContext) {
         if (actor.deathSaves === null || actor.hp.current > 0) throw new CommandRejectedError("That character isn't dying.");
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
         if (actor.deathSaves.failures >= 3) throw new CommandRejectedError("That character is dead - heal or revive them through the GM.");
-        // The die (and preview-vs-commit) is the shared, unit-tested death-save core; the operation keeps
-        // authorization above and the natural-20 heal + narration below.
+        // The die and preview/commit logic live in the shared death-save core.
         roll = rollDeathSave(state, actor, { commit, rollMode, naturalRoll }, { random: context.random, rollId, commandId, sessionId: initiatorSessionId, role: isGmGrade(principal) ? "gm" : "player", now: () => new Date().toISOString() });
         if (commit && roll.outcome.regainsOneHitPoint) events = healActor(state, actorId, 1, { role: "gm" });
       });
@@ -1627,15 +1367,7 @@ export function createGameOperations(context: GameOperationsContext) {
       };
     },
 
-    /**
-     * THE TAP IS THE ATTACK (D10). The sheet says "use this action"; the SERVER decides what that means
-     * right now and says so in the ack, instead of every client re-deriving it from a boolean.
-     *
-     * The old client gate also carried `actor.kind === "player-character"`, which is why a GM tapping a
-     * monster's sheet mid-fight got loose dice while the same action through the tracker resolved
-     * properly. That restriction was never in the server, and it does not come back here: a GM-grade
-     * caller routes structured for any combatant, and the role check below is the only gate.
-     */
+    /** "Use this action": the server picks structured resolve, blocked or loose roll and says so in the ack. */
     async actionUse(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ActionUseSchema, raw, "The action command is malformed.");
       const { commandId, actorId, actionId, targetIds, rollMode, includeDamage, override, expectedRevision } = request;
@@ -1645,8 +1377,7 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
       const route = routeForTap(snapshot.combat, actorId);
 
-      // In the fight, on this creature's turn: delegate VERBATIM to the structured path - same resolver,
-      // same economy, same narration, same idempotency receipt. Nothing is re-implemented here.
+      // On this creature's turn in combat: delegate to the structured path unchanged.
       if (route === "resolved") {
         const resolved = await operations.actionResolve(principal, { commandId, actorId, actionId, ...(targetIds ? { targetIds } : {}), ...(rollMode ? { rollMode } : {}), ...(expectedRevision === undefined ? {} : { expectedRevision }) });
         return { ...resolved, route: "resolved" };
@@ -1656,13 +1387,12 @@ export function createGameOperations(context: GameOperationsContext) {
       const action = effectiveActions(definition, actor, equipmentCatalog()).find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
       if (!action) throw new CommandRejectedError("That action is not on the stat block.");
 
-      // In the fight, off turn: a REAL rules block, which is what makes it overridable by the GM and
-      // askable by the player. Under Advise it resolves with a warning; under Off it just resolves.
+      // Off turn in combat: a real rules block, so the GM can override and the player can ask. Advise
+      // resolves with a warning; Off just resolves.
       if (route === "blocked") {
         const currentName = snapshot.combat.turnActorId === null ? "Someone else" : actorName(snapshot.combat.turnActorId);
-        // A GM Allow (directly, or replayed by `rules.answer`) waves the refusal through AND remembers the
-        // family, so the rest of this creature's off-turn flurry stops re-prompting - D9's one tap. The
-        // memory write is its own tiny mutation because the block lives here, not inside the resolver.
+        // A GM Allow waves the refusal through and remembers the family so the rest of this creature's
+        // off-turn actions stop re-prompting. The memory write is its own small mutation.
         const verdict = override ? { warning: null } : offTurnVerdict(snapshot, action, currentName);
         if (override) {
           await store.execute({ id: context.newId(), type: "action.use", actorId, payload: { commandId, override }, principal: principalTag(principal) }, (state) => { rememberOverride(state, NOT_YOUR_TURN); });
@@ -1673,8 +1403,8 @@ export function createGameOperations(context: GameOperationsContext) {
         return { ...resolved, route: "resolved", ...(verdict.warning === null ? {} : { warning: verdict.warning }) };
       }
 
-      // Loose: the server rolls the action's own dice, attributed to the character, and touches no
-      // combat state at all. No hit points move on this path - HP only ever flows through the resolver.
+      // Loose: the server rolls the action's dice, attributed to the character, and touches no combat
+      // state. HP only ever moves through the resolver.
       const plan = looseRollPlan(action, { includeDamage: includeDamage === true, ...(rollMode ? { rollMode } : {}) });
       if (plan.length === 0) throw new CommandRejectedError(`${action.name} has nothing to roll outside a fight.`);
       const initiator = initiatorOf(principal);
@@ -1702,26 +1432,20 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate, route: "loose", rollIds };
     },
 
-    /**
-     * THE SAVE CHIP ANSWERS THE QUESTION (D10). A pending save open for this character and ability is
-     * ANSWERED - the same `save.answer` path the tracker uses, so the damage and condition apply and the
-     * prompt closes. With nothing open it is an ordinary attributed save roll, which is what the chip
-     * always did and all it could ever do before.
-     */
+    /** The save chip answers an open pending save via `save.answer`; otherwise it is a loose attributed save. */
     async saveRoll(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SaveRollSchema, raw, "The saving throw is malformed.");
       const { commandId, actorId, ability, rollMode, total, expectedRevision } = request;
       const snapshot = store.snapshot;
       const actor = snapshot.actors.find((candidate) => candidate.id === actorId);
       if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-      // Oldest first: a character owing two saves answers the one they have been waiting on longest.
+      // Oldest first: a character owing two saves answers the longest-waiting one.
       const pending = snapshot.combat.pendingSaves.find((entry) => entry.targetActorId === actorId && entry.ability === ability);
       if (pending) {
         const answered = await operations.saveAnswer(principal, { commandId, saveId: pending.id, method: total === undefined ? "roll" : "manual", ...(total === undefined ? {} : { total }), ...(rollMode ? { rollMode } : {}), commit: true, ...(expectedRevision === undefined ? {} : { expectedRevision }) });
         return { ...answered, route: "answered", saveId: pending.id };
       }
-      // No open prompt: a loose save, rolled server-side at the SAME modifier the resolver would use,
-      // so a chip and a forced save can never disagree about the number (the actor-derived contract).
+      // Loose save at the same modifier the resolver would use.
       const definition = actor.definitionId ? resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const modifier = saveTotalFor(definition, actor, ability, deriveEquipment(actor, definition, equipmentCatalog()));
       const die = rollMode === "advantage" ? "2d20kh1" : rollMode === "disadvantage" ? "2d20kl1" : "1d20";
@@ -1733,29 +1457,20 @@ export function createGameOperations(context: GameOperationsContext) {
       return { ...loose, route: "loose" };
     },
 
-    // ---------- Ask the GM (D8/D9) ----------
+    // ---------- Ask the GM ----------
 
-    /**
-     * A blocked player taps "Ask the GM" and the SAME command arrives here.
-     *
-     * The server re-runs it first, under the ASKER's own authority and with no override at all. That is
-     * the whole design: if the situation changed and the command now succeeds, it just succeeds and
-     * nobody is asked anything; only a command that still blocks is parked. It also means the parked
-     * ask is never a lie - the block was re-proved a moment ago, against live state.
-     */
+    /** "Ask the GM": re-runs the command under the asker's authority first, parking it only if it still blocks. */
     async rulesAsk(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(RulesAskSchema, raw, "The question is malformed.");
       const { commandId, type, payload, expectedRevision } = request;
-      // Re-run under the asker's own authority: their role limits are unchanged, so a player still
-      // cannot reach another character's command by wrapping it in an ask.
+      // Under the asker's own authority, so wrapping a command in an ask cannot widen what they may reach.
       const attempt = askRerunPayload(payload);
       try {
         const outcome = await askableRunners[type](principal, attempt);
         return { ...outcome, ran: true };
       } catch (error) {
         if (!(error instanceof RulesBlockedError)) throw error;
-        // Only a rules block becomes a question. Everything else - a malformed payload, an actor the
-        // caller may not act for, a target that no longer exists - is still that command's own refusal.
+        // Only a rules block becomes a question; any other failure is the command's own refusal.
         const actorId = askActorId(attempt);
         if (actorId === null) throw new CommandRejectedError("That action names no character to ask about.");
         const askId = context.newId();
@@ -1770,24 +1485,15 @@ export function createGameOperations(context: GameOperationsContext) {
         });
         if (!result.duplicate) {
           await context.publishGameState(result.state);
-          // GM-only: the question reaches the GM through their projection (and this line); the asker
-          // already knows what they asked, and the rest of the table has no business seeing it.
+          // GM-only: the rest of the table has no business seeing the question.
           context.appendLog({ kind: "override", text: `${actorName(actorId)} asked the GM about a blocked action (${error.rule}): ${error.message}`, actorId, gmOnly: true });
         }
         return { revision: result.state.revision, duplicate: result.duplicate, askId: parked?.id ?? askId, ran: false, blocked: { rule: error.rule, message: error.message, overridable: error.overridable } };
       }
     },
 
-    /**
-     * The GM's one tap (D9). Allow replays the parked command with an injected override under GM
-     * authority - the roll and the economy still attribute to the parked character, and the rules
-     * engine's own override path records the family memory, so the same KIND of block stops nagging for
-     * the rest of that turn. Deny clears the ask and tells the player plainly.
-     *
-     * Order matters: the replay runs BEFORE the ask is cleared. A replay that fails against current
-     * state (the target moved, the target died, a different rule now bites) surfaces its own rejection
-     * and leaves the question parked, so the GM can look and answer again instead of losing it.
-     */
+    /** The GM's answer: Allow replays the parked command with an override (before clearing the ask, so a
+     *  failed replay leaves it parked); Deny clears it and tells the player. */
     async rulesAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can answer a rules question.");
       const request = parse(RulesAnswerSchema, raw, "The answer is malformed.");
@@ -1817,21 +1523,15 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(SetRulesModeSchema, raw, "The rules-mode command is malformed.");
       const { commandId, mode, exceptions, expectedRevision } = request;
       const result = await store.execute({ id: commandId, type: "encounter.set-rules-mode", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        // Omitted exceptions leave the stored ones alone, so an old mode-only payload still means
-        // exactly what it always meant - the field is additive, not a reset.
+        // Omitted exceptions leave the stored ones alone (additive field, not a reset).
         state.combat = { ...state.combat, rulesMode: mode, ...(exceptions === undefined ? {} : { ruleExceptions: { ...exceptions } }) };
       });
       if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Rules mode set to ${mode}${exceptions === undefined ? "" : ` (${describeRuleExceptions(exceptions)})`}.`, gmOnly: true }); }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * The STANDING rules policy every new fight inherits (D7) - campaign policy, not fight state, which
-     * is why it lives top-level beside `builderPolicy` instead of on `combat` (parking it on combat
-     * would drag it through scene park/resume). Changing it does NOT touch the fight in progress; that
-     * is `encounter.set-rules-mode`, and keeping the two separate is what makes "each fight starts from
-     * the table's settings" a promise rather than a surprise mid-combat re-tune.
-     */
+    /** The standing rules policy new fights inherit; campaign policy, so not on `combat`. Doesn't touch the
+     *  running fight (that's `encounter.set-rules-mode`). */
     async rulesSetPolicy(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can set the rules policy.");
       const request = parse(RulesSetPolicySchema, raw, "The rules-policy command is malformed.");
@@ -1843,11 +1543,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * Table defaults for staging (D2). Stored only - the per-add `visibility` argument stays explicit
-     * on the wire, so this is what a surface INITIALIZES its toggle from, never a silent server-side
-     * substitution that would make an add command say one thing and do another.
-     */
+    /** Staging defaults, stored only: surfaces initialize toggles from it; per-add `visibility` stays explicit. */
     async tableSetStagingDefaults(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can set the table's staging defaults.");
       const request = parse(TableSetStagingDefaultsSchema, raw, "The staging-defaults command is malformed.");
@@ -1859,16 +1555,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * How much a player sees of ANOTHER player's character (rulings 5/8/19). Stored only - the whole
-     * of the enforcement is `projectPlayerView` in `projections.ts`, which is what makes this a real
-     * setting rather than a client-side filter over data already on the wire.
-     *
-     * `publishGameState` re-projects for every connected socket, so a player already at the table sees
-     * the new tier on the next tick without reconnecting - the same mechanism every other table
-     * setting rides. The audit line is GM-only: what the GM lets players see is table management, and
-     * announcing it to the table would be its own small leak.
-     */
+    /** How much a player sees of another player's character; enforced in `projectPlayerView`. GM-only audit line. */
     async tableSetPartyVisibility(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can set what players see of each other.");
       const request = parse(TableSetPartyVisibilitySchema, raw, "The party-visibility command is malformed.");
@@ -1962,18 +1649,9 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * RE-MAKE A PICK the content says may be re-made on a rest - ruling A's runtime half.
-     *
-     * "Whenever you finish a Long Rest, choose one type of land." The answer is NOT written to
-     * `character.choices[]`: that ledger is the provenance level-up and respec are built on, and a
-     * re-choice between fights must not require a rebuild. It goes on the actor as `choiceOverrides`,
-     * beside `actionUses`, and the matching rest clears it (`rests.ts`).
-     *
-     * The server decides both halves of legality from the CONTENT, never from the request: which
-     * offers this character may re-choose at all (a feature declaring `replaces`), and what each may
-     * be re-chosen to (that offer's own option list). A client cannot widen either.
-     */
+    /** Re-makes a pick the content allows on a rest. Stored as `choiceOverrides` on the actor (not the
+     *  choices ledger) and cleared by the matching rest. What may be re-chosen comes from content, never
+     *  the request. */
     async actorRechoose(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ActorRechooseSchema, raw, "The re-choose command is malformed.");
       const { commandId, actorId, offer, id, expectedRevision } = request;
@@ -1981,13 +1659,12 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "actor.rechoose", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-        // The same owner-or-GM seam a rest uses: this is a resource decision on a character sheet.
+        // Same owner-or-GM seam as a rest.
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
         const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-        // The GM audience deliberately: legality is a CONTENT question (which feature declares the
-        // clause, what its option list is), and a player re-choosing on their own sheet must get the
-        // same answer the GM would. Nothing GM-only is projected - only the offer they may already see.
+        // GM audience: legality is a content question and must match what the GM would get. Nothing GM-only
+        // is projected.
         const choices = replaceableOffers(definition, contentLibrary.forAudience("gm"));
         const match = choices.find((candidate) => candidate.offer === offer);
         if (!match) {
@@ -2012,9 +1689,8 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(ActorRestSchema, raw, "The rest command is malformed.");
       const { commandId, actorId, kind, expectedRevision } = request;
       let events: EffectNarration[] = [];
-      // A player may rest their own claimed character (v5 #5); the GM rests anyone. Same owner-or-GM seam
-      // as spending a slot - authorised inside the mutation against live state (applyRest itself still
-      // refuses to rest a combatant who is in a running encounter).
+      // A player may rest their own claimed character; authorized inside the mutation against live state
+      // (applyRest still refuses a combatant in a running encounter).
       const result = await store.execute({ id: commandId, type: "actor.rest", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
@@ -2033,9 +1709,8 @@ export function createGameOperations(context: GameOperationsContext) {
       const scope = actorScopeOf(principal);
       const initiatorSessionId = sessionIdOf(principal);
       const { commandId, actorId, count, expectedRevision } = request;
-      // Roll BEFORE the store executes (the dice.roll pattern): a duplicate retry replays the stored
-      // outcome and must not consume fresh randomness. Sides come from the snapshot; the execute
-      // callback re-validates against live state.
+      // Roll before executing: a duplicate retry replays the stored outcome and must not consume fresh
+      // randomness. The execute callback re-validates against live state.
       const snapshotActor = store.snapshot.actors.find((candidate) => candidate.id === actorId);
       const sides = snapshotActor?.hitDice ? Number.parseInt(snapshotActor.hitDice.die.slice(1), 10) : 8;
       const faces = Array.from({ length: count }, () => context.random(sides));
@@ -2047,7 +1722,7 @@ export function createGameOperations(context: GameOperationsContext) {
         healed = outcome.healed;
         events = outcome.events;
         const actor = state.actors.find((candidate) => candidate.id === actorId)!;
-        // The dice land in the shared roll history so the table sees the heal happen; hidden actors stay GM-only.
+        // The dice land in shared roll history; hidden actors stay GM-only.
         const record: RollRecord = {
           id: rollId, commandId, initiatorSessionId, initiatorRole: scope.role, initiatorLabel: actor.name, actorId,
           purpose: "manual", visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
@@ -2158,7 +1833,7 @@ export function createGameOperations(context: GameOperationsContext) {
       requireGmGrade(principal, "Only the GM controls the fog of war.");
       const request = parse(FogPaintSchema, raw, "The fog stroke is malformed.");
       const { commandId, op, rect, sceneId, expectedRevision } = request;
-      // Geometry comes from whichever map the stroke targets: the live table's, or the parked scene's own.
+      // Geometry comes from the stroke's target map: the live table's or the parked scene's.
       const mapAssetId = sceneId === undefined
         ? store.snapshot.combat.mapAssetId
         : store.snapshot.combat.scenes.find((scene) => scene.id === sceneId)?.mapAssetId ?? null;
@@ -2275,8 +1950,7 @@ export function createGameOperations(context: GameOperationsContext) {
     // ---------- Character claims ----------
 
     async characterClaim(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
-      // Claims bind a character to a PLAYER session; GM sessions and integrations (GM authority) are
-      // refused with the table's own message. Integrations wanting a seat hold a player session.
+      // Claims bind a character to a player session; GM sessions and integrations are refused.
       if (isGmGrade(principal)) throw new GameAccessDeniedError("GM sessions do not claim player characters.");
       const request = parse(ActorRemoveSchema, raw, "The claim command is malformed.");
       const { commandId, actorId, expectedRevision } = request;
@@ -2286,7 +1960,7 @@ export function createGameOperations(context: GameOperationsContext) {
     },
 
     async characterRelease(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
-      // Same audience rule as the socket: only a player session has claims to release.
+      // Only a player session has claims to release.
       if (isGmGrade(principal)) throw new GameAccessDeniedError("Join a session first.");
       const request = parse(CommandIdentitySchema, raw, "The release command is malformed.");
       const { commandId, expectedRevision } = request;
@@ -2307,11 +1981,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     // ---------- Actor cosmetics ----------
 
-    /**
-     * D18: a player picks the token for their OWN claimed character. The GM still sets anyone's -
-     * `canInitiateForActor` is the same one-line gate every other player-initiated command uses, so
-     * "own claimed character only" has one definition, not a second copy here.
-     */
+    /** A player picks the token for their own claimed character; the GM may set anyone's. */
     async actorSetTokenImage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SetTokenImageSchema, raw, "The token image command is malformed.");
       const { commandId, actorId, tokenAssetId, expectedRevision } = request;
@@ -2321,7 +1991,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const actor = state.actors.find((item) => item.id === actorId);
         if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-        // Re-checked INSIDE the transaction: the snapshot check above races a claim release.
+        // Re-checked inside the transaction: the snapshot check above races a claim release.
         const inside = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
         if (!inside.ok) throw new CommandRejectedError(inside.message);
         if (tokenAssetId === null) delete actor.tokenAssetId; else actor.tokenAssetId = tokenAssetId;
@@ -2374,17 +2044,15 @@ export function createGameOperations(context: GameOperationsContext) {
       requireGmGrade(principal, "Only the GM can archive characters.");
       const request = parse(SetActorArchivedSchema, raw, "The archive command is malformed.");
       const { commandId, actorId, archived, expectedRevision } = request;
-      // Archiving hides a character from players (projection) and the encounter builder; a live actor may
-      // not be archived while it's in the running fight - the GM removes it from combat first.
+      // Archiving hides a character from players and the encounter builder; a combatant in the running
+      // fight must be removed from combat first.
       let releasedClaim = false;
       const result = await store.execute({ id: commandId, type: "actor.set-archived", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That character no longer exists.");
         if (archived && state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Remove this character from the encounter before archiving it.");
-        // Archiving a CLAIMED character used to leave the claim in place while the projection hid the
-        // character from everyone INCLUDING its owner: the player held an invisible claim and, because
-        // the one-claim rule counts by session, could not claim anything else. Release it here, in the
-        // same mutation, so archiving means what it says - hidden, kept, out of play.
+        // Release a claim on archive, otherwise the owner holds an invisible claim and the one-claim rule
+        // blocks them from claiming anything else.
         releasedClaim = archived && actor.ownerSessionId !== null;
         if (releasedClaim) forceReleaseCharacter(state, actorId, "gm");
         actor.archived = archived;
@@ -2396,11 +2064,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * Share (or un-share) an ARCHIVED character's sheet back to players as a read-only keepsake (D26).
-     * Default hidden; the flag is meaningless while the character is live, whose sheet reaches only its
-     * owner exactly as before. Players receive nothing but the id and name (`archivedCharacters`).
-     */
+    /** Shares an archived character's sheet as a read-only keepsake; players receive only id and name. */
     async actorSetSheetPreview(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can share an archived character's sheet.");
       const request = parse(SetActorSheetPreviewSchema, raw, "The sheet-preview command is malformed.");
@@ -2427,21 +2091,19 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, name, mapAssetId, combatantIds, activate, expectedRevision } = request;
       const geometry = await context.tokenGeometryFor(mapAssetId);
       const implicitSceneId = context.newId();
-      // `activate` makes "prepare and go" one command instead of prepare-then-switch. It runs the SAME
-      // park/resume swap `scene.activate` runs (and inherits its refusals - a GM mid-history-review is
-      // still told to finish first), which is why it goes through executeTimeline and truncates.
+      // `activate` runs the same park/resume swap as `scene.activate` (and inherits its refusals), hence
+      // executeTimeline and truncation.
       const result = await store.executeTimeline({ id: commandId, type: "scene.create", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry);
         if (activate === true) {
-          // The implicit-scene id must NOT be the commandId here: the scene we just created already
-          // owns it, and parking a pre-scenes encounter under the same id would collide.
+          // The implicit-scene id must not be the commandId: the new scene already owns it.
           activateScene(state, commandId, implicitSceneId);
           timeline.truncateAll();
         }
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
-        // Going live also presents the map on the shared screen - the same one action scene.activate is.
+        // Going live also presents the map on the shared screen.
         if (activate === true && result.state.combat.mapAssetId) await context.presentSceneMap(result.state.combat.mapAssetId);
       }
       return { revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId };
@@ -2471,21 +2133,20 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, sceneId, expectedRevision } = request;
       const result = await store.executeTimeline({ id: commandId, type: "scene.activate", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         activateScene(state, sceneId, commandId); // rejects while rewound
-        // Snapshots belong to the scene that was live; the swap invalidates them, so start clean.
+        // Snapshots belong to the scene that was live; the swap invalidates them.
         timeline.truncateAll();
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         const scene = result.state.combat.scenes.find((candidate) => candidate.id === sceneId);
         context.appendLog({ kind: "scene", text: `Switched to scene "${scene?.name ?? "Untitled"}".`, gmOnly: true });
-        // A scene prepared before archived characters were rejected server-side may still hold one.
-        // Activation deliberately does NOT refuse (that would strand the scene with no way back); the
-        // GM is told instead, and removes them. No destructive scrub of stored prep.
+        // Older prepared scenes may still hold archived characters. Activation does not refuse (that would
+        // strand the scene); the GM is told instead.
         const resumedArchived = result.state.combat.initiative
           .map((entry) => result.state.actors.find((actor) => actor.id === entry.actorId))
           .filter((actor): actor is NonNullable<typeof actor> => actor !== undefined && actor.archived);
         if (resumedArchived.length > 0) context.appendLog({ kind: "scene", text: `This scene still stages ${resumedArchived.length} archived character${resumedArchived.length === 1 ? "" : "s"} (${resumedArchived.map((actor) => actor.name).join(", ")}) - restore or remove them.`, gmOnly: true });
-        // Going live also presents the scene's map on the shared screen, so it's one action.
+        // Going live also presents the scene's map on the shared screen.
         if (result.state.combat.mapAssetId) await context.presentSceneMap(result.state.combat.mapAssetId);
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -2503,11 +2164,7 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    /**
-     * LAUNCH FROM HERE (D25). Parks the live table exactly as `sceneActivate` does - same park/resume
-     * motion, same map presentation on the shared screen - and goes live on the recorded moment.
-     * There is no second table: the parked scene is one `scene.activate` away, always.
-     */
+    /** Parks the live table like `sceneActivate` and goes live on a recorded moment. */
     async replayLaunch(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can launch a replay.");
       const request = parse(ReplayLaunchSchema, raw, "The replay launch is malformed.");
@@ -2551,12 +2208,7 @@ export function createGameOperations(context: GameOperationsContext) {
     }
   };
 
-  /**
-   * The closed list of commands an ask can carry, mapped to the SAME handlers every other caller uses
-   * (D8). Deliberately not the command registry: the registry is built from these operations, so this
-   * would be a cycle - and a closed table is the point. `rules.ask` re-runs through it under the asker's
-   * authority; `rules.answer` re-runs through it under the GM's, with the override injected.
-   */
+  /** Commands an ask can carry, mapped to the shared handlers. Not the command registry (that would be a cycle). */
   const askableRunners: Readonly<Record<AskableCommand, (principal: GamePrincipal, raw: unknown) => Promise<GameMutationResult>>> = {
     "action.resolve": (principal, raw) => operations.actionResolve(principal, raw),
     "action.use": (principal, raw) => operations.actionUse(principal, raw),
@@ -2567,18 +2219,14 @@ export function createGameOperations(context: GameOperationsContext) {
   return operations;
 }
 
-/** The character a parked payload is about - every askable command names one, and an ask without one is not askable. */
+/** The character a parked payload is about; an ask without one is not askable. */
 function askActorId(payload: unknown): string | null {
   const actorId = (payload as { actorId?: unknown } | null | undefined)?.actorId;
   return typeof actorId === "string" && actorId.length > 0 ? actorId : null;
 }
 
-/**
- * The command catalog for the generic HTTP tunnel (`POST /api/v1/game/commands`), its GET discovery
- * listing, AND the typed HTTP routes (which derive their scope + handler from here rather than
- * restating them). Types use the store's dot-separated receipt form - the same strings the archive
- * journal and `domain_events` table record. Scopes come from `GAME_COMMAND_SCOPES` (single source).
- */
+/** The command catalog for the HTTP tunnel, its discovery listing and the typed routes. Scopes come from
+ *  `GAME_COMMAND_SCOPES`. */
 export type GameCommandDescriptor = Readonly<{
   type: GameCommandType;
   scope: IntegrationScope;

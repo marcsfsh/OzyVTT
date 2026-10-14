@@ -10,30 +10,9 @@ import {
 import type { ContentView } from "./content-library.js";
 import { CommandRejectedError } from "./game-store.js";
 
-/**
- * THE RANDOM CHARACTER GENERATOR (issue `2d`), SERVER-SIDE.
- *
- * A complete, playable, single-class character at a named level: the standard array distributed by
- * the class's own stat priority, and every remaining decision - species, background, lineage,
- * subclass, skills, feats, spells, equipment - drawn at random.
- *
- * **Every draw goes through the injected `random`**, which the command hands `context.random`, the
- * same authority every other roll at this table comes from (CLAUDE.md rule 2, decision D14). The
- * wizard's name shuffler calls `Math.random` in the browser; that is the pattern this is NOT.
- * Injecting the function is also what makes the generator testable: one seed, one character.
- *
- * **It answers REAL offers, and only real offers.** `computeServerOffers` is the first four steps of
- * `buildCharacterDefinition` itself, so what may be picked here and what will be accepted there are
- * the same list by construction. There is no second model of the content and no second set of rules
- * about what a Cleric owes - a divergence between the generator's picks and the validator's offers
- * would be the same bug class as `computeOffers` vs `character-build.ts`, where the rule is that the
- * divergence is always the bug.
- *
- * **The loop is a fixpoint, not a script.** Answering a pick can create picks (a chosen feat asks
- * for its own; a chosen option raises a budget; a lineage brings traits that ask for more), so the
- * offers are recomputed from the growing ledger after every answer rather than enumerated once. It
- * terminates because every pass either records a row or stops.
- */
+/** Server-side random character generator: standard array by class priority, every other decision
+ *  drawn through the injected `random` (server dice; a seed reproduces a character). Picks come from
+ *  `computeServerOffers`, recomputed after every answer since answers can create new picks. */
 
 /** A die roll, 1..sides - the shape of `GameOperationsContext.random`. */
 export type DiceRandom = (sides: number) => number;
@@ -47,28 +26,24 @@ export type GenerateCharacterInput = Readonly<{
 }>;
 
 export type GeneratedCharacter = Readonly<{
-  /** The build request - the literal input `buildCharacterDefinition` takes, and `character.create`'s payload shape. */
+  /** The build request: `buildCharacterDefinition`'s input and `character.create`'s payload shape. */
   request: CharacterCreateRequestInput;
-  /** The hit-point dice this generation threw (levels 2..level), and the die they were thrown on, for the table feed. */
+  /** The hit-point dice thrown (levels 2..level), for the table feed. */
   hitPointRolls: readonly number[];
   hitDieFaces: number;
   /** One line naming what was rolled up, for the feed row. */
   summary: string;
 }>;
 
-/**
- * The generator sets ability scores with the standard array, which is a TABLE POLICY the GM can
- * withdraw (`builderPolicy.allowedAbilityMethods`). Saying so here beats `validateBaseScores`
- * rejecting the assembled build four hundred lines later with the same fact.
- */
+/** The standard array is a table policy the GM can withdraw, so check it up front. */
 const GENERATOR_ABILITY_METHOD = "standard-array" as const;
 
-/** A hard stop on the fixpoint below. Nothing in the SRD comes close: a level-20 Wizard settles in under 40 passes. */
+/** A hard stop on the fixpoint below; a level-20 Wizard settles in under 40 passes. */
 const MAX_PASSES = 400;
 
 function reject(message: string): never { throw new CommandRejectedError(message); }
 
-/** One item, uniformly. Ids are sorted first so the same seed draws the same character whatever order a Set happened to hold. */
+/** One item, uniformly. Ids are sorted first so the same seed draws the same character regardless of Set order. */
 function drawOne<T>(items: readonly T[], random: DiceRandom): T {
   if (items.length === 0) reject("The generator ran out of options to choose from.");
   return items[random(items.length) - 1];
@@ -92,15 +67,9 @@ function drawPreferring<T>(preferred: readonly T[], all: readonly T[], count: nu
   return [...first, ...drawSome(rest, count - first.length, random)];
 }
 
-// ---------------------------------------------------------------------------------------------
-// Ability scores: the one decision that is NOT random.
-// ---------------------------------------------------------------------------------------------
+// Ability scores: the one decision that is not random.
 
-/**
- * The standard array, best value to most important ability. `statPriorityFor` is the shipped lookup
- * (`packages/rules-5e/class-data.ts`) - every class already carries a `statPriority`, and an unknown
- * homebrew class falls back to sheet order there rather than throwing, so this never dead-ends.
- */
+/** The standard array by `statPriorityFor` (an unknown homebrew class falls back to sheet order). */
 function standardArrayFor(classId: string, library: ContentView): Record<Ability, number> {
   const priority = statPriorityFor(classId, library.classProgressionTable());
   const ordered = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
@@ -110,11 +79,7 @@ function standardArrayFor(classId: string, library: ContentView): Record<Ability
   return scores;
 }
 
-/**
- * The background's printed +2/+1, aimed the same way: the two highest-priority abilities the
- * background is actually allowed to raise. The background itself is random, so which abilities are
- * on offer is random; where the points go inside that is not.
- */
+/** The background's +2/+1, placed on the two highest-priority abilities the background may raise. */
 function backgroundAllocationFor(
   classId: string, library: ContentView, options: { from: readonly Ability[]; spreads: ReadonlyArray<readonly number[]> } | undefined
 ): Array<{ ability: Ability; amount: number }> {
@@ -130,14 +95,12 @@ function backgroundAllocationFor(
   return spread.map((amount, index) => ({ ability: ranked[index], amount })).filter((entry) => entry.ability !== undefined);
 }
 
-// ---------------------------------------------------------------------------------------------
 // Answering one offer.
-// ---------------------------------------------------------------------------------------------
 
 /** Every ability id, so an `ability-score` pick can tell an ability from an option id. */
 const ABILITY_IDS: ReadonlySet<string> = new Set(ABILITIES);
 
-/** The row shape the wizard writes, so a generated ledger reads back exactly like a hand-built one. */
+/** The row shape the wizard writes, so a generated ledger reads back like a hand-built one. */
 function rowFor(offer: ChoiceOffer, id: string, index: number, payload?: Record<string, unknown>): CharacterChoice {
   return {
     level: levelOfPick(offer, index),
@@ -148,7 +111,7 @@ function rowFor(offer: ChoiceOffer, id: string, index: number, payload?: Record<
   };
 }
 
-/** The skills this build is proficient in so far - the union `character-build.ts` step 8 tests an expertise pick against. */
+/** Skills this build is proficient in so far: the union step 8 checks an expertise pick against. */
 function proficientSkills(survey: ServerOfferSurvey): Set<string> {
   const skillIds = new Set(survey.catalogs.skills.map((skill) => skill.id));
   const held = new Set<string>(survey.background.skillProficiencies);
@@ -156,13 +119,12 @@ function proficientSkills(survey: ServerOfferSurvey): Set<string> {
     if (offer.kind !== "skill" && offer.kind !== "skill-or-tool") continue;
     for (const id of offer.taken) if (offer.kind === "skill" || skillIds.has(id)) held.add(id);
   }
-  // Feature GRANTS too. The wizard cannot see these (riders stay server-side, which is why its own
-  // `withExpertiseReach` stops at picks), but this side can - and step 8's test is the same union.
+  // Feature grants count too (step 8 tests the same union).
   for (const { record } of survey.granted) for (const skill of record.grants?.skills ?? []) held.add(skill);
   return held;
 }
 
-/** Proficiencies/languages this build already holds of one kind - a second pick of the same id spends a budget and yields nothing. */
+/** Proficiencies/languages already held of one kind; picking one again spends a budget for nothing. */
 function heldOfKind(survey: ServerOfferSurvey, kind: string): Set<string> {
   const held = new Set<string>();
   if (kind === "skill") for (const skill of survey.background.skillProficiencies) held.add(skill);
@@ -177,7 +139,7 @@ function heldOfKind(survey: ServerOfferSurvey, kind: string): Set<string> {
   return held;
 }
 
-/** The weapon ids this build's chosen starting-equipment bundles actually hand over. */
+/** The weapon ids the chosen starting-equipment bundles hand over. */
 function carriedWeaponIds(survey: ServerOfferSurvey, choices: readonly CharacterChoice[]): Set<string> {
   const chosen = new Set(choices.filter((row) => row.kind === "equipment").map((row) => row.id));
   const carried = new Set<string>();
@@ -188,15 +150,7 @@ function carriedWeaponIds(survey: ServerOfferSurvey, choices: readonly Character
   return carried;
 }
 
-/**
- * Ability scores as step 5 will see them when it checks an ASI against the SRD's 20.
- *
- * `scoresBeforeIncreases` is the survey's own number (base + background spread + species bonuses);
- * the "asi" rows already in the ledger are added on top, because step 5 folds every one of them
- * before it folds anything else. Chosen `ability-score` picks are deliberately NOT added: they land
- * after the ASI rows and clamp rather than reject, so counting them here would only refuse legal
- * increases.
- */
+/** Scores as step 5 sees them for the ASI cap: pre-increase scores plus existing "asi" rows. */
 function projectedScores(survey: ServerOfferSurvey, choices: readonly CharacterChoice[]): Record<Ability, number> {
   const scores = { ...survey.scoresBeforeIncreases };
   for (const row of choices) {
@@ -208,14 +162,7 @@ function projectedScores(survey: ServerOfferSurvey, choices: readonly CharacterC
   return scores;
 }
 
-/**
- * The +2 (or +1/+1) an "asi" row carries, aimed by the class's own priority.
- *
- * The FEAT-OR-SCORES decision is random, as the issue asks; where the points go once "scores" wins
- * is not, for the same reason the standard array is not. A level-20 Fighter whose four ASIs landed
- * on Intelligence would be a random character rather than a playable one, and playable is the ask.
- * Returns null when nothing has headroom - the caller then takes a feat instead.
- */
+/** The +2 (or +1/+1) for an "asi" row, by class priority; null when nothing has headroom. */
 function asiIncreases(survey: ServerOfferSurvey, choices: readonly CharacterChoice[], classId: string, library: ContentView): Array<{ ability: Ability; amount: number }> | null {
   const scores = projectedScores(survey, choices);
   const priority = statPriorityFor(classId, library.classProgressionTable());
@@ -226,14 +173,7 @@ function asiIncreases(survey: ServerOfferSurvey, choices: readonly CharacterChoi
   return byOne.length === 2 ? byOne.map((ability) => ({ ability, amount: 1 })) : null;
 }
 
-/**
- * Is this feat legally takeable right now?
- *
- * A feat already held is simply never drawn. The SRD's repeat rules are real (`ability-score-
- * improvement` and `skilled` repeat; the three Magic Initiates repeat only with a different spell
- * list) but the generator has no need of them: refusing every repeat can only shrink the draw, never
- * produce a build the validator refuses, and thirty-odd general feats leave plenty to choose from.
- */
+/** Whether a feat is legally takeable now. Held feats are never redrawn, which only narrows the draw. */
 function featIsTakeable(id: string, survey: ServerOfferSurvey, level: number, scores: Record<Ability, number>, library: ContentView): boolean {
   if (survey.heldFeatIds.has(id)) return false;
   const feat = library.featRecord(id);
@@ -244,12 +184,7 @@ function featIsTakeable(id: string, survey: ServerOfferSurvey, level: number, sc
 
 const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
 
-/**
- * The rows that answer ONE offer - every outstanding pick on it, at once.
- *
- * Empty means "this offer cannot be answered", which is a finding about the CONTENT rather than a
- * state the generator recovers from: the caller says so by name and stops.
- */
+/** Rows answering every outstanding pick on one offer; empty means the content can't answer it. */
 function answerOffer(
   offer: ChoiceOffer, survey: ServerOfferSurvey, choices: readonly CharacterChoice[],
   input: GenerateCharacterInput & { classId: string }, library: ContentView, random: DiceRandom
@@ -257,7 +192,7 @@ function answerOffer(
   const outstanding = offer.capacity - offer.taken.length;
   const scores = projectedScores(survey, choices);
 
-  // "Raise two points instead of taking a feat" - the built-in shorthand, decided per pick.
+  // "Raise scores instead of taking a feat", decided per pick.
   if (offer.kind === "asi-or-feat" && random(2) === 1) {
     const increases = asiIncreases(survey, choices, input.classId, library);
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
@@ -267,18 +202,15 @@ function answerOffer(
     withinOfferSpellWindow(offer, id)
     && (offer.repeatable || !offer.taken.includes(id)));
 
-  // A HARD filter refuses ids the validator would refuse; a PREFERENCE reorders ids that are all
-  // legal but not all sensible. Keeping them apart matters: a hard filter that ran out of options
-  // would leave the pick unanswerable, while a preference that runs out simply falls through to the
-  // rest of the list and the character is a little less tidy.
+  // Hard filters remove ids the validator would refuse; preferences only reorder legal ids, so running
+  // out of preferred ids falls through instead of leaving the pick unanswerable.
   let candidates = legal;
   let preferred: readonly string[] = legal;
   if (FEAT_KINDS.has(offer.kind)) {
     candidates = legal.filter((id) => featIsTakeable(id, survey, input.level, scores, library));
     preferred = candidates;
   } else if (offer.kind === "expertise") {
-    // SRD: "choose skills in which you have proficiency". Step 8 rejects the build outright
-    // otherwise, so this is a hard filter rather than the wizard's advisory greying.
+    // SRD: expertise must be in skills you are proficient in; step 8 rejects otherwise.
     const proficient = proficientSkills(survey);
     const reachable = legal.filter((id) => proficient.has(id));
     if (reachable.length > 0) { candidates = reachable; preferred = reachable; }
@@ -290,16 +222,14 @@ function answerOffer(
     const held = heldOfKind(survey, offer.kind === "skill-or-tool" ? "skill" : offer.kind);
     preferred = legal.filter((id) => !held.has(id));
   } else if (offer.kind === "weapon-mastery") {
-    // Mastery in a weapon this character is not carrying is legal and inert - the SRD pick is over
-    // the whole weapon table, so nothing rejects it, and a Fighter with mastery in a blowgun he does
-    // not own has spent a class feature on nothing. Own weapons first; the rest of the table after.
+    // Mastery in an uncarried weapon is legal but useless, so carried weapons come first.
     const carried = carriedWeaponIds(survey, choices);
     preferred = legal.filter((id) => carried.has(id));
   }
 
   const drawn = drawPreferring(preferred, candidates, outstanding, random);
   const rows = drawn.map((id, at) => rowFor(offer, id, offer.taken.length + at));
-  // A feat-kinded offer that could draw nothing legal still owes its pick, and "asi" always fits.
+  // A feat-kinded offer with no legal feat still owes its pick, and "asi" always fits.
   if (rows.length === 0 && offer.kind === "asi-or-feat") {
     const increases = asiIncreases(survey, choices, input.classId, library);
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
@@ -307,9 +237,7 @@ function answerOffer(
   return rows;
 }
 
-// ---------------------------------------------------------------------------------------------
-// The class's own spell budgets - printed columns rather than offers, so they are filled by hand.
-// ---------------------------------------------------------------------------------------------
+// The class's own spell budgets are printed columns rather than offers, so they are filled here.
 
 type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 
@@ -331,10 +259,7 @@ function spellListOf(survey: ServerOfferSurvey): { options: readonly SpellOption
   return { options, maxSlotLevel: slots.reduce((highest, slot) => Math.max(highest, slot.level), 0) };
 }
 
-/**
- * Top the class's cantrip and prepared-spell budgets up to the caps step 9 will check them against -
- * the printed column PLUS every `extraPicks` grant, composed exactly as step 9 composes it.
- */
+/** Fills the class cantrip and prepared-spell budgets to step 9's caps (printed column plus `extraPicks`). */
 function fillSpellBudgets(survey: ServerOfferSurvey, choices: readonly CharacterChoice[], random: DiceRandom): CharacterChoice[] {
   const list = spellListOf(survey);
   if (!list) return [];
@@ -355,14 +280,7 @@ function fillSpellBudgets(survey: ServerOfferSurvey, choices: readonly Character
   return rows;
 }
 
-/**
- * ONE class bundle and ONE background bundle, drawn from the options that actually hand over GEAR.
- *
- * Every SRD class prints a "just take the gold" alternative (`fighter-c` is 155gp and nothing else),
- * and a character who took it owns no weapon, no armour and no focus - a sheet with nothing to do on
- * its turn, which is precisely the failure this generator has to not produce. The draw is still a
- * draw; it just runs over the bundles that leave the table with a playable character on it.
- */
+/** One class and one background bundle, only from options that hand over gear (not just gold). */
 function equipmentRows(survey: ServerOfferSurvey, random: DiceRandom): CharacterChoice[] {
   const rows: CharacterChoice[] = [];
   const choose = (options: ClassReference["startingEquipment"], classId: string | null) => {
@@ -376,15 +294,9 @@ function equipmentRows(survey: ServerOfferSurvey, random: DiceRandom): Character
   return rows;
 }
 
-// ---------------------------------------------------------------------------------------------
 // The generator.
-// ---------------------------------------------------------------------------------------------
 
-/**
- * A complete `character.create` request, rolled up. Throws `CommandRejectedError` with a sentence a
- * GM can act on when the CONTENT cannot produce one (a class with no subclass authored at the level
- * that needs it, a pick with no legal answer).
- */
+/** A complete `character.create` request; throws an actionable `CommandRejectedError` on content gaps. */
 export function generateCharacterRequest(
   input: GenerateCharacterInput, library: ContentView, policy: BuilderPolicy, random: DiceRandom
 ): GeneratedCharacter {
@@ -405,14 +317,12 @@ export function generateCharacterRequest(
     subclassId = drawOne(available, random);
   }
 
-  // Hit points are ROLLED, through the same `random`. `hitPointRollRows` writes them into the
-  // ledger, which is what makes a generated character re-buildable from its own record (D14).
+  // Hit points are rolled through `random` and recorded by `hitPointRollRows`, so the character can be rebuilt.
   const faces = hitDieFaces(classRecord.hitDie);
   const hitPointRolls = Array.from({ length: Math.max(0, input.level - 1) }, () => random(faces));
 
   const identity = {
-    // Named where the species is known, so a generated Dwarf reads like a Dwarf. The bundle is the
-    // same one the wizard's suggestion row draws from - through `random`, not `Math.random`.
+    // Drawn from the species' name bundle (the same one the wizard suggests from).
     name: input.name?.trim() || generateName(speciesId, library, random) || `${species.name} ${classRecord.name}`,
     speciesId, backgroundId, classId, level: input.level,
     ...(subclassId ? { subclassId } : {}),
@@ -423,38 +333,24 @@ export function generateCharacterRequest(
   };
 
   const choices: CharacterChoice[] = [];
-  // ONE opening survey for the two rows written before the loop starts. Neither reads a pick, so it
-  // is the same survey the loop's first pass would compute.
+  // One opening survey for the two rows written before the loop; neither reads a pick.
   const opening = computeServerOffers({ ...identity, choices }, library, policy);
-  /**
-   * The subclass row, written through `rowFor` LIKE EVERY OTHER PICK - which is the whole of the fix.
-   *
-   * Hand-writing it here dropped `payload.featureId`, and the wizard stamps one
-   * (`payload: {featureId: "<class>-subclass"}`). `level-ledger.ts` matches a stored row to a wizard
-   * offer on the tuple `(level, kind, classId, featureId)`, so the pick was never prefilled and the
-   * level-up wizard re-asked a generated character for the subclass it already has - against the
-   * explicit claim on `ChoiceOffer.levels`. Routing it through the offer means the row cannot drift
-   * from the offer again, and the level comes from the offer's own grant level rather than from a
-   * second reading of `classRecord.subclassLevel`.
-   */
+  // Written through `rowFor` like every other pick so it carries `payload.featureId` and the offer's own
+  // level, which `level-ledger.ts` matches on for level-up prefill.
   if (subclassId) {
     const offer = opening.offers.find((candidate) => candidate.kind === "subclass");
     choices.push(offer
       ? rowFor(offer, subclassId, 0)
-      // No subclass offer at all is a content gap (a class with no `<class>-subclass` feature). The
-      // row still has to exist - step 4 checks it against the top-level id - so it falls back to
-      // exactly what it always was rather than dropping the character.
+      // A class with no subclass offer still needs the row (step 4 checks it), so fall back to a plain row.
       : { level: classRecord.subclassLevel, classId, kind: "subclass", id: subclassId });
   }
-  // A species that prints more than one size asks which; the server has no offer for it (step 11
-  // reads the row directly), so it is drawn here rather than in the loop.
+  // Size has no server offer (step 11 reads the row directly), so it is drawn here.
   if (species.sizes.length > 1) choices.push({ level: 1, kind: "size", id: drawOne([...species.sizes], random) });
   choices.push(...equipmentRows(opening, random));
 
   for (let pass = 0; pass < MAX_PASSES; pass += 1) {
     const survey = computeServerOffers({ ...identity, choices }, library, policy);
-    // The printed spell columns first: a budget can only grow as options are chosen, so topping up
-    // early costs nothing and a `fromPicks` offer ("one of your known cantrips") needs them present.
+    // Fill spell budgets first: they only grow, and `fromPicks` offers need known spells present.
     const spells = fillSpellBudgets(survey, choices, random);
     if (spells.length > 0) { choices.push(...spells); continue; }
     const open = survey.offers.find((offer) =>
@@ -477,7 +373,7 @@ function summaryOf(survey: ServerOfferSurvey): string {
   return `${survey.species.name}${lineage} ${survey.classRecord.name}${subclass} · ${survey.background.name}`;
 }
 
-/** A name from the species' own name bundle, or null when the content has none. Drawn like everything else. */
+/** A name from the species' name bundle, or null when the content has none. */
 function generateName(speciesId: string, library: ContentView, random: DiceRandom): string | null {
   const bundle = library.nameBundles().find((entry) => entry.speciesId === speciesId);
   if (!bundle) return null;

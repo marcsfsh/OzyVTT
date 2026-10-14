@@ -61,7 +61,7 @@ export class ViewerCoordinator {
     };
   }
 
-  /** Lets the GM's own session subscribe to the exact live presentation the paired TV shows, for an in-tab preview - without a separate self-pairing step. */
+  /** Subscribes the GM's own session to the live presentation the paired screen shows, for an in-tab preview. */
   connectGm(token: string, listener: PresentationListener, close: CloseListener = () => {}) {
     if (!this.authorizeGm(token)) throw new ViewerAccessDeniedError("A valid GM session is required.");
     const connectionId = randomUUID();
@@ -75,18 +75,14 @@ export class ViewerCoordinator {
     const result = await this.presentation.execute({ ...command, role: "gm" }, this.now());
     if (!result.duplicate) {
       this.broadcast();
-      // A ping only lasts for its duration, but nothing else may mutate state before it expires.
-      // Re-broadcast at the soonest ping expiry so the projection (which already filters expired
-      // pings) actually reaches viewers and the ping disappears on its own.
+      // Re-broadcast at the soonest ping expiry; otherwise an expired ping lingers until the next state change.
       if (command.payload.type === "viewer.ping") this.schedulePingExpiry();
     }
     return result;
   }
 
   private schedulePingExpiry() {
-    // One pending timer at a time, re-armed from the callback so staggered pings each expire on the
-    // shared screen instead of only the earliest one (the rest would otherwise linger until the next
-    // broadcast).
+    // One pending timer, re-armed from the callback so staggered pings each expire on time.
     for (const timer of this.pingTimers) clearTimeout(timer);
     this.pingTimers.clear();
     const now = this.now();
@@ -131,12 +127,9 @@ export class ViewerCoordinator {
     return !result.duplicate;
   }
 
-  /**
-   * Bridge for "make a scene live": present that scene's map on the shared screen - enable presentation
-   * and switch to the map in one server-internal action (mirrors synchronize*, role "gm", no token).
-   * Skips when the map is already the enabled presentation, so re-activating avoids a needless camera
-   * reset. Private staging never reaches here (it never activates a scene).
-   */
+  /** Presents a scene's map on the shared screen when the scene goes live (enables presentation and
+   *  switches map in one server-internal action). Skips when that map is already presented, to avoid
+   *  resetting the camera. */
   async presentMap(sourceRevision: number, map: Readonly<{ assetId: string; altText: string; camera: ViewerCamera }>) {
     const current = this.presentation.snapshot;
     if (current.enabled && current.activeMap?.assetId === map.assetId) return false;

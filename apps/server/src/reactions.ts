@@ -19,18 +19,14 @@ export type ReactionAnswerDependencies = Readonly<{
   gmSessionId: string;
   now: () => string;
 }>;
-/** The two optional halves of a `ReactionOutcome`, spread at both return sites so neither can forget one. */
+/** The two optional halves of a `ReactionOutcome`, spread at both return sites. */
 const detailOf = (application: DamageApplication | null) =>
   application === null ? {} : { parts: application.parts, ...(application.flatReduction ? { flatReduction: application.flatReduction } : {}) };
 
 export type ReactionOutcome = Readonly<{
   used: boolean;
   appliedDamage: number;
-  /**
-   * THE TYPED BREAKDOWN of what was applied. Both reaction paths - the opportunity attack's hit and
-   * the Uncanny-Dodge-class halving - used to keep only the total, so "18 becomes 9, then 4 because
-   * you resist it" reached the table as an unexplained 4. Absent when nothing landed.
-   */
+  /** Typed breakdown of what was applied, so the table sees why the number changed. Absent when nothing landed. */
   parts?: DamageApplication["parts"];
   flatReduction?: number;
   actorId: string;
@@ -44,19 +40,18 @@ export type ReactionOutcome = Readonly<{
   events: readonly EffectNarration[];
 }>;
 
-/**
- * Answer a pending reaction prompt (ADR-0020 amendment).
- *
- * hit-by-attack (Uncanny Dodge): the triggering attack's damage was parked on the prompt, so BOTH
- * answers apply it here - "use" spends the reaction and halves each typed part first (floor, per
- * part, before defenses). GM answers any prompt; a player only their own claimed character's.
- *
- * leaves-reach (opportunity attack): "use" spends the reaction and resolves one melee attack
- * (chosen actionId, else the reactor's first melee attack, else Unarmed Strike) against the mover,
- * auto-applying rolled damage on a hit - the reaction carve-out class. "decline" just clears.
- */
+/** Preview/confirm options for an opportunity attack answer. */
 export type OpportunityAttackOptions = Readonly<{ commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; attackNatural?: number }>;
 
+/**
+ * Answers a pending reaction prompt (ADR-0020). GM answers any prompt; a player only their own
+ * claimed character's.
+ * - hit-by-attack (Uncanny Dodge): the parked damage applies either way; "use" spends the reaction and
+ *   halves each typed part first (floor, per part, before defenses).
+ * - leaves-reach (opportunity attack): "use" spends the reaction and resolves one melee attack (chosen
+ *   actionId, else the first melee attack, else Unarmed Strike) against the mover, auto-applying damage
+ *   on a hit. "decline" just clears.
+ */
 export function answerReaction(state: GameState, commandId: string, reactionId: string, use: boolean, actionId: string | undefined, scope: ActorScope, deps: ReactionAnswerDependencies, attackOptions: OpportunityAttackOptions = {}): ReactionOutcome {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingReactions.find((entry) => entry.id === reactionId);
@@ -65,7 +60,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
   if (use && state.combat.reactionsUsed.includes(reactor.id)) {
     throw new CommandRejectedError(`${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`);
   }
-  // A down creature (0 HP) can't take reactions, on its turn or off it (SRD Incapacitated / Unconscious).
+  // A creature at 0 HP can't take reactions (SRD Incapacitated / Unconscious).
   if (use && reactor.hp.current <= 0) {
     throw new CommandRejectedError(`${reactor.name} is down (0 HP) and can't take reactions.`);
   }
@@ -84,28 +79,20 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     const mover = pending.targetActorId ? state.actors.find((candidate) => candidate.id === pending.targetActorId) : undefined;
     if (!mover) { clearPrompt(false); throw new CommandRejectedError("The mover is no longer in the fight."); }
     const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
-    // EFFECTIVE actions, not the definition's: a magic weapon's derived attack must be BOTH resolvable
-    // by id and findable as `fallbackMelee`, or the character swings an unarmed strike instead of the
-    // sword they are holding - and any +1 on it is lost with the swing.
+    // Effective actions, so a magic weapon's derived attack resolves by id and is found as `fallbackMelee`.
     const available = effectiveActions(definition, reactor, deps.catalog);
     const declared = actionId ? available.find((candidate) => candidate.id === actionId) : undefined;
     const fallbackMelee = available.find((candidate) => candidate.attack !== undefined && candidate.attack.reachFeet !== undefined);
     const chosen = declared ?? fallbackMelee ?? builtinAction("unarmed-strike")!;
     const isBuiltin = declared === undefined && fallbackMelee === undefined;
     const commit = attackOptions.commit ?? true;
-    // One melee attack against the mover, off-turn. A PREVIEW (commit:false) rolls the swing but leaves
-    // the reaction unspent and applies nothing - the answerer sees the hit, then re-rolls adv/disadv,
-    // types a d20, or confirms; the same roll experience as a saving throw. The COMMIT spends the
-    // reaction and applies the damage. No distance function on purpose: the SRD opportunity attack
-    // happens right before the target leaves reach, but the engine moves the token first (documented
-    // arrival-timing approximation) - range-checking the ARRIVAL position would wrongly block the swing.
+    // One melee attack against the mover. A preview (commit:false) rolls but spends and applies nothing;
+    // the commit spends the reaction and applies damage. No distance function: the engine moves the token
+    // before the SRD's "right before it leaves reach", so range-checking the arrival would wrongly block it.
     const resolution = resolveDefinitionAction(state, chosen, {
       actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin,
       rollMode: attackOptions.rollMode ?? null, override: null, commit, attackNatural: attackOptions.attackNatural,
-      // THE transport for criterion 7. This is the ONLY producer of an opportunity attack in the
-      // codebase, and the resolve cannot infer the trigger: the chosen action is an ordinary melee
-      // attack with `activation: "action"`. Without this line a rider gated on
-      // `attack-kind-is {kinds: ["opportunity"]}` never matches and reviews as working.
+      // The resolver can't infer an opportunity attack from the action, so announce it for `attack-kind-is` riders.
       attackKinds: ["reaction", "opportunity"]
     }, {
       random: deps.random, newRollId: deps.newRollId, gmSessionId: deps.gmSessionId, now: deps.now,
@@ -116,8 +103,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     let appliedDamage = 0;
     let application: DamageApplication | null = null;
     let events: readonly EffectNarration[] = [];
-    // Auto-apply the hit's damage - unless the resolve itself parked it on a NEW prompt (the mover's
-    // own Uncanny Dodge answers opportunity attacks too).
+    // Auto-apply the hit's damage unless the resolve parked it on a new prompt (the mover's own Uncanny Dodge).
     const parked = (resolution.reactionPrompts?.length ?? 0) > 0;
     if (!parked && resolution.attack && (resolution.attack.outcome === "hit" || resolution.attack.outcome === "crit") && resolution.damageTotal > 0) {
       const parts = [

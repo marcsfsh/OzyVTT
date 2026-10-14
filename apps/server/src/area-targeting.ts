@@ -59,7 +59,7 @@ function containmentTest(shape: AnnotationShapeKind, originG: GridPoint, targetG
 }
 
 /**
- * Server-authoritative "who is under the blast": a token is caught iff ANY cell of its snapped
+ * Server-authoritative "who is under the blast": a token is caught iff any cell of its snapped
  * footprint has its center inside the template. `widthFeet` is only consulted for lines.
  */
 export function tokensInTemplate(state: GameState, calibration: SquareGridCalibration, geometry: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>, shape: AnnotationShapeKind, widthFeet: number | null): string[] {

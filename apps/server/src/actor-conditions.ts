@@ -7,36 +7,28 @@ import { applyExhaustionDeath, endConcentrationSustainedBy, releaseGrapplesHeldB
 import { conditionLabel, currentSpeedFeet, effectiveSpeedFeet, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, rememberOverride } from "./rules-families.js";
 
-/**
- * Track a condition on an actor. Display remains the source of truth for prose effects, but the
- * engine now owns the mechanical hooks (ADR-0020 amendments): condition immunities skip with
- * narration instead of applying, and Exhaustion reaching level 6 is death. Returns narration events
- * for the caller to log. `level` is exhaustion's 1-6; other conditions carry none. Setting an
- * already-active condition updates its level; clearing an absent one is a no-op.
- */
+/** Tracks a condition on an actor. The engine owns the mechanical hooks (ADR-0020): condition immunities
+ *  skip with narration, and Exhaustion reaching level 6 is death. Returns narration events. `level` is
+ *  Exhaustion's 1-6. Setting an active condition updates its level; clearing an absent one is a no-op. */
 export function setCondition(state: GameState, actorId: string, conditionId: string, active: boolean, level: number | undefined, scope: ActorScope, options?: Readonly<{ override?: { reason?: string } | null; resolveDefinition?: (definitionId: string) => ActorDefinition | undefined; catalog?: EquipmentCatalog }>): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (level !== undefined && conditionId !== "exhaustion") throw new CommandRejectedError("Only exhaustion has levels.");
   const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
   if (!active) {
     const events: EffectNarration[] = [];
-    // SRD Prone: standing up costs half your Speed - charged when the current combatant stands on
-    // its own turn during a live fight. Off-turn/GM housekeeping stays free; Speed 0 can't stand.
+    // SRD Prone: standing up costs half your Speed, charged when the current combatant stands on its own
+    // turn in a live fight. Off-turn/GM housekeeping is free; Speed 0 can't stand.
     const standingUp = conditionId === "prone" && actor.conditions.some((condition) => condition.id === "prone");
-    // Standing up spends MOVEMENT, so it follows the movement family, not the table-wide dial.
+    // Standing up spends movement, so it follows the movement family.
     if (standingUp && state.combat.active && state.combat.turnActorId === actor.id && familyModeFor(state.combat, "movement") !== "freeform" && actor.speedFeet !== undefined) {
-      // HALF YOUR SPEED, not half the number printed on the sheet - so a slowed creature pays less to
-      // stand and an exhausted one pays less too. `currentSpeedFeet` and not `effectiveSpeedFeet`: Dash
-      // grants extra movement rather than raising your Speed, and charging a Dashing creature double to
-      // stand up would be a wrong number at the table dressed as a rule.
+      // Half your current Speed (slowed or exhausted creatures pay less). Not `effectiveSpeedFeet`: Dash adds
+      // movement without raising Speed.
       const cost = Math.floor((currentSpeedFeet(actor) ?? 0) / 2);
       const effective = effectiveSpeedFeet(actor) ?? 0;
       const budgetLeft = effective - state.combat.turn.movementUsedFeet;
-      // Speed 0 is its own refusal and must stay one: with the cost now derived from the SAME zeroed
-      // Speed, `cost > budgetLeft` is `0 > 0` for a grappled creature and would have waved it through.
+      // Speed 0 is its own refusal: with a zeroed Speed the cost is also 0, so `cost > budgetLeft` alone would pass.
       const blocked = effective === 0 || cost > budgetLeft;
-      // ONE sentence for the violation, read by both exits below - strict throws it, assisted narrates
-      // it. Two copies of this string is how the refusal and the rules note drift apart.
+      // One sentence for both exits: strict throws it, assisted narrates it.
       const violation = effective === 0
         ? `${actor.name} can't stand up - its Speed is 0.`
         : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`;
@@ -47,27 +39,16 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
       if (blocked && options?.override) rememberOverride(state, "movement.stand-up-cost");
       state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: state.combat.turn.movementUsedFeet + cost } };
       events.push({ kind: "condition", text: `${actor.name} stood up (${cost} ft of movement).`, actorId: actor.id });
-      // ASSISTED MODE WARNS; IT DOES NOT WAVE THROUGH IN SILENCE. This is the movement family's own
-      // convention, verbatim: `applyMovementRules` returns the identical refusal sentence as a warning
-      // when the mode is not strict, the move still happens, and the operation layer logs it with this
-      // exact "Rules note:" label. Without it a grappled creature's stand-up narrated as
-      // "stood up (0 ft of movement)" and nothing else - an illegal action reading as a clean legal
-      // event, which is worse than either refusing it or explaining it. The same line covers the
-      // strict-mode turn where an earlier GM Allow already spent the argument (`overrideCovers`), which
-      // is the other branch that falls past the throw; a GM's explicit `override` on THIS command is
-      // audited by the caller instead and stays silent here.
+      // Assisted mode (and a strict turn already covered by a GM Allow) narrates the violation as a
+      // "Rules note", the movement family's convention, rather than passing silently. An explicit
+      // `override` on this command is audited by the caller instead.
       if (blocked && !options?.override) events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
     }
     actor.conditions = remaining;
     return events;
   }
-  // Immunity: skip-with-narration rather than blocking - this is a manual GM command, and telling
-  // the table WHY nothing happened beats a rejection dialog (SRD condition immunity).
-  //
-  // The bearer's INNATE immunities and the ones an active item GRANTS read the same here: a Periapt
-  // of Wound Closure authored with `grants.conditionImmunities` used to be derived and dropped, so
-  // the condition landed anyway. The catalog is optional - callers that have one plumb it, and one
-  // that does not keeps exactly the pre-item behavior.
+  // Immunity: skip with narration rather than reject (SRD condition immunity). Innate and item-granted
+  // immunities read the same; without a catalog only innate ones apply.
   const granted = options?.catalog
     ? deriveEquipment(actor, actor.definitionId ? options.resolveDefinition?.(actor.definitionId) : undefined, options.catalog).conditionImmunities
     : [];
@@ -79,12 +60,12 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
   const previousExhaustion = exhaustionLevel(actor);
   actor.conditions = [...remaining, { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }]
     .sort((left, right) => left.id.localeCompare(right.id));
-  // SRD: Exhaustion level 6 is death - same engine-owned transition the onEnd grant path fires.
+  // SRD: Exhaustion level 6 is death, the same transition the onEnd grant path fires.
   if (conditionId === "exhaustion" && previousExhaustion < 6 && (level ?? 1) >= 6) {
     return applyExhaustionDeath(state, actor);
   }
-  // SRD: an incapacitated creature releases its grapples (Grappling) and its concentration breaks
-  // (Concentration). 0 HP separately releases everything it sustains.
+  // SRD: an incapacitated creature releases its grapples and its concentration breaks. 0 HP separately
+  // releases everything it sustains.
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     return [...releaseGrapplesHeldBy(state, actor.id), ...endConcentrationSustainedBy(state, actor.id)];
   }

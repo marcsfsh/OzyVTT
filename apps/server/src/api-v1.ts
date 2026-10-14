@@ -22,7 +22,7 @@ type ApiV1RouterOptions = {
   /** GM session bearer auth, distinct from integration-credential auth: only a signed-in GM may manage credentials. */
   authorizeGm: (token: string | undefined) => boolean;
   credentialStore: Pick<IntegrationCredentialStore, "create" | "list" | "get" | "rotate" | "revoke" | "auditEvents">;
-  /** The live-game surface (game-http.ts): mounted inside this router so it shares the request-id/cache-control middleware and sits before the API 404. */
+  /** The live-game surface (game-http.ts), mounted inside this router to share its middleware and sit before the API 404. */
   gameRouter?: Router;
 };
 
@@ -96,15 +96,14 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
         api: { version: API_VERSION, namespace: `/api/v${API_VERSION}` },
         realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" },
         supportedScopes: IntegrationScopeSchema.options,
-        // Inlined rather than derived from `SystemCapabilitiesSchema`, so a new feature flag has to be
-        // added here as well as there. `codex: true` is what tells a credential-holder the worldbuilding
-        // surface is reachable before it tries a scope it may not have been granted.
+        // Inlined rather than derived from `SystemCapabilitiesSchema`, so a new flag must be added in both
+        // places. `codex: true` tells a credential holder the worldbuilding surface exists.
         features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, rulesEngine: true, codex: true }
       }
     });
   });
 
-  // Served from the imported, versioned document itself so the response is always byte-identical to what ships in @vtt/api-contract and is covered by its own tests.
+  // Served from the imported, versioned document so the response matches what ships in @vtt/api-contract.
   router.get(OPENAPI_DOCUMENT_PATH, (_req, res) => res.json(openApiDocument));
 
   router.post(expressPath(INTEGRATION_CREDENTIAL_PATHS.collection), requireGm, (req, res) => {

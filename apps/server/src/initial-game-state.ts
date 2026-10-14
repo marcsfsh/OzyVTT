@@ -3,13 +3,10 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { seedHitDice, seedPactSlots, seedPreparedSpellIds, seedSpellSlots } from "./actor-roster.js";
 
 /**
- * Three level-7 example player characters - a self-sufficient adventuring party that exercises every
- * combat system the table has (melee multiattack, ranged/AoE spells, saving throws, healing,
- * reactions, and enough hit points that a fight spans many turns). Each ships a full
- * `ActorDefinition` sheet in `state.definitions`; its live actor references it by `definitionId`, so
- * the GM (via `content:monster-sheet`) and the owning player (inline in their projection) both see the
- * complete stat block, and the save auto-roll uses the real per-ability save bonuses encoded in the
- * open5e extension. Content is SRD 5.2.1 (CC BY 4.0). Proficiency bonus at level 7 is +3.
+ * Three level-7 example player characters, a party that exercises every combat system (multiattack,
+ * ranged/AoE spells, saves, healing, reactions). Each ships a full `ActorDefinition` in
+ * `state.definitions` referenced by its actor's `definitionId`. Content is SRD 5.2.1 (CC BY 4.0).
+ * Proficiency bonus at level 7 is +3.
  */
 
 export const PLACEHOLDER_ACTOR_IDS = {
@@ -18,16 +15,9 @@ export const PLACEHOLDER_ACTOR_IDS = {
   wizard: "b073fe5f-4394-4869-9e79-a0e3dc4e1703"
 } as const;
 
-/**
- * The example party's sheets are keyed EXACTLY like any imported character - `import-<actorId>` -
- * because two gates in the codebase read that prefix as "this sheet belongs to one character and is
- * editable/removable" (`character-edit.ts`, `actor-roster.ts`). Keying them `example-*` made the
- * starter party permanently un-editable and un-deletable: a GM could not level Borin up, could not
- * respec him, and could not get rid of him. Ordinary characters, from the first launch.
- *
- * `EXAMPLE_DEFINITION_IDS` (the old `example-*` keys) is exported so the one-time normalization seed
- * in `game-store.ts` can find and repoint the same three definitions in an existing save.
- */
+/** The example sheets are keyed `import-<actorId>` like any imported character, since editing and
+ *  removal gate on that prefix. `EXAMPLE_DEFINITION_IDS` (the old `example-*` keys) is exported for the
+ *  one-time normalization in `game-store.ts`. */
 export const EXAMPLE_DEFINITION_ID_PREFIX = "example-";
 export const LEGACY_EXAMPLE_DEFINITION_IDS = {
   fighter: "example-borin-fighter-7",
@@ -191,11 +181,8 @@ const PARTY: ReadonlyArray<Readonly<{ id: string; definitionId: string; definiti
   { id: PLACEHOLDER_ACTOR_IDS.wizard, definitionId: EXAMPLE_DEFINITION_IDS.wizard, definition: LYRA }
 ];
 
-/**
- * Live actor derived from a definition. Sheet-derived resources come from the SAME seeding helpers
- * `instantiate` uses (`actor-roster.ts`) rather than a second copy of the logic, so the example party
- * can never drift from an imported sheet - the drift is exactly how the multiclass slot bug hid.
- */
+/** Live actor from a definition, seeded by the same helpers `instantiate` uses (`actor-roster.ts`) so
+ *  the example party can't drift from an imported sheet. */
 function actorFor(member: (typeof PARTY)[number]) {
   const { id, definitionId, definition } = member;
   return {

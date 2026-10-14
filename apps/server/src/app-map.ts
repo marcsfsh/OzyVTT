@@ -2,14 +2,10 @@ import { GameStateSchema } from "@vtt/domain";
 import { API_VERSION, GAME_COMMAND_SCOPES, REALTIME_PROTOCOL_VERSION, openApiDocument } from "@vtt/api-contract";
 
 /**
- * Renders the always-fresh "app map" - a generated orientation aid for humans and AI agents. Pure:
- * it reads the live runtime sources of truth (the domain `GameState` schema, the api-contract
- * command/scope map, and the served OpenAPI document) and returns deterministic markdown. The
- * freshness test (`apps/server/test/app-map.test.ts`) fails whenever any of those surfaces changes
- * without regenerating via `npm run map`, so the doc can never silently drift from the code.
- *
- * It deliberately reports only machine-derivable surfaces plus a small curated file index; the
- * narrative "how it's built" lives in `docs/ai-context/` and is not duplicated here.
+ * Renders the generated app map (`docs/app-map.md`). Pure: reads the `GameState` schema, the api-contract
+ * command/scope map and the OpenAPI document and returns deterministic markdown. A freshness test fails
+ * when those change without `npm run map`. Reports only machine-derivable surfaces plus a small curated
+ * file index.
  */
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "options", "head", "trace"]);

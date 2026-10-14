@@ -183,8 +183,8 @@ export function createMapRouter(options: MapRouterOptions) {
     response.setHeader("accept-ranges", "bytes");
     response.setHeader("content-type", metadata.mediaType);
     response.setHeader("content-disposition", `inline; filename="${id}.${metadata.extension}"`);
-    // Access can be revoked or the presented map can change at any time. Do not
-    // leave previously authorized map bytes recoverable from a shared-TV cache.
+    // Access can be revoked or the presented map can change at any time, so never leave previously
+    // authorized map bytes recoverable from a shared-screen cache.
     response.setHeader("cache-control", "private, no-store");
     if (request.header("if-none-match") === etag) return response.status(304).end();
     const range = request.header("range");
@@ -202,10 +202,9 @@ export function createMapRouter(options: MapRouterOptions) {
     return response.send(part);
   });
 
-  // Calibration numbers are not secret - the client already receives grid-derived token sizing -
-  // and exposing them (read-only) to anyone who can already read the map's image lets the battle
-  // map show a live preview while measuring or resizing a shape. The server still computes and
-  // snaps the authoritative geometry on every annotation:add/move command; this is presentation only.
+  // Calibration numbers aren't secret (clients already get grid-derived token sizing); exposing them
+  // read-only lets the map preview measurements. The server still computes authoritative geometry on
+  // every annotation command.
   router.get(`${MAP_COLLECTION}/:id/grid`, (request, response) => {
     const id = mapId(request);
     if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");

@@ -59,7 +59,7 @@ export type CreateServerOptions = {
   applicationVersion?: string;
   /** Browser origins that a GM can copy to a separate LAN display. */
   viewerBaseUrls?: readonly string[];
-  /** How long a session's presence stays "reconnecting" after its last connection drops before flipping to "offline". */
+  /** How long a session stays "reconnecting" after its last connection drops before going "offline". */
   presenceGraceMs?: number;
 };
 
@@ -82,21 +82,17 @@ export function createServer(options: CreateServerOptions) {
   const codexStore = new CodexStore(options.databasePath);
   const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), { maxBytes: 10 * 1024 * 1024, maxDimensionPx: 4096, maxPixels: 4096 * 4096 });
   const homebrewStore = new HomebrewStore(options.databasePath);
-  // THE merge point. `publishedFor(audience)` hands `ContentLibrary` only records that are published
-  // and (for a player) player-visible; drafts are in neither slice at all. With no homebrew stored,
-  // both audiences keep sharing the module-level SRD-only catalog - identical cost to before.
+  // `publishedFor(audience)` gives `ContentLibrary` only published (and, for players, player-visible)
+  // records; drafts are in neither slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
-  /**
-   * The codex's three authorization callbacks, named once. `createCodexRouter` and the
-   * `POST /codex/import` body guard both take these SAME functions, so "who may write the codex" has one
-   * definition however early in the stack the question is asked.
-   */
+  // The codex authorization callbacks, shared by `createCodexRouter` and the `POST /codex/import` guard
+  // so "who may write the codex" has one definition.
   const codexAuth = {
     authorizeGm,
     authorizePlayer: (token: string | undefined) => auth.verifyPlayer(token) !== null,
-    // The same credential store the game router gets, so one minted token is checked one way. A codex
-    // credential acts at GM grade; the scope decides read-vs-write, and `admin` implies both.
+    // Same credential store as the game router. A codex credential acts at GM grade; scope decides
+    // read vs write, and `admin` implies both.
     verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => credentials.verify(token, scope)
   };
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
@@ -104,12 +100,10 @@ export function createServer(options: CreateServerOptions) {
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
   const annotationExpiryTimers = new Set<ReturnType<typeof setTimeout>>();
-  /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry - same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
+  /** Re-publishes at the soonest annotation expiry: the projection hides expired annotations, but nothing
+   *  else re-broadcasts once the timestamp passes. Re-publishing also clears it from the shared screen. */
   function scheduleAnnotationExpiry() {
-    // Keep exactly one pending timer: clear any prior one, arm the soonest expiry, then re-arm from
-    // inside the callback so every staggered annotation drops at its own expiry - not just the first.
-    // Without the re-arm, a second ping placed after the first would linger until unrelated activity
-    // re-broadcast the state (the reported "extra pings don't disappear" bug).
+    // One pending timer, re-armed from the callback so staggered annotations each expire on time.
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
     annotationExpiryTimers.clear();
     const soonest = nextAnnotationExpiry(store.snapshot, Date.now());
@@ -123,9 +117,9 @@ export function createServer(options: CreateServerOptions) {
     annotationExpiryTimers.add(timer);
   }
 
-  /** GM view + the time-travel timeline (labels can name hidden combatants, so this is GM-only metadata). */
+  /** GM view plus the time-travel timeline (labels can name hidden combatants, so this is GM-only). */
   function gmView(state: GameState, now = Date.now()) { return { ...projectGmView(state, presenceFor, now), turnHistory: store.listTurnSnapshots() }; }
-  /** Also reauthorizes every connected socket against the latest revocation state, so a revoked GM client is downgraded or disconnected on its next check rather than only when it next sends a command. */
+  /** Also reauthorizes every connected socket, so a revoked GM client is downgraded or disconnected promptly. */
   function broadcast() {
     const state = store.snapshot;
     for (const socket of io.sockets.sockets.values()) {
@@ -136,39 +130,18 @@ export function createServer(options: CreateServerOptions) {
       socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
-  /**
-   * Ping every client that the worldbuilding codex changed so it refetches its own projected view.
-   *
-   * CONTENT-FREE BY DESIGN (D22) - a revision counter and nothing else, the same rule the homebrew notifier
-   * below states for itself. It used to carry a `scope`, which went to every socket including the players'
-   * and told the table which part of the codex the GM was touching. That buys nothing at a home group's
-   * scale and is a small leak of GM intent; no listener ever read it.
-   */
+  /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
+   *  revision): naming the changed scope would leak what the GM is working on. */
   function notifyCodexChanged() {
     io.emit("codex:changed", { codexRevision: codexStore.revision });
   }
-  /**
-   * Ping every client that the GM's homebrew library changed so it refetches its own merged catalog.
-   * CONTENT-FREE BY DESIGN - a revision counter and nothing else. No `scope`, no `type`: telling
-   * players which kind of thing the GM is working on buys nothing at a home group's scale and is a
-   * small leak of GM intent.
-   *
-   * The emit is widened because `ServerToClientEvents` (`packages/domain`) does not carry
-   * `homebrew:changed` yet; it is owned by another workstream this round. Delete the cast - not the
-   * call - once the member lands.
-   */
+  /** Tells every client the homebrew library changed so it refetches its own merged catalog. Content-free
+   *  (only a revision), so players learn nothing about what the GM is working on. */
   function notifyHomebrewChanged() {
     io.emit("homebrew:changed", { revision: homebrewStore.revision });
   }
-  /**
-   * "What refers to this homebrew record?", scanned over the live campaign.
-   *
-   * Memoised for exactly one turn of the event loop, and that is load-bearing rather than fussy: the
-   * library list asks this once PER ROW, and `GameStore.snapshot` structured-clones the whole
-   * campaign on every read - so an unmemoised lookup clones the campaign fifty times to render one
-   * page. A microtask-scoped cache is built once inside a synchronous request handler and is gone
-   * before the next request runs, so it can never serve a stale answer.
-   */
+  // Homebrew usage lookup, memoised for one microtask: the library list asks per row and every
+  // `store.snapshot` clones the campaign. Gone before the next request, so never stale.
   let usageIndex: ReturnType<typeof buildHomebrewUsageIndex> | undefined;
   const homebrewUsagesFor = (type: Parameters<ReturnType<typeof buildHomebrewUsageIndex>["of"]>[0], id: string) => {
     if (!usageIndex) {
@@ -177,11 +150,8 @@ export function createServer(options: CreateServerOptions) {
     }
     return usageIndex.of(type, id);
   };
-  /**
-   * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
-   * GM-only AND every referenced actor is public - so a hidden combatant is never narrated to players.
-   * Not stored in GameState (ephemeral presentation); the viewer channel gets nothing.
-   */
+  /** Emits a transient toast. Players receive it only when it isn't GM-only and every referenced actor is
+   *  public. Not stored; the viewer gets nothing. */
   function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; logged?: boolean }>) {
     const state = store.snapshot;
     const actorIds = event.actorIds ?? [];
@@ -192,38 +162,19 @@ export function createServer(options: CreateServerOptions) {
       if (auth.verify(token)) socket.emit("table:event", payload);
       else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
     }
-    // Every transient toast is also a durable feed line, gated the same way (hidden combatants stay
-    // GM-only) - unless the caller is already writing a richer row for the same moment (`logged: false`).
-    //
-    // ONE feed line per moment (D11). Ten handlers used to call `appendLog` and then broadcast the
-    // IDENTICAL entry, and since a broadcast has always written its own line, every one of those
-    // moments printed twice in the log a player reads. Broadcasting is the whole write; call
-    // `appendLog` directly only for lines that have no toast.
+    // Every toast is also a feed line, gated the same way, unless the caller writes a richer row itself
+    // (`logged: false`). Call `appendLog` directly only for lines with no toast.
     if (event.logged !== false) appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
   }
-  /**
-   * Append one line to the persistent combat log and push it live. Visibility mirrors the toast rule:
-   * GM sockets always receive it; players only when it isn't GM-only and references no hidden combatant.
-   *
-   * `!== "public"` rather than `=== "gm-only"`, and the two are NOT the same test on a combatant the
-   * roster no longer holds. The old comparison asked "is this one hidden?", and `undefined` is not
-   * "gm-only", so a row naming a DELETED actor answered "not hidden" and went to every player - a
-   * gate that fails OPEN. Its two siblings both fail closed on the same input: `broadcastTableEvent`
-   * above requires every named combatant to BE public, and `namesAHiddenCombatant`
-   * (`action-resolution.ts`) reads `?.visibility !== "public"`. Three reads of one question that
-   * disagreed on the one input none of them can see. Written this way, a visibility added later
-   * cannot leak through a comparison that predates it either.
-   */
+  /** Appends a feed line and pushes it live, gated like toasts. `!== "public"` so an actor no longer on the
+   *  roster (or a future visibility) fails closed. */
   function appendLog(entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; actorId?: string | null; roll?: RollRecord | null }>) {
     const state = store.snapshot;
     const actorIds = entry.actorIds ?? [];
     const gmOnly = entry.gmOnly === true || actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility !== "public");
     const row = combatLog.append({ kind: entry.kind, text: entry.text, gmOnly, revision: state.revision, actorId: entry.actorId ?? null, roll: entry.roll ?? null });
-    // Per-RECIPIENT delivery, not the old two-variant GM/player split: a `self-only` roll row is
-    // player-visible but belongs to exactly one player, and only their own session id unlocks it.
-    // `projectFeedRow` is the single place that decides - and the only thing that strips the roller's
-    // session id off the wire. The public viewer never receives `log:entry` at all (it has no game
-    // socket: `viewer-coordinator.ts` drives it), so this loop cannot reach the shared screen.
+    // Per-recipient delivery: a `self-only` roll belongs to one player, unlocked by their session id.
+    // `projectFeedRow` decides and strips the roller's session id. The public viewer has no game socket.
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
       if (auth.verify(token)) { socket.emit("log:entry", row.entry); continue; }
@@ -239,7 +190,7 @@ export function createServer(options: CreateServerOptions) {
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
     appendLog({ kind: "turn", text: `Round ${state.combat.round} - ${name}'s turn.`, actorIds: [state.combat.turnActorId] });
   }
-  /** Translate a timeline navigation outcome into log lines - plain turns for forward play, GM-only history notes for rewinds. */
+  /** Turns a timeline navigation outcome into log lines: plain turns for forward play, GM-only notes for rewinds. */
   function logTimelineOutcome(outcome: TimelineOutcome, state: GameState) {
     switch (outcome.kind) {
       case "advanced": case "legacy": logTurnBegin(state); break;
@@ -262,7 +213,7 @@ export function createServer(options: CreateServerOptions) {
     }
     broadcast();
   }
-  /** Bridge: making a scene live also presents its map on the shared screen (one action). Best-effort - a viewer hiccup must never undo the authoritative scene switch that already committed. */
+  /** Presents a newly-live scene's map on the shared screen. Best-effort: a viewer failure must not undo the committed scene switch. */
   async function presentSceneMap(mapAssetId: string) {
     try {
       const geometry = await tokenGeometryFor(mapAssetId);
@@ -273,8 +224,7 @@ export function createServer(options: CreateServerOptions) {
     }
   }
 
-  // The shared game capabilities: the Socket.IO handlers below and the public HTTP API both run
-  // these exact operations - same validation, authorization, dispatch, and narration (ADR-0016).
+  // The shared game capabilities, used by both the Socket.IO handlers below and the HTTP API (ADR-0016).
   const operations = createGameOperations({
     store,
     combatLog,
@@ -293,11 +243,10 @@ export function createServer(options: CreateServerOptions) {
     playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
-    // The archives live in the game store's own table, not in GameState; `replay.launch` reads one
-    // document through this narrow hook rather than being handed the store.
+    // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
     onEncounterArchived: ({ sceneId, turnCount }) => {
-      // Combat-history bridge: log the fight to the codex timeline, pinned to its location marker if one links this scene.
+      // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {
         const latest = store.listEncounterArchives()[0];
         if (!latest) return;
@@ -306,58 +255,36 @@ export function createServer(options: CreateServerOptions) {
         codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageIds[0] ?? null, playerText: `A battle was fought here${turns}.` });
         notifyCodexChanged();
       } catch (error) {
-        // Best-effort - a codex hiccup must never affect ending a fight - but don't fail silently.
+        // Best-effort (a codex failure must not affect ending a fight), but logged.
         console.error("codex combat-history bridge failed to log the encounter:", error instanceof Error ? error.message : error);
       }
     }
   });
   const commandRegistry = gameCommandRegistry(operations);
 
-  // Open CORS for the VERSIONED integration surface only: every /api/v1 credential travels as a
-  // bearer header (or a SameSite=Strict cookie the browser refuses to send cross-origin anyway),
-  // so a wildcard origin grants nothing a token doesn't already grant - and it lets browser-based
-  // integrations (overlays, dashboards) call the documented surface directly. The legacy
-  // /api/gm/* session endpoints - password login above all - deliberately stay same-origin:
-  // wildcard CORS there would let any web page relay password guesses through a LAN browser.
-  //
-  // Mounted ABOVE the body parsers rather than below them, which it used to be. Three things follow, all
-  // of them wanted: an OPTIONS preflight is answered without buffering a body at all; a 413 from a parser
-  // now carries CORS headers, so a browser integration can read the refusal instead of seeing an opaque
-  // failure; and the codex-import guard below - which answers before any parser runs - does too.
+  // Open CORS for /api/v1 only: credentials there are bearer headers (or SameSite=Strict cookies), so a
+  // wildcard origin grants nothing a token doesn't, and browser integrations can call it. The legacy
+  // /api/gm/* endpoints (password login) stay same-origin so web pages can't relay password guesses.
+  // Mounted above the body parsers so preflights skip body buffering and parser errors carry CORS headers.
   app.use((req, res, next) => {
     if (req.path !== "/api/v1" && !req.path.startsWith("/api/v1/")) return next();
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
     res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    // `x-idempotent-replay` joins the list the day the header exists: a browser integration cannot read
-    // it otherwise, and dead CORS config for an unshipped header is config nobody can verify.
     res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after, x-idempotent-replay");
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });
-  // A homebrew pack can carry up to 500 authored records, which does not fit the global limit below.
-  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
-  // works when it runs FIRST - hence this one line above the global parser rather than inside the
-  // homebrew router.
+  // Homebrew packs exceed the global body limit. body-parser skips already-parsed requests, so a
+  // route-scoped limit must be mounted before the global parser.
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
-  // A codex backup bundle reaches tens of megabytes (two prose layers per page, plus the whole revision
-  // history), which does not fit the global limit below. Same one-line arrangement, same reason:
-  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
-  // works when it runs FIRST.
-  //
-  // AUTHORIZED FIRST, and the guard has to live here for the same reason the parser does. The codex
-  // router's `requireWrite` is a per-route guard and cannot run before an app-level parser, so this body
-  // was buffered, decoded and JSON.parse'd before a 401 could be written: any LAN client with no
-  // Authorization header at all could make the process block on a 64 MB parse, repeatedly, on the event
-  // loop that owns GameState - Socket.IO, turn order and every combat command stall for the duration.
-  // `createCodexImportGuard` is built from the SAME authorization callbacks the router gets and memoizes
-  // its answer on `res.locals`, so this is one policy resolved once, not a second copy of it.
+  // Codex backups reach tens of megabytes; mounted first for the same reason. Authorized before parsing,
+  // so an unauthenticated client cannot make the event loop block on a 64 MB JSON.parse. The guard uses
+  // the same callbacks as the router and memoizes its answer on `res.locals`.
   app.use(CODEX_PATHS.import, createCodexImportGuard(codexAuth), express.json({ limit: "64mb" }));
-  // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
-  // by the operation itself) fit through the HTTP surface too.
+  // Above the express default so canonical ActorDefinition imports (capped at 256kb) fit.
   app.use(express.json({ limit: "512kb" }));
-  // Malformed/oversized JSON bodies die inside express.json before any route runs; give /api/v1
-  // callers the stable error envelope instead of Express's HTML default.
+  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON instead of Express's HTML.
   app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!error || res.headersSent || !(req.path === "/api/v1" || req.path.startsWith("/api/v1/"))) return next(error as Error);
     const tooLarge = (error as { type?: string }).type === "entity.too.large";
@@ -414,9 +341,8 @@ export function createServer(options: CreateServerOptions) {
     const viewerUrls = [...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))];
     return res.json({ viewerUrls });
   });
-  // Encounter archives (#12): permanent, machine-readable turn-by-turn records auto-saved at encounter
-  // end. GM-only - a document holds full state (hidden combatants) and GM-only log lines. The shape is
-  // documented in encounter-archive.ts; consumers list, fetch, and delete over these endpoints.
+  // Encounter archives: permanent turn-by-turn records saved at encounter end. GM-only: a document holds
+  // full state (hidden combatants) and GM-only log lines. Shape documented in encounter-archive.ts.
   app.get("/api/gm/encounters", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
     if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
@@ -439,22 +365,9 @@ export function createServer(options: CreateServerOptions) {
   });
   app.use(createViewerRouter({ access: viewerAccess, presentation: viewerPresentation, coordinator: viewerCoordinator, authorizeGm }));
 
-  /**
-   * IS THIS ASSET THE BATTLEFIELD OF A REPLAY THE GM SHARED? (D26 - the third player map door.)
-   *
-   * Without it a shared replay was readable but not watchable: the turn data arrived and every stage
-   * rendered "Map unavailable", because the only maps a player could load were the LIVE combat map and
-   * revealed atlas maps. The gate is the ARCHIVE'S SHARED FLAG, never "the asset is in some archive" -
-   * an unshared fight's map stays a 403, and un-sharing takes the image away again on the next request.
-   *
-   * `playerReplayMapAssetIds` reads the maps back out of the PLAYER projection of the document rather
-   * than scanning the stored one, so a prepared scene's map that happened to exist when the fight was
-   * recorded can never come through this door (see its own note).
-   *
-   * The per-archive set is memoised because a stored document is immutable once written - only its
-   * visibility and its existence change, and both are re-read from `listEncounterArchives()` on every
-   * call. Deleting an archive leaves a dead entry that is never consulted again.
-   */
+  /** Whether an asset is the map of a replay the GM shared. Gated on the shared flag, and maps come from
+   *  the player projection so a prepared scene's map can't leak. Memoised per archive (documents are
+   *  immutable); visibility is re-read on every call. */
   const replayMapCache = new Map<number, ReadonlySet<string>>();
   const sharedReplayMap = (assetId: string): boolean => {
     for (const summary of store.listEncounterArchives()) {
@@ -479,8 +392,7 @@ export function createServer(options: CreateServerOptions) {
     authorizePlayer: (token, assetId) => {
       if (auth.verifyPlayer(token) === null) return false;
       const combat = store.snapshot.combat;
-      // A player may load the active battle map's image, the image of any revealed atlas map, or the
-      // battlefield of a replay the GM SHARED with them (D26) - three doors, no fourth.
+      // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
       return (combat.active && combat.mapAssetId === assetId) || codexStore.isAssetRevealedToPlayers(assetId) || sharedReplayMap(assetId);
     },
     authorizeViewer: (token, assetId) => {
@@ -496,7 +408,7 @@ export function createServer(options: CreateServerOptions) {
     assets: tokenAssets,
     catalog: tokenCatalog,
     authorizeGm,
-    // D18: a joined player may browse the library the GM offers and upload their own token image.
+    // A joined player may browse the GM's token library and upload their own token image.
     playerSession: (token) => auth.verifyPlayer(token),
     authorizePlayer: (token, assetId) => auth.verifyPlayer(token) !== null && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
     authorizeViewer: (token, assetId) => {
@@ -512,20 +424,18 @@ export function createServer(options: CreateServerOptions) {
     notifyChanged: notifyCodexChanged,
     issuePreviewSession: () => auth.issuePreviewPlayerSession()
   }));
-  // GM-only end to end: `authorizePlayer` is supplied ONLY so an authenticated player gets a 403
-  // rather than the 401 an unauthenticated caller gets. There is no player-readable homebrew route.
+  // GM-only end to end; `authorizePlayer` exists only so a player gets 403 rather than 401.
   app.use(createHomebrewRouter({
     store: homebrewStore,
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
     notifyChanged: notifyHomebrewChanged,
-    // Publish validation and `/duplicate` both read the GM catalog: this router is GM-only end to
-    // end, and a record whose dependencies are published-but-not-player-visible is perfectly valid.
+    // The GM catalog: a dependency that is published but not player-visible is valid here.
     validate: createHomebrewValidator({
       forAudience: (audience) => contentLibrary.forAudience(audience),
       publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
-      // Drafts included, and only here: the gate asks whether a record EXISTS, which is what lets a
-      // class and its subclass publish in either order instead of neither. No catalog reads this.
+      // Drafts included, only here: the gate asks whether a record exists, so a class and its subclass can
+      // publish in either order.
       authoredIndex: () => homebrewStore.authoredIndex()
     }),
     usagesOf: homebrewUsagesFor,
@@ -544,8 +454,8 @@ export function createServer(options: CreateServerOptions) {
       setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible)
     },
     sessions: {
-      // The HTTP mirror of the socket's open LAN-trust join: anyone who can reach the host may
-      // take a player seat once GM setup is complete - same rule as session:join below.
+      // The HTTP mirror of the socket's LAN-trust join: anyone who can reach the host may take a player seat
+      // once GM setup is complete.
       issuePlayer: () => {
         if (!auth.isBootstrapped) return null;
         const token = auth.issuePlayerSession();
@@ -563,18 +473,16 @@ export function createServer(options: CreateServerOptions) {
     credentialStore: credentials,
     gameRouter: gameApiRouter
   });
-  // The versioned router owns its own API-only 404 envelope. Keep that catch-all
-  // scoped to /api/v1 so it cannot swallow the SPA or the dedicated TV viewer.
+  // Keep the API-only 404 envelope scoped to /api/v1 so it cannot swallow the SPA or the viewer.
   app.use((req, res, next) => req.path === "/api/v1" || req.path.startsWith("/api/v1/")
     ? apiV1Router(req, res, next)
     : next());
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
-    // `dotfiles: "allow"` and serving index.html root-relative both matter on hosts whose install
-    // path contains a dot-segment (e.g. OneDrive's `.DesktopOneDrive`): `send` defaults to
-    // `dotfiles: "ignore"`, which 404s any *absolute* path containing a dot-segment - so the SPA
-    // fallback below must pass a root and a clean relative filename, not the full absolute path.
+    // For install paths containing a dot-segment (e.g. OneDrive's `.DesktopOneDrive`): `send` ignores
+    // dotfiles by default and 404s such absolute paths, so allow dotfiles and pass the SPA fallback a
+    // root plus relative filename.
     app.use(express.static(options.webDist, { dotfiles: "allow" }));
     app.get("/{*path}", (_req, res) => res.sendFile("index.html", { root: options.webDist, dotfiles: "allow" }));
   } else {
@@ -626,11 +534,8 @@ export function createServer(options: CreateServerOptions) {
       const player = auth.verifyPlayer(token);
       return player ? { kind: "player", sessionId: player.sessionId } : null;
     };
-    /**
-     * Socket adapter over the shared operations: resolve the principal (or refuse with this
-     * command's historical join/role message), run the operation, and translate outcomes back to
-     * the ack wire shape - including the timeline-confirmation bounce, which is an ok:true ack.
-     */
+    /** Socket adapter: resolve the principal, run the operation, map the outcome to the ack (a timeline
+     *  confirmation bounce is an ok:true ack). */
     const respond = async <Result extends { ok: boolean }>(
       acknowledge: (result: Result) => void,
       unauthenticatedMessage: string,
@@ -643,8 +548,7 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, ...(await work(principal)) } as unknown as Result);
       } catch (error) {
         if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message } as unknown as Result);
-        // A rules-mode rejection carries machine-readable details so the client can offer the
-        // one-tap audited override instead of parsing prose (ADR-0020).
+        // Rules-mode rejections carry machine-readable details for the one-tap audited override (ADR-0020).
         if (error instanceof RulesBlockedError) return acknowledge({ ok: false, message: error.message, blocked: { rule: error.rule, message: error.message, overridable: error.overridable } } as unknown as Result);
         acknowledge({ ok: false, message: error instanceof Error ? error.message : fallbackMessage } as unknown as Result);
       }
@@ -677,8 +581,8 @@ export function createServer(options: CreateServerOptions) {
     socket.on("content:languages", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentLanguages(principal)));
     socket.on("content:spells", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpells(principal)));
     socket.on("content:equipment", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentEquipment(principal)));
-    // The character-builder catalogs: readable by any joined session (a player builds their own character),
-    // and each mirrored one-for-one by a GET under /api/v1/content - no socket-only capability (ADR-0016).
+    // Character-builder catalogs: readable by any joined session, each mirrored by a GET under
+    // /api/v1/content (ADR-0016).
     socket.on("content:classes", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentClasses(principal)));
     socket.on("content:subclasses", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSubclasses(principal)));
     socket.on("content:species", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpecies(principal)));

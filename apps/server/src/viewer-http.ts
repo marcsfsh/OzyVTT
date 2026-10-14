@@ -61,17 +61,8 @@ function viewerToken(request: Request) {
   return bearer(request) ?? cookies(request).vtt_viewer_session;
 }
 
-/**
- * ADR-0016 §2, which this router was the last `/api/v1` surface not to keep: a caller-supplied
- * `X-Request-Id` is echoed **only when it is a UUID v4**, and replaced otherwise.
- *
- * It used to accept any `[A-Za-z0-9._:-]{1,128}` string and echo it verbatim. Nothing in the app sends
- * the header at all, so no caller loses anything — but the id lands in the response body and in logs,
- * and echoing arbitrary caller text into both is how a log line becomes a forgery. Every other router
- * (`api-v1`, `game-http`, `codex-http`, `homebrew-http`, `map-http`, `token-http`) already refused it on
- * exactly that reasoning; this one now agrees, so the ADR's normative clause and the generated reference
- * are true of the whole surface rather than of six sevenths of it.
- */
+// ADR-0016: a caller-supplied X-Request-Id is echoed only when it is a UUID v4, so arbitrary caller
+// text never lands in response bodies or logs.
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function requestId(request: Request, response: Response) {
   const supplied = request.header("x-request-id");
@@ -81,7 +72,7 @@ function requestId(request: Request, response: Response) {
   return id;
 }
 
-/** Adds the shared ok/apiVersion/data envelope alongside the existing top-level keys every caller already reads (e.g. `body.pairing`), so no existing client parsing breaks. */
+/** Adds the shared ok/apiVersion/data envelope alongside the existing top-level keys (e.g. `body.pairing`). */
 function success(response: Response, status: number, body: Record<string, unknown>) {
   return response.status(status).json({ ok: true, apiVersion: API_VERSION, ...body });
 }
@@ -94,9 +85,7 @@ function errorResponse(error: unknown, request: Request, response: Response) {
         : error instanceof z.ZodError ? 400
           : error instanceof Error ? 400 : 500;
   const message = status === 500 ? "Viewer request failed." : error instanceof z.ZodError ? "Viewer request body is invalid." : (error as Error).message;
-  // Codes are aligned to the shared ApiErrorCodeSchema vocabulary (unauthorized -> unauthenticated,
-  // revision_conflict -> conflict, invalid_request -> validation_failed) for cross-router consistency.
-  // No client branches on these values today (only `.error.message` is read), so this is a safe realignment.
+  // Codes follow the shared ApiErrorCodeSchema vocabulary.
   const code = status === 401 ? "unauthenticated" : status === 409 ? "conflict" : status === 429 ? "rate_limited" : status === 400 ? "validation_failed" : "internal_error";
   return response.status(status).json({ ok: false, apiVersion: API_VERSION, error: { code, message, requestId: id } });
 }
@@ -156,8 +145,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     } catch (error) { return errorResponse(error, request, response); }
   });
 
-  // Mints a short-lived read-only viewer cookie for the GM's own preview of the shared screen (the
-  // in-tab iframe and the pop-out window both load /viewer.html and authenticate with this cookie).
+  // Read-only viewer cookie for the GM's own preview of the shared screen (iframe and pop-out).
   router.post("/api/v1/viewer/preview-session", (request, response) => {
     try {
       requireGm(request);

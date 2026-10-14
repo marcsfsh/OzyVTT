@@ -132,12 +132,8 @@ export class ViewerAccessStore {
     return { token, viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata };
   }
 
-  /**
-   * Mints a viewer session directly, without a pairing code, for the GM's own read-only preview of
-   * the shared screen (the in-tab iframe and the pop-out window). Only ever reached from a GM-authed
-   * route. Reuses the newest non-revoked, unexpired preview session named `name` so repeatedly
-   * opening the preview does not accumulate sessions.
-   */
+  /** Mints a viewer session without a pairing code for the GM's own read-only preview; reached only from
+   *  a GM-authed route. Reuses the newest live preview session named `name` so sessions don't accumulate. */
   mintPreviewSession(nameInput: string, ttlMs: number) {
     const database = this.requireDatabase();
     const now = this.now();

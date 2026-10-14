@@ -13,13 +13,8 @@ const FolderRenameSchema = z.object({ from: z.string(), to: z.string().nullable(
 const FolderVisibilitySchema = z.object({ folder: z.string().nullable(), hidden: z.boolean() }).strict();
 /** Where a player's own upload lands, so the GM can find (and curate) the shelf at a glance. */
 const PLAYER_UPLOAD_FOLDER = "Player uploads";
-/**
- * How many images ONE player session may upload per day. The map-asset discipline (6 MiB, real image
- * validation via `assets.import`, content-hash dedupe) already bounds each file; this bounds the
- * count, so a phone cannot fill the host's disk one legal PNG at a time. In-memory and per-process,
- * the same shape as the viewer pairing rate limit - a restart forgives, which is fine for a limit
- * whose job is to stop a runaway loop rather than to punish anyone.
- */
+/** Images one player session may upload per day. File size, image validation and dedupe already bound
+ *  each file; this bounds the count so a phone can't fill the disk. In-memory, so a restart resets it. */
 const PLAYER_UPLOADS_PER_DAY = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -29,10 +24,7 @@ type TokenRouterOptions = Readonly<{
   authorizeGm: (token: string | undefined) => boolean;
   authorizePlayer: (token: string | undefined, assetId: string) => boolean;
   authorizeViewer: (token: string | undefined, assetId: string) => boolean;
-  /**
-   * A joined player SESSION (not per-asset): D18's browse-and-upload half. Returns the session id so
-   * the upload cap can be counted per player. Absent = the pre-D18 GM-only router.
-   */
+  /** Resolves a joined player session (for browse and upload); its id keys the upload cap. Absent means GM-only. */
   playerSession?: (token: string | undefined) => Readonly<{ sessionId: string }> | null;
   now?: () => number;
 }>;
@@ -45,12 +37,7 @@ function viewerCookie(request: Request) {
   }
   return undefined;
 }
-/**
- * ADR-0016 §2's exact rule, shared with every other `/api/v1` router: echo a UUID **v4**, replace
- * anything else. This used to test `/^[0-9a-f-]{36}$/i`, which admits `aaaaaaaa-…-aaaa` and a row of 36
- * hyphens — no forgery surface (the charset excludes everything a log line could be broken with), but
- * not the rule the ADR states, and "nearly the rule" is how six routers become five.
- */
+/** ADR-0016: echo a caller's X-Request-Id only when it is a UUID v4, replace anything else. */
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function requestId(request: Request, response: Response) {
   const supplied = request.header("x-request-id");
@@ -68,11 +55,9 @@ function publicToken(metadata: MapAssetMetadata, entry: TokenCatalogEntry) {
   return { id: metadata.id, name: entry.name, folder: entry.folder, mediaType: metadata.mediaType, width: metadata.width, height: metadata.height, byteLength: metadata.byteLength, importedAt: metadata.importedAt, lastUsedAt: entry.lastUsedAt, hidden: entry.hidden };
 }
 
-/**
- * HTTP for uploaded token images - mirrors the map router. GM uploads/manages; content is readable by
- * anyone who can already see a token referencing it (a public actor for a player; a presented token
- * for a viewer). Mounted BEFORE the /api/v1 catch-all so its routes resolve.
- */
+/** HTTP for uploaded token images, mirroring the map router. The GM uploads and manages; content is
+ *  readable by anyone who can already see a token referencing it (a public actor for a player, a
+ *  presented token for a viewer). Mounted before the /api/v1 catch-all. */
 export function createTokenRouter(options: TokenRouterOptions) {
   const router = Router();
   router.use((request, response, next) => { requestId(request, response); next(); });
@@ -85,11 +70,8 @@ export function createTokenRouter(options: TokenRouterOptions) {
     return options.authorizeGm(token) || options.authorizePlayer(token, assetId) || options.authorizeViewer(viewerCookie(request), assetId);
   };
 
-  /**
-   * D18: a player may upload their OWN character's token. The GM keeps every management route; a
-   * player gets exactly two doors - this upload and the browse list below - and their upload lands in
-   * one named folder so the GM can curate it as a shelf.
-   */
+  /** A player may upload their own character's token. The GM keeps every management route; a player gets
+   *  only this upload and the browse list, with uploads landing in one folder the GM can curate. */
   const requireGmOrPlayer = (request: Request, response: Response, next: NextFunction) => {
     const token = bearer(request);
     if (options.authorizeGm(token)) { response.locals.tokenPrincipal = { role: "gm" }; return next(); }
@@ -119,8 +101,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
       const name = typeof request.query.name === "string" ? request.query.name : filename.replace(/\.[^.]+$/, "");
       // A player does not choose the folder: their uploads land on one shelf the GM can curate.
       const folder = principal.role === "player" ? PLAYER_UPLOAD_FOLDER : (typeof request.query.folder === "string" ? request.query.folder : null);
-      // `assets.import` is the same validation the map assets get: real image, real dimensions,
-      // content-hash dedupe. Nothing player-supplied reaches the disk unvalidated.
+      // The same validation as map assets: real image, real dimensions, content-hash dedupe.
       const imported = await options.assets.import(request.body, filename);
       const entry = options.catalog.register(imported.metadata.id, name, folder);
       return success(response, imported.duplicate ? 200 : 201, { token: publicToken(imported.metadata, entry), duplicate: imported.duplicate });
@@ -133,7 +114,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
     const entries = options.catalog.list(principal.role === "gm" ? "gm" : "player");
     const tokens = (await Promise.all(entries.map(async (entry) => { const metadata = await options.assets.get(entry.assetId); return metadata ? publicToken(metadata, entry) : null; }))).filter((token) => token !== null);
     const definitionId = typeof request.query.definitionId === "string" && DEFINITION_ID.test(request.query.definitionId) ? request.query.definitionId : null;
-    // The per-definition memory is GM prep (which art the GM last used for a stat block) - not a player's business.
+    // The per-definition memory is GM prep, not a player's business.
     const rememberedAssetId = principal.role === "gm" && definitionId ? options.catalog.recallForDefinition(definitionId) : null;
     return success(response, 200, { tokens, rememberedAssetId });
   });
@@ -143,7 +124,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
     catch (error) { return failure(request, response, 400, "validation_failed", error instanceof z.ZodError ? "Folder rename is malformed." : (error as Error).message); }
   });
 
-  /** Curate a whole shelf at once (D18/R1): hide or re-offer every token in one folder. GM only. */
+  /** Hide or re-offer every token in one folder. GM only. */
   router.post(`${TOKEN_COLLECTION}/folders/visibility`, requireGm, (request, response) => {
     try { const input = FolderVisibilitySchema.parse(request.body); options.catalog.setFolderHidden(input.folder, input.hidden); return success(response, 200, { folder: input.folder, hidden: input.hidden }); }
     catch (error) { return failure(request, response, 400, "validation_failed", error instanceof z.ZodError ? "Folder visibility is malformed." : (error as Error).message); }

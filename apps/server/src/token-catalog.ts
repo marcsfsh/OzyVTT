@@ -2,11 +2,8 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-/**
- * `hidden` is the GM's CURATION flag (D18, director ruling R1): a token the shared library does not
- * offer players - spoiler monster art, the boss's portrait. It is NOT an approval queue; a player
- * still picks freely from what the library does offer, and still uploads their own with no gate.
- */
+/** `hidden` is the GM's curation flag: a token the shared library does not offer players (spoiler art).
+ *  Not an approval queue; players still pick from what is offered and upload their own freely. */
 export type TokenCatalogEntry = Readonly<{ assetId: string; name: string; folder: string | null; createdAt: string; lastUsedAt: string | null; hidden: boolean }>;
 type CatalogRow = Readonly<{ asset_id: string; name: string; folder: string | null; created_at: string; last_used_at: string | null; hidden?: number }>;
 
@@ -32,11 +29,9 @@ function rowToEntry(row: CatalogRow): TokenCatalogEntry {
   return { assetId: assetId(row.asset_id), name: tokenName(row.name), folder: row.folder, createdAt: row.created_at, lastUsedAt: row.last_used_at, hidden: row.hidden === 1 };
 }
 
-/**
- * Names/folders for uploaded token images, plus a small per-definition memory of the last image used
- * so re-adding the same creature can offer it as a quick option. Lives on the game SQLite, alongside
- * the map catalog. Folders are implicit - they exist while a row references them.
- */
+/** Names/folders for uploaded token images, plus a small per-definition memory of the last image used
+ *  so re-adding the same creature can offer it as a quick option. Lives on the game SQLite, alongside
+ *  the map catalog. Folders are implicit - they exist while a row references them. */
 export class TokenCatalogStore {
   private database?: DatabaseSync;
   constructor(private readonly databasePath: string, private readonly now: () => number = Date.now) {}
@@ -51,8 +46,7 @@ export class TokenCatalogStore {
         CREATE TABLE IF NOT EXISTS token_catalog (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT, created_at TEXT NOT NULL, last_used_at TEXT) STRICT;
         CREATE TABLE IF NOT EXISTS token_definition_images (definition_id TEXT PRIMARY KEY, asset_id TEXT NOT NULL, used_at TEXT NOT NULL) STRICT;
       `);
-      // Additive migration (this store has no migration table, like the token catalog's neighbours):
-      // every pre-existing row reads back `hidden = 0`, which is what it has always meant.
+      // Additive migration: existing rows read back `hidden = 0`.
       const columns = new Set((database.prepare("PRAGMA table_info(token_catalog)").all() as unknown as ReadonlyArray<{ name: string }>).map((column) => column.name));
       if (!columns.has("hidden")) database.exec("ALTER TABLE token_catalog ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;");
       this.database = database;
@@ -78,7 +72,7 @@ export class TokenCatalogStore {
     return this.get(existing.assetId)!;
   }
 
-  /** Hide (or re-offer) every token in one folder at once - the GM curates a shelf, not a hundred rows. */
+  /** Hides or re-offers every token in one folder at once. */
   setFolderHidden(folder: string | null, hidden: boolean) {
     const target = tokenFolder(folder);
     const database = this.requireDatabase();
@@ -123,10 +117,7 @@ export class TokenCatalogStore {
     return row ? rowToEntry(row) : null;
   }
 
-  /**
-   * The library. `audience: "player"` drops the entries the GM has hidden - the curation half of D18,
-   * applied HERE rather than at the router so no reader can forget it.
-   */
+  /** The library. `audience: "player"` drops entries the GM has hidden; applied here so no reader can forget it. */
   list(audience: "gm" | "player" = "gm") {
     const rows = this.requireDatabase().prepare("SELECT asset_id, name, folder, created_at, last_used_at, hidden FROM token_catalog ORDER BY (last_used_at IS NULL), last_used_at DESC, name").all() as CatalogRow[];
     const entries = rows.map(rowToEntry);

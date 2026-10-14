@@ -8,7 +8,7 @@ type PersistedAuthData = {
   tokenSecret: string;
   /** GM sessions issued at or before this epoch millisecond are invalid, regardless of their own expiry. Set by revoke-all. */
   gmSessionsRevokedBefore?: number;
-  /** Individually logged-out GM session IDs, mapped to their own expiry so stale entries can be pruned without a background job. */
+  /** Individually logged-out GM session ids, mapped to their expiry so stale entries can be pruned without a background job. */
   revokedGmSessionIds?: Record<string, number>;
 };
 
@@ -59,13 +59,9 @@ export class AuthService {
     const now = Date.now();
     return this.sign({ role: "player", sessionId: randomUUID(), issuedAt: now, expiresAt: now + 30 * 24 * 60 * 60 * 1000 });
   }
-  /**
-   * A short-lived PLAYER principal for the GM's own preview of the player Codex. Deliberately a real
-   * player token rather than a role flag on the GM's session: every read then walks the same
-   * `authorizePlayer` path and the same projection a genuine player gets, so the preview cannot show
-   * anything a player could not see. Mirrors the viewer's `mintPreviewSession`. Minting does NOT
-   * register presence - that happens on socket join - so no phantom player appears at the table.
-   */
+  /** A short-lived player principal for the GM's preview of the player Codex. A real player token, so
+   *  every read goes through `authorizePlayer` and the player projection and the preview can't show more
+   *  than a player sees. Minting does not register presence, so no phantom player appears. */
   issuePreviewPlayerSession(ttlMs = 12 * 60 * 60 * 1000) {
     if (!this.data) throw new Error("The host must complete GM setup before players join.");
     const now = Date.now();

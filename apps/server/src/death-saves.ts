@@ -23,16 +23,12 @@ export type DeathSaveRollResult = Readonly<{
 }>;
 
 /**
- * Roll (or confirm) one death saving throw against an actor's current pips, through the SAME dice
- * engine every other roll uses - a death save is just a raw d20 (no modifier), so adv/disadv keep the
- * higher/lower (2d20kh1 / 2d20kl1) and the kept die's face decides it. This is the pure core the
- * operation wraps, mirroring `answerSave`: it does no authorization or narration (the caller owns
- * those and the natural-20 heal), which keeps it unit-testable with a queued random.
+ * Rolls (or confirms) one death saving throw against an actor's current pips. A raw d20 through the
+ * shared dice engine, so adv/disadv keep the higher/lower die. Pure core (like `answerSave`): no
+ * authorization or narration; the caller owns those and the natural-20 heal.
  *
- * `commit=false` PREVIEWS: the die is recorded for the table so everyone sees it, but the pips are
- * left untouched and the caller can offer Adv/Disadv/Confirm - matching the saving-throw flow. `commit`
- * applies the next pip state. A provided `naturalRoll` confirms a previewed (or off-screen physical)
- * die with no fresh roll, so it records nothing new.
+ * `commit=false` previews: the die is recorded for the table but pips are untouched. `commit` applies
+ * the next pip state. A provided `naturalRoll` confirms a previewed or physical die without rolling.
  */
 export function rollDeathSave(state: GameState, actor: Actor, options: Readonly<{ commit: boolean; rollMode?: DeathSaveMode; naturalRoll?: number }>, deps: DeathSaveRollDependencies): DeathSaveRollResult {
   if (actor.deathSaves === null) throw new Error("rollDeathSave requires a dying actor.");
@@ -46,8 +42,7 @@ export function rollDeathSave(state: GameState, actor: Actor, options: Readonly<
     const resolution = resolveDice(parseDiceFormula(formula), deps.random);
     face = resolution.total;
     if (chosen !== "normal") mode = chosen;
-    // The roll lands in the shared history under the dying character's name and real initiator role;
-    // hidden combatants stay GM-only (the save-roll recording pattern).
+    // Recorded under the dying character with the real initiator role; hidden combatants stay GM-only.
     let group = 0;
     const record: RollRecord = {
       id: deps.rollId, commandId: deps.commandId, initiatorSessionId: deps.sessionId, initiatorRole: deps.role, initiatorLabel: actor.name, actorId: actor.id,

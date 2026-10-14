@@ -1,6 +1,6 @@
 import type { GameState } from "@vtt/domain";
 
-/** What a principal is trying to initiate on an actor; lets the policy vary by action class later. */
+/** What a principal is trying to initiate on an actor; lets a per-table policy vary by action class. */
 export type InitiateKind = "attack" | "check" | "save" | "resource" | "inventory" | "edit";
 
 /** Who is acting, reduced to the fields the policy needs (derive from the principal at the call site). */
@@ -8,14 +8,9 @@ export type ActorInitiator = { role: "gm" } | { role: "player"; sessionId: strin
 
 export type InitiateVerdict = { ok: true } | { ok: false; message: string };
 
-/**
- * The single decision for "may this principal initiate this kind of action on this actor?" - the seam
- * every player-initiated command flows through. Today: the GM (and integrations) may act on anyone; a
- * player may act only on the player-character they have claimed. This is deliberately the ONE place a
- * future per-table policy (e.g. "players may initiate their own attacks") would read `state.combat`, so
- * that toggle becomes a one-field change here and nowhere else - the reason the 6+ duplicated ownership
- * checks are being funnelled through this function.
- */
+/** The single decision for "may this principal initiate this kind of action on this actor?". The GM
+ *  (and integrations) may act on anyone; a player only on their claimed player-character. A future
+ *  per-table policy would be read here and nowhere else. */
 export function canInitiateForActor(initiator: ActorInitiator, state: GameState, actorId: string, _kind: InitiateKind): InitiateVerdict {
   if (initiator.role === "gm") return { ok: true };
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -25,12 +20,10 @@ export function canInitiateForActor(initiator: ActorInitiator, state: GameState,
 }
 
 /**
- * May a player TARGET this combatant? Only public ones - never a hidden (gm-only) actor. The runner only
- * ever offers public targets, but the server must not trust client-supplied target ids: resolving an
- * action against a hidden actor would leak its name/AC/outcome back through the resolve ack (which bypasses
- * the player projection) and, in direct-damage mode, apply damage to it. The GM may target anyone (this is
- * only consulted for player-initiated resolves). Distinct from canInitiateForActor, which gates the acting
- * (owned) character; this gates the acted-upon one.
+ * Whether a player may target this combatant: public ones only. The server must not trust client target
+ * ids, since resolving against a hidden actor would leak its name/AC/outcome through the resolve ack
+ * (which bypasses the projection) and in direct mode damage it. Gates the acted-upon actor;
+ * `canInitiateForActor` gates the acting one.
  */
 export function canPlayerTarget(state: GameState, targetId: string): boolean {
   const target = state.actors.find((candidate) => candidate.id === targetId);

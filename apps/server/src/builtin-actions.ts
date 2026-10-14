@@ -3,17 +3,13 @@ import type { ActorDefinition } from "@vtt/schemas";
 type BuiltinAction = ActorDefinition["actions"][number];
 
 /**
- * The SRD 5.2.1 generic actions every combatant can take (rules glossary "[Action]" entries), plus
- * the Unarmed Strike options - engine behavior, not licensed content data, so they live in code and
- * ride the exact same ActionSchema vocabulary and resolution path as stat-block actions. A test pins
- * every entry against ActionSchema so the catalog can never drift from the schema.
+ * The SRD 5.2.1 generic actions every combatant can take (rules glossary "[Action]" entries) plus the
+ * Unarmed Strike options. Engine behaviour rather than content data, but in the same ActionSchema
+ * vocabulary and resolution path as stat-block actions (a test pins every entry to the schema).
  *
- * Ids are a FROZEN replay contract (journaled action.resolve payloads reference them); a stat-block
- * action with the same id wins on lookup, so imports can shadow a builtin deliberately.
- *
- * Mechanics live in the declarative vocabulary where it reaches (grants); the rest (check rolls for
- * Hide/Influence/Search/Study, unarmed strike math) is special-cased in resolveDefinitionAction
- * keyed by builtin id. Descriptions quote the SRD rule so the table sees the text it's using.
+ * Ids are a frozen replay contract (journaled payloads reference them); a stat-block action with the
+ * same id wins on lookup. What the declarative vocabulary can't express (check rolls, unarmed strike
+ * math) is special-cased in resolveDefinitionAction by id. Descriptions quote the SRD rule.
  */
 export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
   {

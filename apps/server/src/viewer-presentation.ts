@@ -28,11 +28,11 @@ export type ViewerInitiativeEntry = Readonly<{
   health: "healthy" | "bloodied" | "down";
   /** Display labels ("Prone", "Exhaustion 3") for public combatants. */
   conditions: readonly string[];
-  /** Content-bundle condition ids parallel to `conditions` so the initiative row picks the same glyphs as the table (labels are already public; ids add nothing hidden). */
+  /** Condition ids parallel to `conditions` so the row picks the same glyphs as the table; labels are already public. */
   conditionIds?: readonly string[];
 }>;
 
-/** The fog mask exactly as the table renders it (geometry only; hidden tokens never reach the viewer anyway). */
+/** The fog mask as the table renders it: geometry only, and hidden tokens never reach the viewer anyway. */
 export type ViewerFog = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
 
 export type ViewerInitiative = Readonly<{
@@ -51,14 +51,14 @@ export type ViewerEncounterToken = Readonly<{
   active: boolean;
   health: "healthy" | "bloodied" | "down";
   conditions: readonly string[];
-  /** Content-bundle condition ids parallel to `conditions` - the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
+  /** Condition ids parallel to `conditions` for glyph lookup; labels are already public. */
   conditionIds?: readonly string[];
-  /** Present only when the GM shows a richer indicator to everyone (audience "all"); the viewer derives the fill fraction from `health` (band) - exact HP never reaches the shared screen. */
+  /** Present only when the GM shows a richer indicator to everyone; the fill derives from the band, never exact HP. */
   healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }>;
   tokenAssetId?: string;
 }>;
 
-/** Player-safe drawing shown on the shared screen - only `public` annotations are ever projected here. */
+/** Player-safe drawing for the shared screen; only `public` annotations are projected. */
 export type ViewerAnnotation = Readonly<{
   id: string;
   kind: "measurement" | "shape" | "ping";
@@ -74,7 +74,7 @@ export type ViewerEncounterScene = Readonly<{
   mapAssetId: string | null;
   tokens: readonly ViewerEncounterToken[];
   annotations: readonly ViewerAnnotation[];
-  /** Absent = no fog (older servers); the viewer renders the mask above everything. */
+  /** Absent means no fog; the viewer renders the mask above everything. */
   fog?: ViewerFog;
 }>;
 
@@ -190,7 +190,7 @@ function conditionIdList(value: unknown): readonly string[] {
   });
 }
 
-/** The shared screen only ever receives the richer bar/ring style (band is a table-client fallback, never sent). */
+/** Only the bar/ring/aura styles are ever sent; band is a table-client fallback. */
 function healthDisplayStyle(value: unknown): "bar" | "ring" | "aura" {
   if (value === "bar" || value === "ring" || value === "aura") return value;
   throw new Error("Viewer token health display style must be \"bar\" or \"ring\".");
@@ -305,9 +305,7 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
   } else if (payload.type === "viewer.initiative.set") next = { ...state, initiative: initiative(payload.initiative) };
   else if (payload.type === "viewer.encounter.set") {
     const scene = encounter(payload.encounter);
-    // Combat-first: while an encounter is live (it carries a map), the shared screen follows that map
-    // automatically, so the image never lags behind the fight and the GM needn't re-present on every
-    // scene switch. When combat ends (no map), the last-shown map stays until the GM changes it.
+    // While an encounter has a map the shared screen follows it; after combat the last-shown map stays.
     const activeMap = scene.mapAssetId
       ? { assetId: scene.mapAssetId, altText: state.activeMap?.assetId === scene.mapAssetId ? state.activeMap.altText : "Battle map" }
       : state.activeMap;

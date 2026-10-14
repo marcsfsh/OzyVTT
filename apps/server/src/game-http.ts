@@ -16,20 +16,16 @@ import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { projectPlayerReplay } from "./replay-projection.js";
 
 /**
- * The public HTTP adapter over the shared game operations (ADR-0016). Every write here runs the
- * exact operation the Socket.IO handlers run - same validation, same role checks, same store
- * dispatch, same side effects - so the REST surface can never fork from the table's behavior.
+ * The public HTTP adapter over the shared game operations (ADR-0016): every write runs the same
+ * operation as the Socket.IO handlers, so REST cannot fork from table behaviour.
  *
- * Principals: a GM session token, a player session token, or a GM-minted integration credential,
- * all as `Authorization: Bearer`. Integration credentials are checked against each route's scope
- * and act with GM authority (they are the GM's own trusted automation); player sessions keep
- * exactly the player limits the table enforces. The public viewer never authenticates here.
+ * Principals (all `Authorization: Bearer`): GM session, player session, or a GM-minted integration
+ * credential, checked against each route's scope and acting with GM authority. Players keep the table's
+ * player limits. The public viewer never authenticates here.
  *
- * Error contract: 400 validation_failed (malformed request), 401 unauthenticated (no token),
- * 403 forbidden (bad/revoked/underscoped token, or a role denial), 404 not_found, and
- * 409 conflict for everything the game itself refuses - domain rejections, stale
- * `expectedRevision` (with `error.currentRevision`), and timeline navigations awaiting GM
- * confirmation (with `error.details.needsConfirm`).
+ * Errors: 400 validation_failed, 401 unauthenticated, 403 forbidden (bad/revoked/underscoped token or
+ * role denial), 404 not_found, and 409 conflict for game refusals, stale `expectedRevision` (with
+ * `error.currentRevision`) and timeline navigations awaiting confirmation (`error.details.needsConfirm`).
  */
 
 export type GameApiRouterOptions = Readonly<{
@@ -42,7 +38,7 @@ export type GameApiRouterOptions = Readonly<{
     list: () => readonly EncounterArchiveSummary[];
     get: (id: number) => string | null;
     remove: (id: number) => void;
-    /** Share (or un-share) one archived fight with players (D26); false when no such archive exists. */
+    /** Shares (or un-shares) one archived fight with players; false when no such archive exists. */
     setVisibility: (id: number, playerVisible: boolean) => boolean;
   }>;
   sessions: Readonly<{
@@ -84,14 +80,14 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     });
   }
 
-  /** One mapping for every operation failure, so REST semantics stay uniform across the whole surface. */
+  /** One mapping for every operation failure, so REST semantics stay uniform. */
   function sendOperationError(res: Response, error: unknown) {
     if (error instanceof GameInputError) return sendError(res, 400, "validation_failed", error.message, error.issues ? { issues: error.issues } : undefined);
     if (error instanceof GameAccessDeniedError) return sendError(res, 403, "forbidden", error.message);
     if (error instanceof TimelineConfirmationRequired) return sendError(res, 409, "conflict", error.message, { needsConfirm: error.confirm });
     if (error instanceof RevisionConflictError) return sendError(res, 409, "conflict", error.message, undefined, options.revision());
-    // Rules-mode rejections (ADR-0020) stay 409 conflict but carry machine-readable blocked details
-    // so integrations can resend with `override: {reason}` without parsing prose.
+    // Rules-mode rejections stay 409 but carry machine-readable details so integrations can resend with
+    // `override: {reason}` (ADR-0020).
     if (error instanceof RulesBlockedError) return sendError(res, 409, "conflict", error.message, { blocked: { rule: error.rule, message: error.message, overridable: error.overridable } });
     if (error instanceof CommandRejectedError) return sendError(res, 409, "conflict", error.message);
     return sendError(res, 500, "internal_error", "The command could not be processed.");
@@ -124,20 +120,14 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     next();
   };
 
-  /**
-   * Assemble a command payload from the JSON body plus path-derived fields. A missing commandId is
-   * minted here (and echoed in the response) so plain curl calls work; clients wanting safe retries
-   * supply their own. Path parameters win over any same-named body field.
-   */
+  /** Builds a command payload from the JSON body plus path fields. A missing commandId is minted (and
+   *  echoed) so plain curl calls work; clients wanting safe retries supply their own. Path params win. */
   function commandPayload(req: Request, extras: Record<string, unknown> = {}) {
     const body = (req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {}) as Record<string, unknown>;
     return { commandId: newId(), ...body, ...extras };
   }
 
-  /**
-   * A typed route for one cataloged command: scope AND handler come from the registry (the same
-   * one the generic tunnel dispatches through), so a typed route can never drift from the tunnel.
-   */
+  /** A typed route for one cataloged command; scope and handler come from the same registry as the tunnel. */
   const command = (type: string, extras?: (req: Request) => Record<string, unknown>) => {
     const descriptor = options.registry.get(type);
     if (!descriptor) throw new Error(`game-http route references an uncataloged command type: ${type}`);
@@ -172,7 +162,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     }
   });
 
-  // Server-computed action availability: the same evaluation strict-mode resolution runs, as a read.
+  // Action availability: the same evaluation strict-mode resolution runs, as a read.
   router.get(expressPath(GAME_PATHS.actorAvailableActions), authorize("combat:read"), (req, res) => {
     try {
       return sendData(res, ops.actorAvailableActions(res.locals.principal as GamePrincipal, { actorId: req.params.actorId }));
@@ -274,8 +264,6 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetProficiencies), ...command("character.set-proficiencies", actorIdParam));
   router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
-  // Registered BEFORE nothing in particular - `/characters/random` is a literal segment under a
-  // collection with no `{id}` route beneath it, so ordering is not load-bearing here.
   router.post(expressPath(GAME_PATHS.charactersRandom), ...command("character.generate"));
   router.post(expressPath(GAME_PATHS.characterRebuild), ...command("character.rebuild", (req) => ({ actorId: req.params.actorId })));
   router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
@@ -287,7 +275,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.rulesAnswer), ...command("rules.answer"));
   router.post(expressPath(GAME_PATHS.stagingDefaults), ...command("table.set-staging-defaults"));
   router.post(expressPath(GAME_PATHS.partyVisibility), ...command("table.set-party-visibility"));
-  // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
+  // Literal segments (ping/clear) are registered before the {id} routes.
   router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
   router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));
   router.post(expressPath(GAME_PATHS.annotations), ...command("annotation.add"));
@@ -328,7 +316,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Bundled content reads ----------
 
-  /** Content misses are 404s here (resource semantics), while the same operation's message text stays intact. */
+  /** Content misses are 404s here (resource semantics), keeping the operation's message text. */
   function sendContent(res: Response, read: () => unknown) {
     try {
       return sendData(res, read());
@@ -342,8 +330,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.get(expressPath(CONTENT_PATHS.monsterById), authorize("game:read"), (req, res) => sendContent(res, () => ops.contentMonsterSheet(res.locals.principal as GamePrincipal, { definitionId: req.params.definitionId })));
   router.get(expressPath(CONTENT_PATHS.monsterActions), authorize("game:read"), (req, res) => sendContent(res, () => ops.contentMonsterActions(res.locals.principal as GamePrincipal, { definitionId: req.params.definitionId })));
   router.get(expressPath(CONTENT_PATHS.conditions), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentConditions(res.locals.principal as GamePrincipal)));
-  // Rules catalogs: public SRD reference, so these accept a player session too (the operations enforce
-  // that themselves - no requireGmGrade). The bestiary above is the deliberate GM-only exception.
+  // Rules catalogs are public SRD reference, so player sessions may read them (the operations enforce
+  // that). The bestiary is the GM-only exception.
   router.get(expressPath(CONTENT_PATHS.skills), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSkills(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.languages), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentLanguages(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.spells), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSpells(res.locals.principal as GamePrincipal)));
@@ -355,9 +343,9 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.get(expressPath(CONTENT_PATHS.feats), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentFeats(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.names), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentNames(res.locals.principal as GamePrincipal)));
 
-  // ---------- Encounter archives (Time Machine v2) ----------
+  // ---------- Encounter archives ----------
 
-  /** Archive MANAGEMENT (visibility, delete) stays GM-grade; the two reads below are role-aware (D26). */
+  /** Archive management (visibility, delete) stays GM-grade; the two reads below are role-aware. */
   function requireGmGradePrincipal(res: Response): GamePrincipal | null {
     const principal = res.locals.principal as GamePrincipal;
     if (!isGmGrade(principal)) {
@@ -377,12 +365,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     return id;
   }
 
-  /**
-   * ROLE-AWARE, one URL (the `ops.view` precedent): the GM gets the verbatim document, a player gets
-   * the computed player replay, and an archive the GM has not shared is a 404 for a player - never a
-   * 403. A 403 would confirm the recording exists, which is the existence oracle the Codex rule
-   * forbids; "not found" is the same answer for a missing id and an unshared one.
-   */
+  /** Role-aware: the GM gets the stored document, a player gets the computed player replay, and an
+   *  unshared archive is a 404 for a player. Never 403, which would confirm the recording exists. */
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.collection), authorize("combat:read"), (_req, res) => {
     const principal = res.locals.principal as GamePrincipal;
     if (!isGmGrade(principal)) return sendData(res, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
@@ -405,18 +389,14 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     }
     const document = options.archives.get(id);
     if (document === null) return sendError(res, 404, "not_found", "No such encounter archive.");
-    // The stored JSON is spliced in verbatim - no parse/re-serialize round trip on a potentially large document.
+    // The stored JSON is spliced in verbatim, avoiding a parse/re-serialize of a potentially large document.
     return res.type("application/json").send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
 
-  /** Launch-from-here (D25). The registry supplies the scope and the handler, like every typed route. */
+  /** Launch-from-here; scope and handler come from the registry like every typed route. */
   router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.launch), ...command("replay.launch", (req) => ({ archiveId: Number(req.params.id) })));
 
-  /**
-   * Per-replay sharing (D26). GM-grade only, like every other archive route: this stores the GM's
-   * decision. The archive READ endpoints stay GM-grade at this version, so sharing does not yet hand
-   * a player a document - the player-facing replay projection is its own, separately reviewed change.
-   */
+  /** Per-replay sharing: GM-grade only, storing the GM's decision. */
   router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.visibility), authorize("combat:write"), (req, res) => {
     if (!requireGmGradePrincipal(res)) return;
     const id = archiveIdParam(req, res);
