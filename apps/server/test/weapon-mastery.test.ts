@@ -20,7 +20,7 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf, masteryReaches } from "../src/equipment-derivation.js";
-import { createGameOperations, type GameOperationsContext } from "../src/game-operations.js";
+import { createGameCommands, type CommandContext } from "../src/commands/index.js";
 import { GameStore, RulesBlockedError } from "../src/game-store.js";
 import { addCombatant, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { MapAssetStore } from "../src/map-assets.js";
@@ -533,7 +533,7 @@ function battlefield(
 const positionOf = (built: Built, actorId: string) =>
   built.state.combat.tokens.find((token) => token.actorId === actorId)!.position;
 
-// The same swing plus the geometry callback. `wired` mirrors what `game-operations.ts` hands the
+// The same swing plus the geometry callback. `wired` mirrors what `commands/actions.ts` hands the
 // resolver; `wired: false` is how `reactions.ts` resolves.
 const pushSwing = (built: Built, actionId: string, faces: number[], wired = true, geometry: TokenMapGeometry = GRID) =>
   resolveDefinitionAction(
@@ -908,9 +908,9 @@ afterEach(async () => {
 
 type FeedLine = Readonly<{ kind: string; text: string; gmOnly?: boolean; actorIds?: readonly string[] }>;
 
-// The operation layer, since a rules note only matters once something receives it. Everything but the
+// The command layer, since a rules note only matters once something receives it. Everything but the
 // feed is a stub: `logged` is the durable table feed, `broadcast` the transient toast.
-async function operationsFor(built: Built, duringGeometryFetch?: (live: GameStore) => Promise<void>) {
+async function commandsFor(built: Built, duringGeometryFetch?: (live: GameStore) => Promise<void>) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-mastery-reaction-"));
   const store = new GameStore(join(directory, "game.sqlite"), built.state);
   await store.initialize();
@@ -922,7 +922,7 @@ async function operationsFor(built: Built, duringGeometryFetch?: (live: GameStor
   const unused = () => {
     throw new Error("answering a reaction must not touch this");
   };
-  const operations = createGameOperations({
+  const commands = createGameCommands({
     store,
     contentLibrary: new ContentLibrary(),
     combatLog: { append: () => {} },
@@ -952,8 +952,8 @@ async function operationsFor(built: Built, duringGeometryFetch?: (live: GameStor
     // Every die the swing rolls after `attackNatural` pins the d20: the pike's damage.
     random: () => 4,
     newId: () => randomUUID()
-  } as unknown as GameOperationsContext);
-  return { operations, store, logged, broadcast };
+  } as unknown as CommandContext);
+  return { commands, store, logged, broadcast };
 }
 
 /** A `leaves-reach` prompt shaped as `movement-rules.ts` mints one: Borin's pike, the foe walking out. */
@@ -989,11 +989,12 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     // `reactions.ts` resolves with no geometry callback, so Push here is only the sentence.
     const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
     const reactionId = parkOpportunityAttack(built);
-    const { operations, store, logged, broadcast } = await operationsFor(built);
+    const { commands, store, logged, broadcast } = await commandsFor(built);
     const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
 
     // +5 to hit vs AC 13, so a pinned natural 18 lands.
-    await operations.reactionAnswer(
+    await commands.dispatch(
+      "reaction.answer",
       { kind: "gm", sessionId: IDS.gmSession },
       {
         commandId: randomUUID(),
@@ -1026,14 +1027,15 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     // `actionResolve` reads the grid before its mutation opens, so a scene switch in between must not be
     // measured against the departed map; the push degrades to the unmeasurable-map sentence.
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
-    const { operations, store, logged } = await operationsFor(built, async (live) => {
+    const { commands, store, logged } = await commandsFor(built, async (live) => {
       await live.execute({ id: randomUUID(), type: "test.scene-switch" }, (state) => {
         state.combat = { ...state.combat, mapAssetId: "20000000-0000-5000-8000-000000000002" };
       });
     });
     const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
 
-    await operations.actionResolve(
+    await commands.dispatch(
+      "action.resolve",
       { kind: "gm", sessionId: IDS.gmSession },
       {
         commandId: randomUUID(),
@@ -1056,9 +1058,10 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
 
   it("shoves for real down the same path when the map did NOT change - the control for the guard above", async () => {
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
-    const { operations, store, logged } = await operationsFor(built);
+    const { commands, store, logged } = await commandsFor(built);
 
-    await operations.actionResolve(
+    await commands.dispatch(
+      "action.resolve",
       { kind: "gm", sessionId: IDS.gmSession },
       {
         commandId: randomUUID(),
@@ -1085,9 +1088,10 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
   it("says nothing on a PREVIEW - the sentence lands once, on the answer that spends the reaction", async () => {
     const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
     const reactionId = parkOpportunityAttack(built);
-    const { operations, logged } = await operationsFor(built);
+    const { commands, logged } = await commandsFor(built);
 
-    await operations.reactionAnswer(
+    await commands.dispatch(
+      "reaction.answer",
       { kind: "gm", sessionId: IDS.gmSession },
       {
         commandId: randomUUID(),

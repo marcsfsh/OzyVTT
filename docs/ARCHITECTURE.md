@@ -44,17 +44,28 @@ Packages are consumed as TypeScript source; only the client and server have buil
 ## The command pipeline
 
 A command is a named socket event (or an HTTP call to `/api/v1/game/...`) carrying a UUID
-`commandId` and an optional `expectedRevision`. Both transports call the same handler in
-`apps/server/src/game-operations.ts`:
+`commandId` and an optional `expectedRevision`. Each command is one entry in the command table
+(`apps/server/src/commands/`, listed in `index.ts`): its type, Zod schema, GM-only refusal and run
+function. Its scope and typed HTTP route come from `GAME_COMMANDS` in `packages/api-contract`, and its
+socket event is its type with the first `.` as `:`. The socket handlers and the HTTP routes are
+registered by looping over the table, and both run the same pipeline (`commands/pipeline.ts`):
 
-1. Validate the payload with a strict Zod schema (`game-commands.ts`).
-2. Authorize from the signed token, per command. Role is never cached at connect.
+1. Refuse a GM-only command from a player, then validate the payload with its strict Zod schema
+   (`game-commands.ts`). Role comes from the signed token, per command; it is never cached at connect.
+2. Run the command. Whether a player may act on a given actor is decided in one place,
+   `canInitiateForActor` in `authorization.ts`, against live state.
 3. `store.execute` commits the idempotency receipt, the domain event and the new state in one
    SQLite transaction and bumps the revision. A repeated `commandId` returns the earlier result
    with `duplicate: true` and changes nothing. A stale `expectedRevision` is rejected.
 4. Broadcast `state:updated` with a projection computed separately for each socket's role.
+5. Reply through `projectReply`, which strips GM-only narration from a player's reply.
 
-Commands run one at a time through a promise queue. Add new capability to the operations layer,
+A failure answers through one mapping (`commands/failures.ts`) on both transports: a validation
+failure is 400, a denial 403, a missing read subject 404, a rules or state refusal 409, and anything
+unexpected is logged and answered with a generic 500. The reads both transports serve (content
+catalogs, action availability, the combat log) are a second table in `commands/reads.ts`.
+
+Commands run one at a time through a promise queue. Add new capability to the command table,
 never to one transport.
 
 ## Realtime

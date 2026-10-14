@@ -91,7 +91,7 @@ export function initiativeRollMode(
 }
 
 /** Told about every initiative die the server rolls, so the caller can put it in the table feed.
- *  Carries no session knowledge: `game-operations.ts` decides attribution. */
+ *  Carries no session knowledge: the command layer decides attribution. */
 export type InitiativeRollSink = (
   roll: Readonly<{
     actorId: string;

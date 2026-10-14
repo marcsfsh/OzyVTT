@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { GameStateSchema } from "@vtt/domain";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import {
@@ -20,7 +18,9 @@ import {
   PlayerSessionIssuedResponseSchema,
   SESSION_PATHS
 } from "@vtt/api-contract";
+import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
+import { gameCommands, gameReads, socketEventOf } from "../src/commands/index.js";
 import { createServer } from "../src/server.js";
 
 // ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
@@ -30,29 +30,6 @@ import { createServer } from "../src/server.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECRET_ID = "10000000-0000-4000-8000-000000000002";
-
-// One `socket.on(...)` registration: the event name and the shared operation it dispatches to (where
-// the real authorization gate lives). The event pattern is `[^"]+` so any quoted name is found, and an
-// unexpected naming style fails the guard rather than disappearing from the scrape.
-function scrapeSocketHandlers(source: string): ReadonlyArray<{ event: string; operation: string | null }> {
-  // Each registration runs to the next one, so a handler formatted across several lines still counts.
-  const registrations = [...source.matchAll(/socket\.on\(\s*"([^"]+)"/g)];
-  return registrations.map((registration, index) => {
-    const body = source.slice(registration.index, registrations[index + 1]?.index ?? source.length);
-    return { event: registration[1], operation: /operations\.([A-Za-z0-9_]+)\(/.exec(body)?.[1] ?? null };
-  });
-}
-
-/** True when the shared operation refuses a player session outright (`requireGmGrade`), the socket's read gate. */
-const operationsSource = readFileSync(fileURLToPath(new URL("../src/game-operations.ts", import.meta.url)), "utf8");
-function gmOnlyOperation(method: string): boolean {
-  const start = [`\n    ${method}(`, `\n    async ${method}(`]
-    .map((marker) => operationsSource.indexOf(marker))
-    .find((index) => index >= 0);
-  if (start === undefined) throw new Error(`operations.${method} was not found in game-operations.ts`);
-  const end = operationsSource.indexOf("\n    },", start);
-  return operationsSource.slice(start, end === -1 ? undefined : end).includes("requireGmGrade");
-}
 
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
@@ -1233,208 +1210,6 @@ describe("public game API over /api/v1", () => {
     // No encounter running: nothing is spent, so everything reports available with no violations.
     expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
   });
-
-  it("keeps the OpenAPI-documented scopes identical to the runtime command scopes (no drift between doc, tunnel, and typed routes)", () => {
-    const TYPED_ROUTES: ReadonlyArray<[string, "post" | "delete", keyof typeof GAME_COMMANDS]> = [
-      [GAME_PATHS.encounterStart, "post", "encounter.start"],
-      [GAME_PATHS.encounterEnd, "post", "encounter.end"],
-      [GAME_PATHS.encounterCombatants, "post", "encounter.add-combatant"],
-      [GAME_PATHS.initiativeSet, "post", "initiative.set"],
-      [GAME_PATHS.initiativeNext, "post", "initiative.next"],
-      [GAME_PATHS.initiativePrevious, "post", "initiative.previous"],
-      [GAME_PATHS.turnEnd, "post", "turn.end"],
-      [GAME_PATHS.turnUse, "post", "turn.use"],
-      [GAME_PATHS.turnReaction, "post", "turn.use-reaction"],
-      [GAME_PATHS.turnLegendary, "post", "turn.use-legendary"],
-      [GAME_PATHS.tokenMove, "post", "token.move"],
-      [GAME_PATHS.actors, "post", "actor.add-from-definition"],
-      [GAME_PATHS.actorById, "delete", "actor.remove"],
-      [GAME_PATHS.actorDamage, "post", "actor.apply-damage"],
-      [GAME_PATHS.actorHeal, "post", "actor.heal"],
-      [GAME_PATHS.actorTempHp, "post", "actor.set-temp-hp"],
-      [GAME_PATHS.actorHp, "post", "actor.set-hp"],
-      [GAME_PATHS.actorConditions, "post", "actor.set-condition"],
-      [GAME_PATHS.definitionsImport, "post", "actor.import-definition"],
-      [GAME_PATHS.characterImports, "post", "character.submit-import"],
-      [GAME_PATHS.characterImportResolve, "post", "character.resolve-import"],
-      [GAME_PATHS.rolls, "post", "dice.roll"],
-      [GAME_PATHS.actionResolve, "post", "action.resolve"],
-      [GAME_PATHS.saveAnswer, "post", "save.answer"],
-      [GAME_PATHS.saveDismiss, "post", "save.dismiss"],
-      [GAME_PATHS.reactionAnswer, "post", "reaction.answer"],
-      [GAME_PATHS.reactionDismiss, "post", "reaction.dismiss"],
-      [GAME_PATHS.damageResolve, "post", "damage.resolve"],
-      [GAME_PATHS.effects, "post", "effect.add"],
-      [GAME_PATHS.effectEnd, "post", "effect.end"],
-      [GAME_PATHS.deathSaveRoll, "post", "death-save.roll"],
-      [GAME_PATHS.rulesMode, "post", "encounter.set-rules-mode"],
-      [GAME_PATHS.playerDamageMode, "post", "encounter.set-player-damage-mode"],
-      [GAME_PATHS.playerInitiativeMode, "post", "encounter.set-player-initiative-mode"],
-      [GAME_PATHS.initiativeRollSelf, "post", "initiative.roll-self"],
-      [GAME_PATHS.initiativeRollRemaining, "post", "initiative.roll-remaining"],
-      [GAME_PATHS.healthDisplay, "post", "encounter.set-health-display"],
-      [GAME_PATHS.environment, "post", "encounter.set-environment"],
-      [GAME_PATHS.actorRest, "post", "actor.rest"],
-      [GAME_PATHS.actorRechoose, "post", "actor.rechoose"],
-      [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],
-      [GAME_PATHS.characterSetSlot, "post", "character.set-slot"],
-      [GAME_PATHS.characterSetPrepared, "post", "character.set-prepared"],
-      [GAME_PATHS.characterSetInventory, "post", "character.set-inventory"],
-      [GAME_PATHS.characterSetCurrency, "post", "character.set-currency"],
-      [GAME_PATHS.characterSetIdentity, "post", "character.set-identity"],
-      [GAME_PATHS.characterSetProficiencies, "post", "character.set-proficiencies"],
-      [GAME_PATHS.characters, "post", "character.create"],
-      [GAME_PATHS.charactersRandom, "post", "character.generate"],
-      [GAME_PATHS.builderPolicy, "post", "builder.set-policy"],
-      [GAME_PATHS.rulesPolicy, "post", "rules.set-policy"],
-      [GAME_PATHS.actionUse, "post", "action.use"],
-      [GAME_PATHS.saveRoll, "post", "save.roll"],
-      [GAME_PATHS.rulesAsk, "post", "rules.ask"],
-      [GAME_PATHS.rulesAnswer, "post", "rules.answer"],
-      [GAME_PATHS.stagingDefaults, "post", "table.set-staging-defaults"],
-      [GAME_PATHS.partyVisibility, "post", "table.set-party-visibility"],
-      [GAME_PATHS.annotations, "post", "annotation.add"],
-      [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
-      [GAME_PATHS.annotationsClear, "post", "annotation.clear"],
-      [GAME_PATHS.annotationById, "delete", "annotation.remove"],
-      [GAME_PATHS.annotationMove, "post", "annotation.move"],
-      [GAME_PATHS.annotationColor, "post", "annotation.set-color"],
-      [GAME_PATHS.annotationVisibility, "post", "annotation.set-visibility"],
-      [GAME_PATHS.annotationMovable, "post", "annotation.set-movable"],
-      [GAME_PATHS.claims, "post", "character.claim"],
-      [GAME_PATHS.claimsRelease, "post", "character.release"],
-      [GAME_PATHS.claimForceRelease, "post", "character.force-release"],
-      [GAME_PATHS.actorTokenImage, "post", "actor.set-token-image"],
-      [GAME_PATHS.actorSize, "post", "actor.set-size"],
-      [GAME_PATHS.actorVisibility, "post", "actor.set-visibility"],
-      [GAME_PATHS.actorArchived, "post", "actor.set-archived"],
-      [GAME_PATHS.actorSheetPreview, "post", "actor.set-sheet-preview"],
-      [GAME_PATHS.actorHealthDisplay, "post", "actor.set-health-display"],
-      [GAME_PATHS.actorSpeed, "post", "actor.set-speed"],
-      [GAME_PATHS.scenes, "post", "scene.create"],
-      [GAME_PATHS.sceneById, "delete", "scene.remove"],
-      [GAME_PATHS.sceneRename, "post", "scene.rename"],
-      [GAME_PATHS.sceneActivate, "post", "scene.activate"],
-      [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"],
-      [GAME_PATHS.sceneDuplicate, "post", "scene.duplicate"],
-      [GAME_PATHS.sceneReorder, "post", "scene.reorder"],
-      [GAME_PATHS.fogEnabled, "post", "fog.set-enabled"],
-      [GAME_PATHS.fogPaint, "post", "fog.paint"],
-      [GAME_PATHS.fogReset, "post", "fog.reset"],
-      [GAME_PATHS.characterRebuild, "post", "character.rebuild"],
-      [GAME_PATHS.builderRollAbilities, "post", "builder.roll-abilities"],
-      // The one typed route outside GAME_PATHS: launch-from-here lives on the archive it replays.
-      [ENCOUNTER_ARCHIVE_PATHS.launch, "post", "replay.launch"]
-    ];
-    // Every cataloged command has exactly one typed route in this table...
-    expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMANDS).sort());
-    // ...and the documented bearer scope for that route equals the runtime scope the tunnel + typed route enforce.
-    const paths = openApiDocument.paths as unknown as Record<
-      string,
-      Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>
-    >;
-    for (const [path, method, type] of TYPED_ROUTES) {
-      const documented = paths[path][method].security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
-      expect(documented, `${method.toUpperCase()} ${path} (${type})`).toEqual([GAME_COMMANDS[type].scope]);
-    }
-  });
-
-  it("scrapes socket handlers by any event name, so an unconventional one fails instead of vanishing", () => {
-    // The guard below is only useful if it can see every handler. A narrow character class
-    // (`[a-z0-9:-]+`) silently matches nothing for a camelCase or underscored event name, so such a
-    // handler would ship socket-only with the guard passing; `[^"]+` turns that into a failure.
-    const synthetic = [
-      `    socket.on("codex:setPage", (payload, acknowledge) => respond(acknowledge, "x", "y", (principal) => operations.codexSetPage(principal, payload)));`,
-      `    socket.on("codex:set_page", (payload, acknowledge) => respond(acknowledge, "x", "y", (principal) => operations.codexSetPage(principal, payload)));`
-    ].join("\n");
-    expect(scrapeSocketHandlers(synthetic).map((handler) => handler.event)).toEqual([
-      "codex:setPage",
-      "codex:set_page"
-    ]);
-    // The narrow class sees neither, which is the blind spot.
-    expect([...synthetic.matchAll(/socket\.on\("([a-z0-9:-]+)"/g)].map((match) => match[1])).toEqual([]);
-    // Once they are seen, the guard's own assertion rejects them: neither is a cataloged command.
-    for (const handler of scrapeSocketHandlers(synthetic))
-      expect(Object.keys(GAME_COMMANDS)).not.toContain(handler.event.replace(":", "."));
-  });
-
-  it("gives every Socket.IO capability an HTTP twin - no socket-only capability (ADR-0016)", () => {
-    // The route-table test above compares GAME_COMMANDS, typed routes and OpenAPI, so a capability
-    // that never entered GAME_COMMANDS is invisible to all three. This test starts from the socket
-    // surface and demands each event reach the public API. The scrape covers every module under src/,
-    // since feature modules (the codex, importers) register handlers too.
-    const sourceDirectory = fileURLToPath(new URL("../src/", import.meta.url));
-    const handlers = readdirSync(sourceDirectory)
-      .filter((file) => file.endsWith(".ts"))
-      .flatMap((file) => scrapeSocketHandlers(readFileSync(join(sourceDirectory, file), "utf8")));
-    const events = handlers.map((handler) => handler.event);
-    expect(events.length).toBeGreaterThan(80); // the scrape actually found the handlers
-
-    // Reads and session issuance aren't commands, so each names the documented operation serving the same data.
-    const READ_TWINS: Readonly<Record<string, readonly [string, string]>> = {
-      "session:join": [SESSION_PATHS.player, "post"],
-      "log:read": [GAME_PATHS.log, "get"],
-      "actor:available-actions": [GAME_PATHS.actorAvailableActions, "get"],
-      "content:monsters": [CONTENT_PATHS.monsters, "get"],
-      "content:monster-sheet": [CONTENT_PATHS.monsterById, "get"],
-      "content:monster-actions": [CONTENT_PATHS.monsterActions, "get"],
-      "content:conditions": [CONTENT_PATHS.conditions, "get"],
-      "content:skills": [CONTENT_PATHS.skills, "get"],
-      "content:languages": [CONTENT_PATHS.languages, "get"],
-      "content:spells": [CONTENT_PATHS.spells, "get"],
-      "content:equipment": [CONTENT_PATHS.equipment, "get"],
-      "content:classes": [CONTENT_PATHS.classes, "get"],
-      "content:subclasses": [CONTENT_PATHS.subclasses, "get"],
-      "content:species": [CONTENT_PATHS.species, "get"],
-      "content:backgrounds": [CONTENT_PATHS.backgrounds, "get"],
-      "content:feats": [CONTENT_PATHS.feats, "get"],
-      "content:names": [CONTENT_PATHS.names, "get"]
-    };
-    const TRANSPORT_ONLY = new Set(["disconnect"]); // Socket.IO lifecycle, not a game capability
-    // `session:join` presents a token while its HTTP twin mints one (the GM issues player sessions), so
-    // the two are gated differently and the authorization comparison does not apply. Every other read must
-    // serve the same audience on both transports.
-    const AUTHORIZATION_EXEMPT = new Set(["session:join"]);
-
-    for (const handler of handlers) {
-      const event = handler.event;
-      if (TRANSPORT_ONLY.has(event)) continue;
-      const twin = READ_TWINS[event];
-      if (twin) {
-        expect(openApiDocument.paths, `socket read "${event}" has no documented HTTP twin`).toHaveProperty([
-          twin[0],
-          twin[1]
-        ]);
-        if (AUTHORIZATION_EXEMPT.has(event)) continue;
-        // A twin must admit the same callers. The socket's real gate is the shared operation it dispatches to
-        // (`requireGmGrade` or not), so compare that against the documented security: a GM-only read must not
-        // offer `playerAuth`, and a table-wide read must.
-        expect(handler.operation, `socket read "${event}" does not dispatch to a shared operation`).not.toBeNull();
-        const documented = (
-          openApiDocument.paths as unknown as Record<
-            string,
-            Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>
-          >
-        )[twin[0]][twin[1]];
-        const playerReachable = (documented.security ?? []).some((entry) => "playerAuth" in entry);
-        expect(
-          playerReachable,
-          `socket read "${event}" and ${twin[1].toUpperCase()} ${twin[0]} disagree on who may read it`
-        ).toBe(!gmOnlyOperation(handler.operation!));
-        continue;
-      }
-      // Every other event is a mutation: the socket name and the command type are the same string
-      // with `:` swapped for `.`, and the command type must be publicly cataloged.
-      const commandType = event.replace(":", ".");
-      expect(
-        Object.keys(GAME_COMMANDS),
-        `socket command "${event}" is not in GAME_COMMANDS (socket-only capability)`
-      ).toContain(commandType);
-    }
-    // And nothing in the read table is stale.
-    for (const event of Object.keys(READ_TWINS))
-      expect(events, `READ_TWINS lists "${event}", which the server no longer handles`).toContain(event);
-  });
 });
 
 // `POST /codex/import` has a 64 MB body limit (a backup bundle carries every page revision). Its parser
@@ -1503,5 +1278,95 @@ describe("the codex import's 64 MB parser runs after authorization, not before i
     // >= rather than ==: a nested path registers its parent too, so 7000 leaves under one shared parent
     // land as 7001 rows. The claim here is "the whole body arrived", not an exact folder count.
     expect((await authorized.json()).data.counts.folders).toBeGreaterThanOrEqual(7000);
+  });
+});
+
+// The command and read tables are the one place a capability is defined: both transports register from
+// them, so these check each entry against the wire contract and against the running server.
+describe("the command and read tables", () => {
+  type Operation = { security?: ReadonlyArray<Record<string, readonly string[]>> };
+  const documented = openApiDocument.paths as unknown as Record<string, Record<string, Operation>>;
+  const bearerScope = (operation: Operation | undefined) =>
+    operation?.security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
+  const offeredToPlayers = (operation: Operation | undefined) =>
+    operation?.security?.some((entry) => "playerAuth" in entry) === true;
+  /** A route with each `{param}` filled, so it can be called. */
+  const concrete = (path: string) => path.replace(/\{[a-zA-Z]+\}/g, (match) => (match === "{id}" ? "1" : HERO_ID));
+
+  it("defines every command in GAME_COMMANDS exactly once", () => {
+    const types = gameCommands.map((command) => command.type);
+    expect(new Set(types).size).toBe(types.length);
+    expect([...types].sort()).toEqual(Object.keys(GAME_COMMANDS).sort());
+  });
+
+  it("gives every command a socket event, a typed route and an OpenAPI operation that agree on scope and audience", () => {
+    for (const command of gameCommands) {
+      const route = GAME_COMMANDS[command.type];
+      expect(socketEventOf(command.type), command.type).toMatch(/^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/);
+      const operation = documented[route.path]?.[route.method];
+      expect(operation, `${route.method.toUpperCase()} ${route.path} (${command.type}) is undocumented`).toBeDefined();
+      expect(bearerScope(operation), command.type).toEqual([route.scope]);
+      // A GM-only command must not be documented as open to player sessions.
+      if (command.gmOnly !== undefined) expect(offeredToPlayers(operation), command.type).toBe(false);
+    }
+  });
+
+  it("gives every read a documented GET with its scope, open to players exactly when the read is", () => {
+    for (const read of gameReads) {
+      const operation = documented[read.path]?.get;
+      expect(operation, `GET ${read.path} (${read.event}) is undocumented`).toBeDefined();
+      expect(bearerScope(operation), read.event).toEqual([read.scope]);
+      expect(offeredToPlayers(operation), read.event).toBe(!("gmOnly" in read));
+    }
+  });
+
+  it("serves every command and read over HTTP and the socket, behind authentication", async () => {
+    const { base } = await boot();
+    for (const command of gameCommands) {
+      const route = GAME_COMMANDS[command.type];
+      const response = await fetch(base + concrete(route.path), { method: route.method.toUpperCase() });
+      expect(response.status, `${route.method.toUpperCase()} ${route.path}`).toBe(401);
+    }
+    for (const read of gameReads)
+      expect((await fetch(base + concrete(read.path))).status, `GET ${read.path}`).toBe(401);
+
+    // A socket that never joined reaches every handler and is turned away by the same gate.
+    const socket = connect(base, { transports: ["websocket"], reconnection: false, forceNew: true });
+    cleanups.push(async () => {
+      socket.disconnect();
+    });
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", () => resolve());
+      socket.once("connect_error", reject);
+    });
+    const events = [
+      ...gameCommands.map((command) => socketEventOf(command.type)),
+      ...gameReads.map((read) => read.event)
+    ];
+    for (const event of events) {
+      const ack = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
+        (socket.emit as (...args: unknown[]) => void)(event, {}, resolve)
+      );
+      expect(ack, event).toEqual({ ok: false, message: "Join a session first." });
+    }
+  });
+
+  it("refuses a player every GM-only command and read with its own refusal, before reading the payload", async () => {
+    const { base, server } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    for (const command of gameCommands.filter((candidate) => candidate.gmOnly !== undefined)) {
+      const route = GAME_COMMANDS[command.type];
+      const response = await fetch(base + concrete(route.path), {
+        method: route.method.toUpperCase(),
+        headers: bearer(playerToken),
+        body: JSON.stringify({ unexpected: true })
+      });
+      expect(response.status, command.type).toBe(403);
+      expect((await response.json()).error.message, command.type).toBe(command.gmOnly);
+    }
+    for (const read of gameReads.filter((candidate) => "gmOnly" in candidate)) {
+      const response = await fetch(base + concrete(read.path), { headers: bearer(playerToken) });
+      expect(response.status, read.event).toBe(403);
+    }
   });
 });

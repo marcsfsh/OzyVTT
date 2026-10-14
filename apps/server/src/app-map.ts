@@ -55,10 +55,10 @@ export function renderAppMap(): string {
   lines.push("## Commands");
   lines.push("");
   lines.push("The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the");
-  lines.push("listed integration scope (`GAME_COMMANDS` in `packages/api-contract`). Adding one walks the");
-  lines.push("pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map + an OpenAPI");
-  lines.push("operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`");
-  lines.push("route -> projection decision.");
+  lines.push("listed integration scope. Adding one: its typed socket event in domain `ClientToServerEvents`, its");
+  lines.push("schema in `game-commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`) with an");
+  lines.push("OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports");
+  lines.push("register from. Then the projection decision.");
   lines.push("");
   lines.push(`Namespaces: ${namespaces.map((namespace) => `\`${namespace}\``).join(", ")}.`);
   lines.push("");
@@ -84,7 +84,7 @@ export function renderAppMap(): string {
   );
   lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.");
   lines.push("- **Command Zod schemas:** `apps/server/src/game-commands.ts`.");
-  lines.push("- **Command handlers + registry:** `apps/server/src/game-operations.ts`.");
+  lines.push("- **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).");
   lines.push("- **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.");
   lines.push("- **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.");
   lines.push("- **Public viewer projection:** `apps/server/src/viewer-encounter.ts`, `viewer-presentation.ts`.");

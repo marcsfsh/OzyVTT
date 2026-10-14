@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -191,16 +191,18 @@ describe("one feed line per moment", () => {
   it("never writes the same line twice: no appendLog immediately followed by an identical broadcast", () => {
     // `broadcastTableEvent` writes its own durable line, so a handler that also calls `appendLog` for
     // the same entry prints it twice.
-    const source = readFileSync(fileURLToPath(new URL("../src/game-operations.ts", import.meta.url)), "utf8").split(
-      "\n"
-    );
+    const directory = fileURLToPath(new URL("../src/commands/", import.meta.url));
     const duplicates: string[] = [];
-    for (let index = 0; index < source.length - 1; index += 1) {
-      const current = source[index].trim();
-      const next = source[index + 1].trim();
-      if (!current.startsWith("context.appendLog(") || !next.startsWith("context.broadcastTableEvent(")) continue;
-      if (current.slice("context.appendLog(".length) === next.slice("context.broadcastTableEvent(".length))
-        duplicates.push(`game-operations.ts:${index + 1}`);
+    for (const file of readdirSync(directory).filter((name) => name.endsWith(".ts"))) {
+      const source = readFileSync(join(directory, file), "utf8").split("\n");
+      for (let index = 0; index < source.length - 1; index += 1) {
+        const current = source[index].trim();
+        const next = source[index + 1].trim();
+        if (!current.startsWith("kit.context.appendLog(") || !next.startsWith("kit.context.broadcastTableEvent("))
+          continue;
+        if (current.slice("kit.context.appendLog(".length) === next.slice("kit.context.broadcastTableEvent(".length))
+          duplicates.push(`${file}:${index + 1}`);
+      }
     }
     expect(
       duplicates,
