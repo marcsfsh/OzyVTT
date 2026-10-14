@@ -33,6 +33,7 @@ import { createHomebrewValidator } from "./homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
 import { findCatalogRecord } from "./homebrew-srd-copy.js";
 import { createInitialGameState } from "./initial-game-state.js";
+import { createStateReader } from "./state-reader.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
 import { MapAssetStore } from "./map-assets.js";
@@ -82,6 +83,8 @@ export function createServer(options: CreateServerOptions) {
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), {
     timelineDirtied
   });
+  // Every read of the game state outside a command's own transaction goes through here.
+  const committedState = createStateReader(store);
   const combatLog = new CombatLogStore(options.databasePath);
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
@@ -124,12 +127,12 @@ export function createServer(options: CreateServerOptions) {
     // One pending timer, re-armed from the callback so staggered annotations each expire on time.
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
     annotationExpiryTimers.clear();
-    const soonest = nextAnnotationExpiry(store.snapshot, Date.now());
+    const soonest = nextAnnotationExpiry(committedState.read(), Date.now());
     if (soonest === null) return;
     const timer = setTimeout(
       () => {
         annotationExpiryTimers.delete(timer);
-        void publishGameState(store.snapshot);
+        void publishGameState(committedState.read());
         scheduleAnnotationExpiry();
       },
       Math.max(0, soonest - Date.now())
@@ -144,7 +147,7 @@ export function createServer(options: CreateServerOptions) {
   }
   /** Also reauthorizes every connected socket, so a revoked GM client is downgraded or disconnected promptly. */
   function broadcast() {
-    const state = store.snapshot;
+    const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
       const gm = auth.verify(token);
@@ -153,7 +156,7 @@ export function createServer(options: CreateServerOptions) {
         socket.disconnect(true);
         continue;
       }
-      socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
+      socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
     }
   }
   /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
@@ -166,12 +169,12 @@ export function createServer(options: CreateServerOptions) {
   function notifyHomebrewChanged() {
     io.emit("homebrew:changed", { revision: homebrewStore.revision });
   }
-  // Homebrew usage lookup, memoised for one microtask: the library list asks per row and every
-  // `store.snapshot` clones the campaign. Gone before the next request, so never stale.
+  // Homebrew usage lookup, memoised for one microtask: the library list asks per row and building the
+  // index walks the whole campaign. Gone before the next request, so never stale.
   let usageIndex: ReturnType<typeof buildHomebrewUsageIndex> | undefined;
   const homebrewUsagesFor = (type: Parameters<ReturnType<typeof buildHomebrewUsageIndex>["of"]>[0], id: string) => {
     if (!usageIndex) {
-      usageIndex = buildHomebrewUsageIndex(store.snapshot);
+      usageIndex = buildHomebrewUsageIndex(committedState.read());
       queueMicrotask(() => {
         usageIndex = undefined;
       });
@@ -189,10 +192,10 @@ export function createServer(options: CreateServerOptions) {
       logged?: boolean;
     }>
   ) {
-    const state = store.snapshot;
+    const { actors } = committedState.read();
     const actorIds = event.actorIds ?? [];
     const publicToPlayers =
-      !event.gmOnly && actorIds.every((id) => state.actors.find((actor) => actor.id === id)?.visibility === "public");
+      !event.gmOnly && actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public");
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
@@ -215,16 +218,16 @@ export function createServer(options: CreateServerOptions) {
       roll?: RollRecord | null;
     }>
   ) {
-    const state = store.snapshot;
+    const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
     const gmOnly =
       entry.gmOnly === true ||
-      actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility !== "public");
+      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public");
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
       gmOnly,
-      revision: state.revision,
+      revision: current.revision,
       actorId: entry.actorId ?? null,
       roll: entry.roll ?? null
     });
@@ -310,7 +313,7 @@ export function createServer(options: CreateServerOptions) {
     try {
       const geometry = await tokenGeometryFor(mapAssetId);
       const entry = mapCatalog.get(mapAssetId);
-      await viewerCoordinator.presentMap(store.snapshot.revision, {
+      await viewerCoordinator.presentMap(store.revision, {
         assetId: mapAssetId,
         altText: entry?.name ?? "Battle map",
         camera: { center: { x: geometry.width / 2, y: geometry.height / 2 }, zoom: 1 }
@@ -328,6 +331,7 @@ export function createServer(options: CreateServerOptions) {
   // The game commands and reads, served by both the Socket.IO handlers below and the HTTP API (ADR-0016).
   const game = createGameCommands({
     store,
+    readState: committedState.read,
     combatLog,
     contentLibrary,
     mapCatalog,
@@ -501,7 +505,7 @@ export function createServer(options: CreateServerOptions) {
       authorizeGm,
       authorizePlayer: (token, assetId) => {
         if (auth.verifyPlayer(token) === null) return false;
-        const combat = store.snapshot.combat;
+        const { combat } = committedState.read();
         // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
         return (
           (combat.active && combat.mapAssetId === assetId) ||
@@ -530,14 +534,16 @@ export function createServer(options: CreateServerOptions) {
       playerSession: (token) => auth.verifyPlayer(token),
       authorizePlayer: (token, assetId) =>
         auth.verifyPlayer(token) !== null &&
-        store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
+        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
       authorizeViewer: (token, assetId) => {
         if (!token) return false;
         try {
           viewerAccess.verify(token);
           return (
             viewerPresentation.project().enabled &&
-            store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
+            committedState
+              .read()
+              .actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
           );
         } catch {
           return false;
@@ -715,7 +721,7 @@ export function createServer(options: CreateServerOptions) {
       );
     socket.emit(
       "state:updated",
-      projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
+      projectPlayerView(committedState.read(), auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
     );
   });
 
@@ -735,7 +741,9 @@ export function createServer(options: CreateServerOptions) {
       codexAssets.initialize(),
       homebrewStore.initialize()
     ]);
-    await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
+    // The store's startup seeds may change the state without a revision bump.
+    committedState.reset();
+    await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
   }
   function close() {
     presence.dispose();

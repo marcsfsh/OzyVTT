@@ -63,6 +63,8 @@ export function gmGradeLabelOf(principal: GamePrincipal): string {
 /** What the commands need from the server around them. */
 export type CommandContext = Readonly<{
   store: GameStore;
+  /** The committed state for reads: frozen, and cloned once per revision rather than per read. */
+  readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
   contentLibrary: ContentLibrary;
   mapCatalog: Readonly<{ get: (assetId: string) => { kind: string } | undefined | null }>;
@@ -117,7 +119,7 @@ export type Kit = ReturnType<typeof createKit>;
 /** The helpers every command area shares, bound to one server's context. */
 export function createKit(context: CommandContext) {
   const { store, contentLibrary } = context;
-  const read = () => store.snapshot;
+  const read = context.readState;
   const actorName = (actorId: string) => read().actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
   const actorHidden = (actorId: string) =>
     read().actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";

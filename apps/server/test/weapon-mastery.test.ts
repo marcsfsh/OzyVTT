@@ -21,6 +21,7 @@ import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf, masteryReaches } from "../src/equipment-derivation.js";
 import { createGameCommands, type CommandContext } from "../src/commands/index.js";
+import { createStateReader } from "../src/state-reader.js";
 import { GameStore, RulesBlockedError } from "../src/game-store.js";
 import { addCombatant, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { MapAssetStore } from "../src/map-assets.js";
@@ -924,6 +925,7 @@ async function commandsFor(built: Built, duringGeometryFetch?: (live: GameStore)
   };
   const commands = createGameCommands({
     store,
+    readState: createStateReader(store).read,
     contentLibrary: new ContentLibrary(),
     combatLog: { append: () => {} },
     mapCatalog: { get: () => undefined },

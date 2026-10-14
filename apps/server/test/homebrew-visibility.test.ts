@@ -30,6 +30,7 @@ import {
 } from "../src/commands/index.js";
 import { GameStore } from "../src/game-store.js";
 import { HomebrewStore } from "../src/homebrew-store.js";
+import { createStateReader } from "../src/state-reader.js";
 
 // Every content read must respect the caller's audience once homebrew merges in. Against a fake
 // `HomebrewContentSource`: drafts reach no catalog, published-but-hidden records reach only the GM, and
@@ -216,9 +217,11 @@ function readsWith(contentLibrary: ContentLibrary): GameCommands {
   const unused = () => {
     throw new Error("a content read must not touch this");
   };
+  // Never initialized, so nothing is written: `snapshot` still serves the parsed default state.
+  const store = new GameStore(join(tmpdir(), "vtt-homebrew-visibility-unused.sqlite"));
   return createGameCommands({
-    // Never initialized, so nothing is written: `snapshot` still serves the parsed default state.
-    store: new GameStore(join(tmpdir(), "vtt-homebrew-visibility-unused.sqlite")),
+    store,
+    readState: createStateReader(store).read,
     combatLog: new CombatLogStore(join(tmpdir(), "vtt-homebrew-visibility-unused-log.sqlite")),
     contentLibrary,
     mapCatalog: { get: () => undefined },
