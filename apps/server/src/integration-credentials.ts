@@ -1,7 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import {
   IntegrationCredentialMetadataSchema,
   IntegrationScopeSchema,
@@ -9,6 +7,7 @@ import {
   type IntegrationScope
 } from "@vtt/api-contract";
 import { z } from "zod";
+import { migrate, openDatabase, transaction, type Migration } from "./database.js";
 
 const TOKEN_PREFIX = "vtt_int_";
 /**
@@ -29,6 +28,34 @@ const CreateCredentialSchema = z
     expiresAt: z.string().datetime({ offset: true }).nullable().default(null)
   })
   .strict();
+
+const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE integration_credentials (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          secret_hash TEXT NOT NULL,
+          scopes_json TEXT NOT NULL,
+          game_id TEXT,
+          created_at TEXT NOT NULL,
+          expires_at TEXT,
+          last_used_at TEXT,
+          revoked_at TEXT
+        ) STRICT;
+        CREATE TABLE integration_credential_audit (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          credential_id TEXT NOT NULL REFERENCES integration_credentials(id),
+          event_type TEXT NOT NULL,
+          occurred_at TEXT NOT NULL,
+          detail_json TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX integration_credential_audit_credential_id ON integration_credential_audit(credential_id, id);
+      `)
+  }
+];
 
 type CredentialRow = {
   id: string;
@@ -85,32 +112,14 @@ export class IntegrationCredentialStore {
   ) {}
 
   async initialize() {
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    this.database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
-    this.database.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
-      PRAGMA busy_timeout = 5000;
-      CREATE TABLE IF NOT EXISTS integration_credentials (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        secret_hash TEXT NOT NULL,
-        scopes_json TEXT NOT NULL,
-        game_id TEXT,
-        created_at TEXT NOT NULL,
-        expires_at TEXT,
-        last_used_at TEXT,
-        revoked_at TEXT
-      ) STRICT;
-      CREATE TABLE IF NOT EXISTS integration_credential_audit (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        credential_id TEXT NOT NULL REFERENCES integration_credentials(id),
-        event_type TEXT NOT NULL,
-        occurred_at TEXT NOT NULL,
-        detail_json TEXT NOT NULL
-      ) STRICT;
-      CREATE INDEX IF NOT EXISTS integration_credential_audit_credential_id ON integration_credential_audit(credential_id, id);
-    `);
+    const database = openDatabase(this.databasePath);
+    try {
+      migrate(database, "integration-credentials", MIGRATIONS, { path: this.databasePath });
+    } catch (error) {
+      database.close();
+      throw error;
+    }
+    this.database = database;
   }
 
   create(input: z.input<typeof CreateCredentialSchema>): IssuedIntegrationCredential {
@@ -121,8 +130,7 @@ export class IntegrationCredentialStore {
     const id = randomUUID();
     const secret = randomBytes(32).toString("base64url");
     const database = this.requireDatabase();
-    database.exec("BEGIN IMMEDIATE");
-    try {
+    transaction(database, () => {
       database
         .prepare(
           "INSERT INTO integration_credentials (id, name, secret_hash, scopes_json, game_id, created_at, expires_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
@@ -141,11 +149,7 @@ export class IntegrationCredentialStore {
         gameBound: parsed.gameId !== null,
         expires: parsed.expiresAt !== null
       });
-      database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
+    });
     return { metadata: this.get(id)!, token: `${TOKEN_PREFIX}${id}.${secret}` };
   }
 
@@ -184,15 +188,10 @@ export class IntegrationCredentialStore {
     const recentlyAudited =
       row.last_used_at !== null && this.now() - Date.parse(row.last_used_at) < USED_AUDIT_THROTTLE_MS;
     if (!recentlyAudited) {
-      database.exec("BEGIN IMMEDIATE");
-      try {
+      transaction(database, () => {
         database.prepare("UPDATE integration_credentials SET last_used_at = ? WHERE id = ?").run(now, row.id);
         this.audit(row.id, "used", now, { requiredScope, gameBound: row.game_id !== null });
-        database.exec("COMMIT");
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+      });
     }
     return this.get(row.id);
   }
@@ -202,17 +201,12 @@ export class IntegrationCredentialStore {
     if (!current || current.revokedAt) return false;
     const now = this.timestamp();
     const database = this.requireDatabase();
-    database.exec("BEGIN IMMEDIATE");
-    try {
+    transaction(database, () => {
       database
         .prepare("UPDATE integration_credentials SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL")
         .run(now, id);
       this.audit(id, "revoked", now, {});
-      database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
+    });
     return true;
   }
 
@@ -226,17 +220,12 @@ export class IntegrationCredentialStore {
     const secret = randomBytes(32).toString("base64url");
     const now = this.timestamp();
     const database = this.requireDatabase();
-    database.exec("BEGIN IMMEDIATE");
-    try {
+    transaction(database, () => {
       database
         .prepare("UPDATE integration_credentials SET secret_hash = ?, expires_at = ?, last_used_at = NULL WHERE id = ?")
         .run(hashSecret(secret).toString("hex"), resolvedExpiration, id);
       this.audit(id, "rotated", now, { expires: resolvedExpiration !== null });
-      database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
+    });
     return { metadata: this.get(id)!, token: `${TOKEN_PREFIX}${id}.${secret}` };
   }
 

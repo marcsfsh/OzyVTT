@@ -31,7 +31,6 @@ import {
   HomebrewRevisionConflictError,
   HomebrewStateError,
   HomebrewStore,
-  MIGRATIONS,
   type HomebrewRevalidator
 } from "../src/homebrew-store.js";
 
@@ -136,7 +135,12 @@ describe("HomebrewStore", () => {
   it("keeps its migration type list in lockstep with the contract's nine types", () => {
     // Migration SQL is frozen, so the CHECK list cannot be derived from the schema; this catches a
     // contract change that would otherwise drift on fresh databases only.
-    const declared = MIGRATIONS[0].sql.match(/type TEXT NOT NULL CHECK \(type IN \(([^)]+)\)\)/)?.[1] ?? "";
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"), { readOnly: true });
+    const { sql } = database.prepare("SELECT sql FROM sqlite_master WHERE name = 'homebrew_records'").get() as {
+      sql: string;
+    };
+    database.close();
+    const declared = sql.match(/type TEXT NOT NULL CHECK \(type IN \(([^)]+)\)\)/)?.[1] ?? "";
     expect(declared.split(",").map((value) => value.trim().replace(/'/g, ""))).toEqual([
       ...HomebrewContentTypeSchema.options
     ]);
@@ -312,7 +316,7 @@ describe("HomebrewStore revision counter", () => {
     expect(cold.revision).toBe(-1);
   });
 
-  it("survives a restart with its counter and rows intact, and uses its OWN migration table", async () => {
+  it("survives a restart with its counter and rows intact, and records its migration under its own name", async () => {
     const path = join(directory, "restart.sqlite");
     const first = new HomebrewStore(path);
     await first.initialize();
@@ -326,12 +330,13 @@ describe("HomebrewStore revision counter", () => {
     expect(second.get(row.id)!.name).toBe("Cinder Wraith");
     second.close();
 
-    // Own migration table, distinct from `codex_schema_migrations` and the game store's `schema_migrations`.
     const database = new DatabaseSync(path);
+    expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([
+      { store: "homebrew", version: 1 }
+    ]);
     const tables = (
       database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
     ).map((r) => r.name);
-    expect(tables).toContain("homebrew_schema_migrations");
     expect(tables).toContain("homebrew_records");
     expect(tables).toContain("homebrew_record_revisions");
     // STRICT tables: a wrong-typed write is refused rather than coerced.
