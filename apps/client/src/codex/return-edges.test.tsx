@@ -63,7 +63,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
-import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker } from "./api";
 
 /**
  * A journal entry's jumps back to its pin and its combat replay. An entry stores only the pin, so the atlas
@@ -71,29 +71,6 @@ import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, 
  * `onOpenReplay` as the page timeline; an entry with neither offers neither button.
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
-
-const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1",
-  playerText: "A battle was fought here.",
-  gmText: null,
-  revealedToPlayers: false,
-  kind: "note",
-  attachMarkerId: null,
-  attachPageId: null,
-  sourceEncounterId: null,
-  payload: null,
-  sessionId: null,
-  sessionNumber: null,
-  realDate: null,
-  inWorldLabel: null,
-  calendarInstant: null,
-  inWorldDate: null,
-  sortKey: 0,
-  tags: [],
-  createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
-  ...over
-});
 
 /** The Journal reads the chronicle record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({

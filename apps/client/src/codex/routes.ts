@@ -57,21 +57,6 @@ export const BARE_SECTION_IDS: readonly CodexSection[] = [
   "settings"
 ];
 
-const CODEX_SECTION_IDS: readonly CodexSection[] = [
-  "pages",
-  "atlas",
-  "graph",
-  "sessions",
-  "quests",
-  "journal",
-  "calendar",
-  "downtime",
-  "tags",
-  "audit",
-  "backup",
-  "settings"
-];
-
 /** The record id inside a section address (`/codex/pages/:id`), or null when the list itself is open. */
 export function recordIdOf(segments: readonly string[]): string | null {
   return segments.length >= 3 ? segments[2] : null;

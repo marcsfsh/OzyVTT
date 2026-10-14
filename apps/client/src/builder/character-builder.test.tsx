@@ -310,7 +310,6 @@ vi.mock("../socket", () => ({
     on: vi.fn(),
     off: vi.fn(),
     emit: vi.fn((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       if (ack) ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
     })
   }

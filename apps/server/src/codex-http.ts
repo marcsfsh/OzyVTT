@@ -8,7 +8,6 @@ import {
   CodexNotFoundError,
   CodexRevisionConflictError,
   CodexValidationError,
-  downtimePayloadOf,
   type CodexSearchRef,
   type CodexStore
 } from "./codex-store.js";

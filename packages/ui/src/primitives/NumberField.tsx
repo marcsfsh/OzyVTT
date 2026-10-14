@@ -55,7 +55,7 @@ export function NumberField({
   }, [value]);
 
   const clean = (raw: string) => {
-    let out = raw.replace(allowDecimal ? /[^0-9.\-]/g : /[^0-9\-]/g, "");
+    let out = raw.replace(allowDecimal ? /[^0-9.-]/g : /[^0-9-]/g, "");
     // A sign is only legal leading, and only once.
     const negative = allowNegative && out.startsWith("-");
     out = out.replace(/-/g, "");

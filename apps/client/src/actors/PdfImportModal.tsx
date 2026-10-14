@@ -76,6 +76,7 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
   };
 
   // Prefer validated data for display; fall back to the raw draft when a required field is missing.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- either a validated definition or a raw draft
   const view = (result?.definition ?? result?.draft) as Record<string, any> | undefined;
   const num = (v: string) => (v === "" ? undefined : Number(v));
 
@@ -166,7 +167,11 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
           <dl className="pdf-import-summary">
             <div>
               <dt>Class &amp; level</dt>
-              <dd>{(view.character?.classes ?? []).map((c: any) => `${c.name} ${c.level}`).join(" / ") || "—"}</dd>
+              <dd>
+                {(view.character?.classes ?? [])
+                  .map((c: { name: string; level: number }) => `${c.name} ${c.level}`)
+                  .join(" / ") || "—"}
+              </dd>
             </div>
             <div>
               <dt>Species · background</dt>

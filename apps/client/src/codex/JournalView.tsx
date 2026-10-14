@@ -14,8 +14,7 @@ import {
   SegmentedControl,
   Select,
   Skeleton,
-  TagInput,
-  Textarea
+  TagInput
 } from "@vtt/ui";
 import { socket } from "../socket";
 import {
@@ -153,7 +152,6 @@ const writeRevealWarn = (on: boolean) => {
 /** Pin and replay jumps are handed up via `onOpenMarker`/`onOpenReplay`; this view never navigates sideways. */
 export function JournalView({
   gmToken,
-  autosave,
   pages: shellPages,
   onOpenPage,
   onOpenMarker,

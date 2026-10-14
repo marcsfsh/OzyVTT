@@ -877,7 +877,6 @@ export function CharacterSheet({
         .filter(Boolean)
         .join(" · ")
     : null;
-  const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
   // Equipped weapons become rollable attacks on the sheet: to-hit = ability mod + PB, damage = weapon
   // die + ability mod. The ability comes from `weaponAbilityModifierFrom`, the server's own function

@@ -17,7 +17,6 @@ import {
 import { navigate } from "../router";
 import { launchRefusalOf, type LaunchRefusal } from "./launch-refusal";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
-import { AnnotationGlyph } from "../scene/annotationGlyph";
 import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { useConfirm } from "../components/feedback";

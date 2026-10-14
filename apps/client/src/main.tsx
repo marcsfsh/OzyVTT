@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "@vtt/ui/styles.css";
@@ -404,14 +404,13 @@ function App() {
       socket.connect();
       socket.emit("session:join", { token }, (result: SessionJoinResult) => {
         setBusy(false);
-        result.ok
-          ? beginEntry(() => {
-              setMode("gm");
-              setConnection("online");
-              setPassword("");
-              setNotice(null);
-            })
-          : fail(result.message ?? "Couldn't sign in as GM.");
+        if (!result.ok) return fail(result.message ?? "Couldn't sign in as GM.");
+        beginEntry(() => {
+          setMode("gm");
+          setConnection("online");
+          setPassword("");
+          setNotice(null);
+        });
       });
     } catch (error) {
       setBusy(false);
@@ -718,7 +717,7 @@ function App() {
                   placeholder="GM password"
                   autoFocus
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && !busy) bootstrapped ? loginGm() : bootstrap();
+                    if (event.key === "Enter" && !busy) void (bootstrapped ? loginGm() : bootstrap());
                   }}
                 />
                 <Button variant="primary" onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>

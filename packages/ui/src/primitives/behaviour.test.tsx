@@ -153,7 +153,6 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   });
 
   it("inserts by click too, and never doubles an existing closing bracket", async () => {
-    const user = userEvent.setup();
     render(<Host initial="[[]]" />);
     const box = screen.getByLabelText("Prep for this session") as HTMLTextAreaElement;
 
@@ -190,7 +189,6 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   });
 
   it("offers nothing when the caller supplies no suggester — the autocomplete is opt-in", async () => {
-    const user = userEvent.setup();
     function Bare() {
       const [value, setValue] = useState("");
       return <MarkdownEditor value={value} onChange={setValue} ariaLabel="Recap" />;

@@ -41,9 +41,6 @@ function serveCatalog() {
   );
 }
 
-type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
-const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
-
 /** A real imported PC, so the sheet renders its Inventory section rather than the "no sheet yet" note. */
 const DEFINITION = ActorDefinitionSchema.parse(loadActorFixture("player-character"));
 const ACTOR = {

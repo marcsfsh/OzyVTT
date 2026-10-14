@@ -44,7 +44,7 @@ describe("the fix: the three composer containers, and only those", () => {
     const bare = withoutComments(CODEX_CSS)
       .split("}")
       .map((chunk) => chunk.split("{"))
-      .filter(([selector, body]) => body !== undefined && /align-content/.test(body))
+      .filter(([, body]) => body !== undefined && /align-content/.test(body))
       .map(([selector]) => selector.split(",").map((part) => part.trim()))
       .flat()
       .filter((selector) => selector === ".nh-field");

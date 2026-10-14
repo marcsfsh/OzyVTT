@@ -84,7 +84,6 @@ import { PlayerCodex } from "./PlayerCodex";
 import type {
   CodexCalendar,
   CodexChronicleRecord,
-  CodexJournalEntry,
   CodexMap,
   CodexPageSummary,
   PlayerCodexChronicleRecord,
@@ -121,29 +120,6 @@ const summary = (
   updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
-
-const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1",
-  playerText: "The party crossed the mists.",
-  gmText: null,
-  revealedToPlayers: false,
-  kind: "note",
-  attachMarkerId: null,
-  attachPageId: null,
-  sourceEncounterId: null,
-  payload: null,
-  sessionId: null,
-  sessionNumber: null,
-  realDate: null,
-  inWorldLabel: null,
-  calendarInstant: null,
-  inWorldDate: null,
-  sortKey: 0,
-  tags: [],
-  createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
-  ...over
-});
 
 /** One GM chronicle row; the dashboard reads the chronicle. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({

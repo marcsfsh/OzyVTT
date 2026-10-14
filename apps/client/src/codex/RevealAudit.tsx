@@ -96,7 +96,6 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
   // Until the first read settles, "nothing is revealed" isn't a claim this screen can make.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingFaction, setPendingFaction] = useState<{ id: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -131,7 +130,6 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
   const [justHidden, setJustHidden] = useState<ReadonlySet<string>>(new Set());
   const setRevealed = async (kind: CodexRevealAuditKind, id: string, title: string, revealed: boolean) => {
     const key = `${kind}:${id}`;
-    setBusyId(key);
     setError(null);
     try {
       await AUDIT_KINDS[kind].setRevealed(gmToken, id, revealed);
@@ -147,8 +145,6 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
       await load();
     } catch (writeError) {
       setError(writeError instanceof Error ? writeError.message : "Couldn't change who can see that.");
-    } finally {
-      setBusyId(null);
     }
   };
   const [announcement, setAnnouncement] = useState("");

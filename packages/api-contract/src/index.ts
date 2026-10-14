@@ -3300,7 +3300,7 @@ export const openApiDocument = {
         body: "CodexPageUpdateRequest",
         params: [uuidParam("id")],
         notFound: true,
-        conflict: "A stale `expectedRev`; `error.currentRevision` carries the page\'s current revision.",
+        conflict: "A stale `expectedRev`; `error.currentRevision` carries the page's current revision.",
         description: "Edits a page. `expectedRev` rejects a stale write with 409."
       }),
       delete: codexOp("deleteCodexPage", codexWrite, "CodexDeletedResponse", {
@@ -3640,7 +3640,7 @@ export const openApiDocument = {
         body: "CodexSessionUpdateRequest",
         params: [uuidParam("id")],
         notFound: true,
-        conflict: "A stale `expectedRev`; `error.currentRevision` carries the session\'s current revision.",
+        conflict: "A stale `expectedRev`; `error.currentRevision` carries the session's current revision.",
         description:
           "Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, not a 409 - it is a bad value, not a lost race."
       }),
@@ -3695,7 +3695,7 @@ export const openApiDocument = {
         body: "CodexQuestUpdateRequest",
         params: [uuidParam("id")],
         notFound: true,
-        conflict: "A stale `expectedRev`; `error.currentRevision` carries the quest\'s current revision.",
+        conflict: "A stale `expectedRev`; `error.currentRevision` carries the quest's current revision.",
         description:
           "Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction (D11) - editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position."
       }),
@@ -3801,7 +3801,7 @@ export const openApiDocument = {
         body: "CodexImportRequest",
         tooLarge: true,
         description:
-          "Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim - `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex - the guardrails are GM/`codex:write` authorization and the caller\'s own confirmation, and the honest advice is to export first."
+          "Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim - `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex - the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first."
       })
     },
     [CODEX_ASSET_PATHS.collection]: {
@@ -9623,7 +9623,7 @@ export const openApiDocument = {
         additionalProperties: false,
         required: ["codex"],
         properties: {
-          codex: { type: "object", additionalProperties: true, description: "The export\'s `codex` bundle, verbatim." },
+          codex: { type: "object", additionalProperties: true, description: "The export's `codex` bundle, verbatim." },
           bundleVersion: {
             type: "integer",
             minimum: 1,
@@ -9670,7 +9670,7 @@ export const openApiDocument = {
             type: "integer",
             minimum: 0,
             description:
-              "DECLARED connections. Mention edges are derived from body text and are rebuilt by the restore, so counting them would double-count the rebuild\'s own output."
+              "DECLARED connections. Mention edges are derived from body text and are rebuilt by the restore, so counting them would double-count the rebuild's own output."
           },
           sessions: { type: "integer", minimum: 0 },
           quests: { type: "integer", minimum: 0 },

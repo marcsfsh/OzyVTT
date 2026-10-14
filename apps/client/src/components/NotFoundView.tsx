@@ -5,7 +5,6 @@ import { navigate } from "../router";
  * What an address that names nothing renders. A player asking for a GM-only address gets exactly
  * this too, so the response never confirms that the surface exists (the 404-not-403 rule).
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function NotFoundView({ role: _role }: Readonly<{ role: "gm" | "player" }>) {
   return (
     <div className="codex-main-empty anim-view" role="status">

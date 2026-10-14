@@ -553,6 +553,7 @@ export function MapManager({
       next[index] = { ...next[index], [coordinate]: Number.isFinite(value) ? value : 0 };
       return next;
     });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the calibration wizard response is untyped
   const acceptWizardData = (data: any) => {
     setWizardId(data.wizardId);
     setWizard(data.state);

@@ -102,8 +102,6 @@ export type PlayerConnectionContext = Readonly<{
   revealedSourceIds: ReadonlySet<string>;
 }>;
 
-const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
-
 function connectionSourceVisible(
   kind: CodexConnectionSourceKind,
   sourceId: string,

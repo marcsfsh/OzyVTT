@@ -214,7 +214,7 @@ export function ActionRunner({
     if (!ok && message) onFeedback(message);
   };
   const resolve = () => resolveTargeting(state.revision, onOutcome);
-  const useDirect = (action: ContentActionSummary) =>
+  const runDirect = (action: ContentActionSummary) =>
     resolveActionDirect(actor.id, action.id, state.revision, onOutcome);
 
   const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
@@ -342,7 +342,7 @@ export function ActionRunner({
                         className={`action-row${hint ? " action-row-hinted" : ""}`}
                         disabled={busy}
                         title={action.description}
-                        onClick={() => (isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id))}
+                        onClick={() => (isTargetless(action) ? runDirect(action) : beginTargeting(action, actor.id))}
                       >
                         <strong className="action-row-name">{action.name}</strong>
                         {parts.length > 0 ? (
@@ -382,7 +382,7 @@ export function ActionRunner({
                             disabled={busy}
                             title={`${action.description}${hint ? `\n\n${hint}` : ""}`}
                             onClick={() =>
-                              isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)
+                              isTargetless(action) ? runDirect(action) : beginTargeting(action, actor.id)
                             }
                           >
                             {action.name}

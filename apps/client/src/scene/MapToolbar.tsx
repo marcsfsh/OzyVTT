@@ -599,8 +599,7 @@ function ViewGroup({
   occupiedCost,
   onOccupiedCostChange,
   notificationsMuted,
-  onNotificationsMutedChange,
-  id
+  onNotificationsMutedChange
 }: MapToolbarProps & { id: string }) {
   return (
     <>

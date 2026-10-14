@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { pactSlotsForLevel, proficiencyBonusForLevel, spellSlotsForClass, type CasterProgression } from "@vtt/rules-5e";
 import { Badge, Button, FieldGrid, IconButton, IconPencil, NumberField, RowEditor, Stepper } from "@vtt/ui";
 import { newId } from "../lib/ids";
-import { getAt, setAt } from "./paths";
+import { setAt } from "./paths";
 import { LEVELS, blankLevelRow } from "./defaults";
 import type { Draft } from "./schema";
 

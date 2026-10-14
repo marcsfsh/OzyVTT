@@ -14,7 +14,7 @@ describe("ViewerAccessStore", () => {
   it("exchanges a short-lived code once and persists only a durable token hash", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-viewer-access-"));
     const databasePath = join(directory, "vtt.sqlite");
-    let now = Date.parse("2026-07-16T12:00:00.000Z");
+    const now = Date.parse("2026-07-16T12:00:00.000Z");
     const store = new ViewerAccessStore(databasePath, () => now, deterministicEntropy());
     try {
       await store.initialize();

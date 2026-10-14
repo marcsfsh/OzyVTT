@@ -54,7 +54,8 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const toggleScope = (scope: IntegrationScope) => {
     setScopes((current) => {
       const next = new Set(current);
-      next.has(scope) ? next.delete(scope) : next.add(scope);
+      if (next.has(scope)) next.delete(scope);
+      else next.add(scope);
       return next;
     });
   };

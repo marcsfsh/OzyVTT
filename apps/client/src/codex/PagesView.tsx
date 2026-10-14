@@ -22,7 +22,6 @@ import {
 import { PageEditor } from "./PageEditor";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
-import { EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { MissingRecordNotice } from "../components/NotFoundView";
 import { navigate, replaceQuery, withQuery } from "../router";

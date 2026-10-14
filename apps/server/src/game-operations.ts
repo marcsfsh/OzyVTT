@@ -64,7 +64,7 @@ import {
   startEncounter,
   type InitiativeRollSink
 } from "./encounter.js";
-import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { addEffect, endEffect, endEncounterEffects, type EffectNarration } from "./effects.js";
 import { rollDeathSave } from "./death-saves.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
 import { pushTokenAway } from "./forced-movement.js";
@@ -85,7 +85,6 @@ import { applyMovementRules } from "./movement-rules.js";
 import { applyRest, spendHitDice } from "./rests.js";
 import { paintFog, resetFog, setFogEnabled } from "./fog.js";
 import {
-  applyDamage,
   applyDamageDetailed,
   damageAdjustmentDetail,
   healActor,

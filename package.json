@@ -15,7 +15,8 @@
     "start": "npm run build && npm run start --workspace=@vtt/server",
     "map": "npm run map --workspace=@vtt/server",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=24"

@@ -19,7 +19,6 @@ import { createServer } from "../src/server.js";
 const HERO = "10000000-0000-4000-8000-000000000001";
 const SECRET = "10000000-0000-4000-8000-000000000002";
 const OTHER = "10000000-0000-4000-8000-000000000003";
-const MAP = "20000000-0000-5000-8000-000000000001";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {

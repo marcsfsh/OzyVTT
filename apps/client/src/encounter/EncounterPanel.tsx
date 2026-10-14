@@ -43,7 +43,7 @@ import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
 import { DamageTypeField } from "./DamageTypeField";
 import { CharacterSheet } from "./CharacterSheet";
-import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
+import { ConditionDots, ConditionEditor } from "./conditions";
 import { InitiativeRow } from "./InitiativeList";
 import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";

@@ -400,10 +400,10 @@ export function EncounterMap({
     let zoom = 1;
     if (svgRect && dockRect && svgRect.width > 0 && svgRect.height > 0) {
       const baseScale = Math.min(svgRect.width / size.width, svgRect.height / size.height);
-      let visibleW = svgRect.width,
-        visibleH = svgRect.height,
-        offsetX = 0,
-        offsetY = 0;
+      let visibleW = svgRect.width;
+      let offsetX = 0;
+      const visibleH = svgRect.height;
+      const offsetY = 0;
       if (dock?.position === "right") {
         visibleW -= dockRect.width;
         offsetX = -dockRect.width / 2;

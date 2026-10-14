@@ -16,7 +16,7 @@ import {
   SUBCLASS_MECHANICS,
   applyMechanics
 } from "./class-mechanics/index.js";
-import { slug, strip, tableAsText, withTables } from "./markdown.js";
+import { slug, strip, withTables } from "./markdown.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";

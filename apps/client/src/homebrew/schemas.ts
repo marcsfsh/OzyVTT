@@ -8,7 +8,6 @@ import { featureFields } from "./FeatureEditor";
 import { getAt } from "./paths";
 import {
   basicsSection,
-  damagePartsField,
   diceValidate,
   humanise,
   inContainer,
@@ -492,7 +491,7 @@ const BACKGROUND_SCHEMA: HomebrewSchema = {
               note: "Not offered in the character builder yet.",
               addLabel: "Add a spread",
               emptyText: "No spreads yet.",
-              rowKey: (row, index) => String(index),
+              rowKey: (_row, index) => String(index),
               newRow: () => ({ amounts: [2, 1] }),
               rows: [{ key: "label", label: "Label", placeholder: "+2 / +1" }]
             }

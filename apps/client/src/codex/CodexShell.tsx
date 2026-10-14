@@ -44,9 +44,7 @@ import {
   questPath,
   recordIdOf,
   sessionPath,
-  tagPath,
-  graphPath,
-  type CodexSection
+  tagPath
 } from "./routes";
 import { SidebarCollapseToggle, SidebarNav } from "./SidebarNav";
 import { useSidebarRailBand } from "./useSidebarRail";

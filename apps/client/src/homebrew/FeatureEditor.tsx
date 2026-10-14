@@ -751,20 +751,6 @@ export function FeatureEditor({
     onDraft(next);
   };
 
-  const patch = (index: number, changes: Readonly<Record<string, unknown>>) => {
-    writeFeatures(
-      features.map((feature, i) => {
-        if (i !== index) return feature;
-        const merged: Record<string, unknown> = { ...feature };
-        for (const [key, value] of Object.entries(changes)) {
-          if (value === undefined) delete merged[key];
-          else merged[key] = value;
-        }
-        return merged as Feature;
-      })
-    );
-  };
-
   /** One feature's whole body, shared by the list and by `single`. */
   const renderFeature = (feature: Feature, index: number) => {
     const levels = grantedLevels(feature);

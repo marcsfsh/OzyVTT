@@ -8,6 +8,7 @@ import "./api-reference.css";
  * Each endpoint expands to its full spec, resolved from the document's own component schemas.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- an arbitrary JSON Schema node
 type Schema = Record<string, any>;
 type Components = Record<string, Schema>;
 type Operation = Readonly<{

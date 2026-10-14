@@ -324,7 +324,7 @@ export function lastLocation(role: "gm" | "player"): string | null {
  * `resumeTarget`: never a dead record or, for a player, a GM-only address.
  */
 export function lastLocationForTab(role: "gm" | "player", head: string): string | null {
-  let stored: string | null = null;
+  let stored: string | null;
   try {
     stored = localStorage.getItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`);
   } catch {

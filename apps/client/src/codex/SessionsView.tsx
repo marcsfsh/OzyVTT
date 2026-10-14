@@ -23,7 +23,7 @@ import {
   type CodexSession,
   type CodexSessionStatus
 } from "./api";
-import { pickNextSession, sessionTitle } from "./sessions";
+import { sessionTitle } from "./sessions";
 import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";
 import { TagChip } from "./TagChip";

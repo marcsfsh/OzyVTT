@@ -1130,7 +1130,7 @@ function barbarianSheet(level: 1 | 3, feat?: Draft): ActorDefinition {
 }
 
 /** How many uses the builder resolved for this action. */
-const useLimit = (definition: ActorDefinition, actionId: string) =>
+const limitOf = (definition: ActorDefinition, actionId: string) =>
   definition.actions.find((entry) => entry.id === actionId)?.uses?.limit;
 
 describe("uses read off the class table's own column — through both paths", () => {
@@ -1192,15 +1192,15 @@ describe("uses read off the class table's own column — through both paths", ()
     const level3 = barbarianSheet(3, feat);
     for (const [label, actionId] of paths) {
       // A count neither record states: 2 at level 1, 3 at level 3, from the same authored line.
-      expect(useLimit(level1, actionId), label).toBe(RAGES.atLevel1);
-      expect(useLimit(level3, actionId), label).toBe(RAGES.atLevel3);
+      expect(limitOf(level1, actionId), label).toBe(RAGES.atLevel1);
+      expect(limitOf(level3, actionId), label).toBe(RAGES.atLevel3);
     }
 
     // Negative control: the same feat naming the Sorcerer's column resolves to 0 uses, while Rage
     // still reads 3.
     const wrongFeat = authoredFuryFeat(RAGES.wrongResourceId);
     const wrong = barbarianSheet(3, wrongFeat);
-    expect(useLimit(wrong, RAGES.featureId)).toBe(RAGES.atLevel3);
+    expect(limitOf(wrong, RAGES.featureId)).toBe(RAGES.atLevel3);
     expect(wrong.actions.find((entry) => entry.id === furyFeatureId(wrongFeat))).toBeUndefined();
   });
 });

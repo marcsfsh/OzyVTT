@@ -4952,7 +4952,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
 
     // Non-vacuity: an in-range value survives the round trip, so the assertions below are the guard firing.
     write("UPDATE codex_meta SET revision_window_minutes = ? WHERE id = 1", 45);
-    let store45 = await reopen();
+    const store45 = await reopen();
     expect(store45.getSettings().revisionHistory.windowMinutes).toBe(45);
     store45.close();
 

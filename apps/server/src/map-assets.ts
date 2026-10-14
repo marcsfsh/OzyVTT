@@ -326,7 +326,7 @@ export class MapAssetStore {
           if (!["EEXIST", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
           const existingOriginal = await readFile(originalPath);
           if (createHash("sha256").update(existingOriginal).digest("hex") !== checksumSha256)
-            throw new Error("Existing map asset content does not match its expected checksum.");
+            throw new Error("Existing map asset content does not match its expected checksum.", { cause: error });
           await rm(tempOriginal, { force: true });
         }
         await rename(tempMetadata, metadataPath);

@@ -20,7 +20,6 @@ import {
   deriveEquipment,
   sourceItemOf,
   weaponPropertiesOf,
-  EMPTY_DERIVATION,
   UNARMED_STRIKE_ACTION_ID,
   type EquipmentCatalog,
   type EquipmentDerivation
@@ -886,16 +885,9 @@ export function resolveDefinitionAction(
   const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derivation, attacker.inventory);
-  let { plan, overridden } = planEconomy(
-    state,
-    attacker,
-    action,
-    input,
-    deps.definition,
-    warnings,
-    deps.distanceFeet,
-    siblings
-  );
+  const economy = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings);
+  const plan = economy.plan;
+  let overridden = economy.overridden;
 
   // GM-adjudicated cover (SRD Cover, no line-of-sight engine): total cover can't be targeted;
   // half/three-quarters add to AC and Dexterity saves below.
