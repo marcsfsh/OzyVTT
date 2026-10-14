@@ -20,7 +20,6 @@ import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { migrateToScene } from "./scenes.js";
 import { CombatLogStore, projectFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
@@ -45,7 +44,7 @@ import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 import { playerReplayMapAssetIds } from "./replay-projection.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
-import { ensureEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
+import type { TokenMapGeometry } from "./token-placement.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
@@ -409,7 +408,6 @@ export function createServer(options: CreateServerOptions) {
       }
     });
   });
-  app.get("/api/health", (_req, res) => res.json({ ok: true, bootstrapped: auth.isBootstrapped }));
   app.get("/api/bootstrap/status", (_req, res) => res.json({ bootstrapped: auth.isBootstrapped }));
   app.post("/api/bootstrap", async (req, res) => {
     if (!isLoopback(req.ip))
@@ -457,13 +455,6 @@ export function createServer(options: CreateServerOptions) {
     broadcast();
     return res.json({ ok: true });
   });
-  app.get("/api/state", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    const state = store.snapshot;
-    res.json(
-      auth.verify(token) ? gmView(state) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId, presenceFor)
-    );
-  });
   app.get("/api/gm/viewer-urls", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
     if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
@@ -471,28 +462,6 @@ export function createServer(options: CreateServerOptions) {
       ...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))
     ];
     return res.json({ viewerUrls });
-  });
-  // Encounter archives: permanent turn-by-turn records saved at encounter end. GM-only: a document holds
-  // full state (hidden combatants) and GM-only log lines. Shape documented in encounter-archive.ts.
-  app.get("/api/gm/encounters", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
-    return res.json({ encounters: store.listEncounterArchives() });
-  });
-  app.get("/api/gm/encounters/:id", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
-    const id = Number(req.params.id);
-    const document = Number.isInteger(id) ? store.getEncounterArchive(id) : null;
-    if (document === null) return res.status(404).json({ message: "No such encounter archive." });
-    return res.type("application/json").send(document); // raw stored JSON - no re-serialization
-  });
-  app.delete("/api/gm/encounters/:id", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
-    const id = Number(req.params.id);
-    if (Number.isInteger(id)) store.deleteEncounterArchive(id);
-    return res.json({ ok: true });
   });
   app.use(
     createViewerRouter({
@@ -1461,38 +1430,6 @@ export function createServer(options: CreateServerOptions) {
       codexAssets.initialize(),
       homebrewStore.initialize()
     ]);
-    const persisted = store.snapshot;
-    if (
-      persisted.combat.active &&
-      persisted.combat.mapAssetId &&
-      persisted.combat.initiative.some(
-        (entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId)
-      )
-    ) {
-      try {
-        const geometry = await tokenGeometryFor(persisted.combat.mapAssetId);
-        await store.execute(
-          {
-            id: `encounter.tokens.prepare:${persisted.revision}`,
-            type: "encounter.tokens.prepare",
-            principal: "system:startup"
-          },
-          (state) => {
-            ensureEncounterTokens(state, geometry);
-          }
-        );
-      } catch {
-        /* Preserve startup for an old encounter whose map asset was removed; the GM can end it and start a new encounter. */
-      }
-    }
-    // Bind a pre-scenes encounter/map to one implicit active scene so park-and-resume has a home.
-    const beforeScenes = store.snapshot;
-    if (beforeScenes.combat.scenes.length === 0 && beforeScenes.combat.mapAssetId !== null) {
-      await store.execute(
-        { id: `scene.migrate:${beforeScenes.revision}`, type: "scene.migrate", principal: "system:startup" },
-        (state) => migrateToScene(state, randomUUID())
-      );
-    }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
   function close() {

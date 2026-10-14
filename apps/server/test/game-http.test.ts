@@ -952,11 +952,6 @@ describe("public game API over /api/v1", () => {
         })
       ).status
     ).toBe(404);
-
-    // The GM-session endpoints keep working unchanged.
-    expect(
-      await (await fetch(`${base}/api/gm/encounters`, { headers: { authorization: `Bearer ${gmToken}` } })).json()
-    ).toEqual({ encounters: [] });
   });
 
   it("issues player sessions over HTTP and runs the claim lifecycle end to end", async () => {
@@ -1187,8 +1182,10 @@ describe("public game API over /api/v1", () => {
       body: JSON.stringify({ password: "wrong" })
     });
     expect(loginPost.headers.get("access-control-allow-origin")).toBeNull();
-    const legacyState = await fetch(`${base}/api/state`, { headers: { origin: "https://evil.example" } });
-    expect(legacyState.headers.get("access-control-allow-origin")).toBeNull();
+    const bootstrapStatus = await fetch(`${base}/api/bootstrap/status`, {
+      headers: { origin: "https://evil.example" }
+    });
+    expect(bootstrapStatus.headers.get("access-control-allow-origin")).toBeNull();
   });
 
   it("serves server-computed action availability with role gating", async () => {

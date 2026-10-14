@@ -333,15 +333,3 @@ export function activateNewScene(
   if (departingId !== null) dropReplayScene(state, departingId);
   return scene;
 }
-
-/** Startup migration: binds a pre-scenes encounter/map to one implicit active scene. */
-export function migrateToScene(state: GameState, sceneId: string) {
-  if (state.combat.scenes.length > 0 || state.combat.mapAssetId === null) return;
-  const scene: Scene = {
-    id: sceneId,
-    name: "Scene 1",
-    mapAssetId: state.combat.mapAssetId,
-    combat: emptySceneCombat()
-  };
-  state.combat = { ...state.combat, scenes: [scene], activeSceneId: sceneId };
-}
