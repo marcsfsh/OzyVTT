@@ -49,8 +49,8 @@ A command is a named socket event (or an HTTP call to `/api/v1/game/...`) carryi
 
 1. Validate the payload with a strict Zod schema (`game-commands.ts`).
 2. Authorize from the signed token, per command. Role is never cached at connect.
-3. `store.execute` commits the idempotency receipt, the domain event and the new state in one
-   SQLite transaction and bumps the revision. A repeated `commandId` returns the earlier result
+3. `store.execute` commits the idempotency receipt and the new state in one SQLite transaction
+   and bumps the revision. A repeated `commandId` returns the earlier result
    with `duplicate: true` and changes nothing. A stale `expectedRevision` is rejected.
 4. Broadcast `state:updated` with a projection computed separately for each socket's role.
 

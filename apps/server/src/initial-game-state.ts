@@ -16,14 +16,7 @@ export const PLACEHOLDER_ACTOR_IDS = {
 } as const;
 
 /** The example sheets are keyed `import-<actorId>` like any imported character, since editing and
- *  removal gate on that prefix. `EXAMPLE_DEFINITION_IDS` (the old `example-*` keys) is exported for the
- *  one-time normalization in `game-store.ts`. */
-export const EXAMPLE_DEFINITION_ID_PREFIX = "example-";
-export const LEGACY_EXAMPLE_DEFINITION_IDS = {
-  fighter: "example-borin-fighter-7",
-  cleric: "example-mirena-cleric-7",
-  wizard: "example-lyra-wizard-7"
-} as const;
+ *  removal gate on that prefix. */
 const EXAMPLE_DEFINITION_IDS = {
   fighter: `import-${PLACEHOLDER_ACTOR_IDS.fighter}`,
   cleric: `import-${PLACEHOLDER_ACTOR_IDS.cleric}`,

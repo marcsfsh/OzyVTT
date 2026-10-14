@@ -102,7 +102,7 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
 export function planPreviousTurn(state: GameState, timeline: TimelineOps, confirmDiscard: boolean): TimelineOutcome {
   const entries = timeline.entries();
   if (entries.length === 0) {
-    // A fight that predates the timeline: fall back to moving the turn pointer.
+    // Nothing recorded since a scene swap or replay launch cleared the timeline: just move the turn pointer.
     previousInitiativeTurn(state);
     return { kind: "legacy" };
   }
