@@ -25,14 +25,12 @@
  * from this guard's census (`npm run docs`), and this file fails when the two disagree.
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HOMEBREW_PATHS } from "@vtt/api-contract";
 import type { HomebrewBodyType } from "@vtt/content-srd-5.2.1/schemas";
 import {
   assertCanonicaliserSound, bootHomebrewApi, censusVerdict, comparableBody, EXEMPTIONS,
-  firstDifference, isSystemForced, probeAddress, renderParityAudit, walkBodySchemas, type ApiFixture
+  firstDifference, isSystemForced, probeAddress, walkBodySchemas, type ApiFixture
 } from "./api-parity-harness";
 import { applyField, authored, authoredRow, publishVerdict, storedBody } from "./authoring-harness";
 import type { Draft } from "./schema";
@@ -298,18 +296,6 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
     // And a key present on one side alone is named too, not swallowed by a values-only walk.
     const extra = firstDifference(comparableBody("monster", { ...editor, sneaky: true }), comparableBody("monster", editor));
     expect(extra).toEqual({ path: "sneaky", api: true, editor: undefined });
-  });
-});
-
-/* ------------------------------------------------------------- the generated audit ---- */
-
-describe("the generated audit (ruling 19)", () => {
-  it("docs/product/vocabulary-parity-audit.md matches this guard's census — regenerate with `npm run docs`", () => {
-    const committed = readFileSync(
-      fileURLToPath(new URL("../../../../docs/product/vocabulary-parity-audit.md", import.meta.url)),
-      "utf8"
-    );
-    expect(committed).toBe(renderParityAudit({ stats, results, exemptions: EXEMPTIONS }));
   });
 });
 

@@ -39,8 +39,7 @@ export function renderAppMap(): string {
   lines.push("Regenerate with `npm run map`. A freshness test (`apps/server/test/app-map.test.ts`) fails");
   lines.push("if this drifts from the code, so it is always current. This is an orientation aid: it maps the");
   lines.push("machine-derivable surfaces of the app (state shape, command catalog, HTTP paths) plus a curated");
-  lines.push("file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-state.md`, and");
-  lines.push("`docs/ai-context/`; the `vtt-orientation` skill routes you here first.");
+  lines.push("file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.");
   lines.push("");
   lines.push(`- API version \`${API_VERSION}\` · realtime protocol \`${REALTIME_PROTOCOL_VERSION}\``);
   lines.push(`- ${stateFields.length} GameState fields · ${commands.length} commands · ${httpPaths.length} HTTP paths`);

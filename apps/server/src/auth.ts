@@ -16,6 +16,9 @@ export type GmSession = { role: "gm"; sessionId: string; issuedAt: number; expir
 export type PlayerSession = { role: "player"; sessionId: string; issuedAt: number; expiresAt: number };
 type Session = GmSession | PlayerSession;
 
+// Cost 12 takes ~440 ms per hash; tests bootstrap a GM many times, so they use the minimum.
+const PASSWORD_HASH_COST = process.env.VITEST ? 4 : 12;
+
 export class AuthService {
   private data: PersistedAuthData | null = null;
   constructor(private readonly filePath: string) {}
@@ -43,7 +46,7 @@ export class AuthService {
   get isBootstrapped() { return this.data !== null; }
   async bootstrap(password: string) {
     if (this.data) throw new Error("GM password is already configured.");
-    this.data = { passwordHash: await bcrypt.hash(password, 12), tokenSecret: randomUUID(), revokedGmSessionIds: {} };
+    this.data = { passwordHash: await bcrypt.hash(password, PASSWORD_HASH_COST), tokenSecret: randomUUID(), revokedGmSessionIds: {} };
     await this.persist();
   }
   async login(password: string) {

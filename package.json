@@ -2,17 +2,23 @@
   "name": "vtt",
   "private": true,
   "version": "0.1.0",
-  "description": "Private, locally hosted D&D 5e combat VTT",
-  "workspaces": ["apps/*", "packages/*"],
+  "description": "Private, LAN-hosted D&D 5e virtual tabletop and worldbuilding Codex",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently -n web,server -c cyan,magenta \"npm run dev --workspace=@vtt/web\" \"npm run dev --workspace=@vtt/server\"",
     "build": "npm run build --workspaces --if-present",
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "start": "npm run build && npm run start --workspace=@vtt/server",
-    "map": "npm run docs:map --workspace=@vtt/server",
-    "docs": "npm run map && npm run docs:generate --workspace=@vtt/api-contract && npm run docs:parity --workspace=@vtt/web"
+    "map": "npm run map --workspace=@vtt/server"
   },
-  "engines": { "node": ">=24" },
-  "devDependencies": { "concurrently": "^9.1.2" }
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
 }

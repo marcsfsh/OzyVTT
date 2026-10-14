@@ -1,17 +1,26 @@
 # OzyVTT
 
-A private, LAN-hosted D&D 5e virtual tabletop and worldbuilding tool for one GM and a small home group. Players join from a phone or laptop on the same network and claim a character. No accounts, no cloud service.
+A private, LAN-hosted D&D 5e virtual tabletop and worldbuilding tool for one GM and a small home
+group. Players join from a phone or laptop on the same network and claim a character. There are
+no accounts and no cloud service.
 
-Two parts:
+It has two parts:
 
-- **Combat** — upload a battlemap, calibrate the grid, run initiative and turns, and move tokens. Players use a character sheet and roll on their own turn. A second screen shows a player-safe view.
-- **Codex** — a wiki of typed pages (characters, locations, factions, items, …), an atlas of nested maps, a journal with a custom calendar, and a relationship graph. Each page has a player-facing layer and a GM-only layer; GM-only content is never sent to players.
+- **The table.** Upload a battlemap, calibrate its grid, stage scenes, and run initiative with
+  server-enforced 5e rules: attacks, typed damage, saves, conditions, reactions, spell slots,
+  rests and death saves. Players use an interactive character sheet and roll on their own turn.
+  A second screen (a TV or tablet) shows a player-safe view of the map and turn order.
+- **The Codex.** A wiki of typed pages (characters, locations, factions, items and more), an
+  atlas of nested maps, a journal on a custom calendar, sessions, quests, downtime and a
+  relationship graph. Every record has a player half and a GM-only half, and players only ever
+  receive what the GM has revealed.
 
-## Requirements
-
-Node.js 24 or newer.
+Characters can be built in a guided builder, imported from a D&D Beyond PDF, or authored as
+homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included.
 
 ## Running it
+
+Node.js 24 or newer.
 
 ```bash
 npm install
@@ -19,7 +28,8 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite also prints a `Network` address such as `http://192.168.1.50:5173` for other devices on the LAN. Port 3001 is the development API.
+Open `http://localhost:5173`. Vite also prints a network address such as
+`http://192.168.1.50:5173` for other devices on the LAN.
 
 To run the single service players use:
 
@@ -27,56 +37,68 @@ To run the single service players use:
 npm run start
 ```
 
-This builds the client and serves everything on `:3001`. Open `http://localhost:3001` on the host; players join at `http://HOST-IP:3001`. On Windows, allow Node.js on private networks only.
+This builds the client and serves everything on port 3001. Players join at
+`http://HOST-IP:3001`. On Windows, allow Node.js on private networks only. Never expose the port
+to the internet; use a VPN for remote players.
 
-`data/` holds the password hash and campaign data. It is git-ignored; back it up separately.
+`data/` holds the GM password hash and all campaign data. It is git-ignored, so back it up
+separately.
+
+## Commands
 
 | Command | What it does |
 | --- | --- |
-| `npm install` | Install dependencies. |
-| `npm run dev` | Client on `:5173` and the server (dev API `:3001`). |
-| `npm run check` | Typecheck each workspace. |
-| `npm run test` | Run tests. |
-| `npm run build` | Build all workspaces. |
+| `npm run dev` | Client on `:5173` and the server on `:3001`, both reloading on change. |
+| `npm run check` | Typecheck every workspace. |
+| `npm test` | Run every workspace's tests. |
+| `npm run build` | Build the client and server. |
 | `npm run start` | Build, then serve on `:3001`. |
+| `npm run map` | Regenerate `docs/app-map.md` after changing state, commands or HTTP paths. |
 
-## Running combat
+## Running a fight
 
-1. Enter GM mode. Open **Scenes**, add a scene, and upload its battlemap under **Manage maps**.
-2. Choose a printed square grid or a gridless map. For a printed grid, drag diagonally across a 3×3 block of squares to set the scale, then confirm and save.
-3. Under **Table viewer**, open the second-screen address and pair it with a code from the GM.
-4. Select the map and click **Present**. This sends the map to the second screen.
-5. Under **Encounter and Initiative**, pick combatants, optionally enter initiative scores (blanks are rolled on the server), and start. Tokens appear in the tray above the map.
-6. Drag tokens onto the map and drag them to move. Printed grids snap to cell centers; gridless maps place freely. Players move only their own character; the GM moves any token.
-7. Advance turns from the GM controls. The player map and second screen update automatically. GM-only combatants do not appear on player screens.
+1. As GM, open **Scenes**, add a scene, and upload its battlemap.
+2. For a printed grid, drag diagonally across a 3x3 block of squares to set the scale. For a
+   gridless map, mark two points and enter the distance between them.
+3. Under **Table viewer**, open the second-screen address on the TV and pair it with the code
+   shown to the GM. Select the map and click **Present**.
+4. Pick combatants and start the encounter. Blank initiative scores are rolled on the server.
+5. Drag tokens onto the map. Players move only their own character; the GM moves anything.
+   GM-only combatants never appear on player screens or the table viewer.
 
 ## Using the Codex
 
-1. As GM, open the **Codex** tab and go to **Pages**. Create a page, pick its type, fill its fields, and write the body. Each page has a player-facing section and a GM-only section. Link pages with `[[wiki-links]]` and typed relationships.
-2. Open **Atlas**, upload a map, and place markers. A marker can link a page, a nested sub-map, or a prepared scene.
-3. Open **Journal**, set the campaign calendar, and post dated entries. The timeline groups by in-world year.
-4. Reveal the pages and markers players should see. Players open the Codex to read them; GM-only content stays hidden.
+1. Open the **Codex** tab, create a page, pick its type and fill in both halves. Link pages
+   with `[[wiki-links]]` and typed relationships.
+2. Upload maps to the **Atlas** and place markers that link pages, sub-maps or scenes.
+3. Set the campaign calendar and post dated journal entries.
+4. Reveal what players should see. The GM can preview exactly what a player sees.
 
 ## HTTP API
 
-The combat commands are also available over a REST API at `/api/v1`. The reference is [docs/api-reference.md](docs/api-reference.md); a running server serves the spec at `/api/v1/openapi.json`.
-
-- Mint a scoped credential with `POST /api/v1/gm/integration-credentials` (requires a GM session token). The token is shown once.
-- Read game state with `GET /api/v1/game` (add `?view=player` for the player-safe projection); poll with the returned `ETag`.
-- Send commands with typed routes such as `POST /api/v1/game/encounter/start`, or the generic `POST /api/v1/game/commands`. Writes use the same validation and authorization as the UI, are idempotent by `commandId`, and honor `expectedRevision`.
-- List and read archived encounters under `GET /api/v1/encounters`.
-- Poll cheaply: `GET /game` and every codex `GET` send a weak `ETag`; send `If-None-Match` for a `304`.
-
-The Codex has its own routes under `/api/v1/codex/*`, accepting a GM session, a player session (reads only, revealed content only), **or an integration credential scoped `codex:read` / `codex:write`** — external tools no longer need to borrow the GM's session token. A credential acts at GM grade; the one exception is `POST /codex/preview-session`, which mints a player session and stays GM-session-only. Player and GM response shapes are documented separately (`CodexPage` / `CodexPagePlayer`, joined by `CodexPageProjected`), so a generated client gets the shape its own credential actually receives.
-
-Conventions across the whole surface — envelopes, request-id echo, which writes accept `commandId`, the 401-vs-403 rule, and why codex lists are unpaginated — are stated normatively in [ADR-0016](docs/adr/0016-public-integration-api.md#v1-conventions-normative).
-
-## Not in scope
-
-Not a voice/video service, a public or multi-tenant service, a scripting language, or a 3D tabletop.
-
-Two boundaries that used to be here have been reversed and are recorded rather than deleted: the worldbuilding Codex is now a core pillar (`docs/ai-ledger/decision-log.md`, 2026-07-24), and the guided character builder has shipped (`docs/adr/0021-player-character-sheet-closing-record.md`).
+Everything the UI does is also available under `/api/v1`, with the same validation,
+authorization and player-safe projections. A running server serves the OpenAPI document at
+`/api/v1/openapi.json`, and the app shows a browsable reference under Settings. A GM mints
+scoped integration credentials in Settings. Conventions are in
+[ADR-0016](docs/adr/0016-public-integration-api.md).
 
 ## Layout
 
-TypeScript monorepo: `apps/client` (React/Vite) and `apps/server` (Express + Socket.IO, authoritative), with shared packages under `packages/`. The roster is `package.json` `workspaces`; `docs/app-map.md` is the generated orientation index. Game state lives on the server in SQLite. More detail is in [docs/ai-context/](docs/ai-context/), [docs/adr/](docs/adr/), and [BUILD_PLAN.md](BUILD_PLAN.md).
+A TypeScript monorepo: `apps/client` (React and Vite), `apps/server` (Express and Socket.IO,
+the authority for all game state, stored in SQLite) and shared packages under `packages/`.
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the pieces fit and the security rules.
+- [docs/DESIGN.md](docs/DESIGN.md): the visual and interaction rules for UI work.
+- [docs/app-map.md](docs/app-map.md): a generated index of state, commands and HTTP paths.
+- [docs/adr/](docs/adr/): architecture decision records.
+
+Bugs and the roadmap are tracked in GitHub issues.
+
+## Not in scope
+
+Voice or video, public or multi-tenant hosting, a scripting language, and 3D maps.
+
+## Content license
+
+SRD 5.2.1 content is used under CC BY 4.0; see
+`packages/content-srd-5.2.1/bundles/attribution.json`.

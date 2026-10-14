@@ -395,7 +395,7 @@ function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
             the hit AREA grows to the floor and the paint stays prose. Its overhang can only reach
             more prose — the paragraph holds no second control — so nothing is stolen. Measured by
             `scripts/tap-audit.mjs 375`, which caught it the moment this page got an address. */}
-        The machine-readable contract lives at <a className="tap-target" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>; a full generated write-up ships in the repo at <code>docs/api-reference.md</code>.
+        The machine-readable contract lives at <a className="tap-target" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>.
       </p>
       {/**
         * D19: the idempotency and revision rules are READ FROM THE SERVED CONTRACT, never restated here.

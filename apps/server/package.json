@@ -8,7 +8,7 @@
     "build": "tsc",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "docs:map": "node --import tsx scripts/generate-app-map.ts"
+    "map": "node --import tsx scripts/generate-app-map.ts"
   },
   "dependencies": {
     "@vtt/api-contract": "*",
