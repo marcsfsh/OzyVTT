@@ -17,7 +17,8 @@ import type { CodexStandingRow } from "./codex/standing.js";
 
 /**
  * The Codex viewer-safety boundary: every player-facing Codex read projects through here. Player shapes are
- * explicit allow-lists (new fields stay secret); callers pass in cross-record reveal state so only this file decides.
+ * explicit allow-lists, so a new field stays secret until it is added. Cross-record reveal state arrives as a
+ * context built by `codex/visibility.ts`.
  */
 
 export type GmCodexPage = CodexPageRow;
@@ -283,7 +284,7 @@ export type PlayerCodexJournalEntry = Readonly<{
 /** Default for an unsupplied revealed-id set: nothing is revealed, so nothing travels. */
 const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
 
-/** Store-resolved facts for a player journal read. Absent sets default to empty, which fails closed. */
+/** Facts for a player journal read, built by `journalContext`. Absent sets default to empty, which fails closed. */
 export type PlayerSessionNumberContext = Readonly<{
   /** Quests the players have been shown; a `quest` history record is gated on its quest. */
   revealedQuestIds?: ReadonlySet<string>;

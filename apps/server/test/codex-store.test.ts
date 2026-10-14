@@ -8,6 +8,7 @@ import { CodexStore } from "../src/codex-store.js";
 import { deadlineFired, downtimePayloadOf, questEventPayloadOf } from "../src/codex/journal-kinds.js";
 import { parseWikiLinks } from "../src/codex/links.js";
 import { CodexRevisionConflictError } from "../src/codex/validate.js";
+import { journalContext } from "../src/codex/visibility.js";
 import { LegacyDatabaseError } from "../src/database.js";
 import {
   projectGmConnections,
@@ -49,22 +50,13 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-/** The sessions a player may not see, as the router resolves them per request. */
-const hiddenSessionIds = (from: CodexStore) =>
-  new Set(
-    from
-      .listSessions()
-      .filter((session) => !session.revealedToPlayers)
-      .map((session) => session.id)
-  );
-
-// The session context the player journal/chronicle projections take. A function, not a constant: reveal
-// state changes mid-test and a captured context would go stale.
+// The session half of the context the player journal/chronicle projections take (`journalContext`). A
+// function, not a constant: reveal state changes mid-test and a captured context would go stale.
 const playerSessionNumbers = (from: CodexStore = store) => ({
-  unrevealedSessionIds: hiddenSessionIds(from)
+  unrevealedSessionIds: journalContext(from).unrevealedSessionIds
 });
 
-// The `PlayerConnectionContext` the router resolves per request. Fixtures here have page sources only,
+// The `PlayerConnectionContext` `connectionContext` resolves per request. Fixtures here have page sources only,
 // so `revealedSourceIds` is empty. A function because reveal state changes mid-test.
 const playerConnectionContext = (from: CodexStore = store) => ({
   revealedPageIds: new Set(
@@ -1766,15 +1758,15 @@ describe("CodexStore sessions (M9)", () => {
     const shown = sessions.createSession({ sessionNumber: 5 });
     sessions.setSessionRevealed(shown.id, true);
     const unnumbered = sessions.createSession({});
-    expect([...hiddenSessionIds(sessions)].sort()).toEqual([hidden.id, unnumbered.id].sort());
+    expect([...journalContext(sessions).unrevealedSessionIds].sort()).toEqual([hidden.id, unnumbered.id].sort());
 
     // Revealing them empties the set, so the ids above are the reveal flag being read.
     sessions.setSessionRevealed(hidden.id, true);
     sessions.setSessionRevealed(unnumbered.id, true);
-    expect([...hiddenSessionIds(sessions)]).toEqual([]);
+    expect([...journalContext(sessions).unrevealedSessionIds]).toEqual([]);
     // ...and hiding 5 again puts a different id in, so this is a per-row read rather than a constant.
     sessions.setSessionRevealed(shown.id, false);
-    expect([...hiddenSessionIds(sessions)]).toEqual([shown.id]);
+    expect([...journalContext(sessions).unrevealedSessionIds]).toEqual([shown.id]);
   });
 
   it("orders numbered sessions by number, with the unnumbered ones below them", () => {
@@ -1820,13 +1812,15 @@ describe("CodexStore sessions (M9)", () => {
     expect(entry.sessionNumber).toBe(0);
 
     expect(
-      projectPlayerJournalEntry(entry, { unrevealedSessionIds: hiddenSessionIds(sessions) })!.sessionNumber
+      projectPlayerJournalEntry(entry, { unrevealedSessionIds: journalContext(sessions).unrevealedSessionIds })!
+        .sessionNumber
     ).toBeNull();
     // Revealed: the number survives, and 0 is not mistaken for "no session".
     sessions.setSessionRevealed(zero.id, true);
-    expect(projectPlayerJournalEntry(entry, { unrevealedSessionIds: hiddenSessionIds(sessions) })!.sessionNumber).toBe(
-      0
-    );
+    expect(
+      projectPlayerJournalEntry(entry, { unrevealedSessionIds: journalContext(sessions).unrevealedSessionIds })!
+        .sessionNumber
+    ).toBe(0);
   });
 
   /** With a session active, editing an entry must not re-file it under the running session. */

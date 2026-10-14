@@ -102,9 +102,10 @@ audience. There are four:
   paused. The fields that may cross are the `ViewerEncounterScene` and
   `ViewerPresentationProjection` types.
 - **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
-  nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target. Some
-  fields (staged scene ids on markers and sessions) are GM-only even when revealed. A hidden
-  record is a 404, never a 403, and ETags are computed after every gate.
+  nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
+  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
+  scene ids on markers and sessions) are GM-only even when revealed. A hidden record is a 404,
+  never a 403, and ETags are computed after every gate.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
 
