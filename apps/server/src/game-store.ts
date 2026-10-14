@@ -1,7 +1,6 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import { GameStateSchema, type GameState, type TurnHistoryEntry } from "@vtt/domain";
+import { migrate, openDatabase, transaction, type Migration } from "./database.js";
 
 export class CommandRejectedError extends Error {}
 /** A rules-mode rejection (ADR-0020); rolls back without burning the commandId and carries the rule id and
@@ -16,7 +15,7 @@ export class RulesBlockedError extends CommandRejectedError {
   }
 }
 export class RevisionConflictError extends Error {}
-/** A timeline navigation needs GM confirmation first. Thrown before any transaction, so it burns no receipt, revision or event; the client re-sends with the confirm flag and a fresh commandId. */
+/** A timeline navigation needs GM confirmation first. Thrown before any transaction, so it burns no receipt or revision; the client re-sends with the confirm flag and a fresh commandId. */
 export class TimelineConfirmationRequired extends Error {
   constructor(
     public readonly confirm: "rewrite-history" | "discard-changes",
@@ -61,7 +60,6 @@ export type JournalEntry = Readonly<{
   revision: number;
   at: string;
 }>;
-const PLACEHOLDER_ROSTER_SEED = "phase-1-placeholder-roster-v1";
 
 export type GameStoreOptions = Readonly<{
   /** Whether a mutation changed restorable state; while rewound, true marks historyDirty. Injected so the
@@ -108,105 +106,60 @@ export type EncounterArchiveSummary = Readonly<{
   /** Shared with players by the GM? Default false. */ playerVisible: boolean;
 }>;
 
-const MIGRATIONS = [
+type SqlWrite = Readonly<{ sql: string; params: readonly (string | number | null)[] }>;
+
+const MIGRATIONS: readonly Migration[] = [
   {
     version: 1,
-    sql: `
-    CREATE TABLE game_state (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      schema_version INTEGER NOT NULL,
-      revision INTEGER NOT NULL,
-      state_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    ) STRICT;
-    CREATE TABLE command_receipts (
-      command_id TEXT PRIMARY KEY,
-      revision INTEGER NOT NULL UNIQUE,
-      command_type TEXT NOT NULL,
-      accepted_at TEXT NOT NULL
-    ) STRICT;
-    CREATE TABLE domain_events (
-      sequence INTEGER PRIMARY KEY,
-      command_id TEXT NOT NULL UNIQUE REFERENCES command_receipts(command_id),
-      event_type TEXT NOT NULL,
-      actor_id TEXT,
-      occurred_at TEXT NOT NULL
-    ) STRICT;
-    CREATE TABLE snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      revision INTEGER NOT NULL UNIQUE,
-      state_json TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    ) STRICT;
-  `
-  },
-  {
-    version: 2,
-    sql: `
-    CREATE TABLE application_seeds (
-      seed_key TEXT PRIMARY KEY,
-      applied_at TEXT NOT NULL
-    ) STRICT;
-  `
-  },
-  {
-    version: 3,
-    sql: `
-    CREATE TABLE turn_snapshots (
-      idx INTEGER PRIMARY KEY,
-      kind TEXT NOT NULL CHECK (kind IN ('turn', 'return')),
-      label TEXT NOT NULL,
-      revision INTEGER NOT NULL,
-      state_json TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    ) STRICT;
-  `
-  },
-  {
-    version: 4,
-    sql: `
-    CREATE TABLE encounter_archives (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      command_id TEXT NOT NULL UNIQUE,
-      archived_at TEXT NOT NULL,
-      started_at TEXT,
-      ended_at TEXT NOT NULL,
-      turn_count INTEGER NOT NULL,
-      document_json TEXT NOT NULL
-    ) STRICT;
-  `
-  },
-  {
-    version: 5,
-    sql: `
-    CREATE TABLE encounter_journal (
-      seq INTEGER PRIMARY KEY AUTOINCREMENT,
-      command_id TEXT NOT NULL,
-      command_type TEXT NOT NULL,
-      actor_id TEXT,
-      principal TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      revision INTEGER NOT NULL,
-      at TEXT NOT NULL
-    ) STRICT;
-  `
-  },
-  {
-    version: 6,
-    // Per-archive sharing: additive column defaulting to 0, so existing archives stay hidden.
-    sql: `ALTER TABLE encounter_archives ADD COLUMN player_visible INTEGER NOT NULL DEFAULT 0;`
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE game_state (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          schema_version INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          state_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE command_receipts (
+          command_id TEXT PRIMARY KEY,
+          revision INTEGER NOT NULL UNIQUE,
+          command_type TEXT NOT NULL,
+          accepted_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE turn_snapshots (
+          idx INTEGER PRIMARY KEY,
+          kind TEXT NOT NULL CHECK (kind IN ('turn', 'return')),
+          label TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          state_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE encounter_archives (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          command_id TEXT NOT NULL UNIQUE,
+          archived_at TEXT NOT NULL,
+          started_at TEXT,
+          ended_at TEXT NOT NULL,
+          turn_count INTEGER NOT NULL,
+          document_json TEXT NOT NULL,
+          player_visible INTEGER NOT NULL DEFAULT 0
+        ) STRICT;
+        CREATE TABLE encounter_journal (
+          seq INTEGER PRIMARY KEY AUTOINCREMENT,
+          command_id TEXT NOT NULL,
+          command_type TEXT NOT NULL,
+          actor_id TEXT,
+          principal TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          at TEXT NOT NULL
+        ) STRICT;
+      `)
   }
 ];
 
-/** The one-time repair that re-keys `example-*` starter sheets as ordinary `import-<actorId>` ones. */
-const EXAMPLE_PARTY_NORMALIZATION_SEED = "example-party-normalization-v1";
-/** Literal, not imported, to avoid an import cycle with the seed-content module; a test pins it to `initial-game-state.ts`. */
-const EXAMPLE_DEFINITION_ID_PREFIX = "example-";
-
 export class GameStore {
   private state: GameState;
-  private readonly initialState: GameState;
   private database?: DatabaseSync;
   private commandQueue: Promise<void> = Promise.resolve();
 
@@ -215,28 +168,28 @@ export class GameStore {
     initialState?: GameState,
     private readonly options: GameStoreOptions = {}
   ) {
-    this.initialState = initialState ? structuredClone(initialState) : GameStateSchema.parse({ schemaVersion: 1 });
-    this.state = structuredClone(this.initialState);
+    this.state = initialState ? structuredClone(initialState) : GameStateSchema.parse({ schemaVersion: 1 });
   }
 
   async initialize() {
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    this.database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
-    this.database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-    this.database.exec(
-      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-    );
-    this.migrate();
-    const row = this.database.prepare("SELECT state_json FROM game_state WHERE id = 1").get() as StateRow | undefined;
-    if (row) this.state = GameStateSchema.parse(JSON.parse(row.state_json));
-    else this.insertInitialState();
-    this.applyPlaceholderRosterSeed();
-    // Must run after the roster seed, which may have just backfilled the example party into an empty save.
-    this.applyExamplePartyNormalizationSeed();
-    // An older server build may have stripped historyCursor while turn_snapshots rows survived; drop the
-    // stale return-point.
-    if (this.state.combat.historyCursor === null)
-      this.database.exec("DELETE FROM turn_snapshots WHERE kind = 'return'");
+    const database = openDatabase(this.databasePath);
+    try {
+      migrate(database, "game", MIGRATIONS, { path: this.databasePath, legacyTables: ["schema_migrations"] });
+      const row = database.prepare("SELECT state_json FROM game_state WHERE id = 1").get() as StateRow | undefined;
+      if (row) {
+        this.state = GameStateSchema.parse(JSON.parse(row.state_json));
+      } else {
+        database
+          .prepare(
+            "INSERT INTO game_state (id, schema_version, revision, state_json, updated_at) VALUES (1, ?, ?, ?, ?)"
+          )
+          .run(this.state.schemaVersion, this.state.revision, JSON.stringify(this.state), new Date().toISOString());
+      }
+    } catch (error) {
+      database.close();
+      throw error;
+    }
+    this.database = database;
   }
 
   get snapshot() {
@@ -264,23 +217,12 @@ export class GameStore {
   async executeTimeline(command: Command, plan: (state: GameState, timeline: TimelineOps) => void) {
     return this.enqueue(command, (nextState) => {
       const database = this.requireDatabase();
-      const pending: Array<{ sql: string; params: readonly (string | number)[] }> = [];
+      const pending: SqlWrite[] = [];
       let nextIndex =
         ((database.prepare("SELECT MAX(idx) AS max_idx FROM turn_snapshots").get() as { max_idx: number | null })
           .max_idx ?? -1) + 1;
       const timeline: TimelineOps = {
-        entries: () =>
-          (
-            database
-              .prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx")
-              .all() as TurnSnapshotRow[]
-          ).map((row) => ({
-            index: row.idx,
-            kind: row.kind,
-            label: row.label,
-            revision: row.revision,
-            at: row.created_at
-          })),
+        entries: () => this.listTurnSnapshots(),
         read: (index) => {
           const row = database.prepare("SELECT state_json FROM turn_snapshots WHERE idx = ?").get(index) as
             StateRow | undefined;
@@ -320,7 +262,7 @@ export class GameStore {
             params: [
               row.commandId,
               new Date().toISOString(),
-              row.startedAt ?? "",
+              row.startedAt,
               row.endedAt,
               row.turnCount,
               row.documentJson
@@ -390,7 +332,7 @@ export class GameStore {
     ).map((row) => ({
       id: row.id,
       archivedAt: row.archived_at,
-      startedAt: row.started_at || null,
+      startedAt: row.started_at,
       endedAt: row.ended_at,
       turnCount: row.turn_count,
       playerVisible: row.player_visible === 1
@@ -414,10 +356,7 @@ export class GameStore {
     this.requireDatabase().prepare("DELETE FROM encounter_archives WHERE id = ?").run(id);
   }
 
-  private async enqueue(
-    command: Command,
-    operate: (nextState: GameState) => ReadonlyArray<{ sql: string; params: readonly (string | number)[] }>
-  ) {
+  private async enqueue(command: Command, operate: (nextState: GameState) => readonly SqlWrite[]) {
     const operation = async () => {
       const database = this.requireDatabase();
       const receipt = database.prepare("SELECT revision FROM command_receipts WHERE command_id = ?").get(command.id) as
@@ -431,25 +370,15 @@ export class GameStore {
       nextState.revision += 1;
       const acceptedAt = new Date().toISOString();
 
-      database.exec("BEGIN IMMEDIATE");
-      try {
+      transaction(database, () => {
         database
           .prepare("INSERT INTO command_receipts (command_id, revision, command_type, accepted_at) VALUES (?, ?, ?, ?)")
           .run(command.id, nextState.revision, command.type, acceptedAt);
         database
           .prepare(
-            "INSERT INTO domain_events (sequence, command_id, event_type, actor_id, occurred_at) VALUES (?, ?, ?, ?, ?)"
-          )
-          .run(nextState.revision, command.id, command.type, command.actorId ?? null, acceptedAt);
-        database
-          .prepare(
             "UPDATE game_state SET schema_version = ?, revision = ?, state_json = ?, updated_at = ? WHERE id = 1"
           )
           .run(nextState.schemaVersion, nextState.revision, JSON.stringify(nextState), acceptedAt);
-        if (nextState.revision % 50 === 0)
-          database
-            .prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)")
-            .run(nextState.revision, JSON.stringify(nextState), "periodic", acceptedAt);
         // Journal every accepted command while an encounter is live, including start and end. Runs before the
         // plan's queued writes so an encounter-lifecycle clearJournal can supersede it in the same transaction.
         if (this.state.combat.active || nextState.combat.active) {
@@ -468,12 +397,8 @@ export class GameStore {
             );
         }
         for (const write of pendingTimelineWrites) database.prepare(write.sql).run(...write.params);
-        database.exec("COMMIT");
-        this.state = nextState;
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+      });
+      this.state = nextState;
       return { state: this.snapshot, duplicate: false };
     };
     const result = this.commandQueue.then(operation);
@@ -487,126 +412,6 @@ export class GameStore {
   close() {
     this.database?.close();
     this.database = undefined;
-  }
-
-  private migrate() {
-    const database = this.requireDatabase();
-    const applied = new Set(
-      (database.prepare("SELECT version FROM schema_migrations").all() as Array<{ version: number }>).map(
-        ({ version }) => version
-      )
-    );
-    for (const migration of MIGRATIONS) {
-      if (applied.has(migration.version)) continue;
-      database.exec("BEGIN IMMEDIATE");
-      try {
-        database.exec(migration.sql);
-        database
-          .prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)")
-          .run(migration.version, new Date().toISOString());
-        database.exec("COMMIT");
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
-    }
-  }
-
-  private insertInitialState() {
-    const database = this.requireDatabase();
-    const now = new Date().toISOString();
-    database
-      .prepare("INSERT INTO game_state (id, schema_version, revision, state_json, updated_at) VALUES (1, ?, ?, ?, ?)")
-      .run(this.state.schemaVersion, this.state.revision, JSON.stringify(this.state), now);
-    database
-      .prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)")
-      .run(this.state.revision, JSON.stringify(this.state), "initial", now);
-  }
-
-  private applyPlaceholderRosterSeed() {
-    const database = this.requireDatabase();
-    const applied = database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(PLACEHOLDER_ROSTER_SEED);
-    if (applied) return;
-    const nextState = structuredClone(this.state);
-    if (nextState.actors.length === 0 && this.initialState.actors.length > 0) {
-      nextState.actors = structuredClone(this.initialState.actors);
-      // Carry the starter sheets too, so backfilled actors don't reference a missing definition.
-      if (nextState.definitions.length === 0) nextState.definitions = structuredClone(this.initialState.definitions);
-    }
-    const now = new Date().toISOString();
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      if (nextState.actors.length !== this.state.actors.length) {
-        database
-          .prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1")
-          .run(JSON.stringify(nextState), now);
-        database
-          .prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?")
-          .run(JSON.stringify(nextState), nextState.revision);
-      }
-      database
-        .prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)")
-        .run(PLACEHOLDER_ROSTER_SEED, now);
-      database.exec("COMMIT");
-      this.state = nextState;
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
-  }
-
-  /** One-time repair re-keying `example-*` starter sheets to `import-<actorId>` so they can be edited and
-   *  removed. A row still referenced elsewhere is left alone. */
-  private applyExamplePartyNormalizationSeed() {
-    const database = this.requireDatabase();
-    if (database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(EXAMPLE_PARTY_NORMALIZATION_SEED))
-      return;
-    const nextState = structuredClone(this.state);
-    let changed = false;
-    for (const actor of nextState.actors) {
-      const current = actor.definitionId;
-      if (!current || !current.startsWith(EXAMPLE_DEFINITION_ID_PREFIX)) continue;
-      const stored = nextState.definitions.find((entry) => entry.id === current);
-      if (!stored) continue;
-      const replacement = `import-${actor.id}`;
-      // Never overwrite a definition that already exists under the target key.
-      if (!nextState.definitions.some((entry) => entry.id === replacement)) {
-        nextState.definitions = [
-          ...nextState.definitions,
-          { id: replacement, definition: structuredClone(stored.definition) }
-        ];
-      }
-      actor.definitionId = replacement;
-      changed = true;
-    }
-    if (changed) {
-      // Drop only the `example-*` rows nothing points at any more.
-      nextState.definitions = nextState.definitions.filter(
-        (entry) =>
-          !entry.id.startsWith(EXAMPLE_DEFINITION_ID_PREFIX) ||
-          nextState.actors.some((actor) => actor.definitionId === entry.id)
-      );
-    }
-    const now = new Date().toISOString();
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      if (changed) {
-        database
-          .prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1")
-          .run(JSON.stringify(nextState), now);
-        database
-          .prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?")
-          .run(JSON.stringify(nextState), nextState.revision);
-      }
-      database
-        .prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)")
-        .run(EXAMPLE_PARTY_NORMALIZATION_SEED, now);
-      database.exec("COMMIT");
-      this.state = nextState;
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
   }
 
   private requireDatabase() {

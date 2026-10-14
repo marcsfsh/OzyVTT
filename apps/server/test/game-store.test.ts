@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { GameStateSchema } from "@vtt/domain";
 import { describe, expect, it } from "vitest";
+import { LegacyDatabaseError } from "../src/database.js";
 import { GameStore, RevisionConflictError } from "../src/game-store.js";
-import { createInitialGameState } from "../src/initial-game-state.js";
 import { claimCharacter, forceReleaseCharacter } from "../src/character-claims.js";
 
 const actor = {
@@ -18,7 +18,7 @@ const actor = {
 };
 
 describe("SQLite GameStore", () => {
-  it("migrates, commits atomically, ignores retries, snapshots, and recovers after restart", async () => {
+  it("migrates, commits atomically, ignores retries, and recovers after restart", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-game-store-"));
     const databasePath = join(directory, "vtt.sqlite");
     let store: GameStore | undefined;
@@ -56,16 +56,10 @@ describe("SQLite GameStore", () => {
       reopened.close();
 
       const database = new DatabaseSync(databasePath, { readOnly: true });
-      expect((database.prepare("SELECT COUNT(*) AS count FROM domain_events").get() as { count: number }).count).toBe(
-        50
-      );
       expect(
         (database.prepare("SELECT COUNT(*) AS count FROM command_receipts").get() as { count: number }).count
       ).toBe(50);
-      expect((database.prepare("SELECT COUNT(*) AS count FROM snapshots").get() as { count: number }).count).toBe(2);
-      expect(
-        (database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count
-      ).toBe(6);
+      expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([{ store: "game", version: 1 }]);
       database.close();
     } finally {
       store?.close();
@@ -146,40 +140,20 @@ describe("SQLite GameStore", () => {
     }
   });
 
-  it("adds the placeholder roster once to an existing empty database", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-roster-seed-"));
+  it("refuses a database created before the migration history was reset", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-legacy-game-"));
     const databasePath = join(directory, "vtt.sqlite");
-    let store: GameStore | undefined;
+    const store = new GameStore(databasePath);
     try {
-      store = new GameStore(databasePath);
-      await store.initialize();
-      store.close();
-      store = undefined;
-      const database = new DatabaseSync(databasePath);
-      database.prepare("DELETE FROM application_seeds").run();
-      database.close();
-
-      store = new GameStore(databasePath, createInitialGameState());
-      await store.initialize();
-      expect(store.snapshot.actors).toHaveLength(3);
-      expect(new Set(store.snapshot.actors.map(({ id }) => id)).size).toBe(3);
-      store.close();
-      store = undefined;
-
-      const reopened = new GameStore(databasePath, createInitialGameState());
-      await reopened.initialize();
-      expect(reopened.snapshot.actors).toHaveLength(3);
-      reopened.close();
-      store = undefined;
-
-      const persisted = new DatabaseSync(databasePath, { readOnly: true });
-      // Two seeds: the placeholder roster backfill and the one-time example-party re-key.
-      expect(
-        (persisted.prepare("SELECT COUNT(*) AS count FROM application_seeds").get() as { count: number }).count
-      ).toBe(2);
-      persisted.close();
+      const legacy = new DatabaseSync(databasePath);
+      legacy.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+      legacy.close();
+      await expect(store.initialize()).rejects.toBeInstanceOf(LegacyDatabaseError);
+      await expect(store.execute({ id: "after-refusal", type: "test.noop" }, () => {})).rejects.toThrow(
+        /not been initialized/
+      );
     } finally {
-      store?.close();
+      store.close();
       await rm(directory, { recursive: true, force: true });
     }
   });

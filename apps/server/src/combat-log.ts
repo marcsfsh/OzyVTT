@@ -1,7 +1,6 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import type { CombatLogEntry, PlayerRollRecord, RollRecord, RollVisibility } from "@vtt/domain";
+import { migrate, openDatabase, type Migration } from "./database.js";
 import { playerRoll } from "./projections.js";
 
 type LogRow = Readonly<{
@@ -22,6 +21,28 @@ const CAP = 2000;
 
 const SELECT_COLUMNS =
   "id, at, kind, text, gm_only, revision, actor_id, visibility, initiator_session_id, payload_json";
+
+// The roll columns are null on narration rows.
+const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE combat_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          at TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          text TEXT NOT NULL,
+          gm_only INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          actor_id TEXT,
+          visibility TEXT,
+          initiator_session_id TEXT,
+          payload_json TEXT
+        ) STRICT;
+      `)
+  }
+];
 
 /** Who is reading the feed. `sessionId` is the reader's own, the only thing that unlocks a `self-only` roll row. */
 export type FeedReader = Readonly<{ gm: boolean; sessionId?: string }>;
@@ -65,33 +86,14 @@ export class CombatLogStore {
 
   async initialize() {
     if (this.database) return;
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
+    const database = openDatabase(this.databasePath);
     try {
-      database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec(
-        "CREATE TABLE IF NOT EXISTS combat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL, gm_only INTEGER NOT NULL, revision INTEGER NOT NULL) STRICT;"
-      );
-      // In-store migration: feed columns are added to an existing table. Nullable, so older rows read back as
-      // plain narration following gm_only.
-      const existing = new Set(
-        (database.prepare("PRAGMA table_info(combat_log)").all() as unknown as ReadonlyArray<{ name: string }>).map(
-          (column) => column.name
-        )
-      );
-      for (const [column, type] of [
-        ["actor_id", "TEXT"],
-        ["visibility", "TEXT"],
-        ["initiator_session_id", "TEXT"],
-        ["payload_json", "TEXT"]
-      ] as const) {
-        if (!existing.has(column)) database.exec(`ALTER TABLE combat_log ADD COLUMN ${column} ${type};`);
-      }
-      this.database = database;
+      migrate(database, "combat-log", MIGRATIONS, { path: this.databasePath });
     } catch (error) {
       database.close();
       throw error;
     }
+    this.database = database;
   }
 
   /** Appends one feed line and returns it with its id, evicting beyond the newest CAP rows. With `roll`,
@@ -179,7 +181,7 @@ export class CombatLogStore {
   }
 }
 
-/** One stored row to the pre-projection shape. Older rows without feed columns read back as plain narration. */
+/** One stored row to the pre-projection shape. */
 function toStoredRow(row: LogRow): StoredFeedRow {
   const roll = row.payload_json === null ? null : (JSON.parse(row.payload_json) as PlayerRollRecord);
   return {
@@ -193,7 +195,7 @@ function toStoredRow(row: LogRow): StoredFeedRow {
       ...(row.actor_id !== null ? { actorId: row.actor_id } : {}),
       ...(roll ? { roll } : {})
     },
-    visibility: (row.visibility as RollVisibility | null) ?? null,
+    visibility: row.visibility as RollVisibility | null,
     initiatorSessionId: row.initiator_session_id
   };
 }

@@ -1,6 +1,5 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { migrate, openDatabase, transaction, type Migration } from "./database.js";
 import {
   applyViewerCommand,
   createViewerPresentationState,
@@ -25,12 +24,24 @@ function parseState(value: string): ViewerPresentationState {
   ) {
     throw new Error("Persisted viewer presentation state is malformed or unsupported.");
   }
-  return {
-    ...parsed,
-    initiative: { ...parsed.initiative!, hiddenTurn: parsed.initiative!.hiddenTurn ?? false },
-    encounter: parsed.encounter ?? { mapAssetId: null, tokens: [] }
-  } as ViewerPresentationState;
+  return parsed as ViewerPresentationState;
 }
+
+const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE viewer_presentation_state (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          schema_version INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          state_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+      `)
+  }
+];
 
 export class ViewerPresentationStore {
   private database?: DatabaseSync;
@@ -41,19 +52,9 @@ export class ViewerPresentationStore {
 
   async initialize() {
     if (this.database) return;
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
+    const database = openDatabase(this.databasePath);
     try {
-      database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS viewer_presentation_state (
-          id INTEGER PRIMARY KEY CHECK (id = 1),
-          schema_version INTEGER NOT NULL,
-          revision INTEGER NOT NULL,
-          state_json TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        ) STRICT;
-      `);
+      migrate(database, "viewer-presentation", MIGRATIONS, { path: this.databasePath });
       const row = database
         .prepare("SELECT schema_version, state_json FROM viewer_presentation_state WHERE id = 1")
         .get() as StateRow | undefined;
@@ -62,18 +63,17 @@ export class ViewerPresentationStore {
           throw new Error(`Viewer presentation schema version ${row.schema_version} is unsupported.`);
         this.state = parseState(row.state_json);
       } else {
-        const now = new Date().toISOString();
         database
           .prepare(
             "INSERT INTO viewer_presentation_state (id, schema_version, revision, state_json, updated_at) VALUES (1, ?, ?, ?, ?)"
           )
-          .run(1, this.state.revision, JSON.stringify(this.state), now);
+          .run(1, this.state.revision, JSON.stringify(this.state), new Date().toISOString());
       }
-      this.database = database;
     } catch (error) {
       database.close();
       throw error;
     }
+    this.database = database;
   }
 
   get snapshot() {
@@ -92,8 +92,7 @@ export class ViewerPresentationStore {
       const result = applyViewerCommand(this.state, command, now);
       if (result.duplicate) return { state: structuredClone(this.state), duplicate: true } as const;
       const nextState = result.state;
-      database.exec("BEGIN IMMEDIATE");
-      try {
+      transaction(database, () => {
         const update = database
           .prepare(
             "UPDATE viewer_presentation_state SET schema_version = ?, revision = ?, state_json = ?, updated_at = ? WHERE id = 1 AND revision = ?"
@@ -106,12 +105,8 @@ export class ViewerPresentationStore {
             this.state.revision
           );
         if (update.changes !== 1) throw new Error("Viewer presentation state changed in another server process.");
-        database.exec("COMMIT");
-        this.state = nextState;
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+      });
+      this.state = nextState;
       return { state: structuredClone(this.state), duplicate: false } as const;
     };
     const result = this.operationQueue.then(operation);
