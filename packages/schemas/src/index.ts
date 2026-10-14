@@ -283,6 +283,28 @@ export const EffectModifierSchema = z.discriminatedUnion("type", [
   /** The bearer's saving throws have advantage; absent ability = all saves (Dodge grants Dex only). */
   z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
   z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
+  /**
+   * THE RUNTIME HALF OF SPEED (U18). `FeatureModifierSchema` has carried a `speed` rider since the
+   * beginning, but that one is BAKED: the builder folds it into `ActorDefinition.speedFeet`, which is
+   * the sheet's permanent number. An effect that ends has to give the feet back, so a runtime change
+   * cannot be written there - `actor.speedFeet` is the base and overwriting it is destructive.
+   *
+   * Signed, so one member covers both directions: Longstrider is `+10` and the `slow` weapon mastery
+   * is `-10`. The bounds match the build-time rider exactly (-30..60), because the same GM authors
+   * both and a number the store then refuses is worse than a narrower control.
+   *
+   * ITS READER IS `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts`), which sums this
+   * member across `actor.effects[].modifiers` and hands the total to the movement budget - so the far
+   * end is the refusal `movement-rules.ts` prints, not the modifier surviving into a struct.
+   *
+   * NAMED ABSENCE - an ITEM's effect does NOT reach that reader. `takeEffects`
+   * (`apps/server/src/equipment-derivation.ts`) turns an item's effect modifiers into standing
+   * RIDERS rather than live `actor.effects`, and `asRiderModifiers` passes this one through to
+   * `EquipmentDerivation.speed`, which nothing in production reads. The row is offered on an item
+   * with that caveat printed beside it (`RiderEditor.tsx`, `effectModifiersField`); the unit that
+   * would close it is the one that gives `EquipmentDerivation.speed` a reader.
+   */
+  z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60) }).strict(),
   AttackBonusVariantSchema,
   ExtraDamageVariantSchema,
   RollModeVariantSchema
@@ -342,6 +364,39 @@ export const EffectInstanceSchema = z.object({
   concentration: z.boolean().default(false),
   /** Cascade: this effect ends when the actor no longer has any other effect carrying this tag (Frenzy's marker ends with the Rage). */
   endsWithTag: z.string().regex(/^[a-z0-9-]+$/).max(40).nullable().default(null),
+  /**
+   * THE IDENTITY OF THE GAME EFFECT, for SRD 5.2.1's "Combining Game Effects": *"The effects of the
+   * same name don't combine... the most potent effect applies."* Two instances that share a key are
+   * ONE game effect however many creatures, weapons or swings produced them, so a reader takes the
+   * single most potent contribution across the group rather than summing it - two attackers' Slows
+   * are one -10, not -20. Each instance still keeps its OWN duration; only the READ collapses.
+   *
+   * Absent (the default) means "this is its own effect" and sums as it always did, so nothing that
+   * predates the field changes behaviour. DIFFERENT keys are different effects and also sum: a Slow
+   * plus a Longstrider is -10 +10, not one of them.
+   *
+   * IT IS GENERIC VOCABULARY AND CARRIES NO MASTERY KNOWLEDGE. `currentSpeedFeet`
+   * (`apps/server/src/condition-rules.ts`) groups `speed` modifiers by this string and never asks
+   * what wrote it; `mastery:slow` is simply the name the Slow property happens to put here. Its one
+   * reader today is that grouping, so a key on an effect whose modifiers nobody groups yet is inert
+   * rather than wrong - it states an identity and waits for a reader that cares.
+   */
+  stackKey: z.string().regex(/^[a-z0-9:-]+$/).max(60).optional(),
+  /**
+   * EXTRA MOVEMENT this effect granted for the current turn, in feet, FIXED AT THE MOMENT IT WAS
+   * GRANTED - the Dash action's *"extra movement for the current turn equal to your Speed after
+   * modifiers"*. It is a QUANTITY, not a multiplier, and that is the whole point: a Slow landing
+   * mid-turn lowers the Speed from that point on, and must not retroactively rewrite feet the Dash
+   * already granted and the creature already spent. Re-deriving `2 x Speed` on every read did exactly
+   * that, and charged a Dashing creature 20 feet for an opportunity attack it had already survived.
+   *
+   * Its reader is `effectiveSpeedFeet` (`apps/server/src/condition-rules.ts`), which adds every
+   * stored grant to the live Speed. ABSENT means "this effect grants no extra movement" - and, on an
+   * effect carrying the `dashing` tag, ALSO means "granted by a build that predates this field", for
+   * which that reader falls back to the old doubling so a fight persisted mid-turn keeps its Dash
+   * instead of silently losing it.
+   */
+  movementGrantFeet: z.number().int().min(0).max(999).optional(),
   modifiers: z.array(EffectModifierSchema).max(8).default([]),
   /** Conditions this effect applied to the SAME actor; removed automatically when the effect ends. */
   linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -412,6 +467,16 @@ export const InventoryItemSchema = z.object({
   description: z.string().max(4000).optional(),
   /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping and (with weapon/armor below) mechanical effect. Additive. */
   category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional(),
+  /**
+   * C9: WHICH base a template magic item is bound to ("dwarven-thrower" -> "warhammer"). Recorded,
+   * not merely applied, so the sheet can print "(Warhammer)", a wrong pick is auditable, and the
+   * mastery/proficiency lookups can follow it to the base. The stats themselves are COPIED onto
+   * `weapon`/`armor` by the SERVER at set-inventory time: the bind validates the pick against the
+   * catalog record's `appliesTo` and OVERWRITES any client-supplied block on a template row -
+   * what a weapon does is never trusted from a client. Additive-optional; absent on every
+   * non-template row and on a legacy template row not yet bound (which derives nothing).
+   */
+  baseId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
   weapon: ItemWeaponSchema.optional(),
   armor: ItemArmorSchema.optional(),
   /** Display-only marker so the sheet can offer Attune without the catalog; NEVER the riders. Additive-optional. */

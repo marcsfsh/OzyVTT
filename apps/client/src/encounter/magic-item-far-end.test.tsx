@@ -33,7 +33,7 @@ import { CharacterSheet } from "./CharacterSheet";
 const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
   id: item.id, name: item.name, category: item.category, costGp: item.costGp,
   weightLb: item.weightLb, description: item.description,
-  weapon: item.weapon ?? null, armor: item.armor ?? null
+  weapon: item.weapon ?? null, armor: item.armor ?? null, appliesTo: item.appliesTo ?? null
 }));
 
 /** Answer `content:equipment` with the real catalog, the way the server's projection does. */
@@ -142,12 +142,131 @@ describe("the far end of the magic-item ETL", () => {
     // The viewer-safety claim, checked rather than asserted in prose. `ContentEquipmentSummary` is
     // the browse projection; it has exactly these keys and none of them is a rider, a cast or a
     // cursed flag. The ETL added 268 rows to what it lists and no key to its shape.
+    //
+    // `appliesTo` JOINED THE WIRE 2026-08-14 (C9): the eligibility column - the printed type-line
+    // qualifier plus its resolved base ids - crosses so the picker's base chooser can offer the
+    // list. It is printed SRD reference text, identical for every viewer, and carries no rider, no
+    // cast and nothing GM-secret; the wand's is null (only weapon/armor templates carry one).
     const wand = CATALOG.find((item) => item.id === "wand-of-the-war-mage-1")!;
+    expect(wand.appliesTo).toBeNull();
     expect(Object.keys(wand).sort()).toEqual([
-      "armor", "category", "costGp", "description", "id", "name", "weapon", "weightLb"
+      "appliesTo", "armor", "category", "costGp", "description", "id", "name", "weapon", "weightLb"
     ]);
     for (const key of ["modifiers", "effects", "actions", "casts", "cursed", "uses", "grants", "rarity", "attunement"]) {
       expect(wand, key).not.toHaveProperty(key);
     }
+  });
+});
+
+describe("the C9 base chooser", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("a choice template inserts ONE step: the eligible-base list, and the add completes with the pick", async () => {
+    serveCatalog();
+    const added: Array<{ id: string; baseId?: string }> = [];
+    render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={(item, baseId) => added.push({ id: item.id, ...(baseId ? { baseId } : {}) })} onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+
+    // Nothing was added yet - the chooser opened instead, showing the printed form and real bases.
+    expect(added).toEqual([]);
+    expect(screen.getByText(/applies to Any Simple or Martial/)).toBeTruthy();
+    // All 38 bases are offered, each with its own numbers on the row.
+    const options = screen.getAllByRole("listitem");
+    expect(options).toHaveLength(38);
+    const greatsword = options.find((row) => within(row).queryByRole("button", { name: "Make it a Greatsword" }));
+    expect(greatsword!.textContent).toContain("2d6 slashing");
+
+    // The search survives into the chooser - 38 rows is a phone screen's worth of scrolling.
+    await user.type(screen.getByRole("searchbox", { name: "Search bases" }), "dagger");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Make it a Dagger" }));
+    expect(added).toEqual([{ id: "weapon-1", baseId: "dagger" }]);
+  });
+
+  it("a single-base template never asks, and an owned template re-adds without re-asking", async () => {
+    serveCatalog();
+    const added: Array<{ id: string; baseId?: string }> = [];
+    const picker = render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={(item, baseId) => added.push({ id: item.id, ...(baseId ? { baseId } : {}) })} onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Dwarven Thrower");
+    await user.click(screen.getByRole("button", { name: "Add Dwarven Thrower" }));
+    // Straight through - the server auto-binds the lone base, no chooser, no baseId needed.
+    expect(added).toEqual([{ id: "dwarven-thrower" }]);
+    picker.unmount();
+
+    // An owned choice template increments its stack keeping its pick - the chooser must NOT reopen.
+    render(<EquipmentPicker ownedCounts={new Map([["weapon-1", 1]])} busy={false} onAdd={(item, baseId) => added.push({ id: item.id, ...(baseId ? { baseId } : {}) })} onClose={() => {}} />);
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+    expect(added).toEqual([{ id: "dwarven-thrower" }, { id: "weapon-1" }]);
+  });
+});
+
+describe("the C9 wire seam - the real sheet ships the pick", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  /** Serve the catalog AND capture every mutation emit, so the assertion is on the wire itself. */
+  function captureEmits(): Array<{ event: string; payload: Record<string, unknown> }> {
+    const emits: Array<{ event: string; payload: Record<string, unknown> }> = [];
+    (socket.emit as unknown as { mockImplementation: (fn: unknown) => void }).mockImplementation(
+      (event: string, payload: Record<string, unknown>, ack?: (result: unknown) => void) => {
+        if (event === "content:equipment") { ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." }); return; }
+        emits.push({ event, payload });
+        ack?.({ ok: true });
+      }
+    );
+    return emits;
+  }
+
+  it("addFromCatalog carries the chooser's pick as baseId, and ships NO stats - the server copies them", async () => {
+    const emits = captureEmits();
+    render(<CharacterSheet actor={ACTOR} role="player" onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+    await user.click(await screen.findByRole("button", { name: "Make it a Dagger" }));
+
+    const emit = emits.find((entry) => entry.event === "character:set-inventory");
+    expect(emit, "the pick never reached the wire").toBeTruthy();
+    expect(emit!.payload.item).toMatchObject({ id: "weapon-1", baseId: "dagger", quantity: 1 });
+    // A template's catalog summary has weapon: null, so the client ships no block; binding is the
+    // server's. A payload that carried stats here would be the client deciding what a weapon does.
+    expect((emit!.payload.item as Record<string, unknown>).weapon).toBeUndefined();
+  });
+
+  it("a re-add of a bound row keeps its stored pick on the wire, chooser skipped", async () => {
+    const emits = captureEmits();
+    const bound = {
+      id: "weapon-1", name: "Weapon, +1", quantity: 1, equipped: true, attuned: false,
+      category: "weapon", baseId: "dagger",
+      weapon: { category: "simple", damageDice: "1d4", damageType: "piercing", rangeFeet: 20, longRangeFeet: 60, properties: ["finesse", "light", "thrown"] }
+    };
+    const holding = { ...ACTOR, inventory: [bound] } as unknown as PlayerActor;
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+
+    // No chooser: the emit went straight out, quantity 2, the stored pick riding along.
+    const emit = emits.find((entry) => entry.event === "character:set-inventory");
+    expect(emit!.payload.item).toMatchObject({ id: "weapon-1", baseId: "dagger", quantity: 2 });
+  });
+
+  it("an unbound legacy row shows its base chooser, and the bind rides the row it already is", async () => {
+    const emits = captureEmits();
+    const legacy = { id: "weapon-2", name: "Weapon, +2", quantity: 1, equipped: true, attuned: false, category: "weapon" };
+    const holding = { ...ACTOR, inventory: [legacy] } as unknown as PlayerActor;
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    const user = userEvent.setup();
+    // The bound-base display is absent and the one sheet-side chooser is offered instead.
+    await user.click(await screen.findByRole("button", { name: "Choose what it is" }));
+    await user.click(await screen.findByRole("button", { name: "Make it a Warhammer" }));
+
+    const emit = emits.find((entry) => entry.event === "character:set-inventory");
+    expect(emit!.payload.item).toMatchObject({ id: "weapon-2", baseId: "warhammer", quantity: 1, equipped: true });
   });
 });

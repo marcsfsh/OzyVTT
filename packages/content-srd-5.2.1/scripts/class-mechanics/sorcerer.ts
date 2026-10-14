@@ -187,13 +187,25 @@ export const sorcerer: ClassMechanicsModule = {
        * bundle: Draconic Sorcery is ETL-generated, so before the ETL imported `SUBCLASS_MECHANICS`
        * there was no way for this rider to exist at all.
        *
+       * `allowShield` IS AUTHORED, because the schema default is `false` and silence would hand this
+       * feature the MONK's answer. The printed sentence restricts one thing and names it - "While you
+       * aren't wearing armor" (classes.md:8637) - and the SRD keeps worn armor and a wielded Shield
+       * apart everywhere else: "Anyone can don armor or hold a Shield" (equipment.md:594), "A creature
+       * can wear only one suit of armor at a time and wield only one Shield at a time" (:602), and the
+       * armor table prints a Shield's Armor Class as an additive "+2" where every armor row prints an
+       * absolute base. The Monk's printing is the one that adds "or wielding a Shield" (classes.md:5147)
+       * and the Barbarian's the one that clarifies the permission (:260); this one does neither, so the
+       * Shield stacks. Measured with the flag absent: a level-3 Dex 14 / Cha 17 Draconic Sorcerer read
+       * AC 15 bare-handed and 14 holding a Shield - strictly worse for picking one up, which is U28's
+       * bug surviving on the SRD's third author of this rider.
+       *
        * WHAT STAYS PROSE, deliberately (ADR-0008): the Hit Point half ("+3, and +1 whenever you gain
        * another Sorcerer level") is a level-3 lump plus a per-level step, and `hit-points-per-level`
        * has no lump. Authoring `amount: 1` would be wrong for every level below 3 and short by 2
        * above it, so the description carries it instead of the record carrying it incorrectly.
        */
       "draconic-resilience": {
-        modifiers: [{ type: "unarmored-defense", ability: "cha" }]
+        modifiers: [{ type: "unarmored-defense", ability: "cha", allowShield: true }]
       },
       /**
        * DRACONIC SPELLS - audit row 26, and the SRD prints it as ONE feature holding a four-tier

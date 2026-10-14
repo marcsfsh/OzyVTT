@@ -209,6 +209,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing
   "extra-attack": "standing",
   "roll-mode": "at-its-moment",
   "extra-damage": "at-its-moment",
+  "damage-bonus": "standing",
   "check-bonus": "standing",
   "spell-attack-bonus": "unread",
   "damage-reduction": "at-its-moment",

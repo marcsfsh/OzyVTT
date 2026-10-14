@@ -1163,6 +1163,7 @@ Adds, updates, or removes (quantity 0) one of a character's inventory items and 
 | `item.weightEach` | number (≥ 0) | no |  |
 | `item.description` | string | no |  |
 | `item.category` | string (pattern) | no |  |
+| `item.baseId` | string (pattern) | no | C9: the picked base for a TEMPLATE magic item - one of the catalog record's appliesTo.baseIds. Validated server-side; the base's weapon/armor stats are COPIED by the server and any client-supplied block on a template row is overwritten. Omit on non-template items (it is stripped there); a single-base template auto-binds without it; on a bound row an omitted baseId inherits the stored pick, and a non-GM write may not change one - remove and re-add instead |
 | `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet. NOT `mastery`: that is browse-only and is rejected here. |
 | `item.armor` | object | no | Armor/shield stats (from the SRD catalog); equipping derives Armor Class |
 
@@ -4696,6 +4697,7 @@ One of the following:
 | `equipment[].description` | string \| null | yes |  |
 | `equipment[].weapon` | object \| null | yes | Populated for weapons only |
 | `equipment[].armor` | object \| null | yes | Populated for armor and shields only |
+| `equipment[].appliesTo` | object \| null | yes | C9: the eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player's pick binds it to one of `baseIds`, validated and copied server-side at set-inventory. |
 | `attribution` | string | yes |  |
 
 ### `ContentExtraPick`
@@ -5264,6 +5266,7 @@ One of the following, discriminated by `type`:
 - `HomebrewEffectIncomingAttackDisadvantage`
 - `HomebrewEffectSaveAdvantage`
 - `HomebrewEffectSaveDisadvantage`
+- `HomebrewEffectSpeed`
 - `HomebrewRiderAttackBonus`
 - `HomebrewRiderExtraDamage`
 - `HomebrewRiderRollMode`
@@ -5296,6 +5299,15 @@ The bearer's saving throws have disadvantage; omit `ability` for all saves.
 | `type` | const `"save-disadvantage"` | yes |  |
 | `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
 
+### `HomebrewEffectSpeed`
+
+The bearer's Speed while the effect lasts, in feet - signed, so Longstrider is +10 and the `slow` weapon mastery is -10. THE RUNTIME half of speed, and distinct from HomebrewFeatureModifier's `speed`: that one is BAKED into the sheet's own speedFeet at build time, which an effect that ends could never give back. This one is summed off the bearer's live effects on every read of the movement budget, so the feet return the moment the effect does. Same bounds as the build-time rider (-30..60) because the same GM authors both. NOTE the one carrier it does not reach: an ITEM's effect is read as a standing rider rather than as a live effect, and a rider's speed has no consumer, so this modifier moves no feet when an equipment record carries it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"speed"` | yes |  |
+| `amount` | integer (-30–60) | yes |  |
+
 ### `HomebrewEquipmentArmor`
 
 Body armor carries its full base AC (11-18); a shield carries its +2 bonus.
@@ -5325,6 +5337,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `weapon` | HomebrewEquipmentWeapon \| null | no | Populated for weapons only |
 | `armor` | HomebrewEquipmentArmor \| null | no | Populated for armor and shields only |
 | `slot` | `weapon` \| `shield` \| `armor` \| `head` \| `neck` \| `shoulders` \| `hands` \| `ring` \| `belt` \| `feet` \| `held` \| `wondrous` \| `consumable` \| `ammunition` \| `none` | no | WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield) |
+| `appliesTo` | object \| null | no | C9: makes the item a TEMPLATE (the SRD's "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a non-weapon/armor category, and fixed stats alongside a template. The picked base's stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`. |
 | `rarity` | string (pattern) | no | Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook |
 | `isMagic` | boolean | no | Default: `false`. |
 | `attunement` | HomebrewItemAttunement | no | Attunement requirement and its advisory class/species restriction |
@@ -5524,6 +5537,7 @@ One of the following, discriminated by `type`:
 - `HomebrewRiderRollMode`
 - `HomebrewModifierSaveBonus`
 - `HomebrewModifierCheckBonus`
+- `HomebrewModifierDamageBonus`
 - `HomebrewModifierSpellSaveDc`
 - `HomebrewModifierSpellAttackBonus`
 - `HomebrewModifierSpellSlot`
@@ -5681,6 +5695,17 @@ Score a critical hit on this natural roll or higher (19 for a keen weapon).
 | --- | --- | --- | --- |
 | `type` | const `"critical-range"` | yes |  |
 | `threshold` | integer (15–20) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierDamageBonus`
+
+A flat bonus to damage rolls - the other half of a "+1 weapon" (`attack-bonus` is the to-hit half). Standing, it folds into the swing's printed damage formula; gated on a moment ("+7 on a critical hit") it lands as its own labelled line at resolution. Weapon-scoped by default on an item with a weapon block, so two magic weapons never stack. This is the FEATURE/ITEM branch; the effect vocabulary keeps its older, differently-shaped `damage-bonus` ({amount, appliesTo}) on HomebrewEffectModifier.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-bonus"` | yes |  |
+| `amount` | integer (-10–10) | yes |  |
 | `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
 | `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 

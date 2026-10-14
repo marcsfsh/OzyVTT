@@ -204,11 +204,20 @@ export function createServer(options: CreateServerOptions) {
   /**
    * Append one line to the persistent combat log and push it live. Visibility mirrors the toast rule:
    * GM sockets always receive it; players only when it isn't GM-only and references no hidden combatant.
+   *
+   * `!== "public"` rather than `=== "gm-only"`, and the two are NOT the same test on a combatant the
+   * roster no longer holds. The old comparison asked "is this one hidden?", and `undefined` is not
+   * "gm-only", so a row naming a DELETED actor answered "not hidden" and went to every player - a
+   * gate that fails OPEN. Its two siblings both fail closed on the same input: `broadcastTableEvent`
+   * above requires every named combatant to BE public, and `namesAHiddenCombatant`
+   * (`action-resolution.ts`) reads `?.visibility !== "public"`. Three reads of one question that
+   * disagreed on the one input none of them can see. Written this way, a visibility added later
+   * cannot leak through a comparison that predates it either.
    */
   function appendLog(entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; actorId?: string | null; roll?: RollRecord | null }>) {
     const state = store.snapshot;
     const actorIds = entry.actorIds ?? [];
-    const gmOnly = entry.gmOnly === true || actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility === "gm-only");
+    const gmOnly = entry.gmOnly === true || actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility !== "public");
     const row = combatLog.append({ kind: entry.kind, text: entry.text, gmOnly, revision: state.revision, actorId: entry.actorId ?? null, roll: entry.roll ?? null });
     // Per-RECIPIENT delivery, not the old two-variant GM/player split: a `self-only` roll row is
     // player-visible but belongs to exactly one player, and only their own session id unlocks it.

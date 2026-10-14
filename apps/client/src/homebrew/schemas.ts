@@ -614,7 +614,7 @@ const SLOTS = [
 
 /** Turning magic off must take the whole magic half with it. Left behind, `isMagic: false`
     plus an orphan rider is a record `.strict()` rejects and a GM cannot see to fix. */
-const MAGIC_KEYS = ["isMagic", "rarity", "attunement", "cursed", "casts", "grantsFeatIds", "modifiers", "grants", "uses", "actions", "effects", "tags"];
+const MAGIC_KEYS = ["isMagic", "rarity", "attunement", "cursed", "casts", "grantsFeatIds", "modifiers", "grants", "uses", "actions", "effects", "tags", "appliesTo"];
 
 const EQUIPMENT_SCHEMA: HomebrewSchema = {
   type: "equipment",
@@ -693,6 +693,26 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           // flag does, and the attunement precondition is why it is only offered here.
           help: "Players can't unattune, unequip or drop it — only you can. Its magic stays hidden from them until they attune.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+        },
+        // C9: the TEMPLATE pair - the same mechanism the SRD's "Weapon, +1 (Any Simple or Martial)"
+        // gets. Fill both and the item has no fixed stats of its own: the player picks which base it
+        // is when it lands on a sheet, and the SERVER copies that base's dice or armour onto the
+        // row. Publish refuses an id that is not really in the catalog, so a typo cannot ship a
+        // pick that can never succeed.
+        {
+          key: "appliesTo.label",
+          label: "Applies to (as printed)",
+          placeholder: "Any martial weapon",
+          help: "The words your players see when they choose — like the book's “Weapon (Any Simple or Martial)”. Fill this AND the base list below, or neither.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        {
+          key: "appliesTo.baseIds",
+          label: "The bases it can be",
+          kind: "tags",
+          placeholder: "longsword",
+          help: "Weapon or armor ids from the catalog — “longsword”, “chain-mail”, your own published base. The player picks ONE of these; its stats become the item's.",
+          visibleWhen: (draft) => draft.isMagic === true && String(getAt(draft, "appliesTo.label") ?? "").trim() !== ""
         },
         {
           key: "casts",

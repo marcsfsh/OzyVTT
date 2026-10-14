@@ -4,6 +4,10 @@ import {
   abilityModifier, armorWeightOf, collectRiders, effectiveSlot, gatePasses, sumRiders, weaponAbilityModifierFrom,
   type ArmorWeight, type RiderAbility, type RiderCarrier, type RiderContext, type RiderModifier, type RiderTrigger, type ResolvedRider
 } from "@vtt/rules-5e";
+import { IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
+
+/** Re-exported so `MasteryInForce`'s importers keep one name; it is declared beside the handlers that read it. */
+export type { MasteryInForce };
 
 /**
  * ============================================================================================
@@ -148,13 +152,20 @@ export type EquipmentRecordLike = RiderBlockLike & Readonly<{
   id: string; name: string; category?: string;
   slot?: string;
   /**
-   * The weapon block, read for its MASTERY only - the damage/range half already reaches the engine
-   * through the inventory row. Resolved from the catalog by item id rather than stored on the row,
-   * which is the same rule an item's riders follow ("Mechanics resolve by `item.id` against the
-   * content catalog, which never leaves the server"). No schema change on the wire, no migration, and
-   * a GM who re-authors a homebrew weapon's mastery sees it on the next read.
+   * The weapon block. Read for its MASTERY on the carrying item's own record (the damage/range half
+   * already reaches the engine through the inventory row - resolved by item id, the same rule an
+   * item's riders follow), and read IN FULL when the record is the BASE of a C9 bind: the server
+   * copies these stats onto a template row at set-inventory time, so the shape here is the whole
+   * stats block rather than the one key the mastery lookup used to need.
    */
-  weapon?: Readonly<{ mastery?: string }> | null;
+  weapon?: Readonly<{ category?: string; damageDice?: string; damageType?: string; rangeFeet?: number | null; longRangeFeet?: number | null; mastery?: string; properties?: readonly string[] }> | null;
+  /** The armor block, read when the record is the BASE of a C9 armor bind. */
+  armor?: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null;
+  /**
+   * C9's eligibility column: which bases a template item may bind to. `baseIds` are RESOLVED ids
+   * (predicates were expanded at build/authoring time), so the bind check is a membership test.
+   */
+  appliesTo?: Readonly<{ label: string; baseIds: readonly string[] }> | null;
   isMagic?: boolean;
   attunement?: Readonly<{ required?: boolean; restrictedTo?: readonly string[] }> | null;
   cursed?: boolean;
@@ -231,7 +242,8 @@ export type CharacterFeatureRef = Readonly<{ id: string; kind: "class" | "subcla
  * `effective-actions.ts`'s `withStandingRiders` against `weaponActionIds` below.
  *
  * It lives HERE, next to the filter that reads it, rather than in `character-build.ts` where the
- * baking happens: this module imports no other server module, so `character-build.ts` can import it
+ * baking happens: this module imports no server module that imports anything itself - `weapon-mastery.ts`
+ * is the only one and it is a deliberate runtime leaf - so `character-build.ts` can import this file
  * without a cycle, while the reverse would drag the whole content library into a leaf.
  */
 export const BUILDER_BAKED_MODIFIER_TYPES = [
@@ -241,37 +253,16 @@ export const BUILDER_BAKED_MODIFIER_TYPES = [
 const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES);
 
 /**
- * WHICH OF THE EIGHT MASTERIES THE ENGINE ACTUALLY IMPLEMENTS - the one place that answers it.
+ * Does this mastery slug reach a real behaviour today? The derivation omits it entirely when not, so
+ * this is the single public gate between "the weapon prints a mastery" and "the engine honours it".
  *
- * The SRD defines exactly eight mastery properties, and all 38 weapons now name one. That data is
- * worth nothing on its own: a slug on 38 records that no engine path reads is the "built but unwired"
- * failure this repo has already shipped three times, and it looks identical to a feature that works.
- * So the derivation refuses to advertise a mastery it cannot honour, and this set is the gate.
- *
- * Implemented, and proved at the far end (a rolled number, a die that changes):
- *   graze - `action-resolution.ts` rolls the ability modifier as damage on a MISS.
- *   sap   - `action-resolution.ts` puts a real effect on the target; its next attack rolls 2d20kl1.
- *
- * NOT implemented, and therefore deliberately inert rather than half-wired. Each needs engine surface
- * that does not exist yet, sized in the Stage 5 report:
- *   push   - moves a token 10 feet directly away; needs the attack path to write a position.
- *   slow   - -10 Speed until the attacker's next turn; the effect vocabulary has no speed modifier.
- *   topple - a Constitution save the WEAPON triggers, then Prone; the save path is action-declared.
- *   cleave - a second attack roll against a different creature inside one resolution.
- *   nick   - moves the Light property's extra attack out of the bonus action; a turn-economy change.
- *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target
- *            scoping, so there is nowhere to hang "against this one foe" today.
+ * The ANSWER is not written here. `IMPLEMENTED_MASTERIES` is derived from the handler registry in
+ * `weapon-mastery.ts` - a slug is in it because a handler answers to it - so implementing a mastery
+ * is registering one, and no unit has to remember to edit a literal in this file. That module is the
+ * one exception to this file's no-server-imports rule and it earns it by having no runtime imports of
+ * its own (its header explains why that has to stay true); the slugs still owed are listed there,
+ * beside the registry a new one joins.
  */
-const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(["graze", "sap"]);
-/**
- * One weapon swing's mastery, as the resolver needs it. The ability modifier travels with the slug
- * because Graze deals "damage equal to the ability modifier you used to make the attack roll", and
- * that choice (finesse takes the better of Str/Dex, a ranged weapon takes Dex) is `weaponAction`'s
- * to make - recomputing it at the resolver would be a second copy of the rule, free to drift.
- */
-export type MasteryInForce = Readonly<{ id: string; abilityModifier: number }>;
-
-/** Does this mastery slug reach a real behaviour today? The derivation omits it entirely when not. */
 export const masteryReaches = (mastery: string): boolean => IMPLEMENTED_MASTERIES.has(mastery);
 
 export type EquipmentCatalog = Readonly<{
@@ -733,10 +724,15 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     if (!weaponAttack) continue;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
-    const mastery = catalog.equipmentRecord(entry.item.id)?.weapon?.mastery;
+    // A C9-bound template row follows its `baseId` to the BASE weapon's record: a "Weapon, +1"
+    // bound to a greatsword IS a greatsword, so it carries the greatsword's mastery, and a mastery
+    // pick spent on "greatsword" covers it (the SRD's pick is per weapon KIND, not per object).
+    const baseRecord = entry.item.baseId !== undefined ? catalog.equipmentRecord(entry.item.baseId) : undefined;
+    const mastery = catalog.equipmentRecord(entry.item.id)?.weapon?.mastery ?? baseRecord?.weapon?.mastery;
+    const unlockedHere = unlocked.has(entry.item.id) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
     // BOTH gates: the weapon has a mastery AND the bearer unlocked THIS weapon - plus the third,
     // that the engine can actually honour it (see `masteryReaches`).
-    if (mastery && unlocked.has(entry.item.id) && masteryReaches(mastery)) {
+    if (mastery && unlockedHere && masteryReaches(mastery)) {
       masteryByActionId[weaponAttack.id] = { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition) };
     }
   }
@@ -761,6 +757,29 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     armorProficiencies, weaponProficiencies, featIds,
     armorClass: sumRiders(standing, "armor-class"),
     initiative: sumRiders(standing, "initiative"),
+    /**
+     * NAMED ABSENCE - THIS SUM HAS NO READER. Measured again at U18: `derivation.speed` is written
+     * here and read by nothing in production. The only references in the tree are
+     * `apps/server/test/feat-riders.test.ts` and `apps/server/test/feature-riders.test.ts`, each
+     * asserting it is `0` to prove a FEAT's speed rider was baked into `speedFeet` instead of
+     * collected twice. So Boots of Striding parse, equip, attune, sum - and change no foot of
+     * movement. The item mechanics scripts refuse to author a `speed` rider on an item for exactly
+     * this reason (`scripts/item-mechanics/overlay.ts`), and zero bundled items carry one.
+     *
+     * U18 closed the EFFECT half instead: `EffectModifierSchema` now has a `speed` member and
+     * `effectiveSpeedFeet` (`condition-rules.ts`) sums it off `actor.effects`, which is what the
+     * `slow` mastery needs. It deliberately did NOT close this one. Two things stand in the way and
+     * neither is a line of code here: `condition-rules.ts` is dependency-free by contract and cannot
+     * import this module, so the number would have to be pushed in from every caller of
+     * `effectiveSpeedFeet` (`movement-rules.ts` and `actor-conditions.ts`) - and a caller with no
+     * catalog would then under-count, which is a wrong number at the table rather than an absent one.
+     *
+     * THE UNIT THAT CLOSES IT: an "item speed reader" unit that (1) threads the derived bonus into
+     * both `effectiveSpeedFeet` call sites, (2) proves it at the same far end U18 used - the feet in
+     * `movement-rules.ts`'s refusal - and (3) lifts the authoring refusal in
+     * `scripts/item-mechanics/overlay.ts` so Boots of Striding can be authored, regenerating the
+     * bundle. Until all three land, this field is inert and is documented as inert.
+     */
     speed: sumRiders(standing, "speed"),
     saveBonus: sumRiders(standing, "save-bonus"),
     checkBonus: sumRiders(standing, "check-bonus"),
@@ -1086,8 +1105,11 @@ export function weaponAction(item: InventoryItem, definition: ActorDefinition | 
   const properties = weapon.properties ?? [];
   const modifier = weaponAbilityModifier(item, definition);
   const trained = definition.proficiencies?.weapons;
-  const granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id);
-  const proficient = granted || trained === undefined || trained.includes(weapon.category) || trained.includes(item.id);
+  // A C9-bound row also answers to its BASE weapon's id: proficiency with "warhammer" covers a
+  // Dwarven Thrower bound to one, because the bound item IS a warhammer.
+  const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
+  const granted = grantedWeapons.includes(weapon.category) || ids.some((id) => grantedWeapons.includes(id));
+  const proficient = granted || trained === undefined || trained.includes(weapon.category) || ids.some((id) => trained.includes(id));
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const damageFormula = `${weapon.damageDice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
   return {

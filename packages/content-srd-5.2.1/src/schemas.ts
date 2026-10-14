@@ -107,6 +107,15 @@ export const WeaponReferenceSchema = z.object({
   name: z.string().min(1).max(80),
   source: ContentSourceSchema,
   category: z.enum(["simple", "martial"]),
+  /**
+   * The Weapons table's category BAND - the melee/ranged half of what `category` says about
+   * simple/martial. A third joined-in column (see `mastery`/`properties` below), because nothing
+   * else can answer it: a thrown Dagger has a range band and IS a melee weapon, a Dart has one and
+   * is not. Exists for the magic-item eligibility column ("Weapon (Any Melee Weapon)"), pinned for
+   * all 38 by name in `bundle.test.ts`. OPTIONAL like its two siblings: absent means "not
+   * recorded", and the pin is what keeps the SRD rows honest.
+   */
+  melee: z.boolean().optional(),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
@@ -158,6 +167,13 @@ export const ArmorReferenceSchema = z.object({
   source: ContentSourceSchema,
   /** Body armor carries its full base AC (11-18); the shield row carries its +2 bonus. */
   acBase: z.number().int().min(2).max(25),
+  /**
+   * The Armor table's category BAND (Light/Medium/Heavy/Shield), joined from the markdown SRD the
+   * way the weapon table's `melee` is. Exists for the magic-item eligibility column: "Armor (Any
+   * Medium or Heavy, Except Hide Armor)" (Demon Armor's family) cannot resolve against anything
+   * else. OPTIONAL like every joined column; `bundle.test.ts` pins all 13 by name.
+   */
+  category: z.enum(["light", "medium", "heavy", "shield"]).optional(),
   addDexModifier: z.boolean(),
   dexModifierCap: z.number().int().nullable(),
   stealthDisadvantage: z.boolean(),
@@ -260,6 +276,21 @@ const EquipmentWeaponStatsSchema = z.object({
   properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
 });
 
+/**
+ * THE ELIGIBILITY COLUMN (C9): which BASE weapons or armors a template item may bind to. The SRD's
+ * printed type-line qualifier ("Weapon (Any Simple or Martial)", "Armor (Half Plate Armor or Plate
+ * Armor)") as data: `label` is the qualifier verbatim, `baseIds` the RESOLVED id list. Predicates
+ * are expanded at BUILD or AUTHORING time against the real weapon/armor tables and fail closed
+ * there, so nothing at play time ever evaluates one - the server's bind check is a membership test
+ * and the picker's chooser is a list. Named (not inlined) for the same inference-budget reason as
+ * `EquipmentWeaponStatsSchema` above.
+ */
+export const ItemAppliesToSchema = z.object({
+  label: z.string().min(1).max(120),
+  baseIds: z.array(z.string().regex(/^[a-z0-9-]+$/).max(60)).min(1).max(40)
+}).strict();
+export type ItemAppliesTo = z.infer<typeof ItemAppliesToSchema>;
+
 export const EquipmentReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),
@@ -298,6 +329,12 @@ export const EquipmentReferenceSchema = z.object({
 
   /** WHERE it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
   slot: ItemSlotSchema.optional(),
+  /**
+   * The eligibility column (above). A row carrying this and no `weapon`/`armor` block is a
+   * TEMPLATE: it derives nothing until the player's pick binds it to one of `baseIds`, server-side.
+   * Absent or null = not a template; whatever stats it has are its own blocks.
+   */
+  appliesTo: ItemAppliesToSchema.nullable().optional(),
   /** Display and filtering only ("uncommon", "legendary"). An OPEN slug - rarity is identity, not a mechanical hook. */
   rarity: ContentIdSchema.optional(),
   isMagic: z.boolean().default(false),

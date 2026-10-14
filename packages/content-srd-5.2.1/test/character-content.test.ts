@@ -808,7 +808,9 @@ describe("the subclass authoring surface, and the tables the parser used to thro
     // SUBCLASS_MECHANICS there was no way for this rider to exist at all. Champion / Evoker / Life
     // Domain are NOT the proof - their class is hand-authored and the whole record is copied through.
     const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
-    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: false, when: [] }]);
+    // `allowShield` is authored `true` here, against the schema default - the printed sentence
+    // restricts only wearing armor. `scripts/class-mechanics/sorcerer.ts` carries the argument.
+    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {
@@ -1175,8 +1177,9 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(item({ id: "hb-b", modifiers: secondHalf }).modifiers).toHaveLength(8);
     // ...and the identical array parses on a chosen OPTION inside a choice, and on a plain feature.
     expect(FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers).toHaveLength(8);
-    // 21 variants: the 8 that existed, the 3 shared with EffectModifierSchema, the 10 new ones.
-    expect(FeatureModifierSchema.options).toHaveLength(21);
+    // 22 variants: the 8 that existed, the 3 shared with EffectModifierSchema, the 11 the
+    // magic-item vocabulary added (`damage-bonus` - the "+1 weapon"'s damage half - is the 11th).
+    expect(FeatureModifierSchema.options).toHaveLength(22);
   });
 
   it("15. an item that grants a feat", () => {

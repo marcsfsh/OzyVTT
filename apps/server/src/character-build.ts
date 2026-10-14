@@ -16,6 +16,7 @@ import type {
 import { featurePicks, NAMED_PICK_BUDGET_KEYS } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, UNARMED_STRIKE_ACTION_ID, type CharacterFeatureRef } from "./equipment-derivation.js";
+import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -298,6 +299,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<Record<CarrierRiderType, "standing" | 
   "extra-attack": "standing",        // effective-actions extraAttacksFor raises attack.count on a weapon swing
   "roll-mode": "at-its-moment",      // attacks (action-resolution), saves (saving-throws), initiative (encounter)
   "extra-damage": "at-its-moment",   // action-resolution rolls it as its own typed damage entry
+  "damage-bonus": "standing",        // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in action-resolution
   "check-bonus": "standing",         // actor-derived.ts checkRiderBonus, into every check and skill row
   "spell-attack-bonus": "unread",    // reaches derivation.spellAttackBonus; no spell-attack path reads it yet
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionFor, applied to the total after resistances
@@ -1594,7 +1596,12 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       // AC); an item the catalog does not know stays display-only (ADR-0008 fail-open) - the
       // authored option already names it, so the player still receives it.
       const record = library.equipmentRecord(item.id);
-      inventory.push({
+      // C9 (2026-08-14 review): this is a PICKLESS minting path, so a template item named in
+      // starting equipment routes through the same server-side bind the picker path gets - a
+      // single-base template auto-binds here exactly per the ruling, and a multi-base one stays
+      // unbound with the sheet's chooser as the designed pick. Without this the row arrived
+      // equipped and dead, quietly contradicting the documented auto-bind.
+      inventory.push(bindTemplateItem({
         id: item.id, name: record?.name ?? item.name, quantity: item.quantity,
         equipped: record ? record.category === "armor" || record.category === "shield" || record.category === "weapon" : false,
         attuned: false,
@@ -1608,7 +1615,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         // absent means "not recorded", which is not the same claim as an empty list.
         ...(record?.weapon ? { weapon: { category: record.weapon.category, damageDice: record.weapon.damageDice, damageType: record.weapon.damageType, rangeFeet: record.weapon.rangeFeet, longRangeFeet: record.weapon.longRangeFeet, ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {}) } } : {}),
         ...(record?.armor ? { armor: { acBase: record.armor.acBase, addDexModifier: record.armor.addDexModifier, dexModifierCap: record.armor.dexModifierCap, stealthDisadvantage: record.armor.stealthDisadvantage, strengthRequired: record.armor.strengthRequired } } : {})
-      });
+      }, { catalog: { equipmentRecord: (id) => library.equipmentRecord(id), featRecord: () => undefined } }));
     }
   };
   consumeEquipmentOption("class", classRecord.startingEquipment);
@@ -1631,8 +1638,23 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const dexModifier = abilityModifier(finalScores.dex);
   // The SAME AC function `instantiate` re-runs on import (risk 3): equipment first, then Unarmored
   // Defense while nothing is worn, then the unarmored 10 + DEX floor; flat riders stack on top.
-  const equipmentAc = armorClassFromEquipment(dexModifier, inventory);
-  const unarmoredAc = interpreted.unarmoredDefense ? 10 + dexModifier + abilityModifier(finalScores[interpreted.unarmoredDefense.ability]) : null;
+  //
+  // Unarmored Defense is handed DOWN into that first step rather than waiting for the `??` below,
+  // because a SHIELD ALONE makes the equipment branch answer - and answering 10 + DEX + shield is how
+  // a Barbarian used to LOSE Constitution by picking a shield up (U28). `allowShield` is the authored
+  // half of that decision and this is its one reader.
+  //
+  // All THREE SRD authors now print the flag, and the reader takes each at its word: Barbarian true
+  // ("You can use a Shield and still gain this benefit"), Monk false ("while you aren't wearing armor
+  // or wielding a Shield"), Draconic Resilience true - its printing restricts only wearing armor, and
+  // the SRD keeps that apart from wielding a Shield. Which answer a SILENT record gets is a content
+  // question, not this reader's: it is settled where the record is authored (`scripts/class-mechanics/`)
+  // and the schema default stays false for back-compat with every record written before the flag.
+  const unarmoredDefense = interpreted.unarmoredDefense
+    ? { bonus: abilityModifier(finalScores[interpreted.unarmoredDefense.ability]), allowShield: interpreted.unarmoredDefense.allowShield }
+    : null;
+  const equipmentAc = armorClassFromEquipment(dexModifier, inventory, unarmoredDefense);
+  const unarmoredAc = unarmoredDefense ? 10 + dexModifier + unarmoredDefense.bonus : null;
   const wearingArmor = inventory.some((item) => item.equipped && item.category === "armor" && item.armor);
   // The flat, NON-equipment part of this character's AC. `instantiate` re-derives AC from the live
   // loadout, so it has to be told about the rider or it silently drops it (task-packet risk 3):
@@ -1661,7 +1683,28 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
     // The prose layer: EVERY feature lands as a trait (riders only ADD mechanics on top), in the
     // extensions block CharacterSheet.tsx already renders for imported sheets.
-    extensions: { "open5e.srd-2024": { traits: interpreted.traits, ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}) } },
+    //
+    // `unarmoredDefense` rides the same open bag as `armorClassBonus`, and for the same reason: THREE
+    // other places re-derive AC from the live loadout (`instantiate`, `rebuildActorDefinition`, and
+    // every inventory write through `reconcileEquipment`) and `ActorDefinition` models only the AC
+    // TOTAL, so without a channel the fix above would hold until the character picked a shield up AT
+    // THE TABLE and then be undone by the reconciliation - the definition saying 17 while the actor
+    // said 14. The ABILITY is stored rather than the modifier so the reader re-derives from the
+    // definition's own scores and the two cannot drift; `unarmoredDefenseOf` in actor-roster.ts is
+    // that reader.
+    //
+    // It is the FAST path, not the only one. Those three sites do have the class content in hand -
+    // each is handed the catalog - so `unarmoredDefenseOf` falls back to the authored rider named by
+    // `character.features` below when this key is absent. That fallback is what reaches a sheet
+    // stored before the key existed; writing the key keeps the common read a lookup rather than a
+    // catalog walk, and answers the one caller (`resolvePendingImport`) that passes no catalog.
+    extensions: {
+      "open5e.srd-2024": {
+        traits: interpreted.traits,
+        ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}),
+        ...(interpreted.unarmoredDefense ? { unarmoredDefense: { ability: interpreted.unarmoredDefense.ability, allowShield: interpreted.unarmoredDefense.allowShield } } : {})
+      }
+    },
     ...(interpreted.damageResistances.length > 0 ? { damageResistances: dedupe(interpreted.damageResistances) } : {}),
     ...(interpreted.damageImmunities.length > 0 ? { damageImmunities: dedupe(interpreted.damageImmunities) } : {}),
     ...(interpreted.conditionImmunities.length > 0 ? { conditionImmunities: dedupe(interpreted.conditionImmunities) } : {}),

@@ -77,7 +77,12 @@ export function buildHomebrewUsageIndex(state: GameState): HomebrewUsageIndex {
     if (actor.definitionId) record("monster", actor.definitionId, at("definition", "on the table right now - action and defence edits reach it immediately"));
 
     // Live actor state the player mutates during play.
-    for (const item of actor.inventory) record("equipment", item.id, at("inventory", `carried by ${actor.name}`));
+    for (const item of actor.inventory) {
+      record("equipment", item.id, at("inventory", `carried by ${actor.name}`));
+      // C9: a bound template references its BASE too - deleting the base strands the bind (the
+      // write path fails open, freezing the copied stats, but the pick can never be re-made).
+      if (item.baseId !== undefined) record("equipment", item.baseId, at("inventory", `bound base of ${item.name}, carried by ${actor.name}`));
+    }
     for (const spellId of actor.preparedSpellIds) record("spell", spellId, at("prepared-spell", `prepared by ${actor.name}`));
 
     const definition = actor.definitionId ? definitionsById.get(actor.definitionId) : undefined;
@@ -129,7 +134,10 @@ function recordDefinitionUsages(
     record("class", spell.classId, at("spell", `casts ${spell.name}`));
   }
   for (const entry of definition.spellcasting?.classes ?? []) record("class", entry.classId, at("spellcasting", null));
-  for (const item of definition.startingInventory ?? []) record("equipment", item.id, at("starting-inventory", item.name));
+  for (const item of definition.startingInventory ?? []) {
+    record("equipment", item.id, at("starting-inventory", item.name));
+    if (item.baseId !== undefined) record("equipment", item.baseId, at("starting-inventory", `bound base of ${item.name}`));
+  }
 }
 
 /**

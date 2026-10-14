@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ActorSchema, GameStateSchema, type GameState } from "@vtt/domain";
+import { ActorSchema, GameStateSchema, type EffectInstance, type GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
@@ -1114,6 +1114,283 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(events.some((event) => /stood up \(20 ft of movement\)/.test(event.text))).toBe(true);
     expect(game.combat.turn.movementUsedFeet).toBe(30);
     expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(false);
+  });
+
+  /* ----------------------------------------------------------------------------------------------
+   * U18 - `speed` as a RUNTIME effect modifier.
+   *
+   * Every assertion below ends at the sentence a player reads when the server refuses their move
+   * (`movement-rules.ts`) or their stand-up (`actor-conditions.ts`), with the FEET quoted in full.
+   * "The modifier survived into the effect" is not a test: the build-time `speed` rider already
+   * satisfied that and moved nothing at runtime, which is the defect U18 exists to close.
+   * -------------------------------------------------------------------------------------------- */
+
+  /** A live effect carrying the runtime `speed` modifier - the shape the `slow` mastery (M2) applies. */
+  const speedEffect = (id: string, amount: number, sourceActionId: string, over: Partial<EffectInstance> = {}): EffectInstance => ({
+    id, name: `Speed ${amount >= 0 ? "+" : ""}${amount}`, tags: [], sourceActorId: IDS.croc1, sourceName: "Giant Crocodile",
+    sourceActionId, startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true,
+    voidWhileIncapacitated: false, concentration: false, endsWithTag: null,
+    modifiers: [{ type: "speed", amount }], linkedConditionIds: [], escapeDc: null, onEnd: [], ...over
+  });
+
+  const dashingEffect: EffectInstance = {
+    id: "dash-1", name: "Dashing", tags: ["dashing"], sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", sourceActionId: "dash",
+    startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+    concentration: false, endsWithTag: null, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: []
+  };
+
+  it("a runtime `speed` effect moves the feet in the refusal, and ending it gives them back (U18)", () => {
+    const game = buildGame(); // Torva's turn, 40 ft on the sheet
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 40 ft of movement left (this move needs 45 ft).");
+
+    addEffect(game, IDS.torva, speedEffect("slow-1", -10, "slow"));
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
+    // The budget really moved rather than the sentence: 35 ft was legal at 40 and is refused at 30.
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 35, y: 0 }))
+      .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 35 ft).");
+
+    endEffect(game, IDS.torva, "slow-1");
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 40 ft of movement left (this move needs 45 ft).");
+    // ...and the move the effect forbade now goes through, spending the feet it costs.
+    expect(moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 35, y: 0 }).warning).toBeNull();
+    expect(game.combat.turn.movementUsedFeet).toBe(35);
+  });
+
+  it("two attackers' speed effects both bite, and each expires with its own source's turn (U18/M2 shape)", () => {
+    const game = buildGame();
+    addEffect(game, IDS.torva, speedEffect("slow-croc1", -10, "slow", { sourceActorId: IDS.croc1, sourceName: "Giant Crocodile" }));
+    addEffect(game, IDS.torva, speedEffect("slow-croc2", -10, "slow", { sourceActorId: IDS.croc2, sourceName: "Giant Crocodile 2" }));
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 20 ft of movement left (this move needs 45 ft).");
+    // The real lifecycle, not a hand-removal: the first crocodile's turn begins and its own -10 lapses.
+    expireEffectsAtTurnStart(game, IDS.croc1);
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
+    expireEffectsAtTurnStart(game, IDS.croc2);
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 40 ft of movement left (this move needs 45 ft).");
+  });
+
+  it("Dash doubles the SLOWED Speed, not the sheet's - the order of operations (U18)", () => {
+    const dash = buildGame();
+    dash.actors.find((actor) => actor.id === IDS.torva)!.effects = [dashingEffect];
+    expect(moveRules(dash, IDS.torva, { x: 0, y: 0 }, { x: 70, y: 0 }).warning).toBeNull(); // 70 <= 80
+
+    const both = buildGame();
+    both.actors.find((actor) => actor.id === IDS.torva)!.effects = [dashingEffect];
+    addEffect(both, IDS.torva, speedEffect("slow-1", -10, "slow"));
+    // (40 - 10) x 2 = 60. Summing AFTER the double would read 80 - 10 = 70 and wave this move through.
+    // `dashingEffect` carries no `movementGrantFeet`, so this is ALSO the legacy branch: an effect
+    // persisted before the grant was recorded still doubles the live Speed. A Dash taken now would
+    // record a 30-ft grant off the same slowed Speed and reach the same 60 by adding it - the two
+    // tests below drive the real action and read that number off the effect.
+    expect(both.actors.find((actor) => actor.id === IDS.torva)!.effects[0].movementGrantFeet).toBeUndefined();
+    expect(() => moveRules(both, IDS.torva, { x: 0, y: 0 }, { x: 70, y: 0 }))
+      .toThrow("Torva Grimtusk has 60 ft of movement left (this move needs 70 ft).");
+  });
+
+  /**
+   * The REAL Dash action, resolved the way the runner resolves it, so the grant this section measures
+   * is the one `action-resolution.ts` writes rather than a number a fixture handed the test.
+   */
+  const dashFor = (game: GameState, actorId: string, definition: ActorDefinition) =>
+    resolveDefinitionAction(
+      game, builtinAction("dash")!,
+      { actorId, targetIds: [], commandId: nextCommandId(), builtin: true, rollMode: null, override: null },
+      { ...deps([], definition), resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition }
+    );
+
+  it("a Slow landing MID-TURN never re-prices the Dash already taken and spent", () => {
+    // Sable's sheet says Speed 30, so the Dash grants 30: 60 feet this turn.
+    const game = buildGame([{ actorId: IDS.sable, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    expect(dashFor(game, IDS.sable, sableDefinition).effectGranted).toEqual({ name: "Dashing", tags: ["dashing"] });
+    // 35 of the 60 spent, all of it legal...
+    expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 35, y: 0 }).warning).toBeNull();
+    expect(game.combat.turn.movementUsedFeet).toBe(35);
+
+    // ...and NOW an opportunity attack slows her. Her Speed is 20 from here on; the feet the Dash
+    // already handed over are not the Dash's to take back.
+    addEffect(game, IDS.sable, speedEffect("slow-croc1", -10, "slow"));
+
+    // THE FAR END: 20 (Speed now) + 30 (granted then) - 35 (spent) = 15 ft left, in the sentence the
+    // player reads. Doubling the LIVE Speed here printed "5 ft of movement left" and charged this
+    // creature 20 feet for a swing that happened after it had already moved.
+    expect(() => moveRules(game, IDS.sable, { x: 35, y: 0 }, { x: 55, y: 0 }))
+      .toThrow("Sable Vex has 15 ft of movement left (this move needs 20 ft).");
+    // ...and the 15 really is there: 15 more feet walk, and the 16th does not.
+    expect(moveRules(game, IDS.sable, { x: 35, y: 0 }, { x: 50, y: 0 }).warning).toBeNull();
+    expect(game.combat.turn.movementUsedFeet).toBe(50);
+    expect(() => moveRules(game, IDS.sable, { x: 50, y: 0 }, { x: 55, y: 0 }))
+      .toThrow("Sable Vex has 0 ft of movement left (this move needs 5 ft).");
+
+    // And the number behind all three sentences: a QUANTITY recorded when the action was taken, not a
+    // multiplier waiting to be re-read. Asserted last so the refusals above are what a regression hits
+    // first - a stored field that no printed sentence depends on is exactly the failure this repo ships.
+    expect(game.actors.find((actor) => actor.id === IDS.sable)!.effects.find((effect) => effect.tags.includes("dashing"))!.movementGrantFeet).toBe(30);
+  });
+
+  it("a Dash taken while ALREADY slowed grants the reduced Speed, and the total is the same 40", () => {
+    // The other ordering, and the one the doubling always got right: slowed FIRST, so "your Speed
+    // after modifiers" is 20 when the action is taken. 20 granted + 20 live = 40.
+    const game = buildGame([{ actorId: IDS.sable, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    addEffect(game, IDS.sable, speedEffect("slow-croc1", -10, "slow"));
+    dashFor(game, IDS.sable, sableDefinition);
+    expect(game.actors.find((actor) => actor.id === IDS.sable)!.effects.find((effect) => effect.tags.includes("dashing"))!.movementGrantFeet).toBe(20);
+    expect(() => moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Sable Vex has 40 ft of movement left (this move needs 45 ft).");
+    expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 40, y: 0 }).warning).toBeNull();
+  });
+
+  it("exhaustion cannot eat a speed BONUS - the reduction stops at 0 where it applies", () => {
+    const game = buildGame([{ actorId: IDS.sable, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
+    sable.speedFeet = 20;
+    sable.conditions = [{ id: "exhaustion", level: 5 }];
+    addEffect(game, IDS.sable, speedEffect("longstrider", 10, "longstrider"));
+    // 20 - 25 stops at 0, and the +10 then reads 10. Carrying the -5 forward printed 5 ft here and
+    // quietly ate half a spell's worth of feet.
+    expect(() => moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 15, y: 0 }))
+      .toThrow("Sable Vex has 10 ft of movement left (this move needs 15 ft).");
+    expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 10, y: 0 }).warning).toBeNull();
+    expect(game.combat.turn.movementUsedFeet).toBe(10);
+  });
+
+  it("two attackers' Slows are ONE reduction, and the last expiry is what hands the feet back", () => {
+    // SRD 5.2.1 "Combining Game Effects": effects with the same name don't combine, the most potent
+    // applies. Two crocodiles' Slow is the same game effect twice, so it is -10 and not -20 - and
+    // the identity is the effect's `stackKey`, not anything either crocodile knows about the other.
+    const game = buildGame();
+    addEffect(game, IDS.torva, speedEffect("slow-croc1", -10, "slow", { sourceActorId: IDS.croc1, sourceName: "Giant Crocodile", stackKey: "mastery:slow" }));
+    addEffect(game, IDS.torva, speedEffect("slow-croc2", -10, "slow-2", { sourceActorId: IDS.croc2, sourceName: "Giant Crocodile 2", stackKey: "mastery:slow" }));
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toHaveLength(2);
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
+
+    // The first crocodile's turn begins and ITS row expires - the other one is still holding the 10
+    // feet, so nothing changes at the table.
+    expireEffectsAtTurnStart(game, IDS.croc1);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toHaveLength(1);
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
+
+    // Only the LAST expiry gives them back.
+    expireEffectsAtTurnStart(game, IDS.croc2);
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 40 ft of movement left (this move needs 45 ft).");
+  });
+
+  it("a DIFFERENT game effect still sums with a Slow, and an equal boon never displaces the penalty", () => {
+    // Different keys are different effects: -10 and -5 is -15, exactly as two keyless effects were.
+    const game = buildGame();
+    addEffect(game, IDS.torva, speedEffect("slow-croc1", -10, "slow", { stackKey: "mastery:slow" }));
+    addEffect(game, IDS.torva, speedEffect("curse-1", -5, "curse", { stackKey: "homebrew:tar" }));
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 25 ft of movement left (this move needs 45 ft).");
+
+    // The tie rule, stated in `morePotent`: a +10 sharing the Slow's key is the same magnitude, so
+    // the WORSE for the bearer wins and the penalty stands. It does not cancel to 0.
+    const tied = buildGame();
+    addEffect(tied, IDS.torva, speedEffect("slow-croc1", -10, "slow", { stackKey: "mastery:slow" }));
+    addEffect(tied, IDS.torva, speedEffect("odd-boon", 10, "boon", { stackKey: "mastery:slow" }));
+    expect(() => moveRules(tied, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 }))
+      .toThrow("Torva Grimtusk has 30 ft of movement left (this move needs 45 ft).");
+  });
+
+  it("the sum floors at 0 before Dash, and a Speed-0 condition refuses a bonus outright (U18)", () => {
+    // 40 - 5x2 exhaustion - 30 = 0 exactly; a second -30 must not become a doubled debt under Dash.
+    const buried = buildGame();
+    buried.actors.find((actor) => actor.id === IDS.torva)!.effects = [dashingEffect];
+    buried.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "exhaustion", level: 2 }];
+    addEffect(buried, IDS.torva, speedEffect("web-1", -30, "web"));
+    addEffect(buried, IDS.torva, speedEffect("web-2", -30, "web-2"));
+    expect(() => moveRules(buried, IDS.torva, { x: 0, y: 0 }, { x: 5, y: 0 }))
+      .toThrow("Torva Grimtusk can't move - its Speed is 0.");
+
+    // Grappled is "your Speed is 0 AND can't increase" - the early return is that second clause.
+    const held = buildGame();
+    held.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "grappled" }];
+    addEffect(held, IDS.torva, speedEffect("haste-1", 20, "haste"));
+    expect(() => moveRules(held, IDS.torva, { x: 0, y: 0 }, { x: 5, y: 0 }))
+      .toThrow("Torva Grimtusk can't move - its Speed is 0.");
+  });
+
+  it("a `voidWhileIncapacitated` speed effect lapses while the bearer is incapacitated (U18)", () => {
+    const game = buildGame();
+    addEffect(game, IDS.torva, speedEffect("boon-1", 20, "boon", { voidWhileIncapacitated: true }));
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 65, y: 0 }))
+      .toThrow("Torva Grimtusk has 60 ft of movement left (this move needs 65 ft).");
+    // `incapacitated` is not one of the Speed-0 conditions, so this is the void rule and nothing else.
+    game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "incapacitated" }];
+    expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 65, y: 0 }))
+      .toThrow("Torva Grimtusk has 40 ft of movement left (this move needs 65 ft).");
+  });
+
+  it("standing up costs half the CURRENT Speed, so a slowed creature pays less (U18 sweep)", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    torva.conditions = [{ id: "prone" }];
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, movementUsedFeet: 25 } }; // 15 left of 40
+    expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" }))
+      .toThrow("Standing up costs 20 ft of movement - Torva Grimtusk has 15 ft left.");
+
+    addEffect(game, IDS.torva, speedEffect("slow-1", -10, "slow"));
+    // Speed 30 now: half of it is 15, and 25 of that 30 is already spent.
+    expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" }))
+      .toThrow("Standing up costs 15 ft of movement - Torva Grimtusk has 5 ft left.");
+
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, movementUsedFeet: 10 } };
+    const events = setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" });
+    expect(events.some((event) => /stood up \(15 ft of movement\)/.test(event.text))).toBe(true);
+    expect(game.combat.turn.movementUsedFeet).toBe(25);
+  });
+
+  it("a grappled creature still cannot stand, though half its Speed is now 0 ft (U18's trap)", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    // Half of a zeroed Speed is 0, so `cost > budgetLeft` alone would have waved the stand-up through.
+    torva.conditions = [{ id: "prone" }, { id: "grappled" }];
+    expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" }))
+      .toThrow("Torva Grimtusk can't stand up - its Speed is 0.");
+    expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(true);
+  });
+
+  it("assisted mode lets the impossible stand-up happen but SAYS SO - it never reads as a clean event", () => {
+    // The movement family's convention, applied to the other half of the family: `applyMovementRules`
+    // returns the identical refusal sentence as a warning when the mode is not strict, and the move
+    // still happens. Standing up used to compute the same sentence and throw it away, so a grappled
+    // creature's stand-up narrated as "stood up (0 ft of movement)" and nothing else - an illegal
+    // action reading as a legal one.
+    const game = buildGame();
+    game.combat = { ...game.combat, rulesMode: "assisted" };
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    torva.conditions = [{ id: "prone" }, { id: "grappled" }];
+    const events = setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" });
+    // It happened - strict mode's refusal is untouched, and assisted mode still does not block.
+    expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(false);
+    // ...and the feed carries the reason, in the same words and with the same label the map uses.
+    expect(events.map((event) => event.text)).toEqual([
+      "Torva Grimtusk stood up (0 ft of movement).",
+      "Rules note: Torva Grimtusk can't stand up - its Speed is 0."
+    ]);
+
+    // The other blocked shape - a real cost against a short budget - narrates its own numbers.
+    const short = buildGame();
+    short.combat = { ...short.combat, rulesMode: "assisted", turn: { ...short.combat.turn, movementUsedFeet: 25 } };
+    short.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "prone" }];
+    expect(setCondition(short, IDS.torva, "prone", false, undefined, { role: "gm" }).map((event) => event.text)).toEqual([
+      "Torva Grimtusk stood up (20 ft of movement).",
+      "Rules note: Standing up costs 20 ft of movement - Torva Grimtusk has 15 ft left."
+    ]);
+
+    // The control: a LEGAL stand-up says nothing extra, so the note means something when it appears.
+    const legal = buildGame();
+    legal.combat = { ...legal.combat, rulesMode: "assisted" };
+    legal.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "prone" }];
+    expect(setCondition(legal, IDS.torva, "prone", false, undefined, { role: "gm" }).map((event) => event.text))
+      .toEqual(["Torva Grimtusk stood up (20 ft of movement)."]);
   });
 });
 

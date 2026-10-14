@@ -44,7 +44,9 @@ export type MovementRulesOutcome = Readonly<{
  *
  * Budget: applies only to the current combatant's own willing move with a known speed on a
  * measurable map; GM off-turn repositioning, tray moves, and unknown speeds stay free and never
- * accumulate. Effective speed folds in exhaustion (−5 ft/level), Speed-0 conditions, and Dashing.
+ * accumulate. Effective speed folds in exhaustion (−5 ft/level), the `speed` modifiers the mover's
+ * live effects carry, Speed-0 conditions, and Dashing - all of it in `effectiveSpeedFeet`, so the
+ * number in the refusal below is the one the SRD would print.
  *
  * Opportunity attacks: leaving an enemy's melee reach opens a leaves-reach reaction prompt answered
  * as a real melee attack; the move completes first (arrival-timing approximation, documented).

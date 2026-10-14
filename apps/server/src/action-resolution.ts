@@ -9,8 +9,9 @@ import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememb
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
-import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
+import { conditionLabel, currentSpeedFeet, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { masteryHitEffects, masteryHitPushes, masteryHitSaves, masteryMissDamage, type MasterySwing } from "./weapon-mastery.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 type LiveActor = GameState["actors"][number];
@@ -74,6 +75,23 @@ export type ResolveDependencies = Readonly<{
    * Resolve it for the GM audience: a player must still be able to roll their own cursed item.
    */
   catalog?: EquipmentCatalog;
+  /**
+   * SRD FORCED MOVEMENT (the Push mastery): move a combatant straight away from another one and
+   * report how far it really went, or null when the map cannot express the distance.
+   *
+   * This file has no geometry and must not gain any - the map's one snapping implementation lives in
+   * `token-placement.ts` (`docs/ai-context/map-grid.md`) and the operation layer has already fetched
+   * the grid for its distance rules, so the callback is built THERE (`game-operations.ts`) and
+   * `forced-movement.ts` does the arithmetic. It takes no direction and no destination: both are the
+   * server's to derive, which is why nothing about a push crosses the wire.
+   *
+   * Optional, and its absence is honest rather than silent: `reactions.ts` resolves opportunity
+   * attacks without geometry, so a pike that hits on a reaction narrates "move the token" instead of
+   * moving it - and `reactionAnswer` drains these warnings into the GM's feed exactly as
+   * `actionResolve` does, or the sentence would be a silent skip wearing a named absence's clothes.
+   * Wiring the push itself needs the reaction operation to fetch the map first.
+   */
+  pushToken?: (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) => Readonly<{ value: number; unit: string }> | null;
 }>;
 
 /**
@@ -717,6 +735,17 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   const warnings: string[] = [];
+  /**
+   * THE TABLE'S OWN LINE (see `ActionTableNarration` in `@vtt/domain`). `warnings` is the GM's
+   * channel - the operation layer writes every one of them `gmOnly: true` - so a rider that CHANGED
+   * THE BOARD had no way to reach the players watching it happen. These do, through the same feed
+   * `narrateTokenMove` narrates the GM's own drag into.
+   *
+   * ONE MOMENT, ONE ROW (D11). A sentence belongs to exactly one of the two arrays: the accomplished
+   * push moved here and left `warnings`, and Topple's warning was cut back to the half - the DC - that
+   * must not cross. Writing a sentence to both would print it twice in the GM's feed.
+   */
+  const tableNarration: Array<{ kind: "movement" | "save"; text: string; actorIds: readonly string[]; gmOnly?: boolean }> = [];
   // The attacker's whole equipment contribution, recomputed from (definition, inventory, catalog).
   // `siblings` is the EFFECTIVE action list - the economy's pool limits and multiattack composition
   // must see an item's derived actions and its raised `uses.limit`, or a charged item never recharges
@@ -968,25 +997,31 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
   }
   /**
-   * WEAPON MASTERY: GRAZE. "If your attack roll with this weapon misses a creature, you can deal
-   * damage to that creature equal to the ability modifier you used to make the attack roll. This
-   * damage is the same type dealt by the weapon."
+   * WEAPON MASTERY, first of two call sites. The rules themselves live in `weapon-mastery.ts` - one
+   * registry keyed by slug, whose keys ARE the implemented set the derivation gates on - because a
+   * mastery is a small rule at one moment of a swing and eight of them inline here is one hunk edited
+   * eight times.
    *
-   * The one mastery that fires on a MISS, which is why it sits outside the damage block above - that
-   * block is gated on hit/crit/unknown by design, and Graze is the exception the SRD writes.
+   * The swing context is built once, here, and null unless a mastery is in force on an attack that
+   * actually rolled: `attack !== null` is what guarantees the single target the SRD's masteries all
+   * act on, so the handlers read the target off `attack` and have no way to name a second.
    *
-   * A FUMBLE is still a miss and still grazes: the SRD gives no carve-out for a natural 1, and the
-   * feature is a floor on the swing rather than a reward for rolling well.
-   *
-   * `bonusDamage` is the right channel and not a compromise - it is flat integers with a source
-   * label, which is exactly what "damage equal to your ability modifier" is, and the roll card
-   * already renders it as its own explainable line. A non-positive modifier deals nothing rather than
-   * healing the target.
+   * The ON-MISS hook fires HERE, outside the damage block above, because Graze is the one mastery
+   * that fires on a MISS and that block is gated on hit/crit/unknown by design.
    */
   const mastery = derivation.masteryByActionId[action.id];
-  if (mastery?.id === "graze" && attack !== null && (attack.outcome === "miss" || attack.outcome === "fumble") && mastery.abilityModifier > 0) {
-    bonusDamage.push({ amount: mastery.abilityModifier, type: action.damage[0]?.type ?? "untyped", source: "Graze" });
-  }
+  const masterySwing: MasterySwing | null = mastery && attack !== null
+    ? {
+        mastery, attack,
+        attacker: { id: attacker.id, name: attacker.name },
+        damageType: action.damage[0]?.type ?? "untyped",
+        proficiencyBonus: deps.definition?.proficiencyBonus ?? 0,
+        actionId: action.id,
+        commandId: input.commandId,
+        round: state.combat.round
+      }
+    : null;
+  bonusDamage.push(...masteryMissDamage(masterySwing));
 
   // TYPED RIDER DAMAGE: criterion 1's "extra 1d4 lightning" and criterion 9's "extra 1d6 fire on a
   // critical hit". Neither existing channel can carry it - `bonusDamage` is flat integers only, and
@@ -1009,6 +1044,19 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const already = new Set<unknown>();
     for (const moment of passes) {
       for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
+        // A MOMENT-GATED flat `damage-bonus` ("+7 Bludgeoning on a critical hit") lands as its own
+        // explainable line beside Rage and Graze - flat integers with a source label are exactly
+        // that channel. The `moment === null` skip is the double-count guard: a STANDING
+        // damage-bonus was already folded into the formula by `withStandingRiders`, and the null
+        // pass would re-collect it here. Typed as the damage it joins; no damage rolled, no bonus.
+        if (rider.modifier.type === "damage-bonus") {
+          if (moment === null || already.has(rider.modifier)) continue;
+          const amount = rider.modifier.amount ?? 0;
+          if (amount === 0 || damage.length === 0) continue;
+          already.add(rider.modifier);
+          bonusDamage.push({ amount, type: damage[0].type, source: rider.label });
+          continue;
+        }
         if (rider.modifier.type !== "extra-damage" || already.has(rider.modifier)) continue;
         // AN ABILITY MODIFIER IS AN AMOUNT, NOT A DIE. "Add your Charisma modifier to the damage"
         // (Agonizing Blast) resolves against the BEARER's own sheet at the roll, so no authored
@@ -1076,44 +1124,134 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   /**
-   * WEAPON MASTERY: SAP. "If you hit a creature with this weapon, that creature has Disadvantage on
-   * its next attack roll before the start of your next turn."
+   * WEAPON MASTERY, second call site: the ON-HIT hook (Sap today). It sits after the declared on-hit
+   * riders because that is the order the two used to run in and the roll card lists `effectsApplied`
+   * in the order it was filled.
    *
-   * A real effect on the TARGET, carrying `attack-disadvantage` - the variant whose own comment reads
-   * "the bearer's own attack rolls have disadvantage" - and ending at the start of the attacker's next
-   * turn, which is what `until-source-next-turn` already means for Reckless Attack and Dodge.
-   *
-   * KNOWN APPROXIMATION, stated rather than hidden: the SRD ends Sap on the target's NEXT attack roll
-   * or the attacker's next turn, whichever comes first, and nothing in the effect vocabulary expires
-   * on use. So a target that attacks twice in that window rolls both at Disadvantage instead of one.
-   * This is the same shape the shipped Help builtin already has (`attack-advantage`, same duration,
-   * also "the next attack roll" in the SRD), so it follows the engine's existing convention rather
-   * than inventing a second one. A one-shot duration is the fix, and it fixes both together.
-   *
-   * NO condition is linked: Sap is not a named condition, and putting one on the row would make the
-   * token render a status it does not have.
+   * The handler BUILDS the effect and this loop ADDS it - `weapon-mastery.ts` deliberately imports
+   * nothing at runtime so `equipment-derivation.ts` can depend on its registry keys without dragging
+   * `effects.ts` into a leaf. `addEffect`'s RETURN is what gets narrated: it is idempotent by id, so a
+   * retried command reports the effect that is really on the actor rather than the one just built.
    */
-  if (mastery?.id === "sap" && attack !== null && (attack.outcome === "hit" || attack.outcome === "crit")) {
-    const sapped = targets[0];
-    const effect = addEffect(state, sapped.id, {
-      id: `${input.commandId}:mastery:sap:${sapped.id}`,
-      name: `Sapped by ${attacker.name}`,
-      tags: ["sap"],
+  for (const applied of masteryHitEffects(masterySwing)) {
+    const effect = addEffect(state, applied.targetId, applied.effect);
+    effectsApplied.push({ targetId: applied.targetId, targetName: applied.targetName, name: effect.name, conditionIds: applied.effect.linkedConditionIds });
+  }
+
+  /**
+   * THE RESOLVER'S OWN HALF OF THE VIEWER GATE, for the table lines below. `appendLog`
+   * (`server.ts`) already re-derives a row's GM-only-ness from its `actorIds` against live state, so
+   * this is the SECOND, independent gate - the same belt-and-braces `tokenMove` runs, where
+   * `narrateTokenMove` decides structurally that a hidden mover has no public line AND the caller
+   * still passes the mover's id for the feed to check again.
+   *
+   * `!== "public"` rather than `=== "gm-only"`: an unknown actor and any visibility that is not
+   * public both fail toward hiding the line, so a third visibility added later cannot leak through a
+   * comparison written before it existed.
+   */
+  const namesAHiddenCombatant = (...actorIds: readonly string[]) =>
+    actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility !== "public");
+
+  /**
+   * WEAPON MASTERY, third call site: the ON-HIT SAVE (Topple today). The handler computed the DC and
+   * named the condition; this parks a real prompt through the SAME door every other save uses, so
+   * answering it rolls the target's own Constitution save and applies Prone through `setCondition`.
+   *
+   * The prompt is NOT mirrored into this resolution's `save` field. That field means "this action
+   * calls for a save", and the runner's note beneath it counts prompts by `actionName` - which for a
+   * mastery is the mastery's, not the weapon's, so mirroring it there would print "All saving throws
+   * for Quarterstaff resolved" over a Topple save that is still owed. Two narration lines say the true
+   * thing instead, and the tracker row is where it is answered either way.
+   *
+   * THE TWO LINES ARE SPLIT BY WHAT MAY CROSS, not by convenience. The table's line names WHAT FORCED
+   * THE SAVE - a Constitution save appearing in front of a player with nothing explaining it is the
+   * gap this closes - and the GM's keeps the DC. The DC is the ATTACKER's number (8 + the modifier
+   * that made the attack roll + their Proficiency Bonus), so printing it to the table would hand every
+   * player a reading off a monster's stat block the moment a monster carries a topple weapon. The
+   * target's OWN player still learns it, through the pending-save projection that has always carried
+   * `dc` because you cannot roll against a number you were not told (`projections.ts`).
+   */
+  for (const forced of masteryHitSaves(masterySwing)) {
+    createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
-      sourceActionId: `${action.id}:sap`,
-      startedRound: state.combat.round,
-      duration: { type: "until-source-next-turn" },
-      endsWhenSourceDefeated: true,
-      voidWhileIncapacitated: false,
-      concentration: false,
-      modifiers: [{ type: "attack-disadvantage" }],
-      linkedConditionIds: [],
-      escapeDc: null,
-      onEnd: [],
-      endsWithTag: null
+      actionName: forced.actionName,
+      ability: forced.ability,
+      dc: forced.dc,
+      targetIds: [forced.targetId],
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionId: forced.conditionId,
+      // A mastery fires on EVERY hit, and Extra Attack lands two of them inside one Attack action, so
+      // this prompt is parked BESIDE its predecessor instead of replacing it (see `createPendingSaves`).
+      // The warning below is written per hit; replacing here would print two saves and owe one.
+      replaceExisting: false,
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
     });
-    effectsApplied.push({ targetId: sapped.id, targetName: sapped.name, name: effect.name, conditionIds: [] });
+    const orTheCondition = forced.conditionId === null ? "" : ` or have the ${conditionLabel(forced.conditionId)} condition`;
+    tableNarration.push({
+      kind: "save",
+      text: `${attacker.name}'s ${forced.actionName} forces ${forced.targetName} to make a ${forced.ability.toUpperCase()} save${orTheCondition}.`,
+      actorIds: [attacker.id, forced.targetId],
+      ...(namesAHiddenCombatant(attacker.id, forced.targetId) ? { gmOnly: true } : {})
+    });
+    warnings.push(`${forced.actionName}: ${forced.targetName}'s save is DC ${forced.dc} - the prompt is in the turn order.`);
+  }
+
+  /**
+   * WEAPON MASTERY, fourth call site: FORCED MOVEMENT (Push today). The handler named the pair, the
+   * distance and the SRD's size gate; the callback owns the geometry (see `pushToken` on
+   * `ResolveDependencies`, and `forced-movement.ts` for why this is not `applyMovementRules`).
+   *
+   * `targets[0]` is the pushed creature and is the SAME creature `forced.targetId` names - an attack
+   * resolves against exactly one target or this function has already thrown, so the size read here
+   * cannot belong to anyone else. It is read the way the declared on-hit riders read theirs.
+   *
+   * EVERY failure degrades to a sentence, never a rejection: too large, unplaced, an uncalibrated
+   * and unscaled map, a resolver with no callback, a map the fight has already left. A swing that hit
+   * must not be undone because the map could not answer a geometry question, so the line tells the GM
+   * to move the token - the builtin Shove's own shape.
+   *
+   * ONLY THE ACCOMPLISHED PUSH IS THE TABLE'S. A token that really moved is something every player
+   * watched happen, so its sentence goes to the feed the whole table reads and leaves `warnings`
+   * entirely - one moment, one row. The other three sentences stay GM-only and are not the same kind
+   * of thing: two of them ("move the token", "the map has nowhere to put it") are INSTRUCTIONS to the
+   * one person who can place a token, and the size gate reports a rule that stopped the board
+   * changing at all. Sending an instruction to players would have them read it as an event.
+   */
+  for (const forced of masteryHitPushes(masterySwing)) {
+    if (!sizeAtMost(targets[0].size, forced.maxTargetSize)) {
+      // Capitalised to match how the SRD prints a creature size in prose ("Large or smaller").
+      warnings.push(`${forced.targetName} is bigger than ${forced.maxTargetSize[0].toUpperCase()}${forced.maxTargetSize.slice(1)} and can't be pushed.`);
+      continue;
+    }
+    const moved = deps.pushToken?.({ actorId: forced.targetId, awayFromActorId: forced.awayFromActorId, distanceFeet: forced.distanceFeet }) ?? null;
+    // THE OUTCOMES ARE THREE, NOT TWO. Null is "the map could not answer" - unplaced, uncalibrated,
+    // no callback, a map the fight has left - and only that one asks the GM to move the token by
+    // hand. A measured ZERO is the opposite: the map DID answer, and `moveEncounterToken`'s own bounds
+    // and footprint checks refused every square along that line (a token pinned at the edge, or a
+    // regional map whose cell is wider than the shove), so telling the GM to move it 10 feet there
+    // asks for a placement the map has already declined. Rounded before the comparison, the way
+    // `narrateTokenMove` rounds a drag, so snapping dust cannot print "pushed 0 ft".
+    if (moved === null) {
+      warnings.push(`${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name} - move the token.`);
+      continue;
+    }
+    const travelled = Math.round(moved.value * 10) / 10;
+    if (travelled > 0) {
+      // Every word here is already a player's to read: two public combatants' names, and a distance
+      // between two token positions the player projection ships anyway (`projections.ts` filters the
+      // token list to public actors, so a player could measure this move off their own screen).
+      tableNarration.push({
+        kind: "movement",
+        text: `${forced.targetName} is pushed ${travelled} ${moved.unit} straight away from ${attacker.name}.`,
+        actorIds: [attacker.id, forced.targetId],
+        ...(namesAHiddenCombatant(attacker.id, forced.targetId) ? { gmOnly: true } : {})
+      });
+      continue;
+    }
+    warnings.push(`${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`);
   }
 
   // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,
@@ -1126,6 +1264,16 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const readyNote = input.builtin && action.id === "ready" && input.note ? `Readied: ${input.note.slice(0, 100)}` : null;
     // A concentration grant may end the granter's previous concentration; surface that as a warning line.
     const replaced: { kind: "effect" | "condition"; text: string; actorId: string }[] = [];
+    // DASH GRANTS A QUANTITY, NOT A MULTIPLIER. "Extra movement for the current turn equal to your
+    // Speed after modifiers" is measured HERE, once, at the moment the action is taken - so a Slow
+    // landing later in the same turn lowers the Speed from that point on without retroactively
+    // rewriting feet the grant already handed over and the creature already spent. `effectiveSpeedFeet`
+    // adds the stored number; it no longer doubles a live one (see its docblock for the 15-vs-5 case).
+    // The `dashing` TAG is the vocabulary, not the builtin's id: a homebrew action that grants the same
+    // tag is the same rule and gets the same measurement. An unknown Speed records 0 rather than
+    // nothing, because ABSENT is reserved for effects granted before this field existed - and a
+    // creature with no Speed has no budget for the movement rules to read anyway.
+    const grantedMovement = grant.tags.includes("dashing") ? { movementGrantFeet: currentSpeedFeet(recipient) ?? 0 } : {};
     const effect = addEffect(state, recipient.id, {
       id: `${input.commandId}:grant`,
       name: readyNote ?? grant.name ?? action.name,
@@ -1142,7 +1290,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       escapeDc: null,
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
-      concentration: grant.concentration
+      concentration: grant.concentration,
+      ...grantedMovement
     }, replaced);
     warnings.push(...replaced.map((event) => event.text));
     if (grant.target === "target") effectsApplied.push({ targetId: recipient.id, targetName: recipient.name, name: effect.name, conditionIds: [] });
@@ -1313,6 +1462,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       ? state.combat.turn.actionInstance.components
       : null,
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(tableNarration.length > 0 ? { tableNarration } : {}),
     overridden,
     ...(reactionPrompts.length > 0 ? { reactionPrompts } : {}),
     ...(check ? { check } : {}),

@@ -47,11 +47,12 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
   if (riders.length === 0) return action;
 
   const attackBonus = sumRiders(riders, "attack-bonus");
+  const damageBonus = sumRiders(riders, "damage-bonus");
   const critDice = sumRiders(riders, "critical-bonus-dice") || riders.reduce((total, rider) => rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total, 0);
   const saveDc = sumRiders(riders, "spell-save-dc");
   const poolBonus = usesBonus(action, riders);
   const extraAttacks = extraAttacksFor(action, derivation, riders);
-  if (attackBonus === 0 && critDice === 0 && saveDc === 0 && poolBonus === 0 && extraAttacks === 0) return action;
+  if (attackBonus === 0 && damageBonus === 0 && critDice === 0 && saveDc === 0 && poolBonus === 0 && extraAttacks === 0) return action;
 
   return {
     ...action,
@@ -68,8 +69,29 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
         } }
       : {}),
     ...(action.save && saveDc !== 0 ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } } : {}),
-    ...(action.uses && poolBonus !== 0 ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } } : {})
+    ...(action.uses && poolBonus !== 0 ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } } : {}),
+    // A standing `damage-bonus` (the "+1" of a +1 weapon) folds into the FIRST damage part's printed
+    // formula - the same treatment `attack-bonus` gets three lines up, so the sheet, the roll and the
+    // resolver all read one number. The constant rides the formula (never crit-doubled - 5e doubles
+    // dice, and `criticalExpression` doubles only dice terms). Moment-gated damage-bonus riders are
+    // NOT here (moment: null collection) - action-resolution.ts lands those as their own labelled
+    // line at the moment they name.
+    ...(action.damage.length > 0 && damageBonus !== 0
+      ? { damage: action.damage.map((part, index) => index === 0 ? { ...part, formula: withFlatBonus(part.formula, damageBonus) } : part) }
+      : {})
   };
+}
+
+/** Fold a flat bonus into a dice formula's trailing constant: "2d6 + 1" + 1 = "2d6 + 2", "1d4" + 1
+    = "1d4 + 1", "1d8 + 1" - 1 = "1d8". The formula grammar here is the derivation's own output
+    (`<dice> ± <constant>`), so a trailing signed integer is the whole of what can appear. */
+function withFlatBonus(formula: string, bonus: number): string {
+  const tail = /\s*([+-])\s*(\d+)\s*$/.exec(formula);
+  const constant = tail ? (tail[1] === "-" ? -Number(tail[2]) : Number(tail[2])) : 0;
+  const base = tail ? formula.slice(0, tail.index).trim() : formula.trim();
+  const next = constant + bonus;
+  if (next === 0) return base;
+  return `${base} ${next > 0 ? "+" : "-"} ${Math.abs(next)}`;
 }
 
 /**

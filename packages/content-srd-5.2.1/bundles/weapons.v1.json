@@ -3,6 +3,7 @@
   "id": "battleaxe",
   "name": "Battleaxe",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -19,6 +20,7 @@
   "id": "blowgun",
   "name": "Blowgun",
   "category": "martial",
+  "melee": false,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -36,6 +38,7 @@
   "id": "club",
   "name": "Club",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -52,6 +55,7 @@
   "id": "dagger",
   "name": "Dagger",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "nick",
   "properties": [
@@ -70,6 +74,7 @@
   "id": "dart",
   "name": "Dart",
   "category": "simple",
+  "melee": false,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -87,6 +92,7 @@
   "id": "flail",
   "name": "Flail",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "sap",
   "properties": [],
@@ -101,6 +107,7 @@
   "id": "glaive",
   "name": "Glaive",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "graze",
   "properties": [
@@ -119,6 +126,7 @@
   "id": "greataxe",
   "name": "Greataxe",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "cleave",
   "properties": [
@@ -136,6 +144,7 @@
   "id": "greatclub",
   "name": "Greatclub",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "push",
   "properties": [
@@ -152,6 +161,7 @@
   "id": "greatsword",
   "name": "Greatsword",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "graze",
   "properties": [
@@ -169,6 +179,7 @@
   "id": "halberd",
   "name": "Halberd",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "cleave",
   "properties": [
@@ -187,6 +198,7 @@
   "id": "hand-crossbow",
   "name": "Hand Crossbow",
   "category": "martial",
+  "melee": false,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -205,6 +217,7 @@
   "id": "handaxe",
   "name": "Handaxe",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -222,6 +235,7 @@
   "id": "heavy-crossbow",
   "name": "Heavy Crossbow",
   "category": "martial",
+  "melee": false,
   "improvised": false,
   "mastery": "push",
   "properties": [
@@ -241,6 +255,7 @@
   "id": "javelin",
   "name": "Javelin",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -257,6 +272,7 @@
   "id": "lance",
   "name": "Lance",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -275,6 +291,7 @@
   "id": "light-crossbow",
   "name": "Light Crossbow",
   "category": "simple",
+  "melee": false,
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -293,6 +310,7 @@
   "id": "light-hammer",
   "name": "Light Hammer",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "nick",
   "properties": [
@@ -310,6 +328,7 @@
   "id": "longbow",
   "name": "Longbow",
   "category": "martial",
+  "melee": false,
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -328,6 +347,7 @@
   "id": "longsword",
   "name": "Longsword",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -344,6 +364,7 @@
   "id": "mace",
   "name": "Mace",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "sap",
   "properties": [],
@@ -358,6 +379,7 @@
   "id": "maul",
   "name": "Maul",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -375,6 +397,7 @@
   "id": "morningstar",
   "name": "Morningstar",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "sap",
   "properties": [],
@@ -389,6 +412,7 @@
   "id": "musket",
   "name": "Musket",
   "category": "martial",
+  "melee": false,
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -407,6 +431,7 @@
   "id": "pike",
   "name": "Pike",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "push",
   "properties": [
@@ -425,6 +450,7 @@
   "id": "pistol",
   "name": "Pistol",
   "category": "martial",
+  "melee": false,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -442,6 +468,7 @@
   "id": "quarterstaff",
   "name": "Quarterstaff",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -458,6 +485,7 @@
   "id": "rapier",
   "name": "Rapier",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -474,6 +502,7 @@
   "id": "scimitar",
   "name": "Scimitar",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "nick",
   "properties": [
@@ -491,6 +520,7 @@
   "id": "shortbow",
   "name": "Shortbow",
   "category": "simple",
+  "melee": false,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -508,6 +538,7 @@
   "id": "shortsword",
   "name": "Shortsword",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -525,6 +556,7 @@
   "id": "sickle",
   "name": "Sickle",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "nick",
   "properties": [
@@ -541,6 +573,7 @@
   "id": "sling",
   "name": "Sling",
   "category": "simple",
+  "melee": false,
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -557,6 +590,7 @@
   "id": "spear",
   "name": "Spear",
   "category": "simple",
+  "melee": true,
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -574,6 +608,7 @@
   "id": "trident",
   "name": "Trident",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -591,6 +626,7 @@
   "id": "war-pick",
   "name": "War Pick",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -607,6 +643,7 @@
   "id": "warhammer",
   "name": "Warhammer",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "push",
   "properties": [
@@ -623,6 +660,7 @@
   "id": "whip",
   "name": "Whip",
   "category": "martial",
+  "melee": true,
   "improvised": false,
   "mastery": "slow",
   "properties": [

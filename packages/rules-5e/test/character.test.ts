@@ -134,4 +134,36 @@ describe("armorClassFromEquipment", () => {
     // unarmored with only a shield: 10 + Dex +3 + shield 2
     expect(armorClassFromEquipment(3, [shield])).toBe(15);
   });
+
+  /**
+   * U28. A shield alone used to answer a flat 10 + Dex + shield, which is how a Barbarian who picked
+   * one up came out BELOW their bare-handed AC. `allowShield` is the whole Barbarian/Monk difference
+   * and these four numbers are the same four the table reads.
+   */
+  describe("Unarmored Defense", () => {
+    const shield = item({ category: "shield", armor: armor(2, false, null) });
+    const barbarian = { bonus: 3, allowShield: true } as const; // Con +3, "you can use a Shield"
+    const monk = { bonus: 3, allowShield: false } as const; // Wis +3, "or wielding a Shield"
+
+    it("keeps the bonus under a shield when the feature allows one", () => {
+      // 10 + Dex +2 + Con +3 + shield 2 - the +2 lands ON TOP OF Constitution, not instead of it
+      expect(armorClassFromEquipment(2, [shield], barbarian)).toBe(17);
+    });
+    it("loses the bonus under a shield when the feature does not", () => {
+      expect(armorClassFromEquipment(2, [shield], monk)).toBe(14); // 10 + Dex +2 + shield 2
+    });
+    it("is replaced by body armor either way", () => {
+      // Both printings begin "while you aren't wearing armor": chain mail 16 + shield 2, no bonus.
+      const mail = item({ category: "armor", armor: armor(16, false, null) });
+      expect(armorClassFromEquipment(2, [mail, shield], barbarian)).toBe(18);
+      expect(armorClassFromEquipment(2, [mail, shield], monk)).toBe(18);
+    });
+    it("still returns null bare-handed, so the caller keeps the AC it already computed", () => {
+      expect(armorClassFromEquipment(2, [], barbarian)).toBeNull();
+    });
+    it("changes nothing for a caller that passes none (every monster and import)", () => {
+      expect(armorClassFromEquipment(2, [shield])).toBe(14);
+      expect(armorClassFromEquipment(2, [shield], null)).toBe(14);
+    });
+  });
 });

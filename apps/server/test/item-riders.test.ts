@@ -736,3 +736,72 @@ describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () 
     expect(effectiveSkillTier(definition, derivation, "perception")).toBe("proficient");
   });
 });
+
+// -------------------------------------------------------------------------------------------------
+// Criterion 16 - the flat "+N to damage rolls" (C9's co-blocker, weapons-armour.ts limit (A))
+// -------------------------------------------------------------------------------------------------
+
+describe("criterion 16: a +1 weapon's flat damage bonus", () => {
+  const PLUS_ONE: EquipmentRecordLike = {
+    id: "shortsword-plus-one", name: "Shortsword, +1", category: "weapon", slot: "weapon",
+    isMagic: true,
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  };
+  const ROW = { id: "shortsword-plus-one", name: "Shortsword, +1", quantity: 1, equipped: true, category: "weapon", weapon: { category: "martial", damageDice: "1d6", damageType: "piercing", rangeFeet: null, longRangeFeet: null } };
+
+  it("folds the +1 into the printed damage formula, and the ROLLED total pays it", () => {
+    const definition = definitionOf();
+    const catalog = catalogOf([PLUS_ONE]);
+    const state = fight(stateWith([item(ROW)]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-shortsword-plus-one")!;
+
+    // Str +3 and the flat +1 in ONE printed formula - the sheet, the roll and the resolver read the
+    // same number, exactly as `attack-bonus` folds into the to-hit beside it.
+    expect(action.damage).toEqual([{ formula: "1d6 + 4", type: "piercing" }]);
+    expect(action.attack!.bonus).toBe(6);
+
+    // The ROLL: d20 = 10 -> 16 vs AC 12 (hit); 1d6 = 4 -> 8 damage, the +1 inside the total.
+    const resolution = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000161" }, deps([10, 4], catalog, definition));
+    expect(resolution.damage).toEqual([{ formula: "1d6 + 4", type: "piercing", total: 8 }]);
+    expect(resolution.damageTotal).toBe(8);
+  });
+
+  it("without the rider the formula stays 1d6 + 3 - the number moves with the value, not the field", () => {
+    const definition = definitionOf();
+    const plain: EquipmentRecordLike = { ...PLUS_ONE, modifiers: [{ type: "attack-bonus", amount: 1 }] };
+    const state = fight(stateWith([item(ROW)]));
+    const action = effectiveActions(definition, state.actors[0], catalogOf([plain])).find((entry) => entry.id === "item-shortsword-plus-one")!;
+    expect(action.damage).toEqual([{ formula: "1d6 + 3", type: "piercing" }]);
+  });
+
+  it("a moment-gated bonus lands only at its moment, as its own labelled line", () => {
+    const definition = definitionOf();
+    const SMITER: EquipmentRecordLike = {
+      id: "smiting-shortsword", name: "Smiting Shortsword", category: "weapon", slot: "weapon",
+      isMagic: true,
+      modifiers: [{ type: "damage-bonus", amount: 7, when: [{ type: "on-critical-hit" }] }]
+    };
+    const row = { ...ROW, id: "smiting-shortsword", name: "Smiting Shortsword" };
+    const catalog = catalogOf([SMITER]);
+    const state = fight(stateWith([item(row)]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-smiting-shortsword")!;
+
+    // NOT folded standing: the printed formula stays the plain swing.
+    expect(action.damage).toEqual([{ formula: "1d6 + 3", type: "piercing" }]);
+
+    // An ordinary hit pays nothing: d20 = 10 -> hit, 1d6 = 4 -> 7, no bonus line.
+    const hit = resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000162" }, deps([10, 4], catalog, definition));
+    expect(hit.bonusDamage).toBeUndefined();
+    expect(hit.damageTotal).toBe(7);
+
+    // A crit pays it as its own explainable line: d20 = 20, doubled 2d6 = 4 + 4 -> 11, plus the 7.
+    const fresh = fight(stateWith([item(row)]));
+    const crit = resolveDefinitionAction(fresh, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000163" }, deps([20, 4, 4], catalog, definition));
+    expect(crit.attack?.outcome).toBe("crit");
+    expect(crit.bonusDamage).toEqual([{ amount: 7, type: "piercing", source: "Smiting Shortsword" }]);
+    expect(crit.damageTotal).toBe(18);
+  });
+});

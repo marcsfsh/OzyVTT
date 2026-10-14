@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
+import type { ActionTableNarration, AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
 import { ABILITY_ROLL_FORMULA, parseDiceFormula, resolveDice, rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { generateCharacterRequest } from "./character-generate.js";
@@ -26,6 +26,7 @@ import { addCombatant, endEncounter, nextInitiativeTurn, rollRemainingInitiative
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { rollDeathSave } from "./death-saves.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
+import { pushTokenAway } from "./forced-movement.js";
 import { activateScene, createScene, duplicateScene, removeScene, renameScene, reorderScenes, setSceneCombatants } from "./scenes.js";
 import { buildEncounterArchive, type EncounterArchiveDocument } from "./encounter-archive.js";
 import { launchReplay } from "./replay-launch.js";
@@ -193,10 +194,72 @@ export type GameMutationResult = { revision: number; duplicate: boolean } & Reco
 
 export type GameOperations = ReturnType<typeof createGameOperations>;
 
+/**
+ * THE ACK'S OWN GATE on the table's lines, and the reason it exists even though nothing gets through
+ * it today.
+ *
+ * A resolution goes two places: into the feed through `appendTableNarration`, which hands each row's
+ * `actorIds` to `appendLog`'s live re-derivation, and STRAIGHT BACK to whoever sent the command as
+ * the socket acknowledgement. The feed half has a gate. The ack half had none - the whole
+ * `resolution` was returned verbatim, `gmOnly: true` rows included, to a player principal.
+ *
+ * It is not exploitable today, and that is precisely the argument for the gate rather than against
+ * it: the reason is that TWO OTHER checks happen to make a player's own resolve name only public
+ * combatants (`canPlayerTarget` forces a player's resolved targets public, `canInitiateForActor`
+ * forces the attacker to be their own claimed character). Both live in a different concern; either
+ * could be relaxed for a good reason by someone who never reads this line, and the day one is, the
+ * ack starts shipping rows the feed refuses. `appendLog` does not trust the resolver's verdict
+ * either - it re-derives. This is that same second read, on the other door.
+ *
+ * GM-GRADE IS UNTOUCHED, deliberately: the GM console legitimately shows every line, and an
+ * integration is the GM's own automation (ADR-0016). Absent-when-empty matches how the resolver
+ * builds the field, so a filtered-to-nothing list reads as "no lines", not "an empty list".
+ */
+function withoutGmOnlyNarration<T extends Readonly<{ tableNarration?: readonly ActionTableNarration[] }>>(principal: GamePrincipal, resolution: T): T {
+  const lines = resolution.tableNarration;
+  if (isGmGrade(principal) || lines === undefined) return resolution;
+  const readable = lines.filter((line) => line.gmOnly !== true);
+  if (readable.length === lines.length) return resolution;
+  const { tableNarration: _withheld, ...rest } = resolution;
+  return (readable.length > 0 ? { ...rest, tableNarration: readable } : rest) as T;
+}
+
 export function createGameOperations(context: GameOperationsContext) {
   const { store, contentLibrary } = context;
   const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
   const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
+
+  /**
+   * THE TABLE'S OWN LINE, drained into the feed - the ONE place a resolution's `tableNarration` is
+   * written, so both resolve paths (`actionResolve` and the off-turn `reactionAnswer`) narrate a
+   * rider the same way and neither can quietly stop.
+   *
+   * This is verbatim how `tokenMove` appends `narrateTokenMove`'s public half: `appendLog` with the
+   * named combatants and NO `gmOnly` of our own, which lets the feed's own gate decide from live
+   * state whether a player may read it. The resolver's structural verdict rides as `line.gmOnly` and
+   * is a strict OR on top of that gate (`appendLog` in `server.ts`), never a replacement for it - two
+   * independent reads of the same question, because this is the row that crosses to players.
+   *
+   * `appendLog` rather than `broadcastTableEvent` for the same reason a drag narrates that way: these
+   * are feed rows, and a toast for every shove would out-shout the damage numbers beside it.
+   *
+   * NAMED ABSENCE - THE PUBLIC SECOND SCREEN STILL SAYS NOTHING. `appendLog` reaches GM and player
+   * sockets only; the shared viewer holds no game socket at all (`viewer-coordinator.ts` drives it
+   * over SSE with `ViewerPresentationProjection`), so a table watching the big screen still sees the
+   * token jump ten feet unexplained. This is not a line that can be forwarded: that projection has no
+   * narration field, and adding one is a viewer-safety change with its own surface - the viewer would
+   * need a bounded, self-expiring caption strip, because a feed there is a permanent record on a
+   * screen a room full of non-players can read. THE UNIT THAT WOULD CLOSE IT: a `caption` on
+   * `ViewerPresentationProjection` (`viewer-presentation.ts`), fed from the same lines below through
+   * `viewer-coordinator.ts`, plus the strip that renders it in `ViewerApp.tsx` - and its own entry in
+   * the pinned invariant list in `docs/ai-context/viewer-mode.md`. Half of that (a field with no
+   * renderer, or a renderer fed by nothing) is worse than this absence.
+   */
+  const appendTableNarration = (resolution: Readonly<{ tableNarration?: readonly ActionTableNarration[] }>) => {
+    for (const line of resolution.tableNarration ?? []) {
+      context.appendLog({ kind: line.kind, text: line.text, actorIds: line.actorIds, ...(line.gmOnly === true ? { gmOnly: true } : {}) });
+    }
+  };
 
   /**
    * Which merged catalog this principal may READ. GM-grade covers the GM's own session and the GM's
@@ -1244,7 +1307,28 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog() });
+        // SRD forced movement (the Push mastery): the resolver has no geometry and must not grow any,
+        // so the token write is built HERE, where the grid was already fetched for `distanceFeet`, and
+        // runs through `moveEncounterToken`'s snapping like the GM's own drag. It takes no client
+        // input - the direction is derived from the two token positions and the distance is the
+        // rule's - and it degrades to null (which the resolver narrates) rather than throwing.
+        //
+        // NO EXTRA AUTHORIZATION LIVES HERE, and that is not an omission. Only `targets[0]` of an
+        // attack that already hit can be pushed, and a player's target ids were cleared by
+        // `canPlayerTarget` above - so a player can never move a hidden combatant's token, and the
+        // one they CAN move is the creature the rules just said they may shove.
+        //
+        // THE GRID WAS FETCHED BEFORE THIS MUTATION OPENED (`tokenGeometryFor` is real file I/O), so a
+        // scene switch that committed inside that window would snap and bound-clamp this token against
+        // a map the fight no longer stands on - the departed map's lattice, the departed map's bounds,
+        // and a narrated distance measured on it. Every other token-position WRITE in this file spends
+        // a rejection on that hazard (`tokenMove`, and the template branch above), but forced movement
+        // never throws: a swing that already hit must not be undone because the map moved. So the
+        // stale case degrades to null, which the resolver narrates as the same "move the token"
+        // sentence an unmeasurable map already earns.
+        const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
+          state.combat.mapAssetId === mapAssetId ? pushTokenAway(state, input, geometry) : null;
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog(), pushToken });
         // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
         // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
         // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.
@@ -1264,6 +1348,7 @@ export function createGameOperations(context: GameOperationsContext) {
         // applied rider effects and granted self effects reach the whole table.
         if (resolution.overridden) context.appendLog({ kind: "override", text: `OVERRIDE (${resolution.overridden.rule}): ${actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`, actorIds: [actorId] });
         for (const warning of resolution.warnings ?? []) context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
+        appendTableNarration(resolution);
         for (const applied of resolution.effectsApplied ?? []) {
           context.broadcastTableEvent({ kind: "effect", text: `${applied.targetName} is ${applied.name}.`, actorIds: [applied.targetId], gmOnly: hidden });
         }
@@ -1297,7 +1382,9 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         }
       }
-      return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) };
+      // The ack carries the resolution back to whoever sent the command - through the gate a
+      // non-GM principal's copy owes (see `withoutGmOnlyNarration`), never verbatim.
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution: withoutGmOnlyNarration(principal, resolution) } : {}) };
     },
 
     async saveAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1373,6 +1460,22 @@ export function createGameOperations(context: GameOperationsContext) {
             const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : "resolved";
             const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} - ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage${detail}` : ""}.`;
             context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
+            // The off-turn swing runs the SAME resolver the on-turn one does, so it produces the same
+            // rules notes - and this was the one resolve path that dropped them on the floor. That
+            // matters most for a mastery the reaction path cannot fully honour: Push resolves here
+            // WITHOUT the geometry callback by design, so its "move the token" sentence is the whole
+            // of what it does off-turn, and Topple's DC line is how the GM learns a save was parked.
+            // Dropping them turned a named absence into a silent skip. Same shape as `actionResolve`'s
+            // drain: GM-only, because the GM is who moves tokens and reads DCs out. `used` excludes
+            // the preview (`reactions.ts` returns `used: false` there), so nothing is said twice.
+            for (const warning of outcome.resolution.warnings ?? []) {
+              context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [outcome.actorId], gmOnly: true });
+            }
+            // The table's own lines drain here for the same reason the rules notes do: the off-turn
+            // swing runs the SAME resolver, so a quarterstaff that Topples on an opportunity attack
+            // owes the table the sentence naming what forced that Constitution save. (Push produces
+            // none here - `reactions.ts` resolves without the geometry callback, so no token moves.)
+            appendTableNarration(outcome.resolution);
           }
         } else if (outcome.used) {
           const text = `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`;
@@ -1383,7 +1486,9 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         publishNarrations(outcome.events);
       }
-      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: outcome.resolution } : {}), ...(outcome.parts ? { parts: outcome.parts } : {}), ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) } } : {}) };
+      // Same gate as `actionResolve`'s ack: the off-turn swing runs the SAME resolver, so it carries
+      // the same table lines and owes a non-GM principal the same filter.
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: withoutGmOnlyNarration(principal, outcome.resolution) } : {}), ...(outcome.parts ? { parts: outcome.parts } : {}), ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {}) } } : {}) };
     },
 
     async reactionDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {

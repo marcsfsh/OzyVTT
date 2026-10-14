@@ -4,7 +4,7 @@ import { type ActorDefinition } from "@vtt/schemas";
 import {
   featurePicks, HOMEBREW_BODY_SCHEMAS,
   resolveSpellLists, spellListMemberIds,
-  type BackgroundReference, type ClassReference, type ContentSpellcasting, type FeatReference,
+  type BackgroundReference, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference,
   type FeatureChoice, type FeatureModifier, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
   type SpellListReference, type SubclassReference
 } from "@vtt/content-srd-5.2.1";
@@ -164,11 +164,13 @@ export function validateForPublish(
     case "feat": featIssues(record as FeatReference, checks); break;
     case "monster": monsterIssues(record as ActorDefinition, id, checks); break;
     case "spell-list": spellListIssues(record as SpellListReference, checks); break;
-    // A spell and an equipment record name no other record. `SpellReference.classes` entries are open
-    // membership TAGS (a list that does not exist yet is not an error - it may be authored later),
-    // and `EquipmentReferenceSchema` is the one `.strict()` content schema, so a typo'd key is
-    // already a tier-1 failure rather than a silently-stripped one.
-    case "spell": case "equipment": break;
+    // A spell names no other record. `SpellReference.classes` entries are open membership TAGS (a
+    // list that does not exist yet is not an error - it may be authored later), and
+    // `EquipmentReferenceSchema` is the one `.strict()` content schema, so a typo'd key is already
+    // a tier-1 failure rather than a silently-stripped one. Since C9, an EQUIPMENT record CAN name
+    // other records - a template's `appliesTo.baseIds` - so it grew the referential arm below.
+    case "spell": break;
+    case "equipment": equipmentIssues(record as EquipmentReference, checks); break;
   }
 
   return { valid: issues.length === 0, issues };
@@ -319,6 +321,44 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
   if (facts.creatureType === null) checks.add(["extensions"], `This creature has no creature type, so the bestiary would list it as "unknown" and type search would never find it. Put a "type" in the "${STATBLOCK_EXTENSION}" extension bag.`);
 }
 
+/**
+ * C9's referential half. A template's `appliesTo.baseIds` is exactly what the bind validates a
+ * player's pick against, so a base the catalog cannot resolve is a pick that can never succeed -
+ * the "publishes clean and is silently inert" failure this file exists to refuse by name. Checked
+ * against the MERGED catalog (bundled + published homebrew), the same view the bind reads, and
+ * against the same branch the bind takes: `category === "weapon"` copies weapon stats, anything
+ * else copies armor stats.
+ */
+function equipmentIssues(item: EquipmentReference, checks: Checks) {
+  damageBonusMomentIssues(item.modifiers, ["modifiers"], item.name, checks);
+  const appliesTo = item.appliesTo;
+  if (!appliesTo) return;
+  if (item.category !== "weapon" && item.category !== "armor") {
+    checks.add(["appliesTo"], `"${item.name}" has an "applies to" list but its category is "${item.category}" - a template must be a weapon or an armor, because those are the stats a bind copies.`);
+    return;
+  }
+  if (item.category === "weapon" ? item.weapon != null : item.armor != null) {
+    checks.add(["appliesTo"], `"${item.name}" has both its own ${item.category} stats and an "applies to" list. Give it one or the other: fixed stats make it one specific ${item.category}; the list makes it a template whose stats come from the player's pick.`);
+  }
+  const summaries = checks.catalog.equipmentSummaries();
+  appliesTo.baseIds.forEach((baseId, index) => {
+    const base = summaries.find((entry) => entry.id === baseId);
+    if (!base) {
+      checks.add(["appliesTo", "baseIds", index], `"${baseId}" is not in the equipment catalog, so "${item.name}" could never be bound to it. Name a real ${item.category} id, or publish the base first.`);
+      return;
+    }
+    // The ETL's own ruling, held for homebrew too: a shield is never a bind target - its armor
+    // block carries its +2 BONUS as acBase, so binding would set the wearer's whole AC to 2.
+    if (item.category === "armor" && base.category === "shield") {
+      checks.add(["appliesTo", "baseIds", index], `"${baseId}" is a shield, and a shield cannot be a template's base - its armor block carries its +2 bonus, not a body AC. Make the magic shield its own fixed item instead.`);
+      return;
+    }
+    if (item.category === "weapon" ? !base.weapon : !base.armor) {
+      checks.add(["appliesTo", "baseIds", index], `"${baseId}" has no ${item.category} stats to copy, so "${item.name}" could never be bound to it.`);
+    }
+  });
+}
+
 function spellListIssues(list: SpellListReference, checks: Checks) {
   const spells = checks.catalog.spellSummaries();
   // Resolve this list ALONGSIDE the published ones: `basedOn` may name a peer, and a draft has to be
@@ -397,7 +437,31 @@ function featureIssues(feature: FeatureRecord, path: Path, checks: Checks, grant
  * cannot say it (a `.superRefine` inside a `z.discriminatedUnion` is not legal in Zod 3), so it is
  * refused HERE, at publish, which is where the codebase already puts authoring errors.
  */
+/**
+ * The moments the DAMAGE pass actually collects (`action-resolution.ts`'s passes list). A
+ * `damage-bonus` gated on any other moment parses, publishes and lands NOWHERE - `on-attack-roll`
+ * is an attack-pass moment whose collection reads `attack-bonus` only. The 2026-08-14 review
+ * reproduced the silent drop; this refusal is what turns it into a named message. Scoped to
+ * `damage-bonus` (born this batch, so no stored record can be demoted by the new rule);
+ * `extra-damage`'s identical exposure predates C9 and is recorded in `known-bugs.md` instead.
+ */
+const DAMAGE_PASS_MOMENTS = new Set(["on-hit", "on-damage-roll", "on-critical-hit", "on-critical-miss"]);
+const RIDER_MOMENTS = new Set([
+  "on-attack-roll", "on-hit", "on-critical-hit", "on-critical-miss", "on-damage-roll", "on-saving-throw",
+  "on-ability-check", "on-initiative-roll", "on-death-save", "on-taking-damage", "on-spell-cast"
+]);
+function damageBonusMomentIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
+  (modifiers ?? []).forEach((modifier, index) => {
+    if (modifier.type !== "damage-bonus") return;
+    const moment = (modifier.when ?? []).map((trigger) => trigger.type).find((type) => RIDER_MOMENTS.has(type) && !DAMAGE_PASS_MOMENTS.has(type));
+    if (moment !== undefined) {
+      checks.add([...path, index], `"${label}" gates a damage-bonus on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on "on-hit", "on-damage-roll" or "on-critical-hit" instead (or drop the moment for an always-on bonus).`);
+    }
+  });
+}
+
 function riderIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
+  damageBonusMomentIssues(modifiers, path, label, checks);
   (modifiers ?? []).forEach((modifier, index) => {
     if (modifier.type !== "extra-damage") return;
     if (modifier.formula === undefined && modifier.abilityModifier === undefined) {

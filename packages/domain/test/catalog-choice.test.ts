@@ -70,6 +70,7 @@ const spellSummary = (id: string, level: number, classes: readonly string[]): Co
 const equipmentSummary = (id: string, category: ContentEquipmentSummary["category"]): ContentEquipmentSummary => ({
   id, name: id, category, costGp: null, weightLb: null, description: null,
   weapon: category === "weapon" ? { category: "simple", damageDice: "1d6", damageType: "slashing", rangeFeet: null, longRangeFeet: null } : null,
+  appliesTo: null,
   armor: null
 });
 

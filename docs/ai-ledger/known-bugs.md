@@ -34,6 +34,39 @@ Format: `[area] — description — suspected cause / status`.
   a z-index argument inside it. **The 44px audit cannot see this** — `scripts/tap-audit.mjs` measures
   size, not reach, and never opens this popover.
 
+- **[homebrew/riders] An `extra-damage` rider gated on a moment the damage pass never collects
+  publishes clean and lands nowhere.** The damage pass collects `null`/`on-damage-roll`/`on-hit`/
+  `on-critical-hit`(/`on-critical-miss`) only (`apps/server/src/action-resolution.ts`, the passes
+  list), while the schema accepts any of the eleven moments - so `extra-damage` gated
+  `on-attack-roll` (or `on-saving-throw`, ...) parses, publishes and silently adds nothing, the
+  hardest homebrew failure to diagnose. Found by the 2026-08-14 C9 review, which reproduced the
+  identical drop for the new `damage-bonus` and closed THAT half with a publish refusal
+  (`homebrew-validate.ts` `damageBonusMomentIssues`). `extra-damage` is left out of the refusal
+  deliberately: it predates C9, and widening the gate could demote an already-published record on
+  its next edit - the demote-on-PATCH hazard this ledger already records. Wants the same refusal
+  behind a one-time sweep of stored records (or the F4 advisory channel, currently deferred).
+
+- **[rules-engine] Push applies automatically where the SRD prints "you CAN push", and an actor
+  already on the roster keeps a stale Armor Class until something writes its inventory.** Two
+  residues of the 2026-08-14 flourishes batch, both named in code beside the mechanism they limit.
+  (1) `push` (greatclub, heavy crossbow, pike, warhammer) shoves on every hit; the printed mastery
+  makes it the attacker's option, so a player cannot decline a shove that would carry a foe out of
+  their own reach before a second Extra Attack swing. The vocabulary it needs is one optional
+  boolean the attacker declares on the resolve payload PLUS the control that sends it - the field
+  alone is unusable, because the shipped client sends no flag and either default is wrong for
+  somebody. Named absence in `apps/server/src/weapon-mastery.ts`. (2) `actor.armorClass` is cached
+  live state written by three sites (`instantiate`, `rebuildActorDefinition`, `reconcileEquipment`),
+  so U28's corrected Unarmored Defence reaches a character already on the table only once some
+  inventory write reconciles it - which equipping the shield itself does, so the reported symptom is
+  covered and the residue is a sheet that already held one. A startup backfill was considered and
+  declined (it writes persisted state to recover what the reader resolves for free); the honest fix
+  is a reconcile pass whenever the content catalog changes under a stored sheet.
+  Also still open from the same batch: push never fires on the opportunity-attack path
+  (`reactions.ts` holds no geometry and resolves without the callback), where it now correctly
+  narrates "move the token" instead of moving it, and neither Push nor Topple reaches the shared
+  table feed - both narrate as GM-only rules notes, so the table watches a token jump with no line
+  explaining why.
+
 - **[encounter/saves] A save preview projects the PRE-defence number, so the prompt prints more than
   the commit lands against any resistant target.** `answerSave`'s preview arm returns `outcomeDamage`
   — the halved, re-typed total — and it `return`s from ABOVE the call to `applyDamageDetailed`
@@ -163,12 +196,6 @@ Format: `[area] — description — suspected cause / status`.
   SRD vocabulary control, and `weapon-properties.mirror.test.ts` swings a GM-authored Finesse weapon
   off Dexterity through the real controls, the real wire and the real catalog.
 
-- **[server/ac] A Barbarian or Monk holding a shield loses their Unarmored Defense.**
-  `armorClassFromEquipment` returns non-null for a shield alone, so equipping only a shield replaces
-  the Constitution/Wisdom AC path instead of adding +2 to it. Found 2026-08-10 by PLANNER-ENGINE.
-  Owner: engine program **U28** (`docs/product/plan-engine-program.md`), together with
-  `unarmored-defense.allowShield` (2 SRD authors: Barbarian `true`, Monk `false`).
-
 - **[homebrew/editor] The "inherit the damage type" empty box mints unpublishable records.**
   `RiderEditor`'s extra-damage row documents an empty `damageType` as "same as the weapon's", and
   `blankModifier` seeds exactly that — but the schema refuses both `""` ("String must contain at
@@ -195,34 +222,6 @@ Format: `[area] — description — suspected cause / status`.
   `extensions["open5e.srd-2024"]` keys that appear zero times in the published contract. (3) The
   closed SRD slug vocabularies are neither published to callers nor validated at publish, so a wrong
   slug ships silently inert. Evidence and units: `docs/product/plan-api-program.md`.
-
-- **[content/items] A magic weapon added from the browse list offers no attack at all, because a
-  magic weapon carries no weapon stats.** The SRD's printed type line names which **base** weapon the
-  item applies to — `Weapon (Warhammer)`, `Weapon (Any Simple or Martial)` — never the item's own
-  dice, and the ETL is faithful to it. *Measured 2026-08-11 over the committed
-  `packages/content-srd-5.2.1/bundles/magic-items.v1.json`: **0 of the 33 `weapon`-category rows carry
-  a `weapon` block**, and 0 of the 14 `armor` rows carry an `armor` block.* The picker mints the
-  inventory row's block from the catalog summary's (`inventoryWeaponFrom`,
-  `apps/client/src/encounter/equipment.tsx`), which is null here, so `weaponAction` returns null
-  (`apps/server/src/equipment-derivation.ts`) and there is nothing to swing. **Driven end to end on a
-  picker-minted `Dwarven Thrower`, equipped and attuned: `derivation.carriers` 1, `weaponActionIds`
-  `[]`, `effectiveActions` `[]`.** A GM who adds a Sun Blade to a character gets a line item and no
-  attack. Not a projection or a wire problem — the data is honest and the mechanism to consume it does
-  not exist. **This is also why every `+N` on a weapon row is a named absence rather than a rider:** an
-  authored `+3` would not be an overstatement, it would be a number that appears nowhere, and
-  `scope: "bearer"` is refused as the workaround because it would raise every attack the bearer makes
-  and two magic weapons would stack. Absences are in
-  `packages/content-srd-5.2.1/scripts/item-mechanics/weapons-armour.ts` (19 rows cite this).
-  **The armour side is milder and has the same root:** the SRD prints a magic shield's bonus *"in
-  addition to the Shield's normal bonus to AC"*, and AC is additive, so an `armor-class` rider stacked
-  on a separately equipped mundane base is what the source describes and it works today — but a bearer
-  who equips **only** the magic row reads `10 + Dex + N` instead of the base's AC + N, because that row
-  carries no `armor` block either. Wants its own unit — **C9, the weapon-template mechanism**, written
-  up in `docs/product/plan-content-program.md`: the player picks the base the template applies to.
-  Two things gate it and both are named there — the eligibility column (18 distinct qualifier forms
-  over the 33 rows, not parsed today) and a flat `damage-bonus` in `FeatureModifierSchema`, without
-  which a `+1` weapon would author its to-hit and silently understate its damage by one. **Do not
-  invent default stats for these rows**; the source does not print them.
 
 - **[content/spells] There is no healing in the spell model, so anything that casts a healing spell
   deals damage instead.** `SpellReferenceSchema` has no `healing` field at all (*measured: no match

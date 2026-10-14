@@ -287,12 +287,22 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(withRiders);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // Twelve variants: the eight that existed, the three shared with FeatureModifierSchema, and
+    // Thirteen variants: the eight that existed, the three shared with FeatureModifierSchema,
     // `damage-vulnerability` - the mirror of `damage-resistance`, without which nothing in the game
-    // could make a player character vulnerable to a damage type.
-    expect(EffectModifierSchema.options).toHaveLength(12);
+    // could make a player character vulnerable to a damage type - and U18's runtime `speed`, the one
+    // that cannot be said with the BAKED `speed` rider because an effect that ends has to give the
+    // feet back. Its reader is `effectiveSpeedFeet`, and the far end is the movement refusal.
+    expect(EffectModifierSchema.options).toHaveLength(13);
     // ...and the JSON twin declares exactly as many branches, which is the lockstep this test buys.
-    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(12);
+    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(13);
+    // The runtime speed member goes through BOTH documents, bounds and all - a branch only Zod knows
+    // about is a stored effect the JSON validator would reject on the next load.
+    expect(EffectModifierSchema.safeParse({ type: "speed", amount: -10 }).success).toBe(true);
+    expect(EffectModifierSchema.safeParse({ type: "speed", amount: 61 }).success).toBe(false);
+    const striding = structuredClone(withRiders) as Record<string, any>;
+    striding.actions[0].grants.modifiers = [{ type: "speed", amount: -10 }];
+    expect(ActorDefinitionSchema.safeParse(striding).success).toBe(true);
+    expect(jsonValidate(striding), JSON.stringify(jsonValidate.errors)).toBe(true);
   });
 
   it("normalises every advantage shape through ONE function, so no consumer branches on eleven", () => {

@@ -764,7 +764,7 @@ export type ContentSpellsResult = { ok: boolean; message?: string; spells?: read
  * is a refusal). Declaring both optional keys here is what lets a caller SEE the difference -
  * `inventoryWeaponFrom` in `encounter/equipment.tsx` is the one projection that takes it.
  */
-export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; mastery?: string; properties?: readonly string[] }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; mastery?: string; properties?: readonly string[] }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null; appliesTo: Readonly<{ label: string; baseIds: readonly string[] }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 
 // ---------- Character-builder catalogs ----------
@@ -963,6 +963,38 @@ export type ContentSheetResult = { ok: boolean; message?: string; definition?: i
 export type ActionResolutionAttack = Readonly<{ targetId: string; targetName: string; total: number; naturalRoll: number; targetAc: number | null; outcome: "crit" | "hit" | "miss" | "fumble" | "unknown"; /** Cover's AC bonus folded into targetAc (SRD Cover: +2 half, +5 three-quarters). */ coverBonus?: number }>;
 /** Why an attack rolled with advantage/disadvantage - every contributing source, so the table can see the math (ADR-0020 explainability). */
 export type ActionRollMode = Readonly<{ mode: "advantage" | "disadvantage" | "normal"; advantage: readonly string[]; disadvantage: readonly string[] }>;
+/**
+ * THE TABLE'S OWN LINE. One feed row a resolve produced for the whole table to read - the shape
+ * `narrateTokenMove` already gives the GM's own drag (`apps/server/src/movement-narration.ts`),
+ * carried on the resolution because only the resolver knows a rider happened and how it turned out.
+ *
+ * IT IS NOT `warnings`, AND THE SPLIT IS THE POINT. A warning is a GM rules note - the operation
+ * layer writes every one of them `gmOnly: true` - so a rider that CHANGED THE BOARD narrated only to
+ * the GM and the table watched a token jump ten feet with nothing explaining why. A line here is a
+ * table event instead: the operation layer appends it with `actorIds`, and the feed's own gate
+ * (`appendLog` in `apps/server/src/server.ts`) re-derives whether a player may read it from those
+ * ids. Anything a player must NOT read - a save DC that is the attacker's secret, an instruction to
+ * the GM to place a token by hand - stays in `warnings`, which is why both channels exist.
+ *
+ * TWO INDEPENDENT GATES, deliberately: `gmOnly` is the resolver's own structural verdict, read off
+ * the actors' visibility while it still has the state in hand, and `actorIds` lets the feed decide
+ * again from live state. Either one alone would hold; a leak needs both to fail.
+ *
+ * THAT FIRST CLAUSE HAD TO BE MADE TRUE - it was written before it was. The feed's read asked
+ * `visibility === "gm-only"`, which answers "not hidden" for a combatant the roster no longer holds,
+ * so the ids-only gate failed OPEN on exactly the input the resolver's `!== "public"` failed CLOSED
+ * on. Both now read `!== "public"` (`appendLog` in `apps/server/src/server.ts`), so each one alone
+ * really does withhold the row, and "a leak needs both to fail" is a property rather than a hope.
+ */
+export type ActionTableNarration = Readonly<{
+  /** The feed row's kind - the same vocabulary `CombatLogEntry` already renders (`log-movement`, `log-save`). */
+  kind: "movement" | "save";
+  text: string;
+  /** Everyone the line names. The feed keeps it from players when any of them is a hidden combatant. */
+  actorIds: readonly string[];
+  /** The resolver already knows this line names a hidden combatant; true forces the GM-only read. */
+  gmOnly?: boolean;
+}>;
 export type ActionResolution = Readonly<{
   actionName: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
@@ -983,6 +1015,8 @@ export type ActionResolution = Readonly<{
   componentsRemaining?: Readonly<Record<string, number>> | null;
   /** Assisted-mode rule conflicts that were allowed through (also logged). */
   warnings?: readonly string[];
+  /** Lines this resolve produced for the whole table to read (an accomplished push, the save a Topple forced) - see `ActionTableNarration`. */
+  tableNarration?: readonly ActionTableNarration[];
   /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
   overridden?: Readonly<{ rule: string; reason: string }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
@@ -1156,7 +1190,11 @@ export interface ClientToServerEvents {
   "actor:spend-hit-dice": (payload: { commandId: string; actorId: string; count: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-slot": (payload: { commandId: string; actorId: string; level: number; remaining: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-prepared": (payload: { commandId: string; actorId: string; spellId: string; prepared: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "character:set-inventory": (payload: { commandId: string; actorId: string; item: { id: string; name: string; quantity?: number; equipped?: boolean; attuned?: boolean; weightEach?: number; description?: string; category?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  // The item's OPTIONAL mechanical keys (weapon/armor/baseId/magic) are declared here even though
+  // conditional spreads at the call sites would compile without them - an undeclared wire key is how
+  // a payload type quietly understates the contract. `baseId` is C9's pick; the server validates it
+  // against the catalog's eligibility and copies the base's stats itself.
+  "character:set-inventory": (payload: { commandId: string; actorId: string; item: { id: string; name: string; quantity?: number; equipped?: boolean; attuned?: boolean; weightEach?: number; description?: string; category?: string; baseId?: string; weapon?: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null; properties?: readonly string[] }>; armor?: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }>; magic?: Readonly<{ isMagic?: boolean; attunementRequired?: boolean; slot?: string }> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-currency": (payload: { commandId: string; actorId: string; currency: { cp?: number; sp?: number; ep?: number; gp?: number; pp?: number }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   // `classes[].hitDie` carries the per-class hit die so an identity edit REBUILDS the multiclass
   // hit-dice pool instead of dropping it (a Fighter 3 / Wizard 2 is 3d10 + 2d6, not 5 of one size).
