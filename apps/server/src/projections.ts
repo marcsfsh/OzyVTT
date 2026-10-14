@@ -147,6 +147,62 @@ function classLineOf(definition: GameState["definitions"][number]["definition"] 
   return classes.length === 0 ? null : classes.map((entry) => `${entry.name} ${entry.level}`).join(" / ");
 }
 
+type Actor = GameState["actors"][number];
+
+/**
+ * Who may see each actor field in the player view. Every field must be listed, so adding one to the
+ * actor schema fails to compile until someone decides its audience.
+ * - table: every player, for every visible actor
+ * - party: every player, but only on player characters (monster stats are GM knowledge)
+ * - derived: never copied directly; projectPlayerView builds a masked or gated version
+ * - never: GM only
+ */
+const PLAYER_ACTOR_FIELDS = {
+  id: "table",
+  name: "table",
+  kind: "table",
+  visibility: "table",
+  size: "table",
+  sizeCells: "table",
+  tokenAssetId: "table",
+  conditions: "table",
+  deathSaves: "table",
+  armorClass: "party",
+  initiative: "party",
+  speedFeet: "party",
+  definitionId: "party",
+  hp: "derived",
+  effects: "derived",
+  ownerSessionId: "derived",
+  healthDisplay: "derived",
+  replaySceneId: "derived",
+  actionUses: "derived",
+  choiceOverrides: "derived",
+  hitDice: "derived",
+  spellSlots: "derived",
+  pactSlots: "derived",
+  preparedSpellIds: "derived",
+  inventory: "derived",
+  currency: "derived",
+  notes: "never",
+  conditionImmunities: "never",
+  legendary: "never",
+  lastUsedAt: "never",
+  archived: "never",
+  sheetPreview: "never"
+} as const satisfies Record<keyof Actor, "table" | "party" | "derived" | "never">;
+
+type FieldsFor<Audience> = { [K in keyof typeof PLAYER_ACTOR_FIELDS]: (typeof PLAYER_ACTOR_FIELDS)[K] extends Audience ? K : never }[keyof typeof PLAYER_ACTOR_FIELDS];
+const TABLE_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filter((key) => PLAYER_ACTOR_FIELDS[key] === "table") as FieldsFor<"table">[];
+const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filter((key) => PLAYER_ACTOR_FIELDS[key] === "table" || PLAYER_ACTOR_FIELDS[key] === "party") as FieldsFor<"table" | "party">[];
+
+/** Copies the listed fields, leaving out optional ones that are unset. */
+function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): Pick<Actor, K> {
+  const picked: Partial<Pick<Actor, K>> = {};
+  for (const key of keys) if (source[key] !== undefined) picked[key] = structuredClone(source[key]);
+  return picked as Pick<Actor, K>;
+}
+
 /**
  * Player projection. `state.partyVisibility` governs only what a player receives about another
  * player's claimed character, and it is enforced here; a client-side filter would still leak on the wire.
@@ -197,10 +253,7 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
     combat: projectPlayerCombat(state, playerSessionId, now),
     // Tiers subtract fields, never entries; only gm-only visibility and archiving remove an actor.
     actors: state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((source) => {
-      // Stripped: notes, ownerSessionId, exact hp; effects (rebuilt masked below); actionUses, choiceOverrides
-      // and hitDice (own character only); conditionImmunities and legendary (monster defenses are GM
-      // knowledge); archived and sheetPreview (GM-only management flags).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, choiceOverrides, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, replaySceneId, ...actor } = source;
+      const { ownerSessionId, actionUses, choiceOverrides, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, replaySceneId } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Another player's claimed character: the only thing `partyVisibility` governs.
       const theirs = !mine && source.kind === "player-character" && ownerSessionId !== null;
@@ -216,7 +269,7 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       const storedSheet = cardVisible && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
       const classLine = theirs && cardVisible ? classLineOf(storedSheet) : null;
       return {
-        ...actor,
+        ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
         hp: playerHp(source),
         effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
         claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
