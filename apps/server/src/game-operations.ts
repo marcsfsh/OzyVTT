@@ -17,7 +17,7 @@ import { ABILITY_ROLL_FORMULA, parseDiceFormula, resolveDice, rollDice, validate
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { generateCharacterRequest } from "./character-generate.js";
 import { buildCharacterDefinition } from "./character-build.js";
-import type { IntegrationScope } from "@vtt/api-contract";
+import { GAME_COMMANDS, type GameCommandType, type IntegrationScope } from "@vtt/api-contract";
 import {
   addAnnotation,
   addPing,
@@ -149,7 +149,6 @@ import {
   EffectAddSchema,
   EffectEndSchema,
   EncounterStartSchema,
-  GAME_COMMAND_SCOPES,
   HpAmountSchema,
   InitiativeNextSchema,
   InitiativePreviousSchema,
@@ -195,8 +194,7 @@ import {
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
-  TurnUseSchema,
-  type GameCommandType
+  TurnUseSchema
 } from "./game-commands.js";
 
 /** Transport-agnostic game capabilities. The socket handlers and the HTTP API both validate, authorize,
@@ -4108,7 +4106,7 @@ function askActorId(payload: unknown): string | null {
 }
 
 /** The command catalog for the HTTP tunnel, its discovery listing and the typed routes. Scopes come from
- *  `GAME_COMMAND_SCOPES`. */
+ *  `GAME_COMMANDS`. */
 export type GameCommandDescriptor = Readonly<{
   type: GameCommandType;
   scope: IntegrationScope;
@@ -4496,6 +4494,6 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["fog.reset", "Hide the whole map again (clear every fog stroke) (GM).", (p, raw) => operations.fogReset(p, raw)]
   ];
   return new Map<string, GameCommandDescriptor>(
-    entries.map(([type, summary, run]) => [type, { type, scope: GAME_COMMAND_SCOPES[type], summary, run }])
+    entries.map(([type, summary, run]) => [type, { type, scope: GAME_COMMANDS[type].scope, summary, run }])
   );
 }

@@ -28,7 +28,7 @@ single JSON blob the server persists and projects per role.
 ## Commands
 
 The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the
-listed integration scope (`GAME_COMMAND_SCOPES` in `packages/api-contract`). Adding one walks the
+listed integration scope (`GAME_COMMANDS` in `packages/api-contract`). Adding one walks the
 pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map + an OpenAPI
 operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`
 route -> projection decision.

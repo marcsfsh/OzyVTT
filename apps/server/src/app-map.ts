@@ -1,5 +1,5 @@
 import { GameStateSchema } from "@vtt/domain";
-import { API_VERSION, GAME_COMMAND_SCOPES, REALTIME_PROTOCOL_VERSION, openApiDocument } from "@vtt/api-contract";
+import { API_VERSION, GAME_COMMANDS, REALTIME_PROTOCOL_VERSION, openApiDocument } from "@vtt/api-contract";
 
 /**
  * Renders the generated app map (`docs/app-map.md`). Pure: reads the `GameState` schema, the api-contract
@@ -18,8 +18,8 @@ function namespaceOf(commandType: string): string {
 
 export function renderAppMap(): string {
   const stateFields = Object.keys(GameStateSchema.shape).sort();
-  const commands = Object.entries(GAME_COMMAND_SCOPES)
-    .map(([type, scope]) => ({ type, scope: String(scope) }))
+  const commands = Object.entries(GAME_COMMANDS)
+    .map(([type, route]) => ({ type, scope: String(route.scope) }))
     .sort((a, b) => a.type.localeCompare(b.type));
   const namespaces = [...new Set(commands.map((command) => namespaceOf(command.type)))].sort();
   const httpPaths = Object.entries(openApiDocument.paths)
@@ -55,7 +55,7 @@ export function renderAppMap(): string {
   lines.push("## Commands");
   lines.push("");
   lines.push("The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the");
-  lines.push("listed integration scope (`GAME_COMMAND_SCOPES` in `packages/api-contract`). Adding one walks the");
+  lines.push("listed integration scope (`GAME_COMMANDS` in `packages/api-contract`). Adding one walks the");
   lines.push("pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map + an OpenAPI");
   lines.push("operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`");
   lines.push("route -> projection decision.");

@@ -5,11 +5,15 @@ import {
   CONTENT_PATHS,
   ENCOUNTER_ARCHIVE_PATHS,
   GAME_PATHS,
+  GAME_COMMANDS,
   GameCommandEnvelopeSchema,
   SESSION_PATHS,
   type ApiErrorCode,
+  type GameCommandType,
   type IntegrationScope
 } from "@vtt/api-contract";
+
+type GameCommandRoute = (typeof GAME_COMMANDS)[GameCommandType];
 import type { EncounterArchiveSummary } from "./game-store.js";
 import { describeFailure } from "./commands/failures.js";
 import { isGmGrade, type GameCommandDescriptor, type GameOperations, type GamePrincipal } from "./game-operations.js";
@@ -249,131 +253,15 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Typed command routes (same operations the socket handlers call) ----------
 
-  const actorIdParam = (req: Request) => ({ actorId: req.params.actorId });
-  const saveIdParam = (req: Request) => ({ saveId: req.params.saveId });
-  const idParam = (req: Request) => ({ id: req.params.id });
-  router.post(expressPath(GAME_PATHS.encounterStart), ...command("encounter.start"));
-  router.post(expressPath(GAME_PATHS.encounterEnd), ...command("encounter.end"));
-  router.post(expressPath(GAME_PATHS.encounterCombatants), ...command("encounter.add-combatant"));
-  router.post(expressPath(GAME_PATHS.initiativeSet), ...command("initiative.set"));
-  router.post(expressPath(GAME_PATHS.initiativeRollSelf), ...command("initiative.roll-self"));
-  router.post(expressPath(GAME_PATHS.initiativeRollRemaining), ...command("initiative.roll-remaining"));
-  router.post(expressPath(GAME_PATHS.initiativeNext), ...command("initiative.next"));
-  router.post(expressPath(GAME_PATHS.initiativePrevious), ...command("initiative.previous"));
-  router.post(expressPath(GAME_PATHS.turnEnd), ...command("turn.end"));
-  router.post(expressPath(GAME_PATHS.turnUse), ...command("turn.use"));
-  router.post(expressPath(GAME_PATHS.turnReaction), ...command("turn.use-reaction"));
-  router.post(expressPath(GAME_PATHS.turnLegendary), ...command("turn.use-legendary"));
-  router.post(expressPath(GAME_PATHS.tokenMove), ...command("token.move", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actors), ...command("actor.add-from-definition"));
-  router.delete(expressPath(GAME_PATHS.actorById), ...command("actor.remove", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorDamage), ...command("actor.apply-damage", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorHeal), ...command("actor.heal", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorTempHp), ...command("actor.set-temp-hp", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorHp), ...command("actor.set-hp", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorConditions), ...command("actor.set-condition", actorIdParam));
-  router.post(expressPath(GAME_PATHS.definitionsImport), ...command("actor.import-definition"));
-  router.post(expressPath(GAME_PATHS.characterImports), ...command("character.submit-import"));
-  router.post(
-    expressPath(GAME_PATHS.characterImportResolve),
-    ...command("character.resolve-import", (req: Request) => ({ importId: req.params.importId }))
-  );
-  router.post(expressPath(GAME_PATHS.rolls), ...command("dice.roll"));
-  router.post(expressPath(GAME_PATHS.actionResolve), ...command("action.resolve"));
-  router.post(expressPath(GAME_PATHS.saveAnswer), ...command("save.answer", saveIdParam));
-  router.post(expressPath(GAME_PATHS.saveDismiss), ...command("save.dismiss", saveIdParam));
-  router.post(
-    expressPath(GAME_PATHS.reactionAnswer),
-    ...command("reaction.answer", (req: Request) => ({ reactionId: req.params.reactionId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.reactionDismiss),
-    ...command("reaction.dismiss", (req: Request) => ({ reactionId: req.params.reactionId }))
-  );
-  router.post(expressPath(GAME_PATHS.damageResolve), ...command("damage.resolve"));
-  router.post(expressPath(GAME_PATHS.effects), ...command("effect.add", actorIdParam));
-  router.post(
-    expressPath(GAME_PATHS.effectEnd),
-    ...command("effect.end", (req: Request) => ({ actorId: req.params.actorId, effectId: req.params.effectId }))
-  );
-  router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));
-  router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
-  router.post(expressPath(GAME_PATHS.playerDamageMode), ...command("encounter.set-player-damage-mode"));
-  router.post(expressPath(GAME_PATHS.playerInitiativeMode), ...command("encounter.set-player-initiative-mode"));
-  router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
-  router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
-  router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorRechoose), ...command("actor.rechoose", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSpendHitDice), ...command("actor.spend-hit-dice", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetSlot), ...command("character.set-slot", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetPrepared), ...command("character.set-prepared", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetInventory), ...command("character.set-inventory", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetCurrency), ...command("character.set-currency", actorIdParam));
-  router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
-  router.post(
-    expressPath(GAME_PATHS.characterSetProficiencies),
-    ...command("character.set-proficiencies", actorIdParam)
-  );
-  router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
-  router.post(expressPath(GAME_PATHS.charactersRandom), ...command("character.generate"));
-  router.post(
-    expressPath(GAME_PATHS.characterRebuild),
-    ...command("character.rebuild", (req) => ({ actorId: req.params.actorId }))
-  );
-  router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
-  router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));
-  router.post(expressPath(GAME_PATHS.rulesPolicy), ...command("rules.set-policy"));
-  router.post(expressPath(GAME_PATHS.actionUse), ...command("action.use"));
-  router.post(expressPath(GAME_PATHS.saveRoll), ...command("save.roll"));
-  router.post(expressPath(GAME_PATHS.rulesAsk), ...command("rules.ask"));
-  router.post(expressPath(GAME_PATHS.rulesAnswer), ...command("rules.answer"));
-  router.post(expressPath(GAME_PATHS.stagingDefaults), ...command("table.set-staging-defaults"));
-  router.post(expressPath(GAME_PATHS.partyVisibility), ...command("table.set-party-visibility"));
-  // Literal segments (ping/clear) are registered before the {id} routes.
-  router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
-  router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));
-  router.post(expressPath(GAME_PATHS.annotations), ...command("annotation.add"));
-  router.delete(expressPath(GAME_PATHS.annotationById), ...command("annotation.remove", idParam));
-  router.post(expressPath(GAME_PATHS.annotationMove), ...command("annotation.move", idParam));
-  router.post(expressPath(GAME_PATHS.annotationColor), ...command("annotation.set-color", idParam));
-  router.post(expressPath(GAME_PATHS.annotationVisibility), ...command("annotation.set-visibility", idParam));
-  router.post(expressPath(GAME_PATHS.annotationMovable), ...command("annotation.set-movable", idParam));
-  router.post(expressPath(GAME_PATHS.claims), ...command("character.claim"));
-  router.post(expressPath(GAME_PATHS.claimsRelease), ...command("character.release"));
-  router.post(expressPath(GAME_PATHS.claimForceRelease), ...command("character.force-release", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorTokenImage), ...command("actor.set-token-image", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorVisibility), ...command("actor.set-visibility", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorArchived), ...command("actor.set-archived", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSheetPreview), ...command("actor.set-sheet-preview", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorHealthDisplay), ...command("actor.set-health-display", actorIdParam));
-  router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
-  router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
-  // Literal /scenes/reorder is registered before the {sceneId} routes so the segment can't be captured as an id.
-  router.post(expressPath(GAME_PATHS.sceneReorder), ...command("scene.reorder"));
-  router.delete(
-    expressPath(GAME_PATHS.sceneById),
-    ...command("scene.remove", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneRename),
-    ...command("scene.rename", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneActivate),
-    ...command("scene.activate", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneCombatants),
-    ...command("scene.set-combatants", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(
-    expressPath(GAME_PATHS.sceneDuplicate),
-    ...command("scene.duplicate", (req) => ({ sceneId: req.params.sceneId }))
-  );
-  router.post(expressPath(GAME_PATHS.fogEnabled), ...command("fog.set-enabled"));
-  router.post(expressPath(GAME_PATHS.fogPaint), ...command("fog.paint"));
-  router.post(expressPath(GAME_PATHS.fogReset), ...command("fog.reset"));
+  // Each command's route comes from GAME_COMMANDS; its path parameters join the payload under their own
+  // names, except the archive launch, whose `{id}` is the archive's number.
+  for (const [type, route] of Object.entries(GAME_COMMANDS) as Array<[GameCommandType, GameCommandRoute]>) {
+    const extras =
+      type === "replay.launch"
+        ? (req: Request) => ({ archiveId: Number(req.params.id) })
+        : (req: Request) => ({ ...req.params });
+    router[route.method](expressPath(route.path), ...command(type, extras));
+  }
 
   // ---------- Player sessions (headless / alternate player clients) ----------
 
@@ -497,12 +385,6 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       .type("application/json")
       .send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
-
-  /** Launch-from-here; scope and handler come from the registry like every typed route. */
-  router.post(
-    expressPath(ENCOUNTER_ARCHIVE_PATHS.launch),
-    ...command("replay.launch", (req) => ({ archiveId: Number(req.params.id) }))
-  );
 
   /** Per-replay sharing: GM-grade only, storing the GM's decision. */
   router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.visibility), authorize("combat:write"), (req, res) => {

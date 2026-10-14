@@ -9,6 +9,7 @@ import { loadActorFixture } from "@vtt/test-fixtures";
 import {
   CONTENT_PATHS,
   ENCOUNTER_ARCHIVE_PATHS,
+  GAME_COMMANDS,
   GAME_PATHS,
   GameCommandCatalogResponseSchema,
   GameLogResponseSchema,
@@ -20,7 +21,6 @@ import {
   SESSION_PATHS
 } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
-import { GAME_COMMAND_SCOPES } from "../src/game-commands.js";
 import { createServer } from "../src/server.js";
 
 // ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
@@ -1235,7 +1235,7 @@ describe("public game API over /api/v1", () => {
   });
 
   it("keeps the OpenAPI-documented scopes identical to the runtime command scopes (no drift between doc, tunnel, and typed routes)", () => {
-    const TYPED_ROUTES: ReadonlyArray<[string, "post" | "delete", keyof typeof GAME_COMMAND_SCOPES]> = [
+    const TYPED_ROUTES: ReadonlyArray<[string, "post" | "delete", keyof typeof GAME_COMMANDS]> = [
       [GAME_PATHS.encounterStart, "post", "encounter.start"],
       [GAME_PATHS.encounterEnd, "post", "encounter.end"],
       [GAME_PATHS.encounterCombatants, "post", "encounter.add-combatant"],
@@ -1327,7 +1327,7 @@ describe("public game API over /api/v1", () => {
       [ENCOUNTER_ARCHIVE_PATHS.launch, "post", "replay.launch"]
     ];
     // Every cataloged command has exactly one typed route in this table...
-    expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMAND_SCOPES).sort());
+    expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMANDS).sort());
     // ...and the documented bearer scope for that route equals the runtime scope the tunnel + typed route enforce.
     const paths = openApiDocument.paths as unknown as Record<
       string,
@@ -1335,7 +1335,7 @@ describe("public game API over /api/v1", () => {
     >;
     for (const [path, method, type] of TYPED_ROUTES) {
       const documented = paths[path][method].security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
-      expect(documented, `${method.toUpperCase()} ${path} (${type})`).toEqual([GAME_COMMAND_SCOPES[type]]);
+      expect(documented, `${method.toUpperCase()} ${path} (${type})`).toEqual([GAME_COMMANDS[type].scope]);
     }
   });
 
@@ -1355,12 +1355,12 @@ describe("public game API over /api/v1", () => {
     expect([...synthetic.matchAll(/socket\.on\("([a-z0-9:-]+)"/g)].map((match) => match[1])).toEqual([]);
     // Once they are seen, the guard's own assertion rejects them: neither is a cataloged command.
     for (const handler of scrapeSocketHandlers(synthetic))
-      expect(Object.keys(GAME_COMMAND_SCOPES)).not.toContain(handler.event.replace(":", "."));
+      expect(Object.keys(GAME_COMMANDS)).not.toContain(handler.event.replace(":", "."));
   });
 
   it("gives every Socket.IO capability an HTTP twin - no socket-only capability (ADR-0016)", () => {
-    // The route-table test above compares GAME_COMMAND_SCOPES, typed routes and OpenAPI, so a capability
-    // that never entered GAME_COMMAND_SCOPES is invisible to all three. This test starts from the socket
+    // The route-table test above compares GAME_COMMANDS, typed routes and OpenAPI, so a capability
+    // that never entered GAME_COMMANDS is invisible to all three. This test starts from the socket
     // surface and demands each event reach the public API. The scrape covers every module under src/,
     // since feature modules (the codex, importers) register handlers too.
     const sourceDirectory = fileURLToPath(new URL("../src/", import.meta.url));
@@ -1427,8 +1427,8 @@ describe("public game API over /api/v1", () => {
       // with `:` swapped for `.`, and the command type must be publicly cataloged.
       const commandType = event.replace(":", ".");
       expect(
-        Object.keys(GAME_COMMAND_SCOPES),
-        `socket command "${event}" is not in GAME_COMMAND_SCOPES (socket-only capability)`
+        Object.keys(GAME_COMMANDS),
+        `socket command "${event}" is not in GAME_COMMANDS (socket-only capability)`
       ).toContain(commandType);
     }
     // And nothing in the read table is stale.
