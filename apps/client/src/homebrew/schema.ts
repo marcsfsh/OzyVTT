@@ -1,53 +1,29 @@
 /**
- * The field-schema vocabulary. Nine content types, ONE renderer.
+ * The field-schema vocabulary: per-type data files describe records, and `FieldRenderer.tsx`
+ * interprets them in one place.
  *
- * Nine hand-built forms is the failure mode this file exists to prevent: nine places
- * for a label to drift, nine places to forget `min-width: 0`, nine places a required
- * field can quietly stop being required. What ships instead is a `FieldDef` union the
- * renderer interprets in exactly one place (`FieldRenderer.tsx`) and nine data files
- * that describe records rather than draw them.
- *
- * ## The standing rule
- *
- * **A new authoring need is a field factory, a `validate`, a `visibleWhen`, or a
- * renderer flag — in that order — before it is ever a new `kind`.**
- *
- * The evidence that this holds rather than merely sounds good: two scope changes landed
- * after the union was fixed and neither needed a member.
- *
- *  - *Multi-term damage* (`1d8 slashing + 1d6 fire`) is `damagePartsField()` below — a
- *    factory returning a `kind: "rows"` field. One helper, four call sites.
- *  - *Picking one spell out of a 339-entry catalog* is `searchable: true` on
- *    `kind: "select"`, which swaps the renderer from `<select>` to a searchable picker.
- *    A `<select>` holding 339 options is unusable; a twelfth kind for it would have been
- *    the wrong fix.
- *
- * `rows` and `group` between them carry roughly two thirds of the field surface, which
- * is why the union stays at eleven members instead of thirty.
+ * Rule: a new authoring need is a field factory, a `validate`, a `visibleWhen` or a renderer flag,
+ * in that order, before it is ever a new `FieldKind`.
  */
 
 import {
-  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS
+  CONDITION_IDS,
+  CREATURE_TYPE_IDS,
+  DAMAGE_TYPE_IDS,
+  MAGIC_SCHOOL_IDS,
+  WEAPON_MASTERY_IDS,
+  WEAPON_PROPERTY_IDS
 } from "@vtt/content-srd-5.2.1/schemas";
 import { setAt } from "./paths";
 import type { HomebrewType } from "./types";
 
-/** The authored record body. Deliberately open: the server owns the per-type schema,
-    and a client-side mirror of it would be a second source of truth to keep in sync. */
+/** The authored record body. Left open because the server owns the per-type schema. */
 export type Draft = Readonly<Record<string, unknown>>;
 
-/**
- * `group` is the renderer flag that keeps a long `select` pickable — it renders an
- * `<optgroup>`, and nothing else changes. It is what lets the rider vocabulary offer
- * twenty-one modifiers and thirty gating conditions from ordinary selects instead of
- * from a twelfth `FieldKind` (see the standing rule above). The group LABEL is the
- * sentence the options finish, so the GM reads "Only while… Attuned" and never has to
- * learn the word the schema calls it.
- */
+/** `group` puts the option in an `<optgroup>` labelled with the phrase it completes ("Only while…"). */
 export type SelectOption = Readonly<{ value: string; label: string; disabled?: boolean; group?: string }>;
 
-/** One entry in a big pickable catalog (spells, equipment). Carries its origin so a
-    picker can badge the minority side and facet when both are present. */
+/** One entry in a large pickable catalog; `origin` drives the picker's badges and facets. */
 export type CatalogEntry = Readonly<{
   id: string;
   name: string;
@@ -56,13 +32,9 @@ export type CatalogEntry = Readonly<{
   keywords?: string;
 }>;
 
-/**
- * What a field needs from OUTSIDE the draft. Option lists are functions of this rather
- * than literals so they stay live: a spell list created two minutes ago has to appear
- * in the class editor's picker without a reload.
- */
+/** What a field needs from outside the draft; option lists derive from it so they stay live. */
 export type SchemaContext = Readonly<{
-  /** The record being edited, so a schema can ask "am I the thing I would reference?". */
+  /** The record being edited, so a schema can recognise references to itself. */
   recordId: string;
   /** Every homebrew record of the same type, for the duplicate-name annotation. */
   siblings: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -82,37 +54,16 @@ export type SchemaContext = Readonly<{
   /** Distinct equipment categories, derived from the catalog rather than hardcoded. */
   equipmentCategories: readonly SelectOption[];
 
-  /**
-   * THE CANONICAL SRD VOCABULARIES — complete lists, never a hand-typed partial.
-   *
-   * Every one of these used to be a bare text box or a suggestion array somebody typed from memory:
-   * ten of the thirteen damage types (missing exactly the three physical ones, so a homebrew weapon
-   * could not be suggested "slashing"), seven of the fifteen conditions, five of the fourteen
-   * creature types, no schools at all. A slug typed one character wrong is not an error — it is
-   * silently inert at play time, which is the hardest homebrew failure there is to diagnose.
-   *
-   * They arrive from `@vtt/content-srd-5.2.1/schemas`, which derives them from the bundles under a
-   * drift test, so the list a GM picks from is the list the engine matches on. Each stays a
-   * SUGGESTION rather than a closed list wherever its schema is an open slug: complete dropdown,
-   * plus "other".
-   */
+  /** Canonical SRD vocabularies (drift-tested against the bundles), so the list a GM picks from is
+      the list the engine matches on. They stay suggestions where the schema is an open slug. */
   damageTypes: readonly string[];
   conditions: readonly string[];
   schools: readonly string[];
   creatureTypes: readonly string[];
-  /**
-   * All 17 weapon properties AND masteries, as the bare slugs riders match on. The bundle suffixes
-   * both families (`finesse-wp`, `cleave-mastery`) because they share one id space there; every
-   * `weapon-property-is` trigger compares the bare word, so suggesting the bundle id would suggest
-   * a value that matches nothing — the silent inertness these lists exist to prevent.
-   */
+  /** Bare property and mastery slugs, as `weapon-property-is` compares them (the bundle suffixes ids). */
   weaponProperties: readonly string[];
 
-  /**
-   * Resolves a `fromCatalog` slug through **the same function the server validates
-   * with** (`resolveCatalogChoice`), so the count a GM reads while authoring is the
-   * count the game will offer — the client never becomes a second rules engine.
-   */
+  /** Resolves a `fromCatalog` slug with the server's own `resolveCatalogChoice`. */
   resolveCatalog: (slug: string) => Readonly<{ count: number }> | Readonly<{ error: string }>;
 }>;
 
@@ -150,10 +101,7 @@ export type FieldKind =
   | "group" //       <fieldset><legend> of nested fields
   | "custom";
 
-/** The four places a bespoke component is genuinely the answer. Everything else is data.
-    (`abilityOrder`, sketched as a fifth, turned out to be a `rows` field of six selects —
-    `RowEditor` already gives Move up / Move down, so the custom component was one the
-    standing rule says not to write.) */
+/** The places a bespoke component is the answer; everything else is data. */
 export type CustomField = "levelTable" | "features" | "riders" | "spellListContents";
 
 export type FieldDef = Readonly<{
@@ -161,77 +109,32 @@ export type FieldDef = Readonly<{
   key: string;
   label: string;
   kind?: FieldKind;
-  /** One sentence, sentence case. Stated ONCE per group — never once per option. */
+  /** One sentence, sentence case, stated once per group rather than per option. */
   help?: string;
-  /** The honesty line for a field that is authored, stored, and not yet read by
-      anything. A rider form that produces records the server silently ignores is worse
-      than no form, because the GM has no way to find out. */
+  /** Shown for a field that is stored but not yet read by anything, so the GM is not misled. */
   note?: string;
   placeholder?: string;
   /** Span the whole grid row. */
   wide?: boolean;
-  /** Feeds `publishBlockedReason` ONLY. Never a red asterisk, never a red border,
-      never a message while drafting — a draft is allowed to be invalid. */
+  /** Feeds the publish checklist only; never rendered as an error while drafting. */
   required?: boolean;
   disabled?: boolean;
 
-  /**
-   * WHAT AN EMPTIED CONTROL WRITES — and the second half of the item-publish repair.
-   *
-   * A `select` returned to "Not set" used to write `null` at every field in the app
-   * (`set(event.target.value || null)`), and a cleared `NumberField` still does. That is right for
-   * `rangeFeet`, whose column is `.nullable()` and REQUIRED — the key must be there with no value —
-   * and wrong for `slot`, `rarity`, `weapon.category` and a cast's `ability`, which are `.optional()`
-   * and reject `null` outright. Four routine authoring gestures therefore produced a body the store
-   * refused, with a 409 reading "Required" that named nothing.
-   *
-   * So the two meanings are now spelled per field, in the schema, next to the label:
-   *
-   *   - `"omit"` (the DEFAULT) — the key is optional; clearing the control removes it. This is
-   *     `defaults.ts` rule 1, "omit, never null", applied to edits as well as to blank drafts.
-   *   - `"null"` — the key is REQUIRED and nullable, so it must survive with a null value.
-   *
-   * There are exactly nine `"null"` fields in the whole editor and they are precisely the nine
-   * required-but-nullable columns in the content schemas. That correspondence is the point: this
-   * flag mirrors one schema fact and is checked by the publish checklist, which runs those very
-   * schemas.
-   */
+  /** What an emptied control writes: `"omit"` (default) removes an optional key, since `.optional()`
+      rejects `null`; `"null"` keeps a required-but-nullable key with a null value. */
   emptyValue?: "omit" | "null";
 
   options?: readonly SelectOption[] | ((ctx: SchemaContext, draft: Draft) => readonly SelectOption[]);
-  /** `kind: "select"` over a catalog too big for a `<select>`. Renders the picker. */
+  /** `kind: "select"` over a catalog too big for a `<select>`; renders a searchable picker. */
   searchable?: boolean;
-  /** `kind: "select"` + `searchable` — which catalog to pick from. */
+  /** With `searchable`: which catalog to pick from. */
   catalog?: "spells" | "equipment";
-  /** `draft` is the whole record, so a list can be derived from what the GM has already
-      authored — the `extraPicks` offer box suggests `feature:<id>` over the record's own
-      features. Most callbacks ignore it. */
+  /** `draft` is the whole record, so suggestions can derive from what is already authored
+      (e.g. `feature:<id>` over the record's own features). */
   suggestions?: readonly string[] | ((ctx: SchemaContext, draft: Draft) => readonly string[]);
-  /**
-   * **`suggestions` — render the CHOOSER instead of a bare box with a `<datalist>`.**
-   *
-   * A renderer flag, not a twelfth `FieldKind`, per the standing rule at the top of this file: the
-   * field is still `text` or still `tags`, still writes the same string or the same array of them,
-   * and still takes a word the SRD has never heard of. What changes is that the list is visible.
-   *
-   * The bug it repairs is the one an `<input list>` cannot: a `<datalist>` has **no affordance at
-   * all** — no arrow, no border cue, nothing that says a list exists — and iOS Safari renders it as
-   * *nothing*, so on a phone the complete vocabulary this repo went to the trouble of shipping is
-   * simply invisible. `Combobox` with `allowFreeText` is the same contract with the list on screen:
-   * every value one tap away, `--tap-min` rows, and unmatched text still handed back as itself.
-   *
-   * **It reads on both control kinds, and it had to.** The client reported it twice — item rarity
-   * (`3a`, one value) and damage types (`3d`, nine sites, six of which are lists — the monster's
-   * three defence rows, a spell's damage types, the `damage-type-is` gate and the damage-type
-   * grants). Had `pick` stayed a `text`-only flag, two thirds of `3d` would have needed a second
-   * mechanism to say the same thing, and the two would have drifted. `kind: "tags"` renders
-   * `TagInput`, which wears the same `Combobox` as its entry box under the same flag.
-   *
-   * Requires `suggestions`; a `pick` field with no list is a chooser over nothing, which is why
-   * `vocabularies.test.ts` censuses it. It is deliberately NOT automatic-on-`suggestions`: see
-   * `TagInputProps.pick` for the two different things a suggestion list means at two kinds of call
-   * site (a canonical vocabulary versus a corpus of what already exists).
-   */
+  /** Render a visible chooser (`Combobox` with free text) instead of a `<datalist>`, which has no
+      visible cue and nothing on iOS Safari. For `text` and `tags`; requires `suggestions`. Opt-in,
+      because some suggestion lists are only a corpus of existing values (see `TagInputProps.pick`). */
   pick?: boolean;
 
   min?: number;
@@ -241,19 +144,12 @@ export type FieldDef = Readonly<{
   allowDecimal?: boolean;
   allowNegative?: boolean;
 
-  /**
-   * `kind: "rows" | "group"` — the nested fields. For `rows`, keys are relative to the row.
-   *
-   * A `kind: "custom"` field may declare them too, and one does: `featuresField` mounts
-   * `FeatureEditor`'s own list. The renderer ignores it there — a custom field draws
-   * itself — but `fieldsOf`/`fieldsWithin` walk it, which is the only way the authoring
-   * harness can see inside a bespoke component. A control it cannot see is a control no
-   * both-paths test can drive, in either direction.
-   */
+  /** Nested fields for `rows` (keys relative to the row) and `group`. A `custom` field may declare
+      them so `fieldsOf`/`fieldsWithin` can see inside it; the renderer ignores them there. */
   rows?: readonly FieldDef[];
-  /** `kind: "rows"` — a STABLE id, never the index. */
+  /** `kind: "rows"`: a stable id, never the index. */
   rowKey?: (row: unknown, index: number) => string;
-  /** `kind: "rows"` — mints a row (with `newId()`), so the renderer never invents data. */
+  /** `kind: "rows"`: mints a row (with `newId()`). */
   newRow?: () => unknown;
   rowLabel?: (row: unknown, index: number) => string;
   addLabel?: string;
@@ -263,25 +159,17 @@ export type FieldDef = Readonly<{
 
   custom?: CustomField;
 
-  /**
-   * Replaces the plain "set this one path" write when a change has to reshape its
-   * container — picking a different modifier variant, say, where the old variant's keys
-   * would otherwise survive into a `.strict()` discriminated union and fail to parse.
-   * `scope` is the nearest container (the record, or one row); the return value
-   * replaces it wholesale.
-   */
+  /** Replaces the plain path write when a change must reshape its container (e.g. a `.strict()`
+      variant switch). `scope` is the nearest container; the return value replaces it. */
   write?: (next: unknown, scope: Draft) => Draft;
-  /** The symmetric read, for a control whose displayed value is DERIVED from the shape
-      rather than stored at `key` — "None" spellcasting is the absence of the block, not
-      a `"none"` value the schema has anywhere to put. Collapse derived, never store it. */
+  /** The matching read, for a value derived from shape rather than stored at `key` (e.g. "None"
+      spellcasting is the absence of the block). */
   read?: (scope: Draft) => unknown;
 
-  /** Fires while typing: this field is wrong NOW (a malformed dice formula, a number
-      out of range). Distinct from `required`, which is a requirement not yet met.
-      `scope` is the nearest container — the record body, or the row this field is in. */
+  /** Live error while typing (malformed dice, out of range), as opposed to `required`. `scope` is
+      the nearest container: the record body or this field's row. */
   validate?: (value: unknown, scope: Draft, ctx: SchemaContext) => string | null;
-  /** DERIVED disclosure. Never stored — there is nothing to invalidate.
-      `scope` is the nearest container; `draft` is always the whole record. */
+  /** Derived disclosure, never stored. `scope` is the nearest container; `draft` is the whole record. */
   visibleWhen?: (scope: Draft, draft: Draft) => boolean;
 }>;
 
@@ -290,7 +178,7 @@ export type SectionDef = Readonly<{
   title: string;
   blurb?: string;
   fields: readonly FieldDef[];
-  /** Collapsed by default. The long tail lives here. */
+  /** Collapsed by default. */
   advanced?: boolean;
   visibleWhen?: (draft: Draft) => boolean;
 }>;
@@ -302,11 +190,7 @@ export type HomebrewSchema = Readonly<{
 
 /* ------------------------------------------------------------------ factories ---- */
 
-/**
- * `1d8 + 1d6`-shaped dice, single or multi-term, with an optional flat modifier.
- * Deliberately permissive about whitespace and case; deliberately strict about shape,
- * because a formula the engine cannot parse is silently zero damage.
- */
+/** Single or multi-term dice with an optional flat modifier; an unparseable formula deals no damage. */
 const TERM = String.raw`(?:\d+d(?:4|6|8|10|12|20|100)|\d+)`;
 const DICE = new RegExp(String.raw`^\s*${TERM}(?:\s*[+-]\s*${TERM})*\s*$`, "i");
 
@@ -314,23 +198,14 @@ export function isDiceFormula(text: string): boolean {
   return DICE.test(text);
 }
 
-/** A dice `validate` for any `kind: "text"` field holding a formula. Empty is allowed —
-    "not filled in yet" is `required`'s business, not this one's. */
+/** Dice `validate` for a text field holding a formula. Empty is allowed; that is `required`'s job. */
 export const diceValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "") return null;
   return isDiceFormula(text) ? null : `“${text}” isn't a dice formula. Try 1d8, 2d6 + 3, or 1d8 + 1d6.`;
 };
 
-/**
- * Multi-term damage as a FIELD FACTORY, not a kind (see the standing rule above).
- *
- * ONE call site as of this writing — `actionsField()` in `RiderEditor.tsx`, which every carrier that
- * mounts riders shows once per action, so a monster's Bite and a magic sword's granted action are the
- * same four controls. *(The docblock used to claim four; measured at HEAD, `grep -c damagePartsField`
- * finds one mount. A spell's damage is `damage.roll` + `damage.types` in `schemas.ts`, a different
- * shape, and there is no separate weapon or item-cast mount. Corrected rather than softened.)*
- */
+/** Multi-term damage as a field factory rather than a kind; used by `actionsField()` in `RiderEditor.tsx`. */
 export function damagePartsField(
   key: string,
   options: Readonly<{ label: string; help?: string; max?: number; newId: () => string }>
@@ -354,32 +229,17 @@ export function damagePartsField(
     },
     rows: [
       { key: "formula", label: "Formula", placeholder: "1d6", validate: diceValidate },
-      // `3d`, site 8 of 9. The column is an open slug and stays one — a homebrew "void" damage type
-      // must remain authorable — so this is `pick` on `text`, never a closed select.
+      // Open slug (homebrew damage types stay authorable), so `pick` on text, not a closed select.
       { key: "type", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
     ]
   };
 }
 
 /**
- * **Fields inside a sub-object that must arrive WHOLE — the item-publish fix, as a factory.**
- *
- * `EquipmentReferenceSchema.weapon` has five keys and all five are REQUIRED (two of them nullable,
- * which is not the same as optional). The editor rendered them as five independent fields over
- * `setAt`, which creates the container on the first touched field and never fills its siblings — so
- * a GM who typed "1d8" into Damage produced `weapon: { damageDice: "1d8" }`, and the store answered
- * with three separate `Required` issues, one at a time, the first of which said "Fill in range" on a
- * melee weapon. That is the whole of "homebrew items cannot be published": seven of eleven realistic
- * authoring paths died on it.
- *
- * The fix is here rather than in the schema. `EquipmentReferenceSchema` is the SAME schema the SRD
- * bundle loads through (ADR-0016, "one shape, never a fork"), so relaxing those keys to `.optional()`
- * would weaken the bundle's own load validation to accommodate a half-written form. Instead the FIRST
- * touch of ANY field in the section seeds the complete container from `defaults`, and the sibling
- * keys land at exactly the values a duplicated SRD weapon already carries (`rangeFeet: null`).
- *
- * `defaults` must therefore contain only values that are honest to invent: nulls, `false`, and — for
- * a closed enum with no null — the option the control is already showing. Never a made-up number.
+ * Makes every field write into `container` as a whole, seeding it from `defaults` on first touch:
+ * `EquipmentReferenceSchema.weapon` requires all five keys, and the schema is shared with the SRD
+ * bundle (ADR-0016) so it is not relaxed. `defaults` may hold only nulls, `false`, or the option a
+ * closed enum's control already shows.
  */
 export function inContainer(
   container: string,
@@ -390,32 +250,36 @@ export function inContainer(
     ...field,
     write: (next: unknown, scope: Draft): Draft => {
       const current = scope[container];
-      const held = current !== null && typeof current === "object" && !Array.isArray(current) ? (current as Record<string, unknown>) : {};
+      const held =
+        current !== null && typeof current === "object" && !Array.isArray(current)
+          ? (current as Record<string, unknown>)
+          : {};
       const leaf = field.key.startsWith(`${container}.`) ? field.key.slice(container.length + 1) : field.key;
       return { ...scope, [container]: setAt({ ...defaults, ...held }, leaf, next) };
     }
   }));
 }
 
-/**
- * The Basics section every type opens with. `id` and `source` are never shown —
- * auto-generated and forced, and an id the GM can see is an id the GM will try to fix.
- *
- * The three optional fields are per type rather than universal because several server
- * schemas are `.strict()`: `EquipmentReferenceSchema` has no `summary` and no
- * `attribution`, and an `ActorDefinition` has no `description`. Offering a field the
- * store rejects is worse than omitting it — the GM fills it in and the record stops
- * being publishable for a reason nothing on screen explains.
- */
+/** The Basics section every type opens with. Optional fields vary per type because several server
+    schemas are `.strict()`; `id` and `source` are auto-generated and never shown. */
 export function basicsSection(
   typeWord: string,
-  has: Readonly<{ summary?: boolean; description?: boolean; attribution?: boolean }> = { summary: true, description: true, attribution: true }
+  has: Readonly<{ summary?: boolean; description?: boolean; attribution?: boolean }> = {
+    summary: true,
+    description: true,
+    attribution: true
+  }
 ): SectionDef {
   const fields: FieldDef[] = [{ key: "name", label: "Name", required: true }];
-  if (has.summary) fields.push({ key: "summary", label: "Summary", help: "One line for the pick list.", max: 280, wide: true });
+  if (has.summary)
+    fields.push({ key: "summary", label: "Summary", help: "One line for the pick list.", max: 280, wide: true });
   if (has.description) fields.push({ key: "description", label: "Description", kind: "textarea", wide: true });
   if (has.attribution) {
-    fields.push({ key: "attribution", label: "Attribution", help: `Credit the original author, if this ${typeWord} came from somewhere.` });
+    fields.push({
+      key: "attribution",
+      label: "Attribution",
+      help: `Credit the original author, if this ${typeWord} came from somewhere.`
+    });
   }
   return { id: "basics", title: "Basics", fields };
 }
@@ -428,13 +292,16 @@ export const opt = (value: string, label?: string, group?: string): SelectOption
   ...(group ? { group } : {})
 });
 
-/** `opt` bound to one `<optgroup>`, so a long grouped list reads as its groups rather
-    than as the same third argument repeated forty times. */
-export const grouped = (group: string) => (value: string, label?: string): SelectOption => opt(value, label, group);
+/** `opt` bound to one `<optgroup>`. */
+export const grouped =
+  (group: string) =>
+  (value: string, label?: string): SelectOption =>
+    opt(value, label, group);
 
-/** Preserves declaration order of the groups themselves, so the renderer never has to
-    sort and the schema's order IS the order the GM sees. Ungrouped options come first. */
-export function groupOptions(options: readonly SelectOption[]): ReadonlyArray<Readonly<{ group: string | null; options: readonly SelectOption[] }>> {
+/** Groups consecutive options, preserving declaration order. Ungrouped options come first. */
+export function groupOptions(
+  options: readonly SelectOption[]
+): ReadonlyArray<Readonly<{ group: string | null; options: readonly SelectOption[] }>> {
   const out: Array<{ group: string | null; options: SelectOption[] }> = [];
   for (const option of options) {
     const group = option.group ?? null;
@@ -445,23 +312,9 @@ export function groupOptions(options: readonly SelectOption[]): ReadonlyArray<Re
   return out;
 }
 
-/**
- * Does this `fromCatalog` slug name **the record being edited**?
- *
- * Two families are derived by appending a suffix to a record's own id —
- * `<classId>-subclasses` and `<speciesId>-lineages` — and they are the two the merged
- * catalogs structurally cannot answer while authoring: they name a DRAFT, and no merged
- * catalog holds a draft. `resolveCatalogChoice` therefore throws for them, correctly and
- * unhelpfully.
- *
- * The server has a carve-out for exactly this pair and answers them from AUTHORSHIP
- * rather than publication (`homebrew-validate.ts`, `SelfCatalog`) — a subclass that
- * exists satisfies its class, draft or not, because publishing is not playing. This
- * predicate is how the client recognises the same pair so it neither blocks on them
- * (`validate.ts`) nor calls them broken (`FeatureEditor`). It is a predicate and not an
- * answer on purpose: the client has no way to count which drafts name this record, so it
- * says what it knows and leaves the count to the side that can.
- */
+/** Whether a `fromCatalog` slug names the record being edited (`<id>-subclasses`, `<id>-lineages`).
+    The merged catalogs hold no drafts, so only the server (`homebrew-validate.ts`) can resolve these;
+    the client neither blocks on them nor flags them as broken. */
 export const namesOwnRecord = (slug: string, recordId: string): boolean =>
   recordId !== "" && (slug === `${recordId}-subclasses` || slug === `${recordId}-lineages`);
 
@@ -483,62 +336,32 @@ export function resolveSuggestions(field: FieldDef, ctx: SchemaContext, draft: D
   return typeof suggestions === "function" ? suggestions(ctx, draft) : suggestions;
 }
 
-/**
- * What a `pick` row READS as: `"very-rare"` → "Very Rare", `"fire"` → "Fire",
- * `"feature:divine-order"` → "Feature: Divine Order".
- *
- * A derived label rather than a hand-written map, because a map is a second list to keep in step
- * with the first — the exact drift `RARITY_IDS`/`DAMAGE_TYPE_IDS` were centralised to end. Every
- * vocabulary these controls offer is a lowercase-hyphen slug of ordinary English words, so one rule
- * covers all of them and a new list is readable the day it lands with nothing to remember.
- *
- * **The colon is a SEPARATOR, not a word character**, which the hyphen-only rule got wrong the
- * moment the feature panel's six offer boxes became `pick`s: a pick budget is
- * `<namespace>:<slug>` (`PickBudgetKeySchema`), so `feature:divine-order` split on hyphens alone
- * read "Feature:divine Order" — the one word in the label that is not a word. Splitting on the
- * colon first is a strict no-op for every colonless slug (a one-element split rejoins to itself),
- * so it can only move the `feature:<id>` form. Measured rather than argued: over the 122 distinct
- * strings the whole field census can reach, 5 moved — four synthesised `feature:<id>` offers and
- * the `feature:my-feature` placeholder — and the other 117 came back byte-identical.
- *
- * **It round-trips.** `Combobox` commits an exact label match as the option's ID rather than as the
- * words, and `pickValue` folds the space this adds back into the colon, so "Feature: Divine Order"
- * typed by hand is still `feature:divine-order`.
- *
- * The VALUE is untouched: the slug is what is picked, stored and matched on. This is display only.
- * A field that needs a label the slug cannot produce is a `kind: "select"` with `options`, which is
- * what that member is for.
- */
+/** Display label for a `pick` slug (`"feature:divine-order"` → "Feature: Divine Order"), treating
+    the colon as a separator. Display only; `pickValue` reverses it. */
 export function suggestionLabel(slug: string): string {
   return slug
     .split(":")
-    .map((part) => part.split("-").map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word)).join(" "))
+    .map((part) =>
+      part
+        .split("-")
+        .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
+        .join(" ")
+    )
     .join(": ");
 }
 
-/**
- * Free text typed into a `pick` control, as the SLUG its column takes.
- *
- * Every field that carries `pick` writes an open slug — `ContentIdSchema` is `/^[a-z0-9-]+$/`, and
- * `rarity`, `category` and the damage types are all that shape. A GM who types "Very Rare" rather
- * than picking it means the rung, not a new one, and without this the record is silently
- * unpublishable at a gate that names a regex. Whitespace collapses to the hyphen the slug uses and
- * case is dropped; nothing else is removed, because deleting characters a GM typed is how a value
- * becomes something they never wrote.
- *
- * **The one exception is the space a colon takes.** A pick budget is `<namespace>:<slug>`
- * (`PickBudgetKeySchema`), and `suggestionLabel` reads it back as "Feature: Divine Order" — so a GM
- * copying the label they can see would otherwise write `feature:-divine-order`, a key naming no
- * budget the build has. The colon eats its own padding and keeps the rest of the rule exactly as it
- * was: no colon in the text, no change at all.
- */
+/** Typed `pick` text as a slug: lowercased, whitespace to hyphens, padding around a colon removed
+    ("Feature: Divine Order" → `feature:divine-order`). */
 export function pickValue(text: string): string {
-  return text.trim().toLowerCase().replace(/\s*:\s*/g, ":").replace(/\s+/g, "-");
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s*:\s*/g, ":")
+    .replace(/\s+/g, "-");
 }
 
-/** Every visible field of a section, flattened through `group` but NOT through `rows`
-    (a row's fields belong to the row, not to the record). Used by `publishBlockedReason`
-    and by the section-jump control. */
+/** Every visible field of a section, flattened through `group` but not `rows` (row fields belong
+    to the row). Used by the publish checklist and the section-jump control. */
 export function visibleFields(section: SectionDef, draft: Draft): readonly FieldDef[] {
   const out: FieldDef[] = [];
   const walk = (fields: readonly FieldDef[]) => {

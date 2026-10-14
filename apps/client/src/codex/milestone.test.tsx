@@ -33,31 +33,60 @@ import { JournalView } from "./JournalView";
 import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "./api";
 
 /**
- * M12 / CT-8 — milestones on the client.
- *
- * The composer writes FOUR shapes of one record now, and the thing that keeps that honest is that the
- * kind switch chooses a ROUTE: a milestone posted through `journalApi.create` would land as a `note` and
- * every row of it would render as an ordinary entry. So the route is asserted, not just the payload.
- *
- * `standing` is deliberately NOT in the switch and that is asserted too — a standing record must never
- * exist without the table change it describes, and the only thing that writes both is the standing card.
+ * Milestones in the composer. The kind switch chooses the route (via `create` a milestone would land as a
+ * note), so the route is asserted. `standing` is not offered: only the standing card writes those.
  */
 const CALENDAR: GmCodexCalendar = {
-  yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: [],
-  currentDate: { year: 1492, month: 0, day: 3 }, publishedDate: { year: 1492, month: 0, day: 3 }
+  yearName: "DR",
+  months: [
+    { name: "Hammer", days: 30 },
+    { name: "Alturiak", days: 30 }
+  ],
+  weekdays: [],
+  currentDate: { year: 1492, month: 0, day: 3 },
+  publishedDate: { year: 1492, month: 0, day: 3 }
 };
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null,
-  fired: false, proposedDate: null, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  ...over
 });
 
 const FACTION: CodexPageSummary = {
-  id: "f1", title: "The Zhentarim", entityType: "faction", fields: {}, folder: null, tags: [],
-  revealedToPlayers: false, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z"
+  id: "f1",
+  title: "The Zhentarim",
+  entityType: "faction",
+  fields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z"
 };
 
 const renderJournal = async (records: CodexChronicleRecord[] = [], pages: CodexPageSummary[] = []) => {
@@ -70,18 +99,19 @@ const renderJournal = async (records: CodexChronicleRecord[] = [], pages: CodexP
 
 const rowOf = (id: string) => document.getElementById(`codex-entry-${id}`)!;
 
-// The composer draft persists in sessionStorage, so a test that types into it would otherwise decide
-// what the next test's composer starts on.
+// The composer draft persists in sessionStorage, so clear it between tests.
 beforeEach(() => sessionStorage.clear());
 
 describe("The milestone is a FOURTH shape of the one composer (CT-8)", () => {
   it("offers Entry, Deadline, Downtime and Milestone — and never Standing", async () => {
     await renderJournal();
     const switcher = screen.getByRole("group", { name: "What to write" });
-    expect(within(switcher).getAllByRole("button").map((option) => option.textContent))
-      .toEqual(["Entry", "Deadline", "Downtime", "Milestone"]);
-    // A standing record is written BY the standing card, as half of one transaction that also moves the
-    // number. Offering it here would be a second way to write a record that must never stand alone.
+    expect(
+      within(switcher)
+        .getAllByRole("button")
+        .map((option) => option.textContent)
+    ).toEqual(["Entry", "Deadline", "Downtime", "Milestone"]);
+    // Standing records are only written by the standing card, together with the value.
     expect(within(switcher).queryByText("Standing")).not.toBeInTheDocument();
   });
 
@@ -96,9 +126,11 @@ describe("The milestone is a FOURTH shape of the one composer (CT-8)", () => {
     await user.click(screen.getByRole("button", { name: "Record milestone" }));
 
     await waitFor(() => expect(createMilestone).toHaveBeenCalled());
-    expect(createMilestone.mock.calls.at(-1)![1].milestone).toEqual({ level: 5, reason: "Cleared the Sunless Citadel" });
-    // The route is the half that decides the KIND. Posted through `create` this would land as a `note`
-    // and every row of it would read as an ordinary entry, silently.
+    expect(createMilestone.mock.calls.at(-1)![1].milestone).toEqual({
+      level: 5,
+      reason: "Cleared the Sunless Citadel"
+    });
+    // Via `create` this would land as a note.
     expect(createEntry).not.toHaveBeenCalled();
     expect(createDeadline).not.toHaveBeenCalled();
     expect(createDowntime).not.toHaveBeenCalled();
@@ -128,8 +160,7 @@ describe("The milestone is a FOURTH shape of the one composer (CT-8)", () => {
   });
 
   it("needs no date — the store dates it at the campaign clock", async () => {
-    // A deadline REQUIRES its date (one with no date can never fire). A milestone is a thing that
-    // happened, so requiring one would be borrowing a rule from a record it is not.
+    // Unlike a deadline, a milestone doesn't need a date.
     await renderJournal();
     createMilestone.mockResolvedValue({});
     const user = userEvent.setup();
@@ -145,16 +176,29 @@ describe("The milestone is a FOURTH shape of the one composer (CT-8)", () => {
 
 describe("A milestone and a standing row read as themselves on the chronicle (R2)", () => {
   it("each says its kind in text and carries its own payload line", async () => {
-    await renderJournal([
-      RECORD({ kind: "milestone", id: "m1", text: "The company came back changed.", payload: { level: 5, reason: "Cleared the citadel" } }),
-      RECORD({ kind: "standing", id: "s1", text: "", payload: { factionPageId: "f1", delta: -20, reason: "Burned the caravan" } })
-    ], [FACTION]);
+    await renderJournal(
+      [
+        RECORD({
+          kind: "milestone",
+          id: "m1",
+          text: "The company came back changed.",
+          payload: { level: 5, reason: "Cleared the citadel" }
+        }),
+        RECORD({
+          kind: "standing",
+          id: "s1",
+          text: "",
+          payload: { factionPageId: "f1", delta: -20, reason: "Burned the caravan" }
+        })
+      ],
+      [FACTION]
+    );
 
-    // Colour lives entirely in CSS, so the proof is that the TEXT of each row distinguishes them.
+    // Colour is CSS-only, so the row text must distinguish the kinds.
     expect(rowOf("m1").textContent).toContain("Milestone");
     expect(rowOf("m1").textContent).toContain("Reached level 5 · Cleared the citadel");
     expect(rowOf("s1").textContent).toContain("Standing");
-    // The faction is NAMED from the page list, and the delta is the change — never the new value.
+    // The faction is named from the page list; the delta is the change, not the new value.
     expect(rowOf("s1").textContent).toContain("The Zhentarim · down 20 · Burned the caravan");
     expect(rowOf("m1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
     expect(rowOf("s1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
@@ -164,8 +208,7 @@ describe("A milestone and a standing row read as themselves on the chronicle (R2
     await renderJournal([
       RECORD({ kind: "entry", id: "e1", text: "An ordinary note.", payload: { level: 9, reason: "smuggled" } })
     ]);
-    // The gate is the KIND, not the payload's shape: a note carrying a milestone-shaped payload says
-    // nothing about a level, because nothing asked it to.
+    // The gate is the kind, not the payload shape.
     expect(rowOf("e1").textContent).not.toContain("Reached level");
     expect(rowOf("e1").textContent).not.toContain("smuggled");
   });

@@ -36,12 +36,14 @@ function hash(value: string) {
 
 function safeName(value: string) {
   const name = value.trim();
-  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error("Viewer name must contain 1 to 100 printable characters.");
+  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name))
+    throw new Error("Viewer name must contain 1 to 100 printable characters.");
   return name;
 }
 
 function safeId(value: string) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) throw new Error("Viewer access ID is malformed.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value))
+    throw new Error("Viewer access ID is malformed.");
   return value;
 }
 
@@ -51,7 +53,14 @@ function timestamp(value: number, label: string) {
 }
 
 function metadata(row: ViewerAccessRow): ViewerAccessMetadata {
-  return { id: row.id, name: row.name, createdAt: row.created_at, expiresAt: row.expires_at, lastUsedAt: row.last_used_at, revokedAt: row.revoked_at };
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    lastUsedAt: row.last_used_at,
+    revokedAt: row.revoked_at
+  };
 }
 
 function normalizePairingCode(value: string) {
@@ -99,11 +108,16 @@ export class ViewerAccessStore {
     this.requireDatabase();
     const now = this.now();
     this.prunePairings(now);
-    if (!Number.isInteger(ttlMs) || ttlMs < 30_000 || ttlMs > PAIRING_TTL_MS) throw new Error(`Pairing lifetime must be an integer from 30000 to ${PAIRING_TTL_MS} milliseconds.`);
-    if (this.pairingCodes.size >= MAX_OUTSTANDING_PAIRINGS) throw new Error("Too many viewer pairing codes are active. Wait for one to expire.");
+    if (!Number.isInteger(ttlMs) || ttlMs < 30_000 || ttlMs > PAIRING_TTL_MS)
+      throw new Error(`Pairing lifetime must be an integer from 30000 to ${PAIRING_TTL_MS} milliseconds.`);
+    if (this.pairingCodes.size >= MAX_OUTSTANDING_PAIRINGS)
+      throw new Error("Too many viewer pairing codes are active. Wait for one to expire.");
     const code = this.entropy(6).toString("hex").toUpperCase();
     this.pairingCodes.set(hash(code), now + ttlMs);
-    return { code: `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`, expiresAt: timestamp(now + ttlMs, "Pairing expiration") };
+    return {
+      code: `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`,
+      expiresAt: timestamp(now + ttlMs, "Pairing expiration")
+    };
   }
 
   exchangePairingCode(codeInput: string, nameInput: string, options: Readonly<{ expiresAt?: number | null }> = {}) {
@@ -111,8 +125,12 @@ export class ViewerAccessStore {
     const now = this.now();
     this.enforceAttemptLimit(now);
     let code: string;
-    try { code = normalizePairingCode(codeInput); }
-    catch (error) { this.recordFailure(now); throw error; }
+    try {
+      code = normalizePairingCode(codeInput);
+    } catch (error) {
+      this.recordFailure(now);
+      throw error;
+    }
     const codeHash = hash(code);
     const pairingExpiresAt = this.pairingCodes.get(codeHash);
     if (pairingExpiresAt === undefined || pairingExpiresAt <= now) {
@@ -123,55 +141,82 @@ export class ViewerAccessStore {
     this.pairingCodes.delete(codeHash);
     const name = safeName(nameInput);
     const expiresAtMs = options.expiresAt ?? null;
-    if (expiresAtMs !== null && (!Number.isFinite(expiresAtMs) || expiresAtMs <= now)) throw new Error("Viewer access expiration must be in the future.");
+    if (expiresAtMs !== null && (!Number.isFinite(expiresAtMs) || expiresAtMs <= now))
+      throw new Error("Viewer access expiration must be in the future.");
     const token = `${TOKEN_PREFIX}${this.entropy(32).toString("base64url")}`;
     const id = randomUUID();
     const createdAt = timestamp(now, "Viewer creation time");
     const expiresAt = expiresAtMs === null ? null : timestamp(expiresAtMs, "Viewer expiration");
-    database.prepare("INSERT INTO viewer_access_tokens (id, name, token_hash, created_at, expires_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)").run(id, name, hash(token), createdAt, expiresAt);
-    return { token, viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata };
+    database
+      .prepare(
+        "INSERT INTO viewer_access_tokens (id, name, token_hash, created_at, expires_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)"
+      )
+      .run(id, name, hash(token), createdAt, expiresAt);
+    return {
+      token,
+      viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata
+    };
   }
 
-  /**
-   * Mints a viewer session directly, without a pairing code, for the GM's own read-only preview of
-   * the shared screen (the in-tab iframe and the pop-out window). Only ever reached from a GM-authed
-   * route. Reuses the newest non-revoked, unexpired preview session named `name` so repeatedly
-   * opening the preview does not accumulate sessions.
-   */
+  /** Mints a viewer session without a pairing code for the GM's own read-only preview; reached only from
+   *  a GM-authed route. Reuses the newest live preview session named `name` so sessions don't accumulate. */
   mintPreviewSession(nameInput: string, ttlMs: number) {
     const database = this.requireDatabase();
     const now = this.now();
     const name = safeName(nameInput);
-    if (!Number.isInteger(ttlMs) || ttlMs < 60_000 || ttlMs > 24 * 60 * 60 * 1_000) throw new Error("Preview session lifetime must be an integer from 1 minute to 24 hours.");
+    if (!Number.isInteger(ttlMs) || ttlMs < 60_000 || ttlMs > 24 * 60 * 60 * 1_000)
+      throw new Error("Preview session lifetime must be an integer from 1 minute to 24 hours.");
     const token = `${TOKEN_PREFIX}${this.entropy(32).toString("base64url")}`;
     const id = randomUUID();
     const createdAt = timestamp(now, "Preview session creation time");
     const expiresAt = timestamp(now + ttlMs, "Preview session expiration");
-    database.prepare("INSERT INTO viewer_access_tokens (id, name, token_hash, created_at, expires_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)").run(id, name, hash(token), createdAt, expiresAt);
-    return { token, viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata };
+    database
+      .prepare(
+        "INSERT INTO viewer_access_tokens (id, name, token_hash, created_at, expires_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)"
+      )
+      .run(id, name, hash(token), createdAt, expiresAt);
+    return {
+      token,
+      viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata
+    };
   }
 
   verify(token: string) {
     const database = this.requireDatabase();
     if (!/^vtt_viewer_[A-Za-z0-9_-]{43}$/.test(token)) throw new ViewerAccessDeniedError("Viewer token is invalid.");
-    const row = database.prepare("SELECT id, name, created_at, expires_at, last_used_at, revoked_at FROM viewer_access_tokens WHERE token_hash = ?").get(hash(token)) as ViewerAccessRow | undefined;
+    const row = database
+      .prepare(
+        "SELECT id, name, created_at, expires_at, last_used_at, revoked_at FROM viewer_access_tokens WHERE token_hash = ?"
+      )
+      .get(hash(token)) as ViewerAccessRow | undefined;
     const now = this.now();
-    if (!row || row.revoked_at || (row.expires_at !== null && Date.parse(row.expires_at) <= now)) throw new ViewerAccessDeniedError("Viewer token is invalid, expired, or revoked.");
+    if (!row || row.revoked_at || (row.expires_at !== null && Date.parse(row.expires_at) <= now))
+      throw new ViewerAccessDeniedError("Viewer token is invalid, expired, or revoked.");
     const lastUsedAt = timestamp(now, "Viewer access time");
-    database.prepare("UPDATE viewer_access_tokens SET last_used_at = ? WHERE id = ? AND revoked_at IS NULL").run(lastUsedAt, row.id);
+    database
+      .prepare("UPDATE viewer_access_tokens SET last_used_at = ? WHERE id = ? AND revoked_at IS NULL")
+      .run(lastUsedAt, row.id);
     return { ...metadata(row), lastUsedAt };
   }
 
   list() {
     const database = this.requireDatabase();
-    return (database.prepare("SELECT id, name, created_at, expires_at, last_used_at, revoked_at FROM viewer_access_tokens ORDER BY created_at, id").all() as ViewerAccessRow[]).map(metadata);
+    return (
+      database
+        .prepare(
+          "SELECT id, name, created_at, expires_at, last_used_at, revoked_at FROM viewer_access_tokens ORDER BY created_at, id"
+        )
+        .all() as ViewerAccessRow[]
+    ).map(metadata);
   }
 
   revoke(idInput: string) {
     const database = this.requireDatabase();
     const id = safeId(idInput);
     const revokedAt = timestamp(this.now(), "Viewer revocation time");
-    const result = database.prepare("UPDATE viewer_access_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?").run(revokedAt, id);
+    const result = database
+      .prepare("UPDATE viewer_access_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?")
+      .run(revokedAt, id);
     if (result.changes !== 1) throw new Error("Viewer access entry was not found.");
     return this.list().find((item) => item.id === id)!;
   }
@@ -189,7 +234,8 @@ export class ViewerAccessStore {
 
   private enforceAttemptLimit(now: number) {
     this.failedAttempts = this.failedAttempts.filter((attempt) => attempt > now - FAILED_ATTEMPT_WINDOW_MS);
-    if (this.failedAttempts.length >= MAX_FAILED_ATTEMPTS) throw new ViewerPairingRateLimitError("Too many failed viewer pairing attempts. Try again shortly.");
+    if (this.failedAttempts.length >= MAX_FAILED_ATTEMPTS)
+      throw new ViewerPairingRateLimitError("Too many failed viewer pairing attempts. Try again shortly.");
   }
 
   private recordFailure(now: number) {

@@ -3,8 +3,7 @@
 Regenerate with `npm run map`. A freshness test (`apps/server/test/app-map.test.ts`) fails
 if this drifts from the code, so it is always current. This is an orientation aid: it maps the
 machine-derivable surfaces of the app (state shape, command catalog, HTTP paths) plus a curated
-file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-state.md`, and
-`docs/ai-context/`; the `vtt-orientation` skill routes you here first.
+file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
 - 11 GameState fields · 88 commands · 193 HTTP paths

@@ -6,14 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { projectGmSession, projectPlayerSession } from "../src/codex-projections.js";
 
-/**
- * D31 + director ruling R2 - SESSION PREP LISTS TONIGHT'S SCENES.
- *
- * The scene attachment is the marker precedent verbatim (a JSON id array, no foreign key, dangling
- * links rendered honestly), with ONE difference that is the whole ruling: `sceneIds` is GM-only
- * ALWAYS, not "GM-only until the session is revealed". Revealing a session publishes its RECAP; the
- * fights the GM has staged for the evening are spoilers even then.
- */
+// A session's `sceneIds` follow the marker pattern (JSON id array, no foreign key, dangling links
+// shown as such) with one difference: they are always GM-only. Revealing a session publishes its
+// recap; the staged fights stay spoilers.
 
 const SCENE_A = "40000000-0000-4000-8000-000000000001";
 const SCENE_B = "40000000-0000-4000-8000-000000000002";
@@ -26,30 +21,44 @@ beforeEach(async () => {
   store = new CodexStore(join(directory, "vtt.sqlite"));
   await store.initialize();
 });
-afterEach(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+afterEach(async () => {
+  store.close();
+  await rm(directory, { recursive: true, force: true });
+});
 
 describe("session scene attachments", () => {
   it("round-trips, dedupes, and merges like every other session field", () => {
-    const session = store.createSession({ sessionNumber: 4, prepBody: "Ambush at the bridge.", sceneIds: [SCENE_A, SCENE_B, SCENE_A] });
+    const session = store.createSession({
+      sessionNumber: 4,
+      prepBody: "Ambush at the bridge.",
+      sceneIds: [SCENE_A, SCENE_B, SCENE_A]
+    });
     expect(session.sceneIds).toEqual([SCENE_A, SCENE_B]);
     expect(store.getSession(session.id)!.sceneIds).toEqual([SCENE_A, SCENE_B]);
 
-    // Omitted means UNCHANGED - the console PATCHes a whole draft on every autosave.
+    // Omitted means unchanged: the console PATCHes a whole draft on every autosave.
     const edited = store.updateSession(session.id, { prepBody: "Ambush at the ford." }, session.rev, "gm");
     expect(edited.sceneIds).toEqual([SCENE_A, SCENE_B]);
-    // Supplied means REPLACED, the marker contract verbatim.
+    // Supplied means replaced, as with markers.
     const detached = store.updateSession(session.id, { sceneIds: [SCENE_B] }, edited.rev, "gm");
     expect(detached.sceneIds).toEqual([SCENE_B]);
     expect(store.updateSession(session.id, { sceneIds: [] }, detached.rev, "gm").sceneIds).toEqual([]);
   });
 
   it("caps at the table's own scene cap", () => {
-    const many = Array.from({ length: 30 }, (_, index) => `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`);
+    const many = Array.from(
+      { length: 30 },
+      (_, index) => `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`
+    );
     expect(store.createSession({ sceneIds: many }).sceneIds).toHaveLength(20);
   });
 
   it("is GM-only in projections ALWAYS - even for a revealed session (R2)", () => {
-    const session = store.createSession({ sessionNumber: 5, recapBody: "They crossed the bridge.", sceneIds: [SCENE_A] });
+    const session = store.createSession({
+      sessionNumber: 5,
+      recapBody: "They crossed the bridge.",
+      sceneIds: [SCENE_A]
+    });
     expect(projectGmSession(session).sceneIds).toEqual([SCENE_A]);
 
     const revealed = store.setSessionRevealed(session.id, true);
@@ -62,7 +71,12 @@ describe("session scene attachments", () => {
   });
 
   it("keeps scene ids out of both search indexes - they are ids, not text", () => {
-    const session = store.createSession({ sessionNumber: 6, prepBody: "Prep", recapBody: "Recap", sceneIds: [SCENE_A] });
+    const session = store.createSession({
+      sessionNumber: 6,
+      prepBody: "Prep",
+      recapBody: "Recap",
+      sceneIds: [SCENE_A]
+    });
     store.setSessionRevealed(session.id, true);
     expect(store.searchAll("gm", SCENE_A).hits).toHaveLength(0);
     expect(store.searchAll("player", SCENE_A).hits).toHaveLength(0);
@@ -76,8 +90,7 @@ describe("session scene attachments", () => {
     const before = first.createSession({ sessionNumber: 1, prepBody: "Written before scenes existed." });
     first.close();
 
-    // Simulate the pre-migration database: drop the column AND forget the migration ran, which is
-    // exactly the state an older campaign's codex is in when this build first opens it.
+    // Simulate a database from before the column existed: drop it and forget the migration ran.
     const raw = new DatabaseSync(path);
     raw.exec("ALTER TABLE codex_sessions DROP COLUMN scene_ids_json;");
     raw.prepare("DELETE FROM codex_schema_migrations WHERE version = ?").run(25);

@@ -16,12 +16,34 @@ const OWNER = { role: "player", sessionId: IDS.session } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 function combatState() {
-  const game = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.pc, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, ownerSessionId: IDS.session },
-    { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } },
-    { id: IDS.hidden, name: "Lurker", kind: "monster", visibility: "gm-only", hp: { current: 10, maximum: 10 } }
-  ] });
-  startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.pc, score: 20 }, { actorId: IDS.monster, score: 10 }, { actorId: IDS.hidden, score: 5 }] }, () => 1, GEOMETRY);
+  const game = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.pc,
+        name: "Alpha",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        ownerSessionId: IDS.session
+      },
+      { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } },
+      { id: IDS.hidden, name: "Lurker", kind: "monster", visibility: "gm-only", hp: { current: 10, maximum: 10 } }
+    ]
+  });
+  startEncounter(
+    game,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.pc, score: 20 },
+        { actorId: IDS.monster, score: 10 },
+        { actorId: IDS.hidden, score: 5 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return game; // turn order: pc -> monster -> hidden
 }
 
@@ -30,12 +52,30 @@ describe("turn economy", () => {
     const game = combatState();
     setTurnSlot(game, "action", true, GM);
     setTurnSlot(game, "bonus-action", true, GM);
-    expect(game.combat.turn).toEqual({ actionUsed: true, bonusActionUsed: true, actionInstance: null, turnUses: {}, movementUsedFeet: 0 });
+    expect(game.combat.turn).toEqual({
+      actionUsed: true,
+      bonusActionUsed: true,
+      actionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    });
     nextInitiativeTurn(game);
-    expect(game.combat.turn).toEqual({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 });
+    expect(game.combat.turn).toEqual({
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    });
     setTurnSlot(game, "action", true, GM);
     previousInitiativeTurn(game);
-    expect(game.combat.turn).toEqual({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 });
+    expect(game.combat.turn).toEqual({
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    });
   });
 
   it("spends reactions off-turn and refreshes them when the owner's turn starts", () => {
@@ -71,7 +111,13 @@ describe("turn economy", () => {
     setReactionUsed(game, IDS.monster, true, GM);
     const view = projectPlayerCombat(game);
     expect(view.hiddenTurn).toBe(true);
-    expect(view.turn).toEqual({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 });
+    expect(view.turn).toEqual({
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    });
     expect(view.reactionsUsed).toEqual([IDS.monster]);
     expect(JSON.stringify(view)).not.toContain(IDS.hidden);
   });

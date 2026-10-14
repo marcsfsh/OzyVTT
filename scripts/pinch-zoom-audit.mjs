@@ -127,7 +127,9 @@ async function gmPage(viewport) {
   await password.fill(PASSWORD);
   await password.press("Enter");
   await page.waitForSelector(".table-layout", { timeout: 25_000 });
-  await page.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
+  await page.addStyleTag({
+    content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }"
+  });
   await page.waitForTimeout(1200);
   return page;
 }
@@ -167,10 +169,15 @@ async function ensurePlacedToken(page) {
 async function requireCalibration(page) {
   await openRail(page);
   const blocked = await page.evaluate(() => {
-    const row = [...document.querySelectorAll(".map-toolbar-row")].find((el) => el.textContent?.includes("Measure distance"));
+    const row = [...document.querySelectorAll(".map-toolbar-row")].find((el) =>
+      el.textContent?.includes("Measure distance")
+    );
     return { missing: !row, disabled: Boolean(row?.disabled) };
   });
-  await page.locator(".map-toolbar-toggle").click({ timeout: 5_000 }).catch(() => {});
+  await page
+    .locator(".map-toolbar-toggle")
+    .click({ timeout: 5_000 })
+    .catch(() => {});
   await page.waitForTimeout(250);
   if (blocked.missing) throw new Error("no map toolbar on this page");
   if (blocked.disabled) throw new Error("this map has no grid — measure, the shapes and the ruler cannot start");
@@ -186,7 +193,10 @@ async function resetView(page) {
   await page.locator(".map-toolbar-rail-head", { hasText: "View" }).first().click({ timeout: 10_000 });
   await page.getByRole("button", { name: "Reset view" }).first().click({ timeout: 10_000 });
   await page.waitForTimeout(300);
-  await page.locator(".map-toolbar-toggle").click({ timeout: 5_000 }).catch(() => {});
+  await page
+    .locator(".map-toolbar-toggle")
+    .click({ timeout: 5_000 })
+    .catch(() => {});
   await page.waitForTimeout(300);
 }
 
@@ -206,7 +216,10 @@ async function clearMap(page) {
   await page.locator(".map-toolbar-rail-head", { hasText: "Fog" }).first().click({ timeout: 10_000 });
   await page.getByRole("button", { name: "Reveal the whole map" }).first().click({ timeout: 10_000 });
   await page.waitForTimeout(900);
-  await page.locator(".map-toolbar-toggle").click({ timeout: 5_000 }).catch(() => {});
+  await page
+    .locator(".map-toolbar-toggle")
+    .click({ timeout: 5_000 })
+    .catch(() => {});
   await page.waitForTimeout(300);
 }
 
@@ -234,8 +247,12 @@ async function drawOneShape(page) {
       await glide(page, touch, 9, from, to);
       await touch.liftAll();
       await page.waitForTimeout(1500);
-    } finally { await touch.liftAll().catch(() => {}); await cdp.detach().catch(() => {}); }
-    if ((await page.locator("[data-annotation-id]").count()) === 0) throw new Error("the fixture shape was not created");
+    } finally {
+      await touch.liftAll().catch(() => {});
+      await cdp.detach().catch(() => {});
+    }
+    if ((await page.locator("[data-annotation-id]").count()) === 0)
+      throw new Error("the fixture shape was not created");
     if (await handlesAreReachable(page)) return;
     if (attempt < targets.length - 1) await clearMap(page);
   }
@@ -246,13 +263,15 @@ async function drawOneShape(page) {
 async function handlesAreReachable(page) {
   const handles = await grabHandles(page);
   if (!handles?.move || !handles?.resize) return false;
-  return page.evaluate(() => ["move", "resize"].every((which) => {
-    const el = document.querySelector(`[data-annotation-handle="${which}"]`);
-    if (!el) return false;
-    const r = el.getBoundingClientRect();
-    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return Boolean(hit && hit.closest("[data-annotation-handle]") === el);
-  }));
+  return page.evaluate(() =>
+    ["move", "resize"].every((which) => {
+      const el = document.querySelector(`[data-annotation-handle="${which}"]`);
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return Boolean(hit && hit.closest("[data-annotation-handle]") === el);
+    })
+  );
 }
 
 /* ── touch ───────────────────────────────────────────────────────────────────────────────────── */
@@ -266,18 +285,33 @@ async function handlesAreReachable(page) {
  */
 function touchDriver(cdp) {
   let down = new Map();
-  const dispatch = (type, points) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: points.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y), id: p.id })) });
+  const dispatch = (type, points) =>
+    cdp.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: points.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y), id: p.id }))
+    });
   return {
-    async start(point) { down.set(point.id, point); await dispatch("touchStart", [...down.values()]); },
-    async move(points) { for (const p of points) down.set(p.id, p); await dispatch("touchMove", [...down.values()]); },
-    async liftAll() { if (down.size) await dispatch("touchEnd", []); down = new Map(); }
+    async start(point) {
+      down.set(point.id, point);
+      await dispatch("touchStart", [...down.values()]);
+    },
+    async move(points) {
+      for (const p of points) down.set(p.id, p);
+      await dispatch("touchMove", [...down.values()]);
+    },
+    async liftAll() {
+      if (down.size) await dispatch("touchEnd", []);
+      down = new Map();
+    }
   };
 }
 
 /** Walk a finger from a to b in `steps` samples, pausing so React renders between them. */
 async function glide(page, touch, id, from, to, steps = 6) {
   for (let step = 1; step <= steps; step += 1) {
-    await touch.move([{ id, x: from.x + (to.x - from.x) * step / steps, y: from.y + (to.y - from.y) * step / steps }]);
+    await touch.move([
+      { id, x: from.x + ((to.x - from.x) * step) / steps, y: from.y + ((to.y - from.y) * step) / steps }
+    ]);
     await page.waitForTimeout(28);
   }
 }
@@ -294,11 +328,17 @@ async function glide(page, touch, id, from, to, steps = 6) {
  */
 async function pinch(page, touch, first, second, factor, bounds, steps = 8) {
   const mid = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
-  const clamp = (point) => bounds
-    ? { ...point, x: Math.min(bounds.right - 6, Math.max(bounds.left + 6, point.x)), y: Math.min(bounds.bottom - 6, Math.max(bounds.top + 6, point.y)) }
-    : point;
+  const clamp = (point) =>
+    bounds
+      ? {
+          ...point,
+          x: Math.min(bounds.right - 6, Math.max(bounds.left + 6, point.x)),
+          y: Math.min(bounds.bottom - 6, Math.max(bounds.top + 6, point.y))
+        }
+      : point;
   const startDist = Math.hypot(first.x - second.x, first.y - second.y);
-  let a = first, b = second;
+  let a = first,
+    b = second;
   for (let step = 1; step <= steps; step += 1) {
     const scale = 1 + (factor - 1) * (step / steps);
     a = clamp({ id: first.id, x: mid.x + (first.x - mid.x) * scale, y: mid.y + (first.y - mid.y) * scale });
@@ -310,12 +350,13 @@ async function pinch(page, touch, first, second, factor, bounds, steps = 8) {
 }
 
 /** The box a pointermove has to stay inside to reach `EncounterMap`'s handlers at all. */
-const gestureBounds = (page) => page.evaluate(() => {
-  const root = document.querySelector(".encounter-map-interaction");
-  if (!root) return null;
-  const r = root.getBoundingClientRect();
-  return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
-});
+const gestureBounds = (page) =>
+  page.evaluate(() => {
+    const root = document.querySelector(".encounter-map-interaction");
+    if (!root) return null;
+    const r = root.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  });
 
 /* ── geometry ────────────────────────────────────────────────────────────────────────────────── */
 
@@ -357,14 +398,18 @@ async function clearPoint(page, fx, fy, away = null, minimum = 0) {
   // committed nothing, which reads exactly like a broken control.
   const usable = away ? grid.filter((p) => Math.hypot(p.x - away.x, p.y - away.y) >= minimum) : grid;
   if (!usable.length) return null;
-  return usable.reduce((best, p) => (Math.hypot(p.ux - fx, p.uy - fy) < Math.hypot(best.ux - fx, best.uy - fy) ? p : best));
+  return usable.reduce((best, p) =>
+    Math.hypot(p.ux - fx, p.uy - fy) < Math.hypot(best.ux - fx, best.uy - fy) ? p : best
+  );
 }
 
 /** Somewhere clear to land the SECOND finger: as far from the first as the clear band allows. */
 async function farthestClearFrom(page, origin, minimum = 55) {
   const grid = await page.evaluate(CLEAR_GRID);
   if (!grid.length) return null;
-  const best = grid.reduce((far, p) => (Math.hypot(p.x - origin.x, p.y - origin.y) > Math.hypot(far.x - origin.x, far.y - origin.y) ? p : far));
+  const best = grid.reduce((far, p) =>
+    Math.hypot(p.x - origin.x, p.y - origin.y) > Math.hypot(far.x - origin.x, far.y - origin.y) ? p : far
+  );
   return Math.hypot(best.x - origin.x, best.y - origin.y) >= minimum ? best : null;
 }
 
@@ -393,7 +438,10 @@ async function openRail(page) {
 async function pickTool(page, tool) {
   if (tool === "select" || tool === "measure") {
     await openRail(page);
-    await page.locator(".map-toolbar-row", { hasText: tool === "select" ? "Select and move" : "Measure distance" }).first().click({ timeout: 10_000 });
+    await page
+      .locator(".map-toolbar-row", { hasText: tool === "select" ? "Select and move" : "Measure distance" })
+      .first()
+      .click({ timeout: 10_000 });
   } else if (tool === "circle") {
     await openRail(page);
     await page.locator(".map-toolbar-rail-head", { hasText: "Draw" }).first().click({ timeout: 10_000 });
@@ -413,12 +461,19 @@ async function pickTool(page, tool) {
     // the second of two consecutive runs silently gestured in select mode and painted no fog at all.
     const reveal = page.locator(".map-toolbar-choice", { hasText: "Reveal" }).first();
     if ((await reveal.getAttribute("aria-pressed")) !== "true") await reveal.click({ timeout: 10_000 });
-    else await page.locator(".map-toolbar-toggle").click({ timeout: 5_000 }).catch(() => {});
+    else
+      await page
+        .locator(".map-toolbar-toggle")
+        .click({ timeout: 5_000 })
+        .catch(() => {});
   }
   await page.waitForTimeout(400);
   // The rail is `.encounter-map-overlay`, which `beginGesture` refuses — it must be shut before a gesture.
   if (await page.locator(".map-toolbar-rail").count()) {
-    await page.locator(".map-toolbar-toggle").click({ timeout: 5_000 }).catch(() => {});
+    await page
+      .locator(".map-toolbar-toggle")
+      .click({ timeout: 5_000 })
+      .catch(() => {});
     await page.waitForTimeout(300);
   }
 }
@@ -435,16 +490,37 @@ const KINDS = [
   { id: "token", label: "token drag", tool: "select", commands: ["token:move"], live: (s) => s.dragging > 0 },
   { id: "pan", label: "pan", tool: "select", commands: [], live: null },
   { id: "measure", label: "measure", tool: "measure", commands: ["annotation:add"], live: (s) => s.liveMeasure > 0 },
-  { id: "shape", label: "shape (circle)", tool: "circle", commands: ["annotation:add"], live: (s) => s.livePreview > 0 },
+  {
+    id: "shape",
+    label: "shape (circle)",
+    tool: "circle",
+    commands: ["annotation:add"],
+    live: (s) => s.livePreview > 0
+  },
   { id: "fog", label: "fog stroke", tool: "fog-reveal", commands: ["fog:paint"], live: (s) => s.fogPreview > 0 },
-  { id: "annotation-move", label: "shape move", tool: "select", commands: ["annotation:move"], live: (s) => s.livePreview > 0 },
-  { id: "annotation-resize", label: "shape resize", tool: "select", commands: ["annotation:move"], live: (s) => s.livePreview > 0 }
+  {
+    id: "annotation-move",
+    label: "shape move",
+    tool: "select",
+    commands: ["annotation:move"],
+    live: (s) => s.livePreview > 0
+  },
+  {
+    id: "annotation-resize",
+    label: "shape resize",
+    tool: "select",
+    commands: ["annotation:move"],
+    live: (s) => s.livePreview > 0
+  }
 ];
 
 const shapeOf = (page) => page.evaluate(SHAPE_OF_THINGS);
 const cameraOf = (page) => page.evaluate(CAMERA);
-const sentSince = (page, mark, names) => page.evaluate(([from, wanted]) =>
-  window.__sent.slice(from).filter((frame) => wanted.some((name) => frame.includes(`"${name}"`))), [mark, names]);
+const sentSince = (page, mark, names) =>
+  page.evaluate(
+    ([from, wanted]) => window.__sent.slice(from).filter((frame) => wanted.some((name) => frame.includes(`"${name}"`))),
+    [mark, names]
+  );
 const sentCount = (page) => page.evaluate(() => window.__sent.length);
 
 /** Select an existing shape so its move/resize handles are on screen, and hand back both handles. */
@@ -479,7 +555,9 @@ async function runKind(page, kind, { interrupt }) {
   await resetView(page);
   if (kind.id === "annotation-move" || kind.id === "annotation-resize") await drawOneShape(page);
   await pickTool(page, kind.tool);
-  let from = null, to = null, second = null;
+  let from = null,
+    to = null,
+    second = null;
 
   if (kind.id === "token") {
     const token = await tokenPoint(page);
@@ -493,17 +571,21 @@ async function runKind(page, kind, { interrupt }) {
     if (!from) throw new Error("the selected shape shows no handles");
     // Aim relative to the handle, not at a fixed corner of the stage: selecting the shape opens
     // `.encounter-shape-editor` over the map, and on a 320px column that panel owns most of it.
-    const at = await page.evaluate(([x, y]) => {
-      const box = document.querySelector(".encounter-map-stage").getBoundingClientRect();
-      return { x: (x - box.left) / box.width, y: (y - box.top) / box.height };
-    }, [from.x, from.y]);
+    const at = await page.evaluate(
+      ([x, y]) => {
+        const box = document.querySelector(".encounter-map-stage").getBoundingClientRect();
+        return { x: (x - box.left) / box.width, y: (y - box.top) / box.height };
+      },
+      [from.x, from.y]
+    );
     to = await clearPoint(page, at.x + 0.16, at.y + 0.12, from, 45);
   } else {
     from = await clearPoint(page, 0.3, 0.38);
     to = await clearPoint(page, 0.62, 0.58, from, 45);
   }
   if (!from || !to) throw new Error("no clear point on the stage that is not under one of the map's own controls");
-  if (Math.hypot(to.x - from.x, to.y - from.y) < 24) throw new Error("the drag would be shorter than the tap threshold — nothing would move");
+  if (Math.hypot(to.x - from.x, to.y - from.y) < 24)
+    throw new Error("the drag would be shorter than the tap threshold — nothing would move");
   second = await farthestClearFrom(page, from);
   if (!second) throw new Error("nowhere clear to land the second finger far enough from the first");
 
@@ -538,7 +620,11 @@ async function runKind(page, kind, { interrupt }) {
 
   const after = await shapeOf(page);
   const cameraAfter = await cameraOf(page);
-  const frames = await sentSince(page, mark, kind.commands.length ? kind.commands : ["token:move", "annotation:add", "annotation:move", "fog:paint"]);
+  const frames = await sentSince(
+    page,
+    mark,
+    kind.commands.length ? kind.commands : ["token:move", "annotation:add", "annotation:move", "fog:paint"]
+  );
   return { before, live, after, cameraBefore, cameraAfter, frames, span };
 }
 
@@ -582,7 +668,12 @@ async function measurePinch(page) {
     await touch.liftAll();
     await page.waitForTimeout(300);
     return {
-      start, spread, squeeze, span, first, second,
+      start,
+      spread,
+      squeeze,
+      span,
+      first,
+      second,
       // Spreading NARROWS the viewBox (more zoom, less map on screen); squeezing widens it. Both
       // ratios are written so that "> 1" means "the gesture did what its name says".
       spreadRatio: start.w / spread.w,
@@ -617,7 +708,9 @@ let unmeasured = 0;
     await page.waitForTimeout(1500);
     await ensureFight(page);
     await ensurePlacedToken(page);
-  } finally { await page.close(); }
+  } finally {
+    await page.close();
+  }
 }
 
 for (const viewport of VIEWPORTS) {
@@ -629,7 +722,11 @@ for (const viewport of VIEWPORTS) {
     await requireCalibration(page);
   } catch (error) {
     unmeasured += 1;
-    zoomRows.push({ label: viewport.label, verdict: "NOT MEASURED", detail: String(error).split("\n")[0].slice(0, 110) });
+    zoomRows.push({
+      label: viewport.label,
+      verdict: "NOT MEASURED",
+      detail: String(error).split("\n")[0].slice(0, 110)
+    });
     if (page) await page.close();
     continue;
   }
@@ -637,21 +734,31 @@ for (const viewport of VIEWPORTS) {
   try {
     const result = await measurePinch(page);
     const problems = [];
-    if (!(result.spreadRatio > 1.15)) problems.push(`spreading two fingers changed the zoom by ${result.spreadRatio.toFixed(3)}x`);
-    if (!(result.squeezeRatio > 1.15)) problems.push(`squeezing them widened the viewBox by only ${result.squeezeRatio.toFixed(3)}x`);
-    if (result.anchorDrift > result.anchorTolerance) problems.push(`the point between the fingers moved ${result.anchorDrift.toFixed(1)} image px (budget ${result.anchorTolerance.toFixed(1)})`);
+    if (!(result.spreadRatio > 1.15))
+      problems.push(`spreading two fingers changed the zoom by ${result.spreadRatio.toFixed(3)}x`);
+    if (!(result.squeezeRatio > 1.15))
+      problems.push(`squeezing them widened the viewBox by only ${result.squeezeRatio.toFixed(3)}x`);
+    if (result.anchorDrift > result.anchorTolerance)
+      problems.push(
+        `the point between the fingers moved ${result.anchorDrift.toFixed(1)} image px (budget ${result.anchorTolerance.toFixed(1)})`
+      );
     if (problems.length) failures += 1;
     zoomRows.push({
       label: viewport.label,
       verdict: problems.length ? "FAIL" : "PASS",
-      detail: problems.length ? `${problems.join(" · ")} · fingers ${result.span.toFixed(0)}px apart at (${result.first.x.toFixed(0)},${result.first.y.toFixed(0)}) and (${result.second.x.toFixed(0)},${result.second.y.toFixed(0)})`
-        : `viewBox w ${result.start.w.toFixed(0)} -> ${result.spread.w.toFixed(0)} -> ${result.squeeze.w.toFixed(0)}`
-          + ` · spread ${result.spreadRatio.toFixed(2)}x in, squeeze ${result.squeezeRatio.toFixed(2)}x back out`
-          + ` · anchor held to ${result.anchorDrift.toFixed(1)} image px`
+      detail: problems.length
+        ? `${problems.join(" · ")} · fingers ${result.span.toFixed(0)}px apart at (${result.first.x.toFixed(0)},${result.first.y.toFixed(0)}) and (${result.second.x.toFixed(0)},${result.second.y.toFixed(0)})`
+        : `viewBox w ${result.start.w.toFixed(0)} -> ${result.spread.w.toFixed(0)} -> ${result.squeeze.w.toFixed(0)}` +
+          ` · spread ${result.spreadRatio.toFixed(2)}x in, squeeze ${result.squeezeRatio.toFixed(2)}x back out` +
+          ` · anchor held to ${result.anchorDrift.toFixed(1)} image px`
     });
   } catch (error) {
     unmeasured += 1;
-    zoomRows.push({ label: viewport.label, verdict: "NOT MEASURED", detail: String(error).split("\n")[0].slice(0, 110) });
+    zoomRows.push({
+      label: viewport.label,
+      verdict: "NOT MEASURED",
+      detail: String(error).split("\n")[0].slice(0, 110)
+    });
   }
 
   for (const kind of KINDS) {
@@ -662,16 +769,28 @@ for (const viewport of VIEWPORTS) {
       const control = await runKind(page, kind, { interrupt: false });
       const controlWrote = kind.commands.length
         ? control.frames.length > 0
-        : Math.abs(control.cameraAfter.x - control.cameraBefore.x) + Math.abs(control.cameraAfter.y - control.cameraBefore.y) > 1;
-      if (kind.live && !kind.live(control.live)) throw new Error(`the ${kind.label} never started (no live preview mid-drag)`);
+        : Math.abs(control.cameraAfter.x - control.cameraBefore.x) +
+            Math.abs(control.cameraAfter.y - control.cameraBefore.y) >
+          1;
+      if (kind.live && !kind.live(control.live))
+        throw new Error(`the ${kind.label} never started (no live preview mid-drag)`);
       if (!controlWrote) throw new Error(`the control ${kind.label} committed nothing, so an abort proves nothing`);
 
       const aborted = await runKind(page, kind, { interrupt: true });
       const problems = [];
-      if (kind.live && !kind.live(aborted.live)) problems.push(`the ${kind.label} never started, so the abort was vacuous`);
-      if (aborted.frames.length) problems.push(`${aborted.frames.length} command(s) went out: ${aborted.frames.map((f) => (f.match(/"([a-z]+:[a-z-]+)"/) ?? [])[1] ?? "?").join(", ")}`);
-      if (kind.id === "token" && JSON.stringify(aborted.after.tokens) !== JSON.stringify(aborted.before.tokens)) problems.push("a token moved");
-      if (kind.id !== "token" && JSON.stringify(aborted.after.annotations) !== JSON.stringify(aborted.before.annotations)) problems.push("an annotation appeared or moved");
+      if (kind.live && !kind.live(aborted.live))
+        problems.push(`the ${kind.label} never started, so the abort was vacuous`);
+      if (aborted.frames.length)
+        problems.push(
+          `${aborted.frames.length} command(s) went out: ${aborted.frames.map((f) => (f.match(/"([a-z]+:[a-z-]+)"/) ?? [])[1] ?? "?").join(", ")}`
+        );
+      if (kind.id === "token" && JSON.stringify(aborted.after.tokens) !== JSON.stringify(aborted.before.tokens))
+        problems.push("a token moved");
+      if (
+        kind.id !== "token" &&
+        JSON.stringify(aborted.after.annotations) !== JSON.stringify(aborted.before.annotations)
+      )
+        problems.push("an annotation appeared or moved");
       if (aborted.after.saving > 0) problems.push('"Saving move…" was up after the pinch');
       /* THE PINCH ITSELF MUST STILL WORK — an abort that also killed the zoom would pass every
          assertion above and be the wrong feature. Measured against the span the fingers ACTUALLY
@@ -679,12 +798,20 @@ for (const viewport of VIEWPORTS) {
          commanded 1.60x arrives as 1.15x, and the contract is "zoom tracks the fingers", not "1.6". */
       const zoomed = aborted.cameraBefore.w / aborted.cameraAfter.w;
       const fingers = aborted.span ? aborted.span.endDist / aborted.span.startDist : null;
-      if (!fingers || fingers < 1.1) throw new Error(`the fingers only spread ${fingers ? fingers.toFixed(2) : "?"}x — too little for the zoom to be readable here`);
-      if (Math.abs(zoomed - fingers) / fingers > 0.12) problems.push(`the zoom did not track the fingers: they spread ${fingers.toFixed(2)}x, the map zoomed ${zoomed.toFixed(2)}x`);
+      if (!fingers || fingers < 1.1)
+        throw new Error(
+          `the fingers only spread ${fingers ? fingers.toFixed(2) : "?"}x — too little for the zoom to be readable here`
+        );
+      if (Math.abs(zoomed - fingers) / fingers > 0.12)
+        problems.push(
+          `the zoom did not track the fingers: they spread ${fingers.toFixed(2)}x, the map zoomed ${zoomed.toFixed(2)}x`
+        );
       if (problems.length) failures += 1;
       abortRows.push({
-        label, verdict: problems.length ? "FAIL" : "PASS",
-        detail: problems.length ? problems.join(" · ")
+        label,
+        verdict: problems.length ? "FAIL" : "PASS",
+        detail: problems.length
+          ? problems.join(" · ")
           : `control wrote ${control.frames.length || "camera"} · aborted wrote 0 · gesture was live mid-drag · fingers spread ${fingers.toFixed(2)}x, map zoomed ${zoomed.toFixed(2)}x`
       });
     } catch (error) {

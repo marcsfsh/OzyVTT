@@ -1,12 +1,4 @@
-/**
- * The one place the party surfaces agree on how a character READS.
- *
- * The claim words, the presence words and the HP shape were duplicated across the shell roster, the
- * Roster tab and the player bar, and they had already drifted: the GM's two roster surfaces said
- * "Available" and "Unclaimed" for the same fact, and the player surface said "Taken" for what the GM
- * called "Claimed" (intake 05 §1). D28 picks the winners — **Available / Claimed / Your character** —
- * and this module is where they live so the three surfaces cannot drift again.
- */
+/** Shared claim words, presence words and HP labels for the party surfaces, so they cannot drift. */
 import type { ActorDefinition, GmActor, PlayerActor, PresenceStatus } from "@vtt/domain";
 import type { AvatarPresence } from "@vtt/ui";
 
@@ -31,7 +23,7 @@ export function hpLabel(hp: GmActor["hp"] | PlayerActor["hp"]): string {
 
 export type ClaimState = "mine" | "claimed" | "available";
 
-/** D28's claim words. Never "Unclaimed" (the GM's Roster tab said it) and never "Taken" (the player's). */
+/** The shared claim words; never "Unclaimed" or "Taken". */
 export const CLAIM_WORD: Readonly<Record<ClaimState, string>> = {
   mine: "Your character",
   claimed: "Claimed",

@@ -35,7 +35,10 @@ const WIDTHS = [390, 1280];
 
 const failures = [];
 const pass = (what, observed) => console.log(`  PASS  ${what} — ${observed}`);
-const fail = (what, observed) => { failures.push(`${what} — ${observed}`); console.log(`  FAIL  ${what} — ${observed}`); };
+const fail = (what, observed) => {
+  failures.push(`${what} — ${observed}`);
+  console.log(`  FAIL  ${what} — ${observed}`);
+};
 
 const browser = await chromium.launch({ executablePath: EXEC, args: ["--no-sandbox"], timeout: 60_000 });
 
@@ -111,5 +114,7 @@ for (const width of WIDTHS) {
 }
 
 await browser.close();
-console.log(failures.length === 0 ? "\nAll checks passed." : `\n${failures.length} FAILED:\n  ${failures.join("\n  ")}`);
+console.log(
+  failures.length === 0 ? "\nAll checks passed." : `\n${failures.length} FAILED:\n  ${failures.join("\n  ")}`
+);
 process.exit(failures.length === 0 ? 0 : 1);

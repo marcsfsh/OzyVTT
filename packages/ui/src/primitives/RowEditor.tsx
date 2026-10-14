@@ -9,7 +9,7 @@ import "./RowEditor.css";
 export interface RowEditorProps<T> {
   rows: readonly T[];
   onChange: (next: readonly T[]) => void;
-  /** STABLE id, never the array index — see the note on the component. */
+  /** Stable id, never the array index (see the component note). */
   rowKey: (row: T) => string;
   renderRow: (row: T, index: number) => ReactNode;
   /** The caller mints the row (with `newId()`), so the primitive never invents data. */
@@ -26,25 +26,13 @@ export interface RowEditorProps<T> {
   className?: string;
 }
 
-/** The repeating-rows editor behind every `kind: "rows"` field — monster actions,
-    starting-equipment options, ability bonuses, damage parts, granted spells.
-
-    **`rowKey` is a stable id, not the index.** Keying by index is the bug this
-    primitive exists to prevent: remove row 2 of 5 and React reuses row 3's DOM for
-    row 2, so the focused input, the open disclosure and any uncommitted keystrokes
-    silently belong to a different record. The caller mints the id with `newId()` when
-    it mints the row, which is also why `onAdd` returns the row rather than the
-    primitive constructing one.
-
-    **One ⋯ menu per row, not four icon buttons.** Move up, move down and remove are
-    three targets that would each need a 44px hit area in a dense list; collapsed into
-    one menu they cost one target, they match `.nh-card-tools`, and there is no gap
-    budget to get wrong. The drag grip is a pointer-only ENHANCEMENT on top — every
-    reorder it offers is also in the menu, so nothing here is mouse-only.
-
-    Collapse is UI-local and derived from what the caller passes, never stored in the
-    draft: there is nothing to invalidate, and a newly added row opens because you just
-    asked for it. */
+/** The repeating-rows editor behind every `kind: "rows"` field (monster actions, equipment options, damage
+    parts, granted spells).
+    `rowKey` must be a stable id, not the index: keyed by index, removing a row hands its focus, open state and
+    unsaved keystrokes to the next record. The caller mints the id with `newId()`, which is why `onAdd` returns
+    the row.
+    One ⋯ menu per row (Move up, Move down, Remove) instead of three icon targets; the drag grip is a pointer-only
+    extra. Collapse state is UI-local and never stored in the draft. */
 export function RowEditor<T>({
   rows,
   onChange,
@@ -95,10 +83,8 @@ export function RowEditor<T>({
     setAnnouncement(`${addLabel} — ${rows.length + 1} total.`);
   };
 
-  /* Pointer drag, not HTML5 drag-and-drop: `dragstart` never fires from a touch, so a
-     DnD handle would be a mouse-only affordance with the menu as its "fallback" — the
-     wrong way round. Pointer capture keeps the moves coming to the grip even when the
-     finger leaves it. */
+  /* Pointer events, not HTML5 drag-and-drop, which never fires from touch. Pointer capture keeps moves coming
+     when the finger leaves the grip. */
   const onGripDown = (event: ReactPointerEvent<HTMLSpanElement>, index: number) => {
     if (!reorderable || rows.length < 2) return;
     event.preventDefault();
@@ -115,11 +101,17 @@ export function RowEditor<T>({
     let over = drag.over;
     for (let i = 0; i < items.length; i++) {
       const box = items[i].getBoundingClientRect();
-      if (event.clientY >= box.top && event.clientY <= box.bottom) { over = i; break; }
+      if (event.clientY >= box.top && event.clientY <= box.bottom) {
+        over = i;
+        break;
+      }
       if (i === 0 && event.clientY < box.top) over = 0;
       if (i === items.length - 1 && event.clientY > box.bottom) over = items.length - 1;
     }
-    if (over !== drag.over) { drag.over = over; setDragOver(over); }
+    if (over !== drag.over) {
+      drag.over = over;
+      setDragOver(over);
+    }
   };
   const onGripUp = () => {
     const drag = dragRef.current;
@@ -132,9 +124,7 @@ export function RowEditor<T>({
   return (
     <div className={cx("nh-roweditor", dragFrom !== null && "is-reordering", className)}>
       {rows.length === 0 && emptyText != null && (
-        /* `.nh-empty` reused rather than rebuilt, with its 12rem min-height dropped:
-           this one sits INSIDE a form section, where a half-screen dashed box would
-           dwarf the fields around it. */
+        /* `.nh-empty` without its 12rem min-height, which would dwarf the fields in a form section. */
         <p className="nh-empty nh-roweditor-empty">{emptyText}</p>
       )}
 
@@ -156,9 +146,7 @@ export function RowEditor<T>({
               >
                 <div className="nh-roweditor-head">
                   {reorderable && rows.length > 1 && (
-                    /* Not a <button>: pressing Enter on it would do nothing, and a
-                       control that announces itself and then refuses to act is worse
-                       than no control. Keyboard reorder is Move up / Move down below. */
+                    /* Not a <button>: Enter would do nothing. Keyboard reorder is Move up / Move down in the menu. */
                     <span
                       className="nh-roweditor-grip tap-target"
                       aria-hidden="true"
@@ -177,29 +165,40 @@ export function RowEditor<T>({
                       className="nh-roweditor-toggle interactive"
                       aria-expanded={open}
                       aria-controls={bodyId}
-                      onClick={() => setExpanded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))}
+                      onClick={() =>
+                        setExpanded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+                      }
                     >
-                      <span className={cx("nh-roweditor-caret", open && "is-open")} aria-hidden="true"><IconChevron /></span>
+                      <span className={cx("nh-roweditor-caret", open && "is-open")} aria-hidden="true">
+                        <IconChevron />
+                      </span>
                       <span className="nh-roweditor-label">{label}</span>
                     </button>
                   ) : (
                     <span className="nh-roweditor-label nh-roweditor-label--static">{label}</span>
                   )}
 
-                  {/* Row-scoped names throughout: a screen reader hearing five bare
-                      "Remove"s in a list has been told nothing. */}
+                  {/* Row-scoped names so a screen reader doesn't hear five bare "Remove"s. */}
                   <Menu icon trigger="⋯" align="end" label={`Actions for ${label}`} className="nh-roweditor-menu">
                     {reorderable && (
-                      <MenuItem disabled={index === 0} onClick={() => move(index, index - 1)}>Move {label} up</MenuItem>
+                      <MenuItem disabled={index === 0} onClick={() => move(index, index - 1)}>
+                        Move {label} up
+                      </MenuItem>
                     )}
                     {reorderable && (
-                      <MenuItem disabled={index === rows.length - 1} onClick={() => move(index, index + 1)}>Move {label} down</MenuItem>
+                      <MenuItem disabled={index === rows.length - 1} onClick={() => move(index, index + 1)}>
+                        Move {label} down
+                      </MenuItem>
                     )}
-                    <MenuItem tone="danger" icon={<IconTrash />} onClick={() => remove(index)}>Remove {label}</MenuItem>
+                    <MenuItem tone="danger" icon={<IconTrash />} onClick={() => remove(index)}>
+                      Remove {label}
+                    </MenuItem>
                   </Menu>
                 </div>
 
-                <div className="nh-roweditor-body" id={bodyId} hidden={!open}>{renderRow(row, index)}</div>
+                <div className="nh-roweditor-body" id={bodyId} hidden={!open}>
+                  {renderRow(row, index)}
+                </div>
               </li>
             );
           })}
@@ -207,8 +206,7 @@ export function RowEditor<T>({
       )}
 
       <div className="nh-roweditor-foot">
-        {/* Annotate at capacity, never hide the Add button (readiness rule 1): a control
-            that vanishes teaches nothing, a disabled one with its reason does. */}
+        {/* At capacity, disable Add with its reason rather than hiding it. */}
         <Button
           variant="secondary"
           size="sm"
@@ -217,13 +215,21 @@ export function RowEditor<T>({
           aria-describedby={full && maxReachedReason ? reasonId : undefined}
           onClick={add}
         >
-          <span className="nh-roweditor-add-icon" aria-hidden="true"><IconPlus /></span>
+          <span className="nh-roweditor-add-icon" aria-hidden="true">
+            <IconPlus />
+          </span>
           {addLabel}
         </Button>
-        {full && maxReachedReason && <p className="nh-roweditor-reason" id={reasonId}>{maxReachedReason}</p>}
+        {full && maxReachedReason && (
+          <p className="nh-roweditor-reason" id={reasonId}>
+            {maxReachedReason}
+          </p>
+        )}
       </div>
 
-      <span className="nh-sr-only" role="status">{announcement}</span>
+      <span className="nh-sr-only" role="status">
+        {announcement}
+      </span>
     </div>
   );
 }

@@ -8,13 +8,16 @@ type PersistedAuthData = {
   tokenSecret: string;
   /** GM sessions issued at or before this epoch millisecond are invalid, regardless of their own expiry. Set by revoke-all. */
   gmSessionsRevokedBefore?: number;
-  /** Individually logged-out GM session IDs, mapped to their own expiry so stale entries can be pruned without a background job. */
+  /** Individually logged-out GM session ids, mapped to their expiry so stale entries can be pruned without a background job. */
   revokedGmSessionIds?: Record<string, number>;
 };
 
 export type GmSession = { role: "gm"; sessionId: string; issuedAt: number; expiresAt: number };
 export type PlayerSession = { role: "player"; sessionId: string; issuedAt: number; expiresAt: number };
 type Session = GmSession | PlayerSession;
+
+// Cost 12 takes ~440 ms per hash; tests bootstrap a GM many times, so they use the minimum.
+const PASSWORD_HASH_COST = process.env.VITEST ? 4 : 12;
 
 export class AuthService {
   private data: PersistedAuthData | null = null;
@@ -35,15 +38,25 @@ export class AuthService {
     this.data = {
       passwordHash: legacy.passwordHash,
       tokenSecret: legacy.tokenSecret,
-      gmSessionsRevokedBefore: typeof legacy.gmSessionsRevokedBefore === "number" ? legacy.gmSessionsRevokedBefore : undefined,
-      revokedGmSessionIds: legacy.revokedGmSessionIds && typeof legacy.revokedGmSessionIds === "object" ? { ...legacy.revokedGmSessionIds } : {}
+      gmSessionsRevokedBefore:
+        typeof legacy.gmSessionsRevokedBefore === "number" ? legacy.gmSessionsRevokedBefore : undefined,
+      revokedGmSessionIds:
+        legacy.revokedGmSessionIds && typeof legacy.revokedGmSessionIds === "object"
+          ? { ...legacy.revokedGmSessionIds }
+          : {}
     };
     this.pruneRevokedSessions();
   }
-  get isBootstrapped() { return this.data !== null; }
+  get isBootstrapped() {
+    return this.data !== null;
+  }
   async bootstrap(password: string) {
     if (this.data) throw new Error("GM password is already configured.");
-    this.data = { passwordHash: await bcrypt.hash(password, 12), tokenSecret: randomUUID(), revokedGmSessionIds: {} };
+    this.data = {
+      passwordHash: await bcrypt.hash(password, PASSWORD_HASH_COST),
+      tokenSecret: randomUUID(),
+      revokedGmSessionIds: {}
+    };
     await this.persist();
   }
   async login(password: string) {
@@ -54,15 +67,16 @@ export class AuthService {
   issuePlayerSession() {
     if (!this.data) throw new Error("The host must complete GM setup before players join.");
     const now = Date.now();
-    return this.sign({ role: "player", sessionId: randomUUID(), issuedAt: now, expiresAt: now + 30 * 24 * 60 * 60 * 1000 });
+    return this.sign({
+      role: "player",
+      sessionId: randomUUID(),
+      issuedAt: now,
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000
+    });
   }
-  /**
-   * A short-lived PLAYER principal for the GM's own preview of the player Codex. Deliberately a real
-   * player token rather than a role flag on the GM's session: every read then walks the same
-   * `authorizePlayer` path and the same projection a genuine player gets, so the preview cannot show
-   * anything a player could not see. Mirrors the viewer's `mintPreviewSession`. Minting does NOT
-   * register presence - that happens on socket join - so no phantom player appears at the table.
-   */
+  /** A short-lived player principal for the GM's preview of the player Codex. A real player token, so
+   *  every read goes through `authorizePlayer` and the player projection and the preview can't show more
+   *  than a player sees. Minting does not register presence, so no phantom player appears. */
   issuePreviewPlayerSession(ttlMs = 12 * 60 * 60 * 1000) {
     if (!this.data) throw new Error("The host must complete GM setup before players join.");
     const now = Date.now();
@@ -80,7 +94,10 @@ export class AuthService {
   async logout(token: string | undefined): Promise<boolean> {
     const session = this.verify(token);
     if (!session || !this.data) return false;
-    this.data.revokedGmSessionIds = { ...(this.data.revokedGmSessionIds ?? {}), [session.sessionId]: session.expiresAt };
+    this.data.revokedGmSessionIds = {
+      ...(this.data.revokedGmSessionIds ?? {}),
+      [session.sessionId]: session.expiresAt
+    };
     this.pruneRevokedSessions();
     await this.persist();
     return true;
@@ -97,7 +114,8 @@ export class AuthService {
     const [encoded, signature] = token.split(".");
     if (!encoded || !signature) return null;
     const expected = createHmac("sha256", this.data.tokenSecret).update(encoded).digest("base64url");
-    if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return null;
+    if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature)))
+      return null;
     try {
       const session = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Session;
       if (session.role !== "gm" && session.role !== "player") return null;
@@ -107,7 +125,9 @@ export class AuthService {
         if (this.data.revokedGmSessionIds?.[session.sessionId] !== undefined) return null;
       }
       return session;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   private pruneRevokedSessions() {
     if (!this.data?.revokedGmSessionIds) return;

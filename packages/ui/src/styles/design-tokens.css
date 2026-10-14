@@ -1,66 +1,40 @@
-/* ============================================================
-   OzyVTT: Design Tokens
-   Retrowave / synthwave, magenta-to-blue, for a D&D 5e VTT.
-   Import once at the app root. Reference these variables in
-   components. Do not hardcode hex values elsewhere.
-   Pairs with DESIGN_LANGUAGE.md (intent + locked decisions).
-
-   Themes: set data-theme="dark|dusk|light" on <html>.
-   Dark is the default (:root). Magenta leads, cyan supports (~60/40).
-   ============================================================ */
+/* OzyVTT design tokens (retrowave, magenta to blue). Import once at the app root and reference these
+   variables; never hardcode hex values elsewhere. See docs/DESIGN.md.
+   Themes: data-theme="dark|dusk|light" on <html>; dark is the :root default. */
 
 :root {
   /* ---- Brand ---- */
   --brand-name: "OzyVTT";
 
-  /* =========================================================
-     THEME: DARK (default). Lifted deep indigo/purple, not black.
-     ========================================================= */
+  /* ---- Theme: dark (default), deep indigo/purple rather than black ---- */
 
   /* Surfaces */
-  --void: #0A0714;
-  --bg: #0E0A1C;
-  --surface-1: #16112B;
-  --surface-2: #1E1838;
+  --void: #0a0714;
+  --bg: #0e0a1c;
+  --surface-1: #16112b;
+  --surface-2: #1e1838;
   --surface-3: #292145;
   --overlay: rgba(10, 7, 20, 0.72);
 
   /* Lines */
-  --line: #2E2A4E;
-  --line-strong: #3F3970;
-  --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent);   /* interactive hover-border tint; adapts per theme via --cyan */
+  --line: #2e2a4e;
+  --line-strong: #3f3970;
+  --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent); /* adapts per theme via --cyan */
 
   /* Neon accents (magenta leads, cyan supports) */
-  --magenta: #FF2E9A;
-  --magenta-hi: #FF5CB8;
-  --cyan: #2DE2FF;
-  --cyan-hi: #7CEFFF;
-  --violet: #A45CFF;
-  --violet-hi: #C79BFF;   /* readable violet for text on dark surfaces */
-  --indigo: #5B6EF5;
+  --magenta: #ff2e9a;
+  --magenta-hi: #ff5cb8;
+  --cyan: #2de2ff;
+  --cyan-hi: #7cefff;
+  --violet: #a45cff;
+  --violet-hi: #c79bff; /* readable violet for text on dark surfaces */
+  --indigo: #5b6ef5;
 
-  /* CODEX ENTITY-KIND ACCENT — RULING 46, and it resolves to ONE HUE FOR ALL EIGHT KINDS.
-     The eight names stay so no consumer changes and a future palette can re-split them, but every
-     one of them is `--indigo` now. This is the ruling's own escape clause ("if the kind list
-     outgrows the free hues, kinds share a hue and the icon disambiguates"), and wave 4 measured
-     that it is the only route left:
-
-       magenta / magenta-hi  = ACT (the primary action)         — disqualified
-       cyan / cyan-hi        = focus, and the selection axis     — disqualified
-       violet / violet-hi    = GM-ONLY CONTENT, reserved         — disqualified, and the one that
-                               bites: a violet kind badge would sit in the same row as a violet
-                               GM-only pill and read as the same statement
-       --caution             = warning / not finished            — disqualified (ruling 39)
-       --state-on            = on                                — disqualified (ruling 4)
-
-     Six of eight were spending a meaning-bearing colour on a taxonomy. `--indigo` is the only
-     free accent in the palette, so it takes all eight, and the ENTITY ICON carries the whole
-     distinction — which it already did (the glyph and the label were always the finer signal;
-     the old comment said so while shipping eight hues anyway).
-
-     The hue is an ACCENT ONLY (ruling 46's first line): the kind badge's rim and glyph and the
-     page-list row's leading rule. Nothing sits behind text, so the floor it must clear is the
-     3:1 graphics one — and it clears 4.5 on every surface in every theme after dusk's lift below. */
+  /* Codex entity-kind accent: one hue for all eight kinds; the entity icon carries the distinction.
+     Every other accent already means something (magenta = action, cyan = focus/selection,
+     violet = GM-only content, --caution, --state-on), so --indigo is the only free one.
+     Accent only (badge rim and glyph, list-row rule); nothing sits behind text. The eight names stay
+     so a future palette can re-split them. */
   --codex-type: var(--indigo);
   --codex-type-note: var(--codex-type);
   --codex-type-character: var(--codex-type);
@@ -71,266 +45,200 @@
   --codex-type-religion: var(--codex-type);
   --codex-type-item: var(--codex-type);
 
-  /* D25: the atlas pin palette. These were eight hardcoded hex values inside `icons.tsx`, which meant
-     the light theme drew map pins at dark-theme saturation. The palette OFFERED is tokenized; the value
-     PERSISTED stays hex on the wire (the server stores `#rrggbb` and no API changed), so an
-     already-placed pin in a colour outside this list still renders as itself. */
-  --pin-1: #FF2E9A;
-  --pin-2: #2DE2FF;
-  --pin-3: #A45CFF;
-  --pin-4: #FF2D5E;
-  --pin-5: #FFB020;
-  --pin-6: #57E39A;
-  --pin-7: #E8ECF4;
-  --pin-8: #94A3B8;
+  /* Atlas pin palette offered to the GM. Pins persist as hex on the wire, so a pin in a colour outside
+     this list still renders as itself. */
+  --pin-1: #ff2e9a;
+  --pin-2: #2de2ff;
+  --pin-3: #a45cff;
+  --pin-4: #ff2d5e;
+  --pin-5: #ffb020;
+  --pin-6: #57e39a;
+  --pin-7: #e8ecf4;
+  --pin-8: #94a3b8;
 
   /* Semantic (hue is a hint; always pair with icon + label) */
   --primary: var(--magenta);
   --success: var(--cyan);
-  /* D21 / director ruling R8 — caution is a WARM ORANGE and no longer violet.
-     It aliased --violet, which invariant 8 reserves exclusively for GM-only content, so
-     a warning badge and a GM-secret block were the same hue: the one colour in the system
-     that must mean exactly one thing meant two. Orange is the only direction left that is
-     neither loss-red, brand magenta/cyan, nor GM-violet; the restraint rule's "no yellow"
-     is respected in letter and intent. Measured 2026-07-31 (Chromium, WCAG 2.1):
-     --caution-hi #FFB877 reads 10.77 / 9.96 / 8.85 on dark's three surfaces and (re-measured
-     2026-08-04 after the sunset retune) 8.24 / 7.20 / 6.08 on dusk's; light's #8F4406 reads
-     6.80 / 6.36 / 5.93. */
-  --caution: #FF9E4A;
-  /* Caution as TEXT. The --danger/--danger-hi pair exists because the fill hue isn't
-     readable as small type; caution needs the same pair. Use --caution for edges and
-     fills, --caution-hi for the words. */
-  --caution-hi: #FFB877;
-  --danger: #FF2D5E;
-  --danger-hi: #FF6B8E;
+  /* Caution is warm orange because violet is reserved for GM-only content. */
+  --caution: #ff9e4a;
+  /* Caution as text: --caution for edges and fills, --caution-hi for words. */
+  --caution-hi: #ffb877;
+  --danger: #ff2d5e;
+  --danger-hi: #ff6b8e;
   --info: var(--indigo);
 
-  /* ---- STATE: ON (ruling 4) ----
-     The segmented control's ON fill. A STATE token whose VALUE varies per theme: the token
-     means "on"; each theme picks the hue that reads best against its own surfaces. Defined
-     three times — here (night), in the dusk block and in the light block.
-
-     WRITTEN AS LITERALS, NOT ALIASES, and that is ruling 39: `--caution` keeps its own meaning
-     (warning / not finished) and "must not be borrowed by the segmented on-state in dusk". An
-     alias would make a severity retune silently move a state colour. The palette hue each value
-     matches is named beside it so nobody thinks it drifted.
-
-     THE HUES ARE SHARED ON PURPOSE and the collisions are real — ruling 7 resolves all three by
-     SHAPE, not by hue: the segmented group takes the corner cut and the on option a leading tick,
-     a silhouette neither the Switch nor the focus ring has. Do not "fix" a collision here by
-     changing a value; the distinction lives in SegmentedControl.css.
-
-     Measured 2026-08-06 (WCAG 2.1, sRGB) as a FILL against this theme's three surfaces —
-     the bar is 3:1 (SC 1.4.11, non-text), and the label on the fill is held to 4.5:1. */
-  /* Night: --magenta #FF2E9A. Fill 5.32 / 4.92 / 4.37 on --surface-1/2/3 (5.66 on --bg).
-     --text-on-neon #0C0A18 on the fill: 5.70. */
-  --state-on: #FF2E9A;
-  /* The label ON the fill. `--text-on-neon` clears 4.5 in all three themes on these values
-     (5.70 night / 8.80 dusk / 6.39 daybreak), so this is an alias and stays one — it is the
-     same "dark ink on a bright fill" decision, not a second one. */
+  /* ---- State: on ----
+     The segmented control's on fill; each theme defines its own value. Literals, not aliases, so
+     retuning --caution never moves a state colour. Hue collisions with other accents are resolved by
+     shape in SegmentedControl.css, not here. Fill must reach 3:1 against the surfaces and the label
+     4.5:1 against the fill. Night uses the --magenta hue. */
+  --state-on: #ff2e9a;
+  /* The label on the fill; --text-on-neon clears 4.5:1 on all three themes' values. */
   --state-on-ink: var(--text-on-neon);
 
   /* Text */
-  --text: #ECEAFB;
-  --text-dim: #A8A2CC;
-  /* D21 #1. Was #6E6892 — 3.53 / 3.26 / 2.90 on this theme's three surfaces, below AA on
-     every one of them, across ~207 usages (placeholders, help text, chronicle when-labels,
-     the whole quiet half of the interface). Raised until it passes: measured 2026-07-31
-     (Chromium, WCAG 2.1) at 6.43 / 5.94 / 5.29. Dusk and light carry their own values
-     below, each measured the same way. */
-  --text-muted: #9A94C2;
-  --text-on-neon: #0C0A18;   /* dark ink on bright neon fills */
+  --text: #eceafb;
+  --text-dim: #a8a2cc;
+  /* Raised to pass AA on all three surfaces in every theme. */
+  --text-muted: #9a94c2;
+  --text-on-neon: #0c0a18; /* dark ink on bright neon fills */
 
   /* Glows: bloom in dark/dusk. State only, never resting elevation.
      Glow switches on/off smoothly and never pulses. */
-  --glow-magenta:        0 0 0 1px rgba(255, 46, 154, 0.55), 0 0 16px 2px rgba(255, 46, 154, 0.35);
-  --glow-magenta-strong: 0 0 0 1.5px rgba(255, 46, 154, 0.70), 0 0 26px 4px rgba(255, 46, 154, 0.50);
-  --glow-cyan:           0 0 0 1px rgba(45, 226, 255, 0.55), 0 0 16px 2px rgba(45, 226, 255, 0.32);
-  --glow-violet:         0 0 0 1px rgba(164, 92, 255, 0.55), 0 0 16px 2px rgba(164, 92, 255, 0.32);
-  --glow-danger:         0 0 0 1px rgba(255, 45, 94, 0.55), 0 0 16px 2px rgba(255, 45, 94, 0.32);
+  --glow-magenta: 0 0 0 1px rgba(255, 46, 154, 0.55), 0 0 16px 2px rgba(255, 46, 154, 0.35);
+  --glow-magenta-strong: 0 0 0 1.5px rgba(255, 46, 154, 0.7), 0 0 26px 4px rgba(255, 46, 154, 0.5);
+  --glow-cyan: 0 0 0 1px rgba(45, 226, 255, 0.55), 0 0 16px 2px rgba(45, 226, 255, 0.32);
+  --glow-violet: 0 0 0 1px rgba(164, 92, 255, 0.55), 0 0 16px 2px rgba(164, 92, 255, 0.32);
+  --glow-danger: 0 0 0 1px rgba(255, 45, 94, 0.55), 0 0 16px 2px rgba(255, 45, 94, 0.32);
 
-  /* Glow as a FILTER — drop-shadow twins of the set above, for chamfered (clip-path)
-     surfaces: box-shadow cannot follow the cut, drop-shadow can (the landing doors
-     proved the pattern). Same hues, door-tuned alphas. */
-  --glow-drop-magenta:        drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.33));
-  --glow-drop-magenta-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85)) drop-shadow(0 0 30px rgba(255, 46, 154, 0.5));
-  --glow-drop-cyan:           drop-shadow(0 0 6px rgba(45, 226, 255, 0.55)) drop-shadow(0 0 18px rgba(45, 226, 255, 0.30));
-  --glow-drop-violet:         drop-shadow(0 0 6px rgba(164, 92, 255, 0.55)) drop-shadow(0 0 18px rgba(164, 92, 255, 0.30));
-  --glow-drop-danger:         drop-shadow(0 0 6px rgba(255, 45, 94, 0.55)) drop-shadow(0 0 18px rgba(255, 45, 94, 0.30));
+  /* Drop-shadow twins of the glows for clip-path (chamfered) surfaces, which box-shadow cannot follow. */
+  --glow-drop-magenta: drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.33));
+  --glow-drop-magenta-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85))
+    drop-shadow(0 0 30px rgba(255, 46, 154, 0.5));
+  --glow-drop-cyan: drop-shadow(0 0 6px rgba(45, 226, 255, 0.55)) drop-shadow(0 0 18px rgba(45, 226, 255, 0.3));
+  --glow-drop-violet: drop-shadow(0 0 6px rgba(164, 92, 255, 0.55)) drop-shadow(0 0 18px rgba(164, 92, 255, 0.3));
+  --glow-drop-danger: drop-shadow(0 0 6px rgba(255, 45, 94, 0.55)) drop-shadow(0 0 18px rgba(255, 45, 94, 0.3));
 
   /* Ambient shadows (dark, for resting elevation) */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.50);
-  /* Elevation as a FILTER — the drop-shadow twin of --shadow-2, for chamfered surfaces, the
-     same reason the --glow-drop-* set exists: box-shadow cannot follow a clip-path cut, and on
-     a cut card a square shadow shows through the notch. The blur is HALVED because the two
-     properties measure it differently — drop-shadow's radius is the Gaussian sigma, box-shadow's
-     is twice it — so 24px of box-shadow reads as 12px of drop-shadow, not 24. */
-  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.50));
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* Drop-shadow twin of --shadow-2 for chamfered surfaces. Blur is halved because drop-shadow's radius is
+     the Gaussian sigma and box-shadow's is twice it. */
+  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
 
   /* Texture (retro screen surface) */
   --grid-line: rgba(255, 46, 154, 0.16);
   --scanline-color: rgba(0, 0, 0, 0.22);
 
-  /* =========================================================
-     SHARED across all themes (structure, not color)
-     ========================================================= */
+  /* ---- Shared across all themes (structure, not color) ---- */
 
   /* Signature color ramp (a color and a light source, not a sun) */
-  --grad-bloom: linear-gradient(180deg, #FF2E9A 0%, #A45CFF 48%, #2DE2FF 100%);
-  --grad-horizon: linear-gradient(180deg, #FF2E9A 0%, #5B6EF5 100%);
+  --grad-bloom: linear-gradient(180deg, #ff2e9a 0%, #a45cff 48%, #2de2ff 100%);
+  --grad-horizon: linear-gradient(180deg, #ff2e9a 0%, #5b6ef5 100%);
   /* Chrome ramp for the arcade wordmark (top light, warm core, cool base) */
-  --grad-chrome: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 34%, #A45CFF 62%, #2DE2FF 100%);
+  --grad-chrome: linear-gradient(180deg, #ffe7f6 0%, #ff5cb8 34%, #a45cff 62%, #2de2ff 100%);
 
-  /* ---- The landing scene (D30) ----
-     The title screen's own palette, named here so the app CSS stays raw-color-free.
-     THE TOGGLE RE-SKINS THE DRIVE (client call, 2026-08-04, reversing the earlier
-     committed-night reading): dark is the night drive, dusk is the sunset hour, and
-     light is daybreak — the [data-theme] blocks at the end of this file override
-     exactly these tokens and nothing else. Base values below are the NIGHT. */
+  /* ---- The landing scene ----
+     The title screen's palette. The [data-theme] blocks at the end of this file override exactly these
+     tokens: dark is night, dusk is sunset, light is daybreak. Base values are night. */
   --landing-sky:
     radial-gradient(130% 80% at 50% 112%, rgba(164, 92, 255, 0.34) 0%, transparent 56%),
-    linear-gradient(180deg, #030210 0%, #070417 20%, #0B0722 38%, #150E33 56%, #241448 74%, #301A5E 88%, #3A1B72 100%);
+    linear-gradient(180deg, #030210 0%, #070417 20%, #0b0722 38%, #150e33 56%, #241448 74%, #301a5e 88%, #3a1b72 100%);
   --landing-star: rgba(255, 255, 255, 1);
   --landing-star-dim: rgba(199, 155, 255, 0.6);
-  --landing-sun: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 26%, #FF2E9A 52%, #A45CFF 84%, #5B6EF5 100%);
-  --landing-sun-glow:
-    0 0 40px 12px rgba(255, 46, 154, 0.46),
-    0 0 110px 40px rgba(164, 92, 255, 0.30);
+  --landing-sun: linear-gradient(180deg, #ffe7f6 0%, #ff5cb8 26%, #ff2e9a 52%, #a45cff 84%, #5b6ef5 100%);
+  --landing-sun-glow: 0 0 40px 12px rgba(255, 46, 154, 0.46), 0 0 110px 40px rgba(164, 92, 255, 0.3);
   --landing-slat: rgba(6, 4, 18, 0.92);
-  --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(45, 226, 255, 0.9) 22%, rgba(255, 92, 184, 0.95) 50%, rgba(45, 226, 255, 0.9) 78%, transparent 100%);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(45, 226, 255, 0.9) 22%,
+    rgba(255, 92, 184, 0.95) 50%,
+    rgba(45, 226, 255, 0.9) 78%,
+    transparent 100%
+  );
   --landing-horizon-glow:
-    0 0 14px 3px rgba(45, 226, 255, 0.85),
-    0 0 52px 14px rgba(255, 46, 154, 0.55),
-    0 0 26px 8px rgba(255, 158, 74, 0.22);
+    0 0 14px 3px rgba(45, 226, 255, 0.85), 0 0 52px 14px rgba(255, 46, 154, 0.55), 0 0 26px 8px rgba(255, 158, 74, 0.22);
   --landing-grid-x: rgba(255, 46, 154, 0.55);
-  --landing-grid-y: rgba(45, 226, 255, 0.50);
-  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.50) 100%);
+  --landing-grid-y: rgba(45, 226, 255, 0.5);
+  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.5) 100%);
   --landing-scanline: rgba(0, 0, 0, 0.26);
   --landing-noise-opacity: 0.05;
-  /* The sign: BLUE-STEEL chrome (client insight: every reference title wears a metal the
-     scene does not — cold blue on this warm magenta/violet drive, so it stands out AND
-     belongs). Smooth by design: thirteen blended stops, one gently softened mirror meet
-     (50 -> 54%), no hard jump anywhere. The chrome structure (light crown, deepening body,
-     mirror meet, flash, dark base) carries legibility over sky and sun alike, with a
-     hairline navy stroke, one solid extrusion, one tight magenta halo. Night and the
-     sunset hour share this steel — the contrast is the point; daybreak depth-tunes it. */
-  --landing-sign: linear-gradient(180deg, #FAFDFF 0%, #EDF6FE 10%, #C6E0F7 22%, #93BEEA 34%, #5E92D4 44%, #2F5C9C 47%, #1F4276 50%, #FBFEFF 54%, #E2F1FC 61%, #A6CBF0 71%, #6FA0DF 82%, #3E6BB1 92%, #254789 100%);
+  /* The sign: blue-steel chrome, a metal the warm scene doesn't use, so it stands out over sky and sun.
+     Night and sunset share it; daybreak tunes its depth. */
+  --landing-sign: linear-gradient(
+    180deg,
+    #fafdff 0%,
+    #edf6fe 10%,
+    #c6e0f7 22%,
+    #93beea 34%,
+    #5e92d4 44%,
+    #2f5c9c 47%,
+    #1f4276 50%,
+    #fbfeff 54%,
+    #e2f1fc 61%,
+    #a6cbf0 71%,
+    #6fa0df 82%,
+    #3e6bb1 92%,
+    #254789 100%
+  );
   --landing-stroke: rgba(12, 32, 72, 0.78);
-  --landing-title-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
-    drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
-  /* The doors. Chamfered arcade panels clipped with clip-path, so their glow rides
-     drop-shadow filters (which follow the cut) rather than box-shadow (which cannot). */
-  /* The doors live in the scene's own language (client note, final round): deep-violet
-     panels, WHITE-HOT labels, a magenta rim on the player door and a violet rim on the
-     GM door. They stand out by LUMINANCE — the labels are the brightest small things on
-     the screen — not by borrowing hues the drive never uses. One design, all three skies. */
-  --landing-door-bg: linear-gradient(180deg, #261448 0%, #170B31 100%);
-  --landing-door-label: #FBF7FF;
-  --landing-door-play-rim: #FF3FA4;
+  --landing-title-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85)) drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
+  /* The doors: chamfered clip-path panels, so their glow uses drop-shadow. Deep-violet panels with
+     white-hot labels; they stand out by luminance, with a magenta rim (player) and violet rim (GM). */
+  --landing-door-bg: linear-gradient(180deg, #261448 0%, #170b31 100%);
+  --landing-door-label: #fbf7ff;
+  --landing-door-play-rim: #ff3fa4;
   --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
-  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 63, 164, 0.85)) drop-shadow(0 0 30px rgba(255, 63, 164, 0.5));
-  --landing-door-gm-rim: #9F6BFF;
+  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 63, 164, 0.85))
+    drop-shadow(0 0 30px rgba(255, 63, 164, 0.5));
+  --landing-door-gm-rim: #9f6bff;
   --landing-door-gm-glow: drop-shadow(0 0 6px rgba(159, 107, 255, 0.55)) drop-shadow(0 0 18px rgba(159, 107, 255, 0.33));
-  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(159, 107, 255, 0.85)) drop-shadow(0 0 30px rgba(159, 107, 255, 0.5));
-  /* The grid, 40% more open than the app texture's 34px cell (client note): the drive
-     reads as a road at this density, not a mesh. */
+  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(159, 107, 255, 0.85))
+    drop-shadow(0 0 30px rgba(159, 107, 255, 0.5));
+  /* Larger than the app texture's 34px cell so the drive reads as a road, not a mesh. */
   --landing-grid-cell: 56px;
-  /* Violet glass + deep ink for the panels that stand ON the scene (theme switch, GM card). */
+  /* Violet glass + deep ink for the panels that stand on the scene (theme switch, GM card). */
   --landing-glass: rgba(23, 11, 49, 0.72);
-  --landing-ink-deep: #0B0620;
-  /* The night's quiet companion (client note): a small ringed planet, upper right — the
-     genre's postcard signature, kept subtle. Daybreak hides it (opacity 0). */
-  --landing-planet: radial-gradient(circle at 35% 30%, #C79BFF 0%, #7A3FD6 55%, #4A2699 100%);
+  --landing-ink-deep: #0b0620;
+  /* A small ringed planet, upper right; daybreak hides it (opacity 0). */
+  --landing-planet: radial-gradient(circle at 35% 30%, #c79bff 0%, #7a3fd6 55%, #4a2699 100%);
   --landing-planet-ring: rgba(255, 92, 184, 0.75);
   --landing-planet-glow: 0 0 16px 2px rgba(164, 92, 255, 0.45);
   --landing-planet-opacity: 0.55;
 
-  /* ---- THE WORK-SCREEN SKY (§9; client call 2026-08-04, reversing "no sun, no horizon,
-     no stars") ----
-     The landing's drive, generalized for a pane that has WORK on it. Same four motifs —
-     stars, a sun cresting a horizon, the glowing horizon line, a receding grid floor —
-     rebuilt to three rules the title screen does not have to obey:
-
-       1. THE HORIZON IS A FIXED INSET FROM THE PANE BOTTOM, never a percentage. A
-          percentage horizon drifts up into the content as the pane grows; 7rem never does,
-          and every other layer is expressed against this one number.
-       2. THE SUN IS A CREST, NOT A DISC. Its box IS the crown above the horizon
-          (--sky-sun-crown tall); --sky-sun-mask cuts that rectangle to the top of a
-          --sky-sun-d circle whose centre sits on the horizon. So the slats the landing
-          paints over the disc's lower half have nothing to cut — the crest is the
-          unslatted half — and the brightest ink is at the line, fading to nothing upward,
-          which is where the text is.
-       3. THE INK IS BUDGETED. --sky-floor-opacity and --sky-sun-opacity are measured
-          per-theme ceilings, not taste: legibility outranks vibe (pillar 3), and the
-          measurements live beside each theme's block.
-
-     Derive, do not hand-type: --sky-horizon-a/b and --sky-grid-x/y are color-mix() over
-     --cyan/--magenta, which already flip per theme, so night and daybreak come free from
-     ONE definition and only the sunset hour overrides them.
-
-     THE ONE-LAYER INVARIANT: --sky-wash must stay a SINGLE background layer. It is the
-     only background on `.pane-scene`; the drive rides `.pane-sky`, whose size/repeat lists
-     assume exactly ten layers. A two-layer wash spliced into a tiled stack re-tiles the
-     ramp into bands — the landing's own --landing-sky is two layers in night and dusk,
-     which is precisely why this is a separate token and not an alias of it. */
+  /* ---- The work-screen sky ----
+     The landing's drive adapted for panes with content on them:
+       1. The horizon is a fixed inset from the pane bottom, never a percentage, so it never drifts into
+          content as the pane grows; every other layer is expressed against it.
+       2. The sun is a crest: its box is the crown above the horizon, masked to the top of a circle
+          centred on the horizon, brightest at the line and fading upward where text sits.
+       3. --sky-floor-opacity and --sky-sun-opacity are per-theme legibility ceilings, not taste.
+     --sky-horizon-a/b and --sky-grid-x/y derive from --cyan/--magenta, so only dusk overrides them.
+     --sky-wash must stay a single background layer: `.pane-sky`'s size/repeat lists assume exactly ten
+     layers, and a two-layer wash would re-tile into bands (why it is not an alias of --landing-sky). */
   --sky-horizon-inset: 7rem;
-  /* NIGHT. Measured 2026-08-04 (Chromium, WCAG 2.1) against the raw wash, no glass:
-     --text-dim #A8A2CC reads 6.86 at the horizon stop (#241448) and 5.51 at the bottom
-     stop (#3A1B72); --text-muted 5.82 / 4.68; --text 13.97 / 11.22. Night needs no
-     truncation — the whole landing ramp clears AA on its own.
-
-     EVERY STOP IS EXPRESSED AGAINST THE HORIZON, which is the rule the rest of the scene
-     already follows and the wash alone was breaking. The sky stops used to be fractions of the
-     FULL box (24/46/68%) while the knee was calc(100% - inset), and those two orderings cross
-     whenever the box is shorter than about 350px: CSS clamps a decreasing stop to the one
-     before it, two stops land on the same position, and the ramp turns into a hard horizontal
-     band. Written as fractions of `100% - inset` the list is monotonic at ANY height, and on a
-     real pane it is the same ramp — the multipliers are the old percentages re-solved against
-     a 1036px pane, so the stops move under a pixel there and ~7px at phone height. */
-  --sky-wash: linear-gradient(180deg,
+  /* Night: the whole ramp clears AA for --text-dim/--text-muted/--text without truncation.
+     Every stop is a fraction of `100% - inset` so the list stays monotonic at any height; percentage
+     stops cross the knee on short panes and collapse into a hard band. */
+  --sky-wash: linear-gradient(
+    180deg,
     #030210 0%,
     #070417 calc((100% - var(--sky-horizon-inset)) * 0.27),
-    #0B0722 calc((100% - var(--sky-horizon-inset)) * 0.52),
-    #150E33 calc((100% - var(--sky-horizon-inset)) * 0.76),
+    #0b0722 calc((100% - var(--sky-horizon-inset)) * 0.52),
+    #150e33 calc((100% - var(--sky-horizon-inset)) * 0.76),
     #241448 calc(100% - var(--sky-horizon-inset)),
-    #301A5E calc(100% - var(--sky-horizon-inset) * 0.5),
-    #3A1B72 100%);
-  /* One flat tile, seven dots, sky-wide — not the landing's two parallax layers. Daybreak
-     stands the stars down by making the INK transparent, so the layer list never changes. */
+    #301a5e calc(100% - var(--sky-horizon-inset) * 0.5),
+    #3a1b72 100%
+  );
+  /* One flat tile of stars. Daybreak hides them by making the ink transparent, so the layer list never changes. */
   --sky-star: rgba(236, 234, 251, 0.8);
   --sky-star-dim: rgba(164, 92, 255, 0.45);
   --sky-star-tile: 251px;
-  /* The crest, and the ONE RATIO that makes it read as a sun: the crown is exactly HALF the
-     disc, so what stands above the line is a hemisphere and the equator sits on the horizon.
-     The diameter is DERIVED from the crown for that reason — the first cut of this shipped
-     them as independent numbers (a 24rem disc under a 3.25rem crown) and the mask's circular
-     cap degenerated into a near-straight chord: measured on the live page at 1920 the visible
-     silhouette was 394x54px, a 7.3:1 slab with 8.8% taper and hard vertical sides, worst in
-     daybreak. Two numbers that must hold a ratio should not both be typed. The crown is also
-     the reserve's second term, so it stays the driver: what you set here is what the scene
-     promises to keep clear of text. */
+  /* The crown is exactly half the disc so the visible part is a hemisphere; the diameter derives from
+     the crown so the ratio can't break. The crown is also the space the scene keeps clear of text. */
   --sky-sun-crown: 4rem;
   --sky-sun-d: calc(var(--sky-sun-crown) * 2);
-  --sky-sun: linear-gradient(180deg,
+  --sky-sun: linear-gradient(
+    180deg,
     rgba(255, 231, 246, 0) 0%,
     rgba(255, 92, 184, 0.42) 52%,
-    rgba(255, 46, 154, 0.86) 100%);
+    rgba(255, 46, 154, 0.86) 100%
+  );
   --sky-sun-mask: radial-gradient(circle calc(var(--sky-sun-d) / 2) at 50% 100%, #000 97%, rgba(0, 0, 0, 0) 100%);
   --sky-sun-opacity: 0.5;
-  /* The horizon beam. The same pair drives the `.neon-beam` divider, so one token owns the
-     sky's line and the chrome's. */
+  /* The horizon beam; the same pair drives the `.neon-beam` divider. */
   --sky-horizon-a: color-mix(in srgb, var(--cyan) 85%, transparent);
   --sky-horizon-b: color-mix(in srgb, var(--magenta) 92%, transparent);
-  --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 46, 154, 0.30) 0%, rgba(45, 226, 255, 0.12) 46%, transparent 74%);
-  /* Night's bloom is the crown the pre-reversal wash already carried, kept because it
-     measured safe (--text-dim 5.26; its AA ceiling is 0.24, so 0.20 keeps margin). */
-  --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.20) 0%, transparent 68%);
-  /* The floor. Shallower and flatter than the landing's road (±32%, 36% tall,
-     perspective 340/63deg, 56/56 cell): a work pane wants a strip, not a highway. Rows are
-     denser than columns — that is what sells the recession once the tilt lands. */
+  --sky-horizon-glow: radial-gradient(
+    46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(255, 46, 154, 0.3) 0%,
+    rgba(45, 226, 255, 0.12) 46%,
+    transparent 74%
+  );
+  /* Night's bloom; 0.20 stays under its AA ceiling for --text-dim. */
+  --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.2) 0%, transparent 68%);
+  /* The floor: a shallow strip, not the landing's highway. Rows are denser than columns to sell the recession. */
   --sky-grid-x: color-mix(in srgb, var(--magenta) 50%, transparent);
   --sky-grid-y: color-mix(in srgb, var(--cyan) 45%, transparent);
   --sky-grid-col: 56px;
@@ -338,117 +246,82 @@
   --sky-grid-perspective: 260px;
   --sky-grid-tilt: 58deg;
   --sky-grid-bleed: 12%;
-  /* Measured AA ceilings for --text-dim sitting directly on a grid line over this theme's
-     floor band (#301A5E): columns 0.44, rows 0.29. 0.28 keeps both (rows 4.57, cols 5.08). */
+  /* Ceiling for --text-dim over a grid line on this theme's floor band. */
   --sky-floor-opacity: 0.28;
-  /* Densest in the middle of the band, quiet at both the horizon join and the pane's bottom
-     edge — where a region's last row lands. The cheapest legibility win in the whole scene. */
+  /* Densest mid-band and quiet at both edges, where a region's last row lands. */
   --sky-floor-mask: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000 30%, #000 62%, rgba(0, 0, 0, 0) 100%);
 
-  /* ---- NEON LINEWORK (§9) ----
-     The horizon's line, lent to the chrome. The style guide separates its parts with the same
-     rule it draws its horizon with, and this is that rule: one token pair for the sky's line
-     and the chrome's, so they can never drift apart.
-
-     IT IS SCENE LANGUAGE, NOT STATE LANGUAGE, and the difference is the whole restraint
-     (pillar 1: neon marks what is interactive, focused, selected or live). A beam is a
-     STRUCTURAL boundary — the frame's chrome row against its region, a dock against the map.
-     It never lands on a control, never marks a state, and never replaces a resting `--line`
-     border just because one was there. That is why it runs at roughly half the horizon's
-     intensity and why the glow is a whisper: a resting rule that glowed like the active tab's
-     underline would say "live" about a heading.
-
-     Derived from --cyan/--magenta so daybreak's deepened inks come free. */
-  --rule-beam: linear-gradient(90deg,
+  /* ---- Neon linework ----
+     The horizon's line reused as a structural rule (chrome row against region, dock against map). It is
+     scene language, not state: it never marks a control or a state, and runs at about half the horizon's
+     intensity so a resting rule never reads as "live". Derived from --cyan/--magenta. */
+  --rule-beam: linear-gradient(
+    90deg,
     transparent 0%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 22%,
     color-mix(in srgb, var(--magenta) 62%, transparent) 50%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 78%,
-    transparent 100%);
-  --rule-beam-v: linear-gradient(180deg,
+    transparent 100%
+  );
+  --rule-beam-v: linear-gradient(
+    180deg,
     transparent 0%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 22%,
     color-mix(in srgb, var(--magenta) 62%, transparent) 50%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 78%,
-    transparent 100%);
+    transparent 100%
+  );
   --rule-beam-glow: 0 0 10px color-mix(in srgb, var(--magenta) 18%, transparent);
 
-  /* ---- ROLE RIMS (§9) ----
-     Magenta is the player's door, violet is the GM's — the pairing the landing's two arcade
-     doors established, promoted so role-scoped CHROME can inherit it.
-
-     READ THE SCOPE CAREFULLY: this attaches to the GM-SECRET TREATMENT (a 3px inline-start
-     edge plus a faint wash of the same hue — the idiom `.scene-preview-banner`, `.party-queue`,
-     `.scene-builder` and the codex's GM blocks already wear), NOT to a claim that the HUE means
-     GM. It does not: --violet is load-bearing for magical/concentration (§2), NPC token strokes,
-     condition dots, legendary actions and presence across ~50 rules, and writing "violet = GM"
-     into the language would make the doc a defect against its own semantic table.
-
-     And a rim is never the only signal. Every site that wears one already says which role it
-     belongs to in words a screen reader reaches — the two tab bars in their aria-labels, the
-     settings groups in their visible Eyebrow. A rim reinforces; it never carries.
-
-     Not aliases of --magenta/--violet: both are lifted (#FF3FA4 vs #FF2E9A, #9F6BFF vs #A45CFF)
-     because an EDGE needs more separation from its surface than a fill does. The glow twins are
-     drop-shadow filters, so a chamfered edge can wear them. */
-  --rim-player: #FF3FA4;
-  --rim-gm: #9F6BFF;
+  /* ---- Role rims ----
+     Magenta for the player's door, violet for the GM's, applied to the GM-secret treatment (3px
+     inline-start edge plus a faint wash). The hue alone does not mean GM (violet has other meanings),
+     and a rim is never the only signal: every site also names its role in text. Lifted above
+     --magenta/--violet because an edge needs more contrast than a fill. */
+  --rim-player: #ff3fa4;
+  --rim-gm: #9f6bff;
   --rim-player-wash: color-mix(in srgb, var(--rim-player) 7%, transparent);
   --rim-gm-wash: color-mix(in srgb, var(--rim-gm) 7%, transparent);
   --rim-player-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
   --rim-gm-glow: drop-shadow(0 0 6px rgba(159, 107, 255, 0.55)) drop-shadow(0 0 18px rgba(159, 107, 255, 0.33));
 
-  /* ---- THE SIGN (§9) ----
-     A hero title wears a metal the scene does not — cold blue-steel on this warm magenta/violet
-     drive — and its legibility comes from the CHROME STRUCTURE (light crown, deepening body,
-     one softened mirror meet at 50->54%, flash, dark base), not from an outline. That is why the
-     stroke is a hairline and the glow is one solid extrusion plus one tight halo rather than a
-     haze: the bands do the work.
-
-     RESERVED FOR TRUE HERO MOMENTS — a full-page title that IS the screen. Never a panel header,
-     never a section heading, never `.nh-panel-title`. One edit there would put the metal on every
-     panel in the app and it would stop meaning anything.
-
-     Deliberate duplication of --landing-sign/--landing-stroke/--landing-title-glow, which the
-     concurrent entry-animation lane owns and this one may not edit. When that lands, the landing
-     should alias these three and the --landing-* copies should go. */
-  --sign-chrome: linear-gradient(180deg, #FAFDFF 0%, #EDF6FE 10%, #C6E0F7 22%, #93BEEA 34%, #5E92D4 44%, #2F5C9C 47%, #1F4276 50%, #FBFEFF 54%, #E2F1FC 61%, #A6CBF0 71%, #6FA0DF 82%, #3E6BB1 92%, #254789 100%);
+  /* ---- The sign ----
+     Hero titles only (a full-page title that is the screen), never panel or section headings. Legibility
+     comes from the chrome bands, so the stroke is a hairline. Duplicates --landing-sign/--landing-stroke/
+     --landing-title-glow; the landing tokens could alias these. */
+  --sign-chrome: linear-gradient(
+    180deg,
+    #fafdff 0%,
+    #edf6fe 10%,
+    #c6e0f7 22%,
+    #93beea 34%,
+    #5e92d4 44%,
+    #2f5c9c 47%,
+    #1f4276 50%,
+    #fbfeff 54%,
+    #e2f1fc 61%,
+    #a6cbf0 71%,
+    #6fa0df 82%,
+    #3e6bb1 92%,
+    #254789 100%
+  );
   --sign-stroke: rgba(12, 32, 72, 0.78);
-  --sign-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
-    drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
+  --sign-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85)) drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
 
-  /* Texture sizing + noise tile. --noise-opacity is a token for the same reason
-     --landing-noise-opacity is one (§9): grain strength is a per-theme dial, not a
-     constant baked into the utility. */
+  /* Texture sizing and noise tile. --noise-opacity is per theme. */
   --grid-cell: 34px;
   --scanline-gap: 3px;
   --noise-opacity: 0.045;
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
-  /* Typography
-     Retro-arcade set: chunky signage wordmark, bold squared display,
-     neutral body, retro mono for live data. */
+  /* Typography: chunky wordmark, squared display, neutral body, retro mono for live data. */
   --font-wordmark: "Bungee", system-ui, sans-serif;
   --font-display: "Russo One", system-ui, sans-serif;
   --font-body: "Manrope", system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, "Courier New", monospace;
-  /* GAME NUMBERS (ruling 50) — HP, AC, initiative, dice totals. Counts and page numbers stay in
-     the body face, so the distinction keeps meaning something. Spend it through `.numeric`.
-
-     THE TABULAR HALF IS FUNCTIONAL, and it decided the face. Measured 2026-08-06 in Chromium at
-     32px, digit advances 0-9 across all four bundled families:
-       Russo One (the arcade face this ruling reads as asking for) — 12.97 to 21.45px, and
-         `font-variant-numeric: tabular-nums` changes NOTHING: the face ships no `tnum`. A `1` is
-         60% the width of a `0`. It cannot carry this ruling.
-       Bungee — 19.23 to 23.27px, no `tnum` either.
-       Manrope (the body face) — proportional (12.48-19.86) but `tnum` works, giving 19.84 flat.
-       Space Mono — 19.59px flat by construction, with or without the feature.
-     So the only face on disk that is BOTH tabular and not the body face is Space Mono. It is
-     `--font-mono` too, which is why `.numeric` sets weight 700: the mono face at 400 is already
-     spoken for by table/meta data, and 700 is what makes a game number read as its own thing.
-     A genuinely separate arcade-numeric face is a `packages/ui/package.json` + `fonts.css`
-     change and belongs to whoever owns those files, not to a token. */
+  /* Game numbers (HP, AC, initiative, dice totals); counts and page numbers stay in the body face. Use
+     `.numeric`. Space Mono is the only bundled face that is tabular and not the body face (Russo One and
+     Bungee ship no `tnum`), and weight 700 separates it from mono table data at 400. */
   --font-numeric: "Space Mono", ui-monospace, "Courier New", monospace;
   --fw-numeric: 700;
 
@@ -459,7 +332,7 @@
   --fs-body: 15px;
   --fs-sm: 13px;
   --fs-xs: 11px;
-  --fs-2xs: 10px;   /* micro eyebrow / dense tile-label tier - uppercase tracked labels only, never body */
+  --fs-2xs: 10px; /* uppercase tracked labels only, never body */
 
   --lh-tight: 1.15;
   --lh-snug: 1.3;
@@ -468,220 +341,144 @@
   --tracking-eyebrow: 0.08em;
   --tracking-display: 0.01em;
 
-  /* Spacing. TIGHTENED once, round 2 (the client's density pass), after wave 3 put ~460
-     declarations across 19 stylesheets onto these tokens. Changing the scale before that would
-     have moved 42% of the app while reporting all of it — the two densest surfaces, the table
-     and the encounter panel, held almost no token references at all.
+  /* Spacing. Step names are ordinal, not pixel values (`--space-4` is the fourth step). The two smallest
+     steps (hairlines and tight glyph/chip gaps) stay put; tightening lives in the large steps. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-8: 26px;
+  --space-10: 32px;
+  --space-12: 38px;
+  --space-16: 50px;
 
-     THE STEP NAMES ARE NOT PIXEL VALUES AND NEVER WERE. `--space-4` means "the fourth step",
-     not 16px. It is 14px now.
-
-     The bottom two steps do NOT move. They are hairline and tight gaps — the space between a
-     glyph and its label, between two chips — where the eye reads a cut as a mistake rather than
-     as tightening. The waste the client saw lives in the large steps, so those give up 17-22%
-     and the small ones give up nothing. */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 10px;  --space-4: 14px;
-  --space-5: 16px;  --space-6: 20px;  --space-8: 26px;  --space-10: 32px;
-  --space-12: 38px; --space-16: 50px;
-
-  /* Radius — THE SQUARE STANDARD (2026-08-04, decision log). The surface radii are ZERO:
-     the screen is the page and its edges are cut, not rounded — panels, cards, inputs and
-     controls sit square, and the big-choice surfaces wear the .chamfer cut below instead.
-     The tokens stay (reversing the ruling is one edit here); only the values flipped.
-
-     --radius-pill SURVIVES, BUT NOT FOR PILLS. Rulings 10 and 24 de-pill all four families —
-     status labels, whole rows wearing a pill, tags and filter chips, and counts — so this
-     token is NOT a licence for any of them; an earlier version of this comment said "status
-     pills, chips" and was cited to keep them. What stays round is where the ROUND IS THE
-     MEANING: gauges (HP and progress bars), token rings, dots, swatches, avatars, and the
-     remove/clear ✕ (`Chip.css` and `Combobox.css` protect theirs by name). If what you are
-     styling would read the same as a rectangle, it is not on this list. */
+  /* Radius: surfaces are square (panels, cards, inputs, controls); big-choice surfaces use the .chamfer cut.
+     --radius-pill is not for pills: tags, chips, counts and status labels are rectangular. It is only for
+     things whose roundness is the meaning: gauges, token rings, dots, swatches, avatars, the remove ✕. */
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
   --radius-pill: 999px;
 
-  /* The chamfer (§9, generalized from the landing doors): the corner cut that stands in
-     for the retired big radius on panels, cards, feature tiles, status tags and the
-     primary/danger buttons. --chamfer sizes the cut; --chamfer-cut is the polygon
-     (top-left and bottom-right corners cut) for rules that cannot take the .chamfer
-     utility class. Glow on a cut surface rides the --glow-drop-* filters, never
-     box-shadow — box-shadow cannot follow a clip-path cut. */
-  --chamfer: .6rem;
-  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
-  /* THE MASKED FORM OF THE SAME CUT (minted for wave 5C, and the stricter of the two techniques).
-     Two 45° `linear-gradient` masks composited with `mask-composite: intersect` cut the same two
-     corners as the polygon above, with three properties the backing layer does not have: it is
-     PAINT-ONLY (hit-testing is untouched, so `elementFromPoint` still answers at both cut corners
-     of a 44px control), it needs no pseudo-element at all, and the element's own background does
-     NOT scroll — which is exactly the failure mode documented on `.chamfer` below. Its one cost is
-     that a masked element paints no box-shadow, so a surface that needs a drop shadow keeps the
-     backing layer.
-     THE STOP IS --chamfer / √2 AND THAT IS GEOMETRY, NOT TASTE: the gradient runs along the
-     diagonal, so a cut of --chamfer along each edge is a band of --chamfer·cos45° measured
-     perpendicular to the gradient's own axis. Typing the edge length here would cut a corner
-     41% too deep. */
+  /* The chamfer: the corner cut on panels, cards, feature tiles, status tags and primary/danger buttons.
+     --chamfer-cut is the polygon for rules that can't use the .chamfer class. Glow on a cut surface uses the
+     --glow-drop-* filters, never box-shadow. */
+  --chamfer: 0.6rem;
+  --chamfer-cut: polygon(
+    0 var(--chamfer),
+    var(--chamfer) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    0 100%
+  );
+  /* The masked form of the same cut: two 45° gradient masks intersected. Paint-only (hit-testing still works
+     at the cut corners), needs no pseudo-element, and the background doesn't scroll (see `.chamfer`); but a
+     masked element paints no box-shadow. The stop is --chamfer / √2 because the gradient runs along the
+     diagonal; using the edge length would cut 41% too deep. */
   --chamfer-mask-stop: calc(var(--chamfer) / 1.4142136);
 
-  /* ---- THE MATERIAL (rulings 2, 40, 64) ----
-     The landing door, expressed as tokens a surface anywhere can take. Phase 0 measured that
-     five of the door's six pieces have ZERO call sites outside `.choices`, so this is a BUILD,
-     not a reuse: the rim, the bezel, the cue and the chamfer had nothing for another surface to
-     inherit. The utilities that spend these live in the §9 block further down.
-
-     RULING 2 SPLITS THE USE and that is why the glow is a token of its own rather than part of
-     the rim: hero surfaces (Roster, Scenes, empty states, not-found, the builder gate) take the
-     full door INCLUDING the rest glow; every other surface takes the material WITHOUT it. A rim
-     that glowed by default would spend the restraint rule's budget on every panel in the app. */
+  /* ---- The material ----
+     The landing door as tokens any surface can take; the utilities live in the material block further down.
+     The glow is separate from the rim because only hero surfaces (Roster, Scenes, empty states, not-found,
+     the builder gate) take the rest glow; every other surface takes the material without it. */
   --rim-w: 2px;
-  /* The rim: a neon-tinted structural edge, well above `--line-strong` (1.63 on --surface-2 —
-     an edge nobody sees). Derived from --cyan/--line-strong so the sunset hour comes free;
-     DAYBREAK OVERRIDES IT, because ruling 29 asks for a daylight TRANSLATION and an inverted
-     neon is a pale line on a pale ground. Measured 2026-08-06 (WCAG 2.1) against
-     --surface-1/2/3: night #3780AC reads 4.22 / 3.90 / 3.47, dusk #5B9DDA 4.84 / 4.23 / 3.58.
-     Both clear the 3:1 non-text bar on every surface in their theme. */
+  /* The rim: a neon-tinted edge clearing 3:1 on every surface. Derived from --cyan/--line-strong; daybreak
+     overrides it because an inverted neon is a pale line on a pale ground. */
   --rim-color: color-mix(in srgb, var(--cyan) 42%, var(--line-strong));
-  /* Interaction (ruling 40): the rim BRIGHTENS. Night #32AFD4 7.15 / 6.61 / 5.88, dusk #45BEEC
-     6.54 / 5.72 / 4.83. Hover is not the only route to it — the utility fires this on
-     :hover, :focus-visible AND :active, because half the table's devices have no hover. */
+  /* The rim brightens on :hover, :focus-visible and :active (many devices have no hover). */
   --rim-color-hi: color-mix(in srgb, var(--cyan) 70%, var(--line-strong));
-  /* The rest glow, separable (ruling 2) and DERIVED FROM THE RIM, so a hero that repaints
-     --rim-color gets a glow in its own hue for free. A filter, never a box-shadow: box-shadow
-     cannot follow a clip-path cut and the material is cut. Daybreak GROUNDS instead of blooming
-     — the rule the --glow-drop-* set already follows in the light theme. */
-  --rim-glow:
-    drop-shadow(0 0 6px color-mix(in srgb, var(--rim-color) 62%, transparent))
+  /* The rest glow, derived from the rim so a repainted rim glows in its own hue. A filter because the
+     material is cut; daybreak grounds it instead of blooming. */
+  --rim-glow: drop-shadow(0 0 6px color-mix(in srgb, var(--rim-color) 62%, transparent))
     drop-shadow(0 0 18px color-mix(in srgb, var(--rim-color) 34%, transparent));
-  /* The bezel: the second, quieter outline just inside the rim, like a cabinet bezel. The
-     landing draws it as `1px solid currentColor` at `opacity: .22`, so it is currentColor here
-     too — a bezel belongs to whatever ink the surface is already using, in every theme at once.
-     --bezel-inset must stay >= --chamfer / 2 (4.8px at the default cut) or the ring's corner
-     lands outside the cut and gets clipped to a notch. */
+  /* The bezel: a quieter currentColor outline just inside the rim. --bezel-inset must stay >= --chamfer / 2
+     or the ring's corner is clipped to a notch. */
   --bezel-color: color-mix(in srgb, currentColor 22%, transparent);
   --bezel-inset: calc(var(--rim-w) + 3px);
-  /* The cue: the small solid triangle that appears on hover/focus/press. Drawn as a conic wedge
-     rather than a clip-path so it can ride a BACKGROUND LAYER — `::before` is the material's
-     backing layer and `::after` belongs to `.tap-target`, whose 44px hit area is not negotiable.
-     The 225deg/90deg pair is exact only while --cue-w is half --cue-h; keep the ratio if you
-     retune the size. currentColor, like the landing's. */
-  --cue-w: .45rem;
-  --cue-h: .9rem;
-  --cue-inset: .95rem;
+  /* The cue: a small triangle shown on hover/focus/press, drawn as a conic wedge so it can be a background
+     layer (`::before` is the backing layer, `::after` belongs to `.tap-target`). The 225deg/90deg pair
+     assumes --cue-w is half --cue-h. */
+  --cue-w: 0.45rem;
+  --cue-h: 0.9rem;
+  --cue-inset: 0.95rem;
   --cue-mark: conic-gradient(from 225deg at 100% 50%, currentColor 0 90deg, transparent 0);
-  /* The fill. --material-fill is the KNOB a consumer sets (it inherits, like any custom
-     property, so a nested surface picks up its ancestor's unless it sets its own); --material-*
-     below are the ready-made values. Default `transparent`: a utility that repainted every
-     surface it touched would be un-composable, and ruling 2 hands the fill to the surface.
-     "Scanline-over-gradient" (ruling 2) is `var(--material-scanline), var(--material-plate)` —
-     exactly how the landing door stacks it. In daybreak the scanline resolves through
-     --scanline-color to a faint paper texture, which is ruling 29's translation, not an
-     exemption. Note this is NOT the `.scanlines` utility: that one is a full-surface CRT
-     overlay with 11 app consumers and ruling 28 scopes it to the outermost panel. */
+  /* The fill: consumers set --material-fill (inherited); --material-* are ready-made values. Defaults to
+     transparent so the utility composes. Scanline-over-gradient is `var(--material-scanline),
+     var(--material-plate)`. Not the `.scanlines` utility, which is a full-surface CRT overlay. */
   --material-fill: transparent;
   --material-plate: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
-  --material-scanline: repeating-linear-gradient(to bottom,
+  --material-scanline: repeating-linear-gradient(
+    to bottom,
     transparent 0 calc(var(--scanline-gap) - 1px),
     var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap));
+    var(--scanline-color) var(--scanline-gap)
+  );
 
-  /* ---- SCROLLBARS (ruling 44) ----
-     A thin neon track, ALWAYS VISIBLE, never hover-revealed. Discoverability is the functional
-     half of the ruling: "is this region scrollable?" has been a recurring real problem, and a
-     permanently visible track answers it without inventing an affordance. The track is a
-     centred hairline so an empty gutter still reads as a rail; the thumb rides it.
-     Style the track and the thumb — never replace the scroller with a custom widget, because
-     keyboard and assistive behaviour come from the real one.
-     Two blessed exceptions, both on the record: `Tabs.css` hides its bar because its edge-fade
-     mask is a BETTER discoverability signal on a phone, and the Codex rail owes wave 4B one. */
+  /* ---- Scrollbars ----
+     A thin, always-visible neon track so scrollable regions are discoverable. Style the native scroller,
+     never replace it (keyboard and assistive behaviour come from it). `Tabs.css` hides its bar in favour of
+     an edge-fade mask. */
   --scrollbar-w: 11px;
   --scrollbar-track: color-mix(in srgb, var(--rim-color) 40%, transparent);
   --scrollbar-thumb: color-mix(in srgb, var(--cyan) 55%, var(--line-strong));
   --scrollbar-thumb-hi: var(--rim-color-hi);
 
-  /* Layout (§7) — the frame's shared dimensions, seeded 2026-08-04 from the live values
-     they will replace; the shell lock and the recomposes consume them phase by phase.
-     (--header-h and its one consumer, the root scroll recipe, retired with the shell lock:
-     the SPA page no longer scrolls, and the styleguide entry carries its own copy.) */
-  --app-bar-h: calc(var(--tap-min) + 1px);  /* the tab-bar row: one 44px tab (Tabs.css min-height) + the bar's 1px baseline */
-  /* The table's own gutter, and the ONLY two consumers are .table-layout and .table-sidebar.
-     The client asked for this specific 24px cut to 8 — a separate ask from the scale change, and
-     the reason wave 3 routed those two gaps through this token instead of the raw step: it cuts
-     the map/dock/sheet gutter without dragging every other consumer of the same step with it. */
-  --pane-gap: var(--space-2);               /* was --space-6 (24px); the client's named cut */
-  --rail-w: clamp(220px, 22vw, 280px);      /* nav/list rails: homebrew's live 220px floor, the viewer rail's live 22vw growth, §7's 280px cap */
-  --dock-w: 22rem;                          /* the table's side dock — the in-map dock's live --dock-side-width (encounter-map.css); the sidebar column's minmax(21rem, 27rem) converges here */
-  --row-h: var(--tap-min);                  /* comfortable rows (§7.4) — the default everywhere */
-  --row-h-compact: 36px;                    /* compact row paint (§7.4) — GM data regions only, never on a phone; route 2 (.tap-target) carries the floor */
+  /* Layout: the frame's shared dimensions. */
+  --app-bar-h: calc(var(--tap-min) + 1px); /* one 44px tab + the bar's 1px baseline */
+  /* The table's own gutter (.table-layout and .table-sidebar only), kept separate so it can be cut
+     without moving every consumer of the same step. */
+  --pane-gap: var(--space-2);
+  --rail-w: clamp(220px, 22vw, 280px); /* nav/list rails */
+  --dock-w: 22rem; /* the table's side dock */
+  --row-h: var(--tap-min); /* comfortable rows, the default everywhere */
+  --row-h-compact: 36px; /* compact row paint for GM data regions only, never on a phone; .tap-target keeps the hit area */
 
-  /* Touch-target floor (decision 16, DESIGN_LANGUAGE §4).
-     Every interactive control presents AT LEAST this hit area on every device.
-     Controls whose paint is deliberately smaller (dense toolbars, chip removes,
-     small buttons) keep their visual weight and grow the AREA with `.tap-target`. */
+  /* Touch-target floor: every interactive control presents at least this hit area. Controls painted smaller
+     keep their visual weight and grow the area with `.tap-target`. */
   --tap-min: 44px;
 
   /* Motion (between snappy and glidey) */
   --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-drawer: cubic-bezier(0.4, 0, 0.2, 1);
-  --dur-press: 100ms;   /* transform on press               */
-  --dur-hover: 140ms;   /* color/bg/border/shadow, glow on-off */
-  --dur-base: 200ms;    /* panels, tabs, popovers, combat tint */
-  --dur-enter: 260ms;   /* full view entrances               */
-  --dur-reveal: 560ms;  /* one-time data reveals             */
-  --dur-theme: 400ms;   /* the theme-switch sky moment       */
+  --dur-press: 100ms; /* transform on press               */
+  --dur-hover: 140ms; /* color/bg/border/shadow, glow on-off */
+  --dur-base: 200ms; /* panels, tabs, popovers, combat tint */
+  --dur-enter: 260ms; /* full view entrances               */
+  --dur-reveal: 560ms; /* one-time data reveals             */
+  --dur-theme: 400ms; /* the theme-switch sky moment       */
 
   /* Focus ring */
   --focus-ring-color: var(--cyan);
 }
 
-/* =========================================================
-   THEME: DUSK (in-between twilight).
-   A real midpoint, not a brighter dark: surfaces lifted well
-   above dark into a warmer dusty-violet, with softer contrast.
-   ========================================================= */
+/* ---- Theme: dusk, the sunset hour: deeper, warmer, more saturated twilight purple ---- */
 [data-theme="dusk"] {
-  /* REIMAGINED (client call, 2026-08-04): dusk read as a washed-out dark mode — the same
-     hues, lifted and drained. It is now the SUNSET HOUR: deeper, warmer, more saturated
-     twilight purple, so choosing it means something. Every text pair got MORE contrast
-     from the deepening (numbers below re-measured on the new surfaces). */
-  --void: #1C1238;
-  --bg: #251A4E;
-  --surface-1: #2E2160;
+  --void: #1c1238;
+  --bg: #251a4e;
+  --surface-1: #2e2160;
   --surface-2: #382970;
   --surface-3: #443381;
-  --overlay: rgba(18, 12, 40, 0.60);
+  --overlay: rgba(18, 12, 40, 0.6);
 
-  --line: #5A4A9A;
-  --line-strong: #7D6BC0;
+  --line: #5a4a9a;
+  --line-strong: #7d6bc0;
 
-  /* D21 #2: dusk inherits the dark theme's warm-orange caution pair — #FFB877 measures
-     8.24 / 7.20 / 6.08 on the sunset surfaces, so it needs no override of its own. */
+  /* Dusk inherits the dark theme's caution pair, which clears AA on these surfaces. */
 
-  /* STATE: ON, definition 2 of 3 (ruling 4) — the sunset orange. Measured 2026-08-06 as a fill:
-     6.82 / 5.96 / 5.03 on --surface-1/2/3 (7.66 on --bg); --text-on-neon #16132C on it, 8.80.
-     THIS IS DELIBERATELY NOT `var(--caution)` even though the value matches today's caution.
-     Ruling 39 keeps caution's meaning (warning / not finished) unborrowed; ruling 7 keeps the
-     hue and gives the on-state a silhouette instead. Both hold only while this is its own
-     value: alias it and a caution retune becomes a state-colour change nobody asked for. */
-  --state-on: #FF9E4A;
+  /* State on: sunset orange. Its own literal, not var(--caution), so a caution retune can't move it. */
+  --state-on: #ff9e4a;
 
-  --text: #F0EEFB;
-  --text-dim: #C4BEE2;
-  /* D21 #1. Was #938CB6 — 3.80 / 3.27 / 2.72 on the old lifted surfaces. #C2BBE0 measures
-     7.64 / 6.68 / 5.64 on the sunset surfaces. */
-  --text-muted: #C2BBE0;
-  --text-on-neon: #16132C;
+  --text: #f0eefb;
+  --text-dim: #c4bee2;
+  --text-muted: #c2bbe0;
+  --text-on-neon: #16132c;
 
-  --violet-hi: #D3AEFF;
-  /* THE SUNSET HOUR NEVER LIFTED ITS INDIGO, and ruling 46 is what surfaced it: the dark theme's
-     #5B6EF5 measures 3.32 / 2.90 / 2.45 on dusk's --surface-1/2/3 (3.74 on --bg), so it was under
-     the 3:1 GRAPHICS floor on two of four grounds — never mind text. #93A4FF measures
-     5.99 / 5.23 / 4.42 (6.73 on --bg), clearing AA on all four. Measured 2026-08-06, Chromium,
-     WCAG 2.1, same method as --violet-hi and --text-muted above.
-     THIS ALSO MOVES `--info`, which aliases --indigo, and that is the point rather than a
-     side-effect: the info alert's icon, the info badge's rim and the downtime entry's glyph were
-     all sitting at 2.45-3.32 in this theme. A solid info badge fills with it under
-     --text-on-neon #16132C, which gets MORE readable, not less. */
-  --indigo: #93A4FF;
+  --violet-hi: #d3aeff;
+  /* Lifted so --indigo (and --info, which aliases it) clears AA on dusk's surfaces. */
+  --indigo: #93a4ff;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.34);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.42);
@@ -691,107 +488,78 @@
   --scanline-color: rgba(0, 0, 0, 0.14);
 }
 
-/* =========================================================
-   THEME: LIGHT. Accessibility-first. Soft cool off-white,
-   deep indigo ink, inked/deepened neon, glow becomes a ring,
-   texture off. Legibility outranks aesthetic here.
-   ========================================================= */
+/* ---- Theme: light. Accessibility first: soft cool off-white, deep indigo ink, deepened neon, glow becomes
+   a ring, texture off. Legibility outranks aesthetic. ---- */
 [data-theme="light"] {
-  --void: #E7E6F2;
-  --bg: #F1F0F8;
-  --surface-1: #FCFBFF;
-  --surface-2: #F4F3FB;
-  --surface-3: #ECEBF6;
+  --void: #e7e6f2;
+  --bg: #f1f0f8;
+  --surface-1: #fcfbff;
+  --surface-2: #f4f3fb;
+  --surface-3: #ecebf6;
   --overlay: rgba(23, 19, 46, 0.28);
 
-  --line: #D6D3E6;
-  --line-strong: #BCB8D4;
+  --line: #d6d3e6;
+  --line-strong: #bcb8d4;
 
   /* Deepened neon so accents keep contrast on light */
-  --magenta: #C81D80;
-  --magenta-hi: #E24C9C;
-  --cyan: #0F7FC0;      /* blue-leaning cyan, never teal */
-  /* On dark/dusk a `-hi` variant is the LIGHTER twin, because "readable" there means
-     lighter than the surface. On light it has to invert — the readable twin is the
-     DEEPER one — which is what `--violet-hi` below already does. `--cyan-hi` followed
-     the dark convention instead and shipped at #2AA0DE: 2.48:1 on --surface-3, failing
-     AA everywhere it is used as text in this theme. The most consequential instance was
-     the Codex "Shown" reveal badge — the marker that answers "can my players see this?"
-     — so this is now the deep twin, ≥5.18:1 on every light surface incl. --void. */
-  --cyan-hi: #0B6497;
-  --violet: #7A3FD0;
-  --violet-hi: #7A3FD0; /* keep deep for text contrast on light */
-  --indigo: #3D50D6;
+  --magenta: #c81d80;
+  --magenta-hi: #e24c9c;
+  --cyan: #0f7fc0; /* blue-leaning cyan, never teal */
+  /* On light the readable `-hi` twin is the deeper one (on dark it is the lighter one). */
+  --cyan-hi: #0b6497;
+  --violet: #7a3fd0;
+  --violet-hi: #7a3fd0; /* keep deep for text contrast on light */
+  --indigo: #3d50d6;
 
   --primary: var(--magenta);
   --success: var(--cyan);
-  /* D25: darkened pins, so a marker on a pale map is as legible as one on a dark map. */
-  --pin-1: #C81D80;
-  --pin-2: #0F7FC0;
-  --pin-3: #7A3FD0;
-  --pin-4: #C8143E;
-  --pin-5: #9A6100;
-  --pin-6: #0E7A55;
-  --pin-7: #4A4568;
-  --pin-8: #5A6472;
-  /* D21 #2: the deep warm orange, the light theme's readable twin of the dark pair.
-     `--caution` is the edge/fill (4.77 / 4.46 / 4.16 — an edge, not small type);
-     `--caution-hi` below is what the words use and measures 6.80 / 6.36 / 5.93. */
-  --caution: #B4560A;
-  --caution-hi: #8F4406;
-  --danger: #C8143E;
-  --danger-hi: #E24C6C;
+  /* Darkened pins so markers stay legible on a pale map. */
+  --pin-1: #c81d80;
+  --pin-2: #0f7fc0;
+  --pin-3: #7a3fd0;
+  --pin-4: #c8143e;
+  --pin-5: #9a6100;
+  --pin-6: #0e7a55;
+  --pin-7: #4a4568;
+  --pin-8: #5a6472;
+  /* --caution is the edge/fill; --caution-hi is for text. */
+  --caution: #b4560a;
+  --caution-hi: #8f4406;
+  --danger: #c8143e;
+  --danger-hi: #e24c6c;
   --info: var(--indigo);
 
-  /* STATE: ON, definition 3 of 3 (ruling 4) — daybreak's cyan, at the DEEP twin's value.
-     Ruling 4 asserts all three clear 3:1 filled and all three do; what it did not check is the
-     LABEL on the fill, and that is what moved this value. Measured 2026-08-06: on --cyan
-     #0F7FC0 the best available ink reads 4.36 (--text-on-neon #FFFFFF) and 4.12 (--text
-     #17132E) — no ink clears the 4.5 floor on that fill, so the fill had to deepen, and the
-     light theme already keeps a deepened cyan for exactly this reason (see --cyan-hi's note
-     above: on a pale ground the READABLE twin is the darker one). At #0B6497 the fill reads
-     6.21 / 5.80 / 5.41 on --surface-1/2/3 (5.65 on --bg) and white ink on it reads 6.39.
-     Still cyan, and it drops half of ruling 4's third collision as a bonus: the focus ring and
-     --line-hover stay on --cyan, one value away. */
-  --state-on: #0B6497;
+  /* State on: a deepened cyan, because no ink reaches 4.5:1 on --cyan itself. */
+  --state-on: #0b6497;
 
-  /* THE MATERIAL, translated (ruling 29): same geometry, daylight values. The rim stops being a
-     lit line and becomes a HARD DARK one — an inverted neon is a pale edge on a pale ground,
-     which is the failure this ruling names. Measured 2026-08-06 against --surface-1/2/3:
-     rest #3B547E reads 7.40 / 6.92 / 6.45; the interaction state moves by CHROMA rather than
-     luminance (--cyan #0F7FC0, 4.23 / 3.96 / 3.69 — still over the 3:1 non-text bar), because
-     "the rim brightens" cannot mean "the rim gets lighter" on a white surface.
-     The glow grounds instead of blooming, and the bezel firms up a little: currentColor here is
-     deep ink, so 22% of it is a paler line than 22% of night's near-white. */
-  --rim-color: #3B547E;
+  /* The material in daylight: the rim is a hard dark line (an inverted neon would vanish on a pale ground),
+     interaction changes chroma rather than lightness, the glow grounds instead of blooming, and the bezel
+     firms up because currentColor is deep ink here. */
+  --rim-color: #3b547e;
   --rim-color-hi: var(--cyan);
   --rim-glow: drop-shadow(0 1px 4px color-mix(in srgb, var(--rim-color) 34%, transparent));
   --bezel-color: color-mix(in srgb, currentColor 30%, transparent);
-  --scrollbar-thumb: #3B547E;
+  --scrollbar-thumb: #3b547e;
   --scrollbar-thumb-hi: var(--cyan);
 
-  --text: #17132E;      /* deep indigo ink */
-  --text-dim: #4A4568;
-  /* D21 #1. Was #726C90 — 5.02 / 4.70 / 4.38: it passed on --surface-1 and failed on the
-     other two, which is the worst kind of near-miss because it reads fine where you check
-     it. Measured at 6.76 / 6.32 / 5.90. */
-  --text-muted: #5B5578;
-  --text-on-neon: #FFFFFF;
+  --text: #17132e; /* deep indigo ink */
+  --text-dim: #4a4568;
+  --text-muted: #5b5578;
+  --text-on-neon: #ffffff;
 
   /* Glow becomes a solid accent ring plus a faint soft shadow */
-  --glow-magenta:        0 0 0 2px rgba(200, 29, 128, 0.90), 0 2px 6px rgba(200, 29, 128, 0.20);
-  --glow-magenta-strong: 0 0 0 2.5px rgba(200, 29, 128, 1),  0 2px 10px rgba(200, 29, 128, 0.28);
-  --glow-cyan:           0 0 0 2px rgba(15, 127, 192, 0.90), 0 2px 6px rgba(15, 127, 192, 0.20);
-  --glow-violet:         0 0 0 2px rgba(122, 63, 208, 0.90), 0 2px 6px rgba(122, 63, 208, 0.20);
-  --glow-danger:         0 0 0 2px rgba(200, 20, 62, 0.90),  0 2px 6px rgba(200, 20, 62, 0.20);
+  --glow-magenta: 0 0 0 2px rgba(200, 29, 128, 0.9), 0 2px 6px rgba(200, 29, 128, 0.2);
+  --glow-magenta-strong: 0 0 0 2.5px rgba(200, 29, 128, 1), 0 2px 10px rgba(200, 29, 128, 0.28);
+  --glow-cyan: 0 0 0 2px rgba(15, 127, 192, 0.9), 0 2px 6px rgba(15, 127, 192, 0.2);
+  --glow-violet: 0 0 0 2px rgba(122, 63, 208, 0.9), 0 2px 6px rgba(122, 63, 208, 0.2);
+  --glow-danger: 0 0 0 2px rgba(200, 20, 62, 0.9), 0 2px 6px rgba(200, 20, 62, 0.2);
 
-  /* Drop-shadow glow follows the light rule: a filter cannot draw the solid ring, so
-     chamfered surfaces GROUND (tight low shadow in the deepened accent) instead of bloom. */
-  --glow-drop-magenta:        drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  /* A filter can't draw the solid ring, so chamfered surfaces get a tight low shadow instead of a bloom. */
+  --glow-drop-magenta: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --glow-drop-magenta-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --glow-drop-cyan:           drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
-  --glow-drop-violet:         drop-shadow(0 1px 4px rgba(122, 63, 208, 0.28));
-  --glow-drop-danger:         drop-shadow(0 1px 4px rgba(200, 20, 62, 0.30));
+  --glow-drop-cyan: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
+  --glow-drop-violet: drop-shadow(0 1px 4px rgba(122, 63, 208, 0.28));
+  --glow-drop-danger: drop-shadow(0 1px 4px rgba(200, 20, 62, 0.3));
 
   --shadow-1: 0 1px 2px rgba(23, 19, 46, 0.08);
   --shadow-2: 0 10px 30px rgba(23, 19, 46, 0.12);
@@ -801,9 +569,7 @@
   --scanline-color: rgba(23, 19, 46, 0.05);
 }
 
-/* ============================================================
-   Base + utilities. Adapt to your framework as needed.
-   ============================================================ */
+/* ---- Base and utilities ---- */
 
 body {
   background: var(--bg);
@@ -820,18 +586,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* GAME numbers (ruling 50) — HP, AC, initiative, dice totals. Not counts, not page numbers:
-   those stay in the body face so the distinction keeps meaning something. See --font-numeric
-   for why this face and not the arcade one.
-
-   TABULAR FIGURES ARE NOT THE WHOLE FIX, and the ruling's own example is the case that proves
-   it: `44` -> `9` loses a DIGIT, so the string is genuinely narrower and the row still moves,
-   tabular or not. What tabular buys is two things, both measured on this rule at 20px:
-   (a) `44` and `11` are both 24.484px, so a same-length change no longer jitters — in the body
-   face they are 24.4px apart; (b) `1ch` is exactly one digit advance (12.25px), because every
-   advance here is equal, so a slot can reserve its width honestly. Reserve it at the widest
-   value the field can hold — `min-width: 3ch` for HP, `2ch` for AC — and the row stops moving
-   for good: measured, that slot holds 36.719px at "9" and 36.734px at "144". */
+/* Game numbers (HP, AC, initiative, dice totals); see --font-numeric. Tabular figures stop same-length
+   changes from jittering and make `1ch` exactly one digit, but a digit-count change (44 -> 9) still moves
+   the row, so reserve the widest value the field can hold (`min-width: 3ch` for HP, `2ch` for AC). */
 .numeric {
   font-family: var(--font-numeric);
   font-weight: var(--fw-numeric);
@@ -852,31 +609,32 @@ body {
   border: 0;
 }
 
-/* Visible keyboard focus in the theme accent. `summary` is in the list because
-   <details>/<summary> is how the system builds disclosures — Menu's trigger and
-   FeatureList's rows are both summaries — and without it they fell back to Chromium's
-   default `outline: auto`, i.e. a platform ring in a colour this palette does not own.
-   `:where()` contributes zero specificity, so any primitive that styles its own focus
-   (`.nh-input:focus`, `.nh-choice:focus-visible`) still wins. */
+/* Visible keyboard focus in the theme accent. `summary` is included because disclosures (Menu, FeatureList)
+   are <summary> elements. `:where()` adds no specificity, so primitives' own focus styles win. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
   border-radius: var(--radius-sm);
 }
 
-/* ---- Interaction defaults (DESIGN_LANGUAGE.md section 7) ---- */
-button, a, .interactive, [role="button"], summary {
+/* ---- Interaction defaults ---- */
+button,
+a,
+.interactive,
+[role="button"],
+summary {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 44px hit-area floor for controls whose PAINT is intentionally smaller than the
-   floor (icon buttons, small buttons, chip removes). The pseudo-element centres a
-   --tap-min box on the control, so the finger target grows without the button
-   getting visually heavier and without touching layout. Do not put it on a control
-   that already uses ::after (e.g. the active tab underline) — give those a
-   min-height instead. */
-.tap-target { position: relative; }
+/* 44px hit-area floor for controls painted smaller (icon buttons, chip removes): the pseudo-element grows
+   the finger target without changing layout or weight. Don't use on a control that already uses ::after
+   (e.g. the active tab underline); give it a min-height instead. */
+.tap-target {
+  position: relative;
+}
 .tap-target::after {
   content: "";
   position: absolute;
@@ -887,15 +645,8 @@ button, a, .interactive, [role="button"], summary {
   transform: translate(-50%, -50%);
 }
 
-/* (No root scroll recipe. `html { scroll-behavior: smooth; scroll-padding-top }` lived here
-   compensating for a sticky header only the styleguide entry has; under the locked shell the
-   SPA page cannot scroll at all, so anchors and scroll-padding belong to the REGION that
-   scrolls — §7 rule 3. The styleguide keeps its own copy in styleguide.css; the wizard layer
-   and the shell's `.pane-frame > .scroll-y` already carry region scroll-padding.) */
-
-/* House transition recipe. Never `all` (7.2). `filter` is in the list because chamfered
-   surfaces glow through drop-shadow filters (see .chamfer) and their glow should ease
-   exactly like a box-shadow glow does. */
+/* House transition recipe; never `all`. `filter` is included because chamfered surfaces glow through
+   drop-shadow filters. */
 .interactive {
   transition:
     border-color var(--dur-hover),
@@ -904,10 +655,11 @@ button, a, .interactive, [role="button"], summary {
     filter var(--dur-hover),
     transform var(--dur-press) var(--ease-settle);
 }
-.interactive:active { transform: translateY(0.5px); }
+.interactive:active {
+  transform: translateY(0.5px);
+}
 
-/* Hover-lift for genuine CARDS (never dense/re-rendered list rows — §7.3): the card rises
-   on hover with a deeper shadow, and settles flush on press. Compose freely with .interactive. */
+/* Hover-lift for genuine cards (never dense list rows); composes with .interactive. */
 .lift {
   transition:
     transform var(--dur-hover) var(--ease-settle),
@@ -915,34 +667,40 @@ button, a, .interactive, [role="button"], summary {
     border-color var(--dur-hover),
     background var(--dur-hover);
 }
-.lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
-.lift:active { transform: translateY(0); }
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.lift:active {
+  transform: translateY(0);
+}
 
-/* Forward-nav nudge (7.5): a trailing arrow glyph that slides 2px when its control is
-   hovered or focused. Put <span class="nav-arrow">→</span> at the end of the label.
+/* Forward-nav nudge: put <span class="nav-arrow">→</span> at the end of the label. `color: inherit` is
+   needed because the client's `button span { color: var(--text-dim) }` would otherwise paint the arrow
+   unreadably on a primary button's fill. */
+.nav-arrow {
+  display: inline-block;
+  margin-left: 0.35em;
+  color: inherit;
+  transition: transform var(--dur-press) var(--ease-settle);
+}
+button:hover .nav-arrow,
+a:hover .nav-arrow,
+[role="button"]:hover .nav-arrow,
+.lift:hover .nav-arrow,
+button:focus-visible .nav-arrow,
+a:focus-visible .nav-arrow {
+  transform: translateX(2px);
+}
 
-   `color: inherit` is a FIX, not a formality. The arrow is a <span> inside a <button>, and the
-   client's base control styling carries `button span { color: var(--text-dim) }` — written for
-   card-shaped buttons with a dim second line, but it catches this too. Element selectors lose to
-   a class, so naming the property here is enough; without it the arrow inside a primary Button
-   rendered --text-dim on the magenta fill and measured 1.44:1 (dark; 1.93 dusk, 1.68 light)
-   against a 4.5 floor — the app's worst reading anywhere. `display` was already claimed for the
-   same reason. A shared utility has to state every property a consumer's element selector might
-   reach, because it cannot see that stylesheet. */
-.nav-arrow { display: inline-block; margin-left: .35em; color: inherit; transition: transform var(--dur-press) var(--ease-settle); }
-button:hover .nav-arrow, a:hover .nav-arrow, [role="button"]:hover .nav-arrow, .lift:hover .nav-arrow,
-button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: translateX(2px); }
-
-/* Frosted floating/sticky surfaces (7.8). Keep panel mostly opaque. */
+/* Frosted floating/sticky surfaces (the chrome glass tier). Keep panels mostly opaque. */
 .surface-frost {
   background: color-mix(in srgb, var(--surface-2) 88%, transparent);
   backdrop-filter: blur(16px) saturate(1.3);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
 }
 
-/* Scene-tier glass (§9): panels standing ON a canvas — a live map, a sky. The deeper of
-   the two glass tiers (.surface-frost above is the chrome tier, over app surfaces).
-   Two tiers of one treatment; do not grow a third. */
+/* Scene-tier glass for panels on a canvas (a live map, a sky). Two glass tiers only; don't add a third. */
 .surface-glass {
   background: color-mix(in srgb, var(--surface-1) 72%, transparent);
   backdrop-filter: blur(8px) saturate(1.15);
@@ -950,72 +708,35 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 }
 
 /* ============================================================
-   THE MATERIAL — the landing door as four composable utilities
-   (rulings 2, 14, 29, 40, 49, 64)
-   ------------------------------------------------------------
-   Phase 0's finding is the reason this exists: FIVE OF THE DOOR'S SIX PIECES HAVE ZERO CALL
-   SITES outside `.choices`. The rim, the bezel, the cue and the chamfer had no consumers at
-   all, so "carry the landing door inward" is a build, not a reuse. These are the vocabulary;
-   spending it on surfaces is wave 5's job, not this file's.
+   The material: the landing door as composable utilities
+     .chamfer   the corner cut, painted on a backing layer
+     .rim       the 2px rim
+     .bezel     the quieter second outline just inside it
+     .cue       the small solid triangle on hover / focus / press
+     .rim-lit   the rest glow, separate so only hero surfaces take it
+   `.rim` is unrelated to the role rims `.rim-player` / `.rim-gm` below; an element may wear both.
 
-   .chamfer   the corner cut, painted on a BACKING LAYER
-   .rim       the 2px rim
-   .bezel     the quieter second outline just inside it
-   .cue       the small solid triangle on hover / focus / press
-   .rim-lit   the rest glow — SEPARATE on purpose (ruling 2: hero surfaces get the full door
-              including the glow; everything else gets the material without it)
+   The material uses only `::before`: `::after` belongs to `.tap-target` (44px hit area) and
+   `.scanlines`. Nothing here puts clip-path on the element itself, because clip-path also clips
+   hit-testing. `.chamfer` removes the element's own background and border (they would show as an
+   uncut square) and moves the fill to --material-fill; the doubled selector beats a consumer's single
+   class, since this file loads first.
 
-   `.rim` IS NOT `.rim-player` / `.rim-gm`. Those are the ROLE rims further down — a 3px
-   inline-start bar saying whose chrome this is — and they neither match nor conflict with this
-   selector. One element may wear both; they touch different properties on different boxes.
-
-   THE PSEUDO-ELEMENT BUDGET IS THE DESIGN CONSTRAINT, and it is worth stating because it
-   looks arbitrary otherwise. `::after` is spoken for twice over — `.tap-target::after` is a
-   44px hit-area guarantee and `.scanlines::after` has 11 app consumers — so the material gets
-   `::before` and nothing else. That is why the cue is a background layer rather than a
-   triangle pseudo, and why the bezel is an outline rather than a second clipped ring.
-
-   CLIP-PATH CLIPS HIT-TESTING, NOT JUST PAINT. That is why `.chamfer` used to be exempt on
-   small buttons and why it never reached a call site; ruling 49 now puts the cut on EVERY
-   button, so the backing layer is the default implementation and not an escape hatch. Nothing
-   here ever puts a clip-path on the element itself. Verified with elementFromPoint on a 44px
-   control: all four corners still hit the control, and `.tap-target`'s extended area survives.
-
-   COMPOSING WITH .chamfer, once, so it is not a surprise later: the cut is painted BEHIND the
-   content, so the element's own background and border would show through it as an uncut
-   square. `.chamfer` therefore takes both off and the fill moves to `--material-fill`. The
-   doubled selector below is not a typo — this file loads before every consumer stylesheet, so
-   a single class loses at equal specificity to `.nh-btn--primary { background: ... }`, which
-   is exactly the case this has to survive. A bordered consumer should drop its border and let
-   `.rim` carry the edge; the border box is left at its own width so nothing reflows.
-
-   ⚠ NEVER PUT `.chamfer` / `.rim` / `.bezel` / `.cue` ON AN ELEMENT THAT SCROLLS. This is the
-   one way to hold this utility that silently destroys it, and it is invisible in a screenshot
-   taken at rest. The backing layer is `position: absolute`, so its containing block is the
-   element's PADDING BOX — and on a scroll container that box is the scrolled box, not the
-   scrollport. The whole plate (fill, rim, bezel, cue) therefore rides the content out of view
-   and the element paints as an unstyled rectangle for the rest of the scroll.
-
-   MEASURED TWICE IN WAVE 5, in two lanes that found it independently:
-     · 5B, Homebrew's detail pane (`.hb-detail`, `.scroll-y` in the markup): at `scrollTop: 500`
-       on a 1,283px item editor the rim's bottom edge sat 380px up a 776px pane, with bare sky
-       under it.
-     · 5C, a phone rail with a section open: at `scrollTop: 198` of 585 the plate was gone above
-       the fold entirely.
-
-   THE FIX IS A COMPOSITION, NOT A PATCH: frame the region, never the scroller. A frame holds a
-   region; the region scrolls INSIDE it. Put the material on the non-scrolling wrapper and leave
-   the `.scroll-y` child bare — which is the arrangement §7 already asks for. Where no wrapper
-   exists, either the element keeps a REAL border at `var(--rim-w) solid var(--rim-color)` (square,
-   no cut — the honest trade) or it takes `--chamfer-mask-stop`'s masked cut above, whose paint is
-   the element's own background and therefore does not scroll.
-
-   VERIFY BY SCROLLING THE REGION AND RE-SHOOTING. A screenshot at scrollTop 0 cannot see this.
+   Never put `.chamfer` / `.rim` / `.bezel` / `.cue` on an element that scrolls: the absolute backing
+   layer sizes to the scrolled padding box, so the plate scrolls out of view. Put the material on a
+   non-scrolling wrapper with a bare `.scroll-y` child; failing that, use a real border or the masked
+   cut (--chamfer-mask-stop). Verify by scrolling, not with a screenshot at scrollTop 0.
    ============================================================ */
 
-/* The backing layer, shared. Behind the content, above the element's own background box, and
-   pointer-transparent, so it can carry paint the element must never be clipped by. */
-.chamfer, .rim, .bezel, .rim-lit, .cue { position: relative; isolation: isolate; }
+/* The shared backing layer: behind the content, above the element's background, pointer-transparent. */
+.chamfer,
+.rim,
+.bezel,
+.rim-lit,
+.cue {
+  position: relative;
+  isolation: isolate;
+}
 .chamfer::before,
 .rim::before,
 .bezel::before,
@@ -1025,51 +746,56 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   position: absolute;
   inset: 0;
   z-index: -1;
-  box-sizing: border-box;   /* packages/ui has no `*` reset — the client's lives in styles.css */
+  box-sizing: border-box; /* packages/ui has no `*` reset; the client's is in styles.css */
   pointer-events: none;
   background: var(--material-fill);
   border: 0 solid transparent;
-  transition: border-color var(--dur-hover), background var(--dur-hover), filter var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover),
+    filter var(--dur-hover);
 }
 
-.chamfer { border-radius: 0; }
-.chamfer::before { clip-path: var(--chamfer-cut); }
-.chamfer.chamfer { background-color: transparent; background-image: none; border-color: transparent; }
+.chamfer {
+  border-radius: 0;
+}
+.chamfer::before {
+  clip-path: var(--chamfer-cut);
+}
+.chamfer.chamfer {
+  background-color: transparent;
+  background-image: none;
+  border-color: transparent;
+}
 
-/* The rim. On the backing layer so it follows the cut — the diagonal itself stays unrimmed,
-   which is the landing door's own silhouette, not an omission. */
-.rim::before { border-width: var(--rim-w); border-color: var(--rim-color); }
-/* Ruling 40: the rim brightens on interaction, and the PRESS state carries the same
-   information as hover, because hover does not exist on half the table's devices. */
+/* The rim follows the cut; the diagonal stays unrimmed, matching the landing door. */
+.rim::before {
+  border-width: var(--rim-w);
+  border-color: var(--rim-color);
+}
+/* The rim brightens on hover and press alike, since many devices have no hover. */
 .rim:hover:not(:disabled)::before,
 .rim:focus-visible::before,
 .rim:active:not(:disabled)::before,
-.rim.is-active::before { border-color: var(--rim-color-hi); }
+.rim.is-active::before {
+  border-color: var(--rim-color-hi);
+}
 
-/* The bezel: a second, quieter outline just inside the rim, like a cabinet bezel. An outline
-   costs no layout and contests no property the rim uses. --bezel-inset must stay at or above
-   half the chamfer or this ring's corner falls outside the cut and is clipped to a notch. */
-.bezel::before { outline: 1px solid var(--bezel-color); outline-offset: calc(-1 * var(--bezel-inset)); }
+/* An outline costs no layout and doesn't contest the rim's properties. */
+.bezel::before {
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+}
 
-/* The rest glow (ruling 2), opt-in and never baked into `.rim`. A filter on the backing layer:
-   it follows the cut, which box-shadow cannot, and it stays off the ELEMENT, where a filter
-   would make a containing block for every fixed overlay inside it. */
-.rim-lit::before { filter: var(--rim-glow); }
+/* Opt-in rest glow. On the backing layer because a filter follows the cut, and a filter on the element
+   would make it the containing block for fixed overlays inside it. */
+.rim-lit::before {
+  filter: var(--rim-glow);
+}
 
-/* The cue: the small solid triangle that appears on hover, focus and press. A background layer
-   ON THE BACKING LAYER, for two measured reasons. It is not a pseudo of its own because the
-   budget note above says there is none left. And it is not a background on the ELEMENT, which
-   was the first cut: the element's own background paints at the very bottom of its stacking
-   context and the backing layer at z-index -1 paints ABOVE it, so an opaque --material-fill
-   hid the triangle outright — verified by screenshot before this moved.
-
-   Prepending one layer to `var(--material-fill)` composes whatever the fill is: a bare colour
-   (`transparent`, the default) becomes the shorthand's final background-color, and a two-layer
-   scanline-over-gradient becomes layers 2 and 3. Nothing has to know which.
-
-   It appears; it does not blink. The landing's blink is a title-screen flourish, and ruling 25's
-   "don't overdo it" is a spec rather than a mood. Ruling 40 is the other half: PRESS carries the
-   same information as hover, because hover does not exist on half the table's devices. */
+/* The cue: a background layer on the backing layer. Not on the element itself, whose background paints
+   below the backing layer and would be hidden by an opaque --material-fill. Prepending one layer to
+   var(--material-fill) composes with any fill. It appears without blinking, on press as well as hover. */
 .cue:hover:not(:disabled)::before,
 .cue:focus-visible::before,
 .cue:active:not(:disabled)::before,
@@ -1079,51 +805,45 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
     var(--material-fill);
 }
 
-/* Inert reads as a material state, not only as reduced opacity (ruling 40): the rim and the
-   texture go, a flat box stays. Written as token overrides so every utility above follows from
-   one rule. The class is spelled out rather than wrapped in `:where()` — measured: at zero
-   class-specificity this rule ties with a consumer's own `--material-fill: …` and loses on
-   source order, because this file loads first, so the disabled door kept its texture. */
-.chamfer:disabled, .rim:disabled, .bezel:disabled, .rim-lit:disabled, .cue:disabled,
-.chamfer[aria-disabled="true"], .rim[aria-disabled="true"], .bezel[aria-disabled="true"],
-.rim-lit[aria-disabled="true"], .cue[aria-disabled="true"] {
+/* Disabled reads as a flat box: rim and texture go. Not wrapped in `:where()` because at zero specificity a
+   consumer's own --material-fill would win on source order. */
+.chamfer:disabled,
+.rim:disabled,
+.bezel:disabled,
+.rim-lit:disabled,
+.cue:disabled,
+.chamfer[aria-disabled="true"],
+.rim[aria-disabled="true"],
+.bezel[aria-disabled="true"],
+.rim-lit[aria-disabled="true"],
+.cue[aria-disabled="true"] {
   --material-fill: var(--surface-2);
   --rim-color: transparent;
   --rim-color-hi: transparent;
   --bezel-color: transparent;
-  /* `:not(:disabled)` guards the cue's own selectors but cannot see `aria-disabled`, and an
-     inert control that still answers a hover with a cue is lying about being inert. */
+  /* `:not(:disabled)` on the cue's selectors can't see `aria-disabled`, so remove the mark here. */
   --cue-mark: none;
   --rim-glow: none;
 }
 
-/* The beam divider (§9): the sky's horizon, used as a rule. Put it on the element whose
-   BOTTOM edge is a structural boundary — a scene surface's heading row against its region —
-   and it draws a 1px lit line across that element's own width, so it aligns with the content
-   column rather than bleeding to the pane's edges. One per boundary; see the token block for
-   why this is not a licence to beam every border. */
-/* Role rims (§9): the GM-secret edge, generalized. A 3px start-edge bar plus a 7% wash of the
-   same hue. Put one on chrome that BELONGS to a role; never on selection state (that axis is
-   cyan and repainting it magenta would break the focus ring's meaning), and never as the only
-   thing saying which role it is.
+/* Role rims: a 3px start-edge bar for chrome that belongs to a role. Never on selection state (that axis
+   is cyan) and never the only signal of the role. An inset shadow rather than a border because a border
+   here loses to consumers' `border` shorthands and an inset shadow adds no width; it does conflict with
+   `.is-selected` / `.is-active-turn`. The utility is the edge only; sites apply the wash token in their
+   own background rule so it composes with `.surface-glass`. */
+.rim-player {
+  box-shadow: inset 3px 0 0 0 var(--rim-player);
+}
+.rim-gm {
+  box-shadow: inset 3px 0 0 0 var(--rim-gm);
+}
 
-   THE EDGE IS AN INSET SHADOW, NOT A BORDER, and that is not a style preference — it is the only
-   form that works. This file loads before every app stylesheet, so a `border-inline-start` here
-   loses at equal specificity to `.settings-group`'s own `border` shorthand and to the tab bar's:
-   measured, both rimmed sites computed `border-left-width: 0px`. An inset shadow contests no
-   property, adds no 3px to the box (so no gutter has to be given back), and is painted on the
-   BORDER box — which matters on the tab bar, because an absolutely-positioned pseudo would have
-   scrolled away with the tabs. (It does mean a rimmed element cannot also wear `.is-selected` or
-   `.is-active-turn`; neither rim site is a selectable thing, and a role is not a state.)
-
-   The UTILITY is the EDGE ALONE. The wash stays a token a site applies in its own rule, because
-   a utility that set background-color would clobber `.surface-glass` on anything it decorated —
-   and the two best rim sites are a glass settings group and a tab bar that also wants a
-   scanline. One rule per element owning its background is the only arrangement that composes. */
-.rim-player { box-shadow: inset 3px 0 0 0 var(--rim-player); }
-.rim-gm     { box-shadow: inset 3px 0 0 0 var(--rim-gm); }
-
-.neon-beam { position: relative; padding-bottom: var(--space-3); }
+/* The beam divider: the sky's horizon as a 1px rule along the bottom edge of an element whose bottom is a
+   structural boundary (a scene surface's heading row). One per boundary. */
+.neon-beam {
+  position: relative;
+  padding-bottom: var(--space-3);
+}
 .neon-beam::after {
   content: "";
   position: absolute;
@@ -1136,64 +856,57 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   pointer-events: none;
 }
 
-/* Frame utilities (§7). A frame is a column that never scrolls; its regions divide the
-   box. .frame-col is the column — min-height: 0 so its children may shrink below their
-   content. .frame-fill is the canvas region that takes the leftover space. A region that
-   can outgrow its share carries .scroll-y as well. */
-.frame-col { display: flex; flex-direction: column; min-height: 0; }
-.frame-fill { flex: 1; min-height: 0; }
+/* Frame utilities: a frame is a column that never scrolls. `.frame-col` lets children shrink below their
+   content; `.frame-fill` is the region that takes leftover space. Regions that can overflow add `.scroll-y`. */
+.frame-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.frame-fill {
+  flex: 1;
+  min-height: 0;
+}
 
-/* Thin NEON scrollbars, always visible (ruling 44). Not hover-revealed — and that is the
-   functional half of the ruling rather than a look: "is this region scrollable?" has been a
-   recurring real problem here, and a permanently visible track answers it without inventing an
-   affordance. The track used to be `transparent`, which is precisely the state the ruling
-   names; it now carries a low-alpha neon so the rail reads even where the thumb is short.
-
-   THE REAL SCROLLER, ALWAYS. Style the track and the thumb; never replace either with a custom
-   widget — keyboard, wheel, touch and assistive behaviour all come from the real one.
-
-   WHY BOTH SYNTAXES, AND WHY THEY MUST AGREE. Measured 2026-08-06 in Chromium 1194: when
-   `scrollbar-width` is anything but `auto`, the ::-webkit-scrollbar rules are IGNORED for that
-   scroller — a `.scroll-y` region measured a 10px gutter (the standard thin bar) while an
-   otherwise identical region without it measured 11px (this file's ::-webkit width). So the
-   standard pair is what actually paints in Chromium and Firefox, and the webkit block is the
-   fallback for engines that only speak it. They are written to look the same on purpose: two
-   scrollbar looks in one app would be worse than the quiet one this replaces.
-
-   THE UNIVERSAL SELECTOR IS NOT LAZINESS — it is the only form that reaches every scroller.
-   `scrollbar-color` inherits but `scrollbar-width` DOES NOT, so the first cut of this put both on
-   :root and measured the cost: `.scroll-y` lost its `thin` (computed `auto`), and because the
-   inherited `scrollbar-color` had already disabled the ::-webkit sizing, every scroll region's
-   gutter went 10px -> 15px. Five pixels off the content width of every scrolling region in the
-   app, silently, in the round that is also tightening spacing.
-   At (0,0,0) the two blessed exemptions still win outright, because they set
-   `scrollbar-width: none` on themselves: `Tabs.css` (its edge-fade mask is the better phone
-   signal — director's ruling) and the Codex rail (wave 4B's debt). `Steps.css` does the same.
-
-   Not verifiable by screenshot in this environment: headless Chromium here paints OVERLAY
-   scrollbars (measured gutter 0 without `scrollbar-gutter`), so nothing renders at rest. The
-   precedence and sizing above were measured through layout, not by looking. On a real desktop
-   Chrome the bars are classic and these rules paint; on macOS and phones the OS may still
-   choose overlay, which no stylesheet can override. */
-*, *::before, *::after {
+/* Thin neon scrollbars, always visible, so scrollable regions are discoverable. Style the real scroller,
+   never replace it.
+   Both syntaxes, kept visually identical: in Chromium, a non-`auto` `scrollbar-width` disables the
+   ::-webkit-scrollbar rules, so the standard pair paints in Chromium and Firefox and the webkit block is
+   the fallback. The universal selector is needed because `scrollbar-width` does not inherit; on :root
+   alone, regions fell back to a 15px gutter. Elements that set `scrollbar-width: none` themselves
+   (Tabs.css, the Codex rail, Steps.css) still win. OS overlay scrollbars (macOS, phones, headless
+   Chromium) may not render any of this. */
+*,
+*::before,
+*::after {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 .scroll-y {
   overflow-y: auto;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;   /* restated: a region may not silently fall back to the 15px bar */
+  scrollbar-width: thin; /* restated so a region never falls back to the 15px bar */
 }
-*::-webkit-scrollbar { width: var(--scrollbar-w); height: var(--scrollbar-w); }
-*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar {
+  width: var(--scrollbar-w);
+  height: var(--scrollbar-w);
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
 *::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: var(--radius-pill);
   border: 3px solid transparent;
   background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hi); background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hi);
+  background-clip: content-box;
+}
 
 /* ---- Signature color bloom ---- */
 .bloom {
@@ -1202,19 +915,15 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 }
 
 /* ---- App wordmark ----
-   Chunky arcade face with a chrome-gradient fill and a bevel.
-   Wordmark only, never body or functional text. drop-shadow is
-   used for the bevel because text-shadow can't show through
-   background-clipped text. */
+   Chrome-gradient fill with a bevel; wordmark only. The bevel uses drop-shadow because text-shadow can't
+   show through background-clipped text. */
 .wordmark-name {
   font-family: var(--font-wordmark);
   background: var(--grad-chrome);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter:
-    drop-shadow(0 1px 0 rgba(6, 4, 16, 0.85))
-    drop-shadow(0 0 7px rgba(255, 46, 154, 0.22))
+  filter: drop-shadow(0 1px 0 rgba(6, 4, 16, 0.85)) drop-shadow(0 0 7px rgba(255, 46, 154, 0.22))
     drop-shadow(0 0 7px rgba(45, 226, 255, 0.14));
 }
 /* Light theme: solid ink wordmark for legibility, no bevel/glow */
@@ -1224,28 +933,13 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   filter: none;
 }
 
-/* THE SIGN (§9): a hero title's metal — blue-steel, a metal the scene never wears. Wordmark-scale
-   display type only, on a full-page moment that IS the screen. `background-clip: text` needs the
-   fill transparent; the glow rides drop-shadow because text-shadow cannot show through clipped
-   text (the `.wordmark-name` lesson, one rule up). NOT for `.nh-panel-title`, `.settings-head h2`
-   or any section heading — one edit there puts the metal on every panel and it stops meaning
-   anything.
-
-   "WORDMARK-SCALE ONLY" IS A CONTRAST LIMIT, not a taste one, and daybreak is where it bites.
-   Measured by image (the element pass cannot see it — `color` is transparent here): every
-   horizontal band of the wordmark reads 3.37-6.91 against the pale sky, so all 34 measured
-   scanline rows are under the 4.5 normal-text floor and none is under 3.0. That is AA-LARGE, and
-   AA-large is the applicable floor at clamp(2.5rem, 8vw, 4.5rem) — with 0.37 of margin, which is
-   thin. Night and the sunset hour have room (7.88-18.89). Shrink a `.sign` below display scale in
-   daybreak and it stops passing; deepen the light --sign-chrome's mid bands first if you must.
-
-   IT LIVES HERE, away from its §9 siblings (`.chamfer`, `.rim-*`, `.neon-beam`), for a reason
-   worth keeping: a treatment that REPLACES the default wordmark fill has to come after the rule
-   that sets it. Grouped with the others it sat ~40 lines earlier, lost at equal specificity, and
-   a `.sign` wordmark rendered in the ordinary magenta chrome — measured. The `[data-theme]` half
-   of the selector answers the same problem one notch up: daybreak swaps `.wordmark-name` to flat
-   ink at (0,2,0), and daybreak has its own depth-tuned --sign-chrome to wear instead. */
-.sign, [data-theme="light"] .sign {
+/* The sign: blue-steel hero title metal (see --sign-chrome). Display-scale text on a full-page title only,
+   never `.nh-panel-title` or section headings. In daybreak it only reaches AA-large against the pale sky,
+   so it must not shrink below display scale there.
+   It must come after `.wordmark-name` to override its fill at equal specificity; the [data-theme] half
+   beats daybreak's flat-ink `.wordmark-name` rule. */
+.sign,
+[data-theme="light"] .sign {
   background-image: var(--sign-chrome);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1254,42 +948,44 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   filter: var(--sign-glow);
 }
 
-/* ---- Texture utilities (6.1-6.4). Atmosphere zones only. ----
-   Never place these behind stat blocks, chat, forms, or tables. */
+/* ---- Texture utilities: atmosphere zones only, never behind stat blocks, chat, forms or tables ---- */
 
 /* Perspective grid floor for decorative UI zones. The tactical
    battle-map grid is drawn by the map renderer, not this. */
 .grid-floor {
   background-image:
-    repeating-linear-gradient(to right,  var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
+    repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
     repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-cell));
   transform: perspective(420px) rotateX(62deg);
   transform-origin: center bottom;
   pointer-events: none;
 }
 
-/* Faint CRT scanlines overlay on a positioned atmosphere container.
-   A one-gap TILE (background-size), not one huge repeating gradient: the repeating form
-   rasterizes unevenly over large layers — the landing found it first (§9): a visible band
-   at one edge, nothing mid-field — and a var(--scanline-gap) tile paints the same
-   everywhere. */
-.scanlines { position: relative; }
+/* Faint CRT scanlines on a positioned container. A one-gap tile rather than one large repeating gradient,
+   which rasterizes unevenly over large layers. */
+.scanlines {
+  position: relative;
+}
 .scanlines::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(to bottom,
+  background-image: linear-gradient(
+    to bottom,
     transparent 0,
     transparent calc(var(--scanline-gap) - 1px),
     var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap));
+    var(--scanline-color) var(--scanline-gap)
+  );
   background-size: 100% var(--scanline-gap);
   opacity: 0.5;
 }
 
 /* Analog static / grain overlay, kept very low opacity (--noise-opacity, per theme) */
-.static-noise { position: relative; }
+.static-noise {
+  position: relative;
+}
 .static-noise::after {
   content: "";
   position: absolute;
@@ -1301,9 +997,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   mix-blend-mode: screen;
 }
 
-/* Subtle magenta/cyan chromatic fringing. App WORDMARK ONLY.
-   Optional garnish; the chrome-gradient fill is the primary
-   wordmark treatment. Do not combine heavily with the fill. */
+/* Subtle magenta/cyan fringing, app wordmark only; optional garnish on top of the chrome fill. */
 .chromatic {
   text-shadow:
     -1px 0 rgba(255, 46, 154, 0.55),
@@ -1313,26 +1007,29 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 /* Light theme: texture off, wordmark fringing off */
 [data-theme="light"] .grid-floor,
 [data-theme="light"] .scanlines::after,
-[data-theme="light"] .static-noise::after { display: none; }
-[data-theme="light"] .chromatic { text-shadow: none; }
+[data-theme="light"] .static-noise::after {
+  display: none;
+}
+[data-theme="light"] .chromatic {
+  text-shadow: none;
+}
 
 /* ---- State treatments ---- */
 
-/* Selected element: steady accent glow, switched on smoothly (7.7) */
+/* Selected element: steady accent glow, switched on smoothly */
 .is-selected {
   box-shadow: var(--glow-cyan);
   transition: box-shadow var(--dur-hover) var(--ease-settle);
 }
 
-/* Active turn: steady, stronger magenta glow. No pulse, no motion (6.6). */
+/* Active turn: steady, stronger magenta glow; no pulse */
 .is-active-turn {
   box-shadow: var(--glow-magenta-strong);
   transition: box-shadow var(--dur-hover) var(--ease-settle);
 }
 
-/* Combat state: encounter/map panels shift hue slightly toward magenta
-   when an encounter is live (6.10). Eases in once, holds, eases out.
-   Adapts per theme via color-mix. Keep it subtle; do not harm contrast. */
+/* Combat state: encounter/map panels shift slightly toward magenta while an encounter is live. Keep it
+   subtle; don't harm contrast. */
 .combat-active {
   background: color-mix(in srgb, var(--surface-1) 90%, var(--magenta));
   border-color: color-mix(in srgb, var(--line) 65%, var(--magenta));
@@ -1343,55 +1040,159 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 
 /* ---- One-shot cues (allowed; they settle, they do not loop) ---- */
 
-/* Entrance vocabulary (7.4). Attach to containers, not list items (7.3). */
-@keyframes view-in    { from { opacity: 0; transform: translateY(7px); }  to { opacity: 1; transform: none; } }
-@keyframes popover-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
-@keyframes dialog-in  { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
-@keyframes backdrop-in{ from { opacity: 0; } to { opacity: 1; } }
-@keyframes sheet-up   { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
-@keyframes panel-fade { from { opacity: 0; } to { opacity: 1; } }
-
-.anim-view    { animation: view-in    var(--dur-enter) var(--ease-settle) both; }
-.anim-panel   { animation: panel-fade var(--dur-base)  ease both; }
-.anim-popover { animation: popover-in var(--dur-base)  var(--ease-settle) both; }
-.anim-dialog  { animation: dialog-in  var(--dur-base)  var(--ease-settle) both; }
-.anim-dialog::backdrop { animation: backdrop-in var(--dur-base) ease both; }
-.anim-sheet   { animation: sheet-up   var(--dur-enter) var(--ease-settle) both; }
-
-/* One-shot attention flash when jumping to a target (7.9) */
-@keyframes attention-flash {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  16% { box-shadow: var(--glow-cyan); }
+/* Entrance vocabulary. Attach to containers, not list items. */
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-.is-flashing { animation: attention-flash 1.2s var(--ease-settle); }
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes panel-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.anim-view {
+  animation: view-in var(--dur-enter) var(--ease-settle) both;
+}
+.anim-panel {
+  animation: panel-fade var(--dur-base) ease both;
+}
+.anim-popover {
+  animation: popover-in var(--dur-base) var(--ease-settle) both;
+}
+.anim-dialog {
+  animation: dialog-in var(--dur-base) var(--ease-settle) both;
+}
+.anim-dialog::backdrop {
+  animation: backdrop-in var(--dur-base) ease both;
+}
+.anim-sheet {
+  animation: sheet-up var(--dur-enter) var(--ease-settle) both;
+}
+
+/* One-shot attention flash when jumping to a target */
+@keyframes attention-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  16% {
+    box-shadow: var(--glow-cyan);
+  }
+}
+.is-flashing {
+  animation: attention-flash 1.2s var(--ease-settle);
+}
 
 /* One-time data reveal, e.g. an HP/progress bar filling on first paint */
-@keyframes bar-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-.anim-bar-reveal { animation: bar-reveal var(--dur-reveal) var(--ease-settle) both; }
+@keyframes bar-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.anim-bar-reveal {
+  animation: bar-reveal var(--dur-reveal) var(--ease-settle) both;
+}
 
-/* View-swap cascade (§7.7): the frame's rows settle into place in a brief stagger —
-   placement snapping into a frame, not parallax. Attach to the frame container; its
-   DIRECT children ride view-in with a capped delay (containers, never long lists — 7.3).
-   One-shot; the reduced-motion kill below collapses it like every other animation. */
-.anim-cascade > * { animation: view-in var(--dur-enter) var(--ease-settle) both; }
-.anim-cascade > :nth-child(2) { animation-delay: 60ms; }
-.anim-cascade > :nth-child(3) { animation-delay: 120ms; }
-.anim-cascade > :nth-child(n + 4) { animation-delay: 180ms; }
+/* View-swap cascade: a frame's direct children settle in with a brief, capped stagger. Containers only,
+   never long lists. */
+.anim-cascade > * {
+  animation: view-in var(--dur-enter) var(--ease-settle) both;
+}
+.anim-cascade > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.anim-cascade > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.anim-cascade > :nth-child(n + 4) {
+  animation-delay: 180ms;
+}
 
-/* The landing→app entry transition (one-shot, settles): the scene answers the door and
-   dips away; the app frame settles up into place, usually carrying the cascade. The
-   shell wires .anim-entry-dip onto the departing landing and .anim-entry-settle onto
-   the arriving frame. */
-@keyframes entry-dip    { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.015); } }
-@keyframes entry-settle { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.anim-entry-dip    { animation: entry-dip    var(--dur-base)  var(--ease-settle) both; }
-.anim-entry-settle { animation: entry-settle var(--dur-enter) var(--ease-settle) both; }
+/* Landing → app entry: .anim-entry-dip on the departing landing, .anim-entry-settle on the arriving frame. */
+@keyframes entry-dip {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+@keyframes entry-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-entry-dip {
+  animation: entry-dip var(--dur-base) var(--ease-settle) both;
+}
+.anim-entry-settle {
+  animation: entry-settle var(--dur-enter) var(--ease-settle) both;
+}
 
-/* The theme-switch sky moment: stamp .theme-switching on the root for the swap and drop
-   it when the fade lands (~var(--dur-theme)); every surface cross-fades to the new hour
-   instead of snapping. Deliberately NOT !important, so the reduced-motion kill below
-   still wins outright. */
-.theme-switching, .theme-switching *, .theme-switching *::before, .theme-switching *::after {
+/* Theme switch: put .theme-switching on the root for about --dur-theme so surfaces cross-fade. Not
+   !important, so the reduced-motion rule below still wins. */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
   transition:
     background-color var(--dur-theme) ease,
     color var(--dur-theme) ease,
@@ -1415,207 +1216,229 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
     -webkit-backdrop-filter: none;
   }
   .scanlines::after,
-  .static-noise::after { display: none; }
+  .static-noise::after {
+    display: none;
+  }
 }
 
 /* Reduced motion: collapse all motion, keep end states */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }
 
-/* =========================================================
-   THE LANDING SCENE, RE-SKINNED BY THEME (client call,
-   2026-08-04). Dark (base, above) is the night drive. These
-   two blocks override ONLY --landing-* tokens: dusk is the
-   sunset hour, light is daybreak. Same composition, three
-   skies — the toggle changes the hour, never the place.
-   ========================================================= */
+/* ---- The landing scene per theme: these blocks override only --landing-* tokens.
+   Dark (base, above) is night; dusk is sunset; light is daybreak. ---- */
 [data-theme="dusk"] {
   --landing-sky:
     radial-gradient(120% 70% at 50% 108%, rgba(255, 120, 60, 0.28) 0%, transparent 55%),
-    linear-gradient(180deg, #140A2E 0%, #1F0C44 20%, #2A1055 36%, #4A1560 52%, #6E1B66 64%, #92285F 74%, #B23A62 84%, #D0623F 93%, #E88A4A 100%);
+    linear-gradient(
+      180deg,
+      #140a2e 0%,
+      #1f0c44 20%,
+      #2a1055 36%,
+      #4a1560 52%,
+      #6e1b66 64%,
+      #92285f 74%,
+      #b23a62 84%,
+      #d0623f 93%,
+      #e88a4a 100%
+    );
   --landing-star: rgba(255, 235, 220, 0.85);
   --landing-star-dim: rgba(255, 170, 190, 0.5);
-  --landing-sun: linear-gradient(180deg, #FFF3C9 0%, #FFC15C 26%, #FF7BAB 55%, #FF2E9A 78%, #A45CFF 100%);
-  --landing-sun-glow:
-    0 0 48px 14px rgba(255, 150, 80, 0.50),
-    0 0 150px 60px rgba(255, 46, 154, 0.40);
+  --landing-sun: linear-gradient(180deg, #fff3c9 0%, #ffc15c 26%, #ff7bab 55%, #ff2e9a 78%, #a45cff 100%);
+  --landing-sun-glow: 0 0 48px 14px rgba(255, 150, 80, 0.5), 0 0 150px 60px rgba(255, 46, 154, 0.4);
   --landing-slat: rgba(24, 7, 32, 0.9);
-  --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(255, 193, 92, 0.95) 22%, rgba(255, 92, 184, 0.95) 50%, rgba(255, 193, 92, 0.95) 78%, transparent 100%);
-  --landing-horizon-glow:
-    0 0 14px 3px rgba(255, 193, 92, 0.80),
-    0 0 52px 14px rgba(255, 46, 154, 0.55);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 193, 92, 0.95) 22%,
+    rgba(255, 92, 184, 0.95) 50%,
+    rgba(255, 193, 92, 0.95) 78%,
+    transparent 100%
+  );
+  --landing-horizon-glow: 0 0 14px 3px rgba(255, 193, 92, 0.8), 0 0 52px 14px rgba(255, 46, 154, 0.55);
   --landing-grid-x: rgba(255, 140, 90, 0.55);
-  --landing-grid-y: rgba(255, 46, 154, 0.50);
+  --landing-grid-y: rgba(255, 46, 154, 0.5);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-planet: radial-gradient(circle at 35% 30%, #FFD9A6 0%, #C86AD9 55%, #7A35B8 100%);
+  --landing-planet: radial-gradient(circle at 35% 30%, #ffd9a6 0%, #c86ad9 55%, #7a35b8 100%);
   --landing-planet-ring: rgba(255, 193, 92, 0.7);
   --landing-planet-glow: 0 0 16px 2px rgba(255, 150, 80, 0.4);
   --landing-planet-opacity: 0.4;
   --landing-stroke: rgba(12, 32, 72, 0.72);
-  --landing-title-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8))
-    drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
+  --landing-title-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8)) drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
 }
 [data-theme="light"] {
-  --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%, #FBD9E4 68%, #FDD8CE 84%, #FFD6B4 100%);
+  --landing-sky: linear-gradient(
+    180deg,
+    #dce6fb 0%,
+    #e6e2f9 24%,
+    #efdff6 42%,
+    #f6daec 56%,
+    #fbd9e4 68%,
+    #fdd8ce 84%,
+    #ffd6b4 100%
+  );
   /* Daybreak: no stars. Transparent star inks keep the layers (and their markup) inert. */
   --landing-star: rgba(255, 255, 255, 0);
   --landing-star-dim: rgba(255, 255, 255, 0);
-  --landing-sun: linear-gradient(180deg, #FFFBEA 0%, #FFD98F 30%, #FF8FC0 62%, #E24C9C 88%, #A45CFF 100%);
-  --landing-sun-glow:
-    0 0 44px 12px rgba(255, 150, 150, 0.45),
-    0 0 120px 48px rgba(255, 190, 120, 0.40);
+  --landing-sun: linear-gradient(180deg, #fffbea 0%, #ffd98f 30%, #ff8fc0 62%, #e24c9c 88%, #a45cff 100%);
+  --landing-sun-glow: 0 0 44px 12px rgba(255, 150, 150, 0.45), 0 0 120px 48px rgba(255, 190, 120, 0.4);
   --landing-slat: rgba(255, 244, 235, 0.95);
-  --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(15, 127, 192, 0.85) 22%, rgba(200, 29, 128, 0.90) 50%, rgba(15, 127, 192, 0.85) 78%, transparent 100%);
-  --landing-horizon-glow:
-    0 0 10px 2px rgba(200, 29, 128, 0.35),
-    0 0 36px 10px rgba(255, 150, 120, 0.35);
-  --landing-grid-x: rgba(200, 29, 128, 0.40);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(15, 127, 192, 0.85) 22%,
+    rgba(200, 29, 128, 0.9) 50%,
+    rgba(15, 127, 192, 0.85) 78%,
+    transparent 100%
+  );
+  --landing-horizon-glow: 0 0 10px 2px rgba(200, 29, 128, 0.35), 0 0 36px 10px rgba(255, 150, 120, 0.35);
+  --landing-grid-x: rgba(200, 29, 128, 0.4);
   --landing-grid-y: rgba(15, 127, 192, 0.35);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EFF6FD 12%, #CBE0F5 26%, #9DBFE7 38%, #6E93CC 47%, #40619E 50%, #FBFDFF 54%, #E2EEFA 63%, #ABCAED 75%, #7396CE 87%, #47649F 100%);
+  --landing-sign: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #eff6fd 12%,
+    #cbe0f5 26%,
+    #9dbfe7 38%,
+    #6e93cc 47%,
+    #40619e 50%,
+    #fbfdff 54%,
+    #e2eefa 63%,
+    #abcaed 75%,
+    #7396ce 87%,
+    #47649f 100%
+  );
   --landing-planet-opacity: 0;
   --landing-stroke: rgba(20, 40, 90, 0.55);
-  --landing-title-glow:
-    drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5))
-    drop-shadow(0 0 8px rgba(226, 76, 156, 0.30));
-  /* Daybreak doors: pale glass with deep-inked rims and labels — sunlit panels for a
-     sunlit sky, not the night's carried into the morning. Hover brightens; the labels
-     stay deep and readable. */
+  --landing-title-glow: drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5)) drop-shadow(0 0 8px rgba(226, 76, 156, 0.3));
+  /* Daybreak doors: pale glass with deep-inked rims and labels. */
   --landing-door-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(242, 233, 255, 0.88) 100%);
-  --landing-door-label: #3A2470;
-  --landing-door-play-rim: #C81D80;
-  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --landing-door-label: #3a2470;
+  --landing-door-play-rim: #c81d80;
+  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --landing-door-play-glow-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --landing-door-gm-rim: #6C3FD4;
+  --landing-door-gm-rim: #6c3fd4;
   --landing-door-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
   --landing-door-gm-glow-strong: drop-shadow(0 2px 8px rgba(108, 63, 212, 0.42));
   --landing-glass: rgba(255, 255, 255, 0.66);
 }
 
-/* =========================================================
-   THE WORK-SCREEN SKY, RE-SKINNED BY THEME. Its own fenced
-   blocks rather than rows inside the landing's above: the two
-   scenes are re-skinned by the same toggle but they are not
-   the same scene, and a shared block would make every sky
-   edit a diff against the title screen.
+/* ---- The work-screen sky per theme, separate from the landing's blocks. Only --sky-* appears here;
+   --sky-horizon-a/b and --sky-grid-x/y need no daybreak override because they derive from --cyan/--magenta. ---- */
 
-   Only --sky-* appears here. --sky-horizon-a/b and
-   --sky-grid-x/y are absent from daybreak on purpose: they
-   are color-mix() over --cyan/--magenta, which the light
-   theme already deepens to ink, so the base definitions
-   resolve to daybreak's inks unchanged.
-   ========================================================= */
-
-/* THE SUNSET HOUR — and the one theme where the sky was a real legibility defect.
-   The landing's dusk ramp runs to #E88A4A: measured 2026-08-04 (Chromium, WCAG 2.1) that
-   ember end reads 1.45:1 against --text-dim #C4BEE2 and 2.24:1 against --text #F0EEFB, and
-   its 85% band still only 3.08. Both fail AA badly, and no opacity dial rescues a ramp.
-   So the WASH stops at #6E1B66 (--text-dim 5.87, --text-muted 5.71, --text 9.11) and the
-   ember is carried by the beam and by a bloom confined BELOW the horizon — "ember horizon
-   over deep twilight purple" survives; only the ember climbing into the text zone is cut. */
+/* Dusk: the landing's ember end fails AA against text, so the wash stops at #6E1B66 and the ember lives
+   in the beam and a bloom confined below the horizon. */
 [data-theme="dusk"] {
-  --sky-wash: linear-gradient(180deg,
-    #140A2E 0%, #1F0C44 24%, #2A1055 44%, #4A1560 68%, #6E1B66 100%);
+  --sky-wash: linear-gradient(180deg, #140a2e 0%, #1f0c44 24%, #2a1055 44%, #4a1560 68%, #6e1b66 100%);
   --sky-star: rgba(255, 235, 220, 0.85);
   --sky-star-dim: rgba(255, 170, 190, 0.5);
-  /* "Amber-gold sun" is the caption, and the first cut missed it: an amber stop at 0.44 under
-     a rose base measured hue 340deg (rgb 192,90,124) three pixels above the line — rose, not
-     gold. The amber now starts higher and carries the base, so the hue at the line is the
-     ember's own rather than the wash's. The pink is gone entirely: the horizon beam is already
-     --caution-hi gold here and a rose disc sitting on a gold line was two warm stories. */
-  --sky-sun: linear-gradient(180deg,
+  /* An amber-gold sun on the gold (--caution-hi) beam; no rose. */
+  --sky-sun: linear-gradient(
+    180deg,
     rgba(255, 243, 201, 0) 0%,
     rgba(255, 206, 122, 0.5) 46%,
-    rgba(255, 168, 66, 0.9) 100%);
+    rgba(255, 168, 66, 0.9) 100%
+  );
   --sky-horizon-a: color-mix(in srgb, var(--caution-hi) 90%, transparent);
-  --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 150, 80, 0.34) 0%, rgba(255, 46, 154, 0.14) 46%, transparent 74%);
-  /* The ellipse's vertical radius IS the horizon inset, so the ember dies at the line and
-     content never crosses it. Measured ceiling on the truncated wash is 0.16 alpha where
-     text can reach; below the horizon it is structural rather than dialled. */
-  --sky-bloom: radial-gradient(110% var(--sky-horizon-inset) at 50% 100%,
-    rgba(255, 120, 60, 0.16) 0%, rgba(255, 46, 154, 0.07) 46%, transparent 72%);
+  --sky-horizon-glow: radial-gradient(
+    46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(255, 150, 80, 0.34) 0%,
+    rgba(255, 46, 154, 0.14) 46%,
+    transparent 74%
+  );
+  /* The bloom's vertical radius is the horizon inset, so the ember stops at the line and never reaches text. */
+  --sky-bloom: radial-gradient(
+    110% var(--sky-horizon-inset) at 50% 100%,
+    rgba(255, 120, 60, 0.16) 0%,
+    rgba(255, 46, 154, 0.07) 46%,
+    transparent 72%
+  );
   --sky-grid-x: color-mix(in srgb, var(--caution) 55%, transparent);
   --sky-grid-y: color-mix(in srgb, var(--magenta) 50%, transparent);
-  /* Measured ceilings on #6E1B66: columns 0.30, rows 0.46. 0.28 keeps the tighter one. */
+  /* Stays under the tighter (column) AA ceiling on #6E1B66. */
   --sky-floor-opacity: 0.28;
 }
 
-/* DAYBREAK — the safest wash of the three, not the riskiest. Measured 2026-08-04 on the raw
-   ramp at every stop: --text #17132E ≥ 13.28:1, --text-dim #4A4568 ≥ 6.63:1, --text-muted
-   #5B5578 ≥ 5.15:1. The hazards here are line ink, not wash: --text-dim on a grid line
-   measures 3.75 raw (hence the floor budget below), and --cyan #0F7FC0 as small type on this
-   sky measures 3.35 — never put cyan small text on the daybreak sky, use --text-dim.
-   Texture drops to near-nothing per the caption: stars stand down (transparent ink, layers
-   intact), no bloom, and `.scanlines`/`.static-noise` are already display:none in this theme.
-   The GRID stays — "dawn over the same grid" — which is why it is a sky layer of its own and
-   not the theme-gated `.grid-floor` utility. */
+/* Daybreak: the wash clears AA everywhere; the hazards are line inks. Never put --cyan small text on this sky
+   (use --text-dim). Stars are transparent and there is no bloom, but the grid stays, which is why it is a
+   sky layer and not the theme-gated `.grid-floor` utility. */
 [data-theme="light"] {
-  /* Same horizon-relative stops as night, for the same reason (see there). */
-  --sky-wash: linear-gradient(180deg,
-    #DCE6FB 0%,
-    #E6E2F9 calc((100% - var(--sky-horizon-inset)) * 0.27),
-    #EFDFF6 calc((100% - var(--sky-horizon-inset)) * 0.47),
-    #F6DAEC calc((100% - var(--sky-horizon-inset)) * 0.63),
-    #FBD9E4 calc(100% - var(--sky-horizon-inset)),
-    #FDD8CE calc(100% - var(--sky-horizon-inset) * 0.4),
-    #FFD6B4 100%);
+  /* Horizon-relative stops, as for night. */
+  --sky-wash: linear-gradient(
+    180deg,
+    #dce6fb 0%,
+    #e6e2f9 calc((100% - var(--sky-horizon-inset)) * 0.27),
+    #efdff6 calc((100% - var(--sky-horizon-inset)) * 0.47),
+    #f6daec calc((100% - var(--sky-horizon-inset)) * 0.63),
+    #fbd9e4 calc(100% - var(--sky-horizon-inset)),
+    #fdd8ce calc(100% - var(--sky-horizon-inset) * 0.4),
+    #ffd6b4 100%
+  );
   --sky-star: rgba(255, 255, 255, 0);
   --sky-star-dim: rgba(255, 255, 255, 0);
-  --sky-sun: linear-gradient(180deg,
+  --sky-sun: linear-gradient(
+    180deg,
     rgba(255, 251, 234, 0) 0%,
     rgba(255, 217, 143, 0.5) 52%,
-    rgba(255, 143, 192, 0.72) 100%);
+    rgba(255, 143, 192, 0.72) 100%
+  );
   --sky-sun-opacity: 0.4;
-  --sky-horizon-glow: radial-gradient(46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(200, 29, 128, 0.16) 0%, rgba(255, 150, 120, 0.14) 48%, transparent 76%);
+  --sky-horizon-glow: radial-gradient(
+    46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(200, 29, 128, 0.16) 0%,
+    rgba(255, 150, 120, 0.14) 48%,
+    transparent 76%
+  );
   --sky-bloom: none;
-  /* Measured ceilings on #FBD9E4: columns 0.73, rows 1.00. 0.55 spends the headroom the
-     deepened inks buy without letting a line touch the AA floor. */
+  /* Below the AA ceilings for grid lines on #FBD9E4. */
   --sky-floor-opacity: 0.55;
 }
 
-/* Mobile: at 390px the pane's visible sky is a ~10px gutter each side plus the bottom band,
-   so the horizon IS the scene. Stepping the inset down keeps the floor from eating 13% of an
-   844px pane; without it the grid also runs under the iOS home indicator. 760 is a ladder
-   rung (§3). Only the crown is stepped — the diameter follows it, so the sun stays a
-   hemisphere at every width and only its scale changes. */
+/* On phones the horizon is most of the visible sky, so step the inset down (it also keeps the grid clear of
+   the iOS home indicator). Only the crown steps; the diameter follows, so the sun stays a hemisphere. */
 @media (max-width: 760px) {
-  :root { --sky-horizon-inset: 5.75rem; --sky-sun-crown: 3.25rem; }
+  :root {
+    --sky-horizon-inset: 5.75rem;
+    --sky-sun-crown: 3.25rem;
+  }
 }
 
-/* =========================================================
-   ROLE RIMS + THE SIGN, PER THEME. Night and the sunset hour
-   share the rims and the steel — the cold metal against a warm
-   drive is the whole point of the sign, and an edge that reads
-   at night reads at dusk. Only the sign's HALO follows the
-   hour. Daybreak deepens all of it: on a pale sky an edge
-   separates by being darker, and glow grounds instead of blooms
-   (the light-theme rule the --glow-drop-* set already follows).
-   ========================================================= */
+/* ---- Role rims and the sign per theme. Night and dusk share rims and steel; only the sign's halo follows
+   dusk. Daybreak deepens everything and grounds the glow. ---- */
 [data-theme="dusk"] {
-  --sign-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8))
-    drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
+  --sign-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8)) drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
   --sign-stroke: rgba(12, 32, 72, 0.72);
 }
 [data-theme="light"] {
-  --rim-player: #C81D80;
-  --rim-gm: #6C3FD4;
-  --rim-player-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --rim-player: #c81d80;
+  --rim-gm: #6c3fd4;
+  --rim-player-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --rim-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
-  --sign-chrome: linear-gradient(180deg, #FFFFFF 0%, #EFF6FD 12%, #CBE0F5 26%, #9DBFE7 38%, #6E93CC 47%, #40619E 50%, #FBFDFF 54%, #E2EEFA 63%, #ABCAED 75%, #7396CE 87%, #47649F 100%);
+  --sign-chrome: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #eff6fd 12%,
+    #cbe0f5 26%,
+    #9dbfe7 38%,
+    #6e93cc 47%,
+    #40619e 50%,
+    #fbfdff 54%,
+    #e2eefa 63%,
+    #abcaed 75%,
+    #7396ce 87%,
+    #47649f 100%
+  );
   --sign-stroke: rgba(20, 40, 90, 0.55);
-  --sign-glow:
-    drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5))
-    drop-shadow(0 0 8px rgba(226, 76, 156, 0.30));
+  --sign-glow: drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5)) drop-shadow(0 0 8px rgba(226, 76, 156, 0.3));
 }

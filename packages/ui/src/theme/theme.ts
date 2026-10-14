@@ -1,7 +1,5 @@
-/* Theme model shared across the app and the standalone viewer. Framework-free so
-   it can run in the no-flash <head> script and inside React alike. The look is
-   fixed per the design language — theme (dark/dusk/light) and OS accessibility
-   settings are the only user-facing switches. */
+/* Theme model shared by the app and the standalone viewer. Framework-free so it runs in the no-flash <head>
+   script and inside React alike. */
 
 export const THEMES = ["dark", "dusk", "light"] as const;
 export type Theme = (typeof THEMES)[number];
@@ -19,7 +17,7 @@ export function getStoredTheme(): Theme {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     if (isTheme(stored)) return stored;
   } catch {
-    /* localStorage unavailable (private mode) — fall through to the default */
+    /* localStorage unavailable (private mode); fall through to the default */
   }
   return "dark";
 }
@@ -34,8 +32,7 @@ export function applyTheme(theme: Theme): void {
   }
 }
 
-/** Inline <head> script that sets data-theme before first paint (prevents a
-    theme flash). Kept here as the single source of truth; index.html and
+/** Inline <head> script that sets data-theme before first paint. The source of truth; index.html and
     viewer.html embed an equivalent literal because HTML can't import TS. */
 export const NO_FLASH_THEME_SCRIPT =
   `try{var t=localStorage.getItem("${THEME_STORAGE_KEY}");` +

@@ -52,10 +52,14 @@ const cmd = () => ({ commandId: crypto.randomUUID() });
 
 async function login() {
   await fetch(`${BASE}/api/bootstrap`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: PASSWORD })
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: PASSWORD })
   });
   const response = await fetch(`${BASE}/api/gm/login`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: PASSWORD })
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: PASSWORD })
   });
   if (!response.ok) throw new Error(`login failed: ${response.status}`);
   ({ token } = await response.json());
@@ -64,37 +68,141 @@ async function login() {
 // ----- Pages. Folders, every entity type, and a mix of shown/hidden so the reveal axis is exercised. -----
 
 const PAGES = [
-  { title: "Strahd von Zarovich", entityType: "character", folder: "Barovia/People", tags: ["villain", "vampire"], revealed: true,
+  {
+    title: "Strahd von Zarovich",
+    entityType: "character",
+    folder: "Barovia/People",
+    tags: ["villain", "vampire"],
+    revealed: true,
     playerBody: "The Devil Strahd. Lord of Barovia; nobody remembers a time before him.",
-    gmBody: "Wants Ireena. Will not kill the party while they amuse him — see [[Castle Ravenloft]]." },
-  { title: "Ireena Kolyana", entityType: "character", folder: "Barovia/People", tags: ["ally"], revealed: true,
-    playerBody: "The burgomaster's adopted daughter. Twice bitten, twice recovered.", gmBody: "Tatyana reborn. She does not know." },
-  { title: "Ismark Kolyanovich", entityType: "character", folder: "Barovia/People", tags: ["ally"], revealed: true,
-    playerBody: "Ireena's brother. Calls himself the Lesser.", gmBody: "" },
-  { title: "Madam Eva", entityType: "character", folder: "Barovia/People", tags: ["vistani"], revealed: false,
-    playerBody: "", gmBody: "Reads the Tarokka. The reading is not a trick." },
-  { title: "Barovia", entityType: "location", folder: "Barovia", tags: ["region", "mist"], revealed: true,
-    playerBody: "A valley walled by mist. The sun has not been seen in living memory.", gmBody: "The mists are Strahd's." },
-  { title: "Castle Ravenloft", entityType: "location", folder: "Barovia/Places", tags: ["dungeon"], revealed: true,
-    playerBody: "It sits on the crag above the village and is visible from everywhere.", gmBody: "Layout shifts nightly below the third floor." },
-  { title: "Vallaki", entityType: "location", folder: "Barovia/Places", tags: ["town"], revealed: true,
-    playerBody: "A walled town that insists, loudly, that all is well.", gmBody: "The baron is one festival from being deposed." },
-  { title: "The Amber Temple", entityType: "location", folder: "Barovia/Places", tags: ["dungeon", "secret"], revealed: false,
-    playerBody: "", gmBody: "Dark gifts, freely offered, always ruinous." },
-  { title: "The Vistani", entityType: "faction", folder: "Barovia/Powers", tags: ["neutral"], revealed: true,
-    playerBody: "Travellers who pass the mists at will.", gmBody: "Some serve Strahd. Not all." },
-  { title: "The Keepers of the Feather", entityType: "faction", folder: "Barovia/Powers", tags: ["ally"], revealed: true,
-    playerBody: "Wereravens. They are watching, and occasionally helping.", gmBody: "" },
-  { title: "The Order of the Silver Dragon", entityType: "faction", folder: "Barovia/Powers", tags: ["history"], revealed: false,
-    playerBody: "", gmBody: "Argynvost's knights. Their beacon can still be lit." },
-  { title: "The Tome of Strahd", entityType: "item", folder: "Barovia/Things", tags: ["quest-item"], revealed: true,
-    playerBody: "A journal in Strahd's own hand.", gmBody: "" },
-  { title: "The Sunsword", entityType: "item", folder: "Barovia/Things", tags: ["quest-item", "secret"], revealed: false,
-    playerBody: "", gmBody: "One of the three Tarokka artifacts." },
-  { title: "Dark gifts", entityType: "note", folder: null, tags: ["rules"], revealed: false,
-    playerBody: "", gmBody: "Each is a permanent bargain. Offer them; never push them." },
-  { title: "The mists", entityType: "note", folder: null, tags: ["mist", "rules"], revealed: true,
-    playerBody: "They turn you around. Every road out is a road back in.", gmBody: "" }
+    gmBody: "Wants Ireena. Will not kill the party while they amuse him — see [[Castle Ravenloft]]."
+  },
+  {
+    title: "Ireena Kolyana",
+    entityType: "character",
+    folder: "Barovia/People",
+    tags: ["ally"],
+    revealed: true,
+    playerBody: "The burgomaster's adopted daughter. Twice bitten, twice recovered.",
+    gmBody: "Tatyana reborn. She does not know."
+  },
+  {
+    title: "Ismark Kolyanovich",
+    entityType: "character",
+    folder: "Barovia/People",
+    tags: ["ally"],
+    revealed: true,
+    playerBody: "Ireena's brother. Calls himself the Lesser.",
+    gmBody: ""
+  },
+  {
+    title: "Madam Eva",
+    entityType: "character",
+    folder: "Barovia/People",
+    tags: ["vistani"],
+    revealed: false,
+    playerBody: "",
+    gmBody: "Reads the Tarokka. The reading is not a trick."
+  },
+  {
+    title: "Barovia",
+    entityType: "location",
+    folder: "Barovia",
+    tags: ["region", "mist"],
+    revealed: true,
+    playerBody: "A valley walled by mist. The sun has not been seen in living memory.",
+    gmBody: "The mists are Strahd's."
+  },
+  {
+    title: "Castle Ravenloft",
+    entityType: "location",
+    folder: "Barovia/Places",
+    tags: ["dungeon"],
+    revealed: true,
+    playerBody: "It sits on the crag above the village and is visible from everywhere.",
+    gmBody: "Layout shifts nightly below the third floor."
+  },
+  {
+    title: "Vallaki",
+    entityType: "location",
+    folder: "Barovia/Places",
+    tags: ["town"],
+    revealed: true,
+    playerBody: "A walled town that insists, loudly, that all is well.",
+    gmBody: "The baron is one festival from being deposed."
+  },
+  {
+    title: "The Amber Temple",
+    entityType: "location",
+    folder: "Barovia/Places",
+    tags: ["dungeon", "secret"],
+    revealed: false,
+    playerBody: "",
+    gmBody: "Dark gifts, freely offered, always ruinous."
+  },
+  {
+    title: "The Vistani",
+    entityType: "faction",
+    folder: "Barovia/Powers",
+    tags: ["neutral"],
+    revealed: true,
+    playerBody: "Travellers who pass the mists at will.",
+    gmBody: "Some serve Strahd. Not all."
+  },
+  {
+    title: "The Keepers of the Feather",
+    entityType: "faction",
+    folder: "Barovia/Powers",
+    tags: ["ally"],
+    revealed: true,
+    playerBody: "Wereravens. They are watching, and occasionally helping.",
+    gmBody: ""
+  },
+  {
+    title: "The Order of the Silver Dragon",
+    entityType: "faction",
+    folder: "Barovia/Powers",
+    tags: ["history"],
+    revealed: false,
+    playerBody: "",
+    gmBody: "Argynvost's knights. Their beacon can still be lit."
+  },
+  {
+    title: "The Tome of Strahd",
+    entityType: "item",
+    folder: "Barovia/Things",
+    tags: ["quest-item"],
+    revealed: true,
+    playerBody: "A journal in Strahd's own hand.",
+    gmBody: ""
+  },
+  {
+    title: "The Sunsword",
+    entityType: "item",
+    folder: "Barovia/Things",
+    tags: ["quest-item", "secret"],
+    revealed: false,
+    playerBody: "",
+    gmBody: "One of the three Tarokka artifacts."
+  },
+  {
+    title: "Dark gifts",
+    entityType: "note",
+    folder: null,
+    tags: ["rules"],
+    revealed: false,
+    playerBody: "",
+    gmBody: "Each is a permanent bargain. Offer them; never push them."
+  },
+  {
+    title: "The mists",
+    entityType: "note",
+    folder: null,
+    tags: ["mist", "rules"],
+    revealed: true,
+    playerBody: "They turn you around. Every road out is a road back in.",
+    gmBody: ""
+  }
 ];
 
 async function seed() {
@@ -104,8 +212,14 @@ async function seed() {
   const pageIds = new Map();
   for (const page of PAGES) {
     const { page: created } = await api("POST", "/pages", {
-      title: page.title, entityType: page.entityType, folder: page.folder, tags: page.tags,
-      playerBody: page.playerBody, gmBody: page.gmBody, fields: {}, ...cmd()
+      title: page.title,
+      entityType: page.entityType,
+      folder: page.folder,
+      tags: page.tags,
+      playerBody: page.playerBody,
+      gmBody: page.gmBody,
+      fields: {},
+      ...cmd()
     });
     pageIds.set(page.title, created.id);
     if (page.revealed) await api("POST", `/pages/${created.id}/reveal`, { revealed: true, ...cmd() });
@@ -127,10 +241,15 @@ async function seed() {
 
   // ----- Calendar (D17). A real fantasy calendar, published behind the GM's own date. -----
   await api("PUT", "/calendar", {
-    yearName: "BC", weekdays: ["Moonday", "Grimday", "Ashday", "Sunday", "Mistday"],
+    yearName: "BC",
+    weekdays: ["Moonday", "Grimday", "Ashday", "Sunday", "Mistday"],
     months: [
-      { name: "Hollowing", days: 30 }, { name: "Greyfall", days: 28 }, { name: "Coldmourn", days: 31 },
-      { name: "Thawing", days: 30 }, { name: "Bloomrot", days: 31 }, { name: "Longmist", days: 30 }
+      { name: "Hollowing", days: 30 },
+      { name: "Greyfall", days: 28 },
+      { name: "Coldmourn", days: 31 },
+      { name: "Thawing", days: 30 },
+      { name: "Bloomrot", days: 31 },
+      { name: "Longmist", days: 30 }
     ],
     // Downtime cannot pass time until the GM's own clock is somewhere, so the seed sets it — the same
     // 400 ("Set the campaign's current date before passing time") a real GM would hit.
@@ -142,42 +261,96 @@ async function seed() {
 
   // ----- Sessions (D9). One played, one active, so both dashboard headings can be seen. -----
   const { session: s13 } = await api("POST", "/sessions", {
-    sessionNumber: 13, realDate: "2026-07-11", attendees: ["Ana", "Bo", "Cass", "Dev"], status: "played",
+    sessionNumber: 13,
+    realDate: "2026-07-11",
+    attendees: ["Ana", "Bo", "Cass", "Dev"],
+    status: "played",
     prepBody: "Open on the funeral. The Keepers make contact if the party helps.",
-    recapBody: "The party buried the burgomaster and left Barovia village with Ireena.", tags: ["barovia"], ...cmd()
+    recapBody: "The party buried the burgomaster and left Barovia village with Ireena.",
+    tags: ["barovia"],
+    ...cmd()
   });
   await api("POST", `/sessions/${s13.id}/reveal`, { revealed: true, ...cmd() });
   const { session: s14 } = await api("POST", "/sessions", {
-    sessionNumber: 14, realDate: "2026-08-01", attendees: ["Ana", "Bo", "Cass"], status: "planned",
+    sessionNumber: 14,
+    realDate: "2026-08-01",
+    attendees: ["Ana", "Bo", "Cass"],
+    status: "planned",
     prepBody: "Vallaki. The Feast of St Andral is three days out and the bones are already gone.",
-    recapBody: "", tags: ["vallaki"], ...cmd()
+    recapBody: "",
+    tags: ["vallaki"],
+    ...cmd()
   });
   await api("POST", `/sessions/${s14.id}/activate`, cmd());
   console.log("2 sessions");
 
   // ----- Quests (D11/R5). Open, completed and failed, so the history surface has all three. -----
   const quests = [
-    { title: "Escort Ireena to Vallaki", status: "active", revealed: true, tags: ["barovia"],
+    {
+      title: "Escort Ireena to Vallaki",
+      status: "active",
+      revealed: true,
+      tags: ["barovia"],
       playerBody: "Ismark asked us to get his sister behind Vallaki's walls.",
       gmBody: "Strahd will not stop them. He wants them to try.",
-      objectives: [{ text: "Leave Barovia village", done: true }, { text: "Survive the Svalich Road", done: true }, { text: "Reach St Andral's", done: false }] },
-    { title: "The Missing Bones", status: "active", revealed: true, tags: ["vallaki"],
+      objectives: [
+        { text: "Leave Barovia village", done: true },
+        { text: "Survive the Svalich Road", done: true },
+        { text: "Reach St Andral's", done: false }
+      ]
+    },
+    {
+      title: "The Missing Bones",
+      status: "active",
+      revealed: true,
+      tags: ["vallaki"],
       playerBody: "St Andral's bones are gone and the priest is terrified.",
       gmBody: "Milivoj took them. He was paid.",
-      objectives: [{ text: "Ask the priest what happened", done: true }, { text: "Find who took them", done: false }] },
-    { title: "The Tome of Strahd", status: "completed", revealed: true, tags: ["barovia"],
+      objectives: [
+        { text: "Ask the priest what happened", done: true },
+        { text: "Find who took them", done: false }
+      ]
+    },
+    {
+      title: "The Tome of Strahd",
+      status: "completed",
+      revealed: true,
+      tags: ["barovia"],
       playerBody: "Madam Eva's reading named a book in the castle.",
-      gmBody: "", objectives: [{ text: "Read the Tarokka", done: true }, { text: "Recover the tome", done: true }] },
-    { title: "Save the burgomaster", status: "failed", revealed: true, tags: ["barovia"],
+      gmBody: "",
+      objectives: [
+        { text: "Read the Tarokka", done: true },
+        { text: "Recover the tome", done: true }
+      ]
+    },
+    {
+      title: "Save the burgomaster",
+      status: "failed",
+      revealed: true,
+      tags: ["barovia"],
       playerBody: "We were too late. Kolyan Indirovich died before we reached the mansion.",
-      gmBody: "This was always going to fail; it is what puts Ismark in charge.", objectives: [{ text: "Reach the mansion", done: true }] },
-    { title: "The Amber Vaults", status: "active", revealed: false, tags: ["secret"],
-      playerBody: "", gmBody: "They do not know this exists yet.", objectives: [{ text: "Find the temple", done: false }] }
+      gmBody: "This was always going to fail; it is what puts Ismark in charge.",
+      objectives: [{ text: "Reach the mansion", done: true }]
+    },
+    {
+      title: "The Amber Vaults",
+      status: "active",
+      revealed: false,
+      tags: ["secret"],
+      playerBody: "",
+      gmBody: "They do not know this exists yet.",
+      objectives: [{ text: "Find the temple", done: false }]
+    }
   ];
   for (const quest of quests) {
     const { quest: created } = await api("POST", "/quests", {
-      title: quest.title, status: quest.status, playerBody: quest.playerBody, gmBody: quest.gmBody,
-      objectives: quest.objectives, tags: quest.tags, ...cmd()
+      title: quest.title,
+      status: quest.status,
+      playerBody: quest.playerBody,
+      gmBody: quest.gmBody,
+      objectives: quest.objectives,
+      tags: quest.tags,
+      ...cmd()
     });
     if (quest.revealed) await api("POST", `/quests/${created.id}/reveal`, { revealed: true, ...cmd() });
   }
@@ -188,42 +361,71 @@ async function seed() {
   // a rule a plain entry does not (a deadline requires a date, downtime requires its payload). The seed
   // follows the server's shape rather than inventing a polymorphic one.
   const entries = [
-    { playerText: "We buried the burgomaster at dawn. Nobody sang.", gmText: "They missed the raven on the wall.", reveal: true, tags: ["barovia"] },
-    { playerText: "The road out of the valley put us back at the gates. Twice.", gmText: "", reveal: true, tags: ["mist"] },
+    {
+      playerText: "We buried the burgomaster at dawn. Nobody sang.",
+      gmText: "They missed the raven on the wall.",
+      reveal: true,
+      tags: ["barovia"]
+    },
+    {
+      playerText: "The road out of the valley put us back at the gates. Twice.",
+      gmText: "",
+      reveal: true,
+      tags: ["mist"]
+    },
     { playerText: "", gmText: "Strahd watched the whole burial from the treeline.", reveal: false, tags: [] },
     { playerText: "Vallaki insists all is well. It says so on a banner.", gmText: "", reveal: true, tags: ["vallaki"] }
   ];
   for (const entry of entries) {
     const { entry: created } = await api("POST", "/journal", {
-      playerText: entry.playerText, gmText: entry.gmText, tags: entry.tags,
-      sessionId: null, attachPageId: null, attachMarkerId: null, ...cmd()
+      playerText: entry.playerText,
+      gmText: entry.gmText,
+      tags: entry.tags,
+      sessionId: null,
+      attachPageId: null,
+      attachMarkerId: null,
+      ...cmd()
     });
     if (entry.reveal) await api("POST", `/journal/${created.id}/reveal`, { revealed: true, ...cmd() });
   }
   const { entry: milestone } = await api("POST", "/journal/milestone", {
-    playerText: "The party reached Vallaki and levelled.", gmText: "", tags: ["vallaki"],
-    milestone: { level: 4, reason: "Escorted Ireena out of the valley floor" }, ...cmd()
+    playerText: "The party reached Vallaki and levelled.",
+    gmText: "",
+    tags: ["vallaki"],
+    milestone: { level: 4, reason: "Escorted Ireena out of the valley floor" },
+    ...cmd()
   });
   await api("POST", `/journal/${milestone.id}/reveal`, { revealed: true, ...cmd() });
   const { entry: deadline } = await api("POST", "/journal/deadline", {
-    playerText: "The Feast of St Andral.", gmText: "If the bones are not back, the church falls.",
-    inWorldDate: { year: 735, month: 2, day: 14 }, tags: ["vallaki"], ...cmd()
+    playerText: "The Feast of St Andral.",
+    gmText: "If the bones are not back, the church falls.",
+    inWorldDate: { year: 735, month: 2, day: 14 },
+    tags: ["vallaki"],
+    ...cmd()
   });
   await api("POST", `/journal/${deadline.id}/reveal`, { revealed: true, ...cmd() });
   // D12: three downtimes — one already applied and two still waiting, so the tracker has both states and
   // the dashboard's "downtime pending" card has something to count.
   const { entry: dt1 } = await api("POST", "/journal/downtime", {
     playerText: "Ana spent the week at the forge.",
-    downtime: { who: "Ana", activity: "Forging a blade", days: 7, characterPageId: pageIds.get("Ismark Kolyanovich") ?? null }, ...cmd()
+    downtime: {
+      who: "Ana",
+      activity: "Forging a blade",
+      days: 7,
+      characterPageId: pageIds.get("Ismark Kolyanovich") ?? null
+    },
+    ...cmd()
   });
   await api("POST", `/journal/${dt1.id}/apply-downtime`, cmd());
   await api("POST", "/journal/downtime", {
     playerText: "Bo went looking for another Tarokka deck.",
-    downtime: { who: "Bo", activity: "Researching the Tarokka", days: 3, characterPageId: null }, ...cmd()
+    downtime: { who: "Bo", activity: "Researching the Tarokka", days: 3, characterPageId: null },
+    ...cmd()
   });
   await api("POST", "/journal/downtime", {
     playerText: "",
-    downtime: { who: "Cass", activity: "Carousing in Vallaki", days: 2, characterPageId: null }, ...cmd()
+    downtime: { who: "Cass", activity: "Carousing in Vallaki", days: 2, characterPageId: null },
+    ...cmd()
   });
   console.log("chronicle: 4 notes, milestone, deadline, 3 downtimes (1 applied)");
 
@@ -233,7 +435,7 @@ async function seed() {
   const png = (w, h, rgb) => {
     const raw = Buffer.alloc((w * 3 + 1) * h);
     for (let y = 0; y < h; y++) {
-      raw[y * (w * 3 + 1)] = 0;                                  // filter byte: none
+      raw[y * (w * 3 + 1)] = 0; // filter byte: none
       for (let x = 0; x < w; x++) {
         const at = y * (w * 3 + 1) + 1 + x * 3;
         // A quiet diagonal wash, so the map is visibly a map and pin contrast can be judged.
@@ -243,25 +445,39 @@ async function seed() {
       }
     }
     const chunk = (type, data) => {
-      const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+      const length = Buffer.alloc(4);
+      length.writeUInt32BE(data.length);
       const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
-      const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body) >>> 0);
+      const crc = Buffer.alloc(4);
+      crc.writeUInt32BE(crc32(body) >>> 0);
       return Buffer.concat([length, body, crc]);
     };
     const ihdr = Buffer.alloc(13);
-    ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
-    ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;   // 8-bit truecolour
+    ihdr.writeUInt32BE(w, 0);
+    ihdr.writeUInt32BE(h, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2;
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0; // 8-bit truecolour
     return Buffer.concat([
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-      chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))
+      chunk("IHDR", ihdr),
+      chunk("IDAT", zlib.deflateSync(raw)),
+      chunk("IEND", Buffer.alloc(0))
     ]);
   };
 
   async function uploadMap(name, kind, rgb) {
     const bytes = png(960, 640, rgb);
-    const upload = await fetch(`${BASE}/api/v1/map-assets?filename=${encodeURIComponent(name)}.png&name=${encodeURIComponent(name)}&kind=regional`, {
-      method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "image/png" }, body: bytes
-    });
+    const upload = await fetch(
+      `${BASE}/api/v1/map-assets?filename=${encodeURIComponent(name)}.png&name=${encodeURIComponent(name)}&kind=regional`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "image/png" },
+        body: bytes
+      }
+    );
     if (!upload.ok) throw new Error(`asset upload -> ${upload.status} ${(await upload.text()).slice(0, 200)}`);
     const { data } = await upload.json();
     const { map } = await api("POST", "/maps", { assetId: data.asset.id, name, kind, tags: [], ...cmd() });
@@ -275,20 +491,91 @@ async function seed() {
   await api("POST", `/maps/${town.id}/parent`, { parentMapId: valley.id, ...cmd() });
 
   const pins = [
-    { map: valley.id, x: 0.31, y: 0.62, icon: "town", color: "#7C5CFF", label: "Barovia village", page: "Barovia", reveal: true },
-    { map: valley.id, x: 0.44, y: 0.28, icon: "castle", color: "#FF2E9A", label: "Castle Ravenloft", page: "Castle Ravenloft", reveal: true },
-    { map: valley.id, x: 0.68, y: 0.41, icon: "town", color: "#2EE6D6", label: "Vallaki", page: "Vallaki", reveal: true, sub: town.id },
-    { map: valley.id, x: 0.84, y: 0.14, icon: "skull", color: "#FF6B4A", label: "The Amber Temple", page: "The Amber Temple", reveal: false },
+    {
+      map: valley.id,
+      x: 0.31,
+      y: 0.62,
+      icon: "town",
+      color: "#7C5CFF",
+      label: "Barovia village",
+      page: "Barovia",
+      reveal: true
+    },
+    {
+      map: valley.id,
+      x: 0.44,
+      y: 0.28,
+      icon: "castle",
+      color: "#FF2E9A",
+      label: "Castle Ravenloft",
+      page: "Castle Ravenloft",
+      reveal: true
+    },
+    {
+      map: valley.id,
+      x: 0.68,
+      y: 0.41,
+      icon: "town",
+      color: "#2EE6D6",
+      label: "Vallaki",
+      page: "Vallaki",
+      reveal: true,
+      sub: town.id
+    },
+    {
+      map: valley.id,
+      x: 0.84,
+      y: 0.14,
+      icon: "skull",
+      color: "#FF6B4A",
+      label: "The Amber Temple",
+      page: "The Amber Temple",
+      reveal: false
+    },
     { map: valley.id, x: 0.22, y: 0.35, icon: "pin", color: "#FFC24A", label: "Tser Pool", page: null, reveal: true },
-    { map: town.id, x: 0.5, y: 0.44, icon: "pin", color: "#5CD97C", label: "St Andral's Church", page: null, reveal: true },
-    { map: town.id, x: 0.72, y: 0.66, icon: "pin", color: "#4AA8FF", label: "The Blue Water Inn", page: null, reveal: true },
-    { map: town.id, x: 0.28, y: 0.71, icon: "pin", color: "#E05CC8", label: "The Baron's mansion", page: null, reveal: false }
+    {
+      map: town.id,
+      x: 0.5,
+      y: 0.44,
+      icon: "pin",
+      color: "#5CD97C",
+      label: "St Andral's Church",
+      page: null,
+      reveal: true
+    },
+    {
+      map: town.id,
+      x: 0.72,
+      y: 0.66,
+      icon: "pin",
+      color: "#4AA8FF",
+      label: "The Blue Water Inn",
+      page: null,
+      reveal: true
+    },
+    {
+      map: town.id,
+      x: 0.28,
+      y: 0.71,
+      icon: "pin",
+      color: "#E05CC8",
+      label: "The Baron's mansion",
+      page: null,
+      reveal: false
+    }
   ];
   let partyPinId = null;
   for (const pin of pins) {
     const { marker } = await api("POST", `/maps/${pin.map}/markers`, {
-      x: pin.x, y: pin.y, iconId: pin.icon, iconColor: pin.color, label: pin.label,
-      pageIds: pin.page ? [pageIds.get(pin.page)] : [], subMapId: pin.sub ?? null, tags: [], ...cmd()
+      x: pin.x,
+      y: pin.y,
+      iconId: pin.icon,
+      iconColor: pin.color,
+      label: pin.label,
+      pageIds: pin.page ? [pageIds.get(pin.page)] : [],
+      subMapId: pin.sub ?? null,
+      tags: [],
+      ...cmd()
     });
     if (pin.reveal) await api("POST", `/markers/${marker.id}/reveal`, { revealed: true, ...cmd() });
     if (pin.label === "Vallaki") partyPinId = marker.id;
@@ -297,7 +584,10 @@ async function seed() {
   console.log(`2 maps, ${pins.length} pins, party pin set`);
 
   // ----- Faction standing, one revealed and one not. -----
-  for (const [faction, value, reveal] of [["The Keepers of the Feather", 2, true], ["The Vistani", -1, false]]) {
+  for (const [faction, value, reveal] of [
+    ["The Keepers of the Feather", 2, true],
+    ["The Vistani", -1, false]
+  ]) {
     const id = pageIds.get(faction);
     await api("PUT", `/standing/${id}`, { value, ...cmd() });
     if (reveal) await api("POST", `/standing/${id}/reveal`, { revealed: true, ...cmd() });

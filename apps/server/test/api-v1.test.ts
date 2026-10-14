@@ -27,7 +27,13 @@ const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
 const directories: string[] = [];
 const stores: IntegrationCredentialStore[] = [];
 afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))));
+  await Promise.all(
+    servers
+      .splice(0)
+      .map(
+        (server) => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+      )
+  );
   for (const store of stores.splice(0)) store.close();
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
@@ -44,25 +50,33 @@ async function newCredentialStore() {
   return { store, path: join(directory, "credentials.sqlite") };
 }
 
-async function start(overrides: { authorizeIntegration?: (token: string, scope: string) => boolean | Promise<boolean> } = {}) {
+async function start(
+  overrides: { authorizeIntegration?: (token: string, scope: string) => boolean | Promise<boolean> } = {}
+) {
   const { store } = await newCredentialStore();
   const app = express();
   app.use(express.json());
-  app.use(createApiV1Router({
-    applicationVersion: "0.1.0-test",
-    actorDefinitionVersion: 1,
-    // Defaults to real store-backed verification; individual tests may override with a simple fake to test router gating in isolation.
-    authorizeIntegration: overrides.authorizeIntegration ?? ((token, scope) => store.verify(token, scope as Parameters<typeof store.verify>[1]) !== null),
-    authorizeGm: (token) => token === GM_TOKEN || token === OTHER_GM_TOKEN,
-    credentialStore: store
-  }));
+  app.use(
+    createApiV1Router({
+      applicationVersion: "0.1.0-test",
+      actorDefinitionVersion: 1,
+      // Defaults to real store-backed verification; individual tests may override with a simple fake to test router gating in isolation.
+      authorizeIntegration:
+        overrides.authorizeIntegration ??
+        ((token, scope) => store.verify(token, scope as Parameters<typeof store.verify>[1]) !== null),
+      authorizeGm: (token) => token === GM_TOKEN || token === OTHER_GM_TOKEN,
+      credentialStore: store
+    })
+  );
   const server = app.listen(0, "127.0.0.1");
   servers.push(server);
   await once(server, "listening");
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, store };
 }
 
-function gmHeaders(token = GM_TOKEN) { return { authorization: `Bearer ${token}`, "content-type": "application/json" }; }
+function gmHeaders(token = GM_TOKEN) {
+  return { authorization: `Bearer ${token}`, "content-type": "application/json" };
+}
 
 describe("API v1 system router", () => {
   it("serves public health and version responses matching the runtime contract", async () => {
@@ -81,12 +95,16 @@ describe("API v1 system router", () => {
   });
 
   it("requires system:read authorization for capability discovery", async () => {
-    const { base } = await start({ authorizeIntegration: (token, scope) => token === "valid-token" && scope === "system:read" });
+    const { base } = await start({
+      authorizeIntegration: (token, scope) => token === "valid-token" && scope === "system:read"
+    });
     const missing = await fetch(base + SYSTEM_PATHS.capabilities);
     expect(missing.status).toBe(401);
     expect(ApiErrorEnvelopeSchema.parse(await missing.json()).error.code).toBe("unauthenticated");
 
-    const forbidden = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: "Bearer invalid-token" } });
+    const forbidden = await fetch(base + SYSTEM_PATHS.capabilities, {
+      headers: { authorization: "Bearer invalid-token" }
+    });
     expect(forbidden.status).toBe(403);
     expect(ApiErrorEnvelopeSchema.parse(await forbidden.json()).error.code).toBe("forbidden");
 
@@ -95,8 +113,7 @@ describe("API v1 system router", () => {
     const capabilities = SystemCapabilitiesResponseSchema.parse(await allowed.json());
     expect(capabilities.data.supportedScopes).toContain("system:read");
     expect(capabilities.data.features.webhooks).toBe(false);
-    // Discovery has to advertise the codex now that a credential can reach it - a consumer should be able
-    // to ask "is the worldbuilding surface here?" before it asks for a scope it may not have been granted.
+    // Discovery advertises the codex so a consumer can check for it before asking for a scope.
     expect(capabilities.data.features.codex).toBe(true);
     expect(capabilities.data.supportedScopes).toEqual(expect.arrayContaining(["codex:read", "codex:write"]));
   });
@@ -107,15 +124,21 @@ describe("API v1 system router", () => {
     expect(noCredential.status).toBe(403);
 
     const issued = store.create({ name: "Read-only overlay", scopes: ["system:read"] });
-    const withCredential = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: `Bearer ${issued.token}` } });
+    const withCredential = await fetch(base + SYSTEM_PATHS.capabilities, {
+      headers: { authorization: `Bearer ${issued.token}` }
+    });
     expect(withCredential.status).toBe(200);
 
     const wrongScope = store.create({ name: "Actor writer", scopes: ["actor:write"] });
-    const wrongScopeResponse = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: `Bearer ${wrongScope.token}` } });
+    const wrongScopeResponse = await fetch(base + SYSTEM_PATHS.capabilities, {
+      headers: { authorization: `Bearer ${wrongScope.token}` }
+    });
     expect(wrongScopeResponse.status).toBe(403);
 
     const admin = store.create({ name: "Admin tool", scopes: ["admin"] });
-    const adminResponse = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: `Bearer ${admin.token}` } });
+    const adminResponse = await fetch(base + SYSTEM_PATHS.capabilities, {
+      headers: { authorization: `Bearer ${admin.token}` }
+    });
     expect(adminResponse.status).toBe(200);
   });
 
@@ -147,9 +170,13 @@ describe("GM-authorized integration credential management", () => {
 
     const missing = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection);
     expect(missing.status).toBe(401);
-    const wrongKind = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, { headers: { authorization: `Bearer ${issued.token}` } });
+    const wrongKind = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
+      headers: { authorization: `Bearer ${issued.token}` }
+    });
     expect(wrongKind.status).toBe(401);
-    const malformed = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, { headers: { authorization: "not-bearer-shaped" } });
+    const malformed = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
+      headers: { authorization: "not-bearer-shaped" }
+    });
     expect(malformed.status).toBe(401);
   });
 
@@ -159,7 +186,12 @@ describe("GM-authorized integration credential management", () => {
     const response = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
       method: "POST",
       headers: gmHeaders(),
-      body: JSON.stringify({ name: "Stream overlay", scopes: ["system:read", "combat:read"], gameId, expiresAt: "2030-01-01T00:00:00.000Z" })
+      body: JSON.stringify({
+        name: "Stream overlay",
+        scopes: ["system:read", "combat:read"],
+        gameId,
+        expiresAt: "2030-01-01T00:00:00.000Z"
+      })
     });
     expect(response.status).toBe(201);
     const body = IntegrationCredentialIssuedResponseSchema.parse(await response.json());
@@ -171,7 +203,11 @@ describe("GM-authorized integration credential management", () => {
 
   it("rejects a malformed create request without touching the store", async () => {
     const { base, store } = await start();
-    const response = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, { method: "POST", headers: gmHeaders(), body: JSON.stringify({ name: "", scopes: [] }) });
+    const response = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
+      method: "POST",
+      headers: gmHeaders(),
+      body: JSON.stringify({ name: "", scopes: [] })
+    });
     expect(response.status).toBe(400);
     expect(ApiErrorEnvelopeSchema.parse(await response.json()).error.code).toBe("validation_failed");
     expect(store.list()).toHaveLength(0);
@@ -195,7 +231,10 @@ describe("GM-authorized integration credential management", () => {
     const { base, store } = await start();
     const issued = store.create({ name: "Rotatable", scopes: ["system:read"] });
 
-    const rotateResponse = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.rotate.replace("{id}", issued.metadata.id)}`, { method: "POST", headers: gmHeaders(), body: JSON.stringify({}) });
+    const rotateResponse = await fetch(
+      `${base}${INTEGRATION_CREDENTIAL_PATHS.rotate.replace("{id}", issued.metadata.id)}`,
+      { method: "POST", headers: gmHeaders(), body: JSON.stringify({}) }
+    );
     expect(rotateResponse.status).toBe(200);
     const rotated = IntegrationCredentialIssuedResponseSchema.parse(await rotateResponse.json());
     expect(rotated.data.token).not.toBe(issued.token);
@@ -208,11 +247,20 @@ describe("GM-authorized integration credential management", () => {
   it("returns 404 rotating or revoking an unknown credential, and 400 for a malformed ID", async () => {
     const { base } = await start();
     const unknownId = "99999999-9999-4999-8999-999999999999";
-    const rotateUnknown = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.rotate.replace("{id}", unknownId)}`, { method: "POST", headers: gmHeaders() });
+    const rotateUnknown = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.rotate.replace("{id}", unknownId)}`, {
+      method: "POST",
+      headers: gmHeaders()
+    });
     expect(rotateUnknown.status).toBe(404);
-    const revokeUnknown = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.revoke.replace("{id}", unknownId)}`, { method: "POST", headers: gmHeaders() });
+    const revokeUnknown = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.revoke.replace("{id}", unknownId)}`, {
+      method: "POST",
+      headers: gmHeaders()
+    });
     expect(revokeUnknown.status).toBe(404);
-    const malformedId = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.revoke.replace("{id}", "not-a-uuid")}`, { method: "POST", headers: gmHeaders() });
+    const malformedId = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.revoke.replace("{id}", "not-a-uuid")}`, {
+      method: "POST",
+      headers: gmHeaders()
+    });
     expect(malformedId.status).toBe(400);
   });
 
@@ -221,13 +269,18 @@ describe("GM-authorized integration credential management", () => {
     const issued = store.create({ name: "Revocable", scopes: ["system:read"] });
     expect(store.verify(issued.token, "system:read")).not.toBeNull();
 
-    const revokeResponse = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.revoke.replace("{id}", issued.metadata.id)}`, { method: "POST", headers: gmHeaders() });
+    const revokeResponse = await fetch(
+      `${base}${INTEGRATION_CREDENTIAL_PATHS.revoke.replace("{id}", issued.metadata.id)}`,
+      { method: "POST", headers: gmHeaders() }
+    );
     expect(revokeResponse.status).toBe(200);
     const revoked = IntegrationCredentialResponseSchema.parse(await revokeResponse.json());
     expect(revoked.data.revokedAt).not.toBeNull();
 
     expect(store.verify(issued.token, "system:read")).toBeNull();
-    const stillVia401 = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: `Bearer ${issued.token}` } });
+    const stillVia401 = await fetch(base + SYSTEM_PATHS.capabilities, {
+      headers: { authorization: `Bearer ${issued.token}` }
+    });
     expect(stillVia401.status).toBe(403);
   });
 
@@ -239,7 +292,10 @@ describe("GM-authorized integration credential management", () => {
     store.verify(wrongSecretToken, "system:read");
     store.revoke(issued.metadata.id);
 
-    const auditResponse = await fetch(`${base}${INTEGRATION_CREDENTIAL_PATHS.audit.replace("{id}", issued.metadata.id)}`, { headers: gmHeaders() });
+    const auditResponse = await fetch(
+      `${base}${INTEGRATION_CREDENTIAL_PATHS.audit.replace("{id}", issued.metadata.id)}`,
+      { headers: gmHeaders() }
+    );
     expect(auditResponse.status).toBe(200);
     const body = IntegrationCredentialAuditResponseSchema.parse(await auditResponse.json());
     const types = body.data.events.map((event) => event.type);
@@ -267,7 +323,9 @@ describe("GM-authorized integration credential management", () => {
   it("uses stable request IDs and the shared error envelope for credential-management failures too", async () => {
     const { base } = await start();
     const suppliedRequestId = "2c9c3a54-2b0a-4c2e-9c7b-2d8b8e0c9b21";
-    const response = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, { headers: { "x-request-id": suppliedRequestId } });
+    const response = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
+      headers: { "x-request-id": suppliedRequestId }
+    });
     expect(response.status).toBe(401);
     expect(response.headers.get("x-request-id")).toBe(suppliedRequestId);
     const body = ApiErrorEnvelopeSchema.parse(await response.json());

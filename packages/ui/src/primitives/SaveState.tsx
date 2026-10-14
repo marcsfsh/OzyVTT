@@ -15,49 +15,47 @@ export interface SaveStateProps {
   className?: string;
 }
 
-/** The autosave readout for a park-as-you-type editor (Codex pages, homebrew records).
-    Three things it fixes about the hand-rolled version it replaces:
-
-    1. **A real resting state.** "idle" and "saved" both read **Saved**. Rendering an
-       empty string at rest means the GM cannot tell "your work is safe" from "nothing
-       has happened yet" — which is the one question this readout exists to answer.
-    2. **Icon AND text, never colour alone.** This palette is heavy in the red-pink-
-       magenta band and reserves violet for GM-only, so no state may be carried by hue
-       (design-language §2). Every status below differs by word first, glyph second,
-       colour third. Colour uses `--text-dim` / `--caution-hi` / `--danger-hi` and
-       never `--text-muted`, which fails AA on every surface it is likely to sit on —
-       measured 3.53:1 on --surface-1 dark, 3.80:1 dusk, 4.17:1 on --surface-3 light
-       (2026-07-28, Chromium). That token is a known systemic gap, not a local one.
-    3. **The two states that need an action get one.** A readout the GM cannot act on
-       is exactly the state that most needs reading: conflict offers Reload, error
-       offers Retry.
-
-    Accessibility: the visible readout is ordinary text, so browse mode reads it any
-    time. A separate polite live region carries ONLY the settled states (saved /
-    conflict / error) — announcing "dirty" would fire on every keystroke. */
+/** The autosave readout for a save-as-you-type editor (Codex pages, homebrew records).
+    - "idle" and "saved" both read Saved, so "your work is safe" is always visible.
+    - Every state differs by word first, glyph second, colour third; colours avoid `--text-muted`.
+    - Conflict offers Reload and error offers Retry.
+    A separate polite live region announces only settled states (saved / conflict / error); "dirty" would fire
+    on every keystroke. */
 export function SaveState({ status, onReload, onRetry, className }: SaveStateProps) {
   const view = VIEWS[status];
   return (
     <div className={cx("nh-savestate", `nh-savestate--${view.tone}`, className)}>
-      <span className="nh-savestate-icon" aria-hidden="true">{view.icon}</span>
+      <span className="nh-savestate-icon" aria-hidden="true">
+        {view.icon}
+      </span>
       <span className="nh-savestate-label">{view.label}</span>
       {status === "conflict" && onReload && (
-        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onReload}>Reload</Button>
+        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onReload}>
+          Reload
+        </Button>
       )}
       {status === "error" && onRetry && (
-        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onRetry}>Retry</Button>
+        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onRetry}>
+          Retry
+        </Button>
       )}
-      {/* Settled states only — see the note above. */}
-      <span className="nh-sr-only" role="status">{view.settled ? view.label : ""}</span>
+      {/* Settled states only; see the note above. */}
+      <span className="nh-sr-only" role="status">
+        {view.settled ? view.label : ""}
+      </span>
     </div>
   );
 }
 
-type View = Readonly<{ label: string; tone: "rest" | "work" | "caution" | "danger"; settled: boolean; icon: ReactNode }>;
+type View = Readonly<{
+  label: string;
+  tone: "rest" | "work" | "caution" | "danger";
+  settled: boolean;
+  icon: ReactNode;
+}>;
 
-/* One table, so a new status cannot ship with a word but no glyph (or the reverse).
-   "saving" borrows the shuffle glyph — the system's existing in-flight mark — rather
-   than a spinner: §7 forbids looping motion, and a spinner is a loop. */
+/* One table, so a status can't ship with a word but no glyph. "saving" uses the shuffle glyph rather than a
+   spinner, because looping motion isn't allowed. */
 const VIEWS: Record<SaveStatus, View> = {
   idle: { label: "Saved", tone: "rest", settled: false, icon: <IconCheck /> },
   saved: { label: "Saved", tone: "rest", settled: true, icon: <IconCheck /> },

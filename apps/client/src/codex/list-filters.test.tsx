@@ -3,21 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /**
- * **D3 + D10 — every list filters in place, and its filters are part of its address.**
- *
- * Two halves of one claim, both of which shipped only partly.
- *
- * *D3.* Pages, Atlas and the Journal put their filters in the URL; **Sessions and Quests kept theirs in
- * component state**. So two of the five GM lists lost their filter on any navigation, and a filtered log
- * could be neither linked to nor refreshed back into — while the three beside them could.
- *
- * *D10.* "In-place search/filter on every list" reached the GM's five and **none of the player's**: their
- * kind filter was component state that only a dashboard card could set (a player who cleared it could
- * not set it again), and Sessions, Quests, the Journal and the Atlas had no filter at all.
- *
- * Each test asserts BOTH directions, because either alone leaves half the bug: **the address changes when
- * the control is used**, and **the control shows the address's filter when the view is opened cold** —
- * which is the linkable, refresh-proof half, and the half a `useState` implementation fails.
+ * Every list filters in place and keeps its filters in the address, for both GM and player. Each test
+ * checks both directions: using the control changes the address, and a cold open shows the address's filter.
  */
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -52,22 +39,35 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      listConnections: (...a: unknown[]) => listConnections(...a), party: (...a: unknown[]) => party(...a),
-      getSettings: (...a: unknown[]) => getSettings(...a), search: (...a: unknown[]) => search(...a),
+      listPages: (...a: unknown[]) => listPages(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      listConnections: (...a: unknown[]) => listConnections(...a),
+      party: (...a: unknown[]) => party(...a),
+      getSettings: (...a: unknown[]) => getSettings(...a),
+      search: (...a: unknown[]) => search(...a),
       markersForPage: async () => []
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
-      listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
-      listMarkers: async () => [], chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listConnections: (...a: unknown[]) => playerConnections(...a), party: (...a: unknown[]) => playerParty(...a),
-      sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a),
-      standing: (...a: unknown[]) => playerStanding(...a), calendar: (...a: unknown[]) => playerCalendar(...a),
+      listPages: (...a: unknown[]) => playerListPages(...a),
+      listMaps: (...a: unknown[]) => playerListMaps(...a),
+      listMarkers: async () => [],
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
+      listConnections: (...a: unknown[]) => playerConnections(...a),
+      party: (...a: unknown[]) => playerParty(...a),
+      sessions: (...a: unknown[]) => playerSessions(...a),
+      quests: (...a: unknown[]) => playerQuests(...a),
+      standing: (...a: unknown[]) => playerStanding(...a),
+      calendar: (...a: unknown[]) => playerCalendar(...a),
       search: (...a: unknown[]) => playerSearch(...a)
     },
     journalApi: { ...actual.journalApi, chronicle: (...a: unknown[]) => chronicle(...a), forPage: async () => [] },
-    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: async () => [], listMarkers: async () => [] },
+    atlasApi: {
+      ...actual.atlasApi,
+      listMaps: (...a: unknown[]) => listMaps(...a),
+      listAssets: async () => [],
+      listMarkers: async () => []
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a) },
     questApi: { ...actual.questApi, list: (...a: unknown[]) => listQuests(...a) },
@@ -81,12 +81,32 @@ import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 
 const session = (id: string, number: number, status: "planned" | "played", recap = "") => ({
-  id, sessionNumber: number, realDate: null, attendees: [], prepBody: "", recapBody: recap, status,
-  tags: [], revealedToPlayers: true, rev: 1, createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+  id,
+  sessionNumber: number,
+  realDate: null,
+  attendees: [],
+  prepBody: "",
+  recapBody: recap,
+  status,
+  tags: [],
+  revealedToPlayers: true,
+  rev: 1,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 });
 const quest = (id: string, title: string, status: "active" | "completed" | "failed") => ({
-  id, title, status, playerBody: "", gmBody: "", objectives: [], entityIds: [], tags: [],
-  revealedToPlayers: true, rev: 1, createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+  id,
+  title,
+  status,
+  playerBody: "",
+  gmBody: "",
+  objectives: [],
+  entityIds: [],
+  tags: [],
+  revealedToPlayers: true,
+  rev: 1,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 });
 
 beforeEach(() => {
@@ -98,9 +118,21 @@ beforeEach(() => {
   search.mockResolvedValue({ hits: [], truncated: false });
   chronicle.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
-  getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [], currentInstant: 0, publishedInstant: 0 });
-  listSessions.mockResolvedValue({ sessions: [session("s1", 1, "played", "the crypt"), session("s2", 2, "planned")], activeSessionId: null });
-  listQuests.mockResolvedValue([quest("q1", "The Sunless Crown", "active"), quest("q2", "The Missing Cask", "completed")]);
+  getCalendar.mockResolvedValue({
+    yearName: "DR",
+    months: [{ name: "Hammer", days: 30 }],
+    weekdays: [],
+    currentInstant: 0,
+    publishedInstant: 0
+  });
+  listSessions.mockResolvedValue({
+    sessions: [session("s1", 1, "played", "the crypt"), session("s2", 2, "planned")],
+    activeSessionId: null
+  });
+  listQuests.mockResolvedValue([
+    quest("q1", "The Sunless Crown", "active"),
+    quest("q2", "The Missing Cask", "completed")
+  ]);
   listStanding.mockResolvedValue([]);
   playerListPages.mockResolvedValue([]);
   playerListMaps.mockResolvedValue([]);
@@ -114,7 +146,12 @@ beforeEach(() => {
   playerSearch.mockResolvedValue({ hits: [], truncated: false });
 });
 
-const renderGm = (at: string) => (goTo(at), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderGm = (at: string) =>
+  (goTo(at), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 const renderPlayer = (at: string) => (goTo(at), render)(<PlayerCodex token="player" />);
 const rail = async (name: string) => within(await screen.findByRole("navigation", { name }));
 
@@ -123,7 +160,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
 
-    // Cold open on a filtered address — the linkable, refresh-proof half. Component state cannot do this.
+    // Cold open on a filtered address.
     const sessions = await rail("Sessions");
     await waitFor(() => expect(sessions.queryByText("Session 1")).not.toBeInTheDocument());
     expect(sessions.getByText("Session 2")).toBeInTheDocument();
@@ -131,7 +168,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
 
     await user.type(screen.getByLabelText("Filter sessions"), "crypt");
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("crypt"));
-    // …and the two filters compose rather than replacing each other.
+    // The two filters compose.
     expect(new URLSearchParams(window.location.search).get("status")).toBe("planned");
   });
 
@@ -148,14 +185,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
     expect((await rail("Quests")).getByText("The Sunless Crown")).toBeInTheDocument();
   });
 
-  /**
-   * Opening a record from a filtered list drops the filter from the address — **and that is the
-   * behaviour of every list in the suite**, Pages included (`navigate(pagePath(id))` carries no query).
-   * Back still returns to the filtered list, because the filtered address is the previous history entry.
-   * Pinned here as the current, uniform answer rather than left for the next reader to discover: making
-   * the filter ride the record address is a change to all five lists and a design call about how long a
-   * filter should stick, not part of putting Sessions and Quests on the same footing as the other three.
-   */
+  /** Opening a record drops the filter from the address, as every list does; Back returns to the filtered list. */
   it("drops the filter from the address when a record is opened — uniformly, as Pages does", async () => {
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
@@ -201,8 +231,34 @@ describe("D10 — the player's lists filter in place too", () => {
   it("Journal: the GM's three filters, over the player's own records", async () => {
     const user = userEvent.setup();
     playerChronicle.mockResolvedValue([
-      { id: "j1", kind: "entry", title: null, text: "We reached Vallaki", tags: ["travel"], realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, sessionId: null, sessionNumber: null, createdAt: "2026-07-31T00:00:00.000Z" },
-      { id: "j2", kind: "deadline", title: "The feast", text: "Before the feast", tags: [], realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, sessionId: null, sessionNumber: null, createdAt: "2026-07-31T00:00:00.000Z" }
+      {
+        id: "j1",
+        kind: "entry",
+        title: null,
+        text: "We reached Vallaki",
+        tags: ["travel"],
+        realDate: null,
+        inWorldLabel: null,
+        inWorldDate: null,
+        calendarInstant: null,
+        sessionId: null,
+        sessionNumber: null,
+        createdAt: "2026-07-31T00:00:00.000Z"
+      },
+      {
+        id: "j2",
+        kind: "deadline",
+        title: "The feast",
+        text: "Before the feast",
+        tags: [],
+        realDate: null,
+        inWorldLabel: null,
+        inWorldDate: null,
+        calendarInstant: null,
+        sessionId: null,
+        sessionNumber: null,
+        createdAt: "2026-07-31T00:00:00.000Z"
+      }
     ]);
     renderPlayer("/codex/journal");
     await waitFor(() => expect(screen.getByText("We reached Vallaki")).toBeInTheDocument());
@@ -217,8 +273,24 @@ describe("D10 — the player's lists filter in place too", () => {
   it("Pages: the kind filter is settable IN PLACE, not only by a dashboard card", async () => {
     const user = userEvent.setup();
     playerListPages.mockResolvedValue([
-      { id: "p1", title: "Strahd", entityType: "character", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-31T00:00:00.000Z" },
-      { id: "p2", title: "Vallaki", entityType: "location", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-31T00:00:00.000Z" }
+      {
+        id: "p1",
+        title: "Strahd",
+        entityType: "character",
+        folder: null,
+        tags: [],
+        bannerAssetId: null,
+        updatedAt: "2026-07-31T00:00:00.000Z"
+      },
+      {
+        id: "p2",
+        title: "Vallaki",
+        entityType: "location",
+        folder: null,
+        tags: [],
+        bannerAssetId: null,
+        updatedAt: "2026-07-31T00:00:00.000Z"
+      }
     ]);
     renderPlayer("/codex/pages");
     await waitFor(() => expect(screen.getByText("Strahd")).toBeInTheDocument());
@@ -228,8 +300,7 @@ describe("D10 — the player's lists filter in place too", () => {
     await waitFor(() => expect(screen.queryByText("Strahd")).not.toBeInTheDocument());
     expect(screen.getByText("Vallaki")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("type")).toBe("location");
-    // And it can be cleared from where they are standing, which the dashboard-only version could not do
-    // once the chip was dismissed.
+    // And it can be cleared where they are.
     await user.selectOptions(screen.getByLabelText("Filter by kind"), "");
     await waitFor(() => expect(screen.getByText("Strahd")).toBeInTheDocument());
   });

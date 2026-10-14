@@ -2,13 +2,8 @@ import { describe, expect, it } from "vitest";
 import { SETTINGS_GROUPS, groupsFor } from "./SettingsPage";
 
 /**
- * D24's shape, pinned. Settings is "one tab, three groups, one page", and a player sees **Mine** only
- * — a sentence that is worth nothing unless something fails when it stops being true.
- *
- * This pins the DECLARATION rather than the DOM. The page renders from `SETTINGS_GROUPS`, and the
- * GM-only groups are gated on a GM token in one place, so a fourth group or a re-audienced group
- * changes this list before it changes any markup. A DOM test would pass just as happily against a
- * player page that mounted the GM controls and hid them with CSS; this cannot.
+ * Pins the Settings declaration rather than the DOM: a player sees Mine only. A DOM test would also
+ * pass for a page that mounted the GM controls and hid them with CSS.
  */
 describe("Settings groups (D24)", () => {
   it("is three groups, in the order the page renders them", () => {

@@ -4,7 +4,7 @@
 
 Accepted by implementation — recorded 2026-08-01. **Closes** ADR-0013 ("Transactional
 command/event log with snapshots and bounded undo"), which had no file and stood as
-*Proposed* in `docs/adr/README.md`.
+_Proposed_ in `docs/adr/README.md`.
 
 ## What happened
 

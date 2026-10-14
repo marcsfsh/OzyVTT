@@ -11,12 +11,11 @@ export interface ModalProps {
   title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  /** Top accent hairline; magenta by default (§5.4: one accent hairline). */
+  /** Top accent hairline; magenta by default. */
   accent?: PanelAccent;
-  /** `full` is the full-screen sheet: a roomy centred surface on a laptop, edge-to-edge
-      over the whole viewport at ≤760px. Reach for it instead of overriding max-height. */
+  /** `full` is a roomy centred sheet on a laptop and edge-to-edge at ≤760px. Use it instead of overriding max-height. */
   size?: "sm" | "md" | "lg" | "full";
-  /** `top` pins the dialog near the top of the viewport — the command-palette shape. */
+  /** `top` pins the dialog near the top of the viewport (the command-palette shape). */
   align?: "center" | "top";
   /** Accessible label when there's no visible title. */
   ariaLabel?: string;
@@ -28,7 +27,19 @@ export interface ModalProps {
 /** Native <dialog> + showModal(): browser-managed focus trap, focus return to
     the opener on close, and Escape handling. Adds scrim blur, scroll lock, and
     click-outside-to-close. One primary action belongs in the footer. */
-export function Modal({ open, onClose, title, children, footer, accent = "magenta", size = "md", align = "center", ariaLabel, className, style }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  accent = "magenta",
+  size = "md",
+  align = "center",
+  ariaLabel,
+  className,
+  style
+}: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -41,8 +52,13 @@ export function Modal({ open, onClose, title, children, footer, accent = "magent
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    const onCancel = (event: Event) => { event.preventDefault(); onClose(); };
-    const onClick = (event: MouseEvent) => { if (event.target === dialog) onClose(); };
+    const onCancel = (event: Event) => {
+      event.preventDefault();
+      onClose();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (event.target === dialog) onClose();
+    };
     dialog.addEventListener("cancel", onCancel);
     dialog.addEventListener("click", onClick);
     return () => {
@@ -55,17 +71,31 @@ export function Modal({ open, onClose, title, children, footer, accent = "magent
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, [open]);
 
   return (
-    <dialog ref={ref} className={cx("nh-modal", `nh-modal--${size}`, align === "top" && "nh-modal--top", "anim-dialog", className)} style={style} aria-label={ariaLabel}>
+    <dialog
+      ref={ref}
+      className={cx("nh-modal", `nh-modal--${size}`, align === "top" && "nh-modal--top", "anim-dialog", className)}
+      style={style}
+      aria-label={ariaLabel}
+    >
       {open && (
         <div className={cx("nh-modal-surface", accent !== "none" && `nh-modal--accent-${accent}`)}>
           {title != null && (
             <header className="nh-modal-head">
               <h2 className="nh-modal-title">{title}</h2>
-              <button type="button" className="nh-modal-close tap-target interactive" aria-label="Close" onClick={onClose}><IconX /></button>
+              <button
+                type="button"
+                className="nh-modal-close tap-target interactive"
+                aria-label="Close"
+                onClick={onClose}
+              >
+                <IconX />
+              </button>
             </header>
           )}
           <div className="nh-modal-body scroll-y">{children}</div>

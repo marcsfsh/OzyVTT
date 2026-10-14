@@ -5,7 +5,7 @@
 Closed — 2026-08-01. Records what shipped. **ADR-0021 is unchanged** and is still correct
 about the play sheet; this record closes its decision 1 only.
 
-**Closes** ADR-0021 decision 1 — "Ship an interactive *play* sheet, not a guided builder —
+**Closes** ADR-0021 decision 1 — "Ship an interactive _play_ sheet, not a guided builder —
 yet … The full **builder** … is the **next roadmap update**"
 (`docs/adr/0021-player-character-sheet.md`).
 

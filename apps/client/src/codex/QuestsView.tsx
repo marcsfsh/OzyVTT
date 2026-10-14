@@ -1,6 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, RevealSwitch, SaveState, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
-import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checklist,
+  Combobox,
+  Field,
+  IconButton,
+  IconChevron,
+  IconPlus,
+  IconX,
+  Input,
+  RevealSwitch,
+  SaveState,
+  Select,
+  Skeleton,
+  TagInput,
+  VisibilityBadge
+} from "@vtt/ui";
+import {
+  questApi,
+  type CodexAutosaveSettings,
+  type CodexQuest,
+  type CodexQuestObjective,
+  type CodexQuestStatus
+} from "./api";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
@@ -11,36 +35,23 @@ import { useConfirm } from "../components/feedback";
 import type { EntityType } from "./entities";
 
 /**
- * M10: the quest log — **the one place a quest is edited**.
- *
- * Deliberately a destination inside the Codex shell rather than a sixth mode tab, for the same reason
- * M9's session log is one: the five existing tabs already overflow a 375px strip, and a sixth would push
- * the overflow past the point where `.codex-modetabs`' cue helps. It is reached from the ops row (which
- * wraps, where a tab strip does not) and from a dashboard card, both of which land ON a quest.
- *
- * It owns no feed. The workspace holds ONE quest list and hands it down here and to the Campaign card,
- * so both are looking at the same records; every write below reports back through `onChanged` and the
- * workspace re-reads. Two quest stores on one screen is precisely how a dashboard ends up disagreeing
- * with the editor beside it.
+ * The quest log, the one place a quest is edited. It owns no feed: the shell's single quest list is
+ * handed down here and to Home, and every write reports through `onChanged` for a re-read.
  */
 type QuestPage = Readonly<{ id: string; title: string; entityType: EntityType }>;
 
 type QuestsViewProps = Readonly<{
   gmToken: string;
   quests: readonly CodexQuest[];
-  /** The notebook, for the linked-entity picker. Already fetched by the workspace; never re-read here. */
+  /** The shell's page list, for the linked-entity picker. */
   pages: readonly QuestPage[];
-  /** CF-2 / R4: the workspace's quest feed is still in flight — an empty list is not yet "no quests". */
+  /** The feed is still loading, so an empty list isn't "no quests" yet. */
   loading: boolean;
-  /** R4: the feed's own failure. Without this a failed read renders as an empty log, silently. */
+  /** The feed's own failure, so it doesn't render as an empty log. */
   error: string | null;
-  /** D3: which quest is open comes from the ADDRESS (`/codex/quests/:id`), not from local state. */
+  /** The open quest comes from the address (`/codex/quests/:id`). */
   openQuestId?: string | null;
-  /**
-   * D3/D10: the filters live in the ADDRESS too (`?q=`, `?status=`), as Pages, Atlas and Journal already
-   * did. In component state they were lost on every navigation and a filtered log could not be linked to
-   * or refreshed back into — two of the five lists behaving unlike the other three.
-   */
+  /** Filters live in the address too (`?q=`, `?status=`). */
   filter?: string;
   statusFilter?: string | null;
   onFilterChange?: (next: Readonly<Record<string, string | null>>) => void;
@@ -52,26 +63,44 @@ type QuestsViewProps = Readonly<{
   onPickTag?: (tag: string) => void;
 }>;
 
-export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId = null, onOpenQuest, onChanged, onOpenPage, autosave, onPickTag, filter = "", statusFilter = null, onFilterChange }: QuestsViewProps) {
+export function QuestsView({
+  gmToken,
+  quests,
+  pages,
+  loading,
+  error,
+  openQuestId = null,
+  onOpenQuest,
+  onChanged,
+  onOpenPage,
+  autosave,
+  onPickTag,
+  filter = "",
+  statusFilter = null,
+  onFilterChange
+}: QuestsViewProps) {
   const [listError, setListError] = useState<string | null>(null);
 
-  const selected = openQuestId ? quests.find((quest) => quest.id === openQuestId) ?? null : null;
+  const selected = openQuestId ? (quests.find((quest) => quest.id === openQuestId) ?? null) : null;
   const shown = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    return quests.filter((quest) =>
-      (!statusFilter || quest.status === statusFilter)
-      && (!needle || quest.title.toLowerCase().includes(needle) || quest.tags.some((tag) => tag.includes(needle))));
+    return quests.filter(
+      (quest) =>
+        (!statusFilter || quest.status === statusFilter) &&
+        (!needle || quest.title.toLowerCase().includes(needle) || quest.tags.some((tag) => tag.includes(needle)))
+    );
   }, [quests, filter, statusFilter]);
 
   const create = async () => {
     setListError(null);
     try {
-      // D7: the SAME create the palette's "New quest" runs — one create per record type, whichever door
-      // starts it.
+      // The same create the palette's "New quest" runs.
       const quest = await createQuest(gmToken);
       await onChanged();
       onOpenQuest(quest.id);
-    } catch (createError) { setListError(createError instanceof Error ? createError.message : "Couldn't create the quest."); }
+    } catch (createError) {
+      setListError(createError instanceof Error ? createError.message : "Couldn't create the quest.");
+    }
   };
 
   return (
@@ -79,32 +108,56 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
       <div className={`codex-workspace${selected ? " has-selection" : ""}`}>
         <aside className="codex-rail">
           <div className="codex-rail-head">
-            <Input value={filter} placeholder="Filter quests" aria-label="Filter quests" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
-{/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
-                screen, and the empty state's own create is the primary when there is nothing to select
-                — the rail's create steps down rather than competing with either. Two magenta-filled
-                buttons at once (twice with the identical label "New page") make neither one the
-                answer to "what do I do here". */}
-            <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}><IconPlus /> New</Button>
+            <Input
+              value={filter}
+              placeholder="Filter quests"
+              aria-label="Filter quests"
+              onChange={(event) => onFilterChange?.({ q: event.target.value || null })}
+            />
+            {/* One primary per view: the rail's create steps down when the editor's Save (autosave off) is primary. */}
+            <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}>
+              <IconPlus /> New
+            </Button>
           </div>
           <div className="codex-rail-tools">
-            <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange?.({ status: event.target.value || null })}>
+            <Select
+              aria-label="Filter by status"
+              value={statusFilter ?? ""}
+              onChange={(event) => onFilterChange?.({ status: event.target.value || null })}
+            >
               <option value="">All quests</option>
-              {/* Built from `QUEST_STATUS_ORDER`, not hand-written: two hand-written lists is exactly how
-                  the filter ends up offering four statuses and the editor below offers five. */}
-              {QUEST_STATUS_ORDER.map((status) => <option key={status} value={status}>{QUEST_STATUS_LABEL[status]}</option>)}
+              {/* Built from `QUEST_STATUS_ORDER` so filter and editor offer the same statuses. */}
+              {QUEST_STATUS_ORDER.map((status) => (
+                <option key={status} value={status}>
+                  {QUEST_STATUS_LABEL[status]}
+                </option>
+              ))}
             </Select>
           </div>
           {listError && <Alert tone="danger">{listError}</Alert>}
           <nav className="codex-list scroll-y" aria-label="Quests">
-            {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
-            {!loading && quests.length === 0 && !error && <p className="codex-list-empty">No quests yet. Create one to start tracking objectives.</p>}
-            {!loading && quests.length > 0 && shown.length === 0 && <p className="codex-list-empty">No quests match.</p>}
+            {loading && (
+              <div className="codex-list-loading">
+                {[0, 1, 2].map((row) => (
+                  <Skeleton key={row} variant="text" />
+                ))}
+              </div>
+            )}
+            {!loading && quests.length === 0 && !error && (
+              <p className="codex-list-empty">No quests yet. Create one to start tracking objectives.</p>
+            )}
+            {!loading && quests.length > 0 && shown.length === 0 && (
+              <p className="codex-list-empty">No quests match.</p>
+            )}
             {shown.map((quest) => (
-              /* `aria-current` as well as the class: the accent is the visual cue, but "which quest am I
-                 looking at" has to survive with every stylesheet stripped (R2's colour rule again). */
-              <button key={quest.id} type="button" aria-current={quest.id === selected?.id ? "true" : undefined}
-                className={`codex-quest-row${quest.id === selected?.id ? " is-active" : ""}`} onClick={() => onOpenQuest(quest.id)}>
+              /* `aria-current` too, so the selection survives without styles. */
+              <button
+                key={quest.id}
+                type="button"
+                aria-current={quest.id === selected?.id ? "true" : undefined}
+                className={`codex-quest-row${quest.id === selected?.id ? " is-active" : ""}`}
+                onClick={() => onOpenQuest(quest.id)}
+              >
                 <CodexIcon iconId="quest" className="codex-ent-icon codex-quest-rowglyph" />
                 <span className="codex-list-title">{quest.title}</span>
                 <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
@@ -115,14 +168,48 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
         </aside>
 
         <section className="codex-main scroll-y">
-          {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenQuest(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All quests</Button>}
-          {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
-              looks exactly like a campaign that has never had a quest. */}
-          {error && <Alert tone="danger" title="Couldn't load the quests">{error}</Alert>}
-          {selected
-            ? <QuestEditor key={selected.id} gmToken={gmToken} quest={selected} pages={pages} autosave={autosave} onPickTag={onPickTag}
-                onChanged={onChanged} onOpenPage={onOpenPage} onDeleted={() => { onOpenQuest(null); void onChanged(); }} />
-            : !loading && !error && <div className="codex-main-empty"><h3>No quest selected</h3><p>A quest holds objectives, the text players read, and GM-only notes. Once a quest is shown to players, its active state appears on their dashboard.</p><Button variant="primary" onClick={create}>New quest</Button></div>}
+          {selected && (
+            <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenQuest(null)}>
+              <IconChevron className="codex-chevron-left" aria-hidden="true" />
+              All quests
+            </Button>
+          )}
+          {/* The feed's own failure, distinct from a campaign with no quests. */}
+          {error && (
+            <Alert tone="danger" title="Couldn't load the quests">
+              {error}
+            </Alert>
+          )}
+          {selected ? (
+            <QuestEditor
+              key={selected.id}
+              gmToken={gmToken}
+              quest={selected}
+              pages={pages}
+              autosave={autosave}
+              onPickTag={onPickTag}
+              onChanged={onChanged}
+              onOpenPage={onOpenPage}
+              onDeleted={() => {
+                onOpenQuest(null);
+                void onChanged();
+              }}
+            />
+          ) : (
+            !loading &&
+            !error && (
+              <div className="codex-main-empty">
+                <h3>No quest selected</h3>
+                <p>
+                  A quest holds objectives, the text players read, and GM-only notes. Once a quest is shown to players,
+                  its active state appears on their dashboard.
+                </p>
+                <Button variant="primary" onClick={create}>
+                  New quest
+                </Button>
+              </div>
+            )
+          )}
         </section>
       </div>
     </>
@@ -130,107 +217,182 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
 }
 
 /**
- * One quest's two layers, its objectives, and what it concerns. Keyed on the quest id by its caller, so
- * selecting another quest gets a fresh draft rather than one component quietly carrying typed text
- * across records.
- *
- * D6 / G6: it autosaves now — and this is the surface where that mattered most. **Ticking an objective
- * used to be lost unless the GM also pressed Save**, which is the exact failure "the Codex always keeps
- * your work" exists to end. `expectedRev` still travels, so the 409 path is unchanged.
+ * One quest's layers, objectives and links. Keyed on the quest id by its caller, so switching quests
+ * gets a fresh draft. Autosaves (ticking an objective included); `expectedRev` still guards with 409.
  */
-type QuestDraft = Readonly<{ title: string; status: CodexQuestStatus; playerBody: string; gmBody: string; objectives: readonly CodexQuestObjective[]; entityIds: readonly string[]; tags: readonly string[] }>;
+type QuestDraft = Readonly<{
+  title: string;
+  status: CodexQuestStatus;
+  playerBody: string;
+  gmBody: string;
+  objectives: readonly CodexQuestObjective[];
+  entityIds: readonly string[];
+  tags: readonly string[];
+}>;
 
-/**
- * Ruling 57 — **a quest is a document, so it wears the page editor's shape and not one of its own.**
- *
- * Literally the same classes (`.codex-editor`, `-head`, `-cols`, `-center`, `-context`) and the same two
- * controls: one body at a time behind the shared `TwoLayerBodyTabs` switch, and everything that is not the
- * writing behind Details. Two shapes in the Codex, not five — per-surface composition is what produced
- * the "stitched-together panels" complaint, and a quest editor that stacked title, status, objectives,
- * tags, TWO 224px writing fields and a link picker down one scrolling column was one of the five.
- */
+/** A quest uses the page editor's shape: one body at a time behind `TwoLayerBodyTabs`, everything else behind Details. */
 const QUEST_DETAILS_KEY = "codex-quest-details";
 const QUEST_DETAILS_ID = "codex-quest-details";
 
-function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, onOpenPage, onDeleted }: Readonly<{
-  gmToken: string; quest: CodexQuest; pages: readonly QuestPage[]; autosave: CodexAutosaveSettings; onPickTag?: (tag: string) => void;
-  onChanged: () => void | Promise<void>; onOpenPage: (pageId: string) => void; onDeleted: () => void;
+function QuestEditor({
+  gmToken,
+  quest,
+  pages,
+  autosave,
+  onPickTag,
+  onChanged,
+  onOpenPage,
+  onDeleted
+}: Readonly<{
+  gmToken: string;
+  quest: CodexQuest;
+  pages: readonly QuestPage[];
+  autosave: CodexAutosaveSettings;
+  onPickTag?: (tag: string) => void;
+  onChanged: () => void | Promise<void>;
+  onOpenPage: (pageId: string) => void;
+  onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [tab, setTab] = useState<BodyLayer>("player");
   const detailsRef = useRef<HTMLElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(() => {
-    try { return localStorage.getItem(QUEST_DETAILS_KEY) === "open"; } catch { return false; }
+    try {
+      return localStorage.getItem(QUEST_DETAILS_KEY) === "open";
+    } catch {
+      return false;
+    }
   });
   const showDetails = useCallback((open: boolean) => {
     setDetailsOpen(open);
-    try { localStorage.setItem(QUEST_DETAILS_KEY, open ? "open" : "closed"); } catch { /* private mode - fine */ }
+    try {
+      localStorage.setItem(QUEST_DETAILS_KEY, open ? "open" : "closed");
+    } catch {
+      /* private mode - fine */
+    }
   }, []);
-  useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
+  useEffect(() => {
+    if (detailsOpen) detailsRef.current?.focus();
+  }, [detailsOpen]);
   const [draft, setDraft] = useState<QuestDraft>({
-    title: quest.title, status: quest.status, playerBody: quest.playerBody, gmBody: quest.gmBody,
-    objectives: quest.objectives, entityIds: quest.entityIds, tags: quest.tags
+    title: quest.title,
+    status: quest.status,
+    playerBody: quest.playerBody,
+    gmBody: quest.gmBody,
+    objectives: quest.objectives,
+    entityIds: quest.entityIds,
+    tags: quest.tags
   });
   const [error, setError] = useState<string | null>(null);
   const revRef = useRef(quest.rev);
   const patch = (next: Partial<QuestDraft>) => setDraft((prev) => ({ ...prev, ...next }));
 
-  const linked = draft.entityIds.map((id) => pages.find((page) => page.id === id)).filter((page): page is QuestPage => Boolean(page));
+  const linked = draft.entityIds
+    .map((id) => pages.find((page) => page.id === id))
+    .filter((page): page is QuestPage => Boolean(page));
   const unlinked = pages.filter((page) => !draft.entityIds.includes(page.id));
   const progress = questProgress(draft.objectives);
 
-  const write = useCallback(async (next: QuestDraft) => {
-    const updated = await questApi.update(gmToken, quest.id, {
-      // `|| "Untitled quest"` is `PageEditor`'s rule verbatim: the route requires a non-empty title
-      // and would answer a blank one with zod's own wording, which is not a sentence a GM should read.
-      title: next.title.trim() || "Untitled quest",
-      status: next.status, playerBody: next.playerBody, gmBody: next.gmBody,
-      /* Sent EXACTLY as rendered — order is content, and a blank row is a row the GM is in the middle
-         of writing, not junk to tidy away. */
-      objectives: next.objectives,
-      // Always sent, never omitted: omitting `entityIds` leaves the stored list alone, so unlinking the
-      // last page has to travel as an explicit empty array (the journal's `tags` contract exactly).
-      entityIds: next.entityIds, tags: next.tags,
-      expectedRev: revRef.current
-    });
-    revRef.current = updated.rev;
-    setError(null);
-    await onChanged();
-  }, [gmToken, quest.id, onChanged]);
+  const write = useCallback(
+    async (next: QuestDraft) => {
+      const updated = await questApi.update(gmToken, quest.id, {
+        // Like `PageEditor`: the route rejects an empty title with a message a GM shouldn't read.
+        title: next.title.trim() || "Untitled quest",
+        status: next.status,
+        playerBody: next.playerBody,
+        gmBody: next.gmBody,
+        /* Sent exactly as rendered: order is content and a blank row is one the GM is still writing. */
+        objectives: next.objectives,
+        // Always sent: omitting `entityIds` keeps the stored list, so unlinking the last page needs `[]`.
+        entityIds: next.entityIds,
+        tags: next.tags,
+        expectedRev: revRef.current
+      });
+      revRef.current = updated.rev;
+      setError(null);
+      await onChanged();
+    },
+    [gmToken, quest.id, onChanged]
+  );
 
-  const { status: saveStatus, dirty, flush } = useCodexAutosave<QuestDraft>({
-    settings: autosave, draft, save: write,
-    onConflict: async () => { revRef.current = (await questApi.get(gmToken, quest.id)).rev; }
+  const {
+    status: saveStatus,
+    dirty,
+    flush
+  } = useCodexAutosave<QuestDraft>({
+    settings: autosave,
+    draft,
+    save: write,
+    onConflict: async () => {
+      revRef.current = (await questApi.get(gmToken, quest.id)).rev;
+    }
   });
-  useEffect(() => { if (saveStatus === "error") setError("Couldn't save the quest."); }, [saveStatus]);
+  useEffect(() => {
+    if (saveStatus === "error") setError("Couldn't save the quest.");
+  }, [saveStatus]);
 
   const reveal = async (revealed: boolean) => {
     setError(null);
-    // Its own route, deliberately: revealing is not an edit, so it carries no `expectedRev`, does not
-    // bump `rev` and does not move `updatedAt`. Sharing a quest must not look like GM activity.
-    try { await questApi.reveal(gmToken, quest.id, revealed); await onChanged(); }
-    catch { setError("Couldn't change who can see this quest."); }
+    // Its own route: revealing isn't an edit (no `expectedRev`, no `rev` bump, no `updatedAt` change).
+    try {
+      await questApi.reveal(gmToken, quest.id, revealed);
+      await onChanged();
+    } catch {
+      setError("Couldn't change who can see this quest.");
+    }
   };
   const remove = async () => {
-    if (!(await confirm({ title: "Delete quest", body: `Delete “${quest.title}”? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`, confirmLabel: "Delete", danger: true }))) return;
-    try { await questApi.remove(gmToken, quest.id); onDeleted(); }
-    catch { setError("Couldn't delete the quest."); }
+    if (
+      !(await confirm({
+        title: "Delete quest",
+        body: `Delete “${quest.title}”? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`,
+        confirmLabel: "Delete",
+        danger: true
+      }))
+    )
+      return;
+    try {
+      await questApi.remove(gmToken, quest.id);
+      onDeleted();
+    } catch {
+      setError("Couldn't delete the quest.");
+    }
   };
 
   return (
     <div className="codex-editor codex-quest-editor">
       <div className="codex-editor-head">
         <div className="codex-editor-titlewrap">
-          <Input variant="title" className="codex-title-input" value={draft.title} placeholder="Untitled quest" aria-label="Quest"
-            onChange={(event) => patch({ title: event.target.value })} />
+          <Input
+            variant="title"
+            className="codex-title-input"
+            value={draft.title}
+            placeholder="Untitled quest"
+            aria-label="Quest"
+            onChange={(event) => patch({ title: event.target.value })}
+          />
         </div>
         <div className="codex-editor-actions">
           <SaveState status={saveStatus} onRetry={() => void flush()} onReload={() => void flush()} />
-          {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
+          {!autosave.enabled && (
+            <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>
+              Save
+            </Button>
+          )}
           <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
           <RevealSwitch revealed={quest.revealedToPlayers} onChange={reveal} ariaLabel="Show this quest to players" />
-          <Button variant="ghost" size="sm" aria-expanded={detailsOpen} aria-controls={QUEST_DETAILS_ID} onClick={() => showDetails(!detailsOpen)}>Details</Button>
-          <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={detailsOpen}
+            aria-controls={QUEST_DETAILS_ID}
+            onClick={() => showDetails(!detailsOpen)}
+          >
+            Details
+          </Button>
+          <Button variant="ghost" size="sm" onClick={remove}>
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -239,83 +401,149 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
           <TwoLayerBodyTabs value={tab} onChange={setTab} />
-          {/* D13: the SAME writing surface a page body gets, so a quest body renders as markdown for the
-              party instead of as the deliberate plain text it used to be. R5 is unchanged: the GM layer
-              still wears the violet block and the "GM only" pill, now as the tab's own surface. */}
-          {tab === "player"
-            ? <CodexEditor id="q-player" token={gmToken} value={draft.playerBody} onChange={(playerBody) => patch({ playerBody })} fill
-                ariaLabel={BODY_LAYER.player.label} placeholder="What players have been told about this quest"
-                pages={pages} onNavigate={() => undefined} />
-            : <CodexEditor id="q-gm" token={gmToken} value={draft.gmBody} onChange={(gmBody) => patch({ gmBody })} fill
-                ariaLabel={BODY_LAYER.gm.label} placeholder="Details players cannot see"
-                pages={pages} onNavigate={() => undefined} gmLayer />}
+          {/* The same editor as a page body; the GM layer keeps its violet block and "GM only" pill. */}
+          {tab === "player" ? (
+            <CodexEditor
+              id="q-player"
+              token={gmToken}
+              value={draft.playerBody}
+              onChange={(playerBody) => patch({ playerBody })}
+              fill
+              ariaLabel={BODY_LAYER.player.label}
+              placeholder="What players have been told about this quest"
+              pages={pages}
+              onNavigate={() => undefined}
+            />
+          ) : (
+            <CodexEditor
+              id="q-gm"
+              token={gmToken}
+              value={draft.gmBody}
+              onChange={(gmBody) => patch({ gmBody })}
+              fill
+              ariaLabel={BODY_LAYER.gm.label}
+              placeholder="Details players cannot see"
+              pages={pages}
+              onNavigate={() => undefined}
+              gmLayer
+            />
+          )}
           <p className="codex-composer-hint">
-            {tab === "player" ? "Players see this once the quest is shown to them." : "Never sent to a player, whatever the quest's reveal state."}
+            {tab === "player"
+              ? "Players see this once the quest is shown to them."
+              : "Never sent to a player, whatever the quest's reveal state."}
           </p>
         </div>
 
         {detailsOpen && (
-        <aside id={QUEST_DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Quest details" tabIndex={-1} ref={detailsRef}
-          onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
-          <div className="codex-context-head">
-            <h3 className="codex-backlinks-title">Quest details</h3>
-            <IconButton label="Close quest details" size="sm" onClick={() => showDetails(false)}><IconX /></IconButton>
-          </div>
-
-          {/* D11: the server writes a dated Journal record on every status change, so the control says so. */}
-          {/* 5d: "Only Active" stopped being true when `not-started` arrived — `openQuests` counts BOTH
-              open states, and since a new quest is created Not started, the old wording said the exact
-              opposite of what a GM would see. It names the three that DROP OFF instead, which is the
-              shorter list and the one with a consequence. */}
-          <Field label="Status" htmlFor="q-status" help="Completed, Failed and Canceled quests drop off Home. Status changes are recorded in the Journal.">
-            <Select id="q-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexQuestStatus })}>
-              {QUEST_STATUS_ORDER.map((status) => <option key={status} value={status}>{QUEST_STATUS_LABEL[status]}</option>)}
-            </Select>
-          </Field>
-
-          {/* Not wrapped in a `Field`: a checklist has no single control for a `<label for>` to point at, so
-              it names itself through `ariaLabel` instead of growing a label that points nowhere. */}
-          <div className="codex-quest-objectives">
-            <div className="codex-quest-objectives-head">
-              <h4 className="codex-quest-subhead">Objectives</h4>
-              {progress.total > 0 && <span className="codex-quest-progress">{progress.label}</span>}
+          <aside
+            id={QUEST_DETAILS_ID}
+            className="codex-editor-context scroll-y"
+            aria-label="Quest details"
+            tabIndex={-1}
+            ref={detailsRef}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                showDetails(false);
+              }
+            }}
+          >
+            <div className="codex-context-head">
+              <h3 className="codex-backlinks-title">Quest details</h3>
+              <IconButton label="Close quest details" size="sm" onClick={() => showDetails(false)}>
+                <IconX />
+              </IconButton>
             </div>
-            <p className="codex-inspector-hint">Objectives are shown to players whenever the quest is.</p>
-            <Checklist items={draft.objectives} ariaLabel="Objectives" max={24}
-              onChange={(objectives: readonly CodexQuestObjective[]) => patch({ objectives })}
-              /* The CALLER appends, because the caller owns what a blank item means here: a fresh row the GM
-                 is about to type into, which the server accepts precisely so this flow works. */
-              onAdd={() => patch({ objectives: [...draft.objectives, { text: "", done: false }] })}
-              addLabel="Add objective" />
-          </div>
 
-          {/* D10: quests are taggable, on the same vocabulary and the same slug rules pages use. */}
-          <Field label="Tags" htmlFor="q-tags">
-            <TagInput id="q-tags" ariaLabel="Tags" placeholder="main-arc, faction" values={draft.tags}
-              onChange={(tags: readonly string[]) => patch({ tags })} max={24} maxReachedReason="A quest may carry at most 24 tags." />
-          </Field>
-          {onPickTag && draft.tags.length > 0 && (
-            <div className="codex-editor-tagjumps">
-              {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
+            {/* The server records each status change in the Journal; the help names the statuses that drop off Home. */}
+            <Field
+              label="Status"
+              htmlFor="q-status"
+              help="Completed, Failed and Canceled quests drop off Home. Status changes are recorded in the Journal."
+            >
+              <Select
+                id="q-status"
+                value={draft.status}
+                onChange={(event) => patch({ status: event.target.value as CodexQuestStatus })}
+              >
+                {QUEST_STATUS_ORDER.map((status) => (
+                  <option key={status} value={status}>
+                    {QUEST_STATUS_LABEL[status]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            {/* No `Field`: a checklist has no single control to label, so it names itself via `ariaLabel`. */}
+            <div className="codex-quest-objectives">
+              <div className="codex-quest-objectives-head">
+                <h4 className="codex-quest-subhead">Objectives</h4>
+                {progress.total > 0 && <span className="codex-quest-progress">{progress.label}</span>}
+              </div>
+              <p className="codex-inspector-hint">Objectives are shown to players whenever the quest is.</p>
+              <Checklist
+                items={draft.objectives}
+                ariaLabel="Objectives"
+                max={24}
+                onChange={(objectives: readonly CodexQuestObjective[]) => patch({ objectives })}
+                /* The caller appends the blank row the GM is about to type into. */
+                onAdd={() => patch({ objectives: [...draft.objectives, { text: "", done: false }] })}
+                addLabel="Add objective"
+              />
             </div>
-          )}
 
-          <Field label="Pages this quest concerns" help="Players see only the pages already shown to them.">
-            <div className="codex-quest-links">
-              {linked.map((page) => (
-                <div key={page.id} className="codex-quest-link">
-                  <button type="button" className="codex-quest-link-open" onClick={() => onOpenPage(page.id)}>
-                    <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
+            <Field label="Tags" htmlFor="q-tags">
+              <TagInput
+                id="q-tags"
+                ariaLabel="Tags"
+                placeholder="main-arc, faction"
+                values={draft.tags}
+                onChange={(tags: readonly string[]) => patch({ tags })}
+                max={24}
+                maxReachedReason="A quest may carry at most 24 tags."
+              />
+            </Field>
+            {onPickTag && draft.tags.length > 0 && (
+              <div className="codex-editor-tagjumps">
+                {draft.tags.map((tag) => (
+                  <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>
+                    {tag}
                   </button>
-                  <IconButton label={`Unlink ${page.title}`} size="sm" onClick={() => patch({ entityIds: draft.entityIds.filter((id) => id !== page.id) })}><IconX /></IconButton>
-                </div>
-              ))}
-              <Combobox options={unlinked.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
-                value={null} onChange={(id) => id && patch({ entityIds: [...draft.entityIds, id] })}
-                ariaLabel="Link a page" placeholder="Link a page" />
-            </div>
-          </Field>
-        </aside>
+                ))}
+              </div>
+            )}
+
+            <Field label="Pages this quest concerns" help="Players see only the pages already shown to them.">
+              <div className="codex-quest-links">
+                {linked.map((page) => (
+                  <div key={page.id} className="codex-quest-link">
+                    <button type="button" className="codex-quest-link-open" onClick={() => onOpenPage(page.id)}>
+                      <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
+                    </button>
+                    <IconButton
+                      label={`Unlink ${page.title}`}
+                      size="sm"
+                      onClick={() => patch({ entityIds: draft.entityIds.filter((id) => id !== page.id) })}
+                    >
+                      <IconX />
+                    </IconButton>
+                  </div>
+                ))}
+                <Combobox
+                  options={unlinked.map((page) => ({
+                    id: page.id,
+                    label: page.title,
+                    icon: <EntityIcon type={page.entityType} />
+                  }))}
+                  value={null}
+                  onChange={(id) => id && patch({ entityIds: [...draft.entityIds, id] })}
+                  ariaLabel="Link a page"
+                  placeholder="Link a page"
+                />
+              </div>
+            </Field>
+          </aside>
         )}
       </div>
       {confirmDialog}

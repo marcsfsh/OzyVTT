@@ -1,6 +1,5 @@
-/* @vtt/ui — the shared OzyVTT design system: tokens (see styles/), theme
-   control, and accessible UI primitives. Consumed as source by the client's Vite
-   build (mirrors @vtt/domain). Import the stylesheet once per app entry:
+/* @vtt/ui: the shared design system (tokens, theme control, accessible primitives), consumed as source by the
+   client's Vite build. Import the stylesheet once per app entry:
      import "@vtt/ui/styles.css";
 */
 
@@ -47,15 +46,21 @@ export { Menu, MenuItem, type MenuProps, type MenuItemProps } from "./primitives
 export { Tooltip, type TooltipProps } from "./primitives/Tooltip";
 export { Modal, type ModalProps } from "./primitives/Modal";
 export { Drawer, type DrawerProps } from "./primitives/Drawer";
-export { ToastProvider, useToast, useToastMute, type ToastApi, type ToastOptions, type ToastTone } from "./primitives/Toast";
+export {
+  ToastProvider,
+  useToast,
+  useToastMute,
+  type ToastApi,
+  type ToastOptions,
+  type ToastTone
+} from "./primitives/Toast";
 export { Badge, type BadgeProps, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarProps, type AvatarSize, type AvatarPresence } from "./primitives/Avatar";
 export { Meter, type MeterProps, type MeterTone } from "./primitives/Meter";
 export { Alert, type AlertProps, type AlertTone } from "./primitives/Alert";
 export { Switch, type SwitchProps } from "./primitives/Switch";
 export { Stepper, type StepperProps } from "./primitives/Stepper";
-/* The reveal family — the one way the product asks "do the players see this?" (D28). Promoted out of
-   the Codex, which grew it first; the words are the decision and travel with the components. */
+/* The reveal family: the one way the product asks "do the players see this?". */
 export { RevealSwitch, VisibilityBadge, HiddenFromPlayers, GmOnlyTag } from "./primitives/Reveal";
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from "./primitives/SegmentedControl";
 export { Steps, type StepsProps, type StepItem } from "./primitives/Steps";
@@ -70,20 +75,48 @@ export { RowEditor, type RowEditorProps } from "./primitives/RowEditor";
 export { Checklist, type ChecklistProps, type ChecklistItem } from "./primitives/Checklist";
 export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/SaveState";
 
-/* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's
-   richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
+/* Icons: the design system's own SVG glyphs. The app's richer set lives in apps/client/src/codex/icons.tsx. */
 export {
-  IconCheck, IconChevron, IconChevronLeft, IconChevronRight, IconSearch, IconShuffle, IconDie,
-  IconPencil, IconWarning, IconInfo, IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff,
-  IconX, IconPlay, IconArrow, IconDownload,
-  // Map tools + content marks, drawn so the toolbar can stop rendering emoji (D4/D7).
-  IconSelect, IconPing, IconMeasure, IconDraw, IconFog, IconColor, IconCleanup, IconScene, IconStar
+  IconCheck,
+  IconChevron,
+  IconChevronLeft,
+  IconChevronRight,
+  IconSearch,
+  IconShuffle,
+  IconDie,
+  IconPencil,
+  IconWarning,
+  IconInfo,
+  IconPlus,
+  IconTrash,
+  IconDrag,
+  IconCopy,
+  IconEye,
+  IconEyeOff,
+  IconX,
+  IconPlay,
+  IconArrow,
+  IconDownload,
+  // Map tools and content marks.
+  IconSelect,
+  IconPing,
+  IconMeasure,
+  IconDraw,
+  IconFog,
+  IconColor,
+  IconCleanup,
+  IconScene,
+  IconStar
 } from "./primitives/icons";
 export { Combobox, type ComboboxProps, type ComboboxOption } from "./primitives/Combobox";
-// `applyMarkdownFormat` / `wikiLinkContext` are the editor's two pure rules — what a toolbar mark does to
-// a selection, and when the caret is inside an unclosed `[[`. Exported so they can be tested directly
-// rather than only through six keystrokes of a textarea; nothing in the app calls them on their own.
-export { MarkdownEditor, applyMarkdownFormat, wikiLinkContext, type MarkdownEditorProps, type MarkdownSuggestion } from "./primitives/MarkdownEditor";
+// The editor's two pure rules, exported for direct testing.
+export {
+  MarkdownEditor,
+  applyMarkdownFormat,
+  wikiLinkContext,
+  type MarkdownEditorProps,
+  type MarkdownSuggestion
+} from "./primitives/MarkdownEditor";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";
@@ -99,4 +132,9 @@ export {
 export { DiceInputRow, type DiceInputRowProps, type DiceEntryMode } from "./primitives/DiceInputRow";
 export { NameField, type NameFieldProps } from "./primitives/NameField";
 export { FeatureList, type FeatureListProps, type FeatureItem } from "./primitives/FeatureList";
-export { ReviewSummary, type ReviewSummaryProps, type ReviewSection, type ReviewItem } from "./primitives/ReviewSummary";
+export {
+  ReviewSummary,
+  type ReviewSummaryProps,
+  type ReviewSection,
+  type ReviewItem
+} from "./primitives/ReviewSummary";

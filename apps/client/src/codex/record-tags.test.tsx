@@ -3,8 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-// The atlas surface fetches an authorized image and does pointer geometry — neither is what CI-2 is
-// about, and jsdom cannot honestly render either (see test/setup.ts).
+// jsdom can't render the real surface, and it isn't what this file tests.
 vi.mock("./MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
 
 const timeline = vi.fn();
@@ -54,55 +53,97 @@ import { AtlasView } from "./AtlasView";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
 
 /**
- * CI-2 (client): **tags are no longer a pages-only idea.**
- *
- * The server half (4818887) gave maps, markers and journal entries the same `tags_json` column and the
- * same validator pages use — max 24, each `/^[a-z0-9][a-z0-9-]*$/`, and it THROWS on a non-slug rather
- * than cleaning one up. So the client's job is two things, and these pin both:
- *
- * 1. every one of the three record types can show and edit its tags, and
- * 2. what leaves the client already satisfies the server's slug rule — which is exactly why every editor
- *    keeps `TagInput`'s default `slugify` normalizer. Typing "Session Recap" must reach the API as
- *    "session-recap"; sending the raw words would come back as a generic save failure the GM cannot act on.
- *
- * Out of scope on purpose (a later milestone): clicking a tag still filters Pages and nothing else.
+ * Maps, markers and journal entries show and edit tags, and what leaves the client already satisfies the
+ * server's slug rule (it rejects non-slugs), which is why editors keep `TagInput`'s default slugify.
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1", playerText: "The party reached Barovia.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: ["dark-gift"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "j1",
+  playerText: "The party reached Barovia.",
+  gmText: null,
+  revealedToPlayers: false,
+  kind: "note",
+  attachMarkerId: null,
+  attachPageId: null,
+  sourceEncounterId: null,
+  payload: null,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  sortKey: 0,
+  tags: ["dark-gift"],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
-/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape, not as raw entries. */
+/** The Journal reads the chronicle record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "The party reached Barovia.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: ["dark-gift"], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "The party reached Barovia.",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: ["dark-gift"],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const MAP = (over: Partial<CodexMap> = {}): CodexMap => ({
-  id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null, revealedToPlayers: false,
-  sortKey: 0, tags: ["faerun"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia",
+  kind: "regional",
+  parentMapId: null,
+  revealedToPlayers: false,
+  sortKey: 0,
+  tags: ["faerun"],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
-  id: "k1", mapId: "m1", x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road",
-  revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: ["dungeon"],
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "k1",
+  mapId: "m1",
+  x: 0.5,
+  y: 0.5,
+  iconId: "pin",
+  iconColor: "#FF2E9A",
+  label: "Old Svalich Road",
+  revealedToPlayers: false,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: ["dungeon"],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 // ----- Journal entries -----
 
-
-/**
- * Ruling 57: an entry's filing — session, in-world date, attached page, tags — lives in the composer's
- * summonable Details panel, not stacked under the writing. Asked rather than assumed, because the
- * panel's state is REMEMBERED across mounts.
- */
+/** Filing fields live in the Details panel, whose open state persists across mounts. */
 const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
   const details = await screen.findByRole("button", { name: "Details" });
   if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
@@ -113,7 +154,9 @@ describe("Journal entry tags (CI-2)", () => {
     chronicle.mockResolvedValue(records);
     listPages.mockResolvedValue([]);
     getCalendar.mockResolvedValue(CALENDAR);
-    render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
+    render(
+      <JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />
+    );
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
   };
 
@@ -131,7 +174,7 @@ describe("Journal entry tags (CI-2)", () => {
 
     await user.type(screen.getByLabelText("Player-visible notes"), "They crossed the mists.");
     await openEntryDetails(user);
-    // Two words with a capital: the server would REJECT "Session Recap" outright.
+    // The server would reject "Session Recap" as typed.
     await user.type(screen.getByLabelText("Tags"), "Session Recap{Enter}");
     await user.click(screen.getByRole("button", { name: "Add entry" }));
 
@@ -144,8 +187,7 @@ describe("Journal entry tags (CI-2)", () => {
     updateEntry.mockResolvedValue(ENTRY());
     const user = userEvent.setup();
 
-    // Scoped to the entry row: D13's one editor puts an Edit/Preview segmented control on each of the
-    // composer's two bodies, so an unscoped "Edit" is now three buttons. The one under test is the row's.
+    // Scoped to the entry row: the composer's editors also have Edit/Preview controls.
     const row = within(await screen.findByRole("article"));
     await user.click(row.getByRole("button", { name: "Edit" }));
     await openEntryDetails(user);
@@ -166,9 +208,22 @@ describe("Marker tags (CI-2)", () => {
     forMarker.mockResolvedValue([]);
     return render(
       <MarkerInspector
-        gmToken="gm" marker={marker} maps={[MAP()]} pages={[]} scenes={[]} actors={[]}
-        activeSceneId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
-        onCreatePage={vi.fn()} onRevealPage={vi.fn()} onActivateScene={vi.fn()} onClose={vi.fn()}
+        gmToken="gm"
+        marker={marker}
+        maps={[MAP()]}
+        pages={[]}
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        autosave={{ enabled: true, intervalSeconds: 1 }}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onOpenMap={vi.fn()}
+        onOpenPage={vi.fn()}
+        onCreatePage={vi.fn()}
+        onRevealPage={vi.fn()}
+        onActivateScene={vi.fn()}
+        onClose={vi.fn()}
       />
     );
   };
@@ -187,30 +242,33 @@ describe("Marker tags (CI-2)", () => {
 
     await user.type(screen.getByLabelText("Tags"), "Old Mill{Enter}");
 
-    // D6: the pin's typed fields ride the shared autosave hook now, so the write lands after the
-    // interval rather than on the keystroke, and it carries the label alongside the tags — one write
-    // for the pair, the same shape every other editor in the Codex sends.
+    // The pin's typed fields autosave after the interval, label and tags in one write.
     await waitFor(() => expect(updateMarker).toHaveBeenCalled(), { timeout: 4_000 });
     expect(updateMarker).toHaveBeenCalledWith("gm", "k1", { label: "Old Svalich Road", tags: ["dungeon", "old-mill"] });
   });
 
-  /**
-   * D6 — the arm the pin inspector never had.
-   *
-   * It wrote through on every control in BOTH modes, so a GM who turned autosave off was told, in the
-   * very panel where they turned it off, that "editors show a Save button and warn you before you leave
-   * with unsaved changes" — and then got the one editor that did the opposite. plan-frontend row 335
-   * specified the missing arm verbatim: "off = controls edit a local draft + Save/dirty-guard".
-   */
+  /** With autosave off, the typed fields hold a local draft behind Save and the leave guard. */
   describe("with autosave OFF", () => {
     const renderOff = (marker: CodexMarker) => {
       forMarker.mockResolvedValue([]);
       return render(
         <MarkerInspector
-          gmToken="gm" marker={marker} maps={[MAP()]} pages={[]} scenes={[]} actors={[]}
-          activeSceneId={null} autosave={{ enabled: false, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()}
-          onOpenMap={vi.fn()} onOpenPage={vi.fn()} onCreatePage={vi.fn()} onRevealPage={vi.fn()}
-          onActivateScene={vi.fn()} onClose={vi.fn()}
+          gmToken="gm"
+          marker={marker}
+          maps={[MAP()]}
+          pages={[]}
+          scenes={[]}
+          actors={[]}
+          activeSceneId={null}
+          autosave={{ enabled: false, intervalSeconds: 1 }}
+          onUpdated={vi.fn()}
+          onDeleted={vi.fn()}
+          onOpenMap={vi.fn()}
+          onOpenPage={vi.fn()}
+          onCreatePage={vi.fn()}
+          onRevealPage={vi.fn()}
+          onActivateScene={vi.fn()}
+          onClose={vi.fn()}
         />
       );
     };
@@ -222,7 +280,7 @@ describe("Marker tags (CI-2)", () => {
 
       await user.clear(screen.getByLabelText("Label"));
       await user.type(screen.getByLabelText("Label"), "Tser Pool");
-      // Nothing has gone to the server, and the panel says so rather than resting on "Saved".
+      // Nothing sent yet, and the panel doesn't claim "Saved".
       expect(updateMarker).not.toHaveBeenCalled();
       expect(await screen.findByText(/Unsaved changes/i)).toBeInTheDocument();
 
@@ -236,7 +294,7 @@ describe("Marker tags (CI-2)", () => {
     });
 
     it("keeps the discrete pickers immediate — choosing is an act, not an edit in progress", async () => {
-      // D6's own recorded scope call, and the reason this change is scoped to the two typed fields.
+      // Discrete acts like reveal stay immediate.
       revealMarker.mockResolvedValue(MARKER());
       renderOff(MARKER({ tags: [] }));
       const user = userEvent.setup();
@@ -254,7 +312,23 @@ describe("Map tags (CI-2)", () => {
     listAssets.mockResolvedValue([]);
     listMarkers.mockResolvedValue([]);
     listPages.mockResolvedValue([]);
-    render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <AtlasView
+          gmToken="gm"
+          scenes={[]}
+          actors={[]}
+          activeSceneId={null}
+          onActivateScene={vi.fn()}
+          mapId={null}
+          pinId={null}
+          autosave={{ enabled: true, intervalSeconds: 1 }}
+          onQuickCreate={vi.fn()}
+          onNavigate={vi.fn()}
+          onReplaceQuery={vi.fn()}
+        />
+      </ToastProvider>
+    );
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Map settings" }));
     return user;

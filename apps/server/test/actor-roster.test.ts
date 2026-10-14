@@ -16,9 +16,19 @@ const TOKEN_GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 const goblin = loadMonsterDefinitions().find((definition) => definition.source.externalId === "goblin-warrior")!;
 
 function state() {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.pc, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 }, initiative: 2 }
-  ] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.pc,
+        name: "Alpha",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 10, maximum: 10 },
+        initiative: 2
+      }
+    ]
+  });
 }
 
 describe("actor roster", () => {
@@ -44,7 +54,12 @@ describe("actor roster", () => {
     addActorFromDefinition(game, goblin, IDS.added, "public");
     addActorFromDefinition(game, goblin, IDS.added2, "public");
     addActorFromDefinition(game, goblin, IDS.added3, "gm-only");
-    expect(game.actors.map((actor) => actor.name)).toEqual(["Alpha", "Goblin Warrior", "Goblin Warrior 2", "Goblin Warrior 3"]);
+    expect(game.actors.map((actor) => actor.name)).toEqual([
+      "Alpha",
+      "Goblin Warrior",
+      "Goblin Warrior 2",
+      "Goblin Warrior 3"
+    ]);
     expect(game.actors[3].visibility).toBe("gm-only");
   });
 
@@ -58,7 +73,18 @@ describe("actor roster", () => {
   it("removes a monster and its stale inactive initiative/token references", () => {
     const game = state();
     addActorFromDefinition(game, goblin, IDS.added, "public");
-    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.pc, score: 15 }, { actorId: IDS.added, score: 10 }] }, () => 1, TOKEN_GEOMETRY);
+    startEncounter(
+      game,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.pc, score: 15 },
+          { actorId: IDS.added, score: 10 }
+        ]
+      },
+      () => 1,
+      TOKEN_GEOMETRY
+    );
     game.combat = { ...game.combat, active: false, turnActorId: null };
     removeActor(game, IDS.added);
     expect(game.actors.some((actor) => actor.id === IDS.added)).toBe(false);
@@ -71,7 +97,18 @@ describe("actor roster", () => {
     const game = state();
     addActorFromDefinition(game, goblin, IDS.added, "public");
     expect(() => removeActor(game, IDS.pc)).toThrow(/Player characters/);
-    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.pc, score: 15 }, { actorId: IDS.added, score: 10 }] }, () => 1, TOKEN_GEOMETRY);
+    startEncounter(
+      game,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.pc, score: 15 },
+          { actorId: IDS.added, score: 10 }
+        ]
+      },
+      () => 1,
+      TOKEN_GEOMETRY
+    );
     expect(() => removeActor(game, IDS.added)).toThrow(/End the encounter/);
   });
 });

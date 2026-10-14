@@ -1,23 +1,14 @@
 import { BUILDER_DRAFT_VERSION, type BuilderDraft } from "./build-payload";
 
 /**
- * Draft persistence for the character builder.
- *
- * Decision 6 wants resume-on-ANY-device, which needs the server-held
- * `GameState.characterDrafts[]` store - that is Phase 3 and does not exist yet. Until it does, the
- * in-progress build parks in `localStorage`, keyed per session, so a reload or an accidental
- * "Save & close" never costs the player their work on THIS device.
- *
- * **This is deliberately a drop-in swap.** The stored record is exactly
- * `{ id, updatedAt, draft: BuilderDraft }` - the same shape a server-held draft row would carry -
- * and every caller goes through `loadDraft` / `saveDraft` / `clearDraft`. Phase 3 replaces the three
- * function bodies with a `characterDrafts` read/write (and the wizard's existing `resume` affordance
- * keeps working unchanged); nothing above this file knows where the draft lives.
+ * Draft persistence for the character builder: the in-progress build parks in `localStorage`,
+ * keyed per session, so a reload or "Save & close" never loses work on this device. Every caller
+ * goes through `loadDraft` / `saveDraft` / `clearDraft`, so the store can move server-side later.
  */
 
 export type StoredDraft = Readonly<{
   id: string;
-  /** ISO timestamp of the last write - what the resume banner shows. */
+  /** ISO timestamp of the last write, shown on the resume banner. */
   updatedAt: string;
   draft: BuilderDraft;
 }>;
@@ -27,10 +18,18 @@ const storageKey = (sessionKey: string) => `${KEY_PREFIX}${sessionKey}`;
 
 /** Private-mode / quota-safe: a browser that refuses storage loses resume, not the wizard. */
 function readRaw(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 function writeRaw(key: string, value: string): void {
-  try { localStorage.setItem(key, value); } catch { /* storage unavailable; the draft stays in memory */ }
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable; the draft stays in memory */
+  }
 }
 
 export function loadDraft(sessionKey: string): StoredDraft | null {
@@ -38,8 +37,8 @@ export function loadDraft(sessionKey: string): StoredDraft | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<StoredDraft>;
-    // A draft written by an older shape is dropped rather than half-restored: a wizard resumed into
-    // a stale model produces a payload the server rejects for reasons the player cannot act on.
+    // A draft from an older shape is dropped rather than half-restored, which would produce a payload
+    // the server rejects.
     if (!parsed?.draft || parsed.draft.version !== BUILDER_DRAFT_VERSION) return null;
     return { id: parsed.id ?? sessionKey, updatedAt: parsed.updatedAt ?? "", draft: parsed.draft };
   } catch {
@@ -53,10 +52,14 @@ export function saveDraft(sessionKey: string, draft: BuilderDraft): void {
 }
 
 export function clearDraft(sessionKey: string): void {
-  try { localStorage.removeItem(storageKey(sessionKey)); } catch { /* nothing to clear */ }
+  try {
+    localStorage.removeItem(storageKey(sessionKey));
+  } catch {
+    /* nothing to clear */
+  }
 }
 
-/** "3 minutes ago" / "yesterday" for the resume banner. Kept local: one line, one caller. */
+/** "3 minutes ago" / "yesterday" for the resume banner. */
 export function describeWhen(iso: string): string {
   const at = Date.parse(iso);
   if (!Number.isFinite(at)) return "earlier";

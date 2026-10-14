@@ -1,10 +1,12 @@
-.nh-combobox { position: relative; display: block; }
-.nh-combobox-input { width: 100%; }
+.nh-combobox {
+  position: relative;
+  display: block;
+}
+.nh-combobox-input {
+  width: 100%;
+}
 
-/* RULING 24 — the same chip family as `Chip.css`, which has read `border-radius: 0` since the
-   de-pilling. The clear ✕ below is deliberately NOT part of this change: it is the exact analogue of
-   `.nh-chip-remove`, which `Chip.css` protects by name, and squaring a 20px close control would make
-   a chip look like it holds a second chip. */
+/* Same chip shape as `Chip.css`. The clear ✕ stays round like `.nh-chip-remove`. */
 .nh-combobox-chip {
   display: inline-flex;
   align-items: center;
@@ -18,10 +20,13 @@
   font: 600 var(--fs-sm) / 1.4 var(--font-body);
   max-width: 100%;
 }
-.nh-combobox-chiplabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nh-combobox-chiplabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* §4 route 2: 20px paint, `.tap-target` centres a 44px box on it. It is the last thing in the chip and
-   nothing sits beside it, so the overhang has nothing to steal. */
+/* 20px paint with a 44px `.tap-target`; it's last in the chip, so the overhang steals nothing. */
 .nh-combobox-clear {
   display: inline-flex;
   align-items: center;
@@ -35,7 +40,10 @@
   cursor: pointer;
   font-size: 13px;
 }
-.nh-combobox-clear:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+.nh-combobox-clear:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-2);
+}
 
 .nh-combobox-list {
   position: absolute;
@@ -53,7 +61,7 @@
   box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 35%));
 }
 
-/* §4 route 1 (grow the paint): a stacked list must never use `::after` overhang. */
+/* A stacked list grows its paint to 44px; never an `::after` overhang. */
 .nh-combobox-option {
   display: flex;
   align-items: center;
@@ -70,6 +78,17 @@
   cursor: pointer;
 }
 .nh-combobox-option:hover,
-.nh-combobox-option.is-active { background: var(--surface-3); }
-.nh-combobox-optionlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nh-combobox-optionmeta { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }
+.nh-combobox-option.is-active {
+  background: var(--surface-3);
+}
+.nh-combobox-optionlabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nh-combobox-optionmeta {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}

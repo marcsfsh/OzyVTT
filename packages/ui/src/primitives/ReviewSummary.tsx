@@ -7,8 +7,7 @@ import "./ReviewSummary.css";
 export interface ReviewItem {
   label: ReactNode;
   value: ReactNode;
-  /** Render the value in the mono/tabular face — scores, HP, AC, gold. Prose
-      (species, background, the chosen feat) stays in the body face. */
+  /** Render the value in the mono/tabular face (scores, HP, AC, gold); prose stays in the body face. */
   numeric?: boolean;
 }
 
@@ -21,7 +20,7 @@ export interface ReviewSection {
   /** Jump back to the step that owns this section. */
   onEdit?: () => void;
   editLabel?: string;
-  /** Something is still missing here — says so, in text, with an icon. */
+  /** Something is still missing here; says so in text, with an icon. */
   incomplete?: ReactNode;
 }
 
@@ -33,14 +32,9 @@ export interface ReviewSummaryProps {
   className?: string;
 }
 
-/** The final "here's your character" step: every choice, grouped by the step that
-    made it, each group with its own way back.
-
-    It extends the existing `.nh-statlist` key/value grid rather than inventing a
-    second one — same cells, same mono values — and adds the section headings and
-    per-section Edit links a review step needs. Anything still missing is called out
-    in words next to its Edit link, so the last screen before submit never hides a
-    hole in the sheet. */
+/** The final review step: every choice grouped by the step that made it, each with an Edit link back. Extends
+    `.nh-statlist`. Anything missing is called out in words beside its Edit link, so the last screen before
+    submit never hides a gap. */
 export function ReviewSummary({ sections, children, ariaLabel = "Character summary", className }: ReviewSummaryProps) {
   return (
     <div className={cx("nh-review", className)} aria-label={ariaLabel} role="group">
@@ -50,7 +44,9 @@ export function ReviewSummary({ sections, children, ariaLabel = "Character summa
             <h3 className="nh-review-title">{section.title}</h3>
             {section.onEdit && (
               <Button variant="ghost" size="sm" className="nh-review-edit" onClick={section.onEdit}>
-                <span className="nh-review-edit-icon" aria-hidden="true"><IconPencil /></span>
+                <span className="nh-review-edit-icon" aria-hidden="true">
+                  <IconPencil />
+                </span>
                 {section.editLabel ?? "Edit"}
                 <span className="nh-sr-only"> {typeof section.title === "string" ? section.title : ""}</span>
               </Button>
@@ -58,7 +54,12 @@ export function ReviewSummary({ sections, children, ariaLabel = "Character summa
           </header>
 
           {section.incomplete != null && (
-            <p className="nh-review-incomplete"><span className="nh-review-incomplete-icon" aria-hidden="true"><IconWarning /></span>{section.incomplete}</p>
+            <p className="nh-review-incomplete">
+              <span className="nh-review-incomplete-icon" aria-hidden="true">
+                <IconWarning />
+              </span>
+              {section.incomplete}
+            </p>
           )}
 
           <dl className="nh-statlist nh-review-stats">

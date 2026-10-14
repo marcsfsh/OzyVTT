@@ -64,8 +64,8 @@ Phase 1.5 ships as `packages/dndbeyond-pdf` + a GM review modal. Two departures 
 original proposal, both validated by a working extractor over six fixtures (Cleric 5, Bard 20,
 Warlock 20, Fighter 20, Wizard 20, a 6-class multiclass — all validate against `ActorDefinitionSchema`):
 
-- **Extraction runs in the browser, not a server worker.** D&D Beyond's PDF export is a *named
-  AcroForm*: every character value is a widget (`/T` field name + `/V` value), so extraction is a
+- **Extraction runs in the browser, not a server worker.** D&D Beyond's PDF export is a _named
+  AcroForm_: every character value is a widget (`/T` field name + `/V` value), so extraction is a
   deterministic field-name → schema mapping via `pdfjs-dist` (Apache-2.0; worker bundled locally,
   no CDN) — no MarkItDown/Python worker, and the PDF never leaves the device (strictly more private
   than the proposed sandbox). This removes the packaging/isolation burden the original decision

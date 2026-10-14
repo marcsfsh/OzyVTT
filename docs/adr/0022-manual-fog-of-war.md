@@ -54,7 +54,7 @@ everything**, so anything inside fog is visually covered even where public data 
 
 Fog is presentation, **never the security boundary**: players receive the mask verbatim (it is
 exactly what they must render), and hidden combatants / GM-only annotations remain stripped by
-their own projection filters regardless of fog. The corollary a GM must know: a *public* token
+their own projection filters regardless of fog. The corollary a GM must know: a _public_ token
 inside fog is visually covered but still present in the player payload — hiding a monster's
 existence still requires `gm-only` visibility, not fog. No token-vision, light sources, or
 auto-reveal-on-move: v1 is deliberately manual (the combat-first "obvious GM action" over a

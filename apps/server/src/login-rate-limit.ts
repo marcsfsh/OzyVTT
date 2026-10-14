@@ -23,7 +23,10 @@ export class LoginRateLimiter {
 
   recordFailure(key: string, now = Date.now()) {
     const entry = this.attempts.get(key);
-    const current: Entry = !entry || now - entry.windowStartedAt > this.windowMs ? { failures: 1, windowStartedAt: now } : { ...entry, failures: entry.failures + 1 };
+    const current: Entry =
+      !entry || now - entry.windowStartedAt > this.windowMs
+        ? { failures: 1, windowStartedAt: now }
+        : { ...entry, failures: entry.failures + 1 };
     if (current.failures >= this.maxAttempts) current.lockedUntil = now + this.lockoutMs;
     this.attempts.set(key, current);
   }

@@ -10,7 +10,7 @@ The combat loop planned in BUILD_PLAN.md §5 needs real monster content (stat bl
 structured attacks/saves/damage) and condition reference text, available fully offline on a
 LAN with no runtime network calls. ADR-0007 fixed the canonical format (`ActorDefinition`
 JSON, adapters at the boundary) and reserved `packages/content-srd-5.2.1` for curated
-bundles; what remained open was the *source*: which SRD dataset to convert, under which
+bundles; what remained open was the _source_: which SRD dataset to convert, under which
 license, and how it enters the repo.
 
 Seven candidate repositories were reviewed (2026-07-17): open5e/open5e-api, open5e/open5e,

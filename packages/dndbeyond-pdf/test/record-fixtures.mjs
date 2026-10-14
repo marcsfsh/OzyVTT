@@ -12,7 +12,12 @@ const dir = new URL("./fixtures/", import.meta.url);
 const files = ["cleric5", "bard20", "warlock20", "fighter20", "wizard20", "multiclass"];
 
 for (const f of files) {
-  const doc = await getDocument({ data: new Uint8Array(readFileSync(new URL(`${f}.pdf`, dir))), standardFontDataUrl, useSystemFonts: false, isEvalSupported: false }).promise;
+  const doc = await getDocument({
+    data: new Uint8Array(readFileSync(new URL(`${f}.pdf`, dir))),
+    standardFontDataUrl,
+    useSystemFonts: false,
+    isEvalSupported: false
+  }).promise;
   const widgets = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);

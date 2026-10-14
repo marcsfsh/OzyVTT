@@ -1,31 +1,19 @@
-/* Character builder — LAYOUT ONLY.
-   Every control comes from @vtt/ui (which carries the 44px floor, the focus ring, and the one
-   chosen treatment), so nothing here paints a control: these rules place the step's sections and
-   give each offer a heading rhythm. Tokens only — no hex, no new breakpoint (760 is the documented
-   phone/laptop step, the same one WizardShell and Steps already swap at). */
+/* Character builder layout only: every control comes from @vtt/ui. */
 
-/* The wizard OWNS the pane: it fills the shell's content pane below the frame rows (the tab
-   bar and the connection strip stay visible above it now — the strip used to be painted over
-   when this layer was `position: fixed; inset: 0` covering the viewport), and it is still a
-   whole-surface page rather than a modal floating over the table (decision 4). The pane sizes
-   it (`.app-pane > *` in styles.css).
-   THE LAYER NO LONGER SCROLLS — the step body does (`.nh-wizard-body`, WizardShell.css, §7's
-   formal shape: the frame is the sticky head and foot, the region is the step). The
-   `overflow-y`, the overscroll containment and the scroll-padding that used to live here moved
-   there with the scroller; the comment that explained the padding moved with them. */
+/* The wizard fills the shell's content pane (sized by `.app-pane > *` in styles.css). The layer
+   does not scroll; the step body (`.nh-wizard-body`) does. */
 .cb-page {
   position: relative;
   display: flex;
   flex-direction: column;
   background: var(--bg);
 }
-/* Inside the pane the wizard column IS the pane: WizardShell's own `min-height: 100dvh` (right
-   for a wizard that owns a whole window) would push the sticky footer below the fold, and with
-   the body scrolling there is no page left to scroll it back. `flex: 1; min-height: 0` makes the
-   column exactly the pane's height and hands the leftover to the step body. The primitive keeps
-   its own default: the app-side override is one line, and every other mount of the shell — the
-   level flow (same layer) and the styleguide's bounded demo — states its own box the same way. */
-.cb-page .nh-wizard { flex: 1; min-height: 0; }
+/* WizardShell's own `min-height: 100dvh` would push the sticky footer below the fold inside the
+   pane; `flex: 1; min-height: 0` makes the column exactly the pane's height. */
+.cb-page .nh-wizard {
+  flex: 1;
+  min-height: 0;
+}
 
 .cb-step {
   display: flex;
@@ -34,8 +22,6 @@
   padding-block: var(--space-4);
 }
 
-/* One offer = one heading + one count + one picker. Every step repeats this shape, so a player
-   who has answered one "choose N" has answered all of them. */
 .cb-offer {
   display: flex;
   flex-direction: column;
@@ -43,7 +29,10 @@
   padding-top: var(--space-4);
   border-top: 1px solid var(--line);
 }
-.cb-step > .cb-offer:first-child { padding-top: 0; border-top: 0; }
+.cb-step > .cb-offer:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
 
 .cb-offer-head {
   display: flex;
@@ -64,9 +53,7 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-/* The running count. NUMBERS ONLY — never a word, and never a second place the pick can be made.
-   The mono face comes from `.tabular` on the element itself (design-tokens.css), which is also what
-   gives it tabular figures; restating `font-family` here was a second declaration of one fact. */
+/* The running count: numbers only. `.tabular` on the element supplies the mono face. */
 .cb-offer-count {
   color: var(--text-dim);
   font-size: var(--fs-sm);
@@ -85,27 +72,33 @@
   line-height: var(--lh-body);
 }
 
-/* The detail column is reserved for the whole of a step that can fill it, so it needs something to
-   say before the first pick. Muted, so it reads as a held place rather than as prose about the
-   character — nothing has gone wrong and there is nothing to fix. */
+/* Placeholder for the reserved detail column before the first pick. */
 .cb-detail-empty {
   margin: 0;
   color: var(--text-muted);
   line-height: var(--lh-body);
 }
 
-/* The server's rejection. It is not a control, so it carries no focus ring of its own — it is only
-   made focusable so it can be scrolled to and announced when Create comes back refused, which on a
-   long review step happens well above the sticky footer the eye is on. `scroll-margin` keeps it
-   clear of that footer when the browser brings it into view. */
-.cb-rejection { scroll-margin-block: var(--space-8); }
-.cb-rejection:focus { outline: none; }
+/* Focusable only so it can be scrolled to and announced when Create is refused; no focus ring.
+   `scroll-margin` keeps it clear of the sticky footer. */
+.cb-rejection {
+  scroll-margin-block: var(--space-8);
+}
+.cb-rejection:focus {
+  outline: none;
+}
 
-/* The ability-increase rows (an ASI's +2 split, a background's +2/+1). Each row is a label plus a
-   Select — the same gesture the allocator already uses to hand out a score, rather than a second
-   invention for the same act. */
-.cb-asi { display: flex; flex-direction: column; gap: var(--space-3); }
-.cb-asi-rows { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+/* Ability-increase rows (an ASI's +2 split, a background's +2/+1): a label plus a Select each. */
+.cb-asi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cb-asi-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
 .cb-asi-row {
   display: flex;
   align-items: center;
@@ -120,40 +113,107 @@
 }
 
 @media (max-width: 760px) {
-  .cb-step { gap: var(--space-5); }
+  .cb-step {
+    gap: var(--space-5);
+  }
   /* A Select next to its label wraps rather than shrinking below a tappable width. */
-  .cb-asi-rows { flex-direction: column; align-items: stretch; }
-  .cb-asi-row { justify-content: space-between; }
+  .cb-asi-rows {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cb-asi-row {
+    justify-content: space-between;
+  }
 }
 
-/* ── Level flow (D13): the rail, the two directions, and the level-down preview. ───────────── */
-.cb-level { display: flex; flex-direction: column; gap: 1.1rem; max-width: 46rem; margin: 0 auto; padding: 1.4rem var(--space-4) var(--space-12); }
-.cb-level-head h2 { margin: .2rem 0 0; font: 700 1.5rem/1.15 var(--font-display); }
-.cb-level-head p { margin: var(--space-1) 0 0; color: var(--text-dim); }
-.cb-level-rail { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; padding: 0; list-style: none; }
-.cb-level-pip { display: grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0 .35rem; border: 1px solid var(--line); border-radius: 0; background: var(--surface-2); color: var(--text-muted); font: 600 .8rem/1 var(--font-body); }
-.cb-level-pip.reached { color: var(--text); border-color: var(--line-strong); }
-.cb-level-pip.current { background: var(--primary); border-color: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
-.cb-level-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
-.cb-level-actions > * { flex: 1 1 12rem; }
-.cb-level-preview { padding: .9rem var(--space-4); border: 1px solid transparent; }
-.cb-level-preview h3 { margin: 0 0 .35rem; font: 700 .95rem/1 var(--font-body); }
-.cb-level-preview p { margin: 0; color: var(--text-dim); font-size: .9rem; }
-.cb-level-gate { padding: 1.4rem; border: 1px solid transparent; display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
-.cb-level-gate h2 { margin: 0; font: 700 1.2rem/1.2 var(--font-display); }
-.cb-level-gate p { margin: 0; color: var(--text-dim); }
+/* Level flow: the rail, the two directions, and the level-down preview. */
+.cb-level {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1.4rem var(--space-4) var(--space-12);
+}
+.cb-level-head h2 {
+  margin: 0.2rem 0 0;
+  font: 700 1.5rem/1.15 var(--font-display);
+}
+.cb-level-head p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-dim);
+}
+.cb-level-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cb-level-pip {
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: 600 0.8rem/1 var(--font-body);
+}
+.cb-level-pip.reached {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+.cb-level-pip.current {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-on-neon);
+  box-shadow: var(--glow-magenta);
+}
+.cb-level-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.cb-level-actions > * {
+  flex: 1 1 12rem;
+}
+.cb-level-preview {
+  padding: 0.9rem var(--space-4);
+  border: 1px solid transparent;
+}
+.cb-level-preview h3 {
+  margin: 0 0 0.35rem;
+  font: 700 0.95rem/1 var(--font-body);
+}
+.cb-level-preview p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.cb-level-gate {
+  padding: 1.4rem;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+.cb-level-gate h2 {
+  margin: 0;
+  font: 700 1.2rem/1.2 var(--font-display);
+}
+.cb-level-gate p {
+  margin: 0;
+  color: var(--text-dim);
+}
 
-/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
-   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
-   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
-   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
-   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
-   daybreak translation arrives for free.
-   THE BUILDER GATE IS ON RULING 2'S HERO LIST, so it is one of the few surfaces in this lane that
-   takes the FULL landing door — the rest glow included, via `--rim-glow` on the backing layer.
-   A filter, never a box-shadow: it follows the cut, which a shadow cannot, and it stays off the
-   element, where a filter would make a containing block for every fixed overlay inside it.
-   The level preview beside it is an ordinary panel and gets the material without the glow. */
+/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
+   `inset: -1px` spans the border box. The gate also gets the rim glow as a filter (it follows the
+   cut, and on the element it would make a containing block for fixed overlays). */
 .cb-level-gate,
 .cb-level-preview {
   position: relative;
@@ -176,8 +236,16 @@
   background-clip: border-box;
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.cb-level-gate { --material-fill: var(--material-scanline), var(--material-plate); }
-.cb-level-gate::before { filter: var(--rim-glow); }
-.cb-level-preview { --material-fill: var(--material-plate); }
+.cb-level-gate {
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.cb-level-gate::before {
+  filter: var(--rim-glow);
+}
+.cb-level-preview {
+  --material-fill: var(--material-plate);
+}

@@ -1,19 +1,7 @@
 /**
- * Direct tests for `@vtt/ui` primitives whose contract is behavioural rather than visual.
- *
- * **Moved here from `apps/client/src/ui-primitives.test.tsx`**, unchanged assertion for assertion. It was
- * written in the client only because this package had no test script and no harness at all - only `check` -
- * so a primitive was otherwise exercised indirectly, through whichever feature happened to render it. That
- * is adequate for a Button and inadequate for a control whose defining property is something a feature test
- * would never assert. The package has its own suite now, so the tests live beside the code they describe.
- *
- * `Drawer` is exactly that case. The whole reason it is not built on `Modal` is that the session console
- * must stay usable *alongside* the Codex mode behind it: no top layer, no focus trap, no scroll lock, and
- * no swallowing of Escape meant for the surface still running. None of that is visible in a screenshot,
- * and all of it would be silently lost by a later "simplification" onto `<dialog>`. So it is asserted here.
- *
- * jsdom caveat (`test/setup.ts`): layout and pointer geometry are not real here, so the 44px tap floor is
- * NOT verifiable in this file and still wants a browser check.
+ * Behavioural contracts of `@vtt/ui` primitives that feature tests would never assert, e.g. `Drawer` staying
+ * usable alongside the view behind it (no top layer, focus trap, scroll lock or swallowed Escape). jsdom has no
+ * layout, so the 44px tap floor still needs a browser check.
  */
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -28,24 +16,34 @@ describe("Drawer", () => {
   it("renders titled, closeable, non-modal, and inert while closed", async () => {
     const onClose = vi.fn();
     const { rerender, container } = render(
-      <><button type="button">Outside</button><Drawer open={false} onClose={onClose} title="Session 14"><button type="button">Inside</button></Drawer></>
+      <>
+        <button type="button">Outside</button>
+        <Drawer open={false} onClose={onClose} title="Session 14">
+          <button type="button">Inside</button>
+        </Drawer>
+      </>
     );
     const panel = container.querySelector("aside")!;
     expect(panel.tagName).toBe("ASIDE");
     // Non-modal: never a <dialog>, so nothing can be in the top layer or focus-trapped.
     expect(container.querySelector("dialog")).toBeNull();
     expect(panel.className).not.toContain("is-open");
-    // Closed but still mounted (so the slide plays both ways) - `inert` is what keeps its controls out of
-    // the tab order and out of the accessibility tree while it is off-screen.
+    // Closed but still mounted (so the slide plays both ways); `inert` keeps its controls out of tab order and the
+    // accessibility tree.
     expect(panel.hasAttribute("inert")).toBe(true);
-    // …and `aria-hidden` says the same thing to engines that do not implement `inert` yet. Safe to pair
-    // here precisely BECAUSE `inert` has already made the subtree unfocusable.
+    // `aria-hidden` covers engines without `inert`; safe because `inert` already made the subtree unfocusable.
     expect(panel.getAttribute("aria-hidden")).toBe("true");
-    // Named by its own visible title without a caller-supplied label. Queried through the DOM rather
-    // than by role, since the closed panel is (correctly) absent from the accessibility tree.
+    // Named by its visible title. Queried through the DOM because the closed panel is absent from the a11y tree.
     expect(panel.getAttribute("aria-labelledby")).toBe(panel.querySelector("h2")!.id);
 
-    rerender(<><button type="button">Outside</button><Drawer open onClose={onClose} title="Session 14"><button type="button">Inside</button></Drawer></>);
+    rerender(
+      <>
+        <button type="button">Outside</button>
+        <Drawer open onClose={onClose} title="Session 14">
+          <button type="button">Inside</button>
+        </Drawer>
+      </>
+    );
     expect(panel.className).toContain("is-open");
     expect(panel.hasAttribute("inert")).toBe(false);
     expect(panel.hasAttribute("aria-hidden")).toBe(false);
@@ -54,8 +52,7 @@ describe("Drawer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    // Escape closes, but only from inside. A global listener would eat Escape from the Codex mode still
-    // running behind the drawer - which is the precise failure a non-modal panel invites.
+    // Escape closes only from inside; a global listener would steal Escape from the view behind.
     screen.getByRole("button", { name: "Inside" }).focus();
     await userEvent.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledTimes(2);
@@ -66,38 +63,25 @@ describe("Drawer", () => {
 
   it("takes an explicit label and a side", () => {
     const { container } = render(
-      <Drawer open onClose={() => {}} side="left" ariaLabel="Session console" title={<span>Session 14</span>}>body</Drawer>
+      <Drawer open onClose={() => {}} side="left" ariaLabel="Session console" title={<span>Session 14</span>}>
+        body
+      </Drawer>
     );
     const panel = container.querySelector("aside")!;
     expect(panel.className).toContain("nh-drawer--left");
     expect(panel.getAttribute("aria-label")).toBe("Session console");
-    // An explicit label wins outright rather than being stacked with a generated one - two names on one
-    // landmark is an ambiguity, not redundancy.
+    // An explicit label replaces the generated one rather than adding a second name.
     expect(panel.hasAttribute("aria-labelledby")).toBe(false);
   });
 });
 
 /**
- * `MarkdownEditor` — **D13's headline capability, and it had no behavioural coverage of any kind.**
- *
- * "One editor everywhere" is what lets a GM's session prep link to their world: before D13 only the page
- * editor had the toolbar and the `[[` autocomplete, and typing `[[` in a session's prep did nothing at
- * all. The primitive is now mounted by every writing surface in the suite (page bodies, session prep and
- * recap, quest bodies, the journal composer, the downtime note) through one Codex wrapper — so a silent
- * regression here is a silent regression on all six at once, and until now nothing would have caught it.
- *
- * What is asserted is the autocomplete's whole loop (open on `[[`, filter as you type, keyboard and
- * mouse selection, the inserted text and its brackets, dismissal), the format helper's transformations,
- * and the Edit/View switch. What is NOT assertable here is caret POSITION after insertion — the component
- * restores it inside `requestAnimationFrame`, and jsdom's textarea has no layout — so the tests check the
- * resulting VALUE, which is the part a GM's document actually keeps.
+ * `MarkdownEditor` is every writing surface's editor, so a regression here hits all of them. Covers the `[[`
+ * autocomplete loop, the format helper and the Edit/View switch. Caret position after insertion is restored in
+ * `requestAnimationFrame` and isn't observable in jsdom, so tests check the resulting value.
  */
 describe("MarkdownEditor — the [[ ]] autocomplete", () => {
-  /**
-   * `userEvent.type` reads `[` and `{` as the start of a key descriptor (`[Enter]`), so a literal
-   * bracket has to be doubled. Doubling them here keeps every test below written in the text a GM
-   * actually types — `[[val` — instead of in the escaping.
-   */
+  /** `userEvent.type` treats `[` and `{` as key descriptors, so literal brackets are doubled here. */
   const typeText = (element: HTMLElement, text: string) =>
     userEvent.setup().type(element, text.replace(/[[{]/g, "$&$&"));
 
@@ -109,12 +93,20 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   const suggest = (query: string) =>
     PAGES.filter((page) => page.label.toLowerCase().includes(query.trim().toLowerCase()));
 
-  /** A controlled host, because the editor is controlled — a stub `onChange` would freeze the value. */
+  /** A controlled host, because the editor is controlled; a stub `onChange` would freeze the value. */
   function Host({ initial = "", onValue }: Readonly<{ initial?: string; onValue?: (next: string) => void }>) {
     const [value, setValue] = useState(initial);
     return (
-      <MarkdownEditor value={value} onChange={(next) => { setValue(next); onValue?.(next); }}
-        ariaLabel="Prep for this session" suggest={suggest} placeholder="Beats, encounters…" />
+      <MarkdownEditor
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          onValue?.(next);
+        }}
+        ariaLabel="Prep for this session"
+        suggest={suggest}
+        placeholder="Beats, encounters…"
+      />
     );
   }
 
@@ -132,12 +124,13 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
     expect(within(list).getAllByRole("option")).toHaveLength(3);
 
     await user.type(box, "val");
-    await waitFor(() => expect(within(screen.getByRole("listbox", { name: "Link to page" })).getAllByRole("option")).toHaveLength(1));
+    await waitFor(() =>
+      expect(within(screen.getByRole("listbox", { name: "Link to page" })).getAllByRole("option")).toHaveLength(1)
+    );
     expect(screen.getByRole("option", { name: "Vallaki" })).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{Enter}");
-    // The typed fragment is REPLACED by the page's real title, and the link is closed — a half-open
-    // `[[Vallaki` would persist as literal text and link nothing.
+    // The fragment is replaced by the page's title and the link is closed.
     expect(box).toHaveValue("The party reaches [[Vallaki]]");
     expect(screen.queryByRole("listbox", { name: "Link to page" })).toBeNull();
   });
@@ -160,24 +153,19 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   });
 
   it("inserts by click too, and never doubles an existing closing bracket", async () => {
-    const user = userEvent.setup();
     render(<Host initial="[[]]" />);
     const box = screen.getByLabelText("Prep for this session") as HTMLTextAreaElement;
 
-    // Caret between the pairs — what the toolbar's own wiki-link button leaves behind. Placed with the
-    // DOM API and announced with `fireEvent`, because `userEvent.click` moves the caret itself and the
-    // position is the whole input to this behaviour.
+    // Caret between the pairs, as the toolbar's wiki-link button leaves it. Set via the DOM and `fireEvent` because
+    // `userEvent.click` would move the caret.
     box.focus();
     box.setSelectionRange(2, 2);
     fireEvent.click(box);
     await screen.findByRole("listbox", { name: "Link to page" });
     /**
-     * The clickable element is the BUTTON inside the row: this list puts `role="option"` on the `<li>`
-     * and the handler on a button within it, where `Combobox` puts the role on the button itself. Worth
-     * knowing when reading the two side by side — clicking the row's `option` element does nothing.
-     * `fireEvent` rather than `userEvent`, because userEvent moves focus off the textarea despite the
-     * mousedown `preventDefault` the component uses precisely to keep it (a jsdom fidelity gap), and the
-     * caret it would take with it is what decides where the link lands.
+     * The click target is the button inside the `<li role="option">` (unlike `Combobox`, which puts the role on the
+     * button). `fireEvent` because userEvent moves focus off the textarea despite the mousedown `preventDefault`
+     * (a jsdom gap), and the caret decides where the link lands.
      */
     fireEvent.click(within(screen.getByRole("option", { name: "Castle Ravenloft" })).getByRole("button"));
 
@@ -195,13 +183,12 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
     expect(screen.queryByRole("listbox", { name: "Link to page" })).toBeNull();
     expect(box).toHaveValue("[[val");
 
-    // A newline inside the brackets is not a link in progress — the suggestion must not come back.
+    // A newline inside the brackets ends the link attempt.
     await user.type(box, "{Enter}more");
     expect(screen.queryByRole("listbox", { name: "Link to page" })).toBeNull();
   });
 
   it("offers nothing when the caller supplies no suggester — the autocomplete is opt-in", async () => {
-    const user = userEvent.setup();
     function Bare() {
       const [value, setValue] = useState("");
       return <MarkdownEditor value={value} onChange={setValue} ariaLabel="Recap" />;
@@ -222,12 +209,11 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
     }
     render(<Host />);
     const box = screen.getByLabelText("Body") as HTMLTextAreaElement;
-    /**
-     * The editor restores the caret inside `requestAnimationFrame`, so a selection set straight after a
-     * click is overwritten a frame later. Each step waits for that frame before placing the next
-     * selection — otherwise the test measures the race rather than the format.
-     */
-    const settle = () => act(async () => { await new Promise((resolve) => requestAnimationFrame(() => resolve(null))); });
+    /** The editor restores the caret in `requestAnimationFrame`, so each step waits a frame before the next selection. */
+    const settle = () =>
+      act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      });
 
     box.setSelectionRange(0, 5);
     await user.click(screen.getByRole("button", { name: "Bold" }));
@@ -255,8 +241,7 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
     const view = render(<Host />);
 
     await user.click(screen.getByRole("button", { name: "View" }));
-    // The primitive renders no markdown itself — that is what keeps the Codex's viewer-safe redlink
-    // renderer and its GM-layer chrome out of the design system.
+    // The primitive renders no markdown itself; the caller's renderer does.
     expect(screen.getByTestId("reader")).toHaveTextContent("read: **bold**");
     expect(renderPreview).toHaveBeenCalledWith("**bold**");
     // Reading is not editing: the formatting toolbar is gone while the reader is up.
@@ -268,7 +253,7 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
       return <MarkdownEditor value={value} onChange={setValue} ariaLabel="Body" />;
     }
     render(<Bare />);
-    // An editor with no reader offers no switch, rather than a switch onto a blank panel.
+    // An editor with no reader offers no switch.
     expect(screen.queryByRole("group", { name: "Edit or read" })).toBeNull();
     expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
   });
@@ -278,7 +263,9 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
     expect(screen.queryByRole("button", { name: "Insert image" })).toBeNull();
     view.unmount();
 
-    render(<MarkdownEditor value="" onChange={() => {}} ariaLabel="Body" onUploadImage={async () => "![x](codex-asset:1)"} />);
+    render(
+      <MarkdownEditor value="" onChange={() => {}} ariaLabel="Body" onUploadImage={async () => "![x](codex-asset:1)"} />
+    );
     expect(screen.getByRole("button", { name: "Insert image" })).toBeInTheDocument();
   });
 });
@@ -289,13 +276,13 @@ describe("MarkdownEditor — the two pure helpers", () => {
     expect(applyMarkdownFormat("hello", 0, 5, "italic").value).toBe("*hello*");
     expect(applyMarkdownFormat("hello", 0, 5, "strike").value).toBe("~~hello~~");
     expect(applyMarkdownFormat("hello", 0, 5, "code").value).toBe("`hello`");
-    // Line prefixes go to the start of the caret's OWN line, not the start of the document.
+    // Line prefixes go to the start of the caret's own line, not the start of the document.
     expect(applyMarkdownFormat("one\ntwo", 5, 5, "bullet").value).toBe("one\n- two");
     expect(applyMarkdownFormat("one\ntwo", 5, 5, "quote").value).toBe("one\n> two");
     expect(applyMarkdownFormat("one\ntwo", 5, 5, "numbered").value).toBe("one\n1. two");
     expect(applyMarkdownFormat("ab", 1, 1, "rule").value).toBe("a\n---\nb");
     expect(applyMarkdownFormat("see X", 4, 5, "wikilink").value).toBe("see [[X]]");
-    // An unknown mark changes nothing — a toolbar typo must not eat the document.
+    // An unknown mark changes nothing.
     expect(applyMarkdownFormat("hello", 0, 5, "nonsense").value).toBe("hello");
   });
 
@@ -304,23 +291,16 @@ describe("MarkdownEditor — the two pure helpers", () => {
     expect(wikiLinkContext("[[", 2)).toEqual({ start: 0, query: "" });
     // Already closed, so the caret is not inside a link in progress.
     expect(wikiLinkContext("[[Vallaki]] and more", 20)).toBeNull();
-    // A newline ends the attempt, and a nested bracket is not a query.
+    // A newline ends the attempt.
     expect(wikiLinkContext("[[val\nmore", 10)).toBeNull();
     expect(wikiLinkContext("[[a[b", 5)).toBeNull();
     expect(wikiLinkContext("no brackets", 5)).toBeNull();
-    // Only the text BEFORE the caret counts: typing in front of an old link opens nothing.
+    // Only text before the caret counts.
     expect(wikiLinkContext("[[Vallaki]]", 3)).toEqual({ start: 0, query: "V" });
   });
 });
 
-/**
- * `Combobox` — 8 call sites, zero behavioural coverage.
- *
- * It was promoted (D25) from two bespoke listboxes that had drifted into different keyboard behaviour and
- * different row heights, which is exactly the failure a shared primitive is supposed to end. It now
- * carries the Codex's tag filters, the downtime "who", the connection label and the character link — and
- * `allowFreeText` is the mode the downtime field depends on, where the id handed back is the raw text.
- */
+/** `Combobox`, including `allowFreeText`, where the id handed back is the raw text. */
 describe("Combobox", () => {
   const OPTIONS = [
     { id: "p1", label: "Ireena", meta: "Character" },
@@ -353,7 +333,7 @@ describe("Combobox", () => {
     await user.click(input);
     await user.keyboard("{ArrowDown}{ArrowDown}");
     expect(screen.getByRole("option", { name: /Vallaki/ })).toHaveAttribute("aria-selected", "true");
-    // The walk stops at the ends rather than wrapping — a picker that wraps steals the last row.
+    // The walk stops at the ends rather than wrapping.
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("option", { name: /Vallaki/ })).toHaveAttribute("aria-selected", "true");
     await user.keyboard("{Enter}");
@@ -366,7 +346,7 @@ describe("Combobox", () => {
     const onChange = vi.fn();
     render(<Combobox options={OPTIONS} value="p2" onChange={onChange} ariaLabel="Who spent the time" />);
 
-    // A chosen value is a CHIP, not typed text sitting in the box — the state is unambiguous.
+    // A chosen value is a chip, not typed text in the box.
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.getByText("Ismark")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear Ismark" }));
@@ -377,14 +357,23 @@ describe("Combobox", () => {
   it("allowFreeText: text that matches no option comes back as itself, and renders as a chip", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const view = render(<Combobox options={OPTIONS} value={null} onChange={onChange} allowFreeText ariaLabel="Who spent the time" />);
+    const view = render(
+      <Combobox options={OPTIONS} value={null} onChange={onChange} allowFreeText ariaLabel="Who spent the time" />
+    );
 
     await user.type(screen.getByRole("combobox", { name: "Who spent the time" }), "Vex the Bold{Enter}");
-    // D12's "who" is either a character page or a name the GM typed; this is the second case, and the
-    // raw text is what the caller stores.
+    // A name the GM typed: the raw text is what the caller stores.
     expect(onChange).toHaveBeenCalledWith("Vex the Bold");
 
-    view.rerender(<Combobox options={OPTIONS} value="Vex the Bold" onChange={onChange} allowFreeText ariaLabel="Who spent the time" />);
+    view.rerender(
+      <Combobox
+        options={OPTIONS}
+        value="Vex the Bold"
+        onChange={onChange}
+        allowFreeText
+        ariaLabel="Who spent the time"
+      />
+    );
     expect(screen.getByText("Vex the Bold")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear Vex the Bold" })).toBeInTheDocument();
   });
@@ -399,15 +388,12 @@ describe("Combobox", () => {
       </>
     );
 
-    // The gesture people actually make: type, then move to the next field. Enter was the ONLY way to
-    // commit, so an open-slug field rendered through this control silently kept nothing — with no
-    // error, because nothing went wrong. That is worse than the bare text box it replaced.
+    // Type, then move to the next field: free text must commit on blur, not only on Enter.
     await user.type(screen.getByRole("combobox", { name: "Rarity" }), "unique");
     await user.click(screen.getByRole("button", { name: "elsewhere" }));
     expect(onChange).toHaveBeenCalledWith("unique");
 
-    // ...and text that IS an option's label commits the OPTION, so a picker in free-text mode cannot
-    // store "Ireena" where `p1` belongs.
+    // Text matching an option's label commits the option's id.
     onChange.mockClear();
     await user.type(screen.getByRole("combobox", { name: "Rarity" }), "ireena");
     await user.click(screen.getByRole("button", { name: "elsewhere" }));
@@ -470,24 +456,16 @@ describe("Combobox", () => {
     expect(onChange).toHaveBeenCalledWith("p1");
     expect(input).toHaveAttribute("aria-expanded", "false");
 
-    // The option's `onMouseDown` preventDefault deliberately leaves focus on the input, so `onFocus`
-    // can never fire again — and a caller that keeps `value` at null (a `TagInput` collecting several)
-    // stays mounted on this very input. Without the click handler the next tap did nothing at all,
-    // which is precisely the "there is no list here" defect the visible list exists to end.
+    // The option's mousedown `preventDefault` keeps focus on the input, so `onFocus` can't reopen the list for a
+    // caller that keeps `value` at null (`TagInput`); the click handler must.
     await user.click(input);
     expect(input).toHaveAttribute("aria-expanded", "true");
   });
 });
 
 /**
- * `TagInput` in `pick` mode — the multi-value half of the client's `3a`/`3d` report.
- *
- * The single-value repair (`Combobox` behind `FieldDef.pick`) landed first and covered one field.
- * Six of the nine damage-type sites are LISTS, and a list rendered its vocabulary into a `<datalist>`:
- * no arrow, no cue, and nothing at all on iOS Safari. So the same chooser became this control's entry
- * box, opt-in, because `suggestions` means two different things at two kinds of call site — a
- * canonical vocabulary a GM should be choosing from, versus a corpus of tags that already exist, where
- * the normal act is to type a new one and a menu of prior tags would be a wall.
+ * `TagInput` in `pick` mode: the entry box becomes a visible `Combobox` instead of a `<datalist>`, which has no
+ * affordance and renders nothing on iOS Safari. Opt-in, because a corpus of existing tags is a hint, not a menu.
  */
 describe("TagInput", () => {
   const TYPES = ["acid", "cold", "fire", "lightning"];
@@ -495,10 +473,11 @@ describe("TagInput", () => {
   it("without `pick` it is the datalist it always was — no listbox, no menu", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const { container } = render(<TagInput values={[]} onChange={onChange} suggestions={TYPES} ariaLabel="Damage resistances" />);
+    const { container } = render(
+      <TagInput values={[]} onChange={onChange} suggestions={TYPES} ariaLabel="Damage resistances" />
+    );
 
-    // The Codex's tag fields are this call, and they must stay this call: their suggestions are every
-    // tag the campaign already uses, which is a hint, not a set to choose from.
+    // Codex tag fields use this default: their suggestions are a hint, not a set to choose from.
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(container.querySelector("datalist")).not.toBeNull();
     await user.type(screen.getByLabelText("Damage resistances"), "fire{Enter}");
@@ -508,14 +487,23 @@ describe("TagInput", () => {
   it("with `pick` the whole list is on screen, by its printed name, before anything is typed", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <TagInput values={[]} onChange={vi.fn()} suggestions={TYPES} pick optionLabel={(value) => value.toUpperCase()} ariaLabel="Damage resistances" />
+      <TagInput
+        values={[]}
+        onChange={vi.fn()}
+        suggestions={TYPES}
+        pick
+        optionLabel={(value) => value.toUpperCase()}
+        ariaLabel="Damage resistances"
+      />
     );
 
     await user.click(screen.getByRole("combobox", { name: "Damage resistances" }));
-    expect(within(screen.getByRole("listbox", { name: "Damage resistances" })).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["ACID", "COLD", "FIRE", "LIGHTNING"]);
-    // The invisible half is GONE rather than merely supplemented — two lists over one field is two
-    // things to keep in step.
+    expect(
+      within(screen.getByRole("listbox", { name: "Damage resistances" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(["ACID", "COLD", "FIRE", "LIGHTNING"]);
+    // The datalist is gone, not supplemented.
     expect(container.querySelector("datalist")).toBeNull();
   });
 
@@ -524,8 +512,7 @@ describe("TagInput", () => {
     const onChange = vi.fn();
     render(<TagInput values={["fire"]} onChange={onChange} suggestions={TYPES} pick ariaLabel="Damage resistances" />);
 
-    // The open half. `slugify` is the primitive's own normalizer and it runs on the picked path and
-    // the typed path alike, so "Void Fire" cannot become a second spelling of anything.
+    // `slugify` normalizes picked and typed entries alike.
     await user.type(screen.getByRole("combobox", { name: "Damage resistances" }), "Void Fire{Enter}");
     expect(onChange).toHaveBeenCalledWith(["fire", "void-fire"]);
   });
@@ -536,11 +523,12 @@ describe("TagInput", () => {
     render(<TagInput values={["fire"]} onChange={onChange} suggestions={TYPES} pick ariaLabel="Damage resistances" />);
 
     await user.click(screen.getByRole("combobox", { name: "Damage resistances" }));
-    const shown = within(screen.getByRole("listbox", { name: "Damage resistances" })).getAllByRole("option").map((option) => option.textContent);
+    const shown = within(screen.getByRole("listbox", { name: "Damage resistances" }))
+      .getAllByRole("option")
+      .map((option) => option.textContent);
     expect(shown).toEqual(["acid", "cold", "lightning"]);
 
-    // Removal is the chip's ✕ in both modes, which matters because `pick` gives up Backspace-on-empty:
-    // the entry box is `Combobox`'s and its keyboard belongs to the listbox.
+    // Removal is the chip's ✕ in both modes; `pick` gives up Backspace-on-empty.
     await user.click(screen.getByRole("button", { name: "Remove fire" }));
     expect(onChange).toHaveBeenCalledWith([]);
   });
@@ -548,8 +536,7 @@ describe("TagInput", () => {
   it("`pick` with no list falls back to the plain box rather than a chooser over nothing", () => {
     render(<TagInput values={[]} onChange={vi.fn()} suggestions={[]} pick ariaLabel="Which languages" />);
 
-    // "Show the list when there is one" — the sentence a caller that sets `pick` for a whole control
-    // (`GrantsEditor`, where the vocabulary changes with the row's kind) needs to stay true.
+    // No suggestions, no chooser: a caller can set `pick` for a whole control whose vocabulary varies.
     expect(screen.queryByRole("combobox", { name: "Which languages" })).toBeNull();
     expect(screen.getByLabelText("Which languages")).toBeInTheDocument();
   });

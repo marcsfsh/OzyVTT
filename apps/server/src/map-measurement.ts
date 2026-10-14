@@ -48,12 +48,14 @@ function positiveFinite(value: number, label: string) {
 
 function measurementUnit(value: string) {
   const unit = value.trim();
-  if (!unit || unit.length > 32 || /[\u0000-\u001f\u007f]/.test(unit)) throw new Error("Measurement unit must contain 1 to 32 printable characters.");
+  if (!unit || unit.length > 32 || /[\u0000-\u001f\u007f]/.test(unit))
+    throw new Error("Measurement unit must contain 1 to 32 printable characters.");
   return unit;
 }
 
 function validatePoint(point: ImagePoint, label: string) {
-  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new Error(`${label} must contain finite coordinates.`);
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y))
+    throw new Error(`${label} must contain finite coordinates.`);
   return point;
 }
 
@@ -65,7 +67,8 @@ function validatePath(points: readonly ImagePoint[]) {
 
 function integerDelta(value: number) {
   const rounded = Math.round(Math.abs(value));
-  if (Math.abs(Math.abs(value) - rounded) > COORDINATE_EPSILON) throw new Error("Snapped grid measurement produced a non-integral cell delta.");
+  if (Math.abs(Math.abs(value) - rounded) > COORDINATE_EPSILON)
+    throw new Error("Snapped grid measurement produced a non-integral cell delta.");
   return rounded;
 }
 
@@ -115,7 +118,9 @@ export function measureGridPath(
   };
 }
 
-export function deriveMapDistanceScale(input: Readonly<{ start: ImagePoint; end: ImagePoint; knownDistance: number; unit: string }>): MapDistanceScale {
+export function deriveMapDistanceScale(
+  input: Readonly<{ start: ImagePoint; end: ImagePoint; knownDistance: number; unit: string }>
+): MapDistanceScale {
   const start = validatePoint(input.start, "Scale start");
   const end = validatePoint(input.end, "Scale end");
   const pixels = Math.hypot(end.x - start.x, end.y - start.y);

@@ -1,6 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Field, GmOnlyTag, IconButton, IconX, Input, Modal, RevealSwitch, SaveState, Select, TagInput, Textarea } from "@vtt/ui";
-import { calendarApi, codexApi, uploadCodexAsset, type CodexAutosaveSettings, type CodexCalendar, type CodexPage, type CodexPageConnection, type CodexPageRevision, type CodexPageSummary, type CodexSettings } from "./api";
+import {
+  Alert,
+  Button,
+  Field,
+  GmOnlyTag,
+  IconButton,
+  IconX,
+  Input,
+  Modal,
+  RevealSwitch,
+  SaveState,
+  Select,
+  TagInput,
+  Textarea
+} from "@vtt/ui";
+import {
+  calendarApi,
+  codexApi,
+  uploadCodexAsset,
+  type CodexAutosaveSettings,
+  type CodexCalendar,
+  type CodexPage,
+  type CodexPageConnection,
+  type CodexPageRevision,
+  type CodexPageSummary,
+  type CodexSettings
+} from "./api";
 import { CodexImage } from "./CodexImage";
 import { CodexEditor } from "./CodexEditor";
 import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
@@ -12,36 +37,42 @@ import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 /**
- * Ruling 11 — **the context column is summonable, and so is everything else that is not the writing.**
- *
- * The ruling names connections, atlas pins and the journal as what moves behind a toggle. Measured, that
- * is not enough to deliver its second half ("writing gets full width and full height"): at 1280x900 with
- * the context column already hidden and the centre at its full 680px, a `location` page's own frontmatter
- * — banner 32 + kind/folder/tags 214 + typed fields 242 + the body tab bar 44 + the editor toolbar 44,
- * plus gaps — stands 636px tall inside a 659px frame. The writing surface would get 23px. So the panel
- * holds the page's PROPERTIES as well as its connections, and the centre column holds exactly one thing:
- * the body being written. That is what takes the textarea from 224px to the frame's height.
- *
- * The panel is an overlay inside the detail column, not a `Drawer`: it belongs to the page, not to the
- * app, and the shell already has a right-edge drawer (Session prep) that a second fixed panel would
- * fight. It is remembered per browser, closed by default, because the writing is the reason to be here.
+ * The page editor. The centre column holds only the body being written; properties and connections live
+ * in a summoned overlay panel (not a `Drawer`, which would fight the shell's Session prep drawer).
+ * The panel's open state is remembered per browser and starts closed.
  */
 const DETAILS_KEY = "codex-page-details";
 const DETAILS_ID = "codex-page-details";
 
-/**
- * `dateYear`/`dateMonth`/`dateDay` are the in-world date that puts an `event` page on the chronicle.
- * They are STRINGS here, exactly as the journal composer holds them, because a half-typed year is a
- * normal state of an input and coercing it every keystroke is how "1" becomes a saved year of 1.
- */
-type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tags: readonly string[]; playerBody: string; gmBody: string; bannerAssetId: string | null; dateYear: string; dateMonth: string; dateDay: string };
+/** In-world date parts are strings, as in the journal composer, so a half-typed year isn't coerced and saved. */
+type Draft = {
+  title: string;
+  entityType: EntityType;
+  fields: Record<string, string>;
+  folder: string;
+  tags: readonly string[];
+  playerBody: string;
+  gmBody: string;
+  bannerAssetId: string | null;
+  dateYear: string;
+  dateMonth: string;
+  dateDay: string;
+};
 
 function draftOf(page: CodexPage): Draft {
-  const date = page.inWorldDate; // the RAW date the GM typed - correct even if the calendar has since changed
+  const date = page.inWorldDate; // the raw date the GM typed, still valid if the calendar changed
   return {
-    title: page.title, entityType: page.entityType, fields: { ...page.fields, ...page.gmFields }, folder: page.folder ?? "",
-    tags: page.tags, playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId,
-    dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : ""
+    title: page.title,
+    entityType: page.entityType,
+    fields: { ...page.fields, ...page.gmFields },
+    folder: page.folder ?? "",
+    tags: page.tags,
+    playerBody: page.playerBody,
+    gmBody: page.gmBody,
+    bannerAssetId: page.bannerAssetId,
+    dateYear: date ? String(date.year) : "",
+    dateMonth: date ? String(date.month) : "0",
+    dateDay: date ? String(date.day) : ""
   };
 }
 
@@ -49,25 +80,40 @@ export type PageEditorProps = Readonly<{
   gmToken: string;
   page: CodexPage;
   pages: readonly CodexPageSummary[];
-  /** D8: one list, both directions, both origins. Replaces `backlinks` + `relationships`. */
+  /** One list, both directions, both origins. */
   connections: readonly CodexPageConnection[];
   autosave: CodexAutosaveSettings;
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
-  /** Follow a `[[link]]`. Unresolved targets open quick-create rather than creating silently (D7). */
+  /** Follow a `[[link]]`. Unresolved targets open quick-create rather than creating silently. */
   onNavigate: (target: string) => void;
   /** Jump to the archived fight an auto-logged battle came from. GM-only: archives carry GM narration. */
   onOpenReplay?: (archiveId: number) => void;
   onConnectionsChanged: () => void;
   onOpenConnection: (kind: CodexPageConnection["otherKind"], id: string) => void;
-  /** Open a pin on the Atlas — the page's "elsewhere" edge. Both halves travel (map, then pin). */
+  /** Open a pin on the Atlas (map, then pin). */
   onOpenMarker?: (markerId: string, mapId: string) => void;
-  /** Land the Graph ON this page's own node — the page's fourth return edge. */
+  /** Land the Graph on this page's node. */
   onShowInGraph?: (pageId: string) => void;
   onPickTag?: (tag: string) => void;
 }>;
 
-export function PageEditor({ gmToken, page, pages, connections, autosave, onChange, onDeleted, onNavigate, onOpenReplay, onConnectionsChanged, onOpenConnection, onOpenMarker, onShowInGraph, onPickTag }: PageEditorProps) {
+export function PageEditor({
+  gmToken,
+  page,
+  pages,
+  connections,
+  autosave,
+  onChange,
+  onDeleted,
+  onNavigate,
+  onOpenReplay,
+  onConnectionsChanged,
+  onOpenConnection,
+  onOpenMarker,
+  onShowInGraph,
+  onPickTag
+}: PageEditorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
@@ -80,54 +126,76 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const detailsRef = useRef<HTMLElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(() => {
-    try { return localStorage.getItem(DETAILS_KEY) === "open"; } catch { return false; }
+    try {
+      return localStorage.getItem(DETAILS_KEY) === "open";
+    } catch {
+      return false;
+    }
   });
   const showDetails = useCallback((open: boolean) => {
     setDetailsOpen(open);
-    try { localStorage.setItem(DETAILS_KEY, open ? "open" : "closed"); } catch { /* private mode - fine */ }
+    try {
+      localStorage.setItem(DETAILS_KEY, open ? "open" : "closed");
+    } catch {
+      /* private mode - fine */
+    }
   }, []);
-  // Summoning a panel that nothing focuses leaves a keyboard user where they were, with the controls they
-  // asked for somewhere behind them. Focus the panel itself rather than its first field: the heading is
-  // what tells them where they landed.
-  useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
+  // Focus the summoned panel itself, so keyboard users land on its heading.
+  useEffect(() => {
+    if (detailsOpen) detailsRef.current?.focus();
+  }, [detailsOpen]);
 
-  /**
-   * D6 — one autosave, the GM's cadence. Identical to the old hand-rolled behaviour when the setting is
-   * on; when it is off the same hook drives an explicit Save, an "Unsaved changes" readout, a navigation
-   * guard and a `beforeunload` handler.
-   */
-  const save = useCallback(async (next: Draft) => {
-    const { fields, gmFields } = splitEntityFields(next.entityType, next.fields);
-    const updated = await codexApi.updatePage(gmToken, page.id, {
-      title: next.title.trim() || "Untitled", entityType: next.entityType, fields, gmFields,
-      folder: next.folder.trim() || null, tags: next.tags,
-      playerBody: next.playerBody, gmBody: next.gmBody, bannerAssetId: next.bannerAssetId,
-      // Only an `event` page has a date control, so only an `event` page states a date. On any other
-      // kind the key is OMITTED, and an omitted date leaves the stored one alone — which is what makes
-      // switching an event to a note and back lossless rather than a silent erase.
-      ...(next.entityType === "event"
-        ? { inWorldDate: next.dateYear.trim() ? { year: Math.trunc(Number(next.dateYear) || 0), month: Number(next.dateMonth || 0), day: Math.max(1, Math.trunc(Number(next.dateDay) || 1)) } : null }
-        : {}),
-      expectedRev: revRef.current
-    });
-    revRef.current = updated.rev;
-    setSaveError(null);
-    onChange(updated);
-  }, [gmToken, page.id, onChange]);
+  /** Autosave at the GM's cadence; when off, the same hook drives Save, the dirty readout and the navigation guards. */
+  const save = useCallback(
+    async (next: Draft) => {
+      const { fields, gmFields } = splitEntityFields(next.entityType, next.fields);
+      const updated = await codexApi.updatePage(gmToken, page.id, {
+        title: next.title.trim() || "Untitled",
+        entityType: next.entityType,
+        fields,
+        gmFields,
+        folder: next.folder.trim() || null,
+        tags: next.tags,
+        playerBody: next.playerBody,
+        gmBody: next.gmBody,
+        bannerAssetId: next.bannerAssetId,
+        // Only `event` pages send a date. Omitting it leaves the stored date alone, so switching kinds is lossless.
+        ...(next.entityType === "event"
+          ? {
+              inWorldDate: next.dateYear.trim()
+                ? {
+                    year: Math.trunc(Number(next.dateYear) || 0),
+                    month: Number(next.dateMonth || 0),
+                    day: Math.max(1, Math.trunc(Number(next.dateDay) || 1))
+                  }
+                : null
+            }
+          : {}),
+        expectedRev: revRef.current
+      });
+      revRef.current = updated.rev;
+      setSaveError(null);
+      onChange(updated);
+    },
+    [gmToken, page.id, onChange]
+  );
 
   const { status, dirty, flush, markSaved } = useCodexAutosave<Draft>({
     settings: autosave,
     draft,
     save,
     onConflict: async () => {
-      try { revRef.current = (await codexApi.getPage(gmToken, page.id)).page.rev; } catch { /* keep stale rev; a later flush retries */ }
+      try {
+        revRef.current = (await codexApi.getPage(gmToken, page.id)).page.rev;
+      } catch {
+        /* keep stale rev; a later flush retries */
+      }
     }
   });
 
   /**
-   * Adopt an EXTERNAL change to this same page (a folder move from the tree patches folder + rev out
-   * from under us). With no unsaved local edits we take the server copy, so the editor does not keep a
-   * stale folder and then 409 its next save. With unsaved edits the draft wins and our save lands.
+   * Adopt an external change to this page (e.g. a folder move bumps rev). With no local edits take the
+   * server copy so the next save doesn't 409; with unsaved edits the draft wins.
    */
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -140,8 +208,10 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   }, [page, markSaved]);
 
   const body = tab === "player" ? draft.playerBody : draft.gmBody;
-  const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
-  const setField = (key: string, value: string) => setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
+  const setBody = (next: string) =>
+    setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
+  const setField = (key: string, value: string) =>
+    setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
   const typeDef = entityDef(draft.entityType);
 
   const isEvent = draft.entityType === "event";
@@ -149,28 +219,34 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   useEffect(() => {
     if (!isEvent || calendar) return;
     let live = true;
-    void calendarApi.get(gmToken).then((next) => { if (live) setCalendar(next); }).catch(() => undefined);
-    return () => { live = false; };
+    void calendarApi
+      .get(gmToken)
+      .then((next) => {
+        if (live) setCalendar(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
   }, [isEvent, calendar, gmToken]);
   // The kind-change copy names the history setting, so read it once when the editor mounts.
-  useEffect(() => { void codexApi.getSettings(gmToken).then(setSettings).catch(() => undefined); }, [gmToken]);
+  useEffect(() => {
+    void codexApi
+      .getSettings(gmToken)
+      .then(setSettings)
+      .catch(() => undefined);
+  }, [gmToken]);
 
   /**
-   * D7 / director ruling R7 — **changing a page's kind always confirms.**
-   *
-   * Unconditional, not "only when fields would be lost": the two cases read the same to a GM mid-flow,
-   * and a conditional dialog is exactly the kind you learn to dismiss unread before the destructive one
-   * arrives. What differs is the copy — with populated foreign fields it names them.
-   *
-   * Recovery is a **hard guarantee**: a type-changing save forces a revision snapshot server-side,
-   * bypassing the coalescing window, so "restore them from History" is literally true. Unless the GM has
-   * switched version history off, in which case the copy softens rather than lying.
+   * Changing a page's kind always confirms, since a conditional dialog gets dismissed unread. A
+   * kind-changing save forces a revision server-side, so "restore them from History" is true unless the GM
+   * has turned history off, in which case the copy says so.
    */
   const changeKind = async (nextType: EntityType) => {
     if (nextType === draft.entityType) return;
     const keep = new Set(entityDef(nextType).fields.map((field) => field.key));
-    const lost = entityDef(draft.entityType).fields
-      .filter((field) => !keep.has(field.key) && (draft.fields[field.key] ?? "").trim())
+    const lost = entityDef(draft.entityType)
+      .fields.filter((field) => !keep.has(field.key) && (draft.fields[field.key] ?? "").trim())
       .map((field) => field.label);
     const historyOn = settings?.revisionHistory.enabled ?? true;
     const recovery = historyOn
@@ -178,29 +254,47 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
       : "They will be removed. Version history is off, so this cannot be undone.";
     const ok = await confirm({
       title: `Change kind to ${ENTITY_DEFS[nextType].label}?`,
-      body: lost.length > 0
-        ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. ${recovery}`
-        : `Its fields become ${ENTITY_DEFS[nextType].label} fields. Nothing you have written is lost.`,
+      body:
+        lost.length > 0
+          ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. ${recovery}`
+          : `Its fields become ${ENTITY_DEFS[nextType].label} fields. Nothing you have written is lost.`,
       confirmLabel: "Change kind"
     });
     if (!ok) return;
-    // Client and server prune identically. Leaving stripped values in the draft would show the GM a
-    // field the very next save deletes — the server prunes to the effective kind on every save that
-    // touches fields or the kind (the CD-2 viewer-safety decision), so the draft must agree.
-    setDraft((prev) => ({ ...prev, entityType: nextType, fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key))) }));
+    // Prune the draft the same way the server prunes on save, so the GM never sees a field the next save
+    // deletes.
+    setDraft((prev) => ({
+      ...prev,
+      entityType: nextType,
+      fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key)))
+    }));
   };
 
   const toggleReveal = async (next: boolean) => {
     setRevealed(next);
     // Flush any pending edit first, so revealing never briefly publishes the pre-edit body.
-    try { await flush(); const updated = await codexApi.revealPage(gmToken, page.id, next); onChange(updated); }
-    catch { setRevealed(!next); setSaveError("Couldn't change who can see this page."); }
+    try {
+      await flush();
+      const updated = await codexApi.revealPage(gmToken, page.id, next);
+      onChange(updated);
+    } catch {
+      setRevealed(!next);
+      setSaveError("Couldn't change who can see this page.");
+    }
   };
 
   const openRevisions = async () => {
     setRevisionsOpen(true);
-    try { setRevisions(await codexApi.listRevisions(gmToken, page.id)); } catch { setRevisions([]); }
-    try { setSettings(await codexApi.getSettings(gmToken)); } catch { setSettings(null); }
+    try {
+      setRevisions(await codexApi.listRevisions(gmToken, page.id));
+    } catch {
+      setRevisions([]);
+    }
+    try {
+      setSettings(await codexApi.getSettings(gmToken));
+    } catch {
+      setSettings(null);
+    }
   };
   const restore = async (revisionId: number) => {
     try {
@@ -211,38 +305,90 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
       markSaved(next);
       setRevisionsOpen(false);
       onChange(updated);
-    } catch { setSaveError("Couldn't restore that version."); }
+    } catch {
+      setSaveError("Couldn't restore that version.");
+    }
   };
   const remove = async () => {
-    if (!(await confirm({ title: "Delete page", body: `Delete "${draft.title || "this page"}"? This cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    try { await codexApi.deletePage(gmToken, page.id); onDeleted(); } catch { setSaveError("Couldn't delete that page."); }
+    if (
+      !(await confirm({
+        title: "Delete page",
+        body: `Delete "${draft.title || "this page"}"? This cannot be undone.`,
+        confirmLabel: "Delete",
+        danger: true
+      }))
+    )
+      return;
+    try {
+      await codexApi.deletePage(gmToken, page.id);
+      onDeleted();
+    } catch {
+      setSaveError("Couldn't delete that page.");
+    }
   };
   const uploadBanner = async (file: File | undefined) => {
     if (!file) return;
-    try { const asset = await uploadCodexAsset(gmToken, file); setDraft((prev) => ({ ...prev, bannerAssetId: asset.id })); }
-    catch { setSaveError("Couldn't upload that image."); }
+    try {
+      const asset = await uploadCodexAsset(gmToken, file);
+      setDraft((prev) => ({ ...prev, bannerAssetId: asset.id }));
+    } catch {
+      setSaveError("Couldn't upload that image.");
+    }
   };
 
   const tagSuggestions = useMemo(() => [...new Set(pages.flatMap((summary) => summary.tags))].sort(), [pages]);
-  const folderCrumbs = draft.folder.split("/").map((segment) => segment.trim()).filter(Boolean);
+  const folderCrumbs = draft.folder
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
 
   return (
     <div className="codex-editor">
       <div className="codex-editor-head">
         <div className="codex-editor-titlewrap">
-          {folderCrumbs.length > 0 && <nav className="codex-crumbs" aria-label="Folder path">{folderCrumbs.map((crumb, index) => <span key={index} className="codex-crumb-seg">{index > 0 && <span className="codex-crumb-sep">/</span>}{crumb}</span>)}</nav>}
-          {/* D25: the bespoke `.codex-title-input` becomes the primitive's title variant. */}
-          <Input variant="title" className="codex-title-input" value={draft.title} placeholder="Untitled page" aria-label="Page title"
-            onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
+          {folderCrumbs.length > 0 && (
+            <nav className="codex-crumbs" aria-label="Folder path">
+              {folderCrumbs.map((crumb, index) => (
+                <span key={index} className="codex-crumb-seg">
+                  {index > 0 && <span className="codex-crumb-sep">/</span>}
+                  {crumb}
+                </span>
+              ))}
+            </nav>
+          )}
+          <Input
+            variant="title"
+            className="codex-title-input"
+            value={draft.title}
+            placeholder="Untitled page"
+            aria-label="Page title"
+            onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+          />
         </div>
         <div className="codex-editor-actions">
           <SaveState status={status} onRetry={() => void flush()} onReload={() => void flush()} />
-          {/* D6: with autosave off, saving is an explicit act — and this view's one primary action. */}
-          {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
+          {/* With autosave off, saving is explicit and this view's one primary action. */}
+          {!autosave.enabled && (
+            <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>
+              Save
+            </Button>
+          )}
           <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
-          <Button variant="ghost" size="sm" aria-expanded={detailsOpen} aria-controls={DETAILS_ID} onClick={() => showDetails(!detailsOpen)}>Details</Button>
-          <Button variant="ghost" size="sm" onClick={openRevisions}>History</Button>
-          <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={detailsOpen}
+            aria-controls={DETAILS_ID}
+            onClick={() => showDetails(!detailsOpen)}
+          >
+            Details
+          </Button>
+          <Button variant="ghost" size="sm" onClick={openRevisions}>
+            History
+          </Button>
+          <Button variant="ghost" size="sm" onClick={remove}>
+            Delete
+          </Button>
         </div>
       </div>
       {saveError && <Alert tone="danger">{saveError}</Alert>}
@@ -251,124 +397,300 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
         <div className="codex-editor-center">
           <TwoLayerBodyTabs value={tab} onChange={setTab} />
 
-          {/* D13: the ONE editor. Toolbar, `[[` autocomplete, image drop/paste and the Edit/View switch
-              are the primitive's; the Codex supplies its reader, its page list and its violet chrome.
-              `fill` is ruling 11's second half: the surface takes the frame's height instead of the
-              primitive's 14rem floor. */}
-          <CodexEditor token={gmToken} value={body} onChange={setBody} fill
+          {/* `fill` makes the editor take the frame's height instead of the primitive's 14rem floor. */}
+          <CodexEditor
+            token={gmToken}
+            value={body}
+            onChange={setBody}
+            fill
             ariaLabel={BODY_LAYER[tab].label}
-            placeholder={tab === "player" ? "What players can read about this page…" : "Hidden from players: hooks, stats, the twist…"}
-            pages={pages} excludePageId={page.id} onNavigate={onNavigate} gmLayer={tab === "gm"} />
+            placeholder={
+              tab === "player"
+                ? "What players can read about this page…"
+                : "Hidden from players: hooks, stats, the twist…"
+            }
+            pages={pages}
+            excludePageId={page.id}
+            onNavigate={onNavigate}
+            gmLayer={tab === "gm"}
+          />
         </div>
 
         {detailsOpen && (
-        <aside id={DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Page details" tabIndex={-1} ref={detailsRef}
-          /* Scoped, never global: a keypress that started inside the panel closes it, and one that started
-             in the body being written belongs to the body. Same contract as `Drawer`. */
-          onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
-          <div className="codex-context-head">
-            <h3 className="codex-backlinks-title">Page details</h3>
-            <IconButton label="Close page details" size="sm" onClick={() => showDetails(false)}><IconX /></IconButton>
-          </div>
-          {draft.bannerAssetId
-            ? <div className="codex-banner"><CodexImage assetId={draft.bannerAssetId} token={gmToken} alt="Page banner" className="codex-banner-img" /><div className="codex-banner-actions"><Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>Change</Button><Button variant="ghost" size="sm" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>Remove banner</Button></div></div>
-            : <Button variant="ghost" size="sm" className="codex-banner-add" onClick={() => bannerInputRef.current?.click()}>Add banner image</Button>}
-          <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadBanner(event.target.files?.[0]); event.target.value = ""; }} />
-
-          <div className="codex-meta-row">
-            <Field label="Kind" htmlFor="codex-type">
-              <Select id="codex-type" value={draft.entityType} onChange={(event) => void changeKind(event.target.value as EntityType)}>
-                {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].label}</option>)}
-              </Select>
-            </Field>
-            <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
-            <Field label="Tags" htmlFor="codex-tags">
-              <TagInput id="codex-tags" ariaLabel="Tags" placeholder="town, npc" values={draft.tags}
-                onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tags: next }))}
-                max={24} maxReachedReason="A page may carry at most 24 tags."
-                suggestions={tagSuggestions} />
-            </Field>
-          </div>
-          {onPickTag && draft.tags.length > 0 && (
-            /* D10: a tag is a cross-type view, everywhere it appears. */
-            <div className="codex-editor-tagjumps">
-              {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
+          <aside
+            id={DETAILS_ID}
+            className="codex-editor-context scroll-y"
+            aria-label="Page details"
+            tabIndex={-1}
+            ref={detailsRef}
+            /* Scoped: Escape closes the panel only for keypresses that started inside it. */
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                showDetails(false);
+              }
+            }}
+          >
+            <div className="codex-context-head">
+              <h3 className="codex-backlinks-title">Page details</h3>
+              <IconButton label="Close page details" size="sm" onClick={() => showDetails(false)}>
+                <IconX />
+              </IconButton>
             </div>
-          )}
+            {draft.bannerAssetId ? (
+              <div className="codex-banner">
+                <CodexImage
+                  assetId={draft.bannerAssetId}
+                  token={gmToken}
+                  alt="Page banner"
+                  className="codex-banner-img"
+                />
+                <div className="codex-banner-actions">
+                  <Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>
+                    Change
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}
+                  >
+                    Remove banner
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="codex-banner-add"
+                onClick={() => bannerInputRef.current?.click()}
+              >
+                Add banner image
+              </Button>
+            )}
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                void uploadBanner(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
 
-          {isEvent && (
-            <div className="codex-meta-row codex-event-date">
-              <Field label="Year" htmlFor="codex-date-year" help="Places this event on the Journal and the Calendar."><Input id="codex-date-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => setDraft((prev) => ({ ...prev, dateYear: event.target.value }))} /></Field>
-              <Field label="Month" htmlFor="codex-date-month"><Select id="codex-date-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => setDraft((prev) => ({ ...prev, dateMonth: event.target.value }))}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
-              <Field label="Day" htmlFor="codex-date-day"><Input id="codex-date-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => setDraft((prev) => ({ ...prev, dateDay: event.target.value }))} /></Field>
+            <div className="codex-meta-row">
+              <Field label="Kind" htmlFor="codex-type">
+                <Select
+                  id="codex-type"
+                  value={draft.entityType}
+                  onChange={(event) => void changeKind(event.target.value as EntityType)}
+                >
+                  {ENTITY_TYPE_LIST.map((type) => (
+                    <option key={type} value={type}>
+                      {ENTITY_DEFS[type].label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains">
+                <Input
+                  id="codex-folder"
+                  value={draft.folder}
+                  placeholder="Unfiled"
+                  onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))}
+                />
+              </Field>
+              <Field label="Tags" htmlFor="codex-tags">
+                <TagInput
+                  id="codex-tags"
+                  ariaLabel="Tags"
+                  placeholder="town, npc"
+                  values={draft.tags}
+                  onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tags: next }))}
+                  max={24}
+                  maxReachedReason="A page may carry at most 24 tags."
+                  suggestions={tagSuggestions}
+                />
+              </Field>
             </div>
-          )}
+            {onPickTag && draft.tags.length > 0 && (
+              <div className="codex-editor-tagjumps">
+                {draft.tags.map((tag) => (
+                  <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {typeDef.fields.some((field) => !field.secret) && (
-            <div className="codex-fields">
-              {typeDef.fields.filter((field) => !field.secret).map((field) => (
-                <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`} className={field.kind === "textarea" ? "codex-field-wide" : undefined}>
-                  {field.kind === "textarea"
-                    ? <Textarea id={`codex-field-${field.key}`} className="codex-field-area" value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />
-                    : <Input id={`codex-field-${field.key}`} value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />}
+            {isEvent && (
+              <div className="codex-meta-row codex-event-date">
+                <Field label="Year" htmlFor="codex-date-year" help="Places this event on the Journal and the Calendar.">
+                  <Input
+                    id="codex-date-year"
+                    type="number"
+                    inputMode="numeric"
+                    value={draft.dateYear}
+                    placeholder="1492"
+                    onChange={(event) => setDraft((prev) => ({ ...prev, dateYear: event.target.value }))}
+                  />
                 </Field>
-              ))}
-            </div>
-          )}
-          {typeDef.fields.some((field) => field.secret) && (
-            <div className="codex-fields codex-fields-secret codex-gm-block">
-              <span className="codex-fields-secret-tag"><GmOnlyTag /></span>
-              {typeDef.fields.filter((field) => field.secret).map((field) => (
-                <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`} className={field.kind === "textarea" ? "codex-field-wide" : undefined}>
-                  {field.kind === "textarea"
-                    ? <Textarea id={`codex-field-${field.key}`} className="codex-field-area" value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />
-                    : <Input id={`codex-field-${field.key}`} value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />}
+                <Field label="Month" htmlFor="codex-date-month">
+                  <Select
+                    id="codex-date-month"
+                    value={draft.dateMonth}
+                    disabled={!draft.dateYear.trim()}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, dateMonth: event.target.value }))}
+                  >
+                    {(calendar?.months ?? []).map((month, index) => (
+                      <option key={index} value={String(index)}>
+                        {month.name}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
-              ))}
-            </div>
-          )}
+                <Field label="Day" htmlFor="codex-date-day">
+                  <Input
+                    id="codex-date-day"
+                    type="number"
+                    inputMode="numeric"
+                    value={draft.dateDay}
+                    placeholder="1"
+                    disabled={!draft.dateYear.trim()}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, dateDay: event.target.value }))}
+                  />
+                </Field>
+              </div>
+            )}
 
-          {/**
-            * ONE region answering ONE question — *where else does this entity appear?* — with a
-            * sub-block per place it can: other records, the atlas, the journal, the graph.
-            *
-            * D8 folded the first two of those together: the separate Relationships panel and the
-            * "Linked from" backlink block below it were the same fact told twice, and are now one list
-            * with an `origin` attribute. The atlas and journal edges keep their own blocks because they
-            * are different relations, not different renderings of one.
-            */}
-          <section className="codex-connections" aria-labelledby="codex-connections-h">
-            <div className="codex-connections-head">
-              <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>
-              {onShowInGraph && <Button variant="ghost" size="sm" onClick={() => onShowInGraph(page.id)}>Show in graph</Button>}
-            </div>
-            <ConnectionsPanel standalone={false} connections={connections} onOpen={onOpenConnection}
-              write={{ gmToken, pageId: page.id, pages, onChanged: onConnectionsChanged }} />
-            <PageMarkers gmToken={gmToken} pageId={page.id} onOpenMarker={onOpenMarker} />
-            <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} onOpenEntry={(entryId) => onOpenConnection("journal", entryId)} />
-          </section>
-        </aside>
+            {typeDef.fields.some((field) => !field.secret) && (
+              <div className="codex-fields">
+                {typeDef.fields
+                  .filter((field) => !field.secret)
+                  .map((field) => (
+                    <Field
+                      key={field.key}
+                      label={field.label}
+                      htmlFor={`codex-field-${field.key}`}
+                      className={field.kind === "textarea" ? "codex-field-wide" : undefined}
+                    >
+                      {field.kind === "textarea" ? (
+                        <Textarea
+                          id={`codex-field-${field.key}`}
+                          className="codex-field-area"
+                          value={draft.fields[field.key] ?? ""}
+                          placeholder={field.placeholder}
+                          onChange={(event) => setField(field.key, event.target.value)}
+                        />
+                      ) : (
+                        <Input
+                          id={`codex-field-${field.key}`}
+                          value={draft.fields[field.key] ?? ""}
+                          placeholder={field.placeholder}
+                          onChange={(event) => setField(field.key, event.target.value)}
+                        />
+                      )}
+                    </Field>
+                  ))}
+              </div>
+            )}
+            {typeDef.fields.some((field) => field.secret) && (
+              <div className="codex-fields codex-fields-secret codex-gm-block">
+                <span className="codex-fields-secret-tag">
+                  <GmOnlyTag />
+                </span>
+                {typeDef.fields
+                  .filter((field) => field.secret)
+                  .map((field) => (
+                    <Field
+                      key={field.key}
+                      label={field.label}
+                      htmlFor={`codex-field-${field.key}`}
+                      className={field.kind === "textarea" ? "codex-field-wide" : undefined}
+                    >
+                      {field.kind === "textarea" ? (
+                        <Textarea
+                          id={`codex-field-${field.key}`}
+                          className="codex-field-area"
+                          value={draft.fields[field.key] ?? ""}
+                          placeholder={field.placeholder}
+                          onChange={(event) => setField(field.key, event.target.value)}
+                        />
+                      ) : (
+                        <Input
+                          id={`codex-field-${field.key}`}
+                          value={draft.fields[field.key] ?? ""}
+                          placeholder={field.placeholder}
+                          onChange={(event) => setField(field.key, event.target.value)}
+                        />
+                      )}
+                    </Field>
+                  ))}
+              </div>
+            )}
+
+            {/* Where else does this entity appear: connections, atlas pins, journal and graph. */}
+            <section className="codex-connections" aria-labelledby="codex-connections-h">
+              <div className="codex-connections-head">
+                <h4 className="codex-backlinks-title" id="codex-connections-h">
+                  Connections
+                </h4>
+                {onShowInGraph && (
+                  <Button variant="ghost" size="sm" onClick={() => onShowInGraph(page.id)}>
+                    Show in graph
+                  </Button>
+                )}
+              </div>
+              <ConnectionsPanel
+                standalone={false}
+                connections={connections}
+                onOpen={onOpenConnection}
+                write={{ gmToken, pageId: page.id, pages, onChanged: onConnectionsChanged }}
+              />
+              <PageMarkers gmToken={gmToken} pageId={page.id} onOpenMarker={onOpenMarker} />
+              <PageTimeline
+                gmToken={gmToken}
+                pageId={page.id}
+                onOpenReplay={onOpenReplay}
+                onOpenEntry={(entryId) => onOpenConnection("journal", entryId)}
+              />
+            </section>
+          </aside>
         )}
       </div>
 
       {revisionsOpen && (
-        <Modal open onClose={() => setRevisionsOpen(false)} title="Version history" size="md" ariaLabel="Version history">
+        <Modal
+          open
+          onClose={() => setRevisionsOpen(false)}
+          title="Version history"
+          size="md"
+          ariaLabel="Version history"
+        >
           {settings && (
             <p className="codex-composer-hint">
               {!settings.revisionHistory.enabled
                 ? "Version history is off, so nothing new is being saved. These can still be restored. Change it in Settings."
                 : settings.revisionHistory.windowMinutes > 0
-                ? `One version is saved per ${settings.revisionHistory.windowMinutes} minutes, so the newest below can be that far behind the page. Change it in Settings.`
-                : "Every save is kept as a version. Change it in Settings."}
+                  ? `One version is saved per ${settings.revisionHistory.windowMinutes} minutes, so the newest below can be that far behind the page. Change it in Settings.`
+                  : "Every save is kept as a version. Change it in Settings."}
             </p>
           )}
-          {revisions.length === 0 ? <p className="codex-preview-empty">No earlier versions.</p> : (
+          {revisions.length === 0 ? (
+            <p className="codex-preview-empty">No earlier versions.</p>
+          ) : (
             <ul className="codex-revisions">
               {revisions.map((revision) => (
                 <li key={revision.id} className="codex-revision">
-                  <div><strong>v{revision.rev}</strong> · <span className="codex-revision-when">{new Date(revision.authoredAt).toLocaleString()}</span></div>
+                  <div>
+                    <strong>v{revision.rev}</strong> ·{" "}
+                    <span className="codex-revision-when">{new Date(revision.authoredAt).toLocaleString()}</span>
+                  </div>
                   <div className="codex-revision-title">{revision.title}</div>
-                  <Button variant="secondary" size="sm" onClick={() => restore(revision.id)}>Restore</Button>
+                  <Button variant="secondary" size="sm" onClick={() => restore(revision.id)}>
+                    Restore
+                  </Button>
                 </li>
               ))}
             </ul>

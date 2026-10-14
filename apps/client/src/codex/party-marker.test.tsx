@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-// The atlas renders a real image-backed surface; this file is about the party FLAG, not the camera.
+// The atlas renders a real image-backed surface; this file is about the party flag, not the camera.
 vi.mock("../scene/mapImage", () => ({
   useAuthorizedMapImage: () => ({ status: "ready", url: "blob:map", width: 1000, height: 800 }),
   imagePointFromClient: () => null,
@@ -43,51 +43,62 @@ import { AtlasView } from "./AtlasView";
 import { MapSurface } from "./MapSurface";
 import type { CodexMap, CodexMarker } from "./api";
 
-/**
- * M12 / CT-7 — the party marker on the client.
- *
- * The three things this has to hold, and why each is asserted the way it is:
- *  - **R2** — "the party is here" may never be carried by the ring alone. Colour and shape live entirely
- *    in CSS and SVG attributes, so the proof is that the TEXT of the surface says it: strip every
- *    stylesheet and a reader still knows where the party is. The `<title>` assertion is the same rule for
- *    a reader who cannot see the map at all.
- *  - **M12-C** — one pin for the whole atlas. The client's half of that is that it re-reads instead of
- *    patching one row: the pin that LOST the flag may be on a different map entirely, so a client that
- *    trusted the echo would leave two pins claiming to be the party until the next refresh.
- *  - **One way to move it.** CT-7 says the party is moved by moving the pin. A second control — a
- *    coordinate field, a "move the party here" action — is the drift this asserts against, and it is
- *    asserted by absence because that is the only way to catch a control being added.
- */
-
 const MAP: CodexMap = {
-  id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null,
-  revealedToPlayers: true, sortKey: 0, tags: [], createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z"
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia",
+  kind: "regional",
+  parentMapId: null,
+  revealedToPlayers: true,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z"
 };
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
-  id: "k1", mapId: "m1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki",
-  revealedToPlayers: true, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false,
-  tags: [], createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
+  id: "k1",
+  mapId: "m1",
+  x: 100,
+  y: 200,
+  iconId: "village",
+  iconColor: "#FF2E9A",
+  label: "Vallaki",
+  revealedToPlayers: true,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: [],
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  ...over
 });
 
-/**
- * The atlas, with the address fed back the way `CodexShell` feeds it.
- *
- * Selecting a pin is a NAVIGATION now (`?pin=`), not local state — that is what puts it behind the
- * autosave-off leave guard, see `pin-selection.test.tsx`. So a harness that swallowed `onNavigate` would
- * render an atlas in which no pin can ever be opened, and every assertion about the inspector below
- * would be about a surface the GM cannot reach.
- */
+/** Feeds the address back like `CodexShell`, since selecting a pin is a navigation (`?pin=`). */
 function AtlasHarness() {
   const [href, setHref] = useState("/codex/atlas");
   const [path, search] = href.split("?");
   const query = new URLSearchParams(search ?? "");
   return (
     <ToastProvider>
-      <AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()}
-        mapId={path.split("/")[3] ?? null} pinId={query.get("pin")}
-        autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()}
+      <AtlasView
+        gmToken="gm"
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        onActivateScene={vi.fn()}
+        mapId={path.split("/")[3] ?? null}
+        pinId={query.get("pin")}
+        autosave={{ enabled: true, intervalSeconds: 1 }}
+        onQuickCreate={vi.fn()}
         onNavigate={setHref}
-        onReplaceQuery={(mutate) => { const next = new URLSearchParams(search ?? ""); mutate(next); setHref(next.toString() ? `${path}?${next}` : path); }} />
+        onReplaceQuery={(mutate) => {
+          const next = new URLSearchParams(search ?? "");
+          mutate(next);
+          setHref(next.toString() ? `${path}?${next}` : path);
+        }}
+      />
     </ToastProvider>
   );
 }
@@ -104,21 +115,40 @@ const renderAtlas = async (markers: CodexMarker[]) => {
 
 describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () => {
   it("draws the words on the map and names the pin for a screen reader", () => {
-    render(<MapSurface token="gm" assetId="a1" placing={false} selectedMarkerId={null}
-      markers={[{ id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki", isParty: true }]}
-      onBackgroundClick={vi.fn()} onMarkerClick={vi.fn()} onMarkerDragEnd={vi.fn()} />);
+    render(
+      <MapSurface
+        token="gm"
+        assetId="a1"
+        placing={false}
+        selectedMarkerId={null}
+        markers={[
+          { id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki", isParty: true }
+        ]}
+        onBackgroundClick={vi.fn()}
+        onMarkerClick={vi.fn()}
+        onMarkerDragEnd={vi.fn()}
+      />
+    );
 
     const pin = document.querySelector('[data-marker-id="k1"]')!;
     expect(pin.textContent).toContain("The party is here");
     expect(pin.querySelector("title")!.textContent).toBe("Vallaki, the party is here");
-    // The ring is decoration on top of that, never instead of it.
     expect(pin.querySelector(".codex-marker-partyring")).not.toBeNull();
   });
 
   it("says nothing at all on an ordinary pin", () => {
-    render(<MapSurface token="gm" assetId="a1" placing={false} selectedMarkerId={null}
-      markers={[{ id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki" }]}
-      onBackgroundClick={vi.fn()} onMarkerClick={vi.fn()} onMarkerDragEnd={vi.fn()} />);
+    render(
+      <MapSurface
+        token="gm"
+        assetId="a1"
+        placing={false}
+        selectedMarkerId={null}
+        markers={[{ id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki" }]}
+        onBackgroundClick={vi.fn()}
+        onMarkerClick={vi.fn()}
+        onMarkerDragEnd={vi.fn()}
+      />
+    );
 
     const pin = document.querySelector('[data-marker-id="k1"]')!;
     expect(pin.textContent).not.toContain("The party");
@@ -132,18 +162,7 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
     expect(screen.getByRole("button", { name: "Show the pin" })).toBeInTheDocument();
   });
 
-  /**
-   * A map whose pins are NOT the party says nothing about the party.
-   *
-   * This replaces an assertion that could not fail. It searched for `/is not on this map/` — a phrase no
-   * implementation produces — inside a DOM that still held the previous render, because the first
-   * `render()` was never unmounted. An adversarial review proved it vacuous by replacing
-   * `markers.find(m => m.isParty)` with `markers[0]`, so every map with any pin announced the party: all
-   * 180 client tests passed.
-   *
-   * Written as its own test with ONE render and the real phrase, so the claim is "this map does not say the
-   * party is here" — which is what CT-7 actually requires, and what the mutation breaks.
-   */
+  /** One render and the real phrase, so a `markers[0]` mutation fails. */
   it("says nothing about the party on a map whose pins are not the party", async () => {
     await renderAtlas([MARKER({ isParty: false })]);
     await waitFor(() => expect(listMarkers).toHaveBeenCalled());
@@ -153,34 +172,24 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
 });
 
 /**
- * "Show the pin" has to SHOW the pin (`ux-principles.md` §9 — actions name their result). Fixed 2026-07-30.
- *
- * It used to call `setSelectedMarkerId` alone: that opens the inspector and rings the pin, neither of which
- * helps when the pin is outside the current view, and on a phone the map is usually below the fold from the
- * row the button sits on. So the tap now does both halves — the surface centres its camera on the pin, and
- * the map is scrolled into the page's own viewport.
- *
- * The camera is asserted through the `viewBox`, which is pure state → attribute with no layout in it, so it
- * is one of the few things about this surface a jsdom test can honestly prove (`test/setup.ts` is explicit
- * that pointer geometry is not). `scrollIntoView` is a no-op shim there, so the second half is asserted as
- * a call rather than as a scroll position.
+ * "Show the pin" centres the camera and scrolls the map into view. The camera is checked through the
+ * `viewBox`; `scrollIntoView` is a jsdom shim, so it is checked as a call.
  */
 describe("Show the pin shows the pin (ux-principles §9)", () => {
-  // The mocked image is 1000×800, and the surface fits it at zoom 1 with the camera at its centre —
-  // `viewBox = "cx - w/2  cy - h/2  w  h"`, so (500, 400) reads as "0 0 1000 800".
+  // The 1000x800 image fits at zoom 1 with the camera centred, so the viewBox is "0 0 1000 800".
   const FIT = "0 0 1000 800";
   const svg = () => document.querySelector(".codex-map-svg")!;
 
   it("centres the camera on the party pin and brings the map into view", async () => {
     const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
-    // Deliberately NOT the centre of the map: a camera that never moved would still read as fitted.
+    // Off-centre, so a camera that never moved can't pass.
     await renderAtlas([MARKER({ isParty: true, x: 100, y: 200 })]);
     const user = userEvent.setup();
     expect(svg()).toHaveAttribute("viewBox", FIT);
 
     await user.click(screen.getByRole("button", { name: "Show the pin" }));
 
-    // Centred on (100, 200) at the same zoom: 100 − 500 = −400, 200 − 400 = −200.
+    // Centred on (100, 200): 100 - 500 = -400, 200 - 400 = -200.
     await waitFor(() => expect(svg()).toHaveAttribute("viewBox", "-400 -200 1000 800"));
     expect(scrolled).toHaveBeenCalled();
     scrolled.mockRestore();
@@ -190,8 +199,7 @@ describe("Show the pin shows the pin (ux-principles §9)", () => {
     await renderAtlas([MARKER({ isParty: true, x: 100, y: 200 })]);
     const user = userEvent.setup();
 
-    // Selecting is not a centring request. A surface that moved the camera on selection would pull the map
-    // out from under the GM's finger every time they opened a pin's inspector.
+    // Selecting must not move the camera out from under the GM's finger.
     await user.click(document.querySelector('[data-marker-id="k1"]')!);
 
     expect(svg()).toHaveAttribute("viewBox", FIT);
@@ -202,7 +210,6 @@ describe("One party pin for the whole atlas (M12-C)", () => {
   it("marks a pin as the party through its own route, and re-reads the map's pins", async () => {
     await renderAtlas([MARKER()]);
     const user = userEvent.setup();
-    // Open the inspector by clicking the pin's group (the surface's own click path).
     await user.click(document.querySelector('[data-marker-id="k1"]')!);
     const toggle = await screen.findByLabelText("This pin is the party's position");
     expect(toggle).toHaveAttribute("aria-checked", "false");
@@ -212,10 +219,9 @@ describe("One party pin for the whole atlas (M12-C)", () => {
     await user.click(toggle);
 
     await waitFor(() => expect(setPartyMarker).toHaveBeenCalledWith("gm", "k1", true));
-    // M12-C: setting this one CLEARED whichever pin held it before, possibly on another map — so the
-    // client re-reads rather than patching the one row it was handed back.
+    // Setting the party may clear a pin on another map, so the client re-reads.
     await waitFor(() => expect(listMarkers.mock.calls.length).toBeGreaterThan(readsBefore));
-    // The party flag is not an edit to the pin: it never travels on the PATCH that rewrites its label.
+    // The party flag never travels on the label PATCH.
     expect(updateMarker).not.toHaveBeenCalled();
   });
 
@@ -238,16 +244,16 @@ describe("One party pin for the whole atlas (M12-C)", () => {
     await user.click(document.querySelector('[data-marker-id="k1"]')!);
     await screen.findByLabelText("This pin is the party's position");
 
-    // Asserted by COUNTING, which is the only way to catch a control being added later: exactly ONE
-    // control in the inspector is about the party, and it is the flag. A coordinate field or a
-    // "move the party here" action would be a second path onto `moveMarker` and would make this two.
+    // Exactly one party control in the inspector: the flag. A second way to move the party would make two.
     const inspector = screen.getByRole("complementary", { name: "Pin" });
-    const partyControls = [...inspector.querySelectorAll("button, input, select, textarea")]
-      .filter((element) => /party/i.test(`${element.getAttribute("aria-label") ?? ""} ${element.textContent ?? ""}`));
+    const partyControls = [...inspector.querySelectorAll("button, input, select, textarea")].filter((element) =>
+      /party/i.test(`${element.getAttribute("aria-label") ?? ""} ${element.textContent ?? ""}`)
+    );
     expect(partyControls).toHaveLength(1);
     expect(partyControls[0]).toHaveAttribute("role", "switch");
     expect(moveMarker).not.toHaveBeenCalled();
-    // And the inspector says out loud how it IS moved.
-    expect(screen.getByText("Players see this pin marked as the party. Drag the pin to move the party.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Players see this pin marked as the party. Drag the pin to move the party.")
+    ).toBeInTheDocument();
   });
 });

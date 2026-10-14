@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import { gridToImage } from "../src/grid-calibration.js";
-import { createEncounterTokens, encounterTokenAppearance, ensureEncounterTokens, moveEncounterToken } from "../src/token-placement.js";
+import {
+  createEncounterTokens,
+  encounterTokenAppearance,
+  ensureEncounterTokens,
+  moveEncounterToken
+} from "../src/token-placement.js";
 
 const ACTOR = "60000000-0000-4000-8000-000000000001";
 const SECOND = "60000000-0000-4000-8000-000000000002";
 const MAP = "70000000-0000-5000-8000-000000000001";
-const calibration = { kind: "square" as const, origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 };
+const calibration = {
+  kind: "square" as const,
+  origin: { x: 0, y: 0 },
+  cellSizePx: 50,
+  rotationRadians: 0,
+  distancePerCell: 5
+};
 const geometry = { width: 500, height: 400, calibration };
 
 function activeState() {
@@ -17,8 +28,14 @@ function activeState() {
       { id: SECOND, name: "Monster", kind: "monster", hp: { current: 10, maximum: 10 } }
     ],
     combat: {
-      active: true, round: 1, turnActorId: ACTOR, mapAssetId: MAP,
-      initiative: [{ actorId: ACTOR, score: 20 }, { actorId: SECOND, score: 10 }],
+      active: true,
+      round: 1,
+      turnActorId: ACTOR,
+      mapAssetId: MAP,
+      initiative: [
+        { actorId: ACTOR, score: 20 },
+        { actorId: SECOND, score: 10 }
+      ],
       tokens: createEncounterTokens([{ actorId: ACTOR }, { actorId: SECOND }], geometry)
     }
   });
@@ -26,20 +43,32 @@ function activeState() {
 
 describe("authoritative encounter token placement", () => {
   it("creates an unplaced tray token sized from the calibrated grid", () => {
-    expect(encounterTokenAppearance(geometry)).toEqual({ sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 });
-    expect(createEncounterTokens([{ actorId: ACTOR }], geometry)).toEqual([{ actorId: ACTOR, position: null, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 }]);
-    expect(encounterTokenAppearance({ width: 900, height: 600, calibration: null })).toEqual({ sizePx: 33.333, gridSizePx: null, gridRotationRadians: null, sizeCells: 1 });
+    expect(encounterTokenAppearance(geometry)).toEqual({
+      sizePx: 41,
+      gridSizePx: 50,
+      gridRotationRadians: 0,
+      sizeCells: 1
+    });
+    expect(createEncounterTokens([{ actorId: ACTOR }], geometry)).toEqual([
+      { actorId: ACTOR, position: null, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 }
+    ]);
+    expect(encounterTokenAppearance({ width: 900, height: 600, calibration: null })).toEqual({
+      sizePx: 33.333,
+      gridSizePx: null,
+      gridRotationRadians: null,
+      sizeCells: 1
+    });
   });
 
   it("draws Tiny and Small smaller than Medium inside their shared cell, footprint unchanged (report #13)", () => {
     // One-cell sizes scale their glyph (Tiny 50% / Small 66% / Medium 82% of the 50px cell) but all
     // still occupy a single cell - the footprint (sizeCells) that drives snapping is untouched.
     expect(encounterTokenAppearance(geometry, 1, "medium").sizePx).toBe(41); // 50 * .82
-    expect(encounterTokenAppearance(geometry, 1, "small").sizePx).toBe(33);  // 50 * .66
-    expect(encounterTokenAppearance(geometry, 1, "tiny").sizePx).toBe(25);   // 50 * .50
+    expect(encounterTokenAppearance(geometry, 1, "small").sizePx).toBe(33); // 50 * .66
+    expect(encounterTokenAppearance(geometry, 1, "tiny").sizePx).toBe(25); // 50 * .50
     expect(encounterTokenAppearance(geometry, 1, "tiny").sizeCells).toBe(1);
     // Multi-cell sizes ignore the single-cell factor and fill their whole footprint.
-    expect(encounterTokenAppearance(geometry, 2, "large").sizePx).toBe(96);  // 50 * (2 - .08)
+    expect(encounterTokenAppearance(geometry, 2, "large").sizePx).toBe(96); // 50 * (2 - .08)
   });
 
   it("snaps drops to cell centers, keeps tokens on-map, and returns them to the tray", () => {
@@ -56,7 +85,12 @@ describe("authoritative encounter token placement", () => {
     const state = activeState();
     const rotated = { ...calibration, origin: { x: 250, y: 100 }, rotationRadians: Math.PI / 6 };
     const expected = gridToImage(rotated, { column: 2.5, row: 1.5 });
-    moveEncounterToken(state, ACTOR, { x: expected.x + 3, y: expected.y - 2 }, { width: 600, height: 500, calibration: rotated });
+    moveEncounterToken(
+      state,
+      ACTOR,
+      { x: expected.x + 3, y: expected.y - 2 },
+      { width: 600, height: 500, calibration: rotated }
+    );
     expect(state.combat.tokens[0].position?.x).toBeCloseTo(expected.x, 3);
     expect(state.combat.tokens[0].position?.y).toBeCloseTo(expected.y, 3);
 
@@ -65,7 +99,8 @@ describe("authoritative encounter token placement", () => {
   });
 
   it("upgrades old active encounters with missing tokens and rejects invalid sequences", () => {
-    const state = activeState(); state.combat = { ...state.combat, tokens: state.combat.tokens.slice(0, 1) };
+    const state = activeState();
+    state.combat = { ...state.combat, tokens: state.combat.tokens.slice(0, 1) };
     expect(ensureEncounterTokens(state, geometry)).toBe(true);
     expect(state.combat.tokens.map((token) => token.actorId)).toEqual([ACTOR, SECOND]);
     expect(ensureEncounterTokens(state, geometry)).toBe(false);

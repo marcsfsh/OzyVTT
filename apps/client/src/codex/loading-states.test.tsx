@@ -29,10 +29,12 @@ vi.mock("./api", async (importOriginal) => {
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    // CI-7: the Campaign dashboard's own three feeds. They resolve EMPTY in every test below on
-    // purpose — an empty journal and an empty atlas are what make `pages` the deciding feed for the
-    // empty state under test, exactly as they were before the dashboard had any other data.
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a) },
+    // The dashboard's other feeds resolve empty, so `pages` decides the empty state under test.
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      timeline: (...a: unknown[]) => timeline(...a)
+    },
     atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) }
   };
@@ -42,24 +44,21 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 
-/**
- * CF-2: **an empty state must never front-run its own fetch.**
- *
- * The bug these pin: every mode renders its empty branch off `list.length === 0`, which is also the
- * state before the first response lands. So a GM with a full campaign was told "No entries yet" /
- * "No entities yet" for one round-trip. M4 fixed this for the Pages rail only; these cover the modes
- * that were missed, which is exactly where the milestone's own stated bar ("every mode shows a
- * loading and an error state") was not met.
- *
- * Each test holds the fetch open deliberately — resolving it would hide the very window under test.
- */
+/** An empty state must not show before its fetch settles. Each test holds the fetch open on purpose. */
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => { resolve = r; });
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 };
 
-const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () =>
+  (goTo("/codex/pages"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 
 describe("Codex loading states (CF-2)", () => {
   beforeEach(() => {
@@ -82,15 +81,24 @@ describe("Codex loading states (CF-2)", () => {
     renderWorkspace();
 
     await user.click(screen.getByRole("button", { name: "Home" }));
-    // The fetch is still open: the invitation to create a first page must not be on screen.
+    // Fetch still open: no first-page invitation yet.
     expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument();
 
-    // ...and once it settles with real data, the mode renders content rather than the empty branch.
-    pages.resolve([{
-      id: "p1", title: "Strahd", entityType: "character", fields: {}, folder: null, tags: [],
-      revealedToPlayers: false, bannerAssetId: null, rev: 1,
-      createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
-    }]);
+    pages.resolve([
+      {
+        id: "p1",
+        title: "Strahd",
+        entityType: "character",
+        fields: {},
+        folder: null,
+        tags: [],
+        revealedToPlayers: false,
+        bannerAssetId: null,
+        rev: 1,
+        createdAt: "2026-07-28T00:00:00.000Z",
+        updatedAt: "2026-07-28T00:00:00.000Z"
+      }
+    ]);
     await waitFor(() => expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument());
     expect(await screen.findByText("Strahd")).toBeInTheDocument();
   });
@@ -104,7 +112,7 @@ describe("Codex loading states (CF-2)", () => {
     await user.click(screen.getByRole("button", { name: "Graph" }));
     expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument();
     pages.resolve([]);
-    // A genuinely empty campaign SHOULD reach the empty state — the fix must not suppress it forever.
+    // A genuinely empty campaign still reaches the empty state.
     expect(await screen.findByText(/No pages yet/i)).toBeInTheDocument();
   });
 

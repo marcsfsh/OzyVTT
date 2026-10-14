@@ -8,10 +8,8 @@ import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 import { Stepper } from "./Stepper";
 import "./AbilityScoreAllocator.css";
 
-/** How the six scores are entered. `assign` hands out values from a fixed pool
-    (standard array, 4d6-drop-lowest, any GM formula that produces six numbers);
-    `spend` nudges each score against a shared budget (point buy). Two interactions
-    cover all four methods — a third would just be a second way to say the same. */
+/** How the six scores are entered: `assign` hands out values from a fixed pool (standard array, rolled scores,
+    a GM formula); `spend` nudges each score against a shared budget (point buy). */
 export type AbilityAllocationMode = "assign" | "spend";
 
 export interface AbilityPoolValue {
@@ -23,7 +21,7 @@ export interface AbilityPoolValue {
 
 export interface AbilityRowData {
   id: string;
-  /** Full name, e.g. "Strength" — the accessible name for the row's control. */
+  /** Full name, e.g. "Strength": the accessible name for the row's control. */
   label: string;
   /** Three-letter form for the compact column, e.g. "STR". */
   abbr: string;
@@ -31,7 +29,7 @@ export interface AbilityRowData {
   score: number | null;
   /** Species / background / feat bonus applied on top. */
   bonus?: number;
-  /** Final score and modifier, computed by @vtt/rules-5e — never derived here. */
+  /** Final score and modifier, computed by @vtt/rules-5e, never here. */
   total: number | null;
   modifier: number | null;
   /** Bounds for the spend-mode stepper. */
@@ -46,7 +44,7 @@ export interface AbilityScoreAllocatorProps {
   mode: AbilityAllocationMode;
   rows: readonly AbilityRowData[];
 
-  /** The allowed methods (the GM picks these — decision 10). Omit to hide the switch. */
+  /** The methods the GM allows. Omit to hide the switch. */
   methods?: readonly SegmentedOption[];
   method?: string;
   onMethodChange?: (method: string) => void;
@@ -63,32 +61,35 @@ export interface AbilityScoreAllocatorProps {
   /** spend mode: the shared budget readout. */
   budget?: { spent: number; total: number; label?: ReactNode };
 
-  /** Controls above the table — a `DiceInputRow` for 4d6, a formula field for custom. */
+  /** Controls above the table: a `DiceInputRow` for 4d6, a formula field for custom. */
   toolbar?: ReactNode;
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
 }
 
-const signed = (value: number | null) => value == null ? "—" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
-const plain = (value: number | null) => value == null ? "—" : String(value);
+const signed = (value: number | null) =>
+  value == null ? "—" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+const plain = (value: number | null) => (value == null ? "—" : String(value));
 
-/** The ability-score step: one component behind all four generation methods
-    (standard array, point buy, 4d6-drop-lowest, GM custom formula).
-
-    Assignment is a per-ability `<Select>`, not drag-and-drop. Dragging a value onto
-    a row is the obvious mouse gesture and a dead end on a phone, and a drag plus a
-    fallback would be two ways to say one thing. A select is one gesture that works
-    with a finger, a mouse, and a screen reader.
-
-    Everything numeric renders in the mono face with `.tabular`, so base / bonus /
-    total / modifier line up as they change. This component is pure presentation: it
-    computes no scores, costs, or modifiers — those come from `@vtt/rules-5e` as
-    props, together with the callbacks that change them. */
+/** The ability-score step for all four generation methods. Assignment is a per-ability `<Select>` rather than
+    drag-and-drop, which fails on a phone. Numbers use `.tabular` so columns line up as they change. Pure
+    presentation: scores, costs and modifiers come from `@vtt/rules-5e` as props. */
 export function AbilityScoreAllocator({
-  mode, rows, methods, method, onMethodChange, methodHint,
-  pool, onAssign, onScoreChange, budget, toolbar,
-  disabled = false, ariaLabel = "Ability scores", className
+  mode,
+  rows,
+  methods,
+  method,
+  onMethodChange,
+  methodHint,
+  pool,
+  onAssign,
+  onScoreChange,
+  budget,
+  toolbar,
+  disabled = false,
+  ariaLabel = "Ability scores",
+  className
 }: AbilityScoreAllocatorProps) {
   const tableId = useId();
   const unassigned = (pool ?? []).filter((entry) => !entry.assignedTo);
@@ -99,7 +100,12 @@ export function AbilityScoreAllocator({
       {(methods && method != null && onMethodChange) || methodHint != null ? (
         <div className="nh-abil-method">
           {methods && method != null && onMethodChange && (
-            <SegmentedControl ariaLabel="Ability score method" options={[...methods]} value={method} onChange={onMethodChange} />
+            <SegmentedControl
+              ariaLabel="Ability score method"
+              options={[...methods]}
+              value={method}
+              onChange={onMethodChange}
+            />
           )}
           {methodHint != null && <p className="nh-abil-hint">{methodHint}</p>}
         </div>
@@ -111,9 +117,15 @@ export function AbilityScoreAllocator({
         <div className="nh-abil-pool">
           <span className="nh-abil-pool-label">Still to assign</span>
           <div className="nh-abil-pool-values">
-            {unassigned.length === 0
-              ? <span className="nh-abil-pool-done">All assigned</span>
-              : unassigned.map((entry) => <Badge key={entry.id} tone="info"><span className="tabular">{entry.value}</span></Badge>)}
+            {unassigned.length === 0 ? (
+              <span className="nh-abil-pool-done">All assigned</span>
+            ) : (
+              unassigned.map((entry) => (
+                <Badge key={entry.id} tone="info">
+                  <span className="tabular">{entry.value}</span>
+                </Badge>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -123,15 +135,16 @@ export function AbilityScoreAllocator({
           <Meter
             value={Math.max(0, budget.total - budget.spent)}
             max={budget.total}
-            /* Overspent CLAMPS the value to 0, so this tone paints a zero-width fill and is never
-               seen. Left as-is deliberately: churning a token that renders nothing is noise. */
+            /* Overspent clamps the value to 0, so this tone never shows. */
             tone={overspent ? "magenta" : "cyan"}
             label={budget.label ?? "Points remaining"}
           />
-          {/* CAUTION, not danger: rose-red is damage and destruction (§2), and an over-budget spread
-              is simply not finished. The Alert owns the FACT; the flow's footer owns the fix, so the
-              two no longer print the same instruction one above the other. */}
-          {overspent && <Alert tone="warning" title="Over budget">You have spent {budget.spent} of {budget.total} points.</Alert>}
+          {/* Caution, not danger: over budget is unfinished, not destructive. The flow's footer owns the fix. */}
+          {overspent && (
+            <Alert tone="warning" title="Over budget">
+              You have spent {budget.spent} of {budget.total} points.
+            </Alert>
+          )}
         </div>
       )}
 
@@ -156,7 +169,9 @@ export function AbilityScoreAllocator({
               </span>
 
               <span className="nh-abil-cell nh-abil-cell--control">
-                <span className="nh-abil-cell-label" aria-hidden="true">{mode === "assign" ? "Assigned" : "Score"}</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  {mode === "assign" ? "Assigned" : "Score"}
+                </span>
                 {mode === "assign" ? (
                   <Select
                     className="nh-abil-select tabular"
@@ -168,7 +183,11 @@ export function AbilityScoreAllocator({
                   >
                     <option value="">—</option>
                     {assigned && <option value={assigned.id}>{assigned.value}</option>}
-                    {unassigned.map((entry) => <option key={entry.id} value={entry.id}>{entry.value}</option>)}
+                    {unassigned.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.value}
+                      </option>
+                    ))}
                   </Select>
                 ) : (
                   <Stepper
@@ -184,25 +203,29 @@ export function AbilityScoreAllocator({
               </span>
 
               <span className="nh-abil-cell">
-                <span className="nh-abil-cell-label" aria-hidden="true">Bonus</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  Bonus
+                </span>
                 <span className="nh-abil-num tabular">{row.bonus ? signed(row.bonus) : "—"}</span>
               </span>
 
               <span className="nh-abil-cell">
-                <span className="nh-abil-cell-label" aria-hidden="true">Total</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  Total
+                </span>
                 <span className="nh-abil-num nh-abil-num--total tabular">{plain(row.total)}</span>
               </span>
 
               <span className="nh-abil-cell">
-                <span className="nh-abil-cell-label" aria-hidden="true">Mod</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  Mod
+                </span>
                 <span className="nh-abil-num nh-abil-num--mod tabular">{signed(row.modifier)}</span>
               </span>
 
               {row.note != null && <span className="nh-abil-note">{row.note}</span>}
 
-              {/* The row's outcome, described to its control. A screen-reader user
-                  hears "Strength score, 15, total 17, modifier +3" on focus — no
-                  six-way live region shouting over every keystroke. */}
+              {/* The row's outcome, read on focus instead of a live region that would announce every keystroke. */}
               <span className="nh-sr-only" id={outcomeId}>
                 Total {plain(row.total)}, modifier {signed(row.modifier)}
               </span>

@@ -24,16 +24,24 @@ export interface NameFieldProps {
   className?: string;
 }
 
-/** Name entry with a generator beside it: type your own, or shuffle for a
-    species-appropriate suggestion and click one.
-
-    The suggestions are plain buttons rather than a dropdown so they are visible
-    without a gesture and tappable on a phone — a name list you have to open is a
-    name list nobody uses. Picking one fills the field; it stays fully editable. */
+/** Name entry with a generator: type your own, or shuffle and click a species-appropriate suggestion.
+    Suggestions are plain buttons so they're visible and tappable without opening anything; the field stays
+    editable. */
 export function NameField({
-  value, onChange, label = "Name", placeholder = "Name your character",
-  suggestions, onShuffle, shuffleLabel = "Suggest names",
-  help, error, required, disabled = false, maxLength, id, className
+  value,
+  onChange,
+  label = "Name",
+  placeholder = "Name your character",
+  suggestions,
+  onShuffle,
+  shuffleLabel = "Suggest names",
+  help,
+  error,
+  required,
+  disabled = false,
+  maxLength,
+  id,
+  className
 }: NameFieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -63,7 +71,9 @@ export function NameField({
 
       {suggestions && suggestions.length > 0 && (
         <div className="nh-namefield-suggestions">
-          <span className="nh-namefield-suggestions-label" id={listId}>Suggestions</span>
+          <span className="nh-namefield-suggestions-label" id={listId}>
+            Suggestions
+          </span>
           <ul className="nh-namefield-list" aria-labelledby={listId}>
             {suggestions.map((name) => (
               <li key={name}>

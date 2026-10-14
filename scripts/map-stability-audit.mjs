@@ -151,7 +151,9 @@ async function gmPage(viewport, dock) {
   await password.press("Enter");
   await page.waitForSelector(".table-layout", { timeout: 25_000 });
   // No transitions, so a rect is never read mid-animation.
-  await page.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
+  await page.addStyleTag({
+    content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }"
+  });
   await page.waitForTimeout(1500);
   return page;
 }
@@ -260,22 +262,39 @@ async function measure(testCase) {
       await page.mouse.move(from.x, from.y);
       await page.mouse.down();
       for (let step = 1; step <= 8; step += 1) {
-        await page.mouse.move(from.x + (to.x - from.x) * step / 8, from.y + (to.y - from.y) * step / 8);
+        await page.mouse.move(from.x + ((to.x - from.x) * step) / 8, from.y + ((to.y - from.y) * step) / 8);
         await page.evaluate(() => window.__mapStability.push("drag"));
         await page.waitForTimeout(20);
       }
-      await page.evaluate(() => { window.__holdSocket = 2500; });
+      await page.evaluate(() => {
+        window.__holdSocket = 2500;
+      });
       await page.mouse.up();
 
-      const mounted = await page.waitForSelector(".encounter-map-saving", { state: "attached", timeout: 6_000 }).then(() => true, () => false);
-      if (!mounted) { await page.evaluate(() => { window.__holdSocket = 0; window.__mapStability.stop(); }); await page.waitForTimeout(500); continue; }
+      const mounted = await page.waitForSelector(".encounter-map-saving", { state: "attached", timeout: 6_000 }).then(
+        () => true,
+        () => false
+      );
+      if (!mounted) {
+        await page.evaluate(() => {
+          window.__holdSocket = 0;
+          window.__mapStability.stop();
+        });
+        await page.waitForTimeout(500);
+        continue;
+      }
       for (let sample = 0; sample < 12; sample += 1) {
         await page.evaluate(() => window.__mapStability.push("saving-held"));
         await page.waitForTimeout(60);
       }
-      await page.evaluate(() => { window.__holdSocket = 0; });
+      await page.evaluate(() => {
+        window.__holdSocket = 0;
+      });
       await page.waitForSelector(".encounter-map-saving", { state: "detached", timeout: 10_000 });
-      await page.evaluate(() => { window.__mapStability.push("settled"); window.__mapStability.stop(); });
+      await page.evaluate(() => {
+        window.__mapStability.push("settled");
+        window.__mapStability.stop();
+      });
       const candidate = await page.evaluate(() => window.__mapStability);
       if (candidate.mounts > 0) log = candidate;
     }
@@ -287,7 +306,10 @@ async function measure(testCase) {
     const drift = { top: worst("top"), height: worst("height") };
     const finish = log.samples[log.samples.length - 1];
     return {
-      base, drift, held: held.length, mounts: log.mounts,
+      base,
+      drift,
+      held: held.length,
+      mounts: log.mounts,
       settledDrift: { top: Math.abs(finish.top - base.top), height: Math.abs(finish.height - base.height) }
     };
   } finally {
@@ -340,7 +362,8 @@ async function measureDock(testCase) {
     const report = await page.evaluate(DOCK_PORTS);
     if (!report) throw new Error("no .encounter-map-dock on the page");
     const problems = [];
-    if (report.ports.length !== 1) problems.push(`${report.ports.length} scroll ports (${report.ports.map((p) => p.el).join(", ")})`);
+    if (report.ports.length !== 1)
+      problems.push(`${report.ports.length} scroll ports (${report.ports.map((p) => p.el).join(", ")})`);
     // §7's marker rule: whichever element keeps the scroll says so in the markup.
     for (const port of report.ports) if (!port.declared) problems.push(`${port.el} scrolls undeclared`);
     if (report.secondFrame) problems.push("the panel paints a second frame (::before)");
@@ -348,17 +371,24 @@ async function measureDock(testCase) {
     const region = await page.locator(".encounter-map-dock .encounter-region").boundingBox();
     if (!region) problems.push("no turn-order region in the dock");
     else {
-      const before = await page.evaluate(() => document.querySelector(".encounter-map-dock .encounter-region").scrollTop);
+      const before = await page.evaluate(
+        () => document.querySelector(".encounter-map-dock .encounter-region").scrollTop
+      );
       await page.mouse.move(region.x + region.width / 2, region.y + Math.min(region.height / 2, region.height - 20));
       await page.mouse.wheel(0, 240);
       await page.waitForTimeout(350);
-      const after = await page.evaluate(() => document.querySelector(".encounter-map-dock .encounter-region").scrollTop);
+      const after = await page.evaluate(
+        () => document.querySelector(".encounter-map-dock .encounter-region").scrollTop
+      );
       const overflow = report.ports[0]?.over ?? 0;
       if (overflow > 0 && after - before <= 0) problems.push(`a wheel over the turn order moved it 0px of ${overflow}`);
       report.wheeled = after - before;
       report.overflow = overflow;
     }
-    return { problems, detail: `${report.ports.length} port(s) · overflow ${report.overflow ?? "?"} · wheel +${report.wheeled ?? "?"} · second frame ${report.secondFrame}` };
+    return {
+      problems,
+      detail: `${report.ports.length} port(s) · overflow ${report.overflow ?? "?"} · wheel +${report.wheeled ?? "?"} · second frame ${report.secondFrame}`
+    };
   } finally {
     await page.close();
   }
@@ -439,7 +469,10 @@ async function measureMenu(testCase) {
     // AFTER the menu, and the menu's own backdrop is dismissed first, because that backdrop is
     // `position: fixed; inset: 0` and swallows every click behind it.
     await page.keyboard.press("Escape");
-    await page.locator(".encounter-menu-backdrop").click({ position: { x: 5, y: 5 }, timeout: 5_000 }).catch(() => {});
+    await page
+      .locator(".encounter-menu-backdrop")
+      .click({ position: { x: 5, y: 5 }, timeout: 5_000 })
+      .catch(() => {});
     await page.waitForTimeout(400);
     const rowButton = page.locator(".initiative-expand").first();
     if (await rowButton.count()) {
@@ -451,17 +484,22 @@ async function measureMenu(testCase) {
       });
     }
     const problems = [];
-    if (report.ports.length !== 1) problems.push(`${report.ports.length} scroll ports (${report.ports.map((p) => p.el).join(", ") || "none"})`);
+    if (report.ports.length !== 1)
+      problems.push(`${report.ports.length} scroll ports (${report.ports.map((p) => p.el).join(", ") || "none"})`);
     for (const port of report.ports) if (!port.declared) problems.push(`${port.el} scrolls undeclared`);
     if (report.atTop.top !== report.atBottom.top || report.atTop.bottom !== report.atBottom.bottom) {
-      problems.push(`the frame scrolls with the content: ${report.atTop.top}..${report.atTop.bottom} -> ${report.atBottom.top}..${report.atBottom.bottom} after ${report.scrolledBy}px`);
+      problems.push(
+        `the frame scrolls with the content: ${report.atTop.top}..${report.atTop.bottom} -> ${report.atBottom.top}..${report.atBottom.bottom} after ${report.scrolledBy}px`
+      );
     }
     if (report.visibleRows > RECENT_COUNT) problems.push(`${report.visibleRows} add rows visible, cap ${RECENT_COUNT}`);
-    if (report.toolsScrolls === true) problems.push(".row-tools-popover is a scroll container and shares the pseudo — same trap");
+    if (report.toolsScrolls === true)
+      problems.push(".row-tools-popover is a scroll container and shares the pseudo — same trap");
     return {
       problems,
-      detail: `${report.ports.length} port(s) · scrolled ${report.scrolledBy}px · frame ${report.atTop.top}..${report.atTop.bottom} unmoved`
-        + ` · ${report.visibleRows}/${report.rowsInDom} add rows visible · row-tools scrolls ${report.toolsScrolls}`
+      detail:
+        `${report.ports.length} port(s) · scrolled ${report.scrolledBy}px · frame ${report.atTop.top}..${report.atTop.bottom} unmoved` +
+        ` · ${report.visibleRows}/${report.rowsInDom} add rows visible · row-tools scrolls ${report.toolsScrolls}`
     };
   } finally {
     await page.close();
@@ -479,14 +517,18 @@ for (const testCase of CASES) {
     const result = await measure(testCase);
     // TO THE PIXEL. There is no budget here: the stage either kept its box or the map moved. A
     // tolerance would be a place for the next 28px to hide.
-    const bad = result.drift.top !== 0 || result.drift.height !== 0
-      || result.settledDrift.top !== 0 || result.settledDrift.height !== 0;
+    const bad =
+      result.drift.top !== 0 ||
+      result.drift.height !== 0 ||
+      result.settledDrift.top !== 0 ||
+      result.settledDrift.height !== 0;
     if (bad) failures += 1;
     rows.push({
       label: testCase.label,
       verdict: bad ? "FAIL" : "PASS",
-      detail: `stage top ${result.base.top} h ${result.base.height} · while saving Δtop ${result.drift.top} Δh ${result.drift.height}`
-        + ` · settled Δtop ${result.settledDrift.top} Δh ${result.settledDrift.height} · ${result.held} samples held, ${result.mounts} mount(s)`
+      detail:
+        `stage top ${result.base.top} h ${result.base.height} · while saving Δtop ${result.drift.top} Δh ${result.drift.height}` +
+        ` · settled Δtop ${result.settledDrift.top} Δh ${result.settledDrift.height} · ${result.held} samples held, ${result.mounts} mount(s)`
     });
   } catch (error) {
     unmeasured += 1;
@@ -505,7 +547,11 @@ for (const testCase of DOCK_CASES) {
     });
   } catch (error) {
     unmeasured += 1;
-    dockRows.push({ label: testCase.label, verdict: "NOT MEASURED", detail: String(error).split("\n")[0].slice(0, 110) });
+    dockRows.push({
+      label: testCase.label,
+      verdict: "NOT MEASURED",
+      detail: String(error).split("\n")[0].slice(0, 110)
+    });
   }
 }
 
@@ -520,7 +566,11 @@ for (const testCase of MENU_CASES) {
     });
   } catch (error) {
     unmeasured += 1;
-    menuRows.push({ label: testCase.label, verdict: "NOT MEASURED", detail: String(error).split("\n")[0].slice(0, 110) });
+    menuRows.push({
+      label: testCase.label,
+      verdict: "NOT MEASURED",
+      detail: String(error).split("\n")[0].slice(0, 110)
+    });
   }
 }
 
@@ -542,5 +592,7 @@ table("the fight menu's frame stays behind its rows, and its add list is capped 
 console.log(`\nA cell reads PASS when the ⋯ menu holds exactly ONE declared scroll port, its plate keeps`);
 console.log(`the same box at every scroll offset, no more than ${RECENT_COUNT} add rows are actually rendered, and`);
 console.log(`.row-tools-popover — which shares the plate's rule — is still not a scroll container.`);
-console.log(`\n${rows.length + dockRows.length + menuRows.length} checks; ${failures} failing; ${unmeasured} NOT MEASURED.`);
+console.log(
+  `\n${rows.length + dockRows.length + menuRows.length} checks; ${failures} failing; ${unmeasured} NOT MEASURED.`
+);
 process.exit(failures === 0 && unmeasured === 0 ? 0 : 1);

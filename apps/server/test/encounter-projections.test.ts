@@ -12,12 +12,31 @@ function game(turnActorId: string) {
   return GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: PUBLIC, name: "Visible Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } },
-      { id: HIDDEN, name: "Secret Lurker", kind: "monster", visibility: "gm-only", hp: { current: 10, maximum: 10 }, notes: "surprise" }
+      {
+        id: PUBLIC,
+        name: "Visible Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 10, maximum: 10 }
+      },
+      {
+        id: HIDDEN,
+        name: "Secret Lurker",
+        kind: "monster",
+        visibility: "gm-only",
+        hp: { current: 10, maximum: 10 },
+        notes: "surprise"
+      }
     ],
     combat: {
-      active: true, round: 3, turnActorId, mapAssetId: MAP,
-      initiative: [{ actorId: HIDDEN, score: 22 }, { actorId: PUBLIC, score: 18 }],
+      active: true,
+      round: 3,
+      turnActorId,
+      mapAssetId: MAP,
+      initiative: [
+        { actorId: HIDDEN, score: 22 },
+        { actorId: PUBLIC, score: 18 }
+      ],
       tokens: [
         { actorId: HIDDEN, position: { x: 100, y: 100 }, sizePx: 40, gridSizePx: 50 },
         { actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50 }
@@ -30,7 +49,48 @@ describe("recipient-safe encounter projections", () => {
   it("omits hidden combatants and reports a safe hidden-turn indicator", () => {
     const state = game(HIDDEN);
     const combat = projectPlayerCombat(state);
-    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy", conditionIds: [], conditions: [] }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", ruleExceptions: { slots: "assisted" }, playerDamageMode: "proposal", pendingInitiative: [], playerInitiativeMode: "immediate", underwater: false, reactionsUsed: [], fog: { enabled: false, shapes: [] }, rewound: false, pendingSaves: [], pendingReactions: [], pendingRuleAsks: [] });
+    expect(combat).toEqual({
+      active: true,
+      round: 3,
+      turnActorId: null,
+      mapAssetId: MAP,
+      hiddenTurn: true,
+      initiative: [
+        {
+          actorId: PUBLIC,
+          name: "Visible Hero",
+          score: 18,
+          active: false,
+          health: "healthy",
+          conditionIds: [],
+          conditions: []
+        }
+      ],
+      tokens: [
+        {
+          actorId: PUBLIC,
+          position: { x: 200, y: 200 },
+          sizePx: 40,
+          gridSizePx: 50,
+          gridRotationRadians: null,
+          sizeCells: 1
+        }
+      ],
+      annotations: [],
+      turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
+      rulesMode: "strict",
+      ruleExceptions: { slots: "assisted" },
+      playerDamageMode: "proposal",
+      pendingInitiative: [],
+      playerInitiativeMode: "immediate",
+      underwater: false,
+      reactionsUsed: [],
+      fog: { enabled: false, shapes: [] },
+      rewound: false,
+      pendingSaves: [],
+      pendingReactions: [],
+      pendingRuleAsks: []
+    });
     const serialized = JSON.stringify(projectPlayerView(state, undefined, () => null));
     expect(serialized).not.toContain(HIDDEN);
     expect(serialized).not.toContain("Secret Lurker");
@@ -39,24 +99,63 @@ describe("recipient-safe encounter projections", () => {
 
   it("marks a public current turn for players and the shared viewer", () => {
     const state = game(PUBLIC);
-    expect(projectPlayerCombat(state)).toMatchObject({ turnActorId: PUBLIC, hiddenTurn: false, initiative: [{ actorId: PUBLIC, active: true }] });
-    expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true, health: "healthy", conditions: [], conditionIds: [] }] });
-    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [], conditionIds: [] }], annotations: [], fog: { enabled: false, shapes: [] } });
+    expect(projectPlayerCombat(state)).toMatchObject({
+      turnActorId: PUBLIC,
+      hiddenTurn: false,
+      initiative: [{ actorId: PUBLIC, active: true }]
+    });
+    expect(projectViewerInitiative(state)).toEqual({
+      visible: true,
+      round: 3,
+      hiddenTurn: false,
+      entries: [
+        {
+          actorId: PUBLIC,
+          name: "Visible Hero",
+          initiative: 18,
+          active: true,
+          health: "healthy",
+          conditions: [],
+          conditionIds: []
+        }
+      ]
+    });
+    expect(projectViewerEncounterScene(state)).toEqual({
+      mapAssetId: MAP,
+      tokens: [
+        {
+          actorId: PUBLIC,
+          name: "Visible Hero",
+          kind: "player-character",
+          position: { x: 200, y: 200 },
+          sizePx: 40,
+          active: true,
+          health: "healthy",
+          conditions: [],
+          conditionIds: []
+        }
+      ],
+      annotations: [],
+      fog: { enabled: false, shapes: [] }
+    });
   });
 
   it("sends condition ids parallel to the display labels so the viewer picks matching glyphs", () => {
     const state = game(PUBLIC);
-    state.actors = state.actors.map((actor) => actor.id === PUBLIC ? { ...actor, conditions: [{ id: "poisoned" }, { id: "exhaustion", level: 3 }] } : actor);
+    state.actors = state.actors.map((actor) =>
+      actor.id === PUBLIC ? { ...actor, conditions: [{ id: "poisoned" }, { id: "exhaustion", level: 3 }] } : actor
+    );
     const token = projectViewerEncounterScene(state).tokens[0];
     expect(token.conditions).toEqual(["Poisoned", "Exhaustion 3"]);
     expect(token.conditionIds).toEqual(["poisoned", "exhaustion"]);
   });
 
   it("hides the Initiative list when a scene is live but not fighting, keeping the map/fog but no tokens", () => {
-    const state = game(PUBLIC); state.combat = { ...state.combat, active: false, turnActorId: null };
+    const state = game(PUBLIC);
+    state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(projectViewerInitiative(state)).toEqual({ visible: false, round: 0, hiddenTurn: false, entries: [] });
-    // A live scene keeps its map + fog on the shared screen (so "go live" shows the scene), but every
-    // combatant token - public AND hidden - clears until the fight is running. No actor data leaks.
+    // A live scene keeps its map and fog on the shared screen, but every combatant token (public or
+    // hidden) stays off until the fight is running.
     const scene = projectViewerEncounterScene(state);
     expect(scene).toEqual({ mapAssetId: MAP, tokens: [], annotations: [], fog: { enabled: false, shapes: [] } });
     expect(JSON.stringify(scene)).not.toContain(PUBLIC);
@@ -72,13 +171,55 @@ function gameWithAnnotations() {
   return GameStateSchema.parse({
     schemaVersion: 1,
     combat: {
-      active: true, round: 1, mapAssetId: MAP, turnActorId: PUBLIC,
+      active: true,
+      round: 1,
+      mapAssetId: MAP,
+      turnActorId: PUBLIC,
       initiative: [{ actorId: PUBLIC, score: 10 }],
       annotations: [
-        { id: "90000000-0000-4000-8000-000000000001", kind: "measurement", geometry, ownerSessionId: PLAYER_A, createdByRole: "player", visibility: "public", createdAt: 0, expiresAt: 5000 },
-        { id: "90000000-0000-4000-8000-000000000002", kind: "shape", shape: "circle", geometry, ownerSessionId: PLAYER_A, createdByRole: "player", visibility: "gm-only", createdAt: 0, expiresAt: null },
-        { id: "90000000-0000-4000-8000-000000000003", kind: "shape", shape: "square", geometry, ownerSessionId: PLAYER_A, createdByRole: "player", visibility: "owner-only", createdAt: 0, expiresAt: null },
-        { id: "90000000-0000-4000-8000-000000000004", kind: "shape", shape: "square", geometry, ownerSessionId: PLAYER_B, createdByRole: "player", visibility: "owner-only", createdAt: 0, expiresAt: null }
+        {
+          id: "90000000-0000-4000-8000-000000000001",
+          kind: "measurement",
+          geometry,
+          ownerSessionId: PLAYER_A,
+          createdByRole: "player",
+          visibility: "public",
+          createdAt: 0,
+          expiresAt: 5000
+        },
+        {
+          id: "90000000-0000-4000-8000-000000000002",
+          kind: "shape",
+          shape: "circle",
+          geometry,
+          ownerSessionId: PLAYER_A,
+          createdByRole: "player",
+          visibility: "gm-only",
+          createdAt: 0,
+          expiresAt: null
+        },
+        {
+          id: "90000000-0000-4000-8000-000000000003",
+          kind: "shape",
+          shape: "square",
+          geometry,
+          ownerSessionId: PLAYER_A,
+          createdByRole: "player",
+          visibility: "owner-only",
+          createdAt: 0,
+          expiresAt: null
+        },
+        {
+          id: "90000000-0000-4000-8000-000000000004",
+          kind: "shape",
+          shape: "square",
+          geometry,
+          ownerSessionId: PLAYER_B,
+          createdByRole: "player",
+          visibility: "owner-only",
+          createdAt: 0,
+          expiresAt: null
+        }
       ]
     }
   });
@@ -118,13 +259,41 @@ describe("recipient-safe annotation projections", () => {
     const geometry = { origin: { x: 0, y: 0 }, target: { x: 50, y: 0 }, sizeFeet: 10 };
     const state = GameStateSchema.parse({
       schemaVersion: 1,
-      actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 }, ownerSessionId: PLAYER_A }],
+      actors: [
+        {
+          id: PUBLIC,
+          name: "Hero",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 10, maximum: 10 },
+          ownerSessionId: PLAYER_A
+        }
+      ],
       combat: {
-        active: true, round: 1, mapAssetId: MAP, turnActorId: PUBLIC, initiative: [{ actorId: PUBLIC, score: 10 }],
-        annotations: [{ id: "91000000-0000-4000-8000-000000000001", kind: "shape", shape: "circle", geometry, ownerSessionId: "45000000-0000-4000-8000-0000000000ff", createdByRole: "gm", visibility: "gm-actor", visibleToActorId: PUBLIC, createdAt: 0, expiresAt: null }]
+        active: true,
+        round: 1,
+        mapAssetId: MAP,
+        turnActorId: PUBLIC,
+        initiative: [{ actorId: PUBLIC, score: 10 }],
+        annotations: [
+          {
+            id: "91000000-0000-4000-8000-000000000001",
+            kind: "shape",
+            shape: "circle",
+            geometry,
+            ownerSessionId: "45000000-0000-4000-8000-0000000000ff",
+            createdByRole: "gm",
+            visibility: "gm-actor",
+            visibleToActorId: PUBLIC,
+            createdAt: 0,
+            expiresAt: null
+          }
+        ]
       }
     });
-    expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations.map((a) => a.id)).toEqual(["91000000-0000-4000-8000-000000000001"]);
+    expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations.map((a) => a.id)).toEqual([
+      "91000000-0000-4000-8000-000000000001"
+    ]);
     expect(projectPlayerCombat(state, PLAYER_B, 1000).annotations).toEqual([]);
   });
 
@@ -139,17 +308,41 @@ describe("recipient-safe annotation projections", () => {
 const GOBLIN = "40000000-0000-4000-8000-000000000003";
 
 /** A public owned PC (7/10), a public non-owned monster (3/12 -> bloodied), and a gm-only monster. */
-function healthGame(combatHealthDisplay?: { style: string; audience: string }, goblinOverride?: { style: string; audience: string }) {
+function healthGame(
+  combatHealthDisplay?: { style: string; audience: string },
+  goblinOverride?: { style: string; audience: string }
+) {
   return GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: PUBLIC, name: "Visible Hero", kind: "player-character", visibility: "public", hp: { current: 7, maximum: 10 }, ownerSessionId: PLAYER_A },
-      { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 3, maximum: 12 }, ...(goblinOverride ? { healthDisplay: goblinOverride } : {}) },
+      {
+        id: PUBLIC,
+        name: "Visible Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 7, maximum: 10 },
+        ownerSessionId: PLAYER_A
+      },
+      {
+        id: GOBLIN,
+        name: "Goblin",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 3, maximum: 12 },
+        ...(goblinOverride ? { healthDisplay: goblinOverride } : {})
+      },
       { id: HIDDEN, name: "Secret Lurker", kind: "monster", visibility: "gm-only", hp: { current: 10, maximum: 10 } }
     ],
     combat: {
-      active: true, round: 1, turnActorId: PUBLIC, mapAssetId: MAP,
-      initiative: [{ actorId: PUBLIC, score: 18 }, { actorId: GOBLIN, score: 12 }, { actorId: HIDDEN, score: 22 }],
+      active: true,
+      round: 1,
+      turnActorId: PUBLIC,
+      mapAssetId: MAP,
+      initiative: [
+        { actorId: PUBLIC, score: 18 },
+        { actorId: GOBLIN, score: 12 },
+        { actorId: HIDDEN, score: 22 }
+      ],
       tokens: [
         { actorId: PUBLIC, position: { x: 10, y: 10 }, sizePx: 40, gridSizePx: 50 },
         { actorId: GOBLIN, position: { x: 20, y: 20 }, sizePx: 40, gridSizePx: 50 },
@@ -162,14 +355,20 @@ function healthGame(combatHealthDisplay?: { style: string; audience: string }, g
 
 describe("token health-display projection (audience gate, viewer safety)", () => {
   it("defaults healthDisplay for a save written before the field existed (additive parse)", () => {
-    const state = GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", hp: { current: 5, maximum: 5 } }], combat: { active: false } });
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", hp: { current: 5, maximum: 5 } }],
+      combat: { active: false }
+    });
     expect(state.combat.healthDisplay).toEqual({ style: "band", audience: "gm" });
     expect(state.actors[0].healthDisplay).toBeUndefined();
   });
 
   it("keeps the default band silent - no healthDisplay reaches players or the viewer", () => {
     const state = healthGame();
-    expect(projectPlayerView(state, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
+    expect(projectPlayerView(state, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(
+      true
+    );
     expect(projectViewerEncounterScene(state).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
   });
 
@@ -188,7 +387,9 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     expect(viewerTokens.map((token) => token.actorId).sort()).toEqual([PUBLIC, GOBLIN].sort());
     expect(viewerTokens.every((token) => token.healthDisplay?.style === "bar")).toBe(true);
     // Structural safety: a viewer token has no hit-point field at all, only the coarse band + a style.
-    expect(viewerTokens.every((token) => !("hp" in token) && !("current" in token) && !("maximum" in token))).toBe(true);
+    expect(viewerTokens.every((token) => !("hp" in token) && !("current" in token) && !("maximum" in token))).toBe(
+      true
+    );
 
     const view = projectPlayerView(state, PLAYER_A, () => null);
     const hero = view.actors.find((actor) => actor.id === PUBLIC)!;
@@ -207,7 +408,9 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     const promotedTokens = projectViewerEncounterScene(promoted).tokens;
     expect(promotedTokens.find((token) => token.actorId === GOBLIN)!.healthDisplay).toEqual({ style: "bar" });
     expect("healthDisplay" in promotedTokens.find((token) => token.actorId === PUBLIC)!).toBe(false);
-    expect(projectPlayerView(promoted, PLAYER_A, () => null).actors.find((actor) => actor.id === GOBLIN)!.healthDisplay).toEqual({ style: "bar" });
+    expect(
+      projectPlayerView(promoted, PLAYER_A, () => null).actors.find((actor) => actor.id === GOBLIN)!.healthDisplay
+    ).toEqual({ style: "bar" });
 
     // Table default bar/all, but the goblin alone is demoted back to GM-only.
     const demoted = healthGame({ style: "bar", audience: "all" }, { style: "ring", audience: "gm" });
@@ -218,23 +421,42 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
 
   it("gates the aura style exactly like bar/ring - to everyone under audience all, hidden under gm", () => {
     const shown = healthGame({ style: "aura", audience: "all" });
-    expect(projectViewerEncounterScene(shown).tokens.every((token) => token.healthDisplay?.style === "aura")).toBe(true);
-    expect(projectPlayerView(shown, PLAYER_A, () => null).actors.find((actor) => actor.id === GOBLIN)!.healthDisplay).toEqual({ style: "aura" });
+    expect(projectViewerEncounterScene(shown).tokens.every((token) => token.healthDisplay?.style === "aura")).toBe(
+      true
+    );
+    expect(
+      projectPlayerView(shown, PLAYER_A, () => null).actors.find((actor) => actor.id === GOBLIN)!.healthDisplay
+    ).toEqual({ style: "aura" });
     const hidden = healthGame({ style: "aura", audience: "gm" });
     expect(projectViewerEncounterScene(hidden).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
-    expect(projectPlayerView(hidden, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
+    expect(projectPlayerView(hidden, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(
+      true
+    );
   });
 });
 
 describe("shared initiative source (player == viewer)", () => {
   it("gives a public combatant identical shared row fields on the player and viewer lists", () => {
     const state = game(PUBLIC);
-    state.actors = state.actors.map((actor) => actor.id === PUBLIC ? { ...actor, conditions: [{ id: "prone" }, { id: "exhaustion", level: 2 }] } : actor);
+    state.actors = state.actors.map((actor) =>
+      actor.id === PUBLIC ? { ...actor, conditions: [{ id: "prone" }, { id: "exhaustion", level: 2 }] } : actor
+    );
     const player = projectPlayerCombat(state).initiative.find((entry) => entry.actorId === PUBLIC)!;
     const viewer = projectViewerInitiative(state).entries.find((entry) => entry.actorId === PUBLIC)!;
     // Every shared field matches exactly (the viewer just surfaces `score` as `initiative`).
-    expect({ name: player.name, active: player.active, health: player.health, conditionIds: player.conditionIds, conditions: player.conditions })
-      .toEqual({ name: viewer.name, active: viewer.active, health: viewer.health, conditionIds: viewer.conditionIds, conditions: viewer.conditions });
+    expect({
+      name: player.name,
+      active: player.active,
+      health: player.health,
+      conditionIds: player.conditionIds,
+      conditions: player.conditions
+    }).toEqual({
+      name: viewer.name,
+      active: viewer.active,
+      health: viewer.health,
+      conditionIds: viewer.conditionIds,
+      conditions: viewer.conditions
+    });
     expect(player.score).toBe(viewer.initiative);
     expect(player.conditions).toEqual(["Prone", "Exhaustion 2"]);
     expect(player.conditionIds).toEqual(["prone", "exhaustion"]);
@@ -261,9 +483,18 @@ describe("combatant recency (GM-only)", () => {
   it("stamps lastUsedAt when an actor enters a fight and keeps it off the player projection", () => {
     const state = GameStateSchema.parse({
       schemaVersion: 1,
-      actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } }]
+      actors: [
+        { id: PUBLIC, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } }
+      ]
     });
-    startEncounter(state, { mapAssetId: MAP, entries: [{ actorId: PUBLIC, score: 12 }] }, () => 1, { width: 900, height: 600, calibration: null }, undefined, 1720000000000);
+    startEncounter(
+      state,
+      { mapAssetId: MAP, entries: [{ actorId: PUBLIC, score: 12 }] },
+      () => 1,
+      { width: 900, height: 600, calibration: null },
+      undefined,
+      1720000000000
+    );
     expect(state.actors[0].lastUsedAt).toBe(1720000000000);
     // The GM sees recency; the player projection strips it.
     expect(projectGmView(state, () => null).actors[0].lastUsedAt).toBe(1720000000000);

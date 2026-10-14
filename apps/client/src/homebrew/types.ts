@@ -1,30 +1,11 @@
-/**
- * The homebrew content types, and the words the UI is allowed to use for them.
- *
- * **The type union is IMPORTED, never hand-written.** `HomebrewContentTypeSchema` in
- * `packages/api-contract/src/index.ts` is the single source of truth, and three
- * engineers holding three slightly different copies of it is exactly how a picker
- * comes to offer a type every create call rejects with a 400 the GM cannot fix.
- * Re-declaring the union here would compile fine and drift silently; importing it
- * makes the next change a type error instead of a bug report.
- *
- * `type` is a FIELD, not a nav axis (the Codex's own rule): it is a filter in the rail
- * and a select in the create modal, never a tab bar. Nine tab labels is ~810px of
- * content in a 343px viewport.
- */
+/** The homebrew content types and the words the UI uses for them. The type union is imported
+    from `@vtt/api-contract` rather than redeclared, so a contract change is a type error here. */
 import { HomebrewContentTypeSchema, type HomebrewContentType } from "@vtt/api-contract";
 
 export type HomebrewType = HomebrewContentType;
 
-/**
- * Render order, everywhere: the two class-shaped types together, then the character
- * options, then the reference catalogs, with `spell-list` beside `spell` because the
- * two are one authoring flow (a caster class needs a list to draw from).
- *
- * Derived from the contract's own `options`, so a type added there can never be
- * missing here — it lands at the end of the list rather than silently disappearing
- * from every picker. The explicit order below is a preference, not the membership.
- */
+/** Render order: class-shaped types, character options, then reference catalogs. Types the
+    contract adds that are missing from this list sort to the end rather than disappearing. */
 const PREFERRED_ORDER: readonly string[] = [
   "class",
   "subclass",
@@ -43,9 +24,8 @@ export const HOMEBREW_TYPES: readonly HomebrewType[] = [...HomebrewContentTypeSc
   return (ai === -1 ? Number.MAX_SAFE_INTEGER : ai) - (bi === -1 ? Number.MAX_SAFE_INTEGER : bi);
 });
 
-/** Singular for a sentence ("Duplicate an existing class"), plural for a group heading
-    and a search placeholder. Both are stored because English pluralisation is not a
-    function you can write ("species", "class" → "classes"). */
+/** Singular for sentences, plural for group headings and placeholders. Both are stored
+    because English plurals are irregular. */
 export type TypeWords = Readonly<{ label: string; plural: string }>;
 
 export const TYPE_WORDS: Readonly<Record<HomebrewType, TypeWords>> = {
@@ -56,9 +36,7 @@ export const TYPE_WORDS: Readonly<Record<HomebrewType, TypeWords>> = {
   feat: { label: "feat", plural: "Feats" },
   spell: { label: "spell", plural: "Spells" },
   "spell-list": { label: "spell list", plural: "Spell lists" },
-  // The wire name is `equipment` (one name per thing — it is what
-  // `ContentEquipmentSummary` and `equipmentSummaries` already say). The GM-facing
-  // word stays "item", because that is what a GM calls a longsword.
+  // Wire name is `equipment`; the GM-facing word is "item".
   equipment: { label: "item", plural: "Items" },
   monster: { label: "monster", plural: "Monsters" }
 };
@@ -73,15 +51,8 @@ export function isHomebrewType(value: string): value is HomebrewType {
   return HomebrewContentTypeSchema.safeParse(value).success;
 }
 
-/**
- * The rail's status filter. This is a VIEW over two orthogonal server fields
- * (`state` and `deletedAt`), not a fourth stored state — "Removed" is a soft-deleted
- * row of either state, so it cannot be a `state` value.
- *
- * The state vocabulary is fixed and must not gain synonyms:
- * **Draft · Published · Shown to players · GM only · Removed.** Never "hidden"
- * (ambiguous between GM-only and removed), never "live", never "active".
- */
+/** The rail's status filter: a view over `state` and `deletedAt`, not a stored state.
+    "Removed" is a soft-deleted row of either state. */
 export type StatusFilter = "all" | "draft" | "published" | "removed";
 
 export const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [

@@ -10,7 +10,11 @@ export interface Widget {
 /** The slice of pdfjs's `getDocument` we depend on. The caller injects it — the Node legacy build
  * (tests/CLI) or the browser build with a worker (client) — so this module stays environment-agnostic. */
 export type GetDocument = (opts: Record<string, unknown>) => { promise: Promise<PdfDoc> };
-interface PdfDoc { numPages: number; getPage(n: number): Promise<PdfPage>; destroy(): Promise<void>; }
+interface PdfDoc {
+  numPages: number;
+  getPage(n: number): Promise<PdfPage>;
+  destroy(): Promise<void>;
+}
 interface PdfPage {
   getViewport(o: { scale: number }): { width: number; height: number };
   getAnnotations(): Promise<AnyWidget[]>;
@@ -25,7 +29,11 @@ interface AnyWidget {
 
 /** Read every filled character-value widget from a DDB PDF. The sheet stores all character data as
  * named AcroForm widgets (`/T` name + `/V` value); template chrome is separate page text we ignore. */
-export async function readWidgetsWith(getDocument: GetDocument, data: Uint8Array, docOptions: Record<string, unknown> = {}): Promise<Widget[]> {
+export async function readWidgetsWith(
+  getDocument: GetDocument,
+  data: Uint8Array,
+  docOptions: Record<string, unknown> = {}
+): Promise<Widget[]> {
   const doc = await getDocument({ data, useSystemFonts: false, isEvalSupported: false, ...docOptions }).promise;
   const widgets: Widget[] = [];
   try {

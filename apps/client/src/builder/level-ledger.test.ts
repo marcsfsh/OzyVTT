@@ -3,67 +3,91 @@ import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { choicesAbove, hpRollGap, hpRolls, identityOf, ledgerOf, methodFor } from "./level-ledger";
 
 /**
- * The level flow's honesty, pinned. Every one of these answers is a sentence the player is shown, and
- * the failure mode they guard against is the same one: a rebuild that quietly loses something and says
- * nothing. Hit points are the sharp case — the server rebuilds on the AVERAGE when a roll is missing,
- * so a client that assumed rolls were kept would walk a character into losing maximum HP silently.
+ * The level flow must never let a rebuild silently lose something. Hit points are the sharp case:
+ * the server rebuilds on the average when a roll is missing.
  */
 
-const definition = (over: Partial<ActorDefinition> = {}): ActorDefinition => ({
-  schemaId: "vtt.actor-character",
-  schemaVersion: 1,
-  source: { name: "test", version: "1" },
-  name: "Thora",
-  size: "medium",
-  abilityScores: { str: 17, dex: 14, con: 14, int: 12, wis: 10, cha: 8 },
-  proficiencyBonus: 2,
-  armorClass: 16,
-  hitPoints: { maximum: 20 },
-  initiativeBonus: 2,
-  speedFeet: 30,
-  actions: [],
-  token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
-  extensions: {},
-  ...over
-} as unknown as ActorDefinition);
+const definition = (over: Partial<ActorDefinition> = {}): ActorDefinition =>
+  ({
+    schemaId: "vtt.actor-character",
+    schemaVersion: 1,
+    source: { name: "test", version: "1" },
+    name: "Thora",
+    size: "medium",
+    abilityScores: { str: 17, dex: 14, con: 14, int: 12, wis: 10, cha: 8 },
+    proficiencyBonus: 2,
+    armorClass: 16,
+    hitPoints: { maximum: 20 },
+    initiativeBonus: 2,
+    speedFeet: 30,
+    actions: [],
+    token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
+    extensions: {},
+    ...over
+  }) as unknown as ActorDefinition;
 
-const withCharacter = (choices: readonly CharacterChoice[] | undefined) => definition({
-  character: {
-    classes: [{ id: "fighter", name: "Fighter", level: 3 }],
-    race: { id: "dwarf", name: "Dwarf" },
-    background: { id: "soldier", name: "Soldier" },
-    feats: [],
-    ...(choices ? { choices } : {})
-  }
-} as unknown as Partial<ActorDefinition>);
+const withCharacter = (choices: readonly CharacterChoice[] | undefined) =>
+  definition({
+    character: {
+      classes: [{ id: "fighter", name: "Fighter", level: 3 }],
+      race: { id: "dwarf", name: "Dwarf" },
+      background: { id: "soldier", name: "Soldier" },
+      feats: [],
+      ...(choices ? { choices } : {})
+    }
+  } as unknown as Partial<ActorDefinition>);
 
 describe("Reading a character back into the wizard", () => {
   it("tells a sheet with NO ledger apart from one that recorded zero decisions", () => {
-    // The distinction is the whole gate: absent means "this was never built here" (a PDF import), and
-    // empty means "the wizard ran and asked nothing". One earns the honest refusal; the other does not.
+    // Absent means "never built here" (a PDF import) and is refused; empty means the wizard ran and
+    // asked nothing.
     expect(ledgerOf(withCharacter(undefined))).toBeNull();
     expect(ledgerOf(withCharacter([]))).toEqual([]);
     expect(ledgerOf(definition())).toBeNull();
   });
 
   it("reads identity off the stored sheet, and refuses a half-recorded one", () => {
-    expect(identityOf(withCharacter([]))).toEqual({ speciesId: "dwarf", backgroundId: "soldier", classId: "fighter", subclassId: null, level: 3 });
+    expect(identityOf(withCharacter([]))).toEqual({
+      speciesId: "dwarf",
+      backgroundId: "soldier",
+      classId: "fighter",
+      subclassId: null,
+      level: 3
+    });
     // No race recorded: the rebuild cannot name a species, so the flow must gate rather than invent one.
-    expect(identityOf(definition({ character: { classes: [{ id: "fighter", name: "Fighter", level: 1 }], feats: [] } } as unknown as Partial<ActorDefinition>))).toBeNull();
+    expect(
+      identityOf(
+        definition({
+          character: { classes: [{ id: "fighter", name: "Fighter", level: 1 }], feats: [] }
+        } as unknown as Partial<ActorDefinition>)
+      )
+    ).toBeNull();
     expect(identityOf(definition())).toBeNull();
   });
 
   it("sums a multiclass sheet's levels rather than reading the first class's", () => {
-    const multi = definition({ character: {
-      classes: [{ id: "fighter", name: "Fighter", level: 3 }, { id: "wizard", name: "Wizard", level: 2 }],
-      race: { id: "human", name: "Human" }, background: { id: "sage", name: "Sage" }, feats: []
-    } } as unknown as Partial<ActorDefinition>);
+    const multi = definition({
+      character: {
+        classes: [
+          { id: "fighter", name: "Fighter", level: 3 },
+          { id: "wizard", name: "Wizard", level: 2 }
+        ],
+        race: { id: "human", name: "Human" },
+        background: { id: "sage", name: "Sage" },
+        feats: []
+      }
+    } as unknown as Partial<ActorDefinition>);
     expect(identityOf(multi)?.level).toBe(5);
   });
 });
 
 describe("Rolled hit points (D14)", () => {
-  const roll = (level: number, value: number): CharacterChoice => ({ level, kind: "hp-roll", id: "hp", payload: { roll: value } });
+  const roll = (level: number, value: number): CharacterChoice => ({
+    level,
+    kind: "hp-roll",
+    id: "hp",
+    payload: { roll: value }
+  });
 
   it("returns the recorded rolls for 2..level, so a round trip restores the same maximum", () => {
     expect(hpRolls([roll(2, 6), roll(3, 4)], 3)).toEqual([6, 4]);

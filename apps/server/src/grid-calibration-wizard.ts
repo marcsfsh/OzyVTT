@@ -50,7 +50,8 @@ function positiveFinite(value: number, label: string) {
 }
 
 function active(state: GridCalibrationWizardState) {
-  if (state.step === "complete") throw new Error("Completed grid calibration must be reopened before it can be changed.");
+  if (state.step === "complete")
+    throw new Error("Completed grid calibration must be reopened before it can be changed.");
 }
 
 function calibrationFrom(state: GridCalibrationWizardState) {
@@ -66,7 +67,9 @@ function pushHistory(stack: readonly SquareGridCalibration[], calibration: Squar
   return [...stack.slice(-(MAX_HISTORY - 1)), calibration];
 }
 
-export function createGridCalibrationWizard(input: Readonly<{ assetId: string; mapWidthPx: number; mapHeightPx: number }>): GridCalibrationWizardState {
+export function createGridCalibrationWizard(
+  input: Readonly<{ assetId: string; mapWidthPx: number; mapHeightPx: number }>
+): GridCalibrationWizardState {
   const assetId = input.assetId.trim();
   if (!assetId) throw new Error("A map asset ID is required.");
   return {
@@ -83,13 +86,16 @@ export function createGridCalibrationWizard(input: Readonly<{ assetId: string; m
   };
 }
 
-export function measureKnownGridSpan(state: GridCalibrationWizardState, input: Readonly<{
-  start: ImagePoint;
-  end: ImagePoint;
-  cellsBetween: number;
-  axis: CalibrationAxis;
-  distancePerCell?: number;
-}>): GridCalibrationWizardState {
+export function measureKnownGridSpan(
+  state: GridCalibrationWizardState,
+  input: Readonly<{
+    start: ImagePoint;
+    end: ImagePoint;
+    cellsBetween: number;
+    axis: CalibrationAxis;
+    distancePerCell?: number;
+  }>
+): GridCalibrationWizardState {
   active(state);
   const calibration = deriveSquareGridFromSegment({
     mapWidthPx: state.mapWidthPx,
@@ -107,13 +113,16 @@ export function measureKnownGridSpan(state: GridCalibrationWizardState, input: R
   };
 }
 
-export function measureKnownGridArea(state: GridCalibrationWizardState, input: Readonly<{
-  start: ImagePoint;
-  end: ImagePoint;
-  cellsAcross: number;
-  cellsDown: number;
-  distancePerCell?: number;
-}>): GridCalibrationWizardState {
+export function measureKnownGridArea(
+  state: GridCalibrationWizardState,
+  input: Readonly<{
+    start: ImagePoint;
+    end: ImagePoint;
+    cellsAcross: number;
+    cellsDown: number;
+    distancePerCell?: number;
+  }>
+): GridCalibrationWizardState {
   active(state);
   const calibration = deriveSquareGridFromArea({
     mapWidthPx: state.mapWidthPx,
@@ -131,7 +140,10 @@ export function measureKnownGridArea(state: GridCalibrationWizardState, input: R
   };
 }
 
-export function adjustWizardGrid(state: GridCalibrationWizardState, adjustment: WizardCalibrationAdjustment): GridCalibrationWizardState {
+export function adjustWizardGrid(
+  state: GridCalibrationWizardState,
+  adjustment: WizardCalibrationAdjustment
+): GridCalibrationWizardState {
   active(state);
   const current = calibrationFrom(state);
   const nudged = nudgeSquareGrid(current, adjustment);
@@ -182,10 +194,21 @@ export function redoWizardGrid(state: GridCalibrationWizardState): GridCalibrati
   };
 }
 
-export function verifyWizardIntersection(state: GridCalibrationWizardState, imagePoint: ImagePoint, tolerancePx?: number): GridCalibrationWizardState {
+export function verifyWizardIntersection(
+  state: GridCalibrationWizardState,
+  imagePoint: ImagePoint,
+  tolerancePx?: number
+): GridCalibrationWizardState {
   active(state);
   const calibration = calibrationFrom(state);
-  if (!Number.isFinite(imagePoint.x) || !Number.isFinite(imagePoint.y) || imagePoint.x < 0 || imagePoint.x > state.mapWidthPx || imagePoint.y < 0 || imagePoint.y > state.mapHeightPx) {
+  if (
+    !Number.isFinite(imagePoint.x) ||
+    !Number.isFinite(imagePoint.y) ||
+    imagePoint.x < 0 ||
+    imagePoint.x > state.mapWidthPx ||
+    imagePoint.y < 0 ||
+    imagePoint.y > state.mapHeightPx
+  ) {
     throw new Error("Verification point must be inside the map bounds.");
   }
   const tolerance = tolerancePx ?? Math.min(8, Math.max(2, calibration.cellSizePx * 0.08));

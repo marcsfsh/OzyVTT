@@ -4,19 +4,9 @@ import { CodexMarkdown } from "./CodexMarkdown";
 import { uploadCodexAsset, pageLinkKey } from "./api";
 
 /**
- * D13 — the Codex's wrapper around the shared `MarkdownEditor` primitive.
- *
- * The primitive is deliberately codex-agnostic; this is where the Codex's own knowledge is wired in:
- * `CodexMarkdown` as the reader (which is what keeps viewer-safe redlinks and `codex-asset:` images
- * working), the page list as `[[` autocomplete, the asset upload route, and the violet GM-layer chrome.
- *
- * **Every writing surface in the suite now mounts this** — page bodies, session prep and recap, quest
- * bodies, the journal composer and its edit path. That is the whole of D13: before it, typing `[[` in a
- * session's prep did nothing at all, and a quest body rendered as plain text for players while the same
- * markdown rendered properly on a page.
- *
- * **Ruling R10:** autocomplete and click-navigation handle **page targets only**. `[[map:…]]` and
- * `[[marker:…]]` still parse and persist server-side (no regression) but get no UI exposure in v1.
+ * The Codex's wrapper around `MarkdownEditor`: `CodexMarkdown` as the reader (viewer-safe redlinks and
+ * `codex-asset:` images), the page list for `[[` autocomplete, asset uploads, and the violet GM-layer
+ * chrome. Every Codex writing surface uses it. Autocomplete and navigation handle page targets only.
  */
 export type CodexEditorProps = Readonly<{
   token: string;
@@ -24,20 +14,19 @@ export type CodexEditorProps = Readonly<{
   onChange: (next: string) => void;
   ariaLabel: string;
   placeholder?: string;
-  /** Page titles for `[[` autocomplete. Pass the shell's one page feed — never a second fetch. */
+  /** Page titles for `[[` autocomplete; pass the shell's page feed. */
   pages: ReadonlyArray<Readonly<{ id: string; title: string }>>;
-  /** Excluded from the suggestions: a page should not offer to link to itself. */
+  /** A page shouldn't offer to link to itself. */
   excludePageId?: string;
-  /** Follow a rendered `[[link]]`. Page targets only (R10). */
+  /** Follow a rendered `[[link]]`. Page targets only. */
   onNavigate: (target: string) => void;
   /** GM-layer instances take the violet chrome and the "GM only" tag. */
   gmLayer?: boolean;
   /** Titles that exist, so an unresolved link renders as a redlink rather than a working one. */
   knownTitles?: ReadonlySet<string>;
   /**
-   * Ruling 11 — take the frame's height instead of the primitive's 14rem floor. Only for a mount whose
-   * ancestors form an unbroken flex column with a definite height; anywhere else it would collapse the
-   * field rather than grow it, which is why it is opt-in and not the default.
+   * Take the frame's height instead of the primitive's 14rem floor. Only for a mount inside an unbroken flex
+   * column with a definite height; elsewhere it would collapse the field.
    */
   fill?: boolean;
   rows?: number;
@@ -45,15 +34,30 @@ export type CodexEditorProps = Readonly<{
 }>;
 
 export function CodexEditor({
-  token, value, onChange, ariaLabel, placeholder, pages, excludePageId, onNavigate, gmLayer = false, knownTitles, fill = false, rows, id
+  token,
+  value,
+  onChange,
+  ariaLabel,
+  placeholder,
+  pages,
+  excludePageId,
+  onNavigate,
+  gmLayer = false,
+  knownTitles,
+  fill = false,
+  rows,
+  id
 }: CodexEditorProps) {
-  const suggest = useCallback((query: string) => {
-    const needle = query.trim().toLowerCase();
-    return pages
-      .filter((page) => page.id !== excludePageId && page.title.toLowerCase().includes(needle))
-      .slice(0, 6)
-      .map((page) => ({ id: page.id, label: page.title }));
-  }, [pages, excludePageId]);
+  const suggest = useCallback(
+    (query: string) => {
+      const needle = query.trim().toLowerCase();
+      return pages
+        .filter((page) => page.id !== excludePageId && page.title.toLowerCase().includes(needle))
+        .slice(0, 6)
+        .map((page) => ({ id: page.id, label: page.title }));
+    },
+    [pages, excludePageId]
+  );
 
   const titles = useMemo(
     () => knownTitles ?? new Set(pages.map((page) => pageLinkKey(page.title))),
@@ -70,7 +74,9 @@ export function CodexEditor({
         placeholder={placeholder}
         rows={rows}
         suggest={suggest}
-        renderPreview={(markdown) => <CodexMarkdown text={markdown} onNavigate={onNavigate} token={token} knownTitles={titles} />}
+        renderPreview={(markdown) => (
+          <CodexMarkdown text={markdown} onNavigate={onNavigate} token={token} knownTitles={titles} />
+        )}
         onUploadImage={async (file) => {
           const asset = await uploadCodexAsset(token, file);
           return `\n![${file.name.replace(/\.[^.]+$/, "")}](codex-asset:${asset.id})\n`;

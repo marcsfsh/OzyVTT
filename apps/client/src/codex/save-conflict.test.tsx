@@ -6,16 +6,19 @@ vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn()
 
 const updatePage = vi.fn();
 const getPage = vi.fn();
-// The editor's Connections area (CI-3/CI-4) reads the page's journal entries and its atlas pins on
-// mount. Neither is what this file is about, and an unstubbed read would put its own R4 error Alert on
-// screen beside the save state these tests actually assert on.
+// The editor's Connections area reads entries and pins on mount; stub them so no error Alert appears.
 const markersForPage = vi.fn();
 const forPage = vi.fn();
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    codexApi: { ...actual.codexApi, updatePage: (...a: unknown[]) => updatePage(...a), getPage: (...a: unknown[]) => getPage(...a), markersForPage: (...a: unknown[]) => markersForPage(...a) },
+    codexApi: {
+      ...actual.codexApi,
+      updatePage: (...a: unknown[]) => updatePage(...a),
+      getPage: (...a: unknown[]) => getPage(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a)
+    },
     journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a) }
   };
 });
@@ -24,28 +27,43 @@ import { PageEditor } from "./PageEditor";
 import { CodexRequestError, type CodexPage } from "./api";
 
 /**
- * CF-5 coverage area 2 of 3: **the save / conflict path**.
- *
- * `PageEditor` autosaves on a debounce, serialises concurrent saves, and resyncs its revision on a 409.
- * This is the most intricate logic in the Codex and M4 is about to refactor the file wholesale, so these
- * are characterization tests: they pin *today's* behaviour so a behaviour-preserving refactor can be
- * proven behaviour-preserving.
- *
- * Note D-4: the Codex is single-writer and last-writer-wins is deliberate policy. These tests therefore
- * assert what the code does, not an idealised concurrency model.
+ * `PageEditor`'s save path: debounced autosave, serialized saves, and revision resync on 409. The Codex is
+ * single-writer with last-writer-wins, so these assert what the code does.
  */
 const page: CodexPage = {
-  id: "page-1", title: "Barovia", entityType: "location", fields: {}, gmFields: {},
-  folder: null, tags: [], revealedToPlayers: false, bannerAssetId: null,
-  inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 3,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z",
-  playerBody: "Fog.", gmBody: ""
+  id: "page-1",
+  title: "Barovia",
+  entityType: "location",
+  fields: {},
+  gmFields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 3,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  playerBody: "Fog.",
+  gmBody: ""
 };
 
 function renderEditor() {
   return render(
-    <PageEditor gmToken="gm" page={page} pages={[page]} connections={[]} autosave={{ enabled: true, intervalSeconds: 1 }}
-      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onOpenConnection={vi.fn()} onConnectionsChanged={() => {}} />
+    <PageEditor
+      gmToken="gm"
+      page={page}
+      pages={[page]}
+      connections={[]}
+      autosave={{ enabled: true, intervalSeconds: 1 }}
+      onChange={() => {}}
+      onDeleted={() => {}}
+      onNavigate={() => {}}
+      onOpenConnection={vi.fn()}
+      onConnectionsChanged={() => {}}
+    />
   );
 }
 
@@ -60,11 +78,14 @@ describe("PageEditor save/conflict path", () => {
   });
 
   it("autosaves an edit, showing the in-flight state then settling", async () => {
-    // NOTE: the shared `SaveState` renders "Saved" for BOTH idle and saved, so asserting that text
-    // proves nothing on its own. Assert the *transition* instead: "Saving…" only ever appears while a
-    // save is genuinely in flight, so seeing it and then seeing it go is real evidence.
+    // `SaveState` shows "Saved" for both idle and saved, so assert the "Saving..." transition instead.
     let release!: (value: unknown) => void;
-    updatePage.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    updatePage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
     const user = userEvent.setup();
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");
@@ -88,9 +109,8 @@ describe("PageEditor save/conflict path", () => {
     const user = userEvent.setup();
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");
-    // The GM is told, and the editor re-reads the page to pick up the server's current revision.
-    // `findAllByText` because `SaveState` deliberately renders a settled label twice — once visibly and
-    // once in an `nh-sr-only` live region — so a single-match query throws on the accessible duplicate.
+    // The editor re-reads the page for the current revision. `findAllByText` because `SaveState` also
+    // renders the label in an `nh-sr-only` live region.
     const shown = await screen.findAllByText(/changed elsewhere/i, {}, { timeout: 4000 });
     expect(shown.length).toBeGreaterThan(0);
     await waitFor(() => expect(getPage).toHaveBeenCalled(), { timeout: 4000 });

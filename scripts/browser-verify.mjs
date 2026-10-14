@@ -40,8 +40,14 @@ mkdirSync(SHOTS, { recursive: true });
 
 const results = [];
 let currentViewport = "";
-const pass = (name, detail) => { results.push({ viewport: currentViewport, ok: true, name, detail }); console.log(`  PASS  ${name}${detail ? ` — ${detail}` : ""}`); };
-const fail = (name, detail) => { results.push({ viewport: currentViewport, ok: false, name, detail }); console.log(`  FAIL  ${name} — ${detail}`); };
+const pass = (name, detail) => {
+  results.push({ viewport: currentViewport, ok: true, name, detail });
+  console.log(`  PASS  ${name}${detail ? ` — ${detail}` : ""}`);
+};
+const fail = (name, detail) => {
+  results.push({ viewport: currentViewport, ok: false, name, detail });
+  console.log(`  FAIL  ${name} — ${detail}`);
+};
 
 async function check(name, fn) {
   try {
@@ -64,7 +70,7 @@ async function check(name, fn) {
  */
 async function loginHere(page) {
   const entry = page.getByText("Enter as GM");
-  if (await entry.count() === 0) return;                      // already authenticated in this context
+  if ((await entry.count()) === 0) return; // already authenticated in this context
   await entry.click({ timeout: 10_000 });
   const field = page.locator('input[type="password"]').first();
   await field.waitFor({ state: "visible", timeout: 10_000 });
@@ -118,7 +124,9 @@ async function navClick(locator) {
     // run reports how many clicks were only reachable this way, so the number is visible rather than
     // absorbed. Silence here is what let "no phone-viewport check can fail when a control is occluded"
     // be true and invisible at the same time.
-    dispatched.push(`[${currentViewport}] ${await locator.evaluate((node) => (node.getAttribute("aria-label") || node.textContent || node.tagName).trim().slice(0, 48)).catch(() => "?")}`);
+    dispatched.push(
+      `[${currentViewport}] ${await locator.evaluate((node) => (node.getAttribute("aria-label") || node.textContent || node.tagName).trim().slice(0, 48)).catch(() => "?")}`
+    );
     await locator.dispatchEvent("click");
   }
 }
@@ -152,7 +160,7 @@ const visibleNav = (page) => page.locator('nav[aria-label="Codex sections"]:visi
 
 /** Open the sidebar if this viewport keeps it in a drawer, then return it. */
 async function openNav(page, width) {
-  if (width < 761 && await visibleNav(page).count() === 0) {
+  if (width < 761 && (await visibleNav(page).count()) === 0) {
     await navClick(page.locator('button[aria-label="Codex sections"]').first());
     await page.waitForTimeout(400);
   }
@@ -162,16 +170,21 @@ async function openNav(page, width) {
 /** The sidebar's own list, read out of the running app rather than duplicated here. */
 async function sidebarItems(page) {
   return page.evaluate(() => {
-    const nav = [...document.querySelectorAll('nav[aria-label="Codex sections"]')].find((node) => node.getAttribute("aria-hidden") !== "true");
+    const nav = [...document.querySelectorAll('nav[aria-label="Codex sections"]')].find(
+      (node) => node.getAttribute("aria-hidden") !== "true"
+    );
     return nav ? [...nav.querySelectorAll("button")].map((button) => button.textContent.trim()).filter(Boolean) : [];
   });
 }
 
-const litItem = (page) => page.evaluate(() => {
-  const nav = [...document.querySelectorAll('nav[aria-label="Codex sections"]')].find((node) => node.getAttribute("aria-hidden") !== "true");
-  const lit = nav ? [...nav.querySelectorAll('[aria-current="page"]')] : [];
-  return lit.map((node) => node.textContent.trim());
-});
+const litItem = (page) =>
+  page.evaluate(() => {
+    const nav = [...document.querySelectorAll('nav[aria-label="Codex sections"]')].find(
+      (node) => node.getAttribute("aria-hidden") !== "true"
+    );
+    const lit = nav ? [...nav.querySelectorAll('[aria-current="page"]')] : [];
+    return lit.map((node) => node.textContent.trim());
+  });
 
 /**
  * Mobile parity's hardest rule: the document must never scroll sideways.
@@ -184,32 +197,50 @@ const litItem = (page) => page.evaluate(() => {
  * that drawer to precisely the viewport edge; without the stylesheet it reported a 404px "overflow" that
  * does not exist. A rule stated as "the page must never scroll sideways" should be tested by scrolling.
  */
-const sidewaysOverflow = (page) => page.evaluate(() => {
-  const from = window.scrollX;
-  window.scrollTo(9999, window.scrollY);
-  const reached = window.scrollX;
-  window.scrollTo(from, window.scrollY);
-  return reached;
-});
+const sidewaysOverflow = (page) =>
+  page.evaluate(() => {
+    const from = window.scrollX;
+    window.scrollTo(9999, window.scrollY);
+    const reached = window.scrollX;
+    window.scrollTo(from, window.scrollY);
+    return reached;
+  });
 
 const SECTIONS = [
-  ["Home", "/codex"], ["Pages", "/codex/pages"], ["Atlas", "/codex/atlas"], ["Graph", "/codex/graph"],
-  ["Sessions", "/codex/sessions"], ["Quests", "/codex/quests"], ["Journal", "/codex/journal"],
-  ["Calendar", "/codex/calendar"], ["Downtime", "/codex/downtime"],
-  ["Reveal audit", "/codex/audit"], ["Backup", "/codex/backup"], ["Settings", "/codex/settings"]
+  ["Home", "/codex"],
+  ["Pages", "/codex/pages"],
+  ["Atlas", "/codex/atlas"],
+  ["Graph", "/codex/graph"],
+  ["Sessions", "/codex/sessions"],
+  ["Quests", "/codex/quests"],
+  ["Journal", "/codex/journal"],
+  ["Calendar", "/codex/calendar"],
+  ["Downtime", "/codex/downtime"],
+  ["Reveal audit", "/codex/audit"],
+  ["Backup", "/codex/backup"],
+  ["Settings", "/codex/settings"]
 ];
 
 async function runViewport(browser, label, width, height) {
   currentViewport = label;
   console.log(`\n===== ${label} (${width}x${height}) =====`);
-  const context = await browser.newContext({ viewport: { width, height }, hasTouch: width < 700, isMobile: width < 700, deviceScaleFactor: 1 });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    hasTouch: width < 700,
+    isMobile: width < 700,
+    deviceScaleFactor: 1
+  });
   const page = await context.newPage();
   const consoleErrors = [];
   page.on("pageerror", (error) => consoleErrors.push(String(error).slice(0, 200)));
-  page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text().slice(0, 200)); });
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text().slice(0, 200));
+  });
 
   await loginAsGm(page);
-  await page.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
+  await page.addStyleTag({
+    content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }"
+  });
 
   // ---- 1. Every sidebar destination renders on a COLD load of its own address ----
   for (const [name, path] of SECTIONS) {
@@ -235,7 +266,8 @@ async function runViewport(browser, label, width, height) {
       // The SPA fallback is the SERVER's, and it must answer 200 with index.html rather than 404.
       if (response.status() !== 200) throw new Error(`server answered ${response.status()}`);
       await tab.waitForTimeout(900);
-      if (await tab.getByText("Enter as GM").count() === 0) throw new Error("no login screen on a session-less deep link");
+      if ((await tab.getByText("Enter as GM").count()) === 0)
+        throw new Error("no login screen on a session-less deep link");
       // D2: the login screen renders AT the requested path, so auth lands on what was asked for.
       await loginHere(tab);
       await tab.waitForSelector(".codex-shell-content", { timeout: 15_000 });
@@ -243,7 +275,9 @@ async function runViewport(browser, label, width, height) {
       if (title !== "Downtime") throw new Error(`landed on "${title}", not the requested address`);
       if (new URL(tab.url()).pathname !== "/codex/downtime") throw new Error(`url is ${tab.url()}`);
       return "200 from the fallback, login at the address, Downtime after auth";
-    } finally { await fresh.close(); }
+    } finally {
+      await fresh.close();
+    }
   });
 
   // ---- 2. Exactly one sidebar item lit, and it is the right one ----
@@ -257,7 +291,7 @@ async function runViewport(browser, label, width, height) {
 
   await check("an unknown address renders not-found with nothing lit", async () => {
     await go(page, "/codex/notebook");
-    if (await page.locator("text=Nothing lives at this address").count() === 0) throw new Error("no not-found view");
+    if ((await page.locator("text=Nothing lives at this address").count()) === 0) throw new Error("no not-found view");
     const lit = await litItem(page);
     if (lit.length !== 0) throw new Error(`${lit.length} lit`);
     return "not-found, nothing lit";
@@ -297,9 +331,11 @@ async function runViewport(browser, label, width, height) {
     if (!page.url().endsWith("/codex/quests")) throw new Error(`after Quests: ${page.url()}`);
     await open("Journal");
     if (!page.url().endsWith("/codex/journal")) throw new Error(`after Journal: ${page.url()}`);
-    await page.goBack({ timeout: 10_000 }); await page.waitForTimeout(350);
+    await page.goBack({ timeout: 10_000 });
+    await page.waitForTimeout(350);
     if (!page.url().endsWith("/codex/quests")) throw new Error(`after back: ${page.url()}`);
-    await page.goForward({ timeout: 10_000 }); await page.waitForTimeout(350);
+    await page.goForward({ timeout: 10_000 });
+    await page.waitForTimeout(350);
     if (!page.url().endsWith("/codex/journal")) throw new Error(`after forward: ${page.url()}`);
     return "quests → journal → back → forward";
   });
@@ -339,13 +375,15 @@ async function runViewport(browser, label, width, height) {
     await go(page, "/codex/calendar");
     await page.waitForTimeout(800);
     const text = await page.locator(".codex-shell-content").innerText();
-    if (!/Hollowing|Greyfall|Coldmourn|Thawing|Bloomrot|Longmist/.test(text)) throw new Error(`no seeded month name on screen: ${text.slice(0, 120)}`);
+    if (!/Hollowing|Greyfall|Coldmourn|Thawing|Bloomrot|Longmist/.test(text))
+      throw new Error(`no seeded month name on screen: ${text.slice(0, 120)}`);
     const cells = await page.locator(".codex-calendar-cell:not(.is-blank)").count();
     if (cells < 28) throw new Error(`only ${cells} day cells`);
     // D17 makes the calendar a LENS, and the two clocks are what say so: the GM's own date and the
     // players' published one, which the seed deliberately left a week apart.
     if (!/Your date/.test(text) || !/Players' date/.test(text)) throw new Error("the two clocks are not both named");
-    if (await page.locator(".codex-calendar-mark").count() === 0) throw new Error("no dated record is marked on the grid");
+    if ((await page.locator(".codex-calendar-mark").count()) === 0)
+      throw new Error("no dated record is marked on the grid");
     return `${cells} day cells, both clocks named, records marked`;
   });
 
@@ -374,7 +412,8 @@ async function runViewport(browser, label, width, height) {
     // must appear under the one heading, with direction stated in words.
     if (!/rules from/i.test(text)) throw new Error("the free-text connection label is not rendered");
     if (!/Mentioned/i.test(text)) throw new Error("the [[wiki-link]] mention is not in the same list");
-    if (!/This page points to/i.test(text) || !/Points at this page/i.test(text)) throw new Error("direction is not stated in words");
+    if (!/This page points to/i.test(text) || !/Points at this page/i.test(text))
+      throw new Error("direction is not stated in words");
     return "typed labels + a mention in one list, direction in words";
   });
 
@@ -399,11 +438,17 @@ async function runViewport(browser, label, width, height) {
     await title.click();
     await title.press("End");
     await title.pressSequentially(stamp, { delay: 20 });
-    if (await inCodex(page, "button").filter({ hasText: /^Save quest$/ }).count() > 0) throw new Error("a Save button is still rendered with autosave on");
+    if (
+      (await inCodex(page, "button")
+        .filter({ hasText: /^Save quest$/ })
+        .count()) > 0
+    )
+      throw new Error("a Save button is still rendered with autosave on");
     // The readout already read "Saved" BEFORE this edit, so waiting for that string returned instantly
     // and the reload beat the 1s debounce. Watch for the round trip instead: the save must be observed
     // in flight (or the field marked unsaved) and only then settle back to Saved.
-    await page.waitForFunction(() => /Saving|Unsaved|Not saved/.test(document.body.innerText), { timeout: 8_000 })
+    await page
+      .waitForFunction(() => /Saving|Unsaved|Not saved/.test(document.body.innerText), { timeout: 8_000 })
       .catch(() => {});
     await page.waitForFunction(() => !/Saving|Unsaved|Not saved/.test(document.body.innerText), { timeout: 12_000 });
     await page.waitForFunction(() => /Saved/.test(document.body.innerText), { timeout: 8_000 });
@@ -438,87 +483,97 @@ async function runViewport(browser, label, width, height) {
    * A pin's reachability ON A PHONE is the tap audit's job, where it is measured rather than clicked.
    */
   if (width >= 1000) {
-  await check("with autosave OFF, leaving a dirty pin draft asks first", async () => {
-    /**
-     * The autosave switch has to go back ON however this check ends. It did not, the first time this ran,
-     * and the cost is worth recording: a dirty draft with autosave off makes the router refuse every
-     * in-app navigation (Playwright dismisses an unhandled `confirm`, and dismiss means "stay"), so ONE
-     * failure here took nine later checks down with it and none of those failures were real.
-     *
-     * **What this proves and what it does not.** The regression was that selecting another PIN did not
-     * go through the guard, because the selection was local state and nothing navigated. Two halves make
-     * that true again, and they are verified in two places: the address half is the check below (a pin
-     * selection is `?pin=`, survives F5, and Back undoes it), and the guard half is here — a dirty pin
-     * draft, a real departure, a real `window.confirm`. The pin-to-pin combination itself is asserted in
-     * `pin-selection.test.tsx` against the real router, because a synthesized click on a SECOND pin is
-     * not reliable in this app: `known-bugs.md` records that a closed session-console drawer stretches
-     * the initial containing block, so `getBoundingClientRect` and pointer coordinates disagree after a
-     * scroll — measured here as four consecutive pins reporting the same viewport box. Driving it anyway
-     * would make this check a coin toss, and a flaky check is worse than an honest boundary.
-     */
-    const setAutosave = async (on) => {
-      await go(page, "/codex/settings");
-      await page.waitForTimeout(800);
-      const control = page.getByRole("switch", { name: "Autosave" }).first();
-      await control.waitFor({ state: "visible", timeout: 10_000 });
-      if ((await control.getAttribute("aria-checked")) !== String(on)) { await control.click(); await page.waitForTimeout(900); }
-    };
-    await setAutosave(false);
-    try {
+    await check("with autosave OFF, leaving a dirty pin draft asks first", async () => {
+      /**
+       * The autosave switch has to go back ON however this check ends. It did not, the first time this ran,
+       * and the cost is worth recording: a dirty draft with autosave off makes the router refuse every
+       * in-app navigation (Playwright dismisses an unhandled `confirm`, and dismiss means "stay"), so ONE
+       * failure here took nine later checks down with it and none of those failures were real.
+       *
+       * **What this proves and what it does not.** The regression was that selecting another PIN did not
+       * go through the guard, because the selection was local state and nothing navigated. Two halves make
+       * that true again, and they are verified in two places: the address half is the check below (a pin
+       * selection is `?pin=`, survives F5, and Back undoes it), and the guard half is here — a dirty pin
+       * draft, a real departure, a real `window.confirm`. The pin-to-pin combination itself is asserted in
+       * `pin-selection.test.tsx` against the real router, because a synthesized click on a SECOND pin is
+       * not reliable in this app: `known-bugs.md` records that a closed session-console drawer stretches
+       * the initial containing block, so `getBoundingClientRect` and pointer coordinates disagree after a
+       * scroll — measured here as four consecutive pins reporting the same viewport box. Driving it anyway
+       * would make this check a coin toss, and a flaky check is worse than an honest boundary.
+       */
+      const setAutosave = async (on) => {
+        await go(page, "/codex/settings");
+        await page.waitForTimeout(800);
+        const control = page.getByRole("switch", { name: "Autosave" }).first();
+        await control.waitFor({ state: "visible", timeout: 10_000 });
+        if ((await control.getAttribute("aria-checked")) !== String(on)) {
+          await control.click();
+          await page.waitForTimeout(900);
+        }
+      };
+      await setAutosave(false);
+      try {
+        await go(page, "/codex/atlas");
+        await selectPin(page, 0);
+        const label = inCodex(page, "#marker-label");
+        await label.waitFor({ state: "visible", timeout: 10_000 });
+        const stayedAt = page.url();
+
+        await label.click();
+        await label.pressSequentially(" (draft)", { delay: 25 });
+        await page.waitForTimeout(400);
+        // The panel says so before anything is at stake — the readout the GM is meant to notice.
+        if (!/Unsaved/i.test(await page.locator("body").innerText()))
+          throw new Error("the inspector does not read as unsaved with autosave off");
+
+        let prompted = "";
+        const dismiss = async (dialog) => {
+          prompted = dialog.message();
+          await dialog.dismiss();
+        };
+        page.on("dialog", dismiss);
+        await navClick(visibleNav(page).getByRole("button", { name: "Journal", exact: true }).first());
+        await page.waitForTimeout(900);
+        page.off("dialog", dismiss);
+
+        if (!/unsaved/i.test(prompted))
+          throw new Error(`no leave prompt — the guard was not consulted (saw "${prompted}")`);
+        if (page.url() !== stayedAt) throw new Error(`dismissing the prompt left anyway: ${page.url()}`);
+        if (!(await label.inputValue()).includes("(draft)")) throw new Error("the draft was lost anyway");
+
+        // …and accepting leaves, which also puts the surface back in a clean state for what follows.
+        const accept = async (dialog) => dialog.accept();
+        page.on("dialog", accept);
+        await navClick(visibleNav(page).getByRole("button", { name: "Journal", exact: true }).first());
+        await page.waitForTimeout(900);
+        page.off("dialog", accept);
+        if (!page.url().endsWith("/codex/journal"))
+          throw new Error(`accepting the prompt did not leave: ${page.url()}`);
+        return `prompted ("${prompted.slice(0, 38)}…"), dismiss kept the pin and the draft, accept left`;
+      } finally {
+        await setAutosave(true);
+      }
+    });
+
+    await check("a selected pin is an address that survives a reload, and Back closes the inspector", async () => {
       await go(page, "/codex/atlas");
       await selectPin(page, 0);
-      const label = inCodex(page, "#marker-label");
-      await label.waitFor({ state: "visible", timeout: 10_000 });
-      const stayedAt = page.url();
+      await inCodex(page, "#marker-label").waitFor({ state: "visible", timeout: 10_000 });
+      const selected = page.url();
 
-      await label.click();
-      await label.pressSequentially(" (draft)", { delay: 25 });
-      await page.waitForTimeout(400);
-      // The panel says so before anything is at stake — the readout the GM is meant to notice.
-      if (!/Unsaved/i.test(await page.locator("body").innerText())) throw new Error("the inspector does not read as unsaved with autosave off");
+      await page.reload(NAV);
+      await loginHere(page);
+      await page.waitForSelector(".codex-shell-content", { timeout: 15_000 });
+      await page.waitForTimeout(1500);
+      if (page.url() !== selected) throw new Error(`the address changed across the reload: ${page.url()}`);
+      if ((await inCodex(page, "#marker-label").count()) === 0)
+        throw new Error("the pin was not re-selected from the address");
 
-      let prompted = "";
-      const dismiss = async (dialog) => { prompted = dialog.message(); await dialog.dismiss(); };
-      page.on("dialog", dismiss);
-      await navClick(visibleNav(page).getByRole("button", { name: "Journal", exact: true }).first());
+      await page.goBack();
       await page.waitForTimeout(900);
-      page.off("dialog", dismiss);
-
-      if (!/unsaved/i.test(prompted)) throw new Error(`no leave prompt — the guard was not consulted (saw "${prompted}")`);
-      if (page.url() !== stayedAt) throw new Error(`dismissing the prompt left anyway: ${page.url()}`);
-      if (!(await label.inputValue()).includes("(draft)")) throw new Error("the draft was lost anyway");
-
-      // …and accepting leaves, which also puts the surface back in a clean state for what follows.
-      const accept = async (dialog) => dialog.accept();
-      page.on("dialog", accept);
-      await navClick(visibleNav(page).getByRole("button", { name: "Journal", exact: true }).first());
-      await page.waitForTimeout(900);
-      page.off("dialog", accept);
-      if (!page.url().endsWith("/codex/journal")) throw new Error(`accepting the prompt did not leave: ${page.url()}`);
-      return `prompted ("${prompted.slice(0, 38)}…"), dismiss kept the pin and the draft, accept left`;
-    } finally {
-      await setAutosave(true);
-    }
-  });
-
-  await check("a selected pin is an address that survives a reload, and Back closes the inspector", async () => {
-    await go(page, "/codex/atlas");
-    await selectPin(page, 0);
-    await inCodex(page, "#marker-label").waitFor({ state: "visible", timeout: 10_000 });
-    const selected = page.url();
-
-    await page.reload(NAV);
-    await loginHere(page);
-    await page.waitForSelector(".codex-shell-content", { timeout: 15_000 });
-    await page.waitForTimeout(1500);
-    if (page.url() !== selected) throw new Error(`the address changed across the reload: ${page.url()}`);
-    if (await inCodex(page, "#marker-label").count() === 0) throw new Error("the pin was not re-selected from the address");
-
-    await page.goBack();
-    await page.waitForTimeout(900);
-    if (/pin=/.test(new URL(page.url()).search)) throw new Error("Back did not clear the selection");
-    return `${new URL(selected).pathname}${new URL(selected).search} survived F5; Back closed the inspector`;
-  });
+      if (/pin=/.test(new URL(page.url()).search)) throw new Error("Back did not clear the selection");
+      return `${new URL(selected).pathname}${new URL(selected).search} survived F5; Back closed the inspector`;
+    });
   }
 
   // ---- 9c. The palette's create verbs CREATE (D7/D20) ----
@@ -530,7 +585,11 @@ async function runViewport(browser, label, width, height) {
     await page.keyboard.press("Control+k");
     const palette = page.locator('dialog[open][aria-label="Codex command palette"]');
     await palette.waitFor({ state: "visible", timeout: 8_000 });
-    await palette.locator(".codex-palette-item").filter({ hasText: /^New session$/ }).first().click({ timeout: 8_000 });
+    await palette
+      .locator(".codex-palette-item")
+      .filter({ hasText: /^New session$/ })
+      .first()
+      .click({ timeout: 8_000 });
 
     // A list address would satisfy "something happened"; the RECORD address is the claim.
     await page.waitForFunction(() => /\/codex\/sessions\/[0-9a-f-]{36}/.test(location.pathname), { timeout: 12_000 });
@@ -557,7 +616,8 @@ async function runViewport(browser, label, width, height) {
     await page.waitForTimeout(1200);
     const afterReload = await inCodex(page, ".codex-session-row").count();
     if (afterReload !== filtered) throw new Error(`after the reload the list shows ${afterReload}, not ${filtered}`);
-    if (await inCodex(page, 'select[aria-label="Filter by status"]').inputValue() !== "played") throw new Error("the control forgot the filter it is applying");
+    if ((await inCodex(page, 'select[aria-label="Filter by status"]').inputValue()) !== "played")
+      throw new Error("the control forgot the filter it is applying");
     return `${all} → ${filtered} sessions, and the same after F5`;
   });
 
@@ -572,14 +632,19 @@ async function runViewport(browser, label, width, height) {
     const create = palette.locator(".codex-palette-item").filter({ hasText: "New page" }).first();
     await create.waitFor({ state: "visible", timeout: 8_000 });
     await create.click();
-    const sheet = page.locator("dialog[open]").filter({ hasText: /New page/i }).first();
+    const sheet = page
+      .locator("dialog[open]")
+      .filter({ hasText: /New page/i })
+      .first();
     await sheet.waitFor({ state: "visible", timeout: 8_000 });
     await navClick(sheet.getByRole("button", { name: /^(Create|New page|Add)/ }).first());
     await page.waitForFunction(() => /\/codex\/pages\/[0-9a-f-]{36}/.test(location.pathname), { timeout: 12_000 });
     await page.waitForTimeout(900);
     // The title is an INPUT: its value is not part of innerText, and at 375px the rail that also shows
     // the name is swapped out for the editor.
-    const opened = await inCodex(page, "input.nh-input--title, input[placeholder='Untitled page']").first().inputValue();
+    const opened = await inCodex(page, "input.nh-input--title, input[placeholder='Untitled page']")
+      .first()
+      .inputValue();
     if (!opened.includes(name)) throw new Error(`landed on a page titled "${opened}"`);
     return `created "${name}" and landed on its address`;
   });
@@ -600,17 +665,19 @@ async function runViewport(browser, label, width, height) {
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify({ codex: { pages: [{ id: "a" }, { id: "b" }] } }))
     });
-    const confirm = page.locator('dialog[open]').filter({ hasText: "Restore this backup?" }).first();
+    const confirm = page.locator("dialog[open]").filter({ hasText: "Restore this backup?" }).first();
     await confirm.waitFor({ state: "visible", timeout: 8_000 });
     const body = await confirm.innerText();
     if (!body.includes("two-pages-only.json")) throw new Error("the confirm does not name the file");
     for (const clause of ["2 pages", "0 maps", "0 pins", "0 journal entries", "0 sessions", "0 quests"]) {
-      if (!body.includes(clause)) throw new Error(`the inventory is missing "${clause}": ${body.replace(/\n/g, " ").slice(0, 200)}`);
+      if (!body.includes(clause))
+        throw new Error(`the inventory is missing "${clause}": ${body.replace(/\n/g, " ").slice(0, 200)}`);
     }
     if (/entrys/.test(body)) throw new Error("the plural is wrong: 'journal entrys'");
     await navClick(confirm.getByRole("button", { name: "Cancel" }).first());
     await page.waitForTimeout(400);
-    if (await confirm.count() > 0 && await confirm.isVisible()) throw new Error("Cancel did not dismiss the confirm");
+    if ((await confirm.count()) > 0 && (await confirm.isVisible()))
+      throw new Error("Cancel did not dismiss the confirm");
     return "every section counted (zeros stated), file named, cancel dismisses";
   });
 
@@ -623,11 +690,11 @@ async function runViewport(browser, label, width, height) {
       if (before !== 0) throw new Error(`${before} sidebars already visible at ${width}px — it is not a drawer`);
       await navClick(page.locator('button[aria-label="Codex sections"]').first());
       await page.waitForTimeout(500);
-      if (await visibleNavs() === 0) throw new Error("the drawer did not open");
+      if ((await visibleNavs()) === 0) throw new Error("the drawer did not open");
       await navClick(visibleNav(page).getByRole("button", { name: "Atlas", exact: true }).first());
       await page.waitForTimeout(600);
       if (!page.url().endsWith("/codex/atlas")) throw new Error(`did not navigate: ${page.url()}`);
-      if (await visibleNavs() !== 0) throw new Error("the drawer stayed open over the destination");
+      if ((await visibleNavs()) !== 0) throw new Error("the drawer stayed open over the destination");
       return "opened, navigated, closed";
     });
 
@@ -637,7 +704,8 @@ async function runViewport(browser, label, width, height) {
       await page.waitForTimeout(500);
       await page.goBack({ timeout: 10_000 });
       await page.waitForTimeout(500);
-      if (await page.locator('nav[aria-label="Codex sections"]:visible').count() !== 0) throw new Error("the drawer is still open");
+      if ((await page.locator('nav[aria-label="Codex sections"]:visible').count()) !== 0)
+        throw new Error("the drawer is still open");
       if (!page.url().endsWith("/codex/quests")) throw new Error(`back left the section: ${page.url()}`);
       return "drawer closed, address unchanged";
     });
@@ -673,7 +741,7 @@ async function runViewport(browser, label, width, height) {
        */
       const toggleSidebar = async (expect) => {
         const control = sidebar().getByRole("button", { name: expect });
-        if (await control.count() === 0) throw new Error(`no "${expect}" control on the sidebar`);
+        if ((await control.count()) === 0) throw new Error(`no "${expect}" control on the sidebar`);
         await control.click({ timeout: 10_000 });
         await page.waitForTimeout(600);
       };
@@ -708,22 +776,22 @@ async function runViewport(browser, label, width, height) {
       const openDrawers = () => page.locator("aside.nh-drawer.is-open").count();
       await prep.click({ timeout: 10_000 });
       await page.waitForTimeout(600);
-      if (await openDrawers() === 0) throw new Error("Session prep did not open");
+      if ((await openDrawers()) === 0) throw new Error("Session prep did not open");
       const drawer = page.locator("aside.nh-drawer.is-open").first();
       await drawer.getByRole("button", { name: "Close" }).click({ timeout: 10_000 });
       await page.waitForTimeout(700);
-      if (await openDrawers() !== 0) throw new Error("the prep drawer would not close from its own Close");
+      if ((await openDrawers()) !== 0) throw new Error("the prep drawer would not close from its own Close");
 
       await prep.click({ timeout: 10_000 });
       await page.waitForTimeout(600);
-      if (await openDrawers() === 0) throw new Error("Session prep did not open a second time");
+      if ((await openDrawers()) === 0) throw new Error("Session prep did not open a second time");
       // Escape closes it FROM INSIDE only — the drawer is non-modal by design (it must not swallow an
       // Escape meant for the surface still running behind it), so the key has to be pressed with focus
       // in the drawer, exactly as a GM reading their prep would have.
       await page.locator("aside.nh-drawer.is-open").first().getByRole("button", { name: "Close" }).focus();
       await page.keyboard.press("Escape");
       await page.waitForTimeout(700);
-      if (await openDrawers() !== 0) throw new Error("Escape did not close the prep drawer");
+      if ((await openDrawers()) !== 0) throw new Error("Escape did not close the prep drawer");
 
       // 3. Autosave: off and back on, from the same switch.
       await go(page, "/codex/settings");
@@ -731,10 +799,14 @@ async function runViewport(browser, label, width, height) {
       const autosave = page.getByRole("switch", { name: "Autosave" }).first();
       await autosave.waitFor({ state: "visible", timeout: 10_000 });
       const started = await autosave.getAttribute("aria-checked");
-      await autosave.click(); await page.waitForTimeout(800);
-      if (await autosave.getAttribute("aria-checked") === started) throw new Error("the autosave switch did not change state");
-      await autosave.click(); await page.waitForTimeout(800);
-      if (await autosave.getAttribute("aria-checked") !== started) throw new Error("the autosave switch would not go back");
+      await autosave.click();
+      await page.waitForTimeout(800);
+      if ((await autosave.getAttribute("aria-checked")) === started)
+        throw new Error("the autosave switch did not change state");
+      await autosave.click();
+      await page.waitForTimeout(800);
+      if ((await autosave.getAttribute("aria-checked")) !== started)
+        throw new Error("the autosave switch would not go back");
 
       return "sidebar collapse reversible incl. across a reload; prep drawer closes by Close and by Escape; autosave off and back on";
     });
@@ -748,7 +820,10 @@ async function runViewport(browser, label, width, height) {
     // the wrong thing. (That stacking is the app shell's, not the Codex's; noted, not changed here.)
     await page.locator(".codex-root").first().scrollIntoViewIfNeeded();
     await page.waitForTimeout(700);
-    await page.screenshot({ path: `${SHOTS}/${label}-${name.toLowerCase().replace(/\W+/g, "-")}.png`, fullPage: false });
+    await page.screenshot({
+      path: `${SHOTS}/${label}-${name.toLowerCase().replace(/\W+/g, "-")}.png`,
+      fullPage: false
+    });
   }
 
   // ---- 14. The PLAYER surface, on a real minted player session ----
@@ -763,74 +838,87 @@ async function runViewport(browser, label, width, height) {
    * each is PRESENT before asserting the GM string is absent — so a preview that rendered nothing, or
    * rendered an error, fails instead of passing vacuously.
    */
-  await check("the GM's Preview as player mounts the real player Codex, with no GM body text on a body surface", async () => {
-    await go(page, "/codex");
-    const nav = await openNav(page, width);
-    await navClick(nav.getByRole("button", { name: "Preview as player", exact: true }).first());
-    const dialog = page.locator('dialog[open][aria-label="Player Codex preview"]');
-    await dialog.waitFor({ state: "visible", timeout: 15_000 });
-    await page.waitForTimeout(1500);
+  await check(
+    "the GM's Preview as player mounts the real player Codex, with no GM body text on a body surface",
+    async () => {
+      await go(page, "/codex");
+      const nav = await openNav(page, width);
+      await navClick(nav.getByRole("button", { name: "Preview as player", exact: true }).first());
+      const dialog = page.locator('dialog[open][aria-label="Player Codex preview"]');
+      await dialog.waitFor({ state: "visible", timeout: 15_000 });
+      await page.waitForTimeout(1500);
 
-    // The GM's own tools must be absent from the player's sidebar, read on the dashboard where it lives.
-    const home = await dialog.innerText();
-    for (const tool of ["Reveal audit", "Backup", "Settings", "Preview as player"]) {
-      if (new RegExp(`\\b${tool}\\b`).test(home)) throw new Error(`GM tool "${tool}" is in the player sidebar`);
-    }
-    if (!/Pages|Atlas|Journal/.test(home)) throw new Error("the preview rendered nothing recognisable");
+      // The GM's own tools must be absent from the player's sidebar, read on the dashboard where it lives.
+      const home = await dialog.innerText();
+      for (const tool of ["Reveal audit", "Backup", "Settings", "Preview as player"]) {
+        if (new RegExp(`\\b${tool}\\b`).test(home)) throw new Error(`GM tool "${tool}" is in the player sidebar`);
+      }
+      if (!/Pages|Atlas|Journal/.test(home)) throw new Error("the preview rendered nothing recognisable");
 
-    /**
-     * Drive the preview's OWN local route (it must not touch the browser address) and read the body.
-     * Below 761px the preview's sidebar is a drawer exactly as the real player's is, so it has to be
-     * opened first — the check timed out at 375px because there was no visible nav to click.
-     */
-    const openInPreview = async (section, recordText) => {
-      if (await dialog.locator('nav[aria-label="Codex sections"]:visible').count() === 0) {
+      /**
+       * Drive the preview's OWN local route (it must not touch the browser address) and read the body.
+       * Below 761px the preview's sidebar is a drawer exactly as the real player's is, so it has to be
+       * opened first — the check timed out at 375px because there was no visible nav to click.
+       */
+      const openInPreview = async (section, recordText) => {
+        if ((await dialog.locator('nav[aria-label="Codex sections"]:visible').count()) === 0) {
+          await navClick(dialog.locator('button[aria-label="Codex sections"]').first());
+          await page.waitForTimeout(500);
+        }
+        const previewNav = dialog.locator('nav[aria-label="Codex sections"]:visible').first();
+        await navClick(previewNav.getByRole("button", { name: section, exact: true }).first());
+        await page.waitForTimeout(700);
+        await navClick(dialog.locator("button").filter({ hasText: recordText }).first());
+        await page.waitForTimeout(900);
+        return dialog.innerText();
+      };
+
+      // A page the player CAN see, whose GM body the seed filled. Both halves are asserted: the control
+      // string must be on screen, or "the secret is absent" means only "the page did not load".
+      const pageText = await openInPreview("Pages", "Ireena");
+      if (!pageText.includes("burgomaster's adopted daughter"))
+        throw new Error(`the player page body did not render: ${pageText.slice(0, 160)}`);
+      if (pageText.includes("Tatyana reborn")) throw new Error('GM body leaked onto the player page: "Tatyana reborn"');
+
+      const questText = await openInPreview("Quests", "Missing Bones");
+      if (!questText.includes("St Andral's bones are gone"))
+        throw new Error(`the player quest body did not render: ${questText.slice(0, 160)}`);
+      if (questText.includes("Milivoj took them"))
+        throw new Error('GM body leaked onto the player quest: "Milivoj took them"');
+
+      /**
+       * D10 on the PLAYER's side, which had no in-place filter on any list. Driven here rather than in a
+       * separate context because this preview IS the real player Codex on a real minted player token —
+       * and the preview keeps its own local address, which is the case a URL-backed filter could break.
+       */
+      if ((await dialog.locator('nav[aria-label="Codex sections"]:visible').count()) === 0) {
         await navClick(dialog.locator('button[aria-label="Codex sections"]').first());
         await page.waitForTimeout(500);
       }
-      const previewNav = dialog.locator('nav[aria-label="Codex sections"]:visible').first();
-      await navClick(previewNav.getByRole("button", { name: section, exact: true }).first());
-      await page.waitForTimeout(700);
-      await navClick(dialog.locator("button").filter({ hasText: recordText }).first());
-      await page.waitForTimeout(900);
-      return dialog.innerText();
-    };
+      await navClick(
+        dialog
+          .locator('nav[aria-label="Codex sections"]:visible')
+          .first()
+          .getByRole("button", { name: "Pages", exact: true })
+          .first()
+      );
+      await page.waitForTimeout(800);
+      const kindFilter = dialog.locator('select[aria-label="Filter by kind"]').first();
+      if ((await kindFilter.count()) === 0) throw new Error("the player's Pages rail has no in-place kind filter");
+      const allRows = await dialog.locator(".codex-list-item").count();
+      await kindFilter.selectOption("location");
+      await page.waitForTimeout(600);
+      const locationRows = await dialog.locator(".codex-list-item").count();
+      if (locationRows === 0 || locationRows >= allRows)
+        throw new Error(`the player's kind filter narrowed nothing (${allRows} → ${locationRows})`);
+      // The preview must never drive the BROWSER's address — the GM is still on their own page.
+      if (/type=location/.test(page.url())) throw new Error("the preview wrote its filter into the GM's address");
 
-    // A page the player CAN see, whose GM body the seed filled. Both halves are asserted: the control
-    // string must be on screen, or "the secret is absent" means only "the page did not load".
-    const pageText = await openInPreview("Pages", "Ireena");
-    if (!pageText.includes("burgomaster's adopted daughter")) throw new Error(`the player page body did not render: ${pageText.slice(0, 160)}`);
-    if (pageText.includes("Tatyana reborn")) throw new Error('GM body leaked onto the player page: "Tatyana reborn"');
-
-    const questText = await openInPreview("Quests", "Missing Bones");
-    if (!questText.includes("St Andral's bones are gone")) throw new Error(`the player quest body did not render: ${questText.slice(0, 160)}`);
-    if (questText.includes("Milivoj took them")) throw new Error('GM body leaked onto the player quest: "Milivoj took them"');
-
-    /**
-     * D10 on the PLAYER's side, which had no in-place filter on any list. Driven here rather than in a
-     * separate context because this preview IS the real player Codex on a real minted player token —
-     * and the preview keeps its own local address, which is the case a URL-backed filter could break.
-     */
-    if (await dialog.locator('nav[aria-label="Codex sections"]:visible').count() === 0) {
-      await navClick(dialog.locator('button[aria-label="Codex sections"]').first());
-      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${SHOTS}/${label}-preview-as-player.png` });
+      await page.keyboard.press("Escape");
+      return `player bodies rendered, GM bodies absent from both, no GM tools; player kind filter ${allRows} → ${locationRows} without touching the GM address`;
     }
-    await navClick(dialog.locator('nav[aria-label="Codex sections"]:visible').first().getByRole("button", { name: "Pages", exact: true }).first());
-    await page.waitForTimeout(800);
-    const kindFilter = dialog.locator('select[aria-label="Filter by kind"]').first();
-    if (await kindFilter.count() === 0) throw new Error("the player's Pages rail has no in-place kind filter");
-    const allRows = await dialog.locator(".codex-list-item").count();
-    await kindFilter.selectOption("location");
-    await page.waitForTimeout(600);
-    const locationRows = await dialog.locator(".codex-list-item").count();
-    if (locationRows === 0 || locationRows >= allRows) throw new Error(`the player's kind filter narrowed nothing (${allRows} → ${locationRows})`);
-    // The preview must never drive the BROWSER's address — the GM is still on their own page.
-    if (/type=location/.test(page.url())) throw new Error("the preview wrote its filter into the GM's address");
-
-    await page.screenshot({ path: `${SHOTS}/${label}-preview-as-player.png` });
-    await page.keyboard.press("Escape");
-    return `player bodies rendered, GM bodies absent from both, no GM tools; player kind filter ${allRows} → ${locationRows} without touching the GM address`;
-  });
+  );
 
   // ---- 15. The 761–849 band, which neither this script nor the tap audit had ever loaded ----
   if (width >= 1000) {
@@ -842,10 +930,14 @@ async function runViewport(browser, label, width, height) {
         await loginHere(tab);
         await tab.waitForSelector(".codex-shell-content", { timeout: 15_000 });
         // The same settling every other check gets — a control mid-transition reports a transitional box.
-        await tab.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
+        await tab.addStyleTag({
+          content:
+            "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }"
+        });
         await tab.waitForTimeout(700);
         const nav = tab.locator('nav[aria-label="Codex sections"]:visible').first();
-        if (await nav.count() === 0) throw new Error("no sidebar visible at 800px — and the hamburger is hidden in this band");
+        if ((await nav.count()) === 0)
+          throw new Error("no sidebar visible at 800px — and the hamburger is hidden in this band");
         // The rail's whole contract: the label is gone from the box AND still reachable as a name.
         const quests = nav.getByRole("button", { name: "Quests", exact: true }).first();
         const title = await quests.getAttribute("title");
@@ -859,14 +951,18 @@ async function runViewport(browser, label, width, height) {
         if (overflow > 1) throw new Error(`document scrolls sideways by ${overflow}px`);
         // And the sidebar's painted box must actually be inside the 56px track it was given.
         const box = await nav.boundingBox();
-        if (box && box.width > 60) throw new Error(`the sidebar paints ${Math.round(box.width)}px wide in a 56px track`);
+        if (box && box.width > 60)
+          throw new Error(`the sidebar paints ${Math.round(box.width)}px wide in a 56px track`);
         await tab.screenshot({ path: `${SHOTS}/tablet-800-rail.png` });
         return `rail at 800px: 0 labels, 0 eyebrows, tooltips present, ${Math.round(box?.width ?? 0)}px wide`;
-      } finally { await tablet.close(); }
+      } finally {
+        await tablet.close();
+      }
     });
   }
 
-  if (consoleErrors.length > 0) fail("no uncaught console errors", `${consoleErrors.length}: ${consoleErrors.slice(0, 3).join(" | ")}`);
+  if (consoleErrors.length > 0)
+    fail("no uncaught console errors", `${consoleErrors.length}: ${consoleErrors.slice(0, 3).join(" | ")}`);
   else pass("no uncaught console errors", "0 across the whole pass");
 
   await context.close();
@@ -887,7 +983,9 @@ for (const row of failed) console.log(`  FAILED [${row.viewport}] ${row.name} �
 // known and separate problem — but it IS the honest caveat on every check that used one, because a
 // dispatched click cannot fail on an occluded control.
 if (dispatched.length > 0) {
-  console.log(`\n  NOTE  ${dispatched.length} navigation click(s) reached their target only by dispatchEvent, bypassing hit-testing:`);
+  console.log(
+    `\n  NOTE  ${dispatched.length} navigation click(s) reached their target only by dispatchEvent, bypassing hit-testing:`
+  );
   for (const entry of dispatched) console.log(`          ${entry}`);
 } else {
   console.log("\n  NOTE  0 navigation clicks needed the dispatchEvent fallback — every one hit-tested.");

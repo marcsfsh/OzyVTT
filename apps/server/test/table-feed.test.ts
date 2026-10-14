@@ -12,29 +12,37 @@ import { CombatLogStore, projectFeedRow } from "../src/combat-log.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../src/roll-history.js";
 import { createServer } from "../src/server.js";
 
-/**
- * THE TABLE FEED (D11 / WI2). Two logs became one: `GameState.rolls` is the live 200-roll hot window,
- * and the combat-log store is the durable feed every roll now reaches. These tests pin the three things
- * that made "my roll vanished" unanswerable before - a roll that never reached the log, a roll attributed
- * to nobody, and initiative that left no dice behind - plus the viewer-safety boundary the merge created:
- * one store now holds private rolls, so the read path must never hand a player somebody else's die.
- */
+// `GameState.rolls` is the live 200-roll hot window; the combat-log store is the durable feed every
+// roll reaches. Pinned: every roll reaches the log, is attributed, initiative leaves dice behind, and
+// a player is never handed somebody else's private roll from the shared store.
 
 const HERO = "10000000-0000-4000-8000-000000000001";
 const SECRET = "10000000-0000-4000-8000-000000000002";
 const OTHER = "10000000-0000-4000-8000-000000000003";
-const MAP = "20000000-0000-5000-8000-000000000001";
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
 function roll(overrides: Partial<RollRecord> = {}): RollRecord {
   return {
-    id: randomUUID(), commandId: randomUUID(), initiatorSessionId: randomUUID(), initiatorRole: "player",
-    initiatorLabel: "Public Hero", label: "Athletics check", actorId: HERO, purpose: "check", visibility: "public",
-    formula: "1d20+3", normalizedFormula: "1d20+3",
-    dice: [{ group: 0, sides: 20, face: 14, kept: true, sign: 1 }], modifiers: [{ value: 3, sign: 1 }],
-    total: 17, createdAt: new Date().toISOString(), ...overrides
+    id: randomUUID(),
+    commandId: randomUUID(),
+    initiatorSessionId: randomUUID(),
+    initiatorRole: "player",
+    initiatorLabel: "Public Hero",
+    label: "Athletics check",
+    actorId: HERO,
+    purpose: "check",
+    visibility: "public",
+    formula: "1d20+3",
+    normalizedFormula: "1d20+3",
+    dice: [{ group: 0, sides: 20, face: 14, kept: true, sign: 1 }],
+    modifiers: [{ value: 3, sign: 1 }],
+    total: 17,
+    createdAt: new Date().toISOString(),
+    ...overrides
   };
 }
 
@@ -43,7 +51,10 @@ async function store() {
   const path = join(directory, "vtt.sqlite");
   const log = new CombatLogStore(path);
   await log.initialize();
-  cleanups.push(async () => { log.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    log.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { log, path, directory };
 }
 
@@ -51,17 +62,30 @@ describe("feed store: migration and per-reader reads", () => {
   it("adds the feed columns to a database created before they existed, and reads legacy rows as plain narration", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-feed-legacy-"));
     const path = join(directory, "vtt.sqlite");
-    // Exactly the pre-feed schema, with a row already in it.
+    // The schema before the feed columns, with a row already in it.
     const legacy = new DatabaseSync(path);
-    legacy.exec("CREATE TABLE combat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL, gm_only INTEGER NOT NULL, revision INTEGER NOT NULL) STRICT;");
-    legacy.prepare("INSERT INTO combat_log (at, kind, text, gm_only, revision) VALUES (?, ?, ?, ?, ?)").run(new Date().toISOString(), "turn", "Round 1 - Alpha's turn.", 0, 1);
+    legacy.exec(
+      "CREATE TABLE combat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL, gm_only INTEGER NOT NULL, revision INTEGER NOT NULL) STRICT;"
+    );
+    legacy
+      .prepare("INSERT INTO combat_log (at, kind, text, gm_only, revision) VALUES (?, ?, ?, ?, ?)")
+      .run(new Date().toISOString(), "turn", "Round 1 - Alpha's turn.", 0, 1);
     legacy.close();
 
     const log = new CombatLogStore(path);
     await log.initialize();
-    cleanups.push(async () => { log.close(); await rm(directory, { recursive: true, force: true }); });
+    cleanups.push(async () => {
+      log.close();
+      await rm(directory, { recursive: true, force: true });
+    });
 
-    const columns = new Set((new DatabaseSync(path).prepare("PRAGMA table_info(combat_log)").all() as unknown as ReadonlyArray<{ name: string }>).map((column) => column.name));
+    const columns = new Set(
+      (
+        new DatabaseSync(path).prepare("PRAGMA table_info(combat_log)").all() as unknown as ReadonlyArray<{
+          name: string;
+        }>
+      ).map((column) => column.name)
+    );
     expect(columns).toContain("actor_id");
     expect(columns).toContain("visibility");
     expect(columns).toContain("initiator_session_id");
@@ -83,15 +107,33 @@ describe("feed store: migration and per-reader reads", () => {
     const mine = randomUUID();
     const yours = randomUUID();
     log.append({ kind: "roll", text: "public", gmOnly: false, revision: 1, roll: roll({ visibility: "public" }) });
-    log.append({ kind: "roll", text: "mine", gmOnly: false, revision: 1, roll: roll({ visibility: "self-only", initiatorSessionId: mine }) });
-    log.append({ kind: "roll", text: "yours", gmOnly: false, revision: 1, roll: roll({ visibility: "self-only", initiatorSessionId: yours }) });
-    log.append({ kind: "roll", text: "blind", gmOnly: rollFeedIsGmOnly(roll({ visibility: "blind" })), revision: 1, roll: roll({ visibility: "blind", initiatorSessionId: mine }) });
+    log.append({
+      kind: "roll",
+      text: "mine",
+      gmOnly: false,
+      revision: 1,
+      roll: roll({ visibility: "self-only", initiatorSessionId: mine })
+    });
+    log.append({
+      kind: "roll",
+      text: "yours",
+      gmOnly: false,
+      revision: 1,
+      roll: roll({ visibility: "self-only", initiatorSessionId: yours })
+    });
+    log.append({
+      kind: "roll",
+      text: "blind",
+      gmOnly: rollFeedIsGmOnly(roll({ visibility: "blind" })),
+      revision: 1,
+      roll: roll({ visibility: "blind", initiatorSessionId: mine })
+    });
     log.append({ kind: "roll", text: "gm", gmOnly: true, revision: 1, roll: roll({ visibility: "gm-only" }) });
     log.append({ kind: "turn", text: "narration", gmOnly: false, revision: 1 });
 
     expect(log.list(true).map((entry) => entry.text)).toEqual(["public", "mine", "yours", "blind", "gm", "narration"]);
-    // A player sees public lines plus their OWN private roll - never another player's, never a GM line,
-    // and never the blind roll they themselves made (the `hiddenFromRoller` contract).
+    // A player sees public lines plus their own private roll: never another player's, never a GM line,
+    // and never their own blind roll (`hiddenFromRoller`).
     expect(log.list(false, 250, mine).map((entry) => entry.text)).toEqual(["public", "mine", "narration"]);
     expect(log.list(false, 250, yours).map((entry) => entry.text)).toEqual(["public", "yours", "narration"]);
     expect(log.list(false).map((entry) => entry.text)).toEqual(["public", "narration"]);
@@ -100,15 +142,30 @@ describe("feed store: migration and per-reader reads", () => {
   it("marks a player's own private roll and never serializes the roller's session id", async () => {
     const { log } = await store();
     const mine = randomUUID();
-    log.append({ kind: "roll", text: "mine", gmOnly: false, revision: 1, roll: roll({ visibility: "self-only", initiatorSessionId: mine }) });
-    log.append({ kind: "roll", text: "open", gmOnly: false, revision: 1, roll: roll({ visibility: "public", initiatorSessionId: mine }) });
+    log.append({
+      kind: "roll",
+      text: "mine",
+      gmOnly: false,
+      revision: 1,
+      roll: roll({ visibility: "self-only", initiatorSessionId: mine })
+    });
+    log.append({
+      kind: "roll",
+      text: "open",
+      gmOnly: false,
+      revision: 1,
+      roll: roll({ visibility: "public", initiatorSessionId: mine })
+    });
 
     const [privateRow, publicRow] = log.list(false, 250, mine);
     expect(privateRow.private).toBe(true);
     expect(publicRow.private).toBeUndefined();
-    // Viewer safety: the session id is the one field on a RollRecord that identifies a person. It must
-    // not reach ANY recipient through the feed - the GM's own view included.
-    for (const view of [JSON.stringify(log.list(true)), JSON.stringify(log.list(false, 250, mine)), JSON.stringify(log.exportSince(0))]) {
+    // The session id identifies a person and must not reach any recipient through the feed, the GM included.
+    for (const view of [
+      JSON.stringify(log.list(true)),
+      JSON.stringify(log.list(false, 250, mine)),
+      JSON.stringify(log.exportSince(0))
+    ]) {
       expect(view).not.toContain(mine);
       expect(view).not.toContain("initiatorSessionId");
     }
@@ -132,18 +189,23 @@ describe("feed store: migration and per-reader reads", () => {
 
 describe("one feed line per moment", () => {
   it("never writes the same line twice: no appendLog immediately followed by an identical broadcast", () => {
-    // `broadcastTableEvent` has ALWAYS written its own durable line, so ten handlers that called
-    // `appendLog` and then broadcast the identical entry printed every damage, reaction, effect and
-    // death save TWICE in the log a player reads. A feed that repeats itself is not one feed (D11).
-    const source = readFileSync(fileURLToPath(new URL("../src/game-operations.ts", import.meta.url)), "utf8").split("\n");
+    // `broadcastTableEvent` writes its own durable line, so a handler that also calls `appendLog` for
+    // the same entry prints it twice.
+    const source = readFileSync(fileURLToPath(new URL("../src/game-operations.ts", import.meta.url)), "utf8").split(
+      "\n"
+    );
     const duplicates: string[] = [];
     for (let index = 0; index < source.length - 1; index += 1) {
       const current = source[index].trim();
       const next = source[index + 1].trim();
       if (!current.startsWith("context.appendLog(") || !next.startsWith("context.broadcastTableEvent(")) continue;
-      if (current.slice("context.appendLog(".length) === next.slice("context.broadcastTableEvent(".length)) duplicates.push(`game-operations.ts:${index + 1}`);
+      if (current.slice("context.appendLog(".length) === next.slice("context.broadcastTableEvent(".length))
+        duplicates.push(`game-operations.ts:${index + 1}`);
     }
-    expect(duplicates, "Broadcasting IS the write. Drop the appendLog call, or pass `logged: false` on the broadcast when the durable record is a richer row you write yourself.").toEqual([]);
+    expect(
+      duplicates,
+      "Broadcasting IS the write. Drop the appendLog call, or pass `logged: false` on the broadcast when the durable record is a richer row you write yourself."
+    ).toEqual([]);
   });
 });
 
@@ -151,10 +213,11 @@ describe("recordRoll: the one writer", () => {
   it("trims the live window at 200 and reports every roll a command produced", () => {
     const state = GameStateSchema.parse({ schemaVersion: 1, actors: [] });
     const commandId = randomUUID();
-    for (let index = 0; index < 205; index += 1) recordRoll(state, roll({ commandId: index < 3 ? commandId : randomUUID() }));
+    for (let index = 0; index < 205; index += 1)
+      recordRoll(state, roll({ commandId: index < 3 ? commandId : randomUUID() }));
     expect(state.rolls.length).toBe(200);
-    // The three tagged rolls aged out of the window with the rest - `rollsForCommand` reads the window,
-    // so the feed row is written from the SAME committed state the command produced, right after it.
+    // The tagged rolls aged out of the window, so the feed row must be written from the committed state
+    // the command produced, right after it.
     const fresh = GameStateSchema.parse({ schemaVersion: 1, actors: [] });
     recordRoll(fresh, roll({ commandId }));
     recordRoll(fresh, roll({ commandId }));
@@ -170,23 +233,46 @@ describe("recordRoll: the one writer", () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// End to end over the public HTTP surface: the same doors a client uses.
-// ---------------------------------------------------------------------------------------------
+// End to end over the public HTTP surface.
 
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8); buffer.write("IHDR", 12, "ascii"); buffer.writeUInt32BE(width, 16); buffer.writeUInt32BE(height, 20);
+  buffer.writeUInt32BE(13, 8);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
   return buffer;
 }
 
 function initialState() {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: HERO, name: "Public Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, initiative: 2 },
-    { id: SECRET, name: "Unrevealed Tyrant", kind: "monster", visibility: "gm-only", hp: { current: 99, maximum: 99 } },
-    { id: OTHER, name: "Second Hero", kind: "player-character", visibility: "public", hp: { current: 18, maximum: 18 } }
-  ] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: HERO,
+        name: "Public Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        initiative: 2
+      },
+      {
+        id: SECRET,
+        name: "Unrevealed Tyrant",
+        kind: "monster",
+        visibility: "gm-only",
+        hp: { current: 99, maximum: 99 }
+      },
+      {
+        id: OTHER,
+        name: "Second Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 18, maximum: 18 }
+      }
+    ]
+  });
 }
 
 async function boot() {
@@ -209,7 +295,10 @@ async function boot() {
   if (!address || typeof address === "string") throw new Error("Server did not bind.");
   const imported = await server.mapAssets.import(png(900, 600), "arena.png");
   server.mapCatalog.register(imported.metadata.id, "Feed Arena", "battlemap");
-  cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken, mapAssetId: imported.metadata.id };
 }
 
@@ -226,10 +315,18 @@ describe("the feed over the API", () => {
   it("puts a loose dice.roll in the feed, attributed to the roller's claimed character", async () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
-    // The player claims Public Hero; the tray roll below names no actor at all - the SERVER attributes it.
-    expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: HERO })).status).toBe(200);
+    // The player claims Public Hero; the tray roll below names no actor, so the server attributes it.
+    expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: HERO })).status).toBe(
+      200
+    );
 
-    const rolled = await post(base, GAME_PATHS.rolls, playerToken, { commandId: randomUUID(), formula: "1d20+3", purpose: "check", visibility: "public", label: "Athletics check" });
+    const rolled = await post(base, GAME_PATHS.rolls, playerToken, {
+      commandId: randomUUID(),
+      formula: "1d20+3",
+      purpose: "check",
+      visibility: "public",
+      label: "Athletics check"
+    });
     expect(rolled.status).toBe(200);
 
     const rows = (await feed(base, playerToken)).filter((entry) => entry.kind === "roll");
@@ -237,7 +334,7 @@ describe("the feed over the API", () => {
     expect(rows[0].actorId).toBe(HERO);
     expect(rows[0].roll?.actorId).toBe(HERO);
     expect(rows[0].text).toContain("rolled");
-    // Same roll, same id, in the hot window - so a client reading both dedupes instead of double-rendering.
+    // Same roll id in the hot window, so a client reading both can dedupe.
     expect(server.store.snapshot.rolls.some((record) => record.id === rows[0].roll?.id)).toBe(true);
     expect(gmToken).toBeTruthy();
   });
@@ -249,8 +346,20 @@ describe("the feed over the API", () => {
     await post(base, GAME_PATHS.claims, mine, { commandId: randomUUID(), actorId: HERO });
     await post(base, GAME_PATHS.claims, yours, { commandId: randomUUID(), actorId: OTHER });
 
-    await post(base, GAME_PATHS.rolls, mine, { commandId: randomUUID(), formula: "1d20", purpose: "check", visibility: "self-only", label: "Secret plan" });
-    await post(base, GAME_PATHS.rolls, gmToken, { commandId: randomUUID(), formula: "1d20", purpose: "check", visibility: "gm-only", label: "GM deliberation" });
+    await post(base, GAME_PATHS.rolls, mine, {
+      commandId: randomUUID(),
+      formula: "1d20",
+      purpose: "check",
+      visibility: "self-only",
+      label: "Secret plan"
+    });
+    await post(base, GAME_PATHS.rolls, gmToken, {
+      commandId: randomUUID(),
+      formula: "1d20",
+      purpose: "check",
+      visibility: "gm-only",
+      label: "GM deliberation"
+    });
 
     const mineRows = await feed(base, mine);
     const yoursRows = await feed(base, yours);
@@ -272,7 +381,11 @@ describe("the feed over the API", () => {
   it("records initiative as real rolls, and a hidden combatant's initiative stays GM-only", async () => {
     const { base, server, gmToken, mapAssetId } = await boot();
     const playerToken = server.auth.issuePlayerSession();
-    const started = await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: HERO }, { actorId: SECRET }] });
+    const started = await post(base, GAME_PATHS.encounterStart, gmToken, {
+      commandId: randomUUID(),
+      mapAssetId,
+      entries: [{ actorId: HERO }, { actorId: SECRET }]
+    });
     expect(started.status).toBe(200);
 
     const initiativeRolls = server.store.snapshot.rolls.filter((record) => record.label === "Initiative");
@@ -301,29 +414,29 @@ describe("the feed over the API", () => {
   });
 });
 
-/**
- * THE INPUT NONE OF THE THREE GATES CAN SEE: a row naming a combatant the roster no longer holds.
- *
- * The feed's live re-derivation (`appendLog`, `server.ts`) used to ask `visibility === "gm-only"`,
- * and `undefined === "gm-only"` is false - so a missing combatant read as "not hidden" and its row
- * went to every player. Its two siblings answer the same input the other way: `broadcastTableEvent`
- * requires every named combatant to BE public, and the resolver's `namesAHiddenCombatant`
- * (`action-resolution.ts`) reads `?.visibility !== "public"`. One question, three reads, and the one
- * that writes the durable row was the one that failed OPEN.
- *
- * The state is written straight into the store because no COMMAND produces it - `removeActor`
- * refuses to drop a combatant who is in an active encounter, which is exactly why the hole survived:
- * it is unreachable until the day something makes it reachable, and by then the gate is either right
- * or it is a leak. The same technique the mastery suite uses to commit a scene switch mid-resolve.
- */
+// A feed row naming a combatant the roster no longer holds must fail closed: a missing combatant is
+// not public. `broadcastTableEvent` and `namesAHiddenCombatant` already read it that way; this pins
+// the live re-derivation in `appendLog`. No command produces this state (`removeActor` refuses an
+// active combatant), so it is written straight into the store.
 describe("a feed row naming a combatant the roster no longer holds", () => {
   it("stays in the GM's feed alone, the way a hidden combatant's row does", async () => {
     const { base, server, gmToken, mapAssetId } = await boot();
     const playerToken = server.auth.issuePlayerSession();
-    expect((await post(base, GAME_PATHS.encounterStart, gmToken, { commandId: randomUUID(), mapAssetId, entries: [{ actorId: HERO, score: 20 }, { actorId: OTHER, score: 10 }] })).status).toBe(200);
+    expect(
+      (
+        await post(base, GAME_PATHS.encounterStart, gmToken, {
+          commandId: randomUUID(),
+          mapAssetId,
+          entries: [
+            { actorId: HERO, score: 20 },
+            { actorId: OTHER, score: 10 }
+          ]
+        })
+      ).status
+    ).toBe(200);
 
-    // THE CONTROL, taken BEFORE anything vanishes: the turn line for a public combatant does reach
-    // this player, so "absent" below is a decision and not an empty feed.
+    // Control, taken before anything vanishes: the public turn line reaches this player, so "absent"
+    // below is a decision and not an empty feed.
     expect((await feed(base, playerToken)).map((entry) => entry.text)).toContain("Round 1 - Public Hero's turn.");
 
     await server.store.execute({ id: randomUUID(), type: "test.roster-drop" }, (state) => {
@@ -332,12 +445,12 @@ describe("a feed row naming a combatant the roster no longer holds", () => {
     expect((await post(base, GAME_PATHS.turnEnd, gmToken, { commandId: randomUUID() })).status).toBe(200);
     expect(server.store.snapshot.combat.turnActorId).toBe(OTHER);
 
-    // THE FAR END: the row exists, the GM reads it, and the player's own feed does not carry it.
+    // The row exists, the GM reads it, and the player's feed does not carry it.
     const gmRows = (await feed(base, gmToken)).map((entry) => entry.text);
     const playerRows = (await feed(base, playerToken)).map((entry) => entry.text);
     expect(gmRows).toContain("Round 1 - A combatant's turn.");
     expect(playerRows).not.toContain("Round 1 - A combatant's turn.");
-    // ...and the row the player DID get is still there, so nothing swept the feed clean.
+    // ...and the row the player did get is still there.
     expect(playerRows).toContain("Round 1 - Public Hero's turn.");
   });
 });

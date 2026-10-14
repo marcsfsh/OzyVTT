@@ -1,4 +1,9 @@
-.nh-mdeditor { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.nh-mdeditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
 
 .nh-mdeditor-bar {
   display: flex;
@@ -8,27 +13,40 @@
   flex-wrap: wrap;
 }
 
-/* Route 2 controls in a wrapping row, and the gap budget measured rather than assumed.
-   `IconButton size="sm"` paints **29.6px**, not the 36px this comment used to claim, and its
-   `.tap-target` ::after is 44px — so each hit box overhangs by (44 − 29.6) / 2 = 7.2px per side and two
-   neighbours need 14.4px between them. At `--space-2` (8px) the boxes overlapped by 6.4px and the later
-   sibling took every tap in that band. `--space-4` (16px) clears it in both axes, which is what
-   `flex-wrap` makes necessary — the rows overlap the same way the columns do. */
-.nh-mdeditor-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+/* `IconButton size="sm"` paints ~29.6px with a 44px `.tap-target`, so neighbours need ~14.4px between them in both
+   axes (the row wraps); --space-4 clears it. */
+.nh-mdeditor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
 
-.nh-mdeditor-letter { font: 800 var(--fs-sm) / 1 var(--font-body); }
-.nh-mdeditor-letter--italic { font-style: italic; font-weight: 600; }
-.nh-mdeditor-letter--strike { text-decoration: line-through; font-weight: 600; }
+.nh-mdeditor-letter {
+  font: 800 var(--fs-sm) / 1 var(--font-body);
+}
+.nh-mdeditor-letter--italic {
+  font-style: italic;
+  font-weight: 600;
+}
+.nh-mdeditor-letter--strike {
+  text-decoration: line-through;
+  font-weight: 600;
+}
 
-.nh-mdeditor-frame { position: relative; min-width: 0; }
-/* THE PRIMITIVE OWNS THE HEIGHT, and `resize: none` is stated rather than merely omitted. `Textarea`
-   renders `.nh-input .nh-textarea .nh-mdeditor-input`, and `forms.css`'s `.nh-textarea` ALSO sets
-   `resize: vertical` at the same specificity (0,0,1,0) — so deleting the declaration here would leave
-   the outcome to import order, which is luck, not a rule. The grab handle goes because every mount is
-   inside a locked pane now (§7): dragging the field taller only lengthens the region's scroll, and on a
-   phone the corner is a mis-tap magnet sitting on the text you were writing. The floor below is the one
-   height authority — the `rows` each call site passes (3 to 8) has never exceeded it. */
-.nh-mdeditor-input { width: 100%; min-height: 14rem; resize: none; font-family: var(--font-body); line-height: 1.6; }
+.nh-mdeditor-frame {
+  position: relative;
+  min-width: 0;
+}
+/* The primitive owns the height. `resize: none` is stated because `.nh-textarea` sets `resize: vertical` at the
+   same specificity and import order would decide. The field lives in locked panes, where resizing only
+   lengthens the scroll and the handle is a mis-tap target on phones. */
+.nh-mdeditor-input {
+  width: 100%;
+  min-height: 14rem;
+  resize: none;
+  font-family: var(--font-body);
+  line-height: 1.6;
+}
 
 .nh-mdeditor-preview {
   position: relative;
@@ -38,7 +56,10 @@
   border-radius: var(--radius-md);
   background: var(--surface-1);
 }
-.nh-mdeditor-empty { color: var(--text-muted); margin: 0; }
+.nh-mdeditor-empty {
+  color: var(--text-muted);
+  margin: 0;
+}
 
 .nh-mdeditor-suggest {
   position: absolute;
@@ -49,15 +70,14 @@
   padding: var(--space-1);
   list-style: none;
   min-width: 14rem;
-  /* Never taller than the frame it opens inside: it is bottom-anchored, so a 15rem list in a 14rem
-     field would run off the top of the editor — and on a phone with the keyboard up, off the region. */
+  /* Never taller than the frame: the list is bottom-anchored and would otherwise run off the top. */
   max-height: min(15rem, 100%);
   overflow-y: auto;
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
 }
-/* §4 route 1 (grow the paint): a stacked suggestion list must not use ::after overhang. */
+/* A stacked suggestion list grows its paint to 44px; an ::after overhang would steal neighbours' taps. */
 .nh-mdeditor-suggestitem {
   display: flex;
   align-items: center;
@@ -73,8 +93,12 @@
   cursor: pointer;
 }
 .nh-mdeditor-suggestitem:hover,
-.nh-mdeditor-suggestitem.is-active { background: var(--surface-3); }
+.nh-mdeditor-suggestitem.is-active {
+  background: var(--surface-3);
+}
 
 @media (max-width: 560px) {
-  .nh-mdeditor-input { min-height: 11rem; }
+  .nh-mdeditor-input {
+    min-height: 11rem;
+  }
 }

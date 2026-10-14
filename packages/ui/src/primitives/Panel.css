@@ -1,15 +1,6 @@
-/* RULING 2 — THE MATERIAL: 2px rim, scanline-over-gradient fill, inner bezel. No glow: hero
-   surfaces get the full landing door, and this primitive is not one of them.
-   No cue triangle either — the cue is a hover/focus affordance, and a Panel is a surface with
-   nothing to cue. Its interactive children carry their own.
-
-   THE HONEST SCOPE, from phase 0 (ruling 64): this primitive has SIX real app call sites, all in
-   the Codex, against ~119 hand-rolled panel-shaped rules in 20 stylesheets that inherit nothing
-   from this file. Doing it correctly here is still right — wave 5 generalises the same recipe as
-   a shared utility — but nobody should read a change to Panel.css as having re-skinned the app.
-
-   The material rides a backing layer, not the element: a panel is full of tap targets, and
-   `clip-path` clips hit-testing. `::after` is left free for the accent bar below. */
+/* Panel material: 2px rim, scanline-over-gradient fill, inner bezel. No glow (hero surfaces only) and no cue
+   (nothing to cue). Note that most app panels are hand-written and don't use this primitive.
+   The material is on a backing layer because clip-path clips hit-testing; `::after` holds the accent bar. */
 .nh-panel {
   position: relative;
   isolation: isolate;
@@ -29,23 +20,29 @@
   border: var(--rim-w) solid var(--rim-color);
   background-color: var(--surface-1);
   background-image:
-    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--scanline-gap) - 1px),
+      var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
+    ),
     linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 40%);
   background-repeat: repeat, no-repeat;
-  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-size:
+    100% var(--scanline-gap),
+    100% 100%;
   background-origin: border-box;
   background-clip: border-box;
-  /* The inner bezel — the cabinet's second, quieter line, set in from the rim. The first shadow
-     re-lays the fill across the gap so the bezel reads as its own line and not as a fatter rim. */
+  /* The inner bezel; the first shadow re-lays the fill so it reads as its own line, not a fatter rim. */
   box-shadow:
     inset 0 0 0 var(--bezel-inset) var(--surface-1),
     inset 0 0 0 calc(var(--bezel-inset) + 1px) var(--bezel-color);
 }
-/* The accent bar moves to ::after — ::before is the material now. It stops at the cut rather than
-   riding over it, which is why it is inset by the chamfer at the leading corner. */
+/* The accent bar uses ::after (::before is the material) and is inset at the leading corner to stop at the cut. */
 .nh-panel--accent-magenta,
 .nh-panel--accent-cyan,
-.nh-panel--accent-violet { padding-top: calc(var(--space-5) + 2px); }
+.nh-panel--accent-violet {
+  padding-top: calc(var(--space-5) + 2px);
+}
 .nh-panel--accent-magenta::after,
 .nh-panel--accent-cyan::after,
 .nh-panel--accent-violet::after {
@@ -55,18 +52,19 @@
   height: 2px;
   pointer-events: none;
 }
-.nh-panel--accent-magenta::after { background: var(--magenta); }
-.nh-panel--accent-cyan::after { background: var(--cyan); }
-.nh-panel--accent-violet::after { background: var(--violet); }
+.nh-panel--accent-magenta::after {
+  background: var(--magenta);
+}
+.nh-panel--accent-cyan::after {
+  background: var(--cyan);
+}
+.nh-panel--accent-violet::after {
+  background: var(--violet);
+}
 
 .nh-panel-head {
-  /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:
-     the client's styles.css carries a bare `header { max-width: 40rem }` (written for
-     its landing hero) which clamps EVERY <header> in the app. In a panel wider than
-     640px that pinned the title to the left 640px and dragged the right-aligned
-     `.nh-panel-actions` in with it, so a panel's own actions floated mid-surface. The
-     fix belongs in the primitive, not in the app global — coupling styles.css to
-     `.nh-panel-head` would invert the dependency (readiness rule 5). */
+  /* The client's bare `header { max-width: 40rem }` would pin the title and actions to 640px; fix it here, not in
+     the app. */
   max-width: none;
   display: flex;
   align-items: flex-end;
@@ -74,6 +72,16 @@
   gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
-.nh-panel-headings { min-width: 0; }
-.nh-panel-title { margin: 0; font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display); color: var(--text); }
-.nh-panel-actions { display: flex; gap: var(--space-2); flex: none; }
+.nh-panel-headings {
+  min-width: 0;
+}
+.nh-panel-title {
+  margin: 0;
+  font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+}
+.nh-panel-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: none;
+}

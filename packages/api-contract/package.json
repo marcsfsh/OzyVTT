@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "vitest run",
-    "docs:generate": "node --import tsx scripts/generate-api-reference.ts"
+    "test": "vitest run"
   },
-  "dependencies": { "zod": "^3.24.2" },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
   "devDependencies": {
     "@vtt/content-srd-5.2.1": "*",
     "@vtt/schemas": "*",

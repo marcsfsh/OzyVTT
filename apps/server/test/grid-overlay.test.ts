@@ -58,8 +58,20 @@ describe("grid overlay geometry", () => {
       axis: "horizontal"
     });
     const lines = gridOverlayLines(calibration, viewport, { overscanCells: 0, majorEvery: 2 });
-    expect(lines).toContainEqual({ axis: "column", index: -2, start: { x: 0, y: 0 }, end: { x: 0, y: 100 }, major: true });
-    expect(lines).toContainEqual({ axis: "row", index: -1, start: { x: 0, y: 0 }, end: { x: 200, y: 0 }, major: false });
+    expect(lines).toContainEqual({
+      axis: "column",
+      index: -2,
+      start: { x: 0, y: 0 },
+      end: { x: 0, y: 100 },
+      major: true
+    });
+    expect(lines).toContainEqual({
+      axis: "row",
+      index: -1,
+      start: { x: 0, y: 0 },
+      end: { x: 200, y: 0 },
+      major: false
+    });
   });
 
   it("rejects invalid viewports, options, and line-count explosions", () => {
@@ -73,6 +85,8 @@ describe("grid overlay geometry", () => {
     });
     expect(() => gridOverlayLines(calibration, { minX: 0, minY: 0, maxX: 0, maxY: 100 })).toThrow("positive width");
     expect(() => gridOverlayLines(calibration, viewport, { majorEvery: 0 })).toThrow("integer");
-    expect(() => gridOverlayLines(calibration, { minX: 0, minY: 0, maxX: 1000, maxY: 1000 }, { maxLines: 100 })).toThrow("Zoom in");
+    expect(() =>
+      gridOverlayLines(calibration, { minX: 0, minY: 0, maxX: 1000, maxY: 1000 }, { maxLines: 100 })
+    ).toThrow("Zoom in");
   });
 });

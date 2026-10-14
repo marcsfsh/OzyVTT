@@ -10,9 +10,7 @@
   width: min(100vw - 2rem, 24rem);
   pointer-events: none;
 }
-/* RULING 39, the toast half: severity on a 2px leading rule (was 3px), never in the fill, so the
-   message reads on a neutral ground in all three themes. The material is on a backing layer
-   because a toast carries its own ✕ — see Alert.css for the same reasoning at length. */
+/* Severity on a 2px leading rule, never the fill. Material on a backing layer because the toast has its own ✕. */
 .nh-toast {
   position: relative;
   isolation: isolate;
@@ -38,19 +36,55 @@
   border: 1px solid var(--line);
   border-left: 2px solid var(--nh-rule);
   background: var(--surface-2);
-  /* A toast floats over arbitrary app surface, so it keeps a lift — as a drop-shadow FILTER,
-     because box-shadow cannot follow a clip-path cut and would have drawn a rectangle. */
+  /* A lift as a drop-shadow filter, since box-shadow can't follow the cut. */
   filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--void) 55%, transparent));
 }
-.nh-toast--success { --nh-rule: var(--success); }
-.nh-toast--error { --nh-rule: var(--danger); }
-.nh-toast--info { --nh-rule: var(--info); }
-.nh-toast-icon { flex: none; display: grid; place-items: center; font-size: 1.05rem; line-height: 1; }
-.nh-toast--success .nh-toast-icon { color: var(--success); }
-.nh-toast--error .nh-toast-icon { color: var(--danger-hi); }
-.nh-toast--info .nh-toast-icon { color: var(--info); }
-.nh-toast-message { flex: 1; font-size: var(--fs-sm); line-height: 1.3; }
-/* Paint stays a quiet ✕; `.tap-target` (route 2, §4) lifts the hit area to the 44px
-   floor without turning the toast into a two-line surface. */
-.nh-toast-close { flex: none; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; background: transparent; color: var(--text-muted); line-height: 1; cursor: pointer; transition: color var(--dur-hover); }
-.nh-toast-close:hover, .nh-toast-close:active { color: var(--text); }
+.nh-toast--success {
+  --nh-rule: var(--success);
+}
+.nh-toast--error {
+  --nh-rule: var(--danger);
+}
+.nh-toast--info {
+  --nh-rule: var(--info);
+}
+.nh-toast-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.nh-toast--success .nh-toast-icon {
+  color: var(--success);
+}
+.nh-toast--error .nh-toast-icon {
+  color: var(--danger-hi);
+}
+.nh-toast--info .nh-toast-icon {
+  color: var(--info);
+}
+.nh-toast-message {
+  flex: 1;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+/* A quiet ✕; `.tap-target` lifts the hit area to 44px without growing the toast. */
+.nh-toast-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--dur-hover);
+}
+.nh-toast-close:hover,
+.nh-toast-close:active {
+  color: var(--text);
+}

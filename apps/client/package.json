@@ -4,9 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
-    "check": "tsc -b --pretty false",
-    "docs:parity": "node --import tsx --import ./scripts/style-stub-loader.mjs scripts/generate-parity-audit.ts",
+    "build": "vite build",
+    "check": "tsc -p . --pretty false",
     "test": "vitest run"
   },
   "dependencies": {

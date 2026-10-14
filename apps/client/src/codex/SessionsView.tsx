@@ -1,7 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, GmOnlyTag, IconChevron, IconPlus, Input, Panel, RevealSwitch, SaveState, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
-import { sessionApi, type CodexAutosaveSettings, type CodexPageSummary, type CodexSession, type CodexSessionStatus } from "./api";
-import { pickNextSession, sessionTitle } from "./sessions";
+import {
+  Alert,
+  Badge,
+  Button,
+  Field,
+  GmOnlyTag,
+  IconChevron,
+  IconPlus,
+  Input,
+  Panel,
+  RevealSwitch,
+  SaveState,
+  Select,
+  Skeleton,
+  TagInput,
+  VisibilityBadge
+} from "@vtt/ui";
+import {
+  sessionApi,
+  type CodexAutosaveSettings,
+  type CodexPageSummary,
+  type CodexSession,
+  type CodexSessionStatus
+} from "./api";
+import { sessionTitle } from "./sessions";
 import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";
 import { TagChip } from "./TagChip";
@@ -10,29 +32,20 @@ import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 
 /**
- * Sessions — **the one place a session is edited**, and since D1 a first-class sidebar section at
- * `/codex/sessions[/:id]` rather than a hidden destination laid over the content region.
- *
- * It owns no feed. The workspace holds ONE session list and hands it down here, to the Campaign card,
- * to the journal's by-session lens and to the console drawer, so all four are looking at the same
- * records; every write below reports back through `onChanged` and the workspace re-reads. Two session
- * stores on one screen is precisely how a console ends up disagreeing with the editor beside it.
+ * The session log at `/codex/sessions[/:id]`, the one place a session is edited. It owns no feed: the
+ * shell's single session list is handed down here, to Home, the journal lens and the console drawer.
  */
 type SessionsViewProps = Readonly<{
   gmToken: string;
   sessions: readonly CodexSession[];
   activeSessionId: string | null;
-  /** CF-2 / R4: the workspace's session feed is still in flight — an empty list is not yet "no sessions". */
+  /** The feed is still loading, so an empty list isn't "no sessions" yet. */
   loading: boolean;
-  /** R4: the feed's own failure. Without this a failed read renders as an empty log, silently. */
+  /** The feed's own failure, so it doesn't render as an empty log. */
   error: string | null;
-  /** D3: which session is open comes from the ADDRESS (`/codex/sessions/:id`), not from local state. */
+  /** The open session comes from the address (`/codex/sessions/:id`). */
   openSessionId?: string | null;
-  /**
-   * D3/D10: the filters live in the ADDRESS too (`?q=`, `?status=`), as Pages, Atlas and Journal already
-   * did. In component state they were lost on every navigation and a filtered log could not be linked to
-   * or refreshed back into — two of the five lists behaving unlike the other three.
-   */
+  /** Filters live in the address too (`?q=`, `?status=`). */
   filter?: string;
   statusFilter?: string | null;
   onFilterChange?: (next: Readonly<Record<string, string | null>>) => void;
@@ -40,37 +53,56 @@ type SessionsViewProps = Readonly<{
   onOpenSession: (sessionId: string | null) => void;
   onChanged: () => void | Promise<void>;
   autosave: CodexAutosaveSettings;
-  /** For the editor's `[[` autocomplete — the shell's one page feed, never a second fetch. */
+  /** For `[[` autocomplete: the shell's page feed. */
   pages: readonly CodexPageSummary[];
-  /** `5a`: the table's roster, for the one thing a Codex page cannot say — whether a character is
-      archived. See `codex/characters.ts`; absent is a campaign with no table state, not an error. */
+  /** The table's roster, used only to tell whether a character is archived (see `characters.ts`). */
   actors?: readonly ArchivableActor[];
   onPickTag?: (tag: string) => void;
 }>;
 
-export function SessionsView({ gmToken, sessions, activeSessionId, loading, error, openSessionId = null, onOpenSession, onChanged, autosave, pages, actors = [], onPickTag, filter = "", statusFilter = null, onFilterChange }: SessionsViewProps) {
+export function SessionsView({
+  gmToken,
+  sessions,
+  activeSessionId,
+  loading,
+  error,
+  openSessionId = null,
+  onOpenSession,
+  onChanged,
+  autosave,
+  pages,
+  actors = [],
+  onPickTag,
+  filter = "",
+  statusFilter = null,
+  onFilterChange
+}: SessionsViewProps) {
   const [listError, setListError] = useState<string | null>(null);
 
-  const selected = openSessionId ? sessions.find((session) => session.id === openSessionId) ?? null : null;
+  const selected = openSessionId ? (sessions.find((session) => session.id === openSessionId) ?? null) : null;
   const shown = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    return sessions.filter((session) =>
-      (!statusFilter || session.status === statusFilter)
-      && (!needle || sessionTitle(session).toLowerCase().includes(needle)
-        || (session.realDate ?? "").toLowerCase().includes(needle)
-        || session.tags.some((tag) => tag.includes(needle))
-        || session.recapBody.toLowerCase().includes(needle)));
+    return sessions.filter(
+      (session) =>
+        (!statusFilter || session.status === statusFilter) &&
+        (!needle ||
+          sessionTitle(session).toLowerCase().includes(needle) ||
+          (session.realDate ?? "").toLowerCase().includes(needle) ||
+          session.tags.some((tag) => tag.includes(needle)) ||
+          session.recapBody.toLowerCase().includes(needle))
+    );
   }, [sessions, filter, statusFilter]);
 
   const create = async () => {
     setListError(null);
-    // D7: the SAME create the palette's "New session" runs — one create per record type, whichever door
-    // starts it, including the number suggestion.
+    // The same create (and number suggestion) the palette's "New session" runs.
     try {
       const session = await createSession(gmToken, sessions);
       await onChanged();
       onOpenSession(session.id);
-    } catch (createError) { setListError(createError instanceof Error ? createError.message : "Couldn't create the session."); }
+    } catch (createError) {
+      setListError(createError instanceof Error ? createError.message : "Couldn't create the session.");
+    }
   };
 
   return (
@@ -78,16 +110,23 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
       <div className={`codex-workspace${selected ? " has-selection" : ""}`}>
         <aside className="codex-rail">
           <div className="codex-rail-head">
-            <Input value={filter} placeholder="Filter sessions" aria-label="Filter sessions" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
-{/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
-                screen, and the empty state's own create is the primary when there is nothing to select
-                — the rail's create steps down rather than competing with either. Two magenta-filled
-                buttons at once (twice with the identical label "New page") make neither one the
-                answer to "what do I do here". */}
-            <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}><IconPlus /> New</Button>
+            <Input
+              value={filter}
+              placeholder="Filter sessions"
+              aria-label="Filter sessions"
+              onChange={(event) => onFilterChange?.({ q: event.target.value || null })}
+            />
+            {/* One primary per view: the rail's create steps down when the editor's Save (autosave off) is primary. */}
+            <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}>
+              <IconPlus /> New
+            </Button>
           </div>
           <div className="codex-rail-tools">
-            <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange?.({ status: event.target.value || null })}>
+            <Select
+              aria-label="Filter by status"
+              value={statusFilter ?? ""}
+              onChange={(event) => onFilterChange?.({ status: event.target.value || null })}
+            >
               <option value="">All sessions</option>
               <option value="planned">Planned</option>
               <option value="played">Played</option>
@@ -95,36 +134,84 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
           </div>
           {listError && <Alert tone="danger">{listError}</Alert>}
           <nav className="codex-list scroll-y" aria-label="Sessions">
-            {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
-            {!loading && sessions.length === 0 && !error && <p className="codex-list-empty">No sessions yet. Create one to prep the next session.</p>}
-            {!loading && sessions.length > 0 && shown.length === 0 && <p className="codex-list-empty">No sessions match.</p>}
+            {loading && (
+              <div className="codex-list-loading">
+                {[0, 1, 2].map((row) => (
+                  <Skeleton key={row} variant="text" />
+                ))}
+              </div>
+            )}
+            {!loading && sessions.length === 0 && !error && (
+              <p className="codex-list-empty">No sessions yet. Create one to prep the next session.</p>
+            )}
+            {!loading && sessions.length > 0 && shown.length === 0 && (
+              <p className="codex-list-empty">No sessions match.</p>
+            )}
             {shown.map((session) => (
-              /* `aria-current` as well as the class: the accent is the visual cue, but "which session am
-                 I looking at" has to survive with every stylesheet stripped (R2's colour rule again). */
-              <button key={session.id} type="button" aria-current={session.id === selected?.id ? "true" : undefined}
-                className={`codex-session-row${session.id === selected?.id ? " is-active" : ""}`} onClick={() => onOpenSession(session.id)}>
+              /* `aria-current` too, so the selection survives without styles. */
+              <button
+                key={session.id}
+                type="button"
+                aria-current={session.id === selected?.id ? "true" : undefined}
+                className={`codex-session-row${session.id === selected?.id ? " is-active" : ""}`}
+                onClick={() => onOpenSession(session.id)}
+              >
                 <span className="codex-list-title">{sessionTitle(session)}</span>
                 {session.id === activeSessionId && <Badge tone="success">Active</Badge>}
                 <VisibilityBadge revealed={session.revealedToPlayers} />
-                {/* The SAME chip the editor two components down renders, and clickable for the same
-                    reason: D10 says a tag opens the cross-type view from anywhere. It was inert here
-                    and a button there — one session, two behaviours, one line apart in one feature. */}
-                {session.tags.slice(0, 2).map((tag) => <TagChip key={tag} tag={tag} onPick={onPickTag} />)}
+                {/* The same clickable chip the editor renders. */}
+                {session.tags.slice(0, 2).map((tag) => (
+                  <TagChip key={tag} tag={tag} onPick={onPickTag} />
+                ))}
               </button>
             ))}
           </nav>
         </aside>
 
         <section className="codex-main scroll-y">
-          {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenSession(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All sessions</Button>}
-          {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
-              looks exactly like a campaign that has never had a session. */}
-          {error && <Alert tone="danger" title="Couldn't load the sessions">{error}</Alert>}
-          {selected
-            ? <SessionEditor key={selected.id} gmToken={gmToken} session={selected} isActive={selected.id === activeSessionId}
-                autosave={autosave} pages={pages} actors={actors} onPickTag={onPickTag}
-                onChanged={onChanged} onDeleted={() => { onOpenSession(null); void onChanged(); }} />
-            : !loading && !error && <div className="codex-main-empty"><h3>No session selected</h3><p>A session holds GM-only prep and a recap for players. While a session is active, new journal entries and logged battles are filed under it.</p><Button variant="primary" onClick={create}>New session</Button></div>}
+          {selected && (
+            <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenSession(null)}>
+              <IconChevron className="codex-chevron-left" aria-hidden="true" />
+              All sessions
+            </Button>
+          )}
+          {/* The feed's own failure, distinct from a campaign with no sessions. */}
+          {error && (
+            <Alert tone="danger" title="Couldn't load the sessions">
+              {error}
+            </Alert>
+          )}
+          {selected ? (
+            <SessionEditor
+              key={selected.id}
+              gmToken={gmToken}
+              session={selected}
+              isActive={selected.id === activeSessionId}
+              autosave={autosave}
+              pages={pages}
+              actors={actors}
+              onPickTag={onPickTag}
+              onChanged={onChanged}
+              onDeleted={() => {
+                onOpenSession(null);
+                void onChanged();
+              }}
+            />
+          ) : (
+            !loading &&
+            !error && (
+              <div className="codex-main-empty">
+                <h3>No session selected</h3>
+                <p>
+                  A session holds GM-only prep and a recap for players. While a session is active, new journal entries
+                  and logged battles are filed under it.
+                </p>
+                <Button variant="primary" onClick={create}>
+                  New session
+                </Button>
+              </div>
+            )
+          )}
         </section>
       </div>
     </>
@@ -132,77 +219,135 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
 }
 
 /**
- * One session's two layers. Keyed on the session id by its caller, so selecting another session gets a
- * fresh draft rather than one component quietly carrying typed text across records.
- *
- * D6: it autosaves now, like everything else. Its old explicit "Save session" was the second cadence in
- * the suite — a GM who typed a recap and navigated away lost it, with no warning, because this surface
- * alone did not keep your work. `expectedRev` still travels, so the 409 path is unchanged.
+ * One session's two layers. Keyed on the session id by its caller, so switching sessions gets a fresh
+ * draft. Autosaves; `expectedRev` still guards with 409.
  */
-type SessionDraft = Readonly<{ sessionNumber: string; realDate: string; attendees: readonly string[]; status: CodexSessionStatus; prepBody: string; recapBody: string; tags: readonly string[] }>;
+type SessionDraft = Readonly<{
+  sessionNumber: string;
+  realDate: string;
+  attendees: readonly string[];
+  status: CodexSessionStatus;
+  prepBody: string;
+  recapBody: string;
+  tags: readonly string[];
+}>;
 
-function SessionEditor({ gmToken, session, isActive, autosave, pages, actors = [], onPickTag, onChanged, onDeleted }: Readonly<{
-  gmToken: string; session: CodexSession; isActive: boolean; autosave: CodexAutosaveSettings;
-  pages: readonly CodexPageSummary[]; actors?: readonly ArchivableActor[]; onPickTag?: (tag: string) => void;
-  onChanged: () => void | Promise<void>; onDeleted: () => void;
+function SessionEditor({
+  gmToken,
+  session,
+  isActive,
+  autosave,
+  pages,
+  actors = [],
+  onPickTag,
+  onChanged,
+  onDeleted
+}: Readonly<{
+  gmToken: string;
+  session: CodexSession;
+  isActive: boolean;
+  autosave: CodexAutosaveSettings;
+  pages: readonly CodexPageSummary[];
+  actors?: readonly ArchivableActor[];
+  onPickTag?: (tag: string) => void;
+  onChanged: () => void | Promise<void>;
+  onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<SessionDraft>({
-    sessionNumber: session.sessionNumber?.toString() ?? "", realDate: session.realDate ?? "",
-    attendees: session.attendees, status: session.status, prepBody: session.prepBody, recapBody: session.recapBody, tags: session.tags
+    sessionNumber: session.sessionNumber?.toString() ?? "",
+    realDate: session.realDate ?? "",
+    attendees: session.attendees,
+    status: session.status,
+    prepBody: session.prepBody,
+    recapBody: session.recapBody,
+    tags: session.tags
   });
   const [error, setError] = useState<string | null>(null);
   const revRef = useRef(session.rev);
   const patch = (next: Partial<SessionDraft>) => setDraft((prev) => ({ ...prev, ...next }));
 
-  /** `5a`: the character list "Who played" offers — names, because that is what the field stores. */
+  /** The characters "Who played" offers; the field stores names. */
   const characters = useMemo(() => charactersFor(pages, actors), [pages, actors]);
   const attendeeSuggestions = useMemo(() => characters.map((option) => option.title), [characters]);
-  /** Display only (`TagInput.optionLabel`): the value picked, normalised and stored is the name itself. */
+  /** Display only: the stored value is the name itself. */
   const attendeeLabel = useCallback(
     (name: string) => archivedOptionLabel(name, characters.find((option) => option.title === name)?.archived ?? false),
     [characters]
   );
 
-  const write = useCallback(async (next: SessionDraft) => {
-    const updated = await sessionApi.update(gmToken, session.id, {
-      sessionNumber: next.sessionNumber.trim() ? Number(next.sessionNumber) : null,
-      realDate: next.realDate.trim() || null,
-      // Always sent, never omitted: omitting `attendees` leaves the stored list alone, so removing the
-      // last name has to travel as an explicit empty array (the journal's `tags` contract exactly).
-      attendees: next.attendees,
-      prepBody: next.prepBody, recapBody: next.recapBody, status: next.status, tags: next.tags,
-      expectedRev: revRef.current
-    });
-    revRef.current = updated.rev;
-    setError(null);
-    await onChanged();
-  }, [gmToken, session.id, onChanged]);
+  const write = useCallback(
+    async (next: SessionDraft) => {
+      const updated = await sessionApi.update(gmToken, session.id, {
+        sessionNumber: next.sessionNumber.trim() ? Number(next.sessionNumber) : null,
+        realDate: next.realDate.trim() || null,
+        // Always sent: omitting `attendees` keeps the stored list, so removing the last name needs `[]`.
+        attendees: next.attendees,
+        prepBody: next.prepBody,
+        recapBody: next.recapBody,
+        status: next.status,
+        tags: next.tags,
+        expectedRev: revRef.current
+      });
+      revRef.current = updated.rev;
+      setError(null);
+      await onChanged();
+    },
+    [gmToken, session.id, onChanged]
+  );
 
-  const { status: saveStatus, dirty, flush } = useCodexAutosave<SessionDraft>({
-    settings: autosave, draft, save: write,
-    // A duplicate session number is a 400 whose message is written for a GM to read ("Session 7 already
-    // exists…"), so it is surfaced verbatim rather than collapsed into "couldn't save".
-    onConflict: async () => { revRef.current = (await sessionApi.get(gmToken, session.id)).rev; }
+  const {
+    status: saveStatus,
+    dirty,
+    flush
+  } = useCodexAutosave<SessionDraft>({
+    settings: autosave,
+    draft,
+    save: write,
+    // A duplicate session number is a 400 written for the GM, so it is shown verbatim.
+    onConflict: async () => {
+      revRef.current = (await sessionApi.get(gmToken, session.id)).rev;
+    }
   });
-  useEffect(() => { if (saveStatus === "error") setError("Couldn't save the session. Check the session number isn't already taken."); }, [saveStatus]);
+  useEffect(() => {
+    if (saveStatus === "error") setError("Couldn't save the session. Check the session number isn't already taken.");
+  }, [saveStatus]);
 
   const reveal = async (revealed: boolean) => {
     setError(null);
-    // Its own route, deliberately: revealing is not an edit, so it carries no `expectedRev`, does not
-    // bump `rev` and does not move `updatedAt`. Publishing a recap must not look like GM activity.
-    try { await sessionApi.reveal(gmToken, session.id, revealed); await onChanged(); }
-    catch { setError("Couldn't change who can see this recap."); }
+    // Its own route: revealing isn't an edit (no `expectedRev`, no `rev` bump, no `updatedAt` change).
+    try {
+      await sessionApi.reveal(gmToken, session.id, revealed);
+      await onChanged();
+    } catch {
+      setError("Couldn't change who can see this recap.");
+    }
   };
   const activate = async () => {
     setError(null);
-    try { await sessionApi.activate(gmToken, session.id); await onChanged(); }
-    catch { setError("Couldn't make this session active."); }
+    try {
+      await sessionApi.activate(gmToken, session.id);
+      await onChanged();
+    } catch {
+      setError("Couldn't make this session active.");
+    }
   };
   const remove = async () => {
-    if (!(await confirm({ title: "Delete session", body: `Delete ${sessionTitle(session).toLowerCase()}? Its prep and recap are lost. Journal entries filed under it are not deleted.`, confirmLabel: "Delete", danger: true }))) return;
-    try { await sessionApi.remove(gmToken, session.id); onDeleted(); }
-    catch { setError("Couldn't delete the session."); }
+    if (
+      !(await confirm({
+        title: "Delete session",
+        body: `Delete ${sessionTitle(session).toLowerCase()}? Its prep and recap are lost. Journal entries filed under it are not deleted.`,
+        confirmLabel: "Delete",
+        danger: true
+      }))
+    )
+      return;
+    try {
+      await sessionApi.remove(gmToken, session.id);
+      onDeleted();
+    } catch {
+      setError("Couldn't delete the session.");
+    }
   };
 
   return (
@@ -211,80 +356,140 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, actors = [
         <strong>{sessionTitle(session)}</strong>
         <div className="codex-composer-head-actions">
           <SaveState status={saveStatus} onRetry={() => void flush()} onReload={() => void flush()} />
-          {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
-          {isActive
-            ? <Badge tone="success"><span className="codex-dot" aria-hidden="true" /> Active session</Badge>
-            : <Button variant="secondary" size="sm" onClick={activate}>Make active</Button>}
+          {!autosave.enabled && (
+            <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>
+              Save
+            </Button>
+          )}
+          {isActive ? (
+            <Badge tone="success">
+              <span className="codex-dot" aria-hidden="true" /> Active session
+            </Badge>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={activate}>
+              Make active
+            </Button>
+          )}
           <RevealSwitch revealed={session.revealedToPlayers} onChange={reveal} ariaLabel="Show this recap to players" />
         </div>
       </div>
 
       {error && <Alert tone="danger">{error}</Alert>}
-      {isActive && <p className="codex-inspector-hint">New journal entries and logged battles are filed under this session.</p>}
+      {isActive && (
+        <p className="codex-inspector-hint">New journal entries and logged battles are filed under this session.</p>
+      )}
 
       <div className="codex-composer-meta">
-        <Field label="Session #" htmlFor="s-number"><Input id="s-number" type="number" inputMode="numeric" value={draft.sessionNumber} onChange={(event) => patch({ sessionNumber: event.target.value })} /></Field>
-        {/* No help string. "Date played" beside a Session # and a Status is already unambiguous, and the
-            sentence cost the row its alignment: a 3-row `.nh-field` set the flex line's height and its
-            2-row neighbours stretched to match, dropping THEIR inputs 23.5px (measured at 1280px). The
-            scoped `align-content: start` in codex.css is the other half — this one is the copy half. */}
-        <Field label="Date played" htmlFor="s-date"><Input id="s-date" value={draft.realDate} placeholder="2026-07-26" onChange={(event) => patch({ realDate: event.target.value })} /></Field>
+        <Field label="Session #" htmlFor="s-number">
+          <Input
+            id="s-number"
+            type="number"
+            inputMode="numeric"
+            value={draft.sessionNumber}
+            onChange={(event) => patch({ sessionNumber: event.target.value })}
+          />
+        </Field>
+        {/* No help string: a 3-row field would stretch its neighbours (see `align-content: start` in codex.css). */}
+        <Field label="Date played" htmlFor="s-date">
+          <Input
+            id="s-date"
+            value={draft.realDate}
+            placeholder="2026-07-26"
+            onChange={(event) => patch({ realDate: event.target.value })}
+          />
+        </Field>
         <Field label="Status" htmlFor="s-status">
-          <Select id="s-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexSessionStatus })}>
+          <Select
+            id="s-status"
+            value={draft.status}
+            onChange={(event) => patch({ status: event.target.value as CodexSessionStatus })}
+          >
             <option value="planned">Planned</option>
             <option value="played">Played</option>
           </Select>
         </Field>
       </div>
 
-      {/* D10: sessions are taggable, on the same vocabulary and the same slug rules pages use. */}
       <Field label="Tags" htmlFor="s-tags">
-        <TagInput id="s-tags" ariaLabel="Tags" placeholder="arc-one, tavern" values={draft.tags}
-          onChange={(tags: readonly string[]) => patch({ tags })} max={24} maxReachedReason="A session may carry at most 24 tags." />
+        <TagInput
+          id="s-tags"
+          ariaLabel="Tags"
+          placeholder="arc-one, tavern"
+          values={draft.tags}
+          onChange={(tags: readonly string[]) => patch({ tags })}
+          max={24}
+          maxReachedReason="A session may carry at most 24 tags."
+        />
       </Field>
       {onPickTag && draft.tags.length > 0 && (
         <div className="codex-editor-tagjumps">
-          {draft.tags.map((tag) => <TagChip key={tag} tag={tag} onPick={onPickTag} />)}
+          {draft.tags.map((tag) => (
+            <TagChip key={tag} tag={tag} onPick={onPickTag} />
+          ))}
         </div>
       )}
 
-      {/* Its own full-width row rather than a cell in `.codex-composer-meta`, whose `flex: 1 1 130px`
-          columns would squeeze a wrapping chip cloud into a 130px gutter on a phone. */}
-      {/* `5a` — bound to the characters that exist, and still open. `TagInput`'s `pick` swaps its entry
-          box for a visible chooser over the campaign's character pages, active ones first and archived
-          ones last and marked (`characters.ts` owns that order and that word). It changes what a GM can
-          SEE, never what the field accepts: `allowFreeText` rides through, so a guest who has no page
-          still commits, and the wire shape stays `string[]` of NAMES — binding this to page ids would
-          put a GM-only list of ids on a record whose attendees are deliberately GM-only anyway. */}
+      {/* Its own full-width row so the chip cloud isn't squeezed on a phone. */}
+      {/* `pick` shows a chooser over character pages (active first, archived marked); `allowFreeText`
+          keeps guests without a page. Stores names, not page ids. */}
       <Field label="Who played" htmlFor="s-attendees">
-        <TagInput id="s-attendees" ariaLabel="Who played" placeholder="Add a name" values={draft.attendees}
-          onChange={(attendees: readonly string[]) => patch({ attendees })} max={24} maxReachedReason="A session may list at most 24 people."
-          suggestions={attendeeSuggestions} pick optionLabel={attendeeLabel}
-          /* The default slugify normalizer is OVERRIDDEN here, and this is the one place in the Codex
-             where that is right: these are people's names, not tags. The server takes any trimmed
-             string up to 40 characters (`AttendeesSchema`), so "Garrett P." must survive as typed —
-             slugifying it to "garrett-p" would be the control quietly rewriting real-world data. */
-          normalize={(raw) => raw.trim().slice(0, 40)} />
+        <TagInput
+          id="s-attendees"
+          ariaLabel="Who played"
+          placeholder="Add a name"
+          values={draft.attendees}
+          onChange={(attendees: readonly string[]) => patch({ attendees })}
+          max={24}
+          maxReachedReason="A session may list at most 24 people."
+          suggestions={attendeeSuggestions}
+          pick
+          optionLabel={attendeeLabel}
+          /* Not slugified: these are people's names (the server accepts any trimmed string up to 40 chars). */
+          normalize={(raw) => raw.trim().slice(0, 40)}
+        />
       </Field>
 
-      {/* R5: GM-only content is ALWAYS the violet block plus the "GM only" pill — the same pair the
-          journal composer and the page editor use, never a new marking of its own. */}
-      {/* D13: the SAME writing surface a page body gets — toolbar, `[[` autocomplete, image drop. Before
-          this, typing `[[` in a session's prep did nothing at all. GM-layer, so it takes the violet block. */}
-      <Field label={<span className="codex-composer-gm-label">Prep for this session <GmOnlyTag /></span>} htmlFor="s-prep">
-        <CodexEditor id="s-prep" token={gmToken} value={draft.prepBody} onChange={(prepBody) => patch({ prepBody })}
-          ariaLabel="Prep for this session" placeholder="Prep notes for this session"
-          pages={pages} onNavigate={() => undefined} gmLayer rows={8} />
+      {/* The same editor as a page body; GM layer, so it takes the violet block. */}
+      <Field
+        label={
+          <span className="codex-composer-gm-label">
+            Prep for this session <GmOnlyTag />
+          </span>
+        }
+        htmlFor="s-prep"
+      >
+        <CodexEditor
+          id="s-prep"
+          token={gmToken}
+          value={draft.prepBody}
+          onChange={(prepBody) => patch({ prepBody })}
+          ariaLabel="Prep for this session"
+          placeholder="Prep notes for this session"
+          pages={pages}
+          onNavigate={() => undefined}
+          gmLayer
+          rows={8}
+        />
       </Field>
 
       <Field label="Recap" help="Players see this once the session is shown to them." htmlFor="s-recap">
-        <CodexEditor id="s-recap" token={gmToken} value={draft.recapBody} onChange={(recapBody) => patch({ recapBody })}
-          ariaLabel="Recap" placeholder="Recap of this session"
-          pages={pages} onNavigate={() => undefined} rows={8} />
+        <CodexEditor
+          id="s-recap"
+          token={gmToken}
+          value={draft.recapBody}
+          onChange={(recapBody) => patch({ recapBody })}
+          ariaLabel="Recap"
+          placeholder="Recap of this session"
+          pages={pages}
+          onNavigate={() => undefined}
+          rows={8}
+        />
       </Field>
 
       <div className="codex-composer-foot">
-        <Button variant="ghost" size="sm" onClick={remove}>Delete session</Button>
+        <Button variant="ghost" size="sm" onClick={remove}>
+          Delete session
+        </Button>
       </div>
       {confirmDialog}
     </Panel>

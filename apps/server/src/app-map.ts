@@ -2,14 +2,10 @@ import { GameStateSchema } from "@vtt/domain";
 import { API_VERSION, GAME_COMMAND_SCOPES, REALTIME_PROTOCOL_VERSION, openApiDocument } from "@vtt/api-contract";
 
 /**
- * Renders the always-fresh "app map" - a generated orientation aid for humans and AI agents. Pure:
- * it reads the live runtime sources of truth (the domain `GameState` schema, the api-contract
- * command/scope map, and the served OpenAPI document) and returns deterministic markdown. The
- * freshness test (`apps/server/test/app-map.test.ts`) fails whenever any of those surfaces changes
- * without regenerating via `npm run map`, so the doc can never silently drift from the code.
- *
- * It deliberately reports only machine-derivable surfaces plus a small curated file index; the
- * narrative "how it's built" lives in `docs/ai-context/` and is not duplicated here.
+ * Renders the generated app map (`docs/app-map.md`). Pure: reads the `GameState` schema, the api-contract
+ * command/scope map and the OpenAPI document and returns deterministic markdown. A freshness test fails
+ * when those change without `npm run map`. Reports only machine-derivable surfaces plus a small curated
+ * file index.
  */
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "options", "head", "trace"]);
@@ -29,7 +25,10 @@ export function renderAppMap(): string {
   const httpPaths = Object.entries(openApiDocument.paths)
     .map(([path, item]) => ({
       path,
-      methods: Object.keys(item as Record<string, unknown>).filter((key) => HTTP_METHODS.has(key)).map((method) => method.toUpperCase()).sort()
+      methods: Object.keys(item as Record<string, unknown>)
+        .filter((key) => HTTP_METHODS.has(key))
+        .map((method) => method.toUpperCase())
+        .sort()
     }))
     .sort((a, b) => a.path.localeCompare(b.path));
 
@@ -39,8 +38,7 @@ export function renderAppMap(): string {
   lines.push("Regenerate with `npm run map`. A freshness test (`apps/server/test/app-map.test.ts`) fails");
   lines.push("if this drifts from the code, so it is always current. This is an orientation aid: it maps the");
   lines.push("machine-derivable surfaces of the app (state shape, command catalog, HTTP paths) plus a curated");
-  lines.push("file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-state.md`, and");
-  lines.push("`docs/ai-context/`; the `vtt-orientation` skill routes you here first.");
+  lines.push("file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.");
   lines.push("");
   lines.push(`- API version \`${API_VERSION}\` · realtime protocol \`${REALTIME_PROTOCOL_VERSION}\``);
   lines.push(`- ${stateFields.length} GameState fields · ${commands.length} commands · ${httpPaths.length} HTTP paths`);
@@ -81,7 +79,9 @@ export function renderAppMap(): string {
   lines.push("");
   lines.push("Curated pointers (verify line numbers before relying on them - code moves):");
   lines.push("");
-  lines.push("- **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`.");
+  lines.push(
+    "- **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`."
+  );
   lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.");
   lines.push("- **Command Zod schemas:** `apps/server/src/game-commands.ts`.");
   lines.push("- **Command handlers + registry:** `apps/server/src/game-operations.ts`.");
@@ -89,7 +89,9 @@ export function renderAppMap(): string {
   lines.push("- **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.");
   lines.push("- **Public viewer projection:** `apps/server/src/viewer-encounter.ts`, `viewer-presentation.ts`.");
   lines.push("- **Persistence (SQLite):** `apps/server/src/game-store.ts`.");
-  lines.push("- **Rules engine:** `apps/server/src/{action-resolution,saving-throws,hit-points,rests,condition-rules}.ts`.");
+  lines.push(
+    "- **Rules engine:** `apps/server/src/{action-resolution,saving-throws,hit-points,rests,condition-rules}.ts`."
+  );
   lines.push("- **Shared 5e math:** `packages/rules-5e/src/{dice,combat,character}.ts`.");
   lines.push("- **SRD content bundles:** `packages/content-srd-5.2.1`.");
   lines.push("- **Client entry points:** `apps/client/src/{main,viewer-main,styleguide-main}.tsx`.");

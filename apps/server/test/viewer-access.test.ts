@@ -14,7 +14,7 @@ describe("ViewerAccessStore", () => {
   it("exchanges a short-lived code once and persists only a durable token hash", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-viewer-access-"));
     const databasePath = join(directory, "vtt.sqlite");
-    let now = Date.parse("2026-07-16T12:00:00.000Z");
+    const now = Date.parse("2026-07-16T12:00:00.000Z");
     const store = new ViewerAccessStore(databasePath, () => now, deterministicEntropy());
     try {
       await store.initialize();
@@ -46,7 +46,11 @@ describe("ViewerAccessStore", () => {
       await store.initialize();
       const pairing = store.createPairingCode();
       const created = store.exchangePairingCode(pairing.code, "Projector", { expiresAt: 20_000 });
-      expect(store.verify(created.token)).toMatchObject({ id: created.viewer.id, name: "Projector", lastUsedAt: new Date(now).toISOString() });
+      expect(store.verify(created.token)).toMatchObject({
+        id: created.viewer.id,
+        name: "Projector",
+        lastUsedAt: new Date(now).toISOString()
+      });
       store.close();
 
       store = new ViewerAccessStore(databasePath, () => now, entropy);
@@ -74,7 +78,8 @@ describe("ViewerAccessStore", () => {
       const pairing = store.createPairingCode(30_000);
       now += 30_000;
       expect(() => store.exchangePairingCode(pairing.code, "Late TV")).toThrow(ViewerAccessDeniedError);
-      for (let attempt = 0; attempt < 19; attempt++) expect(() => store.exchangePairingCode("FFFF-FFFF-FFFF", "Guess")).toThrow(ViewerAccessDeniedError);
+      for (let attempt = 0; attempt < 19; attempt++)
+        expect(() => store.exchangePairingCode("FFFF-FFFF-FFFF", "Guess")).toThrow(ViewerAccessDeniedError);
       expect(() => store.exchangePairingCode("FFFF-FFFF-FFFF", "Guess")).toThrow(ViewerPairingRateLimitError);
       now += 60_001;
       expect(() => store.exchangePairingCode("FFFF-FFFF-FFFF", "Guess")).toThrow(ViewerAccessDeniedError);

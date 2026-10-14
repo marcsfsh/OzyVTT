@@ -15,59 +15,32 @@
   text-align: left;
   cursor: pointer;
 }
-/* EIGHT PIXELS OF STRAY HEIGHT ON EVERY CARD, and the same defect family as the border rules below:
-   the consuming app styles bare elements, and a `.nh-choice` IS a `<button>` whose every row is a
-   `<span>`. The client's styles.css carries `button strong, button span { display: block }` and
-   `button span { color: var(--text-dim); font-size: .9rem; margin-top: var(--space-1) }` at (0,0,2),
-   so each row arrived 4px lower than this stylesheet said and `.nh-choice-head` inherited a 14.4px
-   type size it never asked for.
+/* The client's styles.css styles bare `button span` (display, colour, size, margin-top) at (0,0,2), which adds
+   stray height to every row of this button; restated at (0,1,1) to win. */
+.nh-choice span {
+  margin-top: 0;
+}
+/* Hover owns the surface, not the edge of a chosen card: `:not()` takes its argument's specificity, so a hover
+   border rule would out-specify `.is-selected` and turn its cyan edge grey. Excluded rather than out-specified. */
+.nh-choice:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.nh-choice:hover:not(:disabled):not(.is-selected) {
+  border-color: var(--line-strong);
+}
+/* The client's bare `button:hover:not(:disabled)` border rule at (0,2,1) beats `.is-selected` (0,2,0); restate the
+   chosen edge at (0,3,0). */
+.nh-choice.is-selected:hover {
+  border-color: var(--cyan);
+}
 
-   Measured at 1280 before the fix, on a Cleric cantrip card: `.nh-choice-head` 22.75px tall for an
-   18.75px title, its top 15px below the card's edge against 11px of declared padding+border, and the
-   head-to-desc gap reading 12px against a declared 8px. The card was 80.25px where its own rules add
-   up to 72.25px. Restated here at (0,1,1) — one class clear of any bare-element rule a host defines,
-   the same defence `.nh-choice.is-selected:hover` and `.nh-choice-info { padding: 0 }` already use. */
-.nh-choice span { margin-top: 0; }
-/* Hover owns the SURFACE; it must not own the EDGE of a card that is already chosen.
-   `:not()` takes its argument's specificity, so `.nh-choice:hover:not(:disabled)` is (0,3,0) and
-   out-specified `.nh-choice.is-selected` at (0,2,0): pointing at your own answer repainted its cyan
-   border grey. Excluded here rather than fixed by out-specifying it on the selected rule - a
-   specificity race is silently lost by whoever edits next. */
-.nh-choice:hover:not(:disabled) { background: var(--surface-2); }
-.nh-choice:hover:not(:disabled):not(.is-selected) { border-color: var(--line-strong); }
-/* And defend the edge against the CONSUMING APP's element-selector globals, the same way
-   `.nh-wizard-head` defends its width. A `.nh-choice` IS a <button>, and the client's styles.css
-   carries a bare `button:hover:not(:disabled) { border-color: color-mix(--cyan 55%, transparent) }`
-   at (0,2,1) — which out-specifies `.nh-choice.is-selected` at (0,2,0) all on its own. Excluding
-   hover above therefore got the chosen edge only as far as 55%-alpha cyan (measured: dark theme
-   rgb(38,135,165) composited, against rgb(45,226,255) at rest). This restates it at (0,3,0), one
-   class clear of any bare-element hover rule a host might define. */
-.nh-choice.is-selected:hover { border-color: var(--cyan); }
-
-/* ---- The reference control that rides BESIDE a card (ChoiceCard's `action`) ----
-
-   Laid out as a flex sibling rather than floated over the card, because the two must not share a
-   pixel: the card's whole box is its tap area, and a control on top of it would steal taps from
-   the answer it is only supposed to explain. 44px square is the floor (§4), stated outright rather
-   than grown with `.tap-target`, because at 320px the card beside it is already the narrowest it
-   ever gets and an ::after box would overhang it.
-
-   THE FRAME BELONGS TO THE PAIR, NOT TO EITHER HALF, and that is the fix for "which info icon is
-   this spell's?". The two used to be two bordered boxes 8px apart in a multi-column grid whose own
-   gap was 10px — so an icon standing between two cards was ambiguous BY CONSTRUCTION, and reading
-   order was the only thing that resolved it. Now one border encloses both, they are separated by a
-   1px rule instead of a gap, and `.nh-choicegrid-items:has(.nh-choice-wrap)` (ChoiceGrid.css) steps
-   the gap BETWEEN pairs up to --space-4. Ownership is structural; nothing has to be inferred.
-
-   THE RULE IS THE WRAPPER'S BACKGROUND SHOWING THROUGH A 1px GAP, not a border on either child.
-   A border there would be a border on a `<button>`, and the consuming app's
-   `button:hover:not(:disabled) { border-color: … }` at (0,2,1) out-specifies `.nh-choice-wrap >
-   .nh-choice-info` at (0,2,0) — pointing at the reference control would have repainted the divider.
-   A gap cannot be hijacked by a bare-element rule, so the hairline is the wrapper's alone.
-
-   `align-items: stretch` is what makes the two halves the SAME HEIGHT — the client's actual
-   request ("the spell window needs to match the size of the info icon button"). The card sets the
-   pair's height and the control follows it, rather than a 44px control sitting beside an 80px card. */
+/* ---- The reference control beside a card (ChoiceCard's `action`) ----
+   A flex sibling, never on top of the card, whose whole box is its tap area. 44px square, stated directly
+   rather than via `.tap-target`, whose ::after would overhang a narrow card.
+   One frame encloses both halves so it's obvious which card the control belongs to; ChoiceGrid.css widens the
+   gap between pairs. The divider is the wrapper's background through a 1px gap, not a border, because the
+   client's bare `button:hover` border rule would repaint a border on either child. `align-items: stretch`
+   makes both halves the same height. */
 .nh-choice-wrap {
   display: flex;
   align-items: stretch;
@@ -77,13 +50,8 @@
   border-radius: var(--radius-lg);
   background: var(--line);
 }
-/* Borderless REGIONS inside the shared frame. They keep their own opaque backgrounds — that is what
-   leaves the 1px gap reading as a rule, and it is also what lets each region own its own hover.
-
-   And inside the frame the card is a ROW, not a card: a name over its type line, --space-1 of block
-   padding, no stack gap beyond the leading the two line-heights already carry. Measured 46.25px at
-   320 / 375 / 1280 against the 80.25px the same card cost before — and the 44px floor still governs
-   it, via the `min-height` above, so "smaller" stops where the floor starts. */
+/* Borderless regions inside the shared frame, each with an opaque background (so the gap reads as a rule) and
+   its own hover. Inside the frame the card is a compact row; the 44px min-height still applies. */
 .nh-choice-wrap > .nh-choice {
   flex: 1 1 auto;
   min-width: 0;
@@ -91,56 +59,64 @@
   padding-block: var(--space-1);
   row-gap: 0;
 }
-.nh-choice-wrap > .nh-choice-info { border: 0; height: auto; }
-/* The pair's states live on the pair's frame. `:not(.is-selected)` rather than a higher-weight
-   restatement, for the reason spelled out on `.nh-choice:hover` below: `:has()` takes its
-   argument's specificity, so the hover rule would otherwise land at (0,5,0) against the chosen
-   rule's (0,3,0) and repaint a chosen pair's cyan edge grey. */
-.nh-choice-wrap:has(> .nh-choice:hover:not(.is-selected):not(:disabled)) { border-color: var(--line-strong); }
-.nh-choice-wrap:has(> .nh-choice.is-selected) { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-/* One chosen treatment, one place: the edge and the glow are the wrapper's now, so the card inside
-   spends neither. `:not(:focus-visible)` keeps the keyboard ring — the same carve-out the choose-N
-   rule below needs, and for the same reason. */
-.nh-choice-wrap > .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
+.nh-choice-wrap > .nh-choice-info {
+  border: 0;
+  height: auto;
+}
+/* Pair states live on the frame. `:not(.is-selected)` because `:has()` takes its argument's specificity and the
+   hover rule would otherwise beat the chosen edge. */
+.nh-choice-wrap:has(> .nh-choice:hover:not(.is-selected):not(:disabled)) {
+  border-color: var(--line-strong);
+}
+.nh-choice-wrap:has(> .nh-choice.is-selected) {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+/* The wrapper owns the chosen edge and glow; `:not(:focus-visible)` keeps the card's keyboard ring. */
+.nh-choice-wrap > .nh-choice.is-selected:not(:focus-visible) {
+  box-shadow: none;
+}
 .nh-choice-info {
   flex: none;
   display: grid;
   place-items: center;
-  /* PADDING: 0 IS LOAD-BEARING, not tidiness. The consuming app styles bare elements — its
-     `button { padding: 1.3rem }` (client styles.css) is (0,0,1) and this rule is (0,1,0), so it
-     applied here and left a 44px box with a 2.4px content area. The glyph rendered BELOW the
-     button's midline: measured at 1280px, box centre 544.4 against glyph centre 553.4, a 9px drop
-     against a card whose own centre was 544.4. `.nh-choice` never showed it because it declares
-     its own padding. State it, and the 44px box is 44px of centred content. */
+  /* Required: the client's bare `button { padding }` would otherwise shrink the content area and push the glyph
+     off centre. */
   padding: 0;
   width: var(--tap-min);
   height: var(--tap-min);
-  /* Stated as well as `height`, because inside `.nh-choice-wrap` the height goes to `auto` so the
-     control can stretch to the pair's height. The floor is not negotiable either way. */
+  /* Stated alongside `height`, which becomes `auto` inside `.nh-choice-wrap` so the control can stretch. */
   min-height: var(--tap-min);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface-1);
   color: var(--text-dim);
   font-size: 1.15rem;
-  /* The glyph is the only child and it is `display: block`; a leading of 1 keeps the grid area
-     the height of the box rather than of a 1.5-line strut. */
+  /* Leading of 1 keeps the grid area the box's height rather than a 1.5-line strut. */
   line-height: 1;
   cursor: pointer;
 }
-.nh-choice-info:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--text); }
+.nh-choice-info:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
 
-.nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
-/* WRAPS. A single-line ellipsis is right for a name ("Dragonborn") and wrong for the only other
-   thing a title ever is — the contents of a starting kit — where the clipped tail was the price
-   ("…and 8 GP"), the one number worth comparing against the other option.
-
-   THREE lines, the same ceiling `.nh-choice-desc` below already uses, not a second number: the
-   longest kit in the SRD is 92 characters, which is one line in a 618px card and exactly three in
-   a 293px one. Clamping at two put the price back under the fold on a phone — fixing the laptop by
-   breaking the phone, which is the one trade this project does not make. It is still a ceiling: a
-   pathological title cannot stretch a dense grid's rows. */
+.nh-choice-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.nh-choice-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  color: var(--text-dim);
+}
+/* Wraps to at most three lines (same as `.nh-choice-desc`), because a starting-kit title ends with its price
+   and an ellipsis would hide it on a phone. */
 .nh-choice-title {
   min-width: 0;
   flex: 1 1 auto;
@@ -152,7 +128,9 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.nh-choice-badge { flex: none; }
+.nh-choice-badge {
+  flex: none;
+}
 
 .nh-choice-desc {
   color: var(--text-dim);
@@ -165,12 +143,25 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.nh-choice-meta { color: var(--text-muted); font-size: var(--fs-xs); }
-/* "Locked" is CAUTION (violet), not danger: rose-red is damage and destruction (§2).
-   Kept at --fs-sm and full strength — on a disabled card, why it is locked is the most
-   important thing on the card. */
-.nh-choice-locked { display: flex; align-items: center; gap: var(--space-2); color: var(--caution-hi); font-size: var(--fs-sm); }
-.nh-choice-locked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+.nh-choice-meta {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+/* Locked is caution, not danger (rose-red means damage). Full strength: the reason is the most important thing
+   on a disabled card. */
+.nh-choice-locked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
+.nh-choice-locked-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
 
 /* ---- The one chosen treatment: cyan edge + selection glow + a check ---- */
 .nh-choice-check {
@@ -187,61 +178,70 @@
   font-size: 0.85rem;
   opacity: 0;
   transform: scale(0.8);
-  transition: opacity var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle);
+  transition:
+    opacity var(--dur-hover) var(--ease-settle),
+    transform var(--dur-hover) var(--ease-settle);
 }
-/* Cyan edge + glow + the check disc, and NO fill: hover already owns --surface-2, so
-   a filled selected state would make "the pointer is here" and "this is my answer"
-   the same pixel color. Border + glow + check is unambiguous on its own. */
+/* Edge, glow and check, but no fill: hover already owns --surface-2, so a fill would make "pointer here" and
+   "my answer" the same colour. */
 .nh-choice.is-selected {
   border-color: var(--cyan);
   box-shadow: var(--glow-cyan);
-  transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover);
+  transition:
+    box-shadow var(--dur-hover) var(--ease-settle),
+    border-color var(--dur-hover);
 }
-.nh-choice.is-selected .nh-choice-check { opacity: 1; transform: none; }
-.nh-choice.is-selected .nh-choice-title { color: var(--text); }
+.nh-choice.is-selected .nh-choice-check {
+  opacity: 1;
+  transform: none;
+}
+.nh-choice.is-selected .nh-choice-title {
+  color: var(--text);
+}
 
-/* Choose-N grids keep the chosen EDGE and CHECK — the treatment is unchanged — but spend no glow.
-   §8.1 budgets one glowing element per region, and a "choose 6 spells" region has six answers by
-   definition; six glowing cards is precisely the wallpaper that rule exists to prevent. The cyan
-   edge plus the check still say "chosen" without colour alone, so nothing is lost but the bloom.
+/* Choose-N grids keep the chosen edge and check but drop the glow (one glowing element per region).
+   `:not(:focus-visible)` keeps the keyboard ring, which this selector would otherwise out-specify. */
+.nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) {
+  box-shadow: none;
+}
+/* The same glow budget for framed pairs, where the glow lives on the wrapper. */
+.nh-choicegrid-items[role="group"] .nh-choice-wrap:has(> .nh-choice.is-selected) {
+  box-shadow: none;
+}
 
-   ...EXCEPT while it is focused. At (0,4,0) this selector out-specified BOTH keyboard rings - the
-   local `.nh-choice:focus-visible` (0,2,0) and the global `:where(…)` one (0,1,0), which also sets
-   `outline: none` - so a ticked card in a choose-N grid had no focus indicator at all: tabbing onto
-   your own answer showed nothing. `:not(:focus-visible)` takes this rule out of the way instead of
-   restating the ring at a higher weight; the ring below then wins on source order at equal (0,2,0). */
-.nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
-/* Same budget, said again for the framed pair — the glow moved to the wrapper, so the rule that
-   spends it has to move with it. No `:not(:focus-visible)` carve-out here: the keyboard ring is the
-   CARD's (`.nh-choice:focus-visible`), and suppressing the wrapper's bloom never touches it. */
-.nh-choicegrid-items[role="group"] .nh-choice-wrap:has(> .nh-choice.is-selected) { box-shadow: none; }
-
-/* Disabled dims PER PROPERTY, never with a group `opacity`: group alpha composites the
-   whole subtree, so a child can't opt back out of it (the old `.nh-choice-locked
-   { opacity: 1 }` was a no-op) and the locked reason fell to 2.08:1 in light theme.
-   Dim the frame, the title, and the icon; leave the reason at full strength. */
+/* Disabled dims per property, never with group `opacity` (a child can't opt out of it, and the locked reason
+   would fail contrast). Dim the frame, title and icon; keep the reason at full strength. */
 .nh-choice:disabled {
   cursor: not-allowed;
   border-color: color-mix(in srgb, var(--line) 60%, transparent);
   background: color-mix(in srgb, var(--surface-1) 70%, var(--bg));
 }
-.nh-choice:disabled .nh-choice-title { color: var(--text-dim); }
-/* desc/meta keep their resting colors: dimming them further drops --text-muted below
-   AA, and AA is not negotiable (§2). Disabled reads from the frame, the title, and the
-   locked reason. */
-.nh-choice:disabled .nh-choice-icon { color: var(--text-muted); }
-.nh-choice:disabled .nh-choice-badge { opacity: 0.75; }
-/* The dimmed frame, for a pair — the card inside no longer owns an edge to dim. Declared after the
-   chosen rule above so the tie at (0,3,0) goes to "locked", which is the state that matters more.
-   The reference control keeps its own resting surface: at capacity, reading the two you did NOT
-   take is the whole point, and it is the one live thing on a locked pair. */
-.nh-choice-wrap:has(> .nh-choice:disabled) { border-color: color-mix(in srgb, var(--line) 60%, transparent); }
+.nh-choice:disabled .nh-choice-title {
+  color: var(--text-dim);
+}
+/* desc/meta keep their resting colours: dimming them would drop below AA. */
+.nh-choice:disabled .nh-choice-icon {
+  color: var(--text-muted);
+}
+.nh-choice:disabled .nh-choice-badge {
+  opacity: 0.75;
+}
+/* The dimmed frame for a pair. Declared after the chosen rule so "locked" wins the (0,3,0) tie. The reference
+   control stays live. */
+.nh-choice-wrap:has(> .nh-choice:disabled) {
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+}
 
-/* The selection glow above is a class-level box-shadow, so it would out-specify the
-   zero-specificity global :focus-visible ring and leave a focused, already-selected
-   card with no keyboard ring. Restate the ring here so focus always wins. */
-.nh-choice:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
+/* The selection glow would out-specify the global :focus-visible ring; restate the ring so focus always shows. */
+.nh-choice:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .nh-choice-check { transition: none; transform: none; }
+  .nh-choice-check {
+    transition: none;
+    transform: none;
+  }
 }

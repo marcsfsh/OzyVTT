@@ -5,7 +5,12 @@ import { setCurrency, setInventoryItem } from "../src/inventory.js";
 
 const actorId = "60a6e172-9ff5-44a3-8a8b-93f836f0d16c";
 function stateWith(inventory: unknown[], extra: Record<string, unknown> = {}): GameState {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: actorId, name: "Borin", kind: "player-character", hp: { current: 10, maximum: 10 }, inventory, ...extra }] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: actorId, name: "Borin", kind: "player-character", hp: { current: 10, maximum: 10 }, inventory, ...extra }
+    ]
+  });
 }
 const item = (over: Record<string, unknown>) => InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 const noDefs = () => undefined;
@@ -30,10 +35,24 @@ describe("setInventoryItem", () => {
   });
   it("re-derives Armor Class from equipped armor, reverting to the base when unequipped (v6 #5)", () => {
     // reconcileArmorClass only reads dex + the base armorClass, so a minimal definition suffices.
-    const definition = { abilityScores: { str: 10, dex: 14, con: 10, int: 10, wis: 10, cha: 10 }, armorClass: 12 } as unknown as ActorDefinition;
+    const definition = {
+      abilityScores: { str: 10, dex: 14, con: 10, int: 10, wis: 10, cha: 10 },
+      armorClass: 12
+    } as unknown as ActorDefinition;
     const resolve = (id: string) => (id === "def-borin" ? definition : undefined);
     const state = stateWith([], { definitionId: "def-borin", armorClass: 12 });
-    const chainMail = { id: "chain-mail", name: "Chain Mail", category: "armor", armor: { acBase: 16, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: true, strengthRequired: 13 } };
+    const chainMail = {
+      id: "chain-mail",
+      name: "Chain Mail",
+      category: "armor",
+      armor: {
+        acBase: 16,
+        addDexModifier: false,
+        dexModifierCap: null,
+        stealthDisadvantage: true,
+        strengthRequired: 13
+      }
+    };
     setInventoryItem(state, actorId, item({ ...chainMail, equipped: true }), resolve);
     expect(state.actors[0].armorClass).toBe(16); // heavy armor ignores Dex
     setInventoryItem(state, actorId, item({ ...chainMail, equipped: false }), resolve);

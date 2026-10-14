@@ -24,23 +24,11 @@ import { BackupView } from "./BackupView";
 import { CodexRequestError } from "./api";
 
 /**
- * D16 — **restore is the only irreversible act in this product**, so the dialog in front of it is tested
- * as a safety device rather than as copy.
- *
- * Three properties, each of which failed at least once:
- *
- *  1. **The inventory is unconditional.** A section the file does not carry reads `0`, because `0` is
- *     what the restore will leave behind. The old form dropped a missing section from the sentence and
- *     fell back to the prose "its own records" — so the most dangerous file in the world described
- *     itself the most vaguely, on the screen where a number is the only thing that can stop a GM.
- *  2. **Plurals are real words.** A dead ternary (`noun === "journal entry" ? "s" : "s"`) put
- *     "17 journal entrys" in that dialog.
- *  3. **The server's refusal is quoted, not paraphrased.** Those messages name the section and the row
- *     ("That backup's \"pages\" entry 37 is not valid…"); replacing them with "The restore failed."
- *     throws away the only thing that tells the GM which file to fix.
+ * The restore confirm, tested as a safety device: every section is listed with a count (a missing one is
+ * 0), plurals are real words, and the server's refusal is quoted rather than paraphrased.
  */
 
-/** A File whose `.text()` resolves — jsdom implements the constructor but not the reader. */
+/** A File whose `.text()` resolves; jsdom lacks the reader. */
 function bundleFile(name: string, body: unknown): File {
   const file = new File([JSON.stringify(body)], name, { type: "application/json" });
   Object.defineProperty(file, "text", { value: () => Promise.resolve(JSON.stringify(body)) });
@@ -49,11 +37,15 @@ function bundleFile(name: string, body: unknown): File {
 
 const renderBackup = () => {
   const onChanged = vi.fn();
-  render(<ToastProvider><BackupView gmToken="gm" onChanged={onChanged} /></ToastProvider>);
+  render(
+    <ToastProvider>
+      <BackupView gmToken="gm" onChanged={onChanged} />
+    </ToastProvider>
+  );
   return { onChanged };
 };
 
-/** Choose a file through the hidden input the "Choose a backup file" button clicks. */
+/** Choose a file through the hidden input behind "Choose a backup file". */
 async function choose(user: ReturnType<typeof userEvent.setup>, file: File) {
   const input = document.querySelector('input[type="file"][accept="application/json,.json"]') as HTMLInputElement;
   await user.upload(input, file);
@@ -63,20 +55,24 @@ describe("The restore confirmation states what the file holds (D16)", () => {
   it("counts every section, including the ones the file does not contain", async () => {
     const user = userEvent.setup();
     renderBackup();
-    // A bundle with pages and nothing else. The five silent sections are the danger: restoring this
-    // deletes every map, pin, journal entry, session and quest in the campaign.
+    // Pages only: restoring this deletes every map, pin, journal entry, session and quest.
     await choose(user, bundleFile("partial.json", { codex: { pages: [{ id: "p1" }, { id: "p2" }] } }));
 
     const dialog = await screen.findByRole("dialog", { name: "Restore this backup?" });
-    expect(dialog).toHaveTextContent("That file contains 2 pages, 0 maps, 0 pins, 0 journal entries, 0 sessions, 0 quests.");
+    expect(dialog).toHaveTextContent(
+      "That file contains 2 pages, 0 maps, 0 pins, 0 journal entries, 0 sessions, 0 quests."
+    );
   });
 
   it("says 'journal entries', not 'journal entrys'", async () => {
     const user = userEvent.setup();
     renderBackup();
-    await choose(user, bundleFile("full.json", {
-      codex: { pages: [], maps: [], markers: [], journal: [{ id: "j1" }, { id: "j2" }], sessions: [], quests: [] }
-    }));
+    await choose(
+      user,
+      bundleFile("full.json", {
+        codex: { pages: [], maps: [], markers: [], journal: [{ id: "j1" }, { id: "j2" }], sessions: [], quests: [] }
+      })
+    );
 
     const dialog = await screen.findByRole("dialog", { name: "Restore this backup?" });
     expect(dialog).toHaveTextContent("2 journal entries");
@@ -86,7 +82,10 @@ describe("The restore confirmation states what the file holds (D16)", () => {
   it("uses the singular for exactly one, and the plural for zero", async () => {
     const user = userEvent.setup();
     renderBackup();
-    await choose(user, bundleFile("one.json", { codex: { pages: [{ id: "p1" }], journal: [{ id: "j1" }], markers: [] } }));
+    await choose(
+      user,
+      bundleFile("one.json", { codex: { pages: [{ id: "p1" }], journal: [{ id: "j1" }], markers: [] } })
+    );
 
     const dialog = await screen.findByRole("dialog", { name: "Restore this backup?" });
     expect(dialog).toHaveTextContent("1 page, 0 maps, 0 pins, 1 journal entry, 0 sessions, 0 quests");
@@ -110,13 +109,23 @@ describe("The restore confirmation states what the file holds (D16)", () => {
     const user = userEvent.setup();
     importBundle.mockResolvedValue({ counts: { pages: 1, journal: 0, maps: 0 } });
     const { onChanged } = renderBackup();
-    await choose(user, bundleFile("b.json", { codex: { pages: [{ id: "p1" }] }, exportedAt: "2026-07-30T00:00:00.000Z", bundleVersion: 1 }));
+    await choose(
+      user,
+      bundleFile("b.json", {
+        codex: { pages: [{ id: "p1" }] },
+        exportedAt: "2026-07-30T00:00:00.000Z",
+        bundleVersion: 1
+      })
+    );
 
     await screen.findByRole("dialog", { name: "Restore this backup?" });
     await user.click(screen.getByRole("button", { name: "Replace everything" }));
 
     await waitFor(() => expect(importBundle).toHaveBeenCalledTimes(1));
-    const [, sent] = importBundle.mock.calls[0] as [string, { codex: unknown; exportedAt?: string; bundleVersion?: number; commandId: string }];
+    const [, sent] = importBundle.mock.calls[0] as [
+      string,
+      { codex: unknown; exportedAt?: string; bundleVersion?: number; commandId: string }
+    ];
     expect(sent.codex).toEqual({ pages: [{ id: "p1" }] });
     expect(sent.exportedAt).toBe("2026-07-30T00:00:00.000Z");
     expect(sent.bundleVersion).toBe(1);
@@ -127,14 +136,20 @@ describe("The restore confirmation states what the file holds (D16)", () => {
   it("quotes the server's refusal verbatim, because it names the section and the row", async () => {
     const user = userEvent.setup();
     importBundle.mockRejectedValue(
-      new CodexRequestError('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.', 400, "validation_failed")
+      new CodexRequestError(
+        'That backup\'s "pages" entry 37 is not valid: Codex id is malformed.',
+        400,
+        "validation_failed"
+      )
     );
     renderBackup();
     await choose(user, bundleFile("bad.json", { codex: { pages: [{ id: "!" }] } }));
     await screen.findByRole("dialog", { name: "Restore this backup?" });
     await user.click(screen.getByRole("button", { name: "Replace everything" }));
 
-    expect(await screen.findByText('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.')
+    ).toBeInTheDocument();
   });
 
   it("refuses a file that is not a backup at all, without opening the dialog", async () => {

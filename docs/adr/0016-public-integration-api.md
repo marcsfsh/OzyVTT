@@ -38,9 +38,9 @@ the two cannot drift.
 2. **Request correlation.** Every `/api/v1` router echoes a caller-supplied UUID-v4 `X-Request-Id` on the
    response header and in the error body, minting one when the caller sends none. A value that is not a
    UUID v4 is replaced rather than echoed.
-3. **Idempotency is per surface, and the API does not pretend otherwise.** *Game* writes accept a
+3. **Idempotency is per surface, and the API does not pretend otherwise.** _Game_ writes accept a
    `commandId` (UUID) and execute it exactly once; a retry replays the stored outcome with
-   `duplicate: true`. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim — same status, same bytes — with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none — they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.
+   `duplicate: true`. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim — same status, same bytes — with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none — they are naturally idempotent already. _Homebrew_ writes still carry none and rely on `expectedRev`.
    The API-wide "every write accepts `commandId`" claim that shipped in `info.description` was false for
    two of the three surfaces when it was written; it is now true of two of them and says so.
 4. **Concurrency, two vocabularies.** `expectedRevision` (game) targets the global GameState revision.
@@ -50,7 +50,7 @@ the two cannot drift.
 5. **Status codes.** 400 malformed — a schema failure carries every problem in `details.issues` as
    `{ path, message }`, never only the first. 401 — no credential, or an `Authorization` header that is not
    parseable, and nothing else. 403 — the caller presented something and was refused: a role denial, or a
-   token that is **invalid, revoked, or missing the required scope**. 404 — absent *or secret*: the
+   token that is **invalid, revoked, or missing the required scope**. 404 — absent _or secret_: the
    existence of a record the caller may not see is **never distinguishable** from its absence. 409 — a
    domain refusal or a stale revision. 413 — oversized body. One stated exception: binary asset-content
    routes answer 403 before any existence check, because a media URL must not become an existence oracle.

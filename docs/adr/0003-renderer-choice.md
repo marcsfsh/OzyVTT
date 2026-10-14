@@ -4,7 +4,7 @@
 
 Closed — 2026-08-01. Records an outcome; supersedes nothing and decides nothing new.
 **Closes** ADR-0003 ("Choose a mature Canvas/WebGL renderer after the interaction spike"),
-which had no file and stood as *Proposed* in `docs/adr/README.md`.
+which had no file and stood as _Proposed_ in `docs/adr/README.md`.
 
 ## What happened
 

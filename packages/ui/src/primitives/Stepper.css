@@ -1,13 +1,20 @@
-.nh-stepper { display: inline-flex; align-items: center; gap: var(--space-3); }
-/* Same font shorthand as `.nh-field-label` (forms.css), deliberately — a labeled Stepper standing in a
-   form row IS a field, and its label has to occupy the identical band or the row stops lining up. */
-.nh-stepper-label { color: var(--text-dim); font: 600 var(--fs-sm) / 1.3 var(--font-body); }
-/* D23a — a VISIBLE label stacks into the band instead of sitting beside the control, so the −/+ group's
-   top lands level with the input wells either side of it in a FieldGrid. `--space-2` (not the row's
-   `--space-3`) because the band is `.nh-field`'s gap and this is the same gap by definition.
-   The unlabeled form (aria-label only, e.g. the six ability steppers) keeps the inline layout: the band
-   exists only where a label does, so no phantom space appears in a non-form context. */
-.nh-stepper--labeled { display: grid; gap: var(--space-2); justify-items: start; }
+.nh-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Same font as `.nh-field-label` so a labeled Stepper's label occupies the identical band in a form row. */
+.nh-stepper-label {
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+}
+/* A visible label stacks above the control so the −/+ group lines up with neighbouring input wells. The unlabeled
+   form (aria-label only, e.g. the ability steppers) stays inline. */
+.nh-stepper--labeled {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
 .nh-stepper-controls {
   display: inline-flex;
   align-items: stretch;
@@ -16,12 +23,8 @@
   background: var(--surface-2);
   overflow: hidden;
 }
-/* −/+ are the ability-allocator's primary touch control, so they carry the 44px
-   floor as real paint rather than an invisible extension (decision 16).
-   `min-width`, not `width`: a flex item's `width` is only its BASIS, and the default
-   `flex-shrink: 1` then shaves it under pressure — measured at the 320px floor, the
-   subclass stepper's buttons came out 41.69px wide, i.e. below the very floor this
-   rule exists to guarantee. `min-width` is the one that cannot be shrunk past. */
+/* −/+ carry the 44px floor as real paint. `min-width`, not `width`, because flex-shrink can shave a flex item's
+   width below the floor. */
 .nh-stepper-btn {
   display: grid;
   place-items: center;
@@ -36,8 +39,14 @@
   line-height: 1;
   cursor: pointer;
 }
-.nh-stepper-btn:hover:not(:disabled) { background: var(--surface-3); color: var(--cyan-hi); }
-.nh-stepper-btn:disabled { color: var(--text-muted); cursor: not-allowed; }
+.nh-stepper-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--cyan-hi);
+}
+.nh-stepper-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
 .nh-stepper-value {
   min-width: 2.4rem;
   padding: 0 var(--space-2);

@@ -1,47 +1,43 @@
 /**
- * D1/D3 — the Codex's address space and its sidebar, in one place.
- *
- * The 5-mode tab bar, the 9-button ops row and the four hidden "destination" overlays are retired; every
- * surface is now an address, and the sidebar is the one list of them. This module owns the mapping in
- * both directions so nothing else has to know the string shapes: `CodexShell` renders by
- * `codexSectionOf`, the palette navigates by `CODEX_SECTIONS`, and every jump builds its target here.
- *
- * Deliberately data, not JSX: `SidebarNav` is role-blind and takes item lists, so the GM and player
- * shells differ by which of these constants they pass and by nothing else.
+ * The Codex's addresses and sidebar in one place, so nothing else needs to know the path shapes. Data, not
+ * JSX: `SidebarNav` is role-blind, so the GM and player shells differ only by which lists they pass.
  */
 
 import type { CodexSearchHit } from "./api";
 import { withQuery } from "../router";
 
 export type CodexSection =
-  | "home" | "pages" | "atlas" | "graph"
-  | "sessions" | "quests" | "journal" | "calendar" | "downtime"
-  | "tags" | "audit" | "backup" | "settings";
+  | "home"
+  | "pages"
+  | "atlas"
+  | "graph"
+  | "sessions"
+  | "quests"
+  | "journal"
+  | "calendar"
+  | "downtime"
+  | "tags"
+  | "audit"
+  | "backup"
+  | "settings";
 
 export const CODEX_ROOT = "/codex";
 
-/** The one place a section's address is written. `/codex` is Home; everything else is a child. */
+/** `/codex` is Home; everything else is a child. */
 export function pathForSection(section: CodexSection): string {
   return section === "home" ? CODEX_ROOT : `${CODEX_ROOT}/${section}`;
 }
 
 /**
- * Which section an address renders, or null when the address is not in the Codex at all.
- * An unknown child of `/codex` is null too — the shell then shows the not-found view (invariant §3.2:
- * an address must never confirm that a surface exists).
- *
- * **The segment COUNT is part of the answer**, and it did not used to be. This checked `segments[1]`
- * only, while `isKnownPath` counted segments, so the two disagreed on real addresses: `/codex/tags`
- * rendered a TagView headed "#" with "Nothing carries this tag yet.", and `/codex/journal/j1` rendered
- * a fully working Journal — each underneath an app-shell not-found card, because the router had
- * correctly decided the address does not exist. `router.test.ts` locks the two answers together.
+ * Which section an address renders, or null if it isn't a Codex address. Unknown children and wrong
+ * segment counts are null too, so the shell shows not-found and an address never confirms a surface
+ * exists. Must agree with the router's `isKnownPath` (`router.test.ts`).
  */
 export function codexSectionOf(segments: readonly string[]): CodexSection | null {
   if (segments[0] !== "codex") return null;
   if (segments.length === 1) return "home";
   const candidate = segments[1] as CodexSection;
-  // A tag address must actually name a tag; a record section may carry one id and no more; everything
-  // else is exactly its own two segments. A fourth segment is never an address.
+  // Tags need exactly a tag; record sections allow one id; others are exactly two segments.
   if (candidate === "tags") return segments.length === 3 ? "tags" : null;
   if ((RECORD_SECTION_IDS as readonly string[]).includes(candidate)) return segments.length <= 3 ? candidate : null;
   if ((BARE_SECTION_IDS as readonly string[]).includes(candidate)) return segments.length === 2 ? candidate : null;
@@ -50,11 +46,15 @@ export function codexSectionOf(segments: readonly string[]): CodexSection | null
 
 /** Sections whose address may carry one record id: `/codex/pages/:id`. */
 export const RECORD_SECTION_IDS: readonly CodexSection[] = ["pages", "atlas", "sessions", "quests"];
-/** Sections that are exactly their own address — the journal focuses an entry with `?entry=`, not a segment. */
-export const BARE_SECTION_IDS: readonly CodexSection[] = ["journal", "calendar", "downtime", "graph", "audit", "backup", "settings"];
-
-const CODEX_SECTION_IDS: readonly CodexSection[] = [
-  "pages", "atlas", "graph", "sessions", "quests", "journal", "calendar", "downtime", "tags", "audit", "backup", "settings"
+/** Sections that are exactly their own address. The journal focuses an entry with `?entry=`. */
+export const BARE_SECTION_IDS: readonly CodexSection[] = [
+  "journal",
+  "calendar",
+  "downtime",
+  "graph",
+  "audit",
+  "backup",
+  "settings"
 ];
 
 /** The record id inside a section address (`/codex/pages/:id`), or null when the list itself is open. */
@@ -62,10 +62,10 @@ export function recordIdOf(segments: readonly string[]): string | null {
   return segments.length >= 3 ? segments[2] : null;
 }
 
-// ----- The sidebar (D1, exact labels from the glossary) -----
+// ----- The sidebar -----
 
 export type SidebarItem = Readonly<{
-  /** `path` navigates; `action` runs (Preview as player is the one action in the list). */
+  /** `path` navigates; `action` runs (Preview as player is the only action). */
   id: string;
   label: string;
   iconId: string;
@@ -104,7 +104,7 @@ export const GM_SIDEBAR: readonly SidebarGroup[] = [
   }
 ];
 
-/** The player's sidebar: **the same structure and the same words**, minus the Tools group (D1/D14). */
+/** The player's sidebar: the same structure and words, minus the Tools group. */
 export const PLAYER_SIDEBAR: readonly SidebarGroup[] = [
   { items: [HOME_ITEM] },
   { label: "World", items: WORLD_ITEMS },
@@ -113,38 +113,50 @@ export const PLAYER_SIDEBAR: readonly SidebarGroup[] = [
 
 /** What the codex top bar calls the section it is showing. */
 export const SECTION_TITLE: Readonly<Record<CodexSection, string>> = {
-  home: "Home", pages: "Pages", atlas: "Atlas", graph: "Graph",
-  sessions: "Sessions", quests: "Quests", journal: "Journal", calendar: "Calendar", downtime: "Downtime",
-  tags: "Tag", audit: "Reveal audit", backup: "Backup", settings: "Settings"
+  home: "Home",
+  pages: "Pages",
+  atlas: "Atlas",
+  graph: "Graph",
+  sessions: "Sessions",
+  quests: "Quests",
+  journal: "Journal",
+  calendar: "Calendar",
+  downtime: "Downtime",
+  tags: "Tag",
+  audit: "Reveal audit",
+  backup: "Backup",
+  settings: "Settings"
 };
 
-// ----- Prepared-destination jumps, as addresses (intake strength #1, preserved) -----
+// ----- Jump targets -----
 
-/** `/codex/pages/:id` — the page open. */
 export const pagePath = (id: string) => `${CODEX_ROOT}/pages/${id}`;
-/** `/codex/atlas/:mapId?pin=:markerId` — the map open, then the pin selected. Both halves travel. */
+/** `/codex/atlas/:mapId?pin=:markerId`: the map, then the pin selected. */
 export const atlasPath = (mapId: string | null, markerId?: string | null) =>
   withQuery(mapId ? `${CODEX_ROOT}/atlas/${mapId}` : `${CODEX_ROOT}/atlas`, { pin: markerId ?? null });
-/** `/codex/journal?entry=:id` — the entry focused and marked. */
+/** `/codex/journal?entry=:id`: the entry focused. */
 export const journalEntryPath = (entryId: string) => withQuery(`${CODEX_ROOT}/journal`, { entry: entryId });
 export const sessionPath = (id: string) => `${CODEX_ROOT}/sessions/${id}`;
 export const questPath = (id: string) => `${CODEX_ROOT}/quests/${id}`;
-export const graphPath = (focusPageId?: string | null) => withQuery(`${CODEX_ROOT}/graph`, { focus: focusPageId ?? null });
+export const graphPath = (focusPageId?: string | null) =>
+  withQuery(`${CODEX_ROOT}/graph`, { focus: focusPageId ?? null });
 export const tagPath = (tag: string) => `${CODEX_ROOT}/tags/${encodeURIComponent(tag)}`;
 
-/**
- * Where a search hit opens. One table, so the rail, the palette and every other result list land on the
- * same address for the same record — the strength intake #1 recorded, now expressed as URLs.
- */
+/** Where a search hit opens, shared by every result list. */
 export function pathForHit(hit: CodexSearchHit): string {
   switch (hit.kind) {
-    case "page": return pagePath(hit.id);
-    case "map": return atlasPath(hit.id);
-    // A hit normally names the pin's map. When it does not, the Atlas resolves it through
-    // `GET /codex/markers/{id}` — which is why a map-less pin still travels.
-    case "marker": return atlasPath(hit.mapId, hit.id);
-    case "journal": return journalEntryPath(hit.id);
-    case "quest": return questPath(hit.id);
-    case "session": return sessionPath(hit.id);
+    case "page":
+      return pagePath(hit.id);
+    case "map":
+      return atlasPath(hit.id);
+    // A map-less pin still works: the Atlas resolves its map via `GET /codex/markers/{id}`.
+    case "marker":
+      return atlasPath(hit.mapId, hit.id);
+    case "journal":
+      return journalEntryPath(hit.id);
+    case "quest":
+      return questPath(hit.id);
+    case "session":
+      return sessionPath(hit.id);
   }
 }

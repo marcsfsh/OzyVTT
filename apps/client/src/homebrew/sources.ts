@@ -1,22 +1,9 @@
 /**
- * What the "Duplicate an existing …" route can copy from.
+ * What "Duplicate an existing …" can copy from. The duplicate endpoint accepts SRD ids as well
+ * as homebrew ones, so the bundled catalogs are offered too. The catalog hooks are module-cached
+ * and called unconditionally (rules of hooks); the result is selected by type.
  *
- * `POST /content/{id}/duplicate` accepts an **SRD** id as well as a homebrew one —
- * the server reads the bundled record and mints a namespaced homebrew copy. That is
- * the endpoint that makes a 20-row class table tractable to author, so the picker
- * has to offer the bundled catalogs, not just what the GM has already made.
- *
- * Every catalog here is already module-cached by its own hook (one fetch per session,
- * shared with the builder / the encounter picker / the sheet), so mounting them
- * together costs nothing a GM who has opened those surfaces has not already paid.
- * The hooks are called unconditionally and the result is selected by type, because
- * that is the only shape React's rules of hooks allow.
- *
- * `spell-list` has no bundled catalog endpoint — the eight SRD lists are data inside
- * `@vtt/content-srd-5.2.1`, not an HTTP catalog — so its picker offers homebrew only.
- * That is a real, explainable gap, not a silent empty grid: the create modal says so in
- * the grid's own empty state, and a GM builds a list from `basedOn` in the editor
- * rather than by duplicating one.
+ * `spell-list` has no bundled catalog endpoint, so it offers homebrew only.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -39,28 +26,18 @@ export type DuplicateSource = Readonly<{
   id: string;
   name: string;
   origin: "srd" | "homebrew";
-  /** A short mono line under the title — hit die, spell level, challenge rating. */
+  /** Short line under the title: hit die, spell level, challenge rating. */
   meta?: string;
   /** Extra searchable text beyond the name. */
   keywords?: string;
-  /**
-   * Records that must be copied WITH this one for the copy to stand up on its own.
-   *
-   * Exactly one case today and it is the headline route: a class's subclass pick is
-   * re-pointed to the copy's own `<newId>-subclasses` family by the server
-   * (`homebrew-srd-copy.ts` — keeping `fighter-subclasses` would make the copy behave as
-   * Fighter and `character-build.ts` hard-rejects the build), and that family matches
-   * nothing until a subclass names the copy. So duplicating Fighter without its
-   * subclasses lands a class that cannot be published and a GM reading an error on a
-   * record they have not touched. The copy takes them along.
-   */
+  /** Records copied along with this one so the copy can stand alone. A copied class's subclass
+      pick is re-pointed to the copy's own `<newId>-subclasses` family, which matches nothing
+      until a subclass names the copy, so the class's subclasses come too. */
   companions?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
 }>;
 
-/* ---- The SRD bestiary. Mirrors `encounter/spells.tsx`'s cache exactly: one fetch per
-   session, a `??=` in-flight promise so two simultaneous mounts still cause one, and a
-   failed or empty ack is NEVER cached (a transient miss must retry on the next mount,
-   or the picker is permanently unable to offer a creature). ---- */
+/* ---- SRD bestiary cache, same pattern as `encounter/spells.tsx`: one fetch per session, a
+   shared in-flight promise, and a failed or empty ack is never cached so the next mount retries. ---- */
 let monsterCache: readonly ContentMonsterSummary[] | null = null;
 let monsterInFlight: Promise<void> | null = null;
 const monsterListeners = new Set<(monsters: readonly ContentMonsterSummary[]) => void>();
@@ -80,13 +57,14 @@ function requestMonsterReference(force = false) {
 }
 
 // A homebrew creature published mid-session must reach this picker without a reload.
-registerContentCache(() => { if (monsterCache) requestMonsterReference(true); });
+registerContentCache(() => {
+  if (monsterCache) requestMonsterReference(true);
+});
 
 function useMonsterReference(): readonly ContentMonsterSummary[] {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[]>(monsterCache ?? []);
   useEffect(() => {
-    // Subscribe unconditionally, warm cache or not — otherwise an invalidation refetches
-    // for nobody and the picker keeps the list it read at page load.
+    // Subscribe even with a warm cache, or an invalidation refetches for no listener.
     if (monsterCache) setMonsters(monsterCache);
     monsterListeners.add(setMonsters);
     requestMonsterReference();
@@ -99,14 +77,8 @@ function useMonsterReference(): readonly ContentMonsterSummary[] {
 
 const byName = (a: DuplicateSource, b: DuplicateSource) => a.name.localeCompare(b.name);
 
-/**
- * Every record of `type` the GM could copy: the bundled SRD catalog plus their own
- * homebrew, one flat list, sorted by name within each origin so the two blocks read
- * as one list rather than two interleaved ones.
- *
- * Soft-deleted homebrew is excluded — copying a record the GM has removed from every
- * picker would resurrect it under a new id, which is not what "Removed" means.
- */
+/** Every record of `type` the GM could copy: the SRD catalog then their own homebrew, each
+    sorted by name. Soft-deleted homebrew is excluded so copying cannot resurrect it. */
 export function useDuplicateSources(
   type: HomebrewType | null,
   homebrew: readonly HomebrewRecordSummary[]
@@ -123,17 +95,9 @@ export function useDuplicateSources(
   return useMemo(() => {
     if (!type) return [];
 
-    /**
-     * The GM's own live records, by id. **Exclusion is by ID, never by an optional
-     * `source` field**, and that is the whole fix: a homebrew record authored from blank
-     * carries no `source` key at all, `ContentSourceSchema` defaults it to `"srd"`, and a
-     * filter on `source !== "homebrew"` was therefore a no-op that let a published
-     * homebrew class render twice — once unbadged inside the SRD block, once badged
-     * Homebrew — with React logging a duplicate-key warning every time the grid drew.
-     * An id is present on every row of every catalog, so this holds for all eight types
-     * including `spell`, `equipment` and `monster`, whose wire shapes carry no `source`
-     * at all and so could never have been filtered the old way.
-     */
+    /** The GM's live record ids. Exclude by id, not by `source`: a homebrew record authored from
+        blank has no `source` (it defaults to "srd"), and spell/equipment/monster summaries carry
+        none at all, so filtering on `source` would list homebrew twice. */
     const mineIds = new Set(homebrew.filter((row) => !row.deletedAt).map((row) => row.id));
 
     const srd: DuplicateSource[] = [];
@@ -142,31 +106,34 @@ export function useDuplicateSources(
     switch (type) {
       case "class":
         for (const row of bundled(classes.items)) {
-          // Whatever the merged catalog knows about this class's subclasses, SRD or the
-          // GM's own published ones. A draft subclass is not here and cannot be: nothing
-          // player-facing may reach a draft. It is the right set anyway — the point is to
-          // give the copy a subclass to offer, and a draft one already belongs to the GM.
+          // Subclasses from the merged catalog. Drafts are absent because nothing
+          // player-facing may reach a draft.
           const children = subclasses.items.filter((entry) => entry.classId === row.id);
           srd.push({
             id: row.id,
             name: row.name,
             origin: "srd",
             meta: `Hit die ${row.hitDie}`,
-            ...(children.length > 0 ? { companions: children.map((entry) => ({ id: entry.id, name: entry.name })) } : {})
+            ...(children.length > 0
+              ? { companions: children.map((entry) => ({ id: entry.id, name: entry.name })) }
+              : {})
           });
         }
         break;
       case "subclass":
-        for (const row of bundled(subclasses.items)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.classId, keywords: row.classId });
+        for (const row of bundled(subclasses.items))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.classId, keywords: row.classId });
         break;
       case "species":
-        for (const row of bundled(species.items)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: `${row.speedFeet} ft` });
+        for (const row of bundled(species.items))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: `${row.speedFeet} ft` });
         break;
       case "background":
         for (const row of bundled(backgrounds.items)) srd.push({ id: row.id, name: row.name, origin: "srd" });
         break;
       case "feat":
-        for (const row of bundled(feats.items)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
+        for (const row of bundled(feats.items))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
         break;
       case "spell":
         for (const row of bundled(spells)) {
@@ -180,21 +147,28 @@ export function useDuplicateSources(
         }
         break;
       case "equipment":
-        for (const row of bundled(equipment.catalog)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
+        for (const row of bundled(equipment.catalog))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
         break;
       case "monster":
-        for (const row of bundled(monsters)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: `CR ${row.challengeRating}`, keywords: `${row.type} ${row.size}` });
+        for (const row of bundled(monsters))
+          srd.push({
+            id: row.id,
+            name: row.name,
+            origin: "srd",
+            meta: `CR ${row.challengeRating}`,
+            keywords: `${row.type} ${row.size}`
+          });
         break;
       case "spell-list":
-        // The eight SRD lists are bundle data, not an HTTP catalog. A GM starts a list
-        // from `basedOn` in the editor rather than by duplicating one.
+        // The SRD lists are bundle data, not an HTTP catalog.
         break;
     }
 
     const mine: DuplicateSource[] = homebrew
       .filter((row) => row.type === type && !row.deletedAt)
       .map((row) => {
-        // Same companion rule for the GM's own class: a copy of a copy needs subclasses too.
+        // A copy of the GM's own class needs its subclasses too.
         const children = type === "class" ? subclasses.items.filter((entry) => entry.classId === row.id) : [];
         return {
           id: row.id,
@@ -206,5 +180,16 @@ export function useDuplicateSources(
       });
 
     return [...srd.sort(byName), ...mine.sort(byName)];
-  }, [type, classes.items, subclasses.items, species.items, backgrounds.items, feats.items, spells, equipment.catalog, monsters, homebrew]);
+  }, [
+    type,
+    classes.items,
+    subclasses.items,
+    species.items,
+    backgrounds.items,
+    feats.items,
+    spells,
+    equipment.catalog,
+    monsters,
+    homebrew
+  ]);
 }

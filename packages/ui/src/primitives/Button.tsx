@@ -10,9 +10,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   /** Stretch to the container width. */
   block?: boolean;
-  /** Add a hover-lift — for card-like / CTA buttons, not dense toolbars. */
+  /** Add a hover-lift, for card-like / CTA buttons, not dense toolbars. */
   lift?: boolean;
-  /** Append a forward → that nudges on hover — for navigational actions. */
+  /** Append a forward → that nudges on hover, for navigational actions. */
   arrow?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -34,11 +34,23 @@ export function Button({
   return (
     <button
       type={type}
-      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm tap-target", block && "nh-btn--block", "interactive", lift && "lift", className)}
+      className={cx(
+        "nh-btn",
+        `nh-btn--${variant}`,
+        size === "sm" && "nh-btn--sm tap-target",
+        block && "nh-btn--block",
+        "interactive",
+        lift && "lift",
+        className
+      )}
       {...rest}
     >
       {children}
-      {arrow && <span className="nav-arrow" aria-hidden="true">→</span>}
+      {arrow && (
+        <span className="nav-arrow" aria-hidden="true">
+          →
+        </span>
+      )}
     </button>
   );
 }
@@ -53,20 +65,41 @@ export interface LinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement>
 }
 
 /** Anchor styled as a button, for real navigations (download links, viewer URL). */
-export function LinkButton({ variant = "secondary", size = "md", block = false, lift = false, arrow = false, className, children, ...rest }: LinkButtonProps) {
+export function LinkButton({
+  variant = "secondary",
+  size = "md",
+  block = false,
+  lift = false,
+  arrow = false,
+  className,
+  children,
+  ...rest
+}: LinkButtonProps) {
   return (
     <a
-      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm tap-target", block && "nh-btn--block", "interactive", lift && "lift", className)}
+      className={cx(
+        "nh-btn",
+        `nh-btn--${variant}`,
+        size === "sm" && "nh-btn--sm tap-target",
+        block && "nh-btn--block",
+        "interactive",
+        lift && "lift",
+        className
+      )}
       {...rest}
     >
       {children}
-      {arrow && <span className="nav-arrow" aria-hidden="true">→</span>}
+      {arrow && (
+        <span className="nav-arrow" aria-hidden="true">
+          →
+        </span>
+      )}
     </a>
   );
 }
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Accessible name — icon-only buttons have no text, so this is required. */
+  /** Accessible name; required because icon-only buttons have no text. */
   label: string;
   size?: ButtonSize;
   ref?: Ref<HTMLButtonElement>;

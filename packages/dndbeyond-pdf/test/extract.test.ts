@@ -7,7 +7,8 @@ import { buildDefinition } from "../src/extract.js";
 import { readWidgets, type Widget } from "../src/read-pdf.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const widgetsOf = (name: string): Widget[] => JSON.parse(readFileSync(join(here, "fixtures", `${name}.widgets.json`), "utf8"));
+const widgetsOf = (name: string): Widget[] =>
+  JSON.parse(readFileSync(join(here, "fixtures", `${name}.widgets.json`), "utf8"));
 const importFixture = (name: string) => {
   const { draft, warnings } = buildDefinition(widgetsOf(name));
   return { draft, warnings, parsed: ActorDefinitionSchema.safeParse(draft) };

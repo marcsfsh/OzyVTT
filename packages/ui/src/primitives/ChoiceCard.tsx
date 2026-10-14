@@ -9,58 +9,51 @@ export interface ChoiceCardProps {
   title: ReactNode;
   /** One or two lines of prose. Clamped so a grid of cards keeps an even rhythm. */
   description?: ReactNode;
-  /** Leading glyph — an SVG from the app's icon set, never an emoji. */
+  /** Leading glyph: an SVG from the app's icon set, never an emoji. */
   icon?: ReactNode;
-  /** Provenance slot: the SRD / Homebrew `Badge`. Reuse the existing tones
-      (info = SRD, primary = Homebrew) — do not invent a second vocabulary. */
+  /** Provenance slot: the SRD / Homebrew `Badge` (info = SRD, primary = Homebrew). */
   badge?: ReactNode;
   /** Short mono metadata line (hit die, ability bonuses, prerequisites…). */
   meta?: ReactNode;
   disabled?: boolean;
-  /** Shown under the title when disabled — a locked option must say why. */
+  /** Shown under the title when disabled; a locked option must say why. */
   disabledReason?: ReactNode;
   /** Roving tabindex, set by ChoiceGrid. Standalone cards leave it at 0. */
   tabIndex?: number;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
-  /** "radio" (pick one, the default) or "checkbox" (pick several). Set by
-      `ChoiceGrid` from its own `selection` mode — the two look identical on
-      purpose; only the semantics differ. */
+  /** "radio" (pick one, default) or "checkbox" (pick several), set by `ChoiceGrid`. Both look identical. */
   selectionRole?: "radio" | "checkbox";
   id?: string;
-  /** Points at a reason stated ONCE outside the card — how `ChoiceGrid` says "you have already
-      chosen N" to a screen reader without stamping the sentence onto every locked card. A locked
-      option must still say why; this is the other way of saying it. */
+  /** Points at a reason stated once outside the card (ChoiceGrid's "you have already chosen N"). */
   "aria-describedby"?: string;
-  /**
-   * A second control BESIDE the card — reading a spell's rules while choosing spells, and nothing
-   * that changes the answer.
-   *
-   * It is a SIBLING of the card, never a child, and that is structural rather than stylistic: the
-   * card IS a `<button role="radio|checkbox">`, and a button inside a button is invalid HTML that
-   * browsers reparent — the inner control lands outside the card at parse time and the card's own
-   * hit area is left with a hole in it. So an `action` mounts the card inside `.nh-choice-wrap`
-   * with the control laid out next to it, where its 44px target overlaps nothing.
-   */
+  /** A second control beside the card (e.g. reading a spell's rules). A sibling, never a child, because the card
+   * is a button and browsers reparent a nested button; with `action` the card is wrapped in `.nh-choice-wrap`. */
   action?: ReactNode;
   className?: string;
   ref?: Ref<HTMLButtonElement>;
 }
 
-/** The selectable content card behind every "pick one" step: species, class,
-    background, feat, subclass.
-
-    It carries `aria-checked` under either `role="radio"` (pick one — the default) or
-    `role="checkbox"` (pick N of a list, e.g. three Weapon Masteries). A pressed-button
-    grid would leave a keyboard user unable to tell the two apart; the roles say it
-    outright, and `ChoiceGrid` sets the right one for its selection mode.
-
-    There is exactly ONE chosen treatment in the system: a cyan edge with the
-    selection glow plus a check mark — identical in both modes. Do not add a second cue
-    (no "Selected" label, no filled background) — cyan is selection everywhere else too,
-    and one card selected means one glowing element per region. */
+/** The selectable content card behind every "pick one" step (species, class, background, feat, subclass).
+    `aria-checked` under `role="radio"` or `role="checkbox"` so keyboard and screen-reader users can tell
+    pick-one from pick-N. One chosen treatment everywhere, a cyan edge with the selection glow plus a check
+    mark; don't add a second cue. */
 export function ChoiceCard({
-  selected, onSelect, title, description, icon, badge, meta,
-  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, action, className, ref,
+  selected,
+  onSelect,
+  title,
+  description,
+  icon,
+  badge,
+  meta,
+  disabled = false,
+  disabledReason,
+  tabIndex,
+  onKeyDown,
+  selectionRole = "radio",
+  id,
+  action,
+  className,
+  ref,
   "aria-describedby": describedBy
 }: ChoiceCardProps) {
   const card = (
@@ -78,20 +71,37 @@ export function ChoiceCard({
       className={cx("nh-choice", selected && "is-selected", "interactive", className)}
     >
       <span className="nh-choice-head">
-        {icon != null && <span className="nh-choice-icon" aria-hidden="true">{icon}</span>}
+        {icon != null && (
+          <span className="nh-choice-icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
         <span className="nh-choice-title">{title}</span>
         {badge != null && <span className="nh-choice-badge">{badge}</span>}
       </span>
       {description != null && <span className="nh-choice-desc">{description}</span>}
       {meta != null && <span className="nh-choice-meta tabular">{meta}</span>}
       {disabled && disabledReason != null && (
-        <span className="nh-choice-locked"><span className="nh-choice-locked-icon" aria-hidden="true"><IconWarning /></span>{disabledReason}</span>
+        <span className="nh-choice-locked">
+          <span className="nh-choice-locked-icon" aria-hidden="true">
+            <IconWarning />
+          </span>
+          {disabledReason}
+        </span>
       )}
-      {/* The check is the chosen mark. aria-checked already carries it for AT. */}
-      <span className="nh-choice-check" aria-hidden="true"><IconCheck /></span>
+      {/* The check is the chosen mark; aria-checked carries it for assistive tech. */}
+      <span className="nh-choice-check" aria-hidden="true">
+        <IconCheck />
+      </span>
     </button>
   );
-  /* No wrapper when there is no action: a grid of 203 cards must not grow 203 extra elements to
-     carry nothing, and the card stays the grid's direct child everywhere it always was. */
-  return action == null ? card : <div className="nh-choice-wrap">{card}{action}</div>;
+  /* No wrapper without an action, so a large grid doesn't grow an extra element per card. */
+  return action == null ? (
+    card
+  ) : (
+    <div className="nh-choice-wrap">
+      {card}
+      {action}
+    </div>
+  );
 }

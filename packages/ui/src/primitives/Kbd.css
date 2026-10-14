@@ -12,4 +12,6 @@
   font: 600 var(--fs-xs) / 1.6 var(--font-mono);
   white-space: nowrap;
 }
-.nh-kbd + .nh-kbd { margin-left: 3px; }
+.nh-kbd + .nh-kbd {
+  margin-left: 3px;
+}

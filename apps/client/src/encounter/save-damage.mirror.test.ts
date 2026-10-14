@@ -7,25 +7,14 @@ import { startEncounter } from "../../../server/src/encounter";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
 
 /**
- * ISSUE `4b`'s CLIENT HALF, PROVED AT THE FAR END: the number the answerer types into the save
- * prompt comes off somebody's hit points.
- *
- * The server half shipped in `a4abd8f` and is tested over HTTP in
- * `apps/server/test/typed-damage-feed.test.ts`. What NOTHING tested was the other side of the wire:
- * `SavePrompt` never sent a damage field of any kind, so the whole mechanism was reachable only by
- * an HTTP caller. This file runs the prompt's OWN payload builder (`save-answer.ts`, the module the
- * component emits from) through the server's OWN `.strict()` schema and its OWN `answerSave`, and
- * asserts hit points. A `.mirror.test.ts` for exactly that reason - the node project may import the
- * server's modules, which reach `node:sqlite` through `game-store.js`.
- *
- * The three engine outcomes, in the order they would break:
- *   1. the amended number is what lands at all;
- *   2. it lands as FIRE, so a fire-resistant target still halves it (the regression that would
- *      return the moment someone "simplifies" this to sending a bare total);
- *   3. it is halved ONCE. `damageOverride` is the PRE-halving proposal and the preview reports the
- *      POST-halving number, so a client that echoed the previewed number back as the override would
- *      quarter the damage on every successful half-on-success save. That is the whole reason the
- *      field is bound to `proposedDamage` and not to what the preview showed.
+ * The number typed into the save prompt's damage field is what comes off hit points. Runs the
+ * prompt's payload builder (`save-answer.ts`) through the server's `.strict()` schema and its
+ * `answerSave`, asserting hit points:
+ *   1. the amended number is what lands;
+ *   2. it lands as fire, so a fire-resistant target still halves it;
+ *   3. it is halved once: `damageOverride` is the pre-halving proposal, so echoing the previewed
+ *      (post-halving) number back would quarter the damage on a successful half-on-success save.
+ * A `.mirror.test.ts` so the node project can import server modules (`node:sqlite`).
  */
 
 const IDS = {
@@ -41,32 +30,73 @@ const IDS = {
 const command = "50000000-0000-4000-8000-000000000001";
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/** Borin's sheet, with fire resistance when the case needs it. Only the fields the damage math reads. */
-const sheet = (damageResistances: readonly string[]) => ({
-  abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
-  damageResistances: [...damageResistances],
-  extensions: {}
-}) as unknown as ActorDefinition;
+/** Borin's sheet, fire-resistant when the case needs it. Only the fields the damage maths reads. */
+const sheet = (damageResistances: readonly string[]) =>
+  ({
+    abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
+    damageResistances: [...damageResistances],
+    extensions: {}
+  }) as unknown as ActorDefinition;
 
 /**
- * A live fight with a 17-damage breath owed by Borin, exactly as `action.resolve` would have parked
- * it. `parts` defaults to one fire component; hand it two and the halving stops agreeing with
- * `floor(total / 2)`, which is what makes the two-type case worth having.
+ * A live fight with a 17-damage breath owed by Borin, as `action.resolve` would park it. `parts`
+ * defaults to one fire component; with two, per-part halving stops matching `floor(total / 2)`.
  */
-function tableWith(options: Readonly<{ resistant: boolean; halfOnSuccess: boolean; parts?: ReadonlyArray<{ amount: number; type: string }> }>) {
-  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.dragon, name: "Dragon", kind: "monster", visibility: "public", hp: { current: 100, maximum: 100 } },
-    { id: IDS.borin, name: "Borin", kind: "player-character", visibility: "public", hp: { current: 40, maximum: 40 }, ownerSessionId: IDS.borinSession, definitionId: "borin-def" }
-  ] });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.dragon, score: 20 }, { actorId: IDS.borin, score: 12 }] }, () => 1, GEOMETRY);
+function tableWith(
+  options: Readonly<{
+    resistant: boolean;
+    halfOnSuccess: boolean;
+    parts?: ReadonlyArray<{ amount: number; type: string }>;
+  }>
+) {
+  const state = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: IDS.dragon, name: "Dragon", kind: "monster", visibility: "public", hp: { current: 100, maximum: 100 } },
+      {
+        id: IDS.borin,
+        name: "Borin",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        ownerSessionId: IDS.borinSession,
+        definitionId: "borin-def"
+      }
+    ]
+  });
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.dragon, score: 20 },
+        { actorId: IDS.borin, score: 12 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   createPendingSaves(state, {
-    sourceActorId: IDS.dragon, sourceName: "Dragon", actionName: "Fire Breath", ability: "dex", dc: 15,
-    targetIds: [IDS.borin], proposedDamage: 17, proposedDamageParts: [...(options.parts ?? [{ amount: 17, type: "fire" }])],
-    halfOnSuccess: options.halfOnSuccess, conditionId: null, newSaveId: () => IDS.save, createdAt: 0
+    sourceActorId: IDS.dragon,
+    sourceName: "Dragon",
+    actionName: "Fire Breath",
+    ability: "dex",
+    dc: 15,
+    targetIds: [IDS.borin],
+    proposedDamage: 17,
+    proposedDamageParts: [...(options.parts ?? [{ amount: 17, type: "fire" }])],
+    halfOnSuccess: options.halfOnSuccess,
+    conditionId: null,
+    newSaveId: () => IDS.save,
+    createdAt: 0
   });
   const definition = sheet(options.resistant ? ["fire"] : []);
   const deps = (role: "gm" | "player", sessionId: string): SaveAnswerDependencies => ({
-    random: () => 1, newRollId: () => IDS.roll, sessionId, role, now: () => "2026-08-10T00:00:00.000Z",
+    random: () => 1,
+    newRollId: () => IDS.roll,
+    sessionId,
+    role,
+    now: () => "2026-08-10T00:00:00.000Z",
     resolveDefinition: (id) => (id === "borin-def" ? definition : undefined)
   });
   const hp = () => state.actors.find((actor) => actor.id === IDS.borin)!.hp.current;
@@ -74,12 +104,8 @@ function tableWith(options: Readonly<{ resistant: boolean; halfOnSuccess: boolea
 }
 
 /**
- * The prompt's own gesture, end to end: what the answerer typed into the damage field, through the
- * builder `SavePrompt` emits from, through the server's `.strict()` schema (a mistyped key fails
- * here, loudly), into the engine.
- *
- * `method: "manual"` with the rolled total is what Confirm sends - the auto-rolled preview is a
- * separate, uncommitted round trip whose only job is to reveal the die.
+ * The prompt's gesture end to end: the typed damage, through `SavePrompt`'s builder and the server's
+ * `.strict()` schema, into the engine. `method: "manual"` with the rolled total is what Confirm sends.
  */
 function answerFromThePrompt(
   table: ReturnType<typeof tableWith>,
@@ -89,15 +115,30 @@ function answerFromThePrompt(
   commit = true
 ) {
   const payload = saveAnswerPayload({
-    commandId: command, saveId: IDS.save, method: "manual", commit, total: rolledTotal,
+    commandId: command,
+    saveId: IDS.save,
+    method: "manual",
+    commit,
+    total: rolledTotal,
     ...(saveDamageAmend(17, typedDamage) !== undefined ? { damageOverride: saveDamageAmend(17, typedDamage) } : {})
   });
   const request = SaveAnswerSchema.parse(payload);
   const scope = who.role === "gm" ? { role: "gm" as const } : { role: "player" as const, sessionId: who.sessionId };
   return {
     payload,
-    ...answerSave(table.state, request.commandId, request.saveId, request.method, request.total, request.commit, scope,
-      table.deps(who.role, who.sessionId), request.legendaryResistance, request.rollMode, request.damageOverride)
+    ...answerSave(
+      table.state,
+      request.commandId,
+      request.saveId,
+      request.method,
+      request.total,
+      request.commit,
+      scope,
+      table.deps(who.role, who.sessionId),
+      request.legendaryResistance,
+      request.rollMode,
+      request.damageOverride
+    )
   };
 }
 
@@ -118,7 +159,9 @@ describe("the save prompt's damage field", () => {
     const before = table.hp();
     const { outcome } = answerFromThePrompt(table, "12", 5);
     expect(before - table.hp()).toBe(6);
-    expect(outcome.parts).toEqual([{ amount: 12, type: "fire", adjusted: 6, adjustment: "resistance", adjustmentSource: null }]);
+    expect(outcome.parts).toEqual([
+      { amount: 12, type: "fire", adjusted: 6, adjustment: "resistance", adjustmentSource: null }
+    ]);
   });
 
   it("halves the amend ONCE on a successful half-on-success save - 12 typed lands as 6, not 3", () => {
@@ -131,45 +174,27 @@ describe("the save prompt's damage field", () => {
   });
 
   /**
-   * THE NUMBER `SavePrompt` PRINTS AFTER AN AMEND, sourced.
-   *
-   * The prompt's summary line used to print the PRE-halving proposal in the same "N dmg" grammar
-   * that had meant applied damage a keystroke earlier - 12 shown, 6 landing. It now re-asks the
-   * server with Confirm's own payload and `commit: false`, and prints whatever comes back. These
-   * two cases are what comes back, from the server's own code: the 6 and the 0 that
-   * `save-damage.test.tsx` acknowledges are these, not numbers a test author chose.
+   * What `SavePrompt` prints after an amend: it re-asks the server with Confirm's payload and
+   * `commit: false`. These are the server's own answers, the numbers `save-damage.test.tsx` shows.
    */
   it("answers an uncommitted recheck with the number the commit will apply, and applies nothing", () => {
     const table = tableWith({ resistant: false, halfOnSuccess: true });
     const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
     expect(outcome.committed).toBe(false);
     expect(outcome.appliedDamage).toBe(6);
-    // A recheck is a question, not an answer: no hit points moved and the save is still owed.
+    // A recheck moves no hit points and the save is still owed.
     expect(table.hp()).toBe(40);
     expect(table.state.combat.pendingSaves).toHaveLength(1);
-    // And the commit that follows lands exactly the number the recheck projected.
+    // The commit lands exactly the number the recheck projected.
     expect(40 - answerFromThePrompt(table, "12", 18).outcome.appliedDamage).toBe(34);
     expect(table.hp()).toBe(34);
   });
 
   /**
-   * THE SAME RECHECK AGAINST A DEFENCE, WHERE THE PROJECTION IS WRONG - asserted as it BEHAVES,
-   * not as the prompt claims, because this is a live bug and a test that encoded the aspiration
-   * would go green the day the bug got worse.
-   *
-   * `answerSave`'s preview arm returns `outcomeDamage`, which is the halved, re-typed total BEFORE
-   * `applyDamageDetailed` runs (`saving-throws.ts` - the `if (!commit) return` sits above the call).
-   * Only the commit arm reports `application.totalApplied`. So every defence - resistance,
-   * vulnerability, immunity, flat `damage-reduction` - is invisible to the preview, and the prompt
-   * prints a number the commit will not land.
-   *
-   * The case above passes only because its fixture is `resistant: false`, where the two arms agree
-   * by construction. That is why the gap survived a review: the one test named for the property
-   * exercised it on the only fixture where it cannot fail.
-   *
-   * The gap is NOT new to the amend - the un-amended Roll preview has the identical shape - so the
-   * fix belongs to the preview path rather than to `4b`. Recorded in `known-bugs.md`; when it is
-   * fixed, this test's numbers converge and its title stops being true.
+   * Known bug, asserted as it behaves: the preview arm of `answerSave` returns the halved total before
+   * `applyDamageDetailed` runs (`saving-throws.ts`), so resistance, vulnerability, immunity and damage
+   * reduction are invisible to it. The previous case only agrees because its target is not resistant.
+   * The un-amended Roll preview has the same gap. When fixed, these numbers converge.
    */
   it("projects the PRE-defence number on a recheck, which is not what the commit applies", () => {
     const table = tableWith({ resistant: true, halfOnSuccess: true });
@@ -182,16 +207,21 @@ describe("the save prompt's damage field", () => {
     const committed = answerFromThePrompt(table, "12", 18);
     expect(committed.outcome.appliedDamage).toBe(3);
     expect(40 - table.hp()).toBe(3);
-    // The whole finding in one line: the prompt showed 6, the target lost 3.
+    // The prompt showed 6; the target lost 3.
     expect(preview.outcome.appliedDamage).not.toBe(committed.outcome.appliedDamage);
   });
 
   it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {
-    // 9 fire + 8 cold. `rescaleDamageParts` re-weights 12 across them as 7 + 5, and the success
-    // halving floors EACH part: 3 + 2 = 5. `floor(12 / 2)` is 6. That gap is the point of this case -
-    // it is the fixture `save-damage.test.tsx` renders, so the string it asserts cannot be reached
-    // by any arithmetic the client could have done on the number in its own field.
-    const table = tableWith({ resistant: false, halfOnSuccess: true, parts: [{ amount: 9, type: "fire" }, { amount: 8, type: "cold" }] });
+    // 9 fire + 8 cold: `rescaleDamageParts` re-weights 12 as 7 + 5 and the success halving floors each
+    // part (3 + 2 = 5), while `floor(12 / 2)` is 6. `save-damage.test.tsx` renders this fixture.
+    const table = tableWith({
+      resistant: false,
+      halfOnSuccess: true,
+      parts: [
+        { amount: 9, type: "fire" },
+        { amount: 8, type: "cold" }
+      ]
+    });
     const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
     expect(outcome.appliedDamage).toBe(5);
     expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's halving").not.toBe(5);
@@ -238,38 +268,47 @@ describe("the save prompt's damage field", () => {
 
     const theirs = tableWith({ resistant: false, halfOnSuccess: false });
     expect(() => answerFromThePrompt(theirs, "3", 5, { role: "player", sessionId: IDS.strangerSession }))
-      // THIS is the ownership boundary, and it is the only one: `adjustableActor` turns a player
-      // away from somebody else's target before the amend is looked at. `answerSave` used to carry
-      // a second guard saying "You can only amend your own character's save damage." that could
-      // never fire, which made the sheet's boundary look like it was in two places; it was deleted
-      // 2026-08-10 and this message is what a player really gets.
+      // The ownership boundary: `adjustableActor` turns a player away from someone else's target before
+      // the amend is considered.
       .toThrow(/only track your own character/);
     expect(theirs.hp(), "a refused amend still moved hit points").toBe(40);
   });
 
   it("is refused IN WORDS by the server's own bound rather than silently applying the rolled number", () => {
-    // The client does NOT range-check: a fat-fingered 9999 must come back as a refusal the prompt
-    // can show, never as a quiet fallback to the 17 nobody asked for. The refusal lands one step
-    // earlier than `answerSave` - `SaveAnswerSchema`'s 0..1000 bound turns it away before the
-    // command runs, which is the same door the HTTP and socket paths post through.
+    // The client does not range-check: 9999 must come back as a refusal the prompt can show, never a
+    // silent fallback to 17. `SaveAnswerSchema`'s 0..1000 bound refuses it before the command runs.
     const table = tableWith({ resistant: false, halfOnSuccess: false });
     expect(saveDamageAmend(17, "9999")).toBe(9999);
 
-    // THE MESSAGE, not the path. This assertion used to read `.toThrow(/damageOverride/)`, which
-    // matches the ZodError's serialized JSON - the issue's `path` - and so passed just as happily
-    // while the sentence a GM read was zod's "Number must be less than or equal to 1000". Every
-    // arm of the bound answers with the same sentence, because `save.answer` surfaces
-    // `issues[0].message` verbatim (`game-operations.ts`, `preferIssueMessage`).
+    // Assert the message, not the path: `save.answer` surfaces `issues[0].message` verbatim
+    // (`preferIssueMessage`, game-operations.ts).
     for (const typed of ["9999", "1001"]) {
-      const refusal = SaveAnswerSchema.safeParse(saveAnswerPayload({
-        commandId: command, saveId: IDS.save, method: "manual", commit: true, total: 5,
-        damageOverride: saveDamageAmend(17, typed)
-      }));
+      const refusal = SaveAnswerSchema.safeParse(
+        saveAnswerPayload({
+          commandId: command,
+          saveId: IDS.save,
+          method: "manual",
+          commit: true,
+          total: 5,
+          damageOverride: saveDamageAmend(17, typed)
+        })
+      );
       expect(refusal.success, `${typed} was accepted`).toBe(false);
       expect(refusal.error!.issues[0].message).toBe("Enter the damage as a whole number from 0 to 1000.");
     }
     // 1000 is inside the bound, so the sentence is a refusal and not a wall.
-    expect(SaveAnswerSchema.safeParse(saveAnswerPayload({ commandId: command, saveId: IDS.save, method: "manual", commit: true, total: 5, damageOverride: 1000 })).success).toBe(true);
+    expect(
+      SaveAnswerSchema.safeParse(
+        saveAnswerPayload({
+          commandId: command,
+          saveId: IDS.save,
+          method: "manual",
+          commit: true,
+          total: 5,
+          damageOverride: 1000
+        })
+      ).success
+    ).toBe(true);
 
     expect(() => answerFromThePrompt(table, "9999", 5)).toThrow();
     expect(table.hp()).toBe(40);

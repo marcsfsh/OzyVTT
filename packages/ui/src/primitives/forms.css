@@ -1,68 +1,69 @@
-/* THE LABEL BAND (D23). A Field stacks a label over its control, so inside a FieldGrid cell every
-   Field-wrapped input's well starts one label-height plus one row-gap below the cell top. A control
-   that renders its OWN label (Stepper) or none at all (Switch) has to reserve the same distance or it
-   floats ~25px above its neighbours, dragging its label out of the label row with it.
+/* The label band: a Field's input well starts one label line plus one row-gap below its cell top. Controls with
+   their own label (Stepper) or none (Switch) reserve this so they align. Derived from `.nh-field-label`'s line
+   box (`--fs-sm` × 1.3) and `.nh-field`'s `gap`; change all three together. `forms-band.test.tsx` checks the
+   pairing and `scripts/primitive-align-check.mjs` measures it in a browser. */
+:root {
+  --nh-label-band: calc(var(--fs-sm) * 1.3 + var(--space-2));
+}
 
-   Named once here, next to the two rules it is derived FROM — `.nh-field-label`'s line box
-   (`--fs-sm` × 1.3) plus `.nh-field`'s own `gap` — so the three can never drift apart silently.
-   Change either rule below and change this calc in the same edit; `forms-band.test.tsx` holds the
-   pairing at source level and `scripts/primitive-align-check.mjs` measures the result in a browser. */
-:root { --nh-label-band: calc(var(--fs-sm) * 1.3 + var(--space-2)); }
+.nh-field {
+  display: grid;
+  gap: var(--space-2);
+}
+.nh-field-label {
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+  color: var(--text-dim);
+}
+.nh-field-req {
+  color: var(--magenta);
+}
 
-.nh-field { display: grid; gap: var(--space-2); }
-.nh-field-label { font: 600 var(--fs-sm) / 1.3 var(--font-body); color: var(--text-dim); }
-.nh-field-req { color: var(--magenta); }
-
-/* RULING 31 — the rim, and a FLAT FILL: nothing textured ever sits behind text a person is
-   reading or editing. That half is the easy half and it holds below: `--surface-3`, no scanline,
-   no gradient, in every state.
-
-   RULING 31'S OTHER HALF, THE CORNER CUT, IS NOT HERE, AND THE MEASUREMENT IS WHY.
-   Three independent blockers, all verified rather than argued:
-
-     1. `<input>`, `<select>` and `<textarea>` are replaced elements and generate NO `::before`
-        or `::after` in any engine, so the backing layer that rulings 14/49 make the house
-        technique does not exist to put the cut on.
-     2. `clip-path` on the element itself is the one thing ruling 14 forbids: a field IS the tap
-        target, and on a `<textarea>` the bottom-right corner the chamfer removes is exactly
-        where the resize grip lives.
-     3. It would also clip the focus treatment. `.nh-input:focus` paints an OUTER
-        `box-shadow: var(--glow-cyan)`, and clip-path (and `mask`) erase everything outside the
-        border box — so the cut would cost the field its focus indication, which the director's
-        ruling explicitly protects in this pass.
-
-   The route that works is a wrapper element around the control, which is a markup change in
-   forms.tsx plus the three files that hand-roll `<input className="nh-input">` — and
-   `scripts/primitive-align-check.mjs` measures this control's box against its neighbours, so it
-   is a measured change, not a paint one. Handed on rather than half-done. */
+/* The rim and a flat fill (`--surface-3`, no texture) in every state: nothing textured sits behind text being
+   read or edited. No corner cut: inputs are replaced elements with no `::before` for a backing layer,
+   clip-path on the field would clip its tap area, a textarea's resize grip and the outer focus glow. A cut
+   would need a wrapper element. */
 .nh-input {
   width: 100%;
-  /* Own the box model rather than inheriting it: with content-box, `width: 100%` plus
-     padding and border pushes the field 26px past its column, which is a horizontal
-     scrollbar at 375px on any consumer that hasn't set a global border-box reset. */
+  /* Own the box model: with content-box, `width: 100%` plus padding and border overflows the column. */
   box-sizing: border-box;
-  /* 44px touch floor (decision 16) — a tappable field on a phone. */
+  /* 44px touch floor */
   min-height: var(--tap-min);
-  /* The rim eats 1px more than the old border did, so the padding gives 1px back and the text
-     baseline does not move. Border-box sizing means the outer box is unchanged either way. */
+  /* The rim is 1px wider than a plain border, so the padding gives 1px back and the text doesn't move. */
   padding: calc(var(--space-3) - 1px);
   border: var(--rim-w) solid var(--line);
   border-radius: 0;
   background: var(--surface-3);
   color: var(--text);
   font: 400 var(--fs-body) / 1.4 var(--font-body);
-  transition: border-color var(--dur-hover), box-shadow var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    box-shadow var(--dur-hover),
+    background var(--dur-hover);
 }
-.nh-input::placeholder { color: var(--text-muted); }
-/* `:active` beside `:hover` — ruling 40's touch clause: half this table's devices never fire a
-   hover, and the title variant below uses this rule to say "you can edit this". */
-.nh-input:hover:not(:disabled), .nh-input:active:not(:disabled) { border-color: var(--line-strong); }
-/* Focus is the one place cyan appears in a resting form (§5.2). Overrides the
-   global focus-visible double-ring for inputs with the border + soft glow. */
-.nh-input:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.nh-input:disabled { opacity: 0.6; cursor: not-allowed; }
-.nh-input--invalid { border-color: var(--danger); }
-.nh-input--invalid:focus { box-shadow: var(--glow-danger); }
+.nh-input::placeholder {
+  color: var(--text-muted);
+}
+/* `:active` beside `:hover` for touch; the title variant relies on this to look editable. */
+.nh-input:hover:not(:disabled),
+.nh-input:active:not(:disabled) {
+  border-color: var(--line-strong);
+}
+/* Focus is the one place cyan appears in a resting form; replaces the global double ring with border + glow. */
+.nh-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.nh-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.nh-input--invalid {
+  border-color: var(--danger);
+}
+.nh-input--invalid:focus {
+  box-shadow: var(--glow-danger);
+}
 
 .nh-select {
   appearance: none;
@@ -73,9 +74,17 @@
   background-repeat: no-repeat;
   background-position: right 0.7rem center;
 }
-.nh-textarea { min-height: 5rem; resize: vertical; line-height: var(--lh-body); }
+.nh-textarea {
+  min-height: 5rem;
+  resize: vertical;
+  line-height: var(--lh-body);
+}
 
-.nh-field-help { margin: 0; font-size: var(--fs-sm); color: var(--text-dim); }
+.nh-field-help {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
 .nh-field-error {
   margin: 0;
   display: flex;
@@ -84,11 +93,15 @@
   font-size: var(--fs-sm);
   color: var(--danger-hi);
 }
-.nh-field-error-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+.nh-field-error-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
 
-/* Title variant — the field a record's own NAME is typed into. Display face, no resting
-   well, so a heading reads as a heading; the well returns on hover and focus so it never
-   stops looking editable. Replaces the Codex's bespoke `.codex-title-input` (D25). */
+/* Title variant: the field a record's own name is typed into. Display face and no resting well, so it reads as
+   a heading; the well returns on hover and focus. */
 .nh-input--title {
   font: 700 var(--fs-h2) / 1.25 var(--font-display);
   letter-spacing: var(--tracking-display);
@@ -96,5 +109,11 @@
   border-color: transparent;
   padding-inline: var(--space-2);
 }
-.nh-input--title:hover:not(:disabled), .nh-input--title:active:not(:disabled) { background: var(--surface-3); border-color: var(--line); }
-.nh-input--title:focus { background: var(--surface-3); }
+.nh-input--title:hover:not(:disabled),
+.nh-input--title:active:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--line);
+}
+.nh-input--title:focus {
+  background: var(--surface-3);
+}

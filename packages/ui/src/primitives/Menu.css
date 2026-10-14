@@ -1,10 +1,11 @@
-.nh-menu { position: relative; display: inline-block; }
+.nh-menu {
+  position: relative;
+  display: inline-block;
+}
 
-/* Trigger and items both meet the 44px touch floor as paint — a popover list can't
-   use overlapping `.tap-target` extensions without stealing its neighbours' taps. */
-/* Ruling 49 reaches the trigger: it is a button in everything but tag name. The cut goes on a
-   backing layer for the usual reason — a `<summary>` is the disclosure's whole tap target, and
-   the icon variant below grows its hit area with `::after`, which a clip-path would eat. */
+/* Trigger and items meet the 44px floor as paint: overlapping `.tap-target` extensions in a popover list
+   would steal neighbours' taps. The trigger's cut is on a backing layer because clip-path would eat the
+   icon variant's `::after` hit area. */
 .nh-menu-trigger {
   position: relative;
   isolation: isolate;
@@ -23,7 +24,7 @@
   list-style: none;
   --nh-fill: var(--surface-2);
   --nh-rim: var(--rim-color);
-  --chamfer-trigger: .38rem;
+  --chamfer-trigger: 0.38rem;
 }
 .nh-menu-trigger::before {
   content: "";
@@ -32,30 +33,37 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: polygon(0 var(--chamfer-trigger), var(--chamfer-trigger) 0, 100% 0, 100% calc(100% - var(--chamfer-trigger)), calc(100% - var(--chamfer-trigger)) 100%, 0 100%);
+  clip-path: polygon(
+    0 var(--chamfer-trigger),
+    var(--chamfer-trigger) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer-trigger)),
+    calc(100% - var(--chamfer-trigger)) 100%,
+    0 100%
+  );
   border: 1px solid var(--nh-rim);
   background: var(--nh-fill);
-  transition: border-color var(--dur-hover), background-color var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background-color var(--dur-hover);
 }
-.nh-menu-trigger::-webkit-details-marker { display: none; }
-.nh-menu-trigger::marker { content: ""; }
-/* Ruling 40's touch clause — `:active` says what `:hover` says. */
-.nh-menu-trigger:hover, .nh-menu-trigger:active { --nh-rim: var(--rim-color-hi); }
+.nh-menu-trigger::-webkit-details-marker {
+  display: none;
+}
+.nh-menu-trigger::marker {
+  content: "";
+}
+/* `:active` says what `:hover` says. */
+.nh-menu-trigger:hover,
+.nh-menu-trigger:active {
+  --nh-rim: var(--rim-color-hi);
+}
 
 /* ---- Icon-square trigger ----
-   A compact 1.75rem square for dense tool clusters, so a ⋯ can sit beside a same-size
-   drag grip as an even pair. `min-height` on the base trigger beats any `height` an app
-   sets regardless of specificity, which is exactly how this became a 28×44 rectangle
-   next to a 28×28 square — so the variant clears it here, in the primitive, and the app
-   stops overriding.
-
-   The 44px floor is met by the hit AREA (§4 route 2 — the `.tap-target` recipe,
-   inlined so BOTH ways in share one rule): growing the paint would rebuild the
-   rectangle this variant exists to remove. `.nh-card-tools` gaps its children by
-   --space-4 so two neighbouring 44px areas never overlap.
-
-   Two ways in: the `icon` prop, or the shared `.nh-card-tools` pattern (patterns.css),
-   whose tools are icon-only by definition. */
+   A compact 1.75rem square for dense tool clusters, beside a same-size drag grip. Clears the base trigger's
+   `min-height` (which would beat any app `height`). The 44px floor is met by the hit area (the `.tap-target`
+   recipe inlined); `.nh-card-tools` spaces its children so neighbouring areas don't overlap. Reached via the
+   `icon` prop or the `.nh-card-tools` pattern. */
 .nh-menu-trigger--icon,
 .nh-card-tools .nh-menu-trigger {
   position: relative;
@@ -71,7 +79,7 @@
   line-height: 1;
   --nh-rim: var(--rim-color);
   --nh-fill: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  --chamfer-trigger: .26rem;
+  --chamfer-trigger: 0.26rem;
 }
 .nh-menu-trigger--icon::after,
 .nh-card-tools .nh-menu-trigger::after {
@@ -84,33 +92,31 @@
   transform: translate(-50%, -50%);
 }
 .nh-menu-trigger--icon .nh-menu-trigger-label,
-.nh-card-tools .nh-menu-trigger .nh-menu-trigger-label { display: grid; place-items: center; line-height: 1; }
+.nh-card-tools .nh-menu-trigger .nh-menu-trigger-label {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
 
-.nh-menu-caret { font-size: 0.8em; color: var(--text-dim); transition: transform var(--dur-hover) var(--ease-settle); }
-.nh-menu[open] .nh-menu-caret { transform: rotate(180deg); }
+.nh-menu-caret {
+  font-size: 0.8em;
+  color: var(--text-dim);
+  transition: transform var(--dur-hover) var(--ease-settle);
+}
+.nh-menu[open] .nh-menu-caret {
+  transform: rotate(180deg);
+}
 
 /* ---- Popover ----
-   Viewport clamp (CLAUDE.md rule 5: no horizontal overflow down to a 320px floor).
-   A trigger can sit anywhere — the Codex rail's "New" button lands at x≈280 inside a
-   375px phone — and `left: 0` alone put this box's right edge at 472, widening the
-   document by 97px and shoving a tab off the app's mode strip. Two halves, both here in
-   the primitive so no caller has to remember `align="end"` to stay on screen:
-
-     1. `max-width` caps the box to the viewport minus a gutter, and `min-width` stops
-        insisting on 12rem once the viewport is narrower than that. The min() only bites
-        below a ~216px viewport, so at 320px the popover is still a full 12rem and labels
-        never truncate — shrinking the box was never the fix, moving it is.
-     2. `--nh-menu-shift` is written by Menu.tsx on open (and on resize while open) to
-        slide the box back inside. It rides the `translate` PROPERTY, not `transform`,
-        because `.anim-popover`'s entrance keyframes own `transform`. */
-/* RULING 52 — panel material with a BRIGHTER rim. A menu, a popover and a tooltip read as panels
-   that ARRIVED, and the brighter rim is what carries "on top" without a drop shadow. They are
-   usually the outermost panel while open, so by ruling 28 they do take the scanline.
-   Material on a backing layer: the popover is a list of tap targets. */
+   Kept inside the viewport (no horizontal overflow down to 320px), wherever the trigger sits:
+     1. `max-width` caps the box to the viewport minus a gutter; `min-width` relaxes only below ~216px.
+     2. Menu.tsx writes `--nh-menu-shift` on open and resize to slide the box back inside. It uses the
+        `translate` property because `.anim-popover`'s keyframes own `transform`.
+   Panel material with a brighter rim, which signals "on top" without a drop shadow; on a backing layer
+   because the popover is a list of tap targets. */
 .nh-menu-popover {
   --nh-menu-gutter: var(--space-2);
-  /* The offset off the trigger, as a token rather than an inline `var(--space-1)`, because
-     Menu.tsx reads it to decide which side of the trigger has room (`nh-menu--up`). */
+  /* A token because Menu.tsx reads it to decide which side has room (`nh-menu--up`). */
   --nh-menu-gap: var(--space-1);
   position: absolute;
   isolation: isolate;
@@ -136,24 +142,32 @@
   box-sizing: border-box;
   pointer-events: none;
   clip-path: var(--chamfer-cut);
-  /* The brighter rim of ruling 52 — `--rim-color-hi`, the same value ruling 40 brightens a
-     control's rim to, one step up from the `--rim-color` an ordinary panel wears. */
+  /* The brighter rim: `--rim-color-hi`, one step above an ordinary panel's `--rim-color`. */
   border: var(--rim-w) solid var(--rim-color-hi);
   background-color: var(--surface-2);
   background-image:
-    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--scanline-gap) - 1px),
+      var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
+    ),
     linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 45%);
   background-repeat: repeat, no-repeat;
-  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-size:
+    100% var(--scanline-gap),
+    100% 100%;
   background-origin: border-box;
   background-clip: border-box;
 }
-.nh-menu--end .nh-menu-popover { left: auto; right: 0; }
-/* OPENS UPWARD when there is no room below. Set by Menu.tsx on open and on resize/rotate — CSS
-   cannot know where in the viewport the trigger landed, the same reason `--nh-menu-shift` exists
-   for the horizontal axis. A trigger in the bottom-right corner of the map (the Scenes menu) had
-   its whole list off the bottom of the window until this existed. */
-.nh-menu--up .nh-menu-popover { top: auto; bottom: calc(100% + var(--nh-menu-gap)); }
+.nh-menu--end .nh-menu-popover {
+  left: auto;
+  right: 0;
+}
+/* Opens upward when there's no room below; set by Menu.tsx on open and on resize/rotate. */
+.nh-menu--up .nh-menu-popover {
+  top: auto;
+  bottom: calc(100% + var(--nh-menu-gap));
+}
 
 .nh-menu-item {
   display: flex;
@@ -169,19 +183,34 @@
   font: 500 var(--fs-sm) / 1.3 var(--font-body);
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur-hover), color var(--dur-hover);
+  transition:
+    background var(--dur-hover),
+    color var(--dur-hover);
 }
-/* Ruling 40's touch clause. A menu item's only feedback was `:hover`, which on a phone means
-   no feedback at all between the tap and the action. */
-.nh-menu-item:hover, .nh-menu-item:active { background: var(--surface-3); }
-/* A disabled item (RowEditor's "Move up" on the first row) must dim per PROPERTY, never
-   with a group `opacity` (design-language §5). Two reasons this rule has to exist here:
-   the client's styles.css has a bare `button:disabled { opacity: .55 }` at (0,1,1), and
-   a group alpha composites the subtree so an item's icon or reason cannot opt back out.
-   `.nh-menu-item:disabled` is (0,2,0) and wins; `.nh-menu-item:hover` is only (0,2,0)
-   too, hence the explicit `:disabled:hover` reset below. Matches `.nh-tab:disabled`. */
-.nh-menu-item:disabled { opacity: 1; color: var(--text-muted); cursor: not-allowed; }
-.nh-menu-item:disabled:hover { background: transparent; }
-.nh-menu-item--danger { color: var(--danger-hi); }
-.nh-menu-item--danger:hover, .nh-menu-item--danger:active { background: color-mix(in srgb, var(--danger) 18%, transparent); }
-.nh-menu-item-icon { width: 1.1rem; text-align: center; color: var(--text-dim); }
+/* `:active` too, or a phone gets no feedback between tap and action. */
+.nh-menu-item:hover,
+.nh-menu-item:active {
+  background: var(--surface-3);
+}
+/* Disabled dims per property, not group `opacity`: the client's bare `button:disabled { opacity: .55 }` would
+   otherwise apply. `:hover` ties at (0,2,0), hence the `:disabled:hover` reset below. */
+.nh-menu-item:disabled {
+  opacity: 1;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.nh-menu-item:disabled:hover {
+  background: transparent;
+}
+.nh-menu-item--danger {
+  color: var(--danger-hi);
+}
+.nh-menu-item--danger:hover,
+.nh-menu-item--danger:active {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.nh-menu-item-icon {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--text-dim);
+}

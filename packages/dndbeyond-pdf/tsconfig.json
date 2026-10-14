@@ -1,13 +1,5 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "types": ["node"]
-  },
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": { "resolveJsonModule": true, "types": ["node"] },
   "include": ["src", "test"]
 }

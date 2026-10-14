@@ -1,6 +1,5 @@
-/* WizardShell — full page on a laptop, full-screen sheet on a phone (builder
-   decision 4). Header and footer stick to the edges of the shell so Back/Next stay
-   reachable while the step body scrolls. */
+/* WizardShell: full page on a laptop, full-screen sheet on a phone. Header and footer stay put while the step
+   body scrolls. */
 
 .nh-wizard {
   display: flex;
@@ -15,10 +14,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  /* Defend against the consuming app's element-selector globals. The client's styles.css carries a
-     bare `header { max-width: 40rem }` (written for its landing hero), which clamped this sticky
-     header to 640px: the step body then scrolled visibly past it in the uncovered gutter. A
-     primitive must not depend on which globals its host happens to define. */
+  /* The client's bare `header { max-width: 40rem }` would clamp this sticky header; a primitive must not depend on
+     its host's globals. */
   max-width: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -28,33 +25,33 @@
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
-.nh-wizard-titles { min-width: 0; display: grid; gap: var(--space-1); }
-/* Display face, not the wordmark: a work screen, and the step indicator is already
-   the loud element in this region (§8.1 — one glowing thing per region). */
+.nh-wizard-titles {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+/* Display face, not the wordmark: the step indicator is already the loud element in this region. */
 .nh-wizard-title {
   margin: 0;
   font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display);
   color: var(--text);
   letter-spacing: var(--tracking-display);
 }
-.nh-wizard-headops { display: flex; align-items: center; gap: var(--space-2); }
-.nh-wizard-progress { grid-column: 1 / -1; }
+.nh-wizard-headops {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.nh-wizard-progress {
+  grid-column: 1 / -1;
+}
 
-.nh-wizard-resume { padding: 0 var(--space-4); }
+.nh-wizard-resume {
+  padding: 0 var(--space-4);
+}
 
-/* THE STEP BODY IS THE REGION (design-language §7): it takes the leftover height and scrolls
-   itself, with `.scroll-y` declaring that in the markup.
-   This inverts the earlier composition, and the reason it was earlier written `flex: 1 0 auto`
-   deserves to travel with it: while the LAYER above scrolled, `flex: 1 1 auto` + `min-height: 0`
-   let this item compress inside the shell's `min-height: 100dvh` column, so a step taller than the
-   viewport overflowed its own box — the shell stayed one screen tall, nothing scrolled, and every
-   card below the fold sat unreachable under the sticky footer (found by driving the character
-   builder in a browser; the styleguide demo's steps are short enough never to hit it). Now that
-   the BODY is the scroller, the same compression is the mechanism: the column is exactly its box,
-   the head and foot stay put, and the overflow lives here where the scrollbar belongs.
-   The scroll-padding is inherited from the layer this moved out of: the head and foot are sticky
-   OVER this box, so a card the browser scrolls to — keyboard focus, an anchor — would otherwise
-   land underneath them. */
+/* The step body is the scrolling region (`.scroll-y` in the markup): it takes the leftover height, so head and
+   foot stay put. scroll-padding keeps focused or anchored content clear of the sticky head and foot. */
 .nh-wizard-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -63,7 +60,9 @@
   scroll-padding-top: var(--space-6);
   scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
 }
-.nh-wizard-main { min-width: 0; }
+.nh-wizard-main {
+  min-width: 0;
+}
 
 /* Detail / preview pane. */
 .nh-wizard-detail {
@@ -76,15 +75,26 @@
   border-radius: var(--radius-lg);
   background: var(--surface-1);
 }
-.nh-wizard-detail-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
-.nh-wizard-detail-body { min-width: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-/* The master-detail pair. Both are `Button variant="ghost"` — the system's quiet text
-   action — so they get their look, hover, and 44px hit area from `.nh-btn`; these rules
-   only place them, and hide each one at the width where it makes no sense. */
-.nh-wizard-detail-open { display: none; margin-bottom: var(--space-3); }
-.nh-wizard-detail-back { display: none; align-self: flex-start; }
-/* The system's disclosure caret, turned a quarter clockwise to point back at the list. A STATIC
-   transform, not a transition: nothing animates, so there is nothing for reduced-motion to suppress. */
+.nh-wizard-detail-title {
+  margin: 0;
+  font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+}
+.nh-wizard-detail-body {
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* The master-detail pair are ghost Buttons; these rules only place them and hide each where it makes no sense. */
+.nh-wizard-detail-open {
+  display: none;
+  margin-bottom: var(--space-3);
+}
+.nh-wizard-detail-back {
+  display: none;
+  align-self: flex-start;
+}
+/* The disclosure caret turned a quarter to point back at the list (static, so nothing to reduce for motion). */
 .nh-wizard-detail-back-icon {
   flex: none;
   display: grid;
@@ -106,14 +116,20 @@
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
-/* Back plus an optional second way out (`footerSecondary`), so the group is a row rather than
-   a single slot. With one child it lays out exactly as it did. It WRAPS rather than squeezing:
-   `.nh-btn` is `white-space: nowrap`, so a shrunk button spills its label outside its own border
-   instead of truncating - two actions in half a 375px footer did exactly that. */
-.nh-wizard-foot-back { justify-self: start; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
-.nh-wizard-foot-next { justify-self: end; }
-/* The gating reason. It keeps its row whether or not it is filled, so the footer
-   never jumps as steps validate; role="status" announces it when it appears. */
+/* Back plus an optional second action. Wraps rather than squeezing, because `.nh-btn` is `nowrap` and a shrunk
+   button would spill its label. */
+.nh-wizard-foot-back {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.nh-wizard-foot-next {
+  justify-self: end;
+}
+/* The gating reason keeps its row even when empty so the footer never jumps; role="status" announces it. */
 .nh-wizard-blocked {
   display: flex;
   align-items: center;
@@ -122,17 +138,24 @@
   margin: 0;
   min-height: 1.2em;
   text-align: center;
-  /* "Not finished yet" is CAUTION (violet), not danger: rose-red means damage and
-     destruction (§2). Nothing has gone wrong here — a step is simply incomplete. */
+  /* "Not finished yet" is caution, not danger: nothing has gone wrong. */
   color: var(--caution-hi);
   font-size: var(--fs-sm);
 }
-.nh-wizard-blocked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
-.nh-wizard-blocked.is-clear { color: transparent; }
-.nh-wizard-blocked.is-clear .nh-wizard-blocked-icon { display: none; }
+.nh-wizard-blocked-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
+.nh-wizard-blocked.is-clear {
+  color: transparent;
+}
+.nh-wizard-blocked.is-clear .nh-wizard-blocked-icon {
+  display: none;
+}
 
-/* Inside the step column now (see WizardShell.tsx), so it takes the body's padding and needs only
-   the gap that separates it from the step's last card. */
+/* Inside the step column, so it needs only the gap from the step's last card. */
 .nh-wizard-footnote {
   margin: var(--space-6) 0 0;
   color: var(--text-muted);
@@ -140,27 +163,44 @@
   line-height: var(--lh-body);
 }
 
-/* ---- Narrow: master-detail. Showing both panes stacked would mean two half-read
-   columns; the Codex workspace already solved this by swapping them. 760 is the
-   documented phone/laptop step — the same one Steps uses to swap its two forms, so
-   the rail and the split now change together instead of 140px apart. ---- */
+/* ---- Narrow: master-detail (swap panes rather than stacking them). 760px, the same step Steps uses. ---- */
 @media (max-width: 760px) {
-  .nh-wizard-body--split.has-detail .nh-wizard-main { display: none; }
-  .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail { display: none; }
-  .nh-wizard-detail-open, .nh-wizard-detail-back { display: inline-flex; }
+  .nh-wizard-body--split.has-detail .nh-wizard-main {
+    display: none;
+  }
+  .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail {
+    display: none;
+  }
+  .nh-wizard-detail-open,
+  .nh-wizard-detail-back {
+    display: inline-flex;
+  }
 }
 
 @media (max-width: 560px) {
   /* At phone width the reason needs its own line, or Back/Next get squeezed to nothing. */
-  .nh-wizard-foot { grid-template-columns: 1fr 1fr; }
-  .nh-wizard-blocked { grid-row: 1; grid-column: 1 / -1; }
-  .nh-wizard-foot-back, .nh-wizard-foot-next { grid-row: 2; }
-  /* Back fills its half of the footer alone, and shares it with a second action when both fit —
-     `flex: 1 1 auto` grows to the cell but never shrinks a label past its own button. When they
-     do not fit, the group's `flex-wrap` stacks them instead of overflowing. */
-  .nh-wizard-foot-back .nh-btn { flex: 1 1 auto; }
-  .nh-wizard-foot-next .nh-btn { width: 100%; }
-  .nh-wizard-foot-back, .nh-wizard-foot-next { justify-self: stretch; }
+  .nh-wizard-foot {
+    grid-template-columns: 1fr 1fr;
+  }
+  .nh-wizard-blocked {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+  .nh-wizard-foot-back,
+  .nh-wizard-foot-next {
+    grid-row: 2;
+  }
+  /* Back fills its half of the footer, sharing it with a second action when both fit; otherwise they wrap. */
+  .nh-wizard-foot-back .nh-btn {
+    flex: 1 1 auto;
+  }
+  .nh-wizard-foot-next .nh-btn {
+    width: 100%;
+  }
+  .nh-wizard-foot-back,
+  .nh-wizard-foot-next {
+    justify-self: stretch;
+  }
 }
 
 /* ---- Laptop: a full page inside the app shell, not a floating card ---- */
@@ -171,12 +211,8 @@
     gap: var(--space-4);
     align-items: start;
   }
-  /* Stay beside the list. A step body can run well past a screen (a class's feature set, a
-     66-spell picker), and a preview you have scrolled away from previews nothing — the column
-     just becomes empty gutter. It sticks to the TOP OF THE REGION now (`top: 0`): the head it
-     used to clear is outside the scroller, so the old offset would have parked it a header's
-     height down the empty gutter. The cap stays a viewport fraction — an upper bound, since the
-     region is shorter than the viewport and clips anything past it. */
+  /* Stick to the top of the region so the preview stays beside a long step body. The cap is a viewport fraction,
+     an upper bound since the region is shorter than the viewport. */
   .nh-wizard-detail {
     position: sticky;
     top: 0;

@@ -27,15 +27,17 @@ export interface FeatureListProps {
   className?: string;
 }
 
-/** In-flow disclosure list for long class/species feature sets. `Menu` is a
-    popover — wrong shape for twenty features you need to read side by side with
-    the rest of the step.
-
-    Built on native `<details>`, so keyboard and screen-reader behaviour come from
-    the platform rather than a hand-rolled aria-expanded dance. Collapsed rows are
-    a single tappable line, which is what makes a twenty-feature class readable at
-    375px. */
-export function FeatureList({ items, openIds, onToggle, allowExpandAll = false, ariaLabel, className }: FeatureListProps) {
+/** In-flow disclosure list for long class/species feature sets (a `Menu` popover is the wrong shape for twenty
+    features read side by side). Built on native `<details>` for platform keyboard and screen-reader behaviour;
+    collapsed rows are one tappable line. */
+export function FeatureList({
+  items,
+  openIds,
+  onToggle,
+  allowExpandAll = false,
+  ariaLabel,
+  className
+}: FeatureListProps) {
   const [internal, setInternal] = useState<ReadonlySet<string>>(
     () => new Set(items.filter((item) => item.defaultOpen).map((item) => item.id))
   );
@@ -46,7 +48,8 @@ export function FeatureList({ items, openIds, onToggle, allowExpandAll = false, 
     if (!controlled) {
       setInternal((prev) => {
         const copy = new Set(prev);
-        if (next) copy.add(id); else copy.delete(id);
+        if (next) copy.add(id);
+        else copy.delete(id);
         return copy;
       });
     }
@@ -62,9 +65,15 @@ export function FeatureList({ items, openIds, onToggle, allowExpandAll = false, 
     <div className={cx("nh-features", className)} aria-label={ariaLabel} role={ariaLabel ? "group" : undefined}>
       {allowExpandAll && items.length > 0 && (
         <div className="nh-features-bulk">
-          <Button variant="ghost" size="sm" onClick={() => setAll(true)}>Expand all</Button>
-          <span className="nh-features-bulk-sep" aria-hidden="true">·</span>
-          <Button variant="ghost" size="sm" onClick={() => setAll(false)}>Collapse all</Button>
+          <Button variant="ghost" size="sm" onClick={() => setAll(true)}>
+            Expand all
+          </Button>
+          <span className="nh-features-bulk-sep" aria-hidden="true">
+            ·
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setAll(false)}>
+            Collapse all
+          </Button>
         </div>
       )}
 
@@ -79,7 +88,9 @@ export function FeatureList({ items, openIds, onToggle, allowExpandAll = false, 
           }}
         >
           <summary className="nh-feature-summary">
-            <span className="nh-feature-caret" aria-hidden="true"><IconChevron /></span>
+            <span className="nh-feature-caret" aria-hidden="true">
+              <IconChevron />
+            </span>
             <span className="nh-feature-title">{item.title}</span>
             {item.meta != null && <span className="nh-feature-meta tabular">{item.meta}</span>}
             {item.badge != null && <span className="nh-feature-badge">{item.badge}</span>}

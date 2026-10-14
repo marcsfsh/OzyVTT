@@ -112,7 +112,17 @@ const PASSWORD = process.env.AUDIT_PASSWORD ?? "testpassword123";
  * The first four are ≥980 — the docked pass below uses exactly those, because below the rung
  * there is nowhere to dock and `phoneTable` forces `sidebar`.
  */
-const VIEWPORTS = [[1920, 1080], [1280, 900], [1280, 720], [1024, 667], [390, 844], [320, 568], [844, 390], [667, 375], [390, 400]];
+const VIEWPORTS = [
+  [1920, 1080],
+  [1280, 900],
+  [1280, 720],
+  [1024, 667],
+  [390, 844],
+  [320, 568],
+  [844, 390],
+  [667, 375],
+  [390, 400]
+];
 /** How many leading VIEWPORTS columns sit above the 980 rung. */
 const LAPTOP_CELLS = 4;
 
@@ -120,7 +130,10 @@ const browser = await chromium.launch({ executablePath: EXEC, args: ["--no-sandb
 const at = (path) => `${BASE}${path.replace(/^\//, "")}`.replace(/([^:])\/\//g, "$1/");
 
 /** Kill smooth scrolling and animation so a measurement is never taken mid-transition. */
-const settle = (page) => page.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
+const settle = (page) =>
+  page.addStyleTag({
+    content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }"
+  });
 
 /** The measurement. Y per the doc's stated rule; X by attempted scroll (docblock above). */
 const MEASURE = `(() => {
@@ -261,7 +274,10 @@ async function newPage(width = 1280, height = 900, storage) {
   page.setDefaultTimeout(20_000);
   // Seeded BEFORE any script runs, so the app boots with the preference already in place —
   // which is the only way to reach the docked composition (`dockPosition` defaults to sidebar).
-  if (storage) await page.addInitScript((kv) => { for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v); }, storage);
+  if (storage)
+    await page.addInitScript((kv) => {
+      for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
+    }, storage);
   return page;
 }
 
@@ -313,7 +329,10 @@ async function ensureFight(page) {
   if (!(await start.isEnabled())) {
     // The party stages itself; a battle map may still need picking.
     const map = page.locator(".map-picker-grid button").first();
-    if (await map.count()) { await map.click(); await page.waitForTimeout(600); }
+    if (await map.count()) {
+      await map.click();
+      await page.waitForTimeout(600);
+    }
   }
   await start.click({ timeout: 8_000 });
   await page.waitForSelector(".encounter-panel.combat-active", { timeout: 20_000 });
@@ -322,8 +341,12 @@ async function ensureFight(page) {
 /** The first player character's actor id, read off the table's own tray/map tokens. */
 async function pcActorId(page) {
   await go(page, "/table", ".table-layout");
-  return await page.evaluate(() =>
-    document.querySelector(".tray-token.player-character, .encounter-token.player-character")?.getAttribute("data-token-id") ?? null);
+  return await page.evaluate(
+    () =>
+      document
+        .querySelector(".tray-token.player-character, .encounter-token.player-character")
+        ?.getAttribute("data-token-id") ?? null
+  );
 }
 
 const GM_ROUTES = [
@@ -337,7 +360,8 @@ const GM_ROUTES = [
   // its own address; a session's is behind a record, so the address is resolved from the rail below.
   { path: "/codex/downtime", ready: ".codex-downtime-form" },
   {
-    path: "/codex/sessions/:id", ready: ".codex-session-editor",
+    path: "/codex/sessions/:id",
+    ready: ".codex-session-editor",
     /** D3: which session is open IS the address, so opening the first row yields a real route to probe. */
     resolve: async (page) => {
       await go(page, "/codex/sessions", ".codex-shell-content");
@@ -352,7 +376,8 @@ const GM_ROUTES = [
   { path: "/viewer-controls", ready: ".viewer-controls" },
   { path: "/replays", ready: ".replay-panel" },
   {
-    path: "/replays/:id", ready: ".replay-panel",
+    path: "/replays/:id",
+    ready: ".replay-panel",
     /** The first shared archive's Watch button knows the id; the audit reads the address it lands on. */
     resolve: async (page) => {
       await go(page, "/replays", ".replay-panel");
@@ -369,7 +394,8 @@ const GM_ROUTES = [
   { path: "/settings/api", ready: ".api-reference-page" },
   { path: "/builder", ready: ".cb-page, .builder-gate" },
   {
-    path: "/characters/:id", ready: null,
+    path: "/characters/:id",
+    ready: null,
     /** A player character's sheet: the id comes off the in-combat map's own tokens. */
     resolve: async (page) => {
       const id = await pcActorId(page);
@@ -377,7 +403,8 @@ const GM_ROUTES = [
     }
   },
   {
-    path: "/characters/:id/level", ready: null,
+    path: "/characters/:id/level",
+    ready: null,
     resolve: async (page) => {
       const id = await pcActorId(page);
       return id ? `/characters/${id}/level` : null;
@@ -441,9 +468,10 @@ async function auditRoutes(page, role, routes) {
       // region that scrolls sideways is the same defect wherever it lives.
       const inner = await page.evaluate(INNER);
       const doc = cellOf(m);
-      const cell = doc === "PASS" && verdict.bad.length === 0 && inner.length === 0
-        ? `PASS${verdict.text}`
-        : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad, ...inner].filter(Boolean).join(" ")}`;
+      const cell =
+        doc === "PASS" && verdict.bad.length === 0 && inner.length === 0
+          ? `PASS${verdict.text}`
+          : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad, ...inner].filter(Boolean).join(" ")}`;
       if (cell.startsWith("FAIL")) failures += 1;
       cells.push(cell);
     }
@@ -458,7 +486,10 @@ async function auditRoutes(page, role, routes) {
  * (114-429px) with `localStorage` making it stick to the device. Both roles, both sides.
  */
 async function auditDocked() {
-  for (const [role, side] of [["gm", "left"], ["player", "right"]]) {
+  for (const [role, side] of [
+    ["gm", "left"],
+    ["player", "right"]
+  ]) {
     let page;
     try {
       page = await (role === "gm" ? gmPage : playerPage)({ "vtt.dock-position": side });
@@ -475,11 +506,20 @@ async function auditDocked() {
         // A cell that never reached the docked composition proves nothing — say so rather than pass.
         // (It needs a live map: `showDocked` is gated on `combat.mapAssetId`, which is what the
         // in-combat seed above provides.)
-        const cell = !docked ? "NOT MEASURED" : (doc === "PASS" && verdict.bad.length === 0 && inner.length === 0 ? `PASS${verdict.text}` : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad, ...inner].filter(Boolean).join(" ")}`);
-        if (cell === "NOT MEASURED") unmeasured += 1; else if (cell.startsWith("FAIL")) failures += 1;
+        const cell = !docked
+          ? "NOT MEASURED"
+          : doc === "PASS" && verdict.bad.length === 0 && inner.length === 0
+            ? `PASS${verdict.text}`
+            : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad, ...inner].filter(Boolean).join(" ")}`;
+        if (cell === "NOT MEASURED") unmeasured += 1;
+        else if (cell.startsWith("FAIL")) failures += 1;
         out.push(cell);
       }
-      rows.push({ route: `/table docked-${side}`, role, cells: VIEWPORTS.map((v, i) => (i < LAPTOP_CELLS ? out[i] : "-")) });
+      rows.push({
+        route: `/table docked-${side}`,
+        role,
+        cells: VIEWPORTS.map((v, i) => (i < LAPTOP_CELLS ? out[i] : "-"))
+      });
     } catch (error) {
       rows.push({ route: `/table docked-${side}`, role, cells: VIEWPORTS.map(() => "NOT MEASURED") });
       unmeasured += 1;
@@ -522,8 +562,13 @@ await auditEntry("/viewer.html", at("viewer.html"), null);
 
 try {
   const gm = await gmPage();
-  try { await ensureFight(gm); }
-  catch (error) { console.error(`  in-combat seed failed (the /table rows measure the out-of-combat state): ${String(error).split("\n")[0].slice(0, 90)}`); }
+  try {
+    await ensureFight(gm);
+  } catch (error) {
+    console.error(
+      `  in-combat seed failed (the /table rows measure the out-of-combat state): ${String(error).split("\n")[0].slice(0, 90)}`
+    );
+  }
   await auditRoutes(gm, "gm", GM_ROUTES);
   await gm.close();
 } catch (error) {
@@ -545,7 +590,9 @@ await auditDocked();
 await browser.close();
 
 const headers = ["route", "role", ...VIEWPORTS.map(([w, h]) => `${w}x${h}`)];
-const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (i === 0 ? r.route : i === 1 ? r.role : r.cells[i - 2]).length)));
+const widths = headers.map((h, i) =>
+  Math.max(h.length, ...rows.map((r) => (i === 0 ? r.route : i === 1 ? r.role : r.cells[i - 2]).length))
+);
 const line = (cols) => cols.map((c, i) => c.padEnd(widths[i])).join("  ");
 console.log(`\n===== no-scroll audit (the page never scrolls - design-language.md §7) =====`);
 console.log(line(headers));

@@ -7,14 +7,9 @@ import { removeActor } from "../src/actor-roster.js";
 import { projectPlayerView } from "../src/projections.js";
 import { CommandRejectedError } from "../src/game-store.js";
 
-/**
- * "Archived" has to mean out-of-play on the SERVER, not just out-of-picker on the client.
- *
- * Every guard below closes a path where a caller who simply knew an actorId - a replayed request, an
- * integration credential, a stale client, a curl - could put an archived character back into play or
- * claim one, because the only thing stopping them was a projection filter or a picker's `.filter()`.
- * Projections and pickers are UX; these are the guard.
- */
+// "Archived" must mean out of play on the server. Each guard below closes a path where a caller who
+// knows an actorId (replayed request, integration credential, stale client) could put an archived
+// character back into play or claim one; projection filters and pickers are only UX.
 
 const IDS = {
   retired: "10000000-0000-4000-8000-0000000000a1",
@@ -31,29 +26,61 @@ function state(overrides: Partial<Record<"retiredClaimedBy", string>> = {}): Gam
   return GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: IDS.retired, name: "Retired Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, archived: true, definitionId: `import-${IDS.retired}`, ...(overrides.retiredClaimedBy ? { ownerSessionId: overrides.retiredClaimedBy } : {}) },
-      { id: IDS.active, name: "Active Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, definitionId: `import-${IDS.active}` },
+      {
+        id: IDS.retired,
+        name: "Retired Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        archived: true,
+        definitionId: `import-${IDS.retired}`,
+        ...(overrides.retiredClaimedBy ? { ownerSessionId: overrides.retiredClaimedBy } : {})
+      },
+      {
+        id: IDS.active,
+        name: "Active Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        definitionId: `import-${IDS.active}`
+      },
       { id: IDS.goblin, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
     ]
   });
 }
 
 const start = (game: GameState, actorIds: readonly string[]) =>
-  startEncounter(game, { mapAssetId: IDS.map, entries: actorIds.map((actorId) => ({ actorId, score: 10 })) }, () => 10, GEOMETRY);
+  startEncounter(
+    game,
+    { mapAssetId: IDS.map, entries: actorIds.map((actorId) => ({ actorId, score: 10 })) },
+    () => 10,
+    GEOMETRY
+  );
 
 describe("archived characters are refused by every staging door (server-side, not picker-side)", () => {
   it("refuses to stage an archived character in a new scene", () => {
     const game = state();
-    expect(() => createScene(game, { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active, IDS.retired] }, GEOMETRY))
-      .toThrow(/Retired Hero is archived/);
+    expect(() =>
+      createScene(
+        game,
+        { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active, IDS.retired] },
+        GEOMETRY
+      )
+    ).toThrow(/Retired Hero is archived/);
     // Rejected, not silently filtered: the GM's selection must not lie back to them.
     expect(game.combat.scenes).toHaveLength(0);
   });
 
   it("refuses to add an archived character to an existing scene's combatant list", () => {
     const game = state();
-    createScene(game, { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active] }, GEOMETRY);
-    expect(() => setSceneCombatants(game, IDS.scene, [IDS.active, IDS.retired], GEOMETRY)).toThrow(/Retired Hero is archived/);
+    createScene(
+      game,
+      { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.active] },
+      GEOMETRY
+    );
+    expect(() => setSceneCombatants(game, IDS.scene, [IDS.active, IDS.retired], GEOMETRY)).toThrow(
+      /Retired Hero is archived/
+    );
     expect(game.combat.scenes[0].combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.active]);
   });
 
@@ -73,15 +100,20 @@ describe("archived characters are refused by every staging door (server-side, no
   it("still stages an archived character once it is restored", () => {
     const game = state();
     game.actors.find((actor) => actor.id === IDS.retired)!.archived = false;
-    expect(() => createScene(game, { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.retired] }, GEOMETRY)).not.toThrow();
+    expect(() =>
+      createScene(
+        game,
+        { sceneId: IDS.scene, name: "Ambush", mapAssetId: IDS.map, combatantIds: [IDS.retired] },
+        GEOMETRY
+      )
+    ).not.toThrow();
   });
 });
 
 describe("archived characters cannot be claimed", () => {
   it("refuses a claim on an archived character even when the caller knows its id", () => {
     const game = state();
-    // The projection hides archived characters, so this is exactly the replay a stale or hostile
-    // client makes: the id is known, the character is not in the player's view.
+    // The projection hides archived characters, so this is the replay a stale or hostile client makes.
     expect(projectPlayerView(game, IDS.player, noPresence).actors.map((actor) => actor.id)).not.toContain(IDS.retired);
     expect(() => claimCharacter(game, IDS.retired, IDS.player)).toThrow(CommandRejectedError);
     expect(game.actors.find((actor) => actor.id === IDS.retired)!.ownerSessionId).toBeNull();
@@ -89,8 +121,20 @@ describe("archived characters cannot be claimed", () => {
 
   it("refuses with the same message a missing character gets (no existence oracle)", () => {
     const game = state();
-    const missing = (() => { try { claimCharacter(game, "10000000-0000-4000-8000-0000000000ff", IDS.player); } catch (error) { return (error as Error).message; } })();
-    const archived = (() => { try { claimCharacter(game, IDS.retired, IDS.player); } catch (error) { return (error as Error).message; } })();
+    const missing = (() => {
+      try {
+        claimCharacter(game, "10000000-0000-4000-8000-0000000000ff", IDS.player);
+      } catch (error) {
+        return (error as Error).message;
+      }
+    })();
+    const archived = (() => {
+      try {
+        claimCharacter(game, IDS.retired, IDS.player);
+      } catch (error) {
+        return (error as Error).message;
+      }
+    })();
     expect(archived).toBe(missing);
   });
 

@@ -1,7 +1,26 @@
 import { useState } from "react";
-import type { BuilderAbilityMethod, GmView, PartyVisibility, PlayerView, RuleExceptions, RuleFamily, RuleMode } from "@vtt/domain";
+import type {
+  BuilderAbilityMethod,
+  GmView,
+  PartyVisibility,
+  PlayerView,
+  RuleExceptions,
+  RuleFamily,
+  RuleMode
+} from "@vtt/domain";
 import {
-  Avatar, Badge, Button, Eyebrow, Input, RevealSwitch, SegmentedControl, Select, Stepper, Switch, ThemeToggle, useToast
+  Avatar,
+  Badge,
+  Button,
+  Eyebrow,
+  Input,
+  RevealSwitch,
+  SegmentedControl,
+  Select,
+  Stepper,
+  Switch,
+  ThemeToggle,
+  useToast
 } from "@vtt/ui";
 import { IntegrationsPanel } from "../integrations/IntegrationsPanel";
 import { TokenLibrary } from "../tokens/TokenLibrary";
@@ -12,22 +31,17 @@ import { setAutoArrange, useAutoArrange } from "./preferences";
 import "./settings.css";
 
 /**
- * **Settings — one tab, three groups, one page (D24).**
- *
- * Every knob that used to be somewhere else is here, and the two that had nowhere at all finally have a
- * home: the rules dial was buried in a mid-fight overflow menu (so the standing campaign setting could
- * only be reached during a fight), and `builderPolicy` — stored, projected, enforced server-side — had
- * no client control whatsoever. `/setup` folds in as the *Access & integrations* subsection (§B9.4):
- * nothing it held is lost.
- *
- * **Who sees what is structural, not a filter.** `SETTINGS_GROUPS` declares each group's audience and
- * the page renders only the groups a role may see, so a player's Settings page contains one group and
- * the GM-only controls are never mounted at all. The GM groups also take `state` as a `GmView`, which a
- * player projection is not — the type says the same thing the audience does.
+ * Settings: one page, three groups. Includes the rules dial, `builderPolicy`, and access &
+ * integrations.
+ * Who sees what is structural, not a filter: `SETTINGS_GROUPS` declares each group's audience and
+ * only allowed groups render, so GM-only controls are never mounted for a player. The GM groups take
+ * `state` as a `GmView`, which a player projection is not.
  */
 
-/** The page's shape as DATA, so a test can pin it without scraping the DOM (plan-3 §2.4). */
-export const SETTINGS_GROUPS: ReadonlyArray<Readonly<{ id: "mine" | "table" | "players"; label: string; audience: "everyone" | "gm" }>> = [
+/** The page's shape as data, so a test can pin it without scraping the DOM. */
+export const SETTINGS_GROUPS: ReadonlyArray<
+  Readonly<{ id: "mine" | "table" | "players"; label: string; audience: "everyone" | "gm" }>
+> = [
   { id: "mine", label: "Mine", audience: "everyone" },
   { id: "table", label: "The table", audience: "gm" },
   { id: "players", label: "Players", audience: "gm" }
@@ -38,9 +52,8 @@ export function groupsFor(role: "gm" | "player"): typeof SETTINGS_GROUPS {
 }
 
 /**
- * D6 — the dial's user-facing words. The WIRE stays `strict | assisted | freeform`: renaming an enum
- * that three schemas, the archive documents and the public API all speak would be a breaking change to
- * fix a copy problem. Copy is copy; this map is the whole of it.
+ * The dial's user-facing words. The wire stays `strict | assisted | freeform`: three schemas, the
+ * archive documents and the public API speak it, so renaming it would be a breaking change.
  */
 const DIAL_COPY: ReadonlyArray<Readonly<{ value: RuleMode; label: string; help: string }>> = [
   { value: "strict", label: "Enforce", help: "blocks illegal moves; you can allow them" },
@@ -50,9 +63,8 @@ const DIAL_COPY: ReadonlyArray<Readonly<{ value: RuleMode; label: string; help: 
 const dialLabel = (mode: RuleMode) => DIAL_COPY.find((entry) => entry.value === mode)?.label ?? mode;
 
 /**
- * One toggle per SERVER rule family, never finer. The engine classifies every rule into these five
- * (`apps/server/src/rules-families.ts`, pinned by a totality test); a sixth switch here would promise a
- * split the engine cannot make.
+ * One toggle per server rule family, never finer: the engine classifies every rule into these five
+ * (`apps/server/src/rules-families.ts`).
  */
 const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>> = [
   { family: "movement", label: "Don't police movement" },
@@ -70,17 +82,10 @@ const ABILITY_METHODS: ReadonlyArray<Readonly<{ id: BuilderAbilityMethod; label:
 ];
 
 /**
- * Rulings 5/8/19 — how much a player sees of ANOTHER player's character. **These four words are the
- * client's ruling and the GM's whole mental model of the feature**; the wire says
- * `off | name-and-class | full-sheet | sheet-and-resources` and `apps/server/src/projections.ts` is
- * the only thing that enforces them. Nothing here filters anything — a withheld field never arrives.
- * (One clarification, because the two are easy to confuse: `PartyStrip` consults the tier to decide
- * whether to MOUNT at all, which is a rendering decision about a surface, not a filter over data.
- * Which FIELDS reach a player is still the projection's alone, and always will be — see rule 3 in
- * `projections.ts`'s field table.)
- *
- * A `Select`, not a `SegmentedControl`: four labels this long are unreadable in a segment at 320px,
- * and the health-display row beside it already sets the precedent for a picker with many options.
+ * How much a player sees of another player's character. The wire values are
+ * `off | name-and-class | full-sheet | sheet-and-resources`; only `apps/server/src/projections.ts`
+ * enforces them, and nothing here filters (`PartyStrip` only uses the tier to decide whether to
+ * mount). A `Select`: four labels this long are unreadable as a segmented control at 320px.
  */
 const PARTY_VISIBILITY_OPTIONS = [
   { value: "off", label: "Off" },
@@ -90,11 +95,9 @@ const PARTY_VISIBILITY_OPTIONS = [
 ] as const;
 
 /**
- * These four strings are the PROMISE the GM reads before choosing, so they are held to what the tier
- * actually does rather than to what it sounds like. `off` used to end "and nothing else — no party
- * list": the second half is true (the party strip is gone at this tier), the first half was not —
- * a character at `off` is still named in the turn order, and their token still carries a health band
- * and condition dots. What `off` removes is the SHEET. Say that.
+ * The promise the GM reads before choosing, so it must match what the tier does: at `off` a
+ * character is still named in the turn order and their token still shows health and conditions;
+ * what `off` removes is the party list and the sheet.
  */
 const PARTY_VISIBILITY_HELP: Readonly<Record<PartyVisibility, string>> = {
   off: "Players see each other's tokens and turn order — no party list, and no sheet to open.",
@@ -113,70 +116,83 @@ const HEALTH_STYLES = [
 type Ack = Readonly<{ ok: boolean; message?: string }>;
 
 /**
- * One settings group. The `--{id}` modifier is what the ≥1280 two-column rule places by name
- * (The table on the left, Mine + Players on the right — settings.css).
- *
- * **`.surface-glass` is gone from here, and revised ruling 23 is why it went now rather than
- * earlier.** That ruling keeps the class *until the material replaces it* — and on this surface the
- * material has: `settings.css` paints ruling 2's rim, bezel and scanline fill on `.settings-group`
- * and switches `backdrop-filter` off in the same block, so the class was computing `none` and doing
- * nothing but reserving the name. It still does real work on the shared screen's two control columns
- * (`viewer-controls.css`, a live `blur(8px) saturate(1.15)`), which ruling 34 gave *more* identity,
- * so it stays there. Removing it from a surface the material has taken over is the ruling; removing
- * it from one the material has not reached would be the thing the ruling was written to stop.
- *
- * `gmOnly` takes the violet role rim (§9). It says something the GM cannot otherwise see on this
- * page: THESE are the groups a player is never handed — *Mine* renders for both roles, the other
- * two do not render at all without a GM token.
- *
- * A RIM IS NEVER THE ONLY SIGNAL, and the words come from this ONE place rather than each call
- * site, so the edge and the sentence cannot drift apart: `gmOnly` paints the rim and appends
- * "GM only" to the Eyebrow in the same breath. It shipped without the words first — the two
- * Eyebrows read "The table" and "Players", so the violet edge was the only thing separating the
- * GM-only groups from *Mine*, which is exactly the claim §9 makes and the markup did not have.
- * "GM only" unhyphenated is the reveal vocabulary's spelling (play-vocabulary.test.ts). The
- * Eyebrow is the section's accessible name, so a screen reader reaches it.
+ * One settings group. The `--{id}` modifier is what the 1280px two-column layout places by name
+ * (settings.css).
+ * `gmOnly` adds the violet GM rim and appends "GM only" to the Eyebrow (the section's accessible
+ * name), so the edge is never the only signal. *Mine* renders for both roles; the GM groups do not
+ * render at all without a GM token.
  */
-function Group({ id, label, gmOnly = false, children }: Readonly<{ id: string; label: string; gmOnly?: boolean; children: React.ReactNode }>) {
-  return <section className={`settings-group settings-group--${id}${gmOnly ? " rim-gm" : ""}`} aria-labelledby={`settings-${id}`}>
-    <Eyebrow id={`settings-${id}`}>{label}{gmOnly ? " · GM only" : ""}</Eyebrow>
-    {children}
-  </section>;
+function Group({
+  id,
+  label,
+  gmOnly = false,
+  children
+}: Readonly<{ id: string; label: string; gmOnly?: boolean; children: React.ReactNode }>) {
+  return (
+    <section
+      className={`settings-group settings-group--${id}${gmOnly ? " rim-gm" : ""}`}
+      aria-labelledby={`settings-${id}`}
+    >
+      <Eyebrow id={`settings-${id}`}>
+        {label}
+        {gmOnly ? " · GM only" : ""}
+      </Eyebrow>
+      {children}
+    </section>
+  );
 }
 
 /** One labelled setting: a title, the control, and at most one line of help. */
-function Row({ title, help, children, stacked = false }: Readonly<{ title: string; help?: string; children: React.ReactNode; stacked?: boolean }>) {
-  return <div className={`settings-row${stacked ? " stacked" : ""}`}>
-    <div className="settings-row-text">
-      <span className="settings-row-title">{title}</span>
-      {help && <span className="settings-row-help">{help}</span>}
+function Row({
+  title,
+  help,
+  children,
+  stacked = false
+}: Readonly<{ title: string; help?: string; children: React.ReactNode; stacked?: boolean }>) {
+  return (
+    <div className={`settings-row${stacked ? " stacked" : ""}`}>
+      <div className="settings-row-text">
+        <span className="settings-row-title">{title}</span>
+        {help && <span className="settings-row-help">{help}</span>}
+      </div>
+      <div className="settings-row-control">{children}</div>
     </div>
-    <div className="settings-row-control">{children}</div>
-  </div>;
+  );
 }
 
-// ───────────────────────────────── Mine (every role) ─────────────────────────────────
+// Mine (every role)
 
 function MineGroup() {
   const { rollInput, setRollInput } = useRollPreference();
-  return <Group id="mine" label="Mine">
-    <Row title="Theme" help="This device.">
-      <ThemeToggle />
-    </Row>
-    <Row title="How you roll" help="'I roll my dice' asks you to type what your physical dice show.">
-      <SegmentedControl
-        ariaLabel="How you roll"
-        value={rollInput}
-        onChange={(value) => setRollInput(value as "digital" | "manual")}
-        options={[{ value: "digital", label: "Auto-roll" }, { value: "manual", label: "I roll my dice" }]}
-      />
-    </Row>
-  </Group>;
+  return (
+    <Group id="mine" label="Mine">
+      <Row title="Theme" help="This device.">
+        <ThemeToggle />
+      </Row>
+      <Row title="How you roll" help="'I roll my dice' asks you to type what your physical dice show.">
+        <SegmentedControl
+          ariaLabel="How you roll"
+          value={rollInput}
+          onChange={(value) => setRollInput(value as "digital" | "manual")}
+          options={[
+            { value: "digital", label: "Auto-roll" },
+            { value: "manual", label: "I roll my dice" }
+          ]}
+        />
+      </Row>
+    </Group>
+  );
 }
 
-// ───────────────────────────────── The table (GM only) ─────────────────────────────────
+// The table (GM only)
 
-function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
+function TableGroup({
+  state,
+  gmToken,
+  onSignOut,
+  onRevokeAll,
+  busy
+}: Readonly<{
   state: GmView;
   gmToken: string;
   onSignOut: () => void;
@@ -189,200 +205,301 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
   const builder = state.builderPolicy;
   const [formula, setFormula] = useState(builder.customFormula ?? "");
 
-  /** Every write on this page is the same shape: emit, and say so only when it fails. */
+  /** Every write here is the same shape: emit, and say so only when it fails. */
   const send = (event: string, payload: Record<string, unknown>, failure: string) => {
     (socket.emit as (event: string, payload: unknown, ack: (result: Ack) => void) => void)(
-      event, { commandId: newId(), ...payload }, (result) => { if (!result.ok) toast(result.message ?? failure, { tone: "error" }); }
+      event,
+      { commandId: newId(), ...payload },
+      (result) => {
+        if (!result.ok) toast(result.message ?? failure, { tone: "error" });
+      }
     );
   };
 
-  const setDial = (dial: RuleMode) => send("rules:set-policy", { dial, exceptions: policy.exceptions }, "The rules setting was rejected.");
+  const setDial = (dial: RuleMode) =>
+    send("rules:set-policy", { dial, exceptions: policy.exceptions }, "The rules setting was rejected.");
   /**
-   * A toggle ON pins that family Off whatever the dial says; OFF removes the key, which is what "follow
-   * the dial" IS on the wire (an absent key). Exception beats dial, server-side — this control is a 1:1
-   * map onto `rulesPolicy.exceptions`, never a second policy the client keeps.
+   * ON pins that family Off whatever the dial says; OFF removes the key, which on the wire means
+   * "follow the dial". A 1:1 map onto `rulesPolicy.exceptions`.
    */
   const setException = (family: RuleFamily, off: boolean) => {
     const next: RuleExceptions = { ...policy.exceptions };
-    if (off) next[family] = "freeform"; else delete next[family];
+    if (off) next[family] = "freeform";
+    else delete next[family];
     send("rules:set-policy", { dial: policy.dial, exceptions: next }, "The rules exception was rejected.");
   };
 
-  const setBuilderPolicy = (change: Partial<{ allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula: string | null; maxLevel: number; playerBuilder: "open" | "gm-only" }>) =>
-    send("builder:set-policy", {
-      allowedAbilityMethods: builder.allowedAbilityMethods,
-      customFormula: builder.customFormula,
-      maxLevel: builder.maxLevel,
-      playerBuilder: builder.playerBuilder,
-      ...change
-    }, "That builder setting was rejected.");
+  const setBuilderPolicy = (
+    change: Partial<{
+      allowedAbilityMethods: readonly BuilderAbilityMethod[];
+      customFormula: string | null;
+      maxLevel: number;
+      playerBuilder: "open" | "gm-only";
+    }>
+  ) =>
+    send(
+      "builder:set-policy",
+      {
+        allowedAbilityMethods: builder.allowedAbilityMethods,
+        customFormula: builder.customFormula,
+        maxLevel: builder.maxLevel,
+        playerBuilder: builder.playerBuilder,
+        ...change
+      },
+      "That builder setting was rejected."
+    );
 
   const toggleMethod = (id: BuilderAbilityMethod, on: boolean) => {
-    const next = on ? [...builder.allowedAbilityMethods, id] : builder.allowedAbilityMethods.filter((method) => method !== id);
-    // The server requires at least one method; refusing here says why instead of bouncing a rejection.
-    if (next.length === 0) { toast("Leave the players at least one way to set ability scores.", { tone: "error" }); return; }
+    const next = on
+      ? [...builder.allowedAbilityMethods, id]
+      : builder.allowedAbilityMethods.filter((method) => method !== id);
+    // The server requires at least one method; refusing here explains why.
+    if (next.length === 0) {
+      toast("Leave the players at least one way to set ability scores.", { tone: "error" });
+      return;
+    }
     setBuilderPolicy({ allowedAbilityMethods: next });
   };
 
   const health = state.combat.healthDisplay;
 
-  return <Group id="table" label="The table" gmOnly>
-    <Row title="Rules assistant" help="Each fight starts from this and can be changed mid-fight on the Table." stacked>
-      <SegmentedControl
-        ariaLabel="Rules assistant"
-        value={policy.dial}
-        onChange={(value) => setDial(value as RuleMode)}
-        options={DIAL_COPY.map((entry) => ({ value: entry.value, label: entry.label }))}
-      />
-      <p className="settings-note">{DIAL_COPY.map((entry) => `${entry.label} — ${entry.help}`).join(" · ")}</p>
-      <div className="settings-exceptions">
-        <span className="settings-subhead">Exceptions</span>
-        {FAMILY_COPY.map(({ family, label }) => {
-          const stored = policy.exceptions[family];
-          return <div key={family} className="settings-exception">
-            <Switch checked={stored === "freeform"} onChange={(next) => setException(family, next)} label={label} />
-            {/* A family the GM (or the shipped default) parked at Advise while the dial says Enforce is
-                neither on nor off. Saying which it is beats a switch that looks the same either way. */}
-            {stored && stored !== "freeform" && stored !== policy.dial && <Badge tone="info">{dialLabel(stored)}</Badge>}
-          </div>;
-        })}
-      </div>
-    </Row>
-
-    <Row title="Max party level" help="Players can build and level their own characters up to this level.">
-      <Stepper value={builder.maxLevel} min={1} max={20} aria-label="Max party level" onChange={(maxLevel) => setBuilderPolicy({ maxLevel })} />
-    </Row>
-
-    <Row title="Health display" help="Per-token overrides stay on the token's own menu." stacked>
-      <div className="settings-inline">
-        <Select
-          value={health.style}
-          aria-label="Health display style"
-          onChange={(event) => send("encounter:set-health-display", { style: event.target.value, audience: health.audience }, "The health display was rejected.")}
-        >
-          {HEALTH_STYLES.map((style) => <option key={style.value} value={style.value}>{style.label}</option>)}
-        </Select>
-        <span className="settings-inline-label">Health is:</span>
-        <SegmentedControl
-          ariaLabel="Who sees health"
-          value={health.audience}
-          onChange={(value) => send("encounter:set-health-display", { style: health.style, audience: value }, "The health display was rejected.")}
-          options={[{ value: "gm", label: "GM only" }, { value: "all", label: "Shown to players" }]}
-        />
-      </div>
-    </Row>
-
-    <Row title="What players see of each other" help={PARTY_VISIBILITY_HELP[state.partyVisibility]} stacked>
-      <Select
-        value={state.partyVisibility}
-        aria-label="What players see of each other"
-        onChange={(event) => send("table:set-party-visibility", { visibility: event.target.value }, "That setting was rejected.")}
+  return (
+    <Group id="table" label="The table" gmOnly>
+      <Row
+        title="Rules assistant"
+        help="Each fight starts from this and can be changed mid-fight on the Table."
+        stacked
       >
-        {PARTY_VISIBILITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </Select>
-      <p className="settings-note">Their own character is always theirs in full — this is only what they see of the rest of the party.</p>
-    </Row>
-
-    <Row title="New tokens" help="What a newly staged character or monster starts as." stacked>
-      <RevealSwitch
-        revealed={state.stagingDefaults.visibility === "public"}
-        ariaLabel="New tokens shown to players"
-        onChange={(revealed) => send("table:set-staging-defaults", { visibility: revealed ? "public" : "gm-only" }, "The staging default was rejected.")}
-      />
-      <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new scenes for arranging automatically" />
-      <p className="settings-note">Arranging is private to you — this device.</p>
-    </Row>
-
-    <Row title="Players' hits">
-      <SegmentedControl
-        ariaLabel="Players' hits"
-        value={state.combat.playerDamageMode}
-        onChange={(value) => send("encounter:set-player-damage-mode", { mode: value }, "That setting was rejected.")}
-        options={[{ value: "proposal", label: "Applied by the GM" }, { value: "direct", label: "Applied immediately" }]}
-      />
-    </Row>
-
-    <Row title="Players' initiative" help="When players roll their own initiative at the start of a fight.">
-      <SegmentedControl
-        ariaLabel="When turns start"
-        value={state.combat.playerInitiativeMode}
-        onChange={(value) => send("encounter:set-player-initiative-mode", { mode: value }, "That setting was rejected.")}
-        options={[{ value: "immediate", label: "Start turns immediately" }, { value: "wait", label: "When everyone has rolled" }]}
-      />
-    </Row>
-
-    <Row title="Builder policy" help="Who may build characters, and how their ability scores are set." stacked>
-      <Switch
-        checked={builder.playerBuilder === "open"}
-        onChange={(open) => setBuilderPolicy({ playerBuilder: open ? "open" : "gm-only" })}
-        label="Players can build & level their own characters"
-      />
-      <div className="settings-methods" role="group" aria-label="Ability score methods">
-        {ABILITY_METHODS.map((method) => <Switch
-          key={method.id}
-          checked={builder.allowedAbilityMethods.includes(method.id)}
-          onChange={(on) => toggleMethod(method.id, on)}
-          label={method.label}
-        />)}
-      </div>
-      {builder.allowedAbilityMethods.includes("custom") && <div className="settings-inline">
-        <Input
-          value={formula}
-          aria-label="Custom ability formula"
-          placeholder="4d6kh3"
-          maxLength={160}
-          onChange={(event) => setFormula(event.target.value)}
+        <SegmentedControl
+          ariaLabel="Rules assistant"
+          value={policy.dial}
+          onChange={(value) => setDial(value as RuleMode)}
+          options={DIAL_COPY.map((entry) => ({ value: entry.value, label: entry.label }))}
         />
-        <Button variant="secondary" disabled={formula.trim() === (builder.customFormula ?? "")} onClick={() => setBuilderPolicy({ customFormula: formula.trim() || null })}>Save formula</Button>
-      </div>}
-    </Row>
+        <p className="settings-note">{DIAL_COPY.map((entry) => `${entry.label} — ${entry.help}`).join(" · ")}</p>
+        <div className="settings-exceptions">
+          <span className="settings-subhead">Exceptions</span>
+          {FAMILY_COPY.map(({ family, label }) => {
+            const stored = policy.exceptions[family];
+            return (
+              <div key={family} className="settings-exception">
+                <Switch checked={stored === "freeform"} onChange={(next) => setException(family, next)} label={label} />
+                {/* A family parked at Advise while the dial says Enforce is neither on nor off, so say which. */}
+                {stored && stored !== "freeform" && stored !== policy.dial && (
+                  <Badge tone="info">{dialLabel(stored)}</Badge>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Row>
 
-    <div className="settings-subsection">
-      <span className="settings-subhead">Access &amp; integrations</span>
-      <IntegrationsPanel gmToken={gmToken} />
-      <div className="settings-session">
-        <Button variant="secondary" onClick={onSignOut} disabled={busy}>Sign out</Button>
-        <Button variant="destructive" onClick={onRevokeAll} disabled={busy}>Revoke all GM sessions</Button>
+      <Row title="Max party level" help="Players can build and level their own characters up to this level.">
+        <Stepper
+          value={builder.maxLevel}
+          min={1}
+          max={20}
+          aria-label="Max party level"
+          onChange={(maxLevel) => setBuilderPolicy({ maxLevel })}
+        />
+      </Row>
+
+      <Row title="Health display" help="Per-token overrides stay on the token's own menu." stacked>
+        <div className="settings-inline">
+          <Select
+            value={health.style}
+            aria-label="Health display style"
+            onChange={(event) =>
+              send(
+                "encounter:set-health-display",
+                { style: event.target.value, audience: health.audience },
+                "The health display was rejected."
+              )
+            }
+          >
+            {HEALTH_STYLES.map((style) => (
+              <option key={style.value} value={style.value}>
+                {style.label}
+              </option>
+            ))}
+          </Select>
+          <span className="settings-inline-label">Health is:</span>
+          <SegmentedControl
+            ariaLabel="Who sees health"
+            value={health.audience}
+            onChange={(value) =>
+              send(
+                "encounter:set-health-display",
+                { style: health.style, audience: value },
+                "The health display was rejected."
+              )
+            }
+            options={[
+              { value: "gm", label: "GM only" },
+              { value: "all", label: "Shown to players" }
+            ]}
+          />
+        </div>
+      </Row>
+
+      <Row title="What players see of each other" help={PARTY_VISIBILITY_HELP[state.partyVisibility]} stacked>
+        <Select
+          value={state.partyVisibility}
+          aria-label="What players see of each other"
+          onChange={(event) =>
+            send("table:set-party-visibility", { visibility: event.target.value }, "That setting was rejected.")
+          }
+        >
+          {PARTY_VISIBILITY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+        <p className="settings-note">
+          Their own character is always theirs in full — this is only what they see of the rest of the party.
+        </p>
+      </Row>
+
+      <Row title="New tokens" help="What a newly staged character or monster starts as." stacked>
+        <RevealSwitch
+          revealed={state.stagingDefaults.visibility === "public"}
+          ariaLabel="New tokens shown to players"
+          onChange={(revealed) =>
+            send(
+              "table:set-staging-defaults",
+              { visibility: revealed ? "public" : "gm-only" },
+              "The staging default was rejected."
+            )
+          }
+        />
+        <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new scenes for arranging automatically" />
+        <p className="settings-note">Arranging is private to you — this device.</p>
+      </Row>
+
+      <Row title="Players' hits">
+        <SegmentedControl
+          ariaLabel="Players' hits"
+          value={state.combat.playerDamageMode}
+          onChange={(value) => send("encounter:set-player-damage-mode", { mode: value }, "That setting was rejected.")}
+          options={[
+            { value: "proposal", label: "Applied by the GM" },
+            { value: "direct", label: "Applied immediately" }
+          ]}
+        />
+      </Row>
+
+      <Row title="Players' initiative" help="When players roll their own initiative at the start of a fight.">
+        <SegmentedControl
+          ariaLabel="When turns start"
+          value={state.combat.playerInitiativeMode}
+          onChange={(value) =>
+            send("encounter:set-player-initiative-mode", { mode: value }, "That setting was rejected.")
+          }
+          options={[
+            { value: "immediate", label: "Start turns immediately" },
+            { value: "wait", label: "When everyone has rolled" }
+          ]}
+        />
+      </Row>
+
+      <Row title="Builder policy" help="Who may build characters, and how their ability scores are set." stacked>
+        <Switch
+          checked={builder.playerBuilder === "open"}
+          onChange={(open) => setBuilderPolicy({ playerBuilder: open ? "open" : "gm-only" })}
+          label="Players can build & level their own characters"
+        />
+        <div className="settings-methods" role="group" aria-label="Ability score methods">
+          {ABILITY_METHODS.map((method) => (
+            <Switch
+              key={method.id}
+              checked={builder.allowedAbilityMethods.includes(method.id)}
+              onChange={(on) => toggleMethod(method.id, on)}
+              label={method.label}
+            />
+          ))}
+        </div>
+        {builder.allowedAbilityMethods.includes("custom") && (
+          <div className="settings-inline">
+            <Input
+              value={formula}
+              aria-label="Custom ability formula"
+              placeholder="4d6kh3"
+              maxLength={160}
+              onChange={(event) => setFormula(event.target.value)}
+            />
+            <Button
+              variant="secondary"
+              disabled={formula.trim() === (builder.customFormula ?? "")}
+              onClick={() => setBuilderPolicy({ customFormula: formula.trim() || null })}
+            >
+              Save formula
+            </Button>
+          </div>
+        )}
+      </Row>
+
+      <div className="settings-subsection">
+        <span className="settings-subhead">Access &amp; integrations</span>
+        <IntegrationsPanel gmToken={gmToken} />
+        <div className="settings-session">
+          <Button variant="secondary" onClick={onSignOut} disabled={busy}>
+            Sign out
+          </Button>
+          <Button variant="destructive" onClick={onRevokeAll} disabled={busy}>
+            Revoke all GM sessions
+          </Button>
+        </div>
       </div>
-    </div>
-  </Group>;
+    </Group>
+  );
 }
 
-// ───────────────────────────────── Players (GM only) ─────────────────────────────────
+// Players (GM only)
 
 /**
- * **Projection guard.** Every row is built from claim + presence the GM view already carries
- * (`GmActor.ownerSessionId`, `GmActor.presence`) — no session id, token, address or any other
- * player-identifying value exists in the projection, and none is added for this surface. A player who
- * has connected but claimed nobody is, by construction, not visible to the GM as a row: the table's
- * model of "a player" IS a claimed character.
+ * Projection guard: rows are built only from claim and presence the GM view already carries
+ * (`ownerSessionId`, `presence`). No session id, token, address or other player-identifying value is
+ * in the projection or added here. A connected player who has claimed nobody is not a row.
  */
-function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: GmView; gmToken: string; onPreviewPlayers: () => void }>) {
+function PlayersGroup({
+  state,
+  gmToken,
+  onPreviewPlayers
+}: Readonly<{ state: GmView; gmToken: string; onPreviewPlayers: () => void }>) {
   const { toast } = useToast();
   const builder = state.builderPolicy;
   /**
-   * `playerRandom` is a PLAYERS setting, not a builder one, which is why it is here rather than
-   * beside "Players can build & level their own characters" in *The table*. The question it asks is
-   * about the people at this table — may they help themselves to a character — and the answer is no
-   * until the GM says otherwise (issue `2d`). The GM's own door is never gated by it.
-   *
-   * The other four `builderPolicy` fields ride along on every write because `builder.set-policy`
-   * requires `allowedAbilityMethods` and treats the rest as "omitted keeps the stored value".
+   * `playerRandom` is a Players setting: whether the people at this table may roll their own random
+   * character (closed by default). The GM's own door is never gated by it. The other `builderPolicy`
+   * fields ride along because `builder.set-policy` requires `allowedAbilityMethods` and keeps omitted
+   * keys.
    */
   const setPlayerRandom = (open: boolean) => {
-    socket.emit("builder:set-policy", {
-      commandId: newId(),
-      allowedAbilityMethods: builder.allowedAbilityMethods,
-      customFormula: builder.customFormula,
-      maxLevel: builder.maxLevel,
-      playerBuilder: builder.playerBuilder,
-      playerRandom: open ? "open" : "gm-only"
-    }, (result: Ack) => {
-      if (!result.ok) toast(result.message ?? "That setting was rejected.", { tone: "error" });
-    });
+    socket.emit(
+      "builder:set-policy",
+      {
+        commandId: newId(),
+        allowedAbilityMethods: builder.allowedAbilityMethods,
+        customFormula: builder.customFormula,
+        maxLevel: builder.maxLevel,
+        playerBuilder: builder.playerBuilder,
+        playerRandom: open ? "open" : "gm-only"
+      },
+      (result: Ack) => {
+        if (!result.ok) toast(result.message ?? "That setting was rejected.", { tone: "error" });
+      }
+    );
   };
-  const [tokenFor, setTokenFor] = useState<Readonly<{ id: string; name: string; definitionId?: string; assetId: string | null }> | null>(null);
-  const claimed = state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived && actor.ownerSessionId !== null);
+  const [tokenFor, setTokenFor] = useState<Readonly<{
+    id: string;
+    name: string;
+    definitionId?: string;
+    assetId: string | null;
+  }> | null>(null);
+  const claimed = state.actors.filter(
+    (actor) => actor.kind === "player-character" && !actor.archived && actor.ownerSessionId !== null
+  );
 
   const forceRelease = (actorId: string, name: string) => {
     socket.emit("character:force-release", { commandId: newId(), actorId }, (result: Ack) => {
@@ -391,72 +508,107 @@ function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: Gm
     });
   };
 
-  return <Group id="players" label="Players" gmOnly>
-    <Row title="Random characters" help="You can always roll one. This is about whether they can." stacked>
-      <Switch
-        checked={builder.playerRandom === "open"}
-        onChange={setPlayerRandom}
-        label="Players can roll a random character for themselves"
-      />
-    </Row>
-    {claimed.length === 0
-      ? <p className="settings-empty">No players connected yet.</p>
-      : <ul className="settings-players">
-          {claimed.map((actor) => <li key={actor.id} className="settings-player">
-            <Avatar name={actor.name} presence={actor.presence === "online" ? "online" : actor.presence === "reconnecting" ? "away" : "offline"} size="sm" />
-            <div className="settings-player-text">
-              <span className="settings-player-name">{actor.name}</span>
-              <span className="settings-player-meta">{actor.presence === "online" ? "Connected" : actor.presence === "reconnecting" ? "Reconnecting" : "Away"}</span>
-            </div>
-            <div className="settings-player-actions">
-              <Button variant="secondary" size="sm" onClick={onPreviewPlayers}>See their view</Button>
-              <Button variant="secondary" size="sm" onClick={() => forceRelease(actor.id, actor.name)}>Force release</Button>
-              <Button variant="secondary" size="sm" onClick={() => setTokenFor({ id: actor.id, name: actor.name, ...(actor.definitionId ? { definitionId: actor.definitionId } : {}), assetId: actor.tokenAssetId ?? null })}>Set token image…</Button>
-            </div>
-          </li>)}
-        </ul>}
-    {tokenFor && <TokenLibrary
-      actorId={tokenFor.id}
-      actorName={tokenFor.name}
-      definitionId={tokenFor.definitionId ?? null}
-      currentAssetId={tokenFor.assetId}
-      token={gmToken}
-      role="gm"
-      onClose={() => setTokenFor(null)}
-    />}
-  </Group>;
+  return (
+    <Group id="players" label="Players" gmOnly>
+      <Row title="Random characters" help="You can always roll one. This is about whether they can." stacked>
+        <Switch
+          checked={builder.playerRandom === "open"}
+          onChange={setPlayerRandom}
+          label="Players can roll a random character for themselves"
+        />
+      </Row>
+      {claimed.length === 0 ? (
+        <p className="settings-empty">No players connected yet.</p>
+      ) : (
+        <ul className="settings-players">
+          {claimed.map((actor) => (
+            <li key={actor.id} className="settings-player">
+              <Avatar
+                name={actor.name}
+                presence={
+                  actor.presence === "online" ? "online" : actor.presence === "reconnecting" ? "away" : "offline"
+                }
+                size="sm"
+              />
+              <div className="settings-player-text">
+                <span className="settings-player-name">{actor.name}</span>
+                <span className="settings-player-meta">
+                  {actor.presence === "online"
+                    ? "Connected"
+                    : actor.presence === "reconnecting"
+                      ? "Reconnecting"
+                      : "Away"}
+                </span>
+              </div>
+              <div className="settings-player-actions">
+                <Button variant="secondary" size="sm" onClick={onPreviewPlayers}>
+                  See their view
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => forceRelease(actor.id, actor.name)}>
+                  Force release
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setTokenFor({
+                      id: actor.id,
+                      name: actor.name,
+                      ...(actor.definitionId ? { definitionId: actor.definitionId } : {}),
+                      assetId: actor.tokenAssetId ?? null
+                    })
+                  }
+                >
+                  Set token image…
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {tokenFor && (
+        <TokenLibrary
+          actorId={tokenFor.id}
+          actorName={tokenFor.name}
+          definitionId={tokenFor.definitionId ?? null}
+          currentAssetId={tokenFor.assetId}
+          token={gmToken}
+          role="gm"
+          onClose={() => setTokenFor(null)}
+        />
+      )}
+    </Group>
+  );
 }
 
-// ───────────────────────────────── The page ─────────────────────────────────
+// The page
 
 /**
- * **A GM token is not yet a GM view.** `main.tsx` names this race where the table's scenes row
- * guards it: "the first state after login can still be player-projected ... until the session join
- * lands". On a COLD DEEP LINK to `/settings` that window is the first paint — the address
- * authenticates, a state arrives, and the join that upgrades the projection has not happened yet.
- * `PlayerView` carries `builderPolicy` verbatim but no `rulesPolicy`, no `stagingDefaults` and no
- * `combat.healthDisplay`, so `TableGroup` read `state.rulesPolicy.dial` on undefined and took the
- * whole page into the error boundary: "Cannot read properties of undefined (reading 'dial')",
- * reproduced 8/8 at 375x667 and 1280x900 (in-SPA navigation never hit it — by then the join has
- * landed).
- *
- * So guard the FIELDS, not the role, exactly as the scenes row guards `combat.scenes` with
- * `Array.isArray`: a state that does not carry the GM's own policy is not a `GmView` yet, whatever
- * the token says. The cost is one frame of a page with only *Mine* on it; the next state has the
- * fields and the GM groups mount. The three checked here are exactly the GM-only fields `TableGroup`
- * dereferences — a projection either carries all of them or is not the GM's.
+ * A GM token is not yet a GM view: on a cold deep link to `/settings` the first state can still be
+ * player-projected (no `rulesPolicy`, `stagingDefaults` or `combat.healthDisplay`) until the session
+ * join lands. So check the GM-only fields `TableGroup` reads, not the role; the GM groups mount on
+ * the next state.
  */
 function gmViewOrNull(state: GmView | PlayerView | null): GmView | null {
   const view = state as GmView | null;
   if (!view) return null;
-  const projected = view.rulesPolicy !== undefined && view.stagingDefaults !== undefined && view.combat?.healthDisplay !== undefined;
+  const projected =
+    view.rulesPolicy !== undefined && view.stagingDefaults !== undefined && view.combat?.healthDisplay !== undefined;
   return projected ? view : null;
 }
 
-export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut, onRevokeAll, busy = false }: Readonly<{
+export function SettingsPage({
+  role,
+  state,
+  gmToken,
+  onPreviewPlayers,
+  onSignOut,
+  onRevokeAll,
+  busy = false
+}: Readonly<{
   role: "gm" | "player";
   state: GmView | PlayerView | null;
-  /** Present exactly when `role === "gm"` — the GM groups need it for the integrations and token doors. */
+  /** Present exactly when `role === "gm"`; the GM groups need it for the integrations and token doors. */
   gmToken?: string | null;
   onPreviewPlayers?: () => void;
   onSignOut?: () => void;
@@ -464,19 +616,33 @@ export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut
   busy?: boolean;
 }>) {
   const gm = role === "gm" && gmToken ? gmViewOrNull(state) : null;
-  /* THE FRAME (§7): the heading never moves, and the groups are the one region that scrolls.
-     Settings no longer rides the shell's staged pane — it owns its column, its sky, and its
-     scroller. */
-  return <div className="settings-page pane-frame pane-scene scanlines frame-col anim-view">
-    <div className="pane-sky" aria-hidden="true" />
-    <header className="settings-head neon-beam">
-      <h2>Settings</h2>
-      <p>{role === "gm" ? "Your device, this table, and the people at it." : "Your device. The rest of the table is your GM's to set."}</p>
-    </header>
-    <div className="settings-body scroll-y frame-fill">
-      <MineGroup />
-      {gm && gmToken && <TableGroup state={gm} gmToken={gmToken} onSignOut={onSignOut ?? (() => {})} onRevokeAll={onRevokeAll ?? (() => {})} busy={busy} />}
-      {gm && gmToken && <PlayersGroup state={gm} gmToken={gmToken} onPreviewPlayers={onPreviewPlayers ?? (() => {})} />}
+  /* The heading stays fixed; the groups are the one scroll region. */
+  return (
+    <div className="settings-page pane-frame pane-scene scanlines frame-col anim-view">
+      <div className="pane-sky" aria-hidden="true" />
+      <header className="settings-head neon-beam">
+        <h2>Settings</h2>
+        <p>
+          {role === "gm"
+            ? "Your device, this table, and the people at it."
+            : "Your device. The rest of the table is your GM's to set."}
+        </p>
+      </header>
+      <div className="settings-body scroll-y frame-fill">
+        <MineGroup />
+        {gm && gmToken && (
+          <TableGroup
+            state={gm}
+            gmToken={gmToken}
+            onSignOut={onSignOut ?? (() => {})}
+            onRevokeAll={onRevokeAll ?? (() => {})}
+            busy={busy}
+          />
+        )}
+        {gm && gmToken && (
+          <PlayersGroup state={gm} gmToken={gmToken} onPreviewPlayers={onPreviewPlayers ?? (() => {})} />
+        )}
+      </div>
     </div>
-  </div>;
+  );
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
-import { nextInitiativeTurn, rollRemainingInitiative, rollSelfInitiative, setInitiativeScore, startEncounter } from "../src/encounter.js";
+import {
+  nextInitiativeTurn,
+  rollRemainingInitiative,
+  rollSelfInitiative,
+  setInitiativeScore,
+  startEncounter
+} from "../src/encounter.js";
 
 const PC = "10000000-0000-4000-8000-000000000001";
 const PC2 = "10000000-0000-4000-8000-000000000003";
@@ -9,14 +15,34 @@ const OWNER = "30000000-0000-4000-8000-00000000000a";
 const OWNER2 = "30000000-0000-4000-8000-00000000000b";
 const MAP = "20000000-0000-5000-8000-000000000001";
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
-const queue = (values: number[]) => { const q = [...values]; return () => q.shift() ?? 1; };
+const queue = (values: number[]) => {
+  const q = [...values];
+  return () => q.shift() ?? 1;
+};
 
 // Alpha (init +2, owned), Beta (init +0, owned), Goblin (monster). Player-rolled initiative parks the two PCs.
 function fresh(mode: "immediate" | "wait" = "immediate"): GameState {
-  return GameStateSchema.parse({ schemaVersion: 1,
+  return GameStateSchema.parse({
+    schemaVersion: 1,
     actors: [
-      { id: PC, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, ownerSessionId: OWNER, initiative: 2 },
-      { id: PC2, name: "Beta", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, ownerSessionId: OWNER2, initiative: 0 },
+      {
+        id: PC,
+        name: "Alpha",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        ownerSessionId: OWNER,
+        initiative: 2
+      },
+      {
+        id: PC2,
+        name: "Beta",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        ownerSessionId: OWNER2,
+        initiative: 0
+      },
       { id: MON, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
     ],
     combat: { playerInitiativeMode: mode }
@@ -24,7 +50,12 @@ function fresh(mode: "immediate" | "wait" = "immediate"): GameState {
 }
 const started = (mode: "immediate" | "wait", rolls: number[]) => {
   const game = fresh(mode);
-  startEncounter(game, { mapAssetId: MAP, entries: [{ actorId: PC }, { actorId: PC2 }, { actorId: MON }], playersRollInitiative: true }, queue(rolls), GEOMETRY);
+  startEncounter(
+    game,
+    { mapAssetId: MAP, entries: [{ actorId: PC }, { actorId: PC2 }, { actorId: MON }], playersRollInitiative: true },
+    queue(rolls),
+    GEOMETRY
+  );
   return game;
 };
 const scoreOf = (game: GameState, id: string) => game.combat.initiative.find((entry) => entry.actorId === id)?.score;
@@ -56,7 +87,9 @@ describe("player-rolled initiative", () => {
     const game = started("immediate", [10, 10, 15]);
     rollSelfInitiative(game, PC, { natural: 18 }, queue([]));
     expect(() => rollSelfInitiative(game, PC, { natural: 5 }, queue([]))).toThrow(/already set/);
-    expect(() => rollSelfInitiative(game, "99999999-0000-4000-8000-000000000000", {}, queue([7]))).toThrow(/not in this encounter/);
+    expect(() => rollSelfInitiative(game, "99999999-0000-4000-8000-000000000000", {}, queue([7]))).toThrow(
+      /not in this encounter/
+    );
   });
 
   it("immediate mode never blocks turn advancement, even with rolls still pending", () => {
