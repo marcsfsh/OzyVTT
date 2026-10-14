@@ -1,6 +1,6 @@
-import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord, RollRecord } from "@vtt/domain";
+import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord } from "@vtt/domain";
 import type { EncounterArchiveDocument, EncounterArchiveTurn } from "./encounter-archive.js";
-import { conditionLabels, playerHp, projectPlayerCombat } from "./projections.js";
+import { conditionLabels, playerHp, playerRoll, projectPlayerCombat } from "./projections.js";
 
 /**
  * The player's replay: a projection built from an explicit allow-list, never a filtered archive. The
@@ -35,11 +35,6 @@ export type PlayerReplayDocument = Readonly<{
   attribution: string | null;
 }>;
 
-/** A public roll with the roller's session id removed; the only roll shape a player receives. */
-function safePublicRoll(roll: RollRecord | PlayerRollRecord): PlayerRollRecord {
-  const { initiatorSessionId: _private, ...visible } = roll as RollRecord;
-  return visible;
-}
 
 /** Log rows from this boundary's revision up to the next boundary's; the last turn takes the rest. */
 function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): readonly CombatLogEntry[] {
@@ -55,7 +50,7 @@ function playerLogRow(entry: CombatLogEntry): CombatLogEntry | null {
   if (entry.gmOnly) return null;
   if (entry.roll) {
     if (entry.roll.visibility !== "public") return null;
-    return { ...entry, roll: safePublicRoll(entry.roll) };
+    return { ...entry, roll: playerRoll(entry.roll) };
   }
   return entry;
 }
@@ -94,7 +89,7 @@ export function projectPlayerReplay(id: number, document: EncounterArchiveDocume
     turnCount: turns.length,
     turns,
     // Self-only and gm-only rolls are dropped: the reader is any player, not the roller.
-    rolls: (document.rolls ?? []).filter((roll) => roll.visibility === "public").map(safePublicRoll),
+    rolls: (document.rolls ?? []).filter((roll) => roll.visibility === "public").map(playerRoll),
     attribution: document.attribution ?? null
     // Not projected: journal (payloads naming hidden combatants), finalState/postEncounterState (full
     // GameStates), definitions (monster stat blocks), and every turn's raw state.

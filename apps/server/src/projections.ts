@@ -1,4 +1,4 @@
-import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerEffect, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import type { Annotation, GameState, GmView, PendingReaction, PendingRuleAsk, PendingSave, PlayerAnnotation, PlayerCombatView, PlayerEffect, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
 import { actionPools } from "./effective-actions.js";
 import { healthBandOf } from "./hit-points.js";
 
@@ -16,9 +16,9 @@ function visibleToPlayer(roll: RollRecord, playerSessionId?: string) {
   return roll.visibility === "public" || (roll.visibility === "self-only" && roll.initiatorSessionId === playerSessionId);
 }
 
-// A session id is credential-shaped, so the roller's never reaches players.
-function safeRoll(roll: RollRecord): PlayerRollRecord {
-  const { initiatorSessionId: _privateSession, ...visible } = roll;
+/** The only roll shape players receive. A session id is credential-shaped, so the roller's is removed. */
+export function playerRoll(roll: RollRecord | PlayerRollRecord): PlayerRollRecord {
+  const { initiatorSessionId: _privateSession, ...visible } = roll as RollRecord;
   return visible;
 }
 
@@ -71,6 +71,54 @@ function withoutSourceName(text: string, sourceName: string | null): string {
   return text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "giu"), HIDDEN_SOURCE);
 }
 
+type FieldAudience = "player" | "derived" | "never";
+type PlayerKeys<M> = { [K in keyof M]: M[K] extends "player" ? K : never }[keyof M];
+
+/** Copies the fields a classification map marks "player". "derived" fields are rebuilt by the caller. */
+function copyPlayerFields<T extends object, const M extends Record<keyof T, FieldAudience>>(source: T, map: M): Pick<T, PlayerKeys<M> & keyof T> {
+  const picked: Partial<T> = {};
+  for (const key of Object.keys(map) as (keyof T)[]) {
+    if (map[key] === "player" && source[key] !== undefined) picked[key] = structuredClone(source[key]);
+  }
+  return picked as Pick<T, PlayerKeys<M> & keyof T>;
+}
+
+// Each map must list every field of its schema, so a new field does not compile until it is classified.
+const PENDING_SAVE_FIELDS = {
+  id: "player", targetActorId: "player", ability: "player", dc: "player", actionName: "player",
+  proposedDamage: "player", proposedDamageParts: "player", halfOnSuccess: "player", conditionId: "player",
+  saveBonus: "player", createdAt: "player",
+  sourceName: "derived", onFailEffect: "derived",
+  sourceActorId: "never", endsEffects: "never"
+} as const satisfies Record<keyof PendingSave, FieldAudience>;
+
+const ON_FAIL_EFFECT_FIELDS = {
+  tags: "player", linkedConditionIds: "player", escapeDc: "player",
+  name: "derived", sourceName: "derived", sourceActorId: "derived"
+} as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
+
+const PENDING_REACTION_FIELDS = {
+  id: "player", kind: "player", actorId: "player", actionId: "player", actionName: "player", targetActorId: "player",
+  triggerCommandId: "player", proposedDamage: "player", proposedDamageParts: "player", critical: "player", createdAt: "player",
+  sourceName: "derived",
+  sourceActorId: "never"
+} as const satisfies Record<keyof PendingReaction, FieldAudience>;
+
+const PENDING_RULE_ASK_FIELDS = {
+  id: "player", actorId: "player", rule: "player", family: "player", message: "player", createdAt: "player",
+  // The parked payload can name target ids the asker may not know.
+  command: "never"
+} as const satisfies Record<keyof PendingRuleAsk, FieldAudience>;
+
+function isHiddenSource(sourceActorId: string | null, publicActorIds: ReadonlySet<string>): boolean {
+  return sourceActorId !== null && !publicActorIds.has(sourceActorId);
+}
+
+function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
+  const owner = state.actors.find((actor) => actor.id === actorId)?.ownerSessionId ?? null;
+  return owner !== null && owner === playerSessionId;
+}
+
 export function projectPlayerCombat(state: GameState, playerSessionId?: string, now = Date.now()): PlayerCombatView {
   const initiative = projectPublicInitiative(state);
   const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
@@ -105,39 +153,43 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
     rewound: state.combat.historyCursor !== null,
     // Only the saves the player's own character owes; source actor id dropped, hidden source name masked.
+    // Only the player's own prompts; a hidden source is masked in both its name and the effect label.
     pendingSaves: state.combat.pendingSaves
-      .filter((entry) => { const target = state.actors.find((actor) => actor.id === entry.targetActorId); return target !== undefined && target.ownerSessionId !== null && target.ownerSessionId === playerSessionId; })
-      .map(({ sourceActorId, endsEffects: _endsEffects, ...entry }) => {
-        // On-fail effect: source ids dropped and the "Grappled by <attacker>" label scrubbed like an effect's;
-        // concentration references (endsEffects) are server bookkeeping and are stripped.
+      .filter((entry) => ownedBy(state, entry.targetActorId, playerSessionId))
+      .map((entry) => {
         const onFail = entry.onFailEffect;
-        const onFailHidden = onFail !== undefined && onFail.sourceActorId !== null && !publicActorIds.has(onFail.sourceActorId);
+        const onFailHidden = onFail !== undefined && isHiddenSource(onFail.sourceActorId, publicActorIds);
         return {
-          ...entry,
-          sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? HIDDEN_SOURCE : entry.sourceName,
+          ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
+          sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
           ...(onFail
-            ? { onFailEffect: onFailHidden
-              ? { ...onFail, sourceActorId: null, name: withoutSourceName(onFail.name, onFail.sourceName), sourceName: HIDDEN_SOURCE }
-              : { ...onFail, sourceActorId: null } }
+            ? {
+                onFailEffect: {
+                  ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
+                  name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
+                  sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
+                  sourceActorId: null
+                }
+              }
             : {})
         };
       }),
-    // Only the player's own character's asks. The parked `command` is dropped: its payload can name
-    // target ids the asker may not know.
     pendingRuleAsks: state.combat.pendingRuleAsks
-      .filter((entry) => { const actor = state.actors.find((candidate) => candidate.id === entry.actorId); return actor !== undefined && actor.ownerSessionId !== null && actor.ownerSessionId === playerSessionId; })
-      .map(({ command: _command, ...entry }) => entry),
-    // Only the player's own reaction prompts; source actor id dropped, hidden source name masked.
+      .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
+      .map((entry) => copyPlayerFields(entry, PENDING_RULE_ASK_FIELDS)),
     pendingReactions: state.combat.pendingReactions
-      .filter((entry) => { const reactor = state.actors.find((actor) => actor.id === entry.actorId); return reactor !== undefined && reactor.ownerSessionId !== null && reactor.ownerSessionId === playerSessionId; })
-      .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? HIDDEN_SOURCE : entry.sourceName }))
+      .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
+      .map((entry) => ({
+        ...copyPlayerFields(entry, PENDING_REACTION_FIELDS),
+        sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName
+      }))
   };
 }
 
 /** An effect as players see it: no source ids, and a hidden source masked in both `sourceName` and `name`. */
 function playerEffect(effect: GameState["actors"][number]["effects"][number], publicActorIds: ReadonlySet<string>): PlayerEffect {
   const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
-  if (sourceActorId === null || publicActorIds.has(sourceActorId)) return visible;
+  if (!isHiddenSource(sourceActorId, publicActorIds)) return visible;
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
 
@@ -292,7 +344,7 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
       };
     }),
-    rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)
+    rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(playerRoll)
   };
 }
 

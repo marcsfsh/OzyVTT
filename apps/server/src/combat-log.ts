@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { CombatLogEntry, PlayerRollRecord, RollRecord, RollVisibility } from "@vtt/domain";
+import { playerRoll } from "./projections.js";
 
 type LogRow = Readonly<{
   id: number; at: string; kind: string; text: string; gm_only: number; revision: number;
@@ -24,11 +25,6 @@ export type StoredFeedRow = Readonly<{
   initiatorSessionId: string | null;
 }>;
 
-/** A roll as it rides the feed: the player-safe shape for every recipient (the GM has the session id in `GameState.rolls`). */
-function safeRoll(roll: RollRecord): PlayerRollRecord {
-  const { initiatorSessionId: _private, ...visible } = roll;
-  return visible;
-}
 
 /** Whether a reader may see a row (null if not). Non-roll rows follow `gmOnly`; `self-only` rolls reach
  *  their roller and the GM; `blind` rolls reach only the GM. */
@@ -77,7 +73,7 @@ export class CombatLogStore {
     const actorId = entry.actorId ?? roll?.actorId ?? null;
     const visibility = roll?.visibility ?? null;
     const initiatorSessionId = roll?.initiatorSessionId ?? null;
-    const safe = roll ? safeRoll(roll) : null;
+    const safe = roll ? playerRoll(roll) : null;
     const info = database
       .prepare(`INSERT INTO combat_log (at, kind, text, gm_only, revision, actor_id, visibility, initiator_session_id, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(at, entry.kind, entry.text, entry.gmOnly ? 1 : 0, entry.revision, actorId, visibility, initiatorSessionId, safe ? JSON.stringify(safe) : null);
