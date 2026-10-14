@@ -145,32 +145,32 @@ export function indexEntry(
 }
 
 /**
- * Search one audience's index. Ranking: an exact title match first, then bm25 with the title weighted 10x
- * (`bm25()` takes a weight for every declared column, the UNINDEXED ones included).
+ * Search one audience's index. Only known kinds are asked for, so the cap counts rows a caller can use and
+ * `truncated` is exact. Ranking: an exact title match first, then bm25 with the title weighted 10x (`bm25()`
+ * takes a weight for every declared column, the UNINDEXED ones included).
  */
 export function searchAll(
   db: CodexDb,
   audience: "player" | "gm",
   query: string,
-  kinds?: readonly CodexRecordKind[]
+  kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
 ): CodexSearchResult {
   const match = ftsQuery(query);
   if (!match) return { hits: [], truncated: false };
   // Never "" here (`ftsQuery` requires a letter or digit), so empty-titled rows cannot match the first tier.
   const exactTitle = query.trim().toLowerCase();
   const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
-  const kindFilter = kinds && kinds.length > 0 ? ` AND ${table}.kind IN (${kinds.map(() => "?").join(", ")})` : "";
+  const wanted = kinds.length > 0 ? kinds : CODEX_RECORD_KINDS;
   const visibility = audience === "gm" ? "" : ` AND ${PLAYER_SEARCH_VISIBLE_SQL}`;
   // One row past the cap: its presence is what says the results were cut off.
-  const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility}
+  const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ? AND ${table}.kind IN (${wanted.map(() => "?").join(", ")})${visibility}
     ORDER BY (CASE WHEN LOWER(${table}.title) = ? THEN 0 ELSE 1 END), bm25(${table}, 0.0, 0.0, 10.0, 1.0)
     LIMIT ${SEARCH_LIMIT + 1}`;
   try {
-    const rows = (
-      db.database.prepare(sql).all(match, ...(kinds ?? []), exactTitle) as Array<{ kind: string; record_id: string }>
-    ).filter((row): row is { kind: CodexRecordKind; record_id: string } =>
-      (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind)
-    );
+    const rows = db.database.prepare(sql).all(match, ...wanted, exactTitle) as Array<{
+      kind: CodexRecordKind;
+      record_id: string;
+    }>;
     return {
       hits: rows.slice(0, SEARCH_LIMIT).map((row) => ({ kind: row.kind, id: row.record_id })),
       truncated: rows.length > SEARCH_LIMIT

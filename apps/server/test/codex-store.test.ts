@@ -4433,6 +4433,28 @@ describe("CodexStore search — sessions join the one index (D10, three gates)",
     expect(over.hits).toHaveLength(50);
     expect(over.truncated).toBe(true);
   });
+
+  // An index row of a kind this build does not know (another build wrote it) is never a hit, so it must not
+  // take a place under the cap either: there it would hide the 51st real match and clear `truncated`.
+  it("counts truncation over the kinds it can return, so a foreign index row cannot hide a cut-off", () => {
+    for (let index = 0; index < 50; index += 1)
+      store.createPage({ title: `Barovia hamlet ${index}`, playerBody: "barovia" });
+    // Titled to rank first, ahead of every real match.
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    raw
+      .prepare("INSERT INTO codex_search_gm (kind, record_id, title, body) VALUES ('rumour', ?, 'Barovia', 'barovia')")
+      .run(crypto.randomUUID());
+    raw.close();
+
+    const exact = store.searchAll("gm", "barovia");
+    expect(exact.hits).toHaveLength(50);
+    expect(exact.hits.every((hit) => hit.kind === "page")).toBe(true);
+    expect(exact.truncated, "50 real matches and a foreign row are not a cut-off").toBe(false);
+    store.createPage({ title: "Barovia hamlet 50", playerBody: "barovia" });
+    const over = store.searchAll("gm", "barovia");
+    expect(over.hits).toHaveLength(50);
+    expect(over.truncated, "51 real matches are").toBe(true);
+  });
 });
 
 // A player chronicle row carries the server's `calendarInstant` alongside `inWorldDate`, so the client never
