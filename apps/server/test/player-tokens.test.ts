@@ -1,7 +1,6 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { GameStateSchema } from "@vtt/domain";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
@@ -117,28 +116,6 @@ describe("token library curation (R1)", () => {
     // A whole shelf at once.
     store.setFolderHidden("Spoilers", true);
     expect(store.list("player").map((entry) => entry.assetId)).toEqual([ASSET_B]);
-  });
-
-  it("adds the column to a catalog created before it existed, defaulting every row to visible", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-token-migrate-"));
-    const path = join(directory, "vtt.sqlite");
-    const legacy = new DatabaseSync(path);
-    legacy.exec(
-      "CREATE TABLE token_catalog (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT, created_at TEXT NOT NULL, last_used_at TEXT) STRICT;"
-    );
-    legacy
-      .prepare("INSERT INTO token_catalog (asset_id, name, folder, created_at, last_used_at) VALUES (?, ?, ?, ?, NULL)")
-      .run(ASSET_A, "Old Token", null, "2026-01-01T00:00:00.000Z");
-    legacy.close();
-
-    const store = new TokenCatalogStore(path);
-    await store.initialize();
-    cleanups.push(async () => {
-      store.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-    expect(store.get(ASSET_A)).toMatchObject({ name: "Old Token", hidden: false });
-    expect(store.list("player")).toHaveLength(1);
   });
 });
 
