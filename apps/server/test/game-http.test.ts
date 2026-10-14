@@ -390,7 +390,7 @@ describe("public game API over /api/v1", () => {
     expect(unknown.status).toBe(404);
     expect((await unknown.json()).error.details.availableTypes).toContain("encounter.start");
 
-    // The tunnel dispatches through the same operations as the typed routes.
+    // The tunnel dispatches through the same command table as the typed routes.
     const viaTunnel = await post(base, GAME_PATHS.commands, bot.token, {
       type: "encounter.start",
       payload: { mapAssetId, entries: [{ actorId: HERO_ID, score: 15 }] }

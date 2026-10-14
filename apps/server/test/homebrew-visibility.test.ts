@@ -401,7 +401,7 @@ describe("homebrew never reaches an audience it was not published to", () => {
 
 // The fake above pins the contract; these pin `HomebrewStore` as an implementation of it. A store
 // that filtered nothing would pass the fake-driven suite.
-describe("HomebrewStore.publishedFor, end to end through the content operations", () => {
+describe("HomebrewStore.publishedFor, end to end through the content reads", () => {
   const directories: string[] = [];
   const stores: HomebrewStore[] = [];
   afterEach(async () => {
