@@ -1,6 +1,6 @@
-// Codex entity vocabulary shared by client and server: the field keys of each entity type and which are
-// GM-secret. One copy, because a key marked secret on the client but missing on the server is never sealed
-// and ships to players. Presentation (labels, icons, input kinds) stays in the client.
+// Codex entity vocabulary shared by client and server: the field keys of each entity type, which are
+// GM-secret, and how a page title becomes a link key. One copy, because a key marked secret on the client but
+// missing on the server is never sealed and ships to players. Presentation stays in the client.
 
 export const CODEX_ENTITY_TYPES = [
   "note",
@@ -68,4 +68,9 @@ export function pruneCodexFields(
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) if (allowed.has(key)) out[key] = value;
   return out;
+}
+
+/** A page title reduced to its `[[wiki link]]` key: trimmed, lowercased, whitespace collapsed. */
+export function pageLinkKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, " ");
 }

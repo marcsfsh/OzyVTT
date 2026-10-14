@@ -319,7 +319,7 @@ export function CampaignDateEditor({
             />
           </div>
         </Field>
-        {/* Read the typed numbers back as a date, era and weekday included. */}
+        {/* Read the typed numbers back as a date, era included and clamped into its month as it will sort. */}
         {parsed && (
           <p className="codex-composer-hint">
             Reads as <strong>{formatWorldDate(calendar, parsed)}</strong>.

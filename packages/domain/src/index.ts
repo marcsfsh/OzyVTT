@@ -16,6 +16,8 @@ import type { PickBudgetScaling } from "./pick-budget.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";
+/** In-world calendar arithmetic, shared so stored labels and the client's display agree. */
+export * from "./codex-calendar.js";
 
 export {
   ACTOR_SCHEMA_VERSION,

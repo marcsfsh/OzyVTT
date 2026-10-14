@@ -7,6 +7,7 @@ import type { BadgeTone, MeterTone } from "@vtt/ui";
 import {
   calendarDaysPerYear,
   calendarYearOf,
+  clampToCalendar,
   dateToInstant,
   formatWorldYear,
   instantToDate,
@@ -256,13 +257,6 @@ export function campaignDeadlines<T extends DeadlineRef>(records: readonly T[]):
 }
 
 // ----- Dates the GM is about to move to -----
-
-/** Snaps a date the way the server's `calendarInstantOf` does, returning a date rather than an instant. */
-function clampToCalendar(calendar: CodexCalendar, date: CodexInWorldDate): CodexInWorldDate {
-  const month = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
-  const days = calendar.months[month]?.days ?? 1;
-  return { year: Math.trunc(date.year), month, day: Math.min(Math.max(1, Math.trunc(date.day)), days) };
-}
 
 /** Where applying downtime would move the clock: now plus its days. Null with no current date. */
 export function downtimeProposedDate(calendar: CodexCalendar | null, days: number): CodexInWorldDate | null {
