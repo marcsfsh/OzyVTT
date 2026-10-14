@@ -1171,11 +1171,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.get(`${CODEX_ASSET_BASE}/:id/content`, async (request, response) => {
     const id = pathParam(request, "id");
-    // GM or credential always; a player only when a revealed page uses the asset. Everyone else gets the
-    // same 403 before any lookup, so a media URL cannot be an existence oracle.
+    // GM or credential always; a player only when revealed player-facing content uses the image. Everyone
+    // else gets the same 403 before any lookup, so a media URL cannot be an existence oracle.
     const principal = principalFor(request, response, options, "codex:read");
     const allowed = principal.kind === "gm" || principal.kind === "integration"
-      || (principal.kind === "player" && store.isPageAssetVisibleToPlayers(id));
+      || (principal.kind === "player" && store.isMediaVisibleToPlayers(id));
     if (!allowed) return failure(response, 403, "forbidden", "That image is not available to this session.");
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;

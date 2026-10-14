@@ -2623,11 +2623,18 @@ export class CodexStore {
     return this.requireDatabase().prepare("SELECT 1 FROM codex_maps WHERE asset_id = ? AND revealed = 1 LIMIT 1").get(assetId) !== undefined;
   }
 
-  /** Whether a revealed page's player-facing content (banner or player body) uses this asset: the gate for a player fetching page media. */
-  isPageAssetVisibleToPlayers(assetId: string): boolean {
+  /**
+   * Whether a player may load this uploaded image: it is a revealed page's banner, or it appears in the
+   * player-facing text of a revealed page, quest, session recap or journal entry (downtime included).
+   */
+  isMediaVisibleToPlayers(assetId: string): boolean {
     if (!ID.test(assetId)) return false;
-    // A revealed page's banner, or a revealed page whose player body references the asset id (inline image).
-    return this.requireDatabase().prepare("SELECT 1 FROM codex_pages WHERE revealed = 1 AND (banner_asset_id = ? OR player_body LIKE ?) LIMIT 1").get(assetId, `%${assetId}%`) !== undefined;
+    return this.requireDatabase().prepare(`
+      SELECT 1 FROM codex_pages WHERE revealed = 1 AND (banner_asset_id = :id OR player_body LIKE :pattern)
+      UNION ALL SELECT 1 FROM codex_quests WHERE revealed = 1 AND player_body LIKE :pattern
+      UNION ALL SELECT 1 FROM codex_sessions WHERE revealed = 1 AND recap_body LIKE :pattern
+      UNION ALL SELECT 1 FROM codex_journal WHERE revealed = 1 AND player_text LIKE :pattern
+      LIMIT 1`).get({ id: assetId, pattern: `%${assetId}%` }) !== undefined;
   }
 
   /** The location marker linked to a prepared scene, if any - the combat-history bridge pins fights here. */

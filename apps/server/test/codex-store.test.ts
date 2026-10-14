@@ -1026,11 +1026,28 @@ describe("CodexStore media visibility (page images)", () => {
   const gmOnly = "44444444-4444-4444-8444-444444444444";
   it("exposes page media to players only when the page is revealed and the reference is player-facing", () => {
     const page = store.createPage({ title: "Bree", bannerAssetId: banner, playerBody: `See ![m](codex-asset:${inline})`, gmBody: `secret ![s](codex-asset:${gmOnly})` });
-    expect(store.isPageAssetVisibleToPlayers(banner)).toBe(false); // page not revealed yet
+    expect(store.isMediaVisibleToPlayers(banner)).toBe(false); // page not revealed yet
     store.setPageRevealed(page.id, true);
-    expect(store.isPageAssetVisibleToPlayers(banner)).toBe(true);   // banner of a revealed page
-    expect(store.isPageAssetVisibleToPlayers(inline)).toBe(true);   // inline in the revealed player body
-    expect(store.isPageAssetVisibleToPlayers(gmOnly)).toBe(false);  // referenced only in gmBody, so stays hidden
+    expect(store.isMediaVisibleToPlayers(banner)).toBe(true);   // banner of a revealed page
+    expect(store.isMediaVisibleToPlayers(inline)).toBe(true);   // inline in the revealed player body
+    expect(store.isMediaVisibleToPlayers(gmOnly)).toBe(false);  // referenced only in gmBody, so stays hidden
+  });
+
+  it("exposes images in the player text of revealed quests, session recaps and journal entries", () => {
+    const quest = "55555555-5555-4555-8555-555555555555";
+    const recap = "66666666-6666-4666-8666-666666666666";
+    const prep = "77777777-7777-4777-8777-777777777777";
+    const entry = "88888888-8888-4888-8888-888888888888";
+    const hiddenQuest = "99999999-9999-4999-8999-999999999999";
+    store.createQuest({ title: "Shown", playerBody: `![q](codex-asset:${quest})`, revealedToPlayers: true });
+    store.createQuest({ title: "Hidden", playerBody: `![q](codex-asset:${hiddenQuest})` });
+    store.createSession({ recapBody: `![r](codex-asset:${recap})`, prepBody: `![p](codex-asset:${prep})`, revealedToPlayers: true });
+    store.createEntry({ playerText: `![e](codex-asset:${entry})`, revealedToPlayers: true });
+    expect(store.isMediaVisibleToPlayers(quest)).toBe(true);
+    expect(store.isMediaVisibleToPlayers(recap)).toBe(true);
+    expect(store.isMediaVisibleToPlayers(entry)).toBe(true);
+    expect(store.isMediaVisibleToPlayers(prep)).toBe(false);        // session prep is GM-only
+    expect(store.isMediaVisibleToPlayers(hiddenQuest)).toBe(false); // quest not revealed
   });
 });
 
@@ -4463,7 +4480,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "listFolders", "getPage", "listPages", "exportBundle", "listAllDeclaredConnections", "connectionsForPage",
     "listAllConnections", "getSettings", "listRevisions", "listAllRevisions", "searchAll", "searchPages",
     "getMap", "listMaps", "getMarker", "listMarkers", "markersForPage", "isAssetRevealedToPlayers",
-    "isPageAssetVisibleToPlayers", "markerForScene", "partyMarker", "getCalendar", "getPublishedDate",
+    "isMediaVisibleToPlayers", "markerForScene", "partyMarker", "getCalendar", "getPublishedDate",
     "campaignInstant", "publishedInstant", "dateForInstant", "proposedDateFor", "getEntry", "listTimeline",
     "listDatedEventPages", "listChronicle", "listEntriesFor", "getSession", "listSessions",
     "unrevealedSessionIds", "getQuest", "listQuests", "listStanding", "getStanding", "revision",
