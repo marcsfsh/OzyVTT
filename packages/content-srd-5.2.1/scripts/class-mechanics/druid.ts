@@ -23,13 +23,15 @@ export const druid: ClassMechanicsModule = {
           {
             id: "magician",
             name: "Magician",
-            description: "You know one extra cantrip from the Druid spell list. In addition, your mystical connection to nature gives you a bonus to your Intelligence (Arcana or Nature) checks. The bonus equals your Wisdom modifier (minimum bonus of +1).",
+            description:
+              "You know one extra cantrip from the Druid spell list. In addition, your mystical connection to nature gives you a bonus to your Intelligence (Arcana or Nature) checks. The bonus equals your Wisdom modifier (minimum bonus of +1).",
             extraPicks: [{ offer: "class-cantrips", amount: 1 }]
           },
           {
             id: "warden",
             name: "Warden",
-            description: "Trained for battle, you gain proficiency with Martial weapons and training with Medium armor.",
+            description:
+              "Trained for battle, you gain proficiency with Martial weapons and training with Medium armor.",
             grants: { weapons: ["martial"], armor: ["medium"] }
           }
         ]
@@ -43,13 +45,16 @@ export const druid: ClassMechanicsModule = {
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
-      actions: [{
-        id: "wild-shape",
-        name: "Wild Shape",
-        activation: "bonus-action",
-        description: "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
-        damage: []
-      }]
+      actions: [
+        {
+          id: "wild-shape",
+          name: "Wild Shape",
+          activation: "bonus-action",
+          description:
+            "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
+          damage: []
+        }
+      ]
     },
 
     // Find Familiar always prepared. Casting it with a Wild Shape use instead of a slot stays prose.
@@ -69,23 +74,28 @@ export const druid: ClassMechanicsModule = {
           {
             id: "potent-spellcasting",
             name: "Potent Spellcasting",
-            description: "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
+            description:
+              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
           },
           {
             id: "primal-strike",
             name: "Primal Strike",
-            description: "Once on each of your turns when you hit a creature with an attack roll using a weapon or a Beast form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit). The extra damage increases to 2d8 when Improved Elemental Fury takes effect at Druid level 15.",
-            actions: [{
-              id: "primal-strike",
-              name: "Primal Strike",
-              activation: "other",
-              description: "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
-              damage: [{ formula: "1d8", type: "lightning" }],
-              damageByLevel: [
-                { level: 7, formula: "1d8", type: "lightning" },
-                { level: 15, formula: "2d8", type: "lightning" }
-              ]
-            }],
+            description:
+              "Once on each of your turns when you hit a creature with an attack roll using a weapon or a Beast form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit). The extra damage increases to 2d8 when Improved Elemental Fury takes effect at Druid level 15.",
+            actions: [
+              {
+                id: "primal-strike",
+                name: "Primal Strike",
+                activation: "other",
+                description:
+                  "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
+                damage: [{ formula: "1d8", type: "lightning" }],
+                damageByLevel: [
+                  { level: 7, formula: "1d8", type: "lightning" },
+                  { level: 15, formula: "2d8", type: "lightning" }
+                ]
+              }
+            ],
             uses: { limit: 1, per: "turn", pool: "primal-strike" }
           }
         ]
@@ -104,7 +114,8 @@ export const druid: ClassMechanicsModule = {
           {
             id: "improved-potent-spellcasting",
             name: "Improved Potent Spellcasting",
-            description: "A Druid cantrip you cast that has a range of 10 feet or greater has its range increased by 300 feet.",
+            description:
+              "A Druid cantrip you cast that has a range of 10 feet or greater has its range increased by 300 feet.",
             requires: { offer: "feature:elemental-fury", id: "potent-spellcasting" }
           },
           {
@@ -132,19 +143,22 @@ export const druid: ClassMechanicsModule = {
        * healing half stays prose (no healing formula on actions).
        */
       "lands-aid": {
-        actions: [{
-          id: "lands-aid",
-          name: "Land's Aid",
-          activation: "action",
-          description: "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
-          save: { ability: "con", dc: "spellcasting" },
-          damage: [{ formula: "2d6", type: "necrotic" }],
-          damageByLevel: [
-            { level: 3, formula: "2d6", type: "necrotic" },
-            { level: 10, formula: "3d6", type: "necrotic" },
-            { level: 14, formula: "4d6", type: "necrotic" }
-          ]
-        }],
+        actions: [
+          {
+            id: "lands-aid",
+            name: "Land's Aid",
+            activation: "action",
+            description:
+              "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
+            save: { ability: "con", dc: "spellcasting" },
+            damage: [{ formula: "2d6", type: "necrotic" }],
+            damageByLevel: [
+              { level: 3, formula: "2d6", type: "necrotic" },
+              { level: 10, formula: "3d6", type: "necrotic" },
+              { level: 14, formula: "4d6", type: "necrotic" }
+            ]
+          }
+        ],
         uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" }
       },
 
@@ -160,10 +174,26 @@ export const druid: ClassMechanicsModule = {
           kind: "land",
           choose: 1,
           options: [
-            { id: "arid", name: "Arid Land", description: "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire." },
-            { id: "polar", name: "Polar Land", description: "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm." },
-            { id: "temperate", name: "Temperate Land", description: "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm." },
-            { id: "tropical", name: "Tropical Land", description: "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague." }
+            {
+              id: "arid",
+              name: "Arid Land",
+              description: "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire."
+            },
+            {
+              id: "polar",
+              name: "Polar Land",
+              description: "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm."
+            },
+            {
+              id: "temperate",
+              name: "Temperate Land",
+              description: "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm."
+            },
+            {
+              id: "tropical",
+              name: "Tropical Land",
+              description: "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague."
+            }
           ]
         }
       },
@@ -180,25 +210,29 @@ export const druid: ClassMechanicsModule = {
           choose: 1,
           options: [
             {
-              id: "natures-ward-arid", name: "Nature's Ward (Arid)",
+              id: "natures-ward-arid",
+              name: "Nature's Ward (Arid)",
               description: "Your current land choice is Arid, so you have Resistance to Fire damage.",
               requires: { offer: "feature:circle-of-the-land-spells", id: "arid" },
               grants: { damageResistances: ["fire"] }
             },
             {
-              id: "natures-ward-polar", name: "Nature's Ward (Polar)",
+              id: "natures-ward-polar",
+              name: "Nature's Ward (Polar)",
               description: "Your current land choice is Polar, so you have Resistance to Cold damage.",
               requires: { offer: "feature:circle-of-the-land-spells", id: "polar" },
               grants: { damageResistances: ["cold"] }
             },
             {
-              id: "natures-ward-temperate", name: "Nature's Ward (Temperate)",
+              id: "natures-ward-temperate",
+              name: "Nature's Ward (Temperate)",
               description: "Your current land choice is Temperate, so you have Resistance to Lightning damage.",
               requires: { offer: "feature:circle-of-the-land-spells", id: "temperate" },
               grants: { damageResistances: ["lightning"] }
             },
             {
-              id: "natures-ward-tropical", name: "Nature's Ward (Tropical)",
+              id: "natures-ward-tropical",
+              name: "Nature's Ward (Tropical)",
               description: "Your current land choice is Tropical, so you have Resistance to Poison damage.",
               requires: { offer: "feature:circle-of-the-land-spells", id: "tropical" },
               grants: { damageResistances: ["poison"] }
@@ -209,16 +243,18 @@ export const druid: ClassMechanicsModule = {
 
       // Spends the shared Wild Shape pool. The Cube, cover, movement and sharing Nature's Ward's resistance stay prose.
       "natures-sanctuary": {
-        actions: [{
-          id: "natures-sanctuary",
-          name: "Nature's Sanctuary",
-          activation: "action",
-          description: "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
-          damage: []
-        }],
+        actions: [
+          {
+            id: "natures-sanctuary",
+            name: "Nature's Sanctuary",
+            activation: "action",
+            description:
+              "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
+            damage: []
+          }
+        ],
         uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" }
       }
-
     }
   },
 

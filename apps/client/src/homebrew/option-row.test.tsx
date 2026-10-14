@@ -48,7 +48,10 @@ const GATED_FEAT: Draft = {
     map (without it the custom `features` section renders empty). */
 function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);
-  const write = (next: Draft) => { setDraft(next); onBody(next); };
+  const write = (next: Draft) => {
+    setDraft(next);
+    onBody(next);
+  };
   return (
     <SchemaForm
       schema={SCHEMAS.feat}
@@ -57,7 +60,14 @@ function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => vo
       ctx={EMPTY_CONTEXT}
       custom={{
         features: ({ field }) => (
-          <FeatureEditor draft={draft} onDraft={write} ctx={EMPTY_CONTEXT} featuresKey={field.key} single idPrefix="hb-feat" />
+          <FeatureEditor
+            draft={draft}
+            onDraft={write}
+            ctx={EMPTY_CONTEXT}
+            featuresKey={field.key}
+            single
+            idPrefix="hb-feat"
+          />
         )
       }}
     />
@@ -66,7 +76,14 @@ function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => vo
 
 async function mount(seed: Draft = GATED_FEAT) {
   let body: Draft = seed;
-  render(<RecordForm seed={seed} onBody={(next) => { body = next; }} />);
+  render(
+    <RecordForm
+      seed={seed}
+      onBody={(next) => {
+        body = next;
+      }}
+    />
+  );
   // The option list is collapsible, so open the stored row as a GM would.
   const toggle = screen.getByRole("button", { name: /Ember Ward/ });
   if (toggle.getAttribute("aria-expanded") !== "true") await userEvent.setup().click(toggle);
@@ -106,7 +123,9 @@ describe("an inline option's gate can be cleared, not only set", () => {
 
     await user.click(form.clear("emberborn"));
     // No key at all, not `{}` (which would raise two "Required" issues for a removed gate).
-    expect(Object.keys(form.option()), "the cleared clause must not survive as an empty object").not.toContain("requires");
+    expect(Object.keys(form.option()), "the cleared clause must not survive as an empty object").not.toContain(
+      "requires"
+    );
     expect(form.option()).toMatchObject({ id: "ember-ward", name: "Ember Ward" });
 
     // The boxes remain, so re-entering the gate is one tap.
@@ -117,7 +136,8 @@ describe("an inline option's gate can be cleared, not only set", () => {
   it("a gate typed from nothing lands whole, so the row can add as well as remove", async () => {
     const user = userEvent.setup();
     const seed = JSON.parse(JSON.stringify(GATED_FEAT)) as typeof GATED_FEAT;
-    delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0].requires;
+    delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0]
+      .requires;
     const form = await mount(seed);
     expect(Object.keys(form.option())).not.toContain("requires");
 
@@ -129,16 +149,25 @@ describe("an inline option's gate can be cleared, not only set", () => {
   it("THE GATE IS PICKED, not spelled — the half a datalist could not do on a phone", async () => {
     const user = userEvent.setup();
     const seed = JSON.parse(JSON.stringify(GATED_FEAT)) as typeof GATED_FEAT;
-    delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0].requires;
+    delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0]
+      .requires;
     const form = await mount(seed);
 
     // A listbox exists at all, which a datalist never provides.
     await user.click(form.box("Which pick"));
-    const offered = within(screen.getByRole("listbox", { name: "Which pick" })).getAllByRole("option").map((option) => option.textContent);
+    const offered = within(screen.getByRole("listbox", { name: "Which pick" }))
+      .getAllByRole("option")
+      .map((option) => option.textContent);
     // The named budgets by printed name, plus this record's own feature (colon as separator).
     expect(offered).toEqual([
-      "Class Skills", "Class Tools", "Background Skills", "Background Tools",
-      "Background Languages", "Species Languages", "Class Cantrips", "Class Spells",
+      "Class Skills",
+      "Class Tools",
+      "Background Skills",
+      "Background Tools",
+      "Background Languages",
+      "Species Languages",
+      "Class Cantrips",
+      "Class Spells",
       "Feature: Echoed Ward"
     ]);
 
@@ -151,13 +180,17 @@ describe("an inline option's gate can be cleared, not only set", () => {
   it("the answer half offers the ids the record really declares", async () => {
     const user = userEvent.setup();
     const seed = JSON.parse(JSON.stringify(GATED_FEAT)) as typeof GATED_FEAT;
-    delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0].requires;
+    delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0]
+      .requires;
     const form = await mount(seed);
 
     await user.click(form.box("Which answer"));
     // `optionIdsOf`: answers any pick on this record could hold.
-    expect(within(screen.getByRole("listbox", { name: "Which answer" })).getAllByRole("option").map((o) => o.textContent))
-      .toEqual(["Ember Ward"]);
+    expect(
+      within(screen.getByRole("listbox", { name: "Which answer" }))
+        .getAllByRole("option")
+        .map((o) => o.textContent)
+    ).toEqual(["Ember Ward"]);
 
     await user.click(screen.getByRole("option", { name: "Ember Ward" }));
     expect(form.option().requires).toEqual({ id: "ember-ward" });

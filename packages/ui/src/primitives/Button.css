@@ -32,7 +32,7 @@
   /* Labels use the display face; tracking is lighter than the landing doors' because a label is a word in a row. */
   font: 700 var(--fs-body) / 1 var(--font-display);
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -45,9 +45,9 @@
   --nh-cue: none;
   --nh-glow: none;
   /* The shared cue at button scale, inset for a button's padding. Keep the 1:2 w:h ratio the conic wedge needs. */
-  --cue-w: .3rem;
-  --cue-h: .6rem;
-  --cue-inset: .34rem;
+  --cue-w: 0.3rem;
+  --cue-h: 0.6rem;
+  --cue-inset: 0.34rem;
 }
 
 .nh-btn::before {
@@ -64,52 +64,99 @@
      `.tap-target` hit-area extension on `--sm`. */
   background-image:
     var(--nh-cue),
-    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--nh-tex) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--scanline-gap) - 1px),
+      var(--nh-tex) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
+    ),
     linear-gradient(to bottom, color-mix(in srgb, var(--text) 7%, transparent), transparent 60%);
   background-repeat: no-repeat, repeat, no-repeat;
-  background-size: var(--cue-w) var(--cue-h), 100% var(--scanline-gap), 100% 100%;
-  background-position: var(--cue-inset) center, 0 0, 0 0;
+  background-size:
+    var(--cue-w) var(--cue-h),
+    100% var(--scanline-gap),
+    100% 100%;
+  background-position:
+    var(--cue-inset) center,
+    0 0,
+    0 0;
   background-origin: border-box;
   background-clip: border-box;
   filter: var(--nh-glow);
-  transition: background-color var(--dur-hover), border-color var(--dur-hover), filter var(--dur-hover);
+  transition:
+    background-color var(--dur-hover),
+    border-color var(--dur-hover),
+    filter var(--dur-hover);
 }
 
 /* Small keeps its light paint; `.tap-target` grows the hit area to 44px. The cut doesn't shrink with the box
    (`--chamfer-cut` is computed on :root). The width floor is scoped so `--sm` and the icon button keep their paint. */
-.nh-btn:not(.nh-btn--sm) { min-width: var(--tap-min); }
-.nh-btn--sm { min-height: 2rem; padding: var(--space-2) var(--space-3); font-size: var(--fs-sm); }
-.nh-btn--block { display: flex; width: 100%; }
+.nh-btn:not(.nh-btn--sm) {
+  min-width: var(--tap-min);
+}
+.nh-btn--sm {
+  min-height: 2rem;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+}
+.nh-btn--block {
+  display: flex;
+  width: 100%;
+}
 
 /* Primary: magenta fill, dark ink, glow only on hover */
-.nh-btn--primary { --nh-fill: var(--primary); --nh-rim: var(--magenta-hi); color: var(--text-on-neon); }
+.nh-btn--primary {
+  --nh-fill: var(--primary);
+  --nh-rim: var(--magenta-hi);
+  color: var(--text-on-neon);
+}
 
 /* Secondary: the resting default, no fill, a rim for the whole edge (`--rim-color`, so daybreak gets a dark line). */
-.nh-btn--secondary { --nh-rim: var(--rim-color); color: var(--text); }
+.nh-btn--secondary {
+  --nh-rim: var(--rim-color);
+  color: var(--text);
+}
 
 /* Ghost: text only, no rim at rest; the cue and a quiet fill are its interaction. */
-.nh-btn--ghost { color: var(--text-dim); --nh-tex: transparent; }
+.nh-btn--ghost {
+  color: var(--text-dim);
+  --nh-tex: transparent;
+}
 
 /* Destructive — danger edge at rest, fills on hover, always with a clear label */
-.nh-btn--destructive { --nh-rim: var(--danger); color: var(--danger-hi); }
+.nh-btn--destructive {
+  --nh-rim: var(--danger);
+  color: var(--danger-hi);
+}
 
 /* ---- Interaction: the rim brightens and the cue appears, on :active as well as :hover. ---- */
-.nh-btn:hover:not(:disabled), .nh-btn:active:not(:disabled), .nh-btn:focus-visible { --nh-cue: var(--cue-mark); }
-.nh-btn--primary:hover:not(:disabled), .nh-btn--primary:active:not(:disabled), .nh-btn--primary:focus-visible {
+.nh-btn:hover:not(:disabled),
+.nh-btn:active:not(:disabled),
+.nh-btn:focus-visible {
+  --nh-cue: var(--cue-mark);
+}
+.nh-btn--primary:hover:not(:disabled),
+.nh-btn--primary:active:not(:disabled),
+.nh-btn--primary:focus-visible {
   --nh-fill: var(--magenta-hi);
   --nh-rim: var(--magenta-hi);
   --nh-glow: var(--glow-drop-magenta);
 }
-.nh-btn--secondary:hover:not(:disabled), .nh-btn--secondary:active:not(:disabled), .nh-btn--secondary:focus-visible {
+.nh-btn--secondary:hover:not(:disabled),
+.nh-btn--secondary:active:not(:disabled),
+.nh-btn--secondary:focus-visible {
   --nh-fill: var(--surface-3);
   --nh-rim: var(--rim-color-hi);
 }
-.nh-btn--ghost:hover:not(:disabled), .nh-btn--ghost:active:not(:disabled), .nh-btn--ghost:focus-visible {
+.nh-btn--ghost:hover:not(:disabled),
+.nh-btn--ghost:active:not(:disabled),
+.nh-btn--ghost:focus-visible {
   color: var(--text);
   --nh-fill: color-mix(in srgb, var(--surface-3) 60%, transparent);
   --nh-rim: var(--rim-color);
 }
-.nh-btn--destructive:hover:not(:disabled), .nh-btn--destructive:active:not(:disabled), .nh-btn--destructive:focus-visible {
+.nh-btn--destructive:hover:not(:disabled),
+.nh-btn--destructive:active:not(:disabled),
+.nh-btn--destructive:focus-visible {
   --nh-fill: var(--danger);
   --nh-rim: var(--danger-hi);
   color: var(--text-on-neon);
@@ -127,8 +174,9 @@
   --nh-cue: none;
   --nh-glow: none;
 }
-.nh-btn:disabled::before { background-image: none; }
-
+.nh-btn:disabled::before {
+  background-image: none;
+}
 
 /* Icon-only square control: compact paint, with `.tap-target` (added by the component) for the 44px hit area.
    Fill and edge live on `--nh-fill` / `--nh-rim`, so setting `background` or `border-color` on `.nh-iconbtn`
@@ -164,9 +212,28 @@
   border: var(--rim-w, 2px) solid var(--nh-rim);
   background: var(--nh-fill);
   filter: var(--nh-glow);
-  transition: background-color var(--dur-hover), border-color var(--dur-hover), filter var(--dur-hover);
+  transition:
+    background-color var(--dur-hover),
+    border-color var(--dur-hover),
+    filter var(--dur-hover);
 }
-.nh-iconbtn--sm { width: 1.85rem; height: 1.85rem; }
-.nh-iconbtn:hover:not(:disabled), .nh-iconbtn:active:not(:disabled) { color: var(--text); --nh-rim: var(--rim-color-hi); }
-.nh-iconbtn[aria-pressed="true"] { color: var(--text); --nh-rim: var(--magenta); --nh-glow: var(--glow-drop-magenta); }
-.nh-iconbtn:disabled { color: var(--text-muted); cursor: not-allowed; --nh-rim: transparent; --nh-glow: none; }
+.nh-iconbtn--sm {
+  width: 1.85rem;
+  height: 1.85rem;
+}
+.nh-iconbtn:hover:not(:disabled),
+.nh-iconbtn:active:not(:disabled) {
+  color: var(--text);
+  --nh-rim: var(--rim-color-hi);
+}
+.nh-iconbtn[aria-pressed="true"] {
+  color: var(--text);
+  --nh-rim: var(--magenta);
+  --nh-glow: var(--glow-drop-magenta);
+}
+.nh-iconbtn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  --nh-rim: transparent;
+  --nh-glow: none;
+}

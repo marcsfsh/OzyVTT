@@ -1,4 +1,9 @@
-.nh-mdeditor { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.nh-mdeditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
 
 .nh-mdeditor-bar {
   display: flex;
@@ -10,17 +15,38 @@
 
 /* `IconButton size="sm"` paints ~29.6px with a 44px `.tap-target`, so neighbours need ~14.4px between them in both
    axes (the row wraps); --space-4 clears it. */
-.nh-mdeditor-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.nh-mdeditor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
 
-.nh-mdeditor-letter { font: 800 var(--fs-sm) / 1 var(--font-body); }
-.nh-mdeditor-letter--italic { font-style: italic; font-weight: 600; }
-.nh-mdeditor-letter--strike { text-decoration: line-through; font-weight: 600; }
+.nh-mdeditor-letter {
+  font: 800 var(--fs-sm) / 1 var(--font-body);
+}
+.nh-mdeditor-letter--italic {
+  font-style: italic;
+  font-weight: 600;
+}
+.nh-mdeditor-letter--strike {
+  text-decoration: line-through;
+  font-weight: 600;
+}
 
-.nh-mdeditor-frame { position: relative; min-width: 0; }
+.nh-mdeditor-frame {
+  position: relative;
+  min-width: 0;
+}
 /* The primitive owns the height. `resize: none` is stated because `.nh-textarea` sets `resize: vertical` at the
    same specificity and import order would decide. The field lives in locked panes, where resizing only
    lengthens the scroll and the handle is a mis-tap target on phones. */
-.nh-mdeditor-input { width: 100%; min-height: 14rem; resize: none; font-family: var(--font-body); line-height: 1.6; }
+.nh-mdeditor-input {
+  width: 100%;
+  min-height: 14rem;
+  resize: none;
+  font-family: var(--font-body);
+  line-height: 1.6;
+}
 
 .nh-mdeditor-preview {
   position: relative;
@@ -30,7 +56,10 @@
   border-radius: var(--radius-md);
   background: var(--surface-1);
 }
-.nh-mdeditor-empty { color: var(--text-muted); margin: 0; }
+.nh-mdeditor-empty {
+  color: var(--text-muted);
+  margin: 0;
+}
 
 .nh-mdeditor-suggest {
   position: absolute;
@@ -64,8 +93,12 @@
   cursor: pointer;
 }
 .nh-mdeditor-suggestitem:hover,
-.nh-mdeditor-suggestitem.is-active { background: var(--surface-3); }
+.nh-mdeditor-suggestitem.is-active {
+  background: var(--surface-3);
+}
 
 @media (max-width: 560px) {
-  .nh-mdeditor-input { min-height: 11rem; }
+  .nh-mdeditor-input {
+    min-height: 11rem;
+  }
 }

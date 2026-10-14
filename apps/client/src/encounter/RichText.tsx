@@ -17,7 +17,12 @@ function inline(text: string, keyBase: string): ReactNode[] {
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
-    if (match[1] !== undefined) nodes.push(<strong key={`${keyBase}-${index}`}><em>{match[1]}</em></strong>);
+    if (match[1] !== undefined)
+      nodes.push(
+        <strong key={`${keyBase}-${index}`}>
+          <em>{match[1]}</em>
+        </strong>
+      );
     else if (match[2] !== undefined) nodes.push(<strong key={`${keyBase}-${index}`}>{match[2]}</strong>);
     else nodes.push(<em key={`${keyBase}-${index}`}>{match[3]}</em>);
     last = match.index + match[0].length;
@@ -41,7 +46,10 @@ function parseBlocks(text: string): Block[] {
   let match: RegExpExecArray | null;
   while ((match = tablePattern.exec(text)) !== null) {
     if (match.index > last) blocks.push({ kind: "prose", text: text.slice(last, match.index) });
-    const cells = match[2].split("|").map((cell) => cell.trim()).filter((cell) => cell !== "");
+    const cells = match[2]
+      .split("|")
+      .map((cell) => cell.trim())
+      .filter((cell) => cell !== "");
     const firstSeparator = cells.findIndex(isSeparatorCell);
     const header = firstSeparator === -1 ? [] : cells.slice(0, firstSeparator);
     const columns = header.length || 2;
@@ -56,26 +64,60 @@ function parseBlocks(text: string): Block[] {
 }
 
 function ProseBlock({ text, keyBase }: Readonly<{ text: string; keyBase: string }>) {
-  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
-  return <>{lines.map((line, lineIndex) => {
-    const bullet = line.startsWith("- ") || line.startsWith("* ");
-    return <p key={`${keyBase}-${lineIndex}`} className={bullet ? "rt-line rt-bullet" : "rt-line"}>
-      {bullet ? "• " : null}{inline(bullet ? line.slice(2) : line, `${keyBase}-${lineIndex}`)}
-    </p>;
-  })}</>;
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (
+    <>
+      {lines.map((line, lineIndex) => {
+        const bullet = line.startsWith("- ") || line.startsWith("* ");
+        return (
+          <p key={`${keyBase}-${lineIndex}`} className={bullet ? "rt-line rt-bullet" : "rt-line"}>
+            {bullet ? "• " : null}
+            {inline(bullet ? line.slice(2) : line, `${keyBase}-${lineIndex}`)}
+          </p>
+        );
+      })}
+    </>
+  );
 }
 
 export function RichText({ text }: Readonly<{ text: string }>) {
   // Em-dashes become " - " at render (house style: none on screen); stored content is untouched.
   const normalized = text.replace(/\s*—\s*/g, " - ");
   const blocks = parseBlocks(normalized);
-  return <>{blocks.map((block, blockIndex) => block.kind === "table"
-    ? <div className="rt-table-wrap" key={`t-${blockIndex}`}>
-        <table className="rt-table">
-          <caption>{block.name}</caption>
-          {block.header.length > 0 && <thead><tr>{block.header.map((cell, cellIndex) => <th key={cellIndex}>{cell}</th>)}</tr></thead>}
-          <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{inline(cell, `t-${blockIndex}-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody>
-        </table>
-      </div>
-    : <ProseBlock key={`p-${blockIndex}`} text={block.text} keyBase={`p-${blockIndex}`} />)}</>;
+  return (
+    <>
+      {blocks.map((block, blockIndex) =>
+        block.kind === "table" ? (
+          <div className="rt-table-wrap" key={`t-${blockIndex}`}>
+            <table className="rt-table">
+              <caption>{block.name}</caption>
+              {block.header.length > 0 && (
+                <thead>
+                  <tr>
+                    {block.header.map((cell, cellIndex) => (
+                      <th key={cellIndex}>{cell}</th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {block.rows.map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {row.map((cell, cellIndex) => (
+                      <td key={cellIndex}>{inline(cell, `t-${blockIndex}-${rowIndex}-${cellIndex}`)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <ProseBlock key={`p-${blockIndex}`} text={block.text} keyBase={`p-${blockIndex}`} />
+        )
+      )}
+    </>
+  );
 }

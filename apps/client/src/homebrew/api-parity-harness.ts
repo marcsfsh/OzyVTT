@@ -19,7 +19,11 @@ import { join } from "node:path";
 import express from "express";
 import { HOMEBREW_BODY_SCHEMAS, type HomebrewBodyType } from "@vtt/content-srd-5.2.1/schemas";
 import { ContentLibrary } from "../../../server/src/content-library.js";
-import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "../../../server/src/homebrew-http.js";
+import {
+  createHomebrewRouter,
+  homebrewPackBodyParser,
+  HOMEBREW_PACK_IMPORT_PATH
+} from "../../../server/src/homebrew-http.js";
 import { findCatalogRecord } from "../../../server/src/homebrew-srd-copy.js";
 import { HomebrewStore } from "../../../server/src/homebrew-store.js";
 import { createHomebrewValidator } from "../../../server/src/homebrew-validate.js";
@@ -47,13 +51,27 @@ function unwrap(schema: unknown): unknown {
   for (let hops = 0; hops < 32; hops += 1) {
     const def = defOf(cursor);
     switch (def.typeName) {
-      case "ZodOptional": case "ZodNullable": case "ZodReadonly": case "ZodDefault": case "ZodCatch":
-        cursor = def.innerType; break;
-      case "ZodEffects": cursor = def.schema; break;
-      case "ZodPipeline": cursor = def.in; break;
-      case "ZodBranded": cursor = def.type; break;
-      case "ZodLazy": cursor = (def.getter as () => unknown)(); break;
-      default: return cursor;
+      case "ZodOptional":
+      case "ZodNullable":
+      case "ZodReadonly":
+      case "ZodDefault":
+      case "ZodCatch":
+        cursor = def.innerType;
+        break;
+      case "ZodEffects":
+        cursor = def.schema;
+        break;
+      case "ZodPipeline":
+        cursor = def.in;
+        break;
+      case "ZodBranded":
+        cursor = def.type;
+        break;
+      case "ZodLazy":
+        cursor = (def.getter as () => unknown)();
+        break;
+      default:
+        return cursor;
     }
   }
   throw new Error("Schema wrapper nesting exceeded 32 levels — a cycle, not a schema.");
@@ -70,7 +88,7 @@ const isObjectSchema = (schema: unknown): boolean => defOf(schema).typeName === 
 function objectOptions(schema: unknown): readonly unknown[] {
   const def = defOf(schema);
   if (def.typeName === "ZodUnion" || def.typeName === "ZodDiscriminatedUnion") {
-    return ([...(def.options as Iterable<unknown>)]).map(unwrap).flatMap((option) => objectOptions(option));
+    return [...(def.options as Iterable<unknown>)].map(unwrap).flatMap((option) => objectOptions(option));
   }
   return isObjectSchema(schema) ? [schema] : [];
 }
@@ -154,7 +172,12 @@ function featureCarrierKeys(type: HomebrewBodyType): readonly string[] {
 
 const containerResolves = (type: HomebrewBodyType, within: readonly string[]): boolean => {
   if (within.length === 0) return true;
-  try { fieldsWithin(type as HomebrewType, within); return true; } catch { return false; }
+  try {
+    fieldsWithin(type as HomebrewType, within);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 type Candidate = Readonly<{ within: readonly string[]; key: string }>;
@@ -236,8 +259,7 @@ const SIDE_EFFECT_WRITERS: ReadonlyArray<{
     writer: "mode",
     sample: "by-level",
     prepare: [["uses.limit", 1]],
-    proves: (written) =>
-      (written as { uses?: { scaling?: { type?: unknown } } })?.uses?.scaling?.type === "by-level"
+    proves: (written) => (written as { uses?: { scaling?: { type?: unknown } } })?.uses?.scaling?.type === "by-level"
   }
 ];
 
@@ -295,7 +317,11 @@ export function probeAddress(address: ParityAddress): ProbeResult {
       if (!field) continue;
       const exact = take === segments.length;
       if (!exact && typeof field.write !== "function") continue;
-      return { address, covered: true, via: `${candidate.within.length > 0 ? `${candidate.within.join("[].")}[]. ` : ""}${candidateKey}${exact ? "" : " (composite ancestor)"}` };
+      return {
+        address,
+        covered: true,
+        via: `${candidate.within.length > 0 ? `${candidate.within.join("[].")}[]. ` : ""}${candidateKey}${exact ? "" : " (composite ancestor)"}`
+      };
     }
   }
   return { address, covered: false, via: sawContainer ? "no control" : "container unreachable" };
@@ -311,14 +337,18 @@ export function assertCanonicaliserSound(): void {
     for (const field of riderFieldsForTest(scope)) {
       if (!field.rows || field.kind !== "rows") continue;
       if (!containerResolves(type, [field.key])) {
-        throw new Error(`Canonicaliser rule is stale: rider rows field "${field.key}" on ${type} does not resolve as a container.`);
+        throw new Error(
+          `Canonicaliser rule is stale: rider rows field "${field.key}" on ${type} does not resolve as a container.`
+        );
       }
       resolvableSomewhere.add(field.key);
     }
   }
   for (const segment of RIDER_SEGMENTS) {
     if (!resolvableSomewhere.has(segment)) {
-      throw new Error(`Canonicaliser rule is stale: restart target "${segment}" is not a rows field on any rider mount.`);
+      throw new Error(
+        `Canonicaliser rule is stale: restart target "${segment}" is not a rows field on any rider mount.`
+      );
     }
   }
 }
@@ -368,7 +398,10 @@ export function rowMatches(row: ExemptionRow, address: ParityAddress): boolean {
 /** The census in both directions: `unmatched` (an open address no row covers) and `stale` (a row
     whose group no longer exists). First match wins in table order; `matched` gives each row's live
     count. */
-export function censusVerdict(open: readonly ProbeResult[], rows: readonly ExemptionRow[]): {
+export function censusVerdict(
+  open: readonly ProbeResult[],
+  rows: readonly ExemptionRow[]
+): {
   unmatched: readonly string[];
   stale: readonly string[];
   matched: ReadonlyMap<ExemptionRow, number>;
@@ -380,145 +413,405 @@ export function censusVerdict(open: readonly ProbeResult[], rows: readonly Exemp
     if (row) matched.set(row, (matched.get(row) ?? 0) + 1);
     else unmatched.push(`${addressId(result.address)} (${result.via})`);
   }
-  const stale = rows.filter((row) => (matched.get(row) ?? 0) === 0)
+  const stale = rows
+    .filter((row) => (matched.get(row) ?? 0) === 0)
     .map((row) => `${row.types === "*" ? "*" : row.types.join("|")}.${row.at} (${row.owner})`);
   return { unmatched: unmatched.sort(), stale, matched };
 }
 
 /** The seven types that mount the action rider surface (spell and spell-list do not). */
-const ACTION_CARRIERS: readonly HomebrewBodyType[] =
-  ["background", "class", "equipment", "feat", "monster", "species", "subclass"];
+const ACTION_CARRIERS: readonly HomebrewBodyType[] = [
+  "background",
+  "class",
+  "equipment",
+  "feat",
+  "monster",
+  "species",
+  "subclass"
+];
 /** The six that mount effects/feature riders (every action carrier except the statblock). */
-const FEATURE_CARRIERS: readonly HomebrewBodyType[] =
-  ["background", "class", "equipment", "feat", "species", "subclass"];
+const FEATURE_CARRIERS: readonly HomebrewBodyType[] = [
+  "background",
+  "class",
+  "equipment",
+  "feat",
+  "species",
+  "subclass"
+];
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
-  { at: "actions[].onHit[].**", types: ACTION_CARRIERS,
-    reason: "a hit that lands a condition — no rows control on the action row", owner: "C1" },
-  { at: "actions[].legendary.cost", types: ACTION_CARRIERS,
-    reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost", owner: "C2" },
-  { at: "actions[].damageByLevel[].**", types: FEATURE_CARRIERS,
-    reason: "damage that grows with level — feature-carrier actions only (a statblock ActionSchema has no such key, which is why monster is absent)", owner: "C3" },
-  { at: "actions[].attack.count", types: ACTION_CARRIERS,
-    reason: "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "actions[].attack.criticalBonusDice", types: ACTION_CARRIERS,
-    reason: "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "actions[].attack.proficient", types: FEATURE_CARRIERS,
-    reason: "the feature attack shape's proficiency flag — no row enumerates it (the statblock shape does not carry it)", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "actions[].save.dc.**", types: FEATURE_CARRIERS,
-    reason: "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "actions[].grants.**", types: ACTION_CARRIERS,
-    reason: "an action that grants itself an effect, the whole EffectGrant subtree included", owner: "C4" },
-  { at: "actions[].multiattack[].**", types: ACTION_CARRIERS,
-    reason: "126 SRD authors; owned outside this program (census row at vocabulary-parity.mirror.test.ts:3416)", owner: "U21a (engine program)" },
-  { at: "actions[].reaction.**", types: ACTION_CARRIERS,
-    reason: "one SRD author (rogue uncanny-dodge) — test 2's 'not a lone record' is unsatisfiable (§4)", owner: "permanent: lone SRD record" },
-  { at: "actions[].spellId", types: ACTION_CARRIERS,
-    reason: "synthesised at character-build.ts:443, zero hand authors (§4)", owner: "permanent: system-synthesised" },
-  { at: "actions[].spellSlot.level", types: ACTION_CARRIERS,
-    reason: "synthesised from an item's consumesSpellSlot (equipment-derivation.ts:918), zero hand authors (§4)", owner: "permanent: system-synthesised" },
-  { at: "actions[].requiresEffectTag", types: ACTION_CARRIERS,
-    reason: "zero SRD authors; read at action-resolution.ts:230 — C4 authors the effect side it reads (§4)", owner: "permanent: zero SRD authors" },
-  { at: "actions[].targetRules", types: ACTION_CARRIERS,
-    reason: "one SRD author (§4, lone record)", owner: "permanent: lone SRD record" },
+  {
+    at: "actions[].onHit[].**",
+    types: ACTION_CARRIERS,
+    reason: "a hit that lands a condition — no rows control on the action row",
+    owner: "C1"
+  },
+  {
+    at: "actions[].legendary.cost",
+    types: ACTION_CARRIERS,
+    reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",
+    owner: "C2"
+  },
+  {
+    at: "actions[].damageByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "damage that grows with level — feature-carrier actions only (a statblock ActionSchema has no such key, which is why monster is absent)",
+    owner: "C3"
+  },
+  {
+    at: "actions[].attack.count",
+    types: ACTION_CARRIERS,
+    reason:
+      "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "actions[].attack.criticalBonusDice",
+    types: ACTION_CARRIERS,
+    reason:
+      "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "actions[].attack.proficient",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the feature attack shape's proficiency flag — no row enumerates it (the statblock shape does not carry it)",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "actions[].save.dc.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "actions[].grants.**",
+    types: ACTION_CARRIERS,
+    reason: "an action that grants itself an effect, the whole EffectGrant subtree included",
+    owner: "C4"
+  },
+  {
+    at: "actions[].multiattack[].**",
+    types: ACTION_CARRIERS,
+    reason: "126 SRD authors; owned outside this program (census row at vocabulary-parity.mirror.test.ts:3416)",
+    owner: "U21a (engine program)"
+  },
+  {
+    at: "actions[].reaction.**",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (rogue uncanny-dodge) — test 2's 'not a lone record' is unsatisfiable (§4)",
+    owner: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].spellId",
+    types: ACTION_CARRIERS,
+    reason: "synthesised at character-build.ts:443, zero hand authors (§4)",
+    owner: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].spellSlot.level",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from an item's consumesSpellSlot (equipment-derivation.ts:918), zero hand authors (§4)",
+    owner: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].requiresEffectTag",
+    types: ACTION_CARRIERS,
+    reason: "zero SRD authors; read at action-resolution.ts:230 — C4 authors the effect side it reads (§4)",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "actions[].targetRules",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (§4, lone record)",
+    owner: "permanent: lone SRD record"
+  },
 
   // ---- effect rider surface ----
-  { at: "effects[].onEnd[].**", types: FEATURE_CARRIERS,
-    reason: "what happens when an effect ends — no program unit authors it", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "effects[].endsWithTag", types: FEATURE_CARRIERS,
-    reason: "effect linkage vocabulary with no control — no program unit authors it", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "effects[].target", types: FEATURE_CARRIERS,
-    reason: "effect linkage vocabulary with no control — no program unit authors it", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "effects[].voidWhileIncapacitated", types: FEATURE_CARRIERS,
-    reason: "effect linkage vocabulary with no control — no program unit authors it", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "modifiers[].**", types: FEATURE_CARRIERS,
-    reason: "the modifier rows beyond U6's type control — neither union's per-key internals (appliesTo/damageTypes on effects; the feature union's filters) have fields", owner: "unowned: recorded by this census, owned by no plan" },
+  {
+    at: "effects[].onEnd[].**",
+    types: FEATURE_CARRIERS,
+    reason: "what happens when an effect ends — no program unit authors it",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "effects[].endsWithTag",
+    types: FEATURE_CARRIERS,
+    reason: "effect linkage vocabulary with no control — no program unit authors it",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "effects[].target",
+    types: FEATURE_CARRIERS,
+    reason: "effect linkage vocabulary with no control — no program unit authors it",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "effects[].voidWhileIncapacitated",
+    types: FEATURE_CARRIERS,
+    reason: "effect linkage vocabulary with no control — no program unit authors it",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "modifiers[].**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the modifier rows beyond U6's type control — neither union's per-key internals (appliesTo/damageTypes on effects; the feature union's filters) have fields",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
 
   // ---- feature-scope machinery shared by the feature carriers ----
-  { at: "choice.options[].**", types: "*",
-    reason: "an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper", owner: "unowned: the panel's depth-1 boundary, recorded by this census" },
-  { at: "choices[].**", types: "*",
-    reason: "the plural choices list — the panel writes the singular choice; the list shape has no control at all", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "choice.**", types: "*",
-    reason: "the parts of a feature's choice beyond the panel's fields", owner: "unowned: the panel's field set, recorded by this census" },
+  {
+    at: "choice.options[].**",
+    types: "*",
+    reason:
+      "an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper",
+    owner: "unowned: the panel's depth-1 boundary, recorded by this census"
+  },
+  {
+    at: "choices[].**",
+    types: "*",
+    reason: "the plural choices list — the panel writes the singular choice; the list shape has no control at all",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "choice.**",
+    types: "*",
+    reason: "the parts of a feature's choice beyond the panel's fields",
+    owner: "unowned: the panel's field set, recorded by this census"
+  },
   // GrantsEditor territory, spelled per mount: a bare `grants.**` would also match under
   // `actions[].grants.` and absorb that group.
-  { at: "grants.spells[].**", types: "*",
-    reason: "GrantsEditor writes the spells array whole (grantsFromRows, U9); the per-row keys have no FieldDef the probe can see", owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)" },
-  { at: "features[].grants.**", types: "*",
-    reason: "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe", owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)" },
-  { at: "traits[].grants.**", types: "*",
-    reason: "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe", owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)" },
-  { at: "^feature.grants.**", types: ["feat"],
-    reason: "bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone", owner: "content-program C7, then the GrantsEditor\u2192declarative follow-on (\u00a74.1)" },
-  { at: "^grants.**", types: "*",
-    reason: "bespoke GrantsEditor JSX at record scope — same probe-blind mount", owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)" },
-  { at: "uses.scaling.table[].**", types: "*",
-    reason: "the by-level table at the three mounts the canonicaliser cannot reach — lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "casts[].uses.scaling.**", types: ["equipment"],
-    reason: "an item cast's scaling — zero SRD authors until the magic-item bundle lands", owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)" },
-  { at: "extraPicks[].**", types: "*",
-    reason: "extra-pick rows beyond the resolver U15 wired — no rows control at feature scope", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "replaces[].**", types: "*",
-    reason: "the replacement clause's rows — written whole by the U14 control, per-key fields invisible to the probe", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "replacesFeatureId", types: ["species"],
-    reason: "supersession at species-trait scope — the control exists on class features (U14), not here", owner: "unowned: recorded by this census, owned by no plan" },
+  {
+    at: "grants.spells[].**",
+    types: "*",
+    reason:
+      "GrantsEditor writes the spells array whole (grantsFromRows, U9); the per-row keys have no FieldDef the probe can see",
+    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+  },
+  {
+    at: "features[].grants.**",
+    types: "*",
+    reason:
+      "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
+    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+  },
+  {
+    at: "traits[].grants.**",
+    types: "*",
+    reason:
+      "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
+    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+  },
+  {
+    at: "^feature.grants.**",
+    types: ["feat"],
+    reason:
+      "bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone",
+    owner: "content-program C7, then the GrantsEditor\u2192declarative follow-on (\u00a74.1)"
+  },
+  {
+    at: "^grants.**",
+    types: "*",
+    reason: "bespoke GrantsEditor JSX at record scope — same probe-blind mount",
+    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+  },
+  {
+    at: "uses.scaling.table[].**",
+    types: "*",
+    reason:
+      "the by-level table at the three mounts the canonicaliser cannot reach — lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "casts[].uses.scaling.**",
+    types: ["equipment"],
+    reason: "an item cast's scaling — zero SRD authors until the magic-item bundle lands",
+    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+  },
+  {
+    at: "extraPicks[].**",
+    types: "*",
+    reason: "extra-pick rows beyond the resolver U15 wired — no rows control at feature scope",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "replaces[].**",
+    types: "*",
+    reason: "the replacement clause's rows — written whole by the U14 control, per-key fields invisible to the probe",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "replacesFeatureId",
+    types: ["species"],
+    reason: "supersession at species-trait scope — the control exists on class features (U14), not here",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
 
   // ---- record-scope gaps, per type ----
-  { at: "^lineages[].**", types: ["species"],
-    reason: "a lineage's own traits — today a lineage row is name + description only", owner: "D2" },
-  { at: "languageChoices.**", types: ["species"],
-    reason: "9 of 9 SRD species author languageChoices — the builder's language offer has no authoring end", owner: "D1" },
-  { at: "languageChoices.**", types: ["background"],
-    reason: "zero SRD backgrounds author it (§4)", owner: "permanent: zero SRD authors" },
-  { at: "^languages", types: ["background"],
-    reason: "zero SRD backgrounds author it (§4)", owner: "permanent: zero SRD authors" },
-  { at: "skillChoices.**", types: ["background"],
-    reason: "zero SRD backgrounds author it (§4)", owner: "permanent: zero SRD authors" },
-  { at: "toolChoices.**", types: ["background"],
-    reason: "one SRD background authors it (§4, lone record)", owner: "permanent: lone SRD record" },
-  { at: "abilityBonusChoice.**", types: ["species"],
-    reason: "zero SRD species author it (§4)", owner: "permanent: zero SRD authors" },
-  { at: "skillChoices.fromCatalog", types: ["class"],
-    reason: "zero of 12 SRD classes author it — every class uses the from list, which has a control (\u00a74); the group's rows never offered it", owner: "permanent: zero SRD authors" },
-  { at: "toolChoices.fromCatalog", types: ["class"],
-    reason: "zero of 12 SRD classes author it (\u00a74); the group's rows never offered it", owner: "permanent: zero SRD authors" },
-  { at: "multiclassProficiencies.**", types: ["class"],
-    reason: "the builder does not multiclass — no reader on the build path and no control", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "multiclassPrerequisites.**", types: ["class"],
-    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "levelTable[].classResources[].**", types: ["class", "subclass"],
-    reason: "the resource rows LevelTableEditor writes without FieldDefs — E1's refactor gives them real fields plus the missing id/display pair", owner: "E1" },
-  { at: "levelTable[].**", types: ["class", "subclass"],
-    reason: "bespoke LevelTableEditor JSX with no FieldDef — authored today, invisible to the probe (the E1 refactor is the visibility fix)", owner: "E1" },
-  { at: "^uses.scaling.id", types: ["equipment"],
-    reason: "the class-resource id at ITEM scope — the dedicated field exists on feature mounts only; the item's uses rows omit it", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "weapon.mastery", types: ["equipment"],
-    reason: "owned outside this program (census row at vocabulary-parity.mirror.test.ts:3415)", owner: "U38 (mastery program)" },
-  { at: "prerequisite.**", types: ["feat"],
-    reason: "feat prerequisites have no controls — the ability-score rows, the requires slug and the printed text alike", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "castingOptions[].**", types: ["spell"],
-    reason: "a spell's casting options — the spell form has no rows control for them", owner: "unowned: recorded by this census, owned by no plan" },
-  { at: "^add", types: ["spell-list"],
-    reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see", owner: "permanent: bespoke editor, probe-blind" },
-  { at: "^remove", types: ["spell-list"],
-    reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see", owner: "permanent: bespoke editor, probe-blind" },
+  {
+    at: "^lineages[].**",
+    types: ["species"],
+    reason: "a lineage's own traits — today a lineage row is name + description only",
+    owner: "D2"
+  },
+  {
+    at: "languageChoices.**",
+    types: ["species"],
+    reason: "9 of 9 SRD species author languageChoices — the builder's language offer has no authoring end",
+    owner: "D1"
+  },
+  {
+    at: "languageChoices.**",
+    types: ["background"],
+    reason: "zero SRD backgrounds author it (§4)",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "^languages",
+    types: ["background"],
+    reason: "zero SRD backgrounds author it (§4)",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "skillChoices.**",
+    types: ["background"],
+    reason: "zero SRD backgrounds author it (§4)",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "toolChoices.**",
+    types: ["background"],
+    reason: "one SRD background authors it (§4, lone record)",
+    owner: "permanent: lone SRD record"
+  },
+  {
+    at: "abilityBonusChoice.**",
+    types: ["species"],
+    reason: "zero SRD species author it (§4)",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "skillChoices.fromCatalog",
+    types: ["class"],
+    reason:
+      "zero of 12 SRD classes author it — every class uses the from list, which has a control (\u00a74); the group's rows never offered it",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "toolChoices.fromCatalog",
+    types: ["class"],
+    reason: "zero of 12 SRD classes author it (\u00a74); the group's rows never offered it",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "multiclassProficiencies.**",
+    types: ["class"],
+    reason: "the builder does not multiclass — no reader on the build path and no control",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "multiclassPrerequisites.**",
+    types: ["class"],
+    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "levelTable[].classResources[].**",
+    types: ["class", "subclass"],
+    reason:
+      "the resource rows LevelTableEditor writes without FieldDefs — E1's refactor gives them real fields plus the missing id/display pair",
+    owner: "E1"
+  },
+  {
+    at: "levelTable[].**",
+    types: ["class", "subclass"],
+    reason:
+      "bespoke LevelTableEditor JSX with no FieldDef — authored today, invisible to the probe (the E1 refactor is the visibility fix)",
+    owner: "E1"
+  },
+  {
+    at: "^uses.scaling.id",
+    types: ["equipment"],
+    reason:
+      "the class-resource id at ITEM scope — the dedicated field exists on feature mounts only; the item's uses rows omit it",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "weapon.mastery",
+    types: ["equipment"],
+    reason: "owned outside this program (census row at vocabulary-parity.mirror.test.ts:3415)",
+    owner: "U38 (mastery program)"
+  },
+  {
+    at: "prerequisite.**",
+    types: ["feat"],
+    reason:
+      "feat prerequisites have no controls — the ability-score rows, the requires slug and the printed text alike",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "castingOptions[].**",
+    types: ["spell"],
+    reason: "a spell's casting options — the spell form has no rows control for them",
+    owner: "unowned: recorded by this census, owned by no plan"
+  },
+  {
+    at: "^add",
+    types: ["spell-list"],
+    reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see",
+    owner: "permanent: bespoke editor, probe-blind"
+  },
+  {
+    at: "^remove",
+    types: ["spell-list"],
+    reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see",
+    owner: "permanent: bespoke editor, probe-blind"
+  },
 
   // ---- the monster stat block's shared-schema tail ----
-  { at: "^extensions", types: ["monster"],
-    reason: "the opaque bag itself — the census's structural blind spot; B0 declares the key contract the walk cannot see", owner: "B0" },
-  { at: "proficiencies.**", types: ["monster"],
-    reason: "0 of 330 SRD monsters author it, and a control would change which rung saves resolve on (§4, B1's trap)", owner: "permanent: zero SRD authors" },
-  { at: "spellcasting.**", types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)", owner: "permanent: built-character field" },
-  { at: "character.**", types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)", owner: "permanent: built-character field" },
-  { at: "startingInventory[].**", types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)", owner: "permanent: built-character field" },
-  { at: "startingCurrency.**", types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)", owner: "permanent: built-character field" }
+  {
+    at: "^extensions",
+    types: ["monster"],
+    reason:
+      "the opaque bag itself — the census's structural blind spot; B0 declares the key contract the walk cannot see",
+    owner: "B0"
+  },
+  {
+    at: "proficiencies.**",
+    types: ["monster"],
+    reason: "0 of 330 SRD monsters author it, and a control would change which rung saves resolve on (§4, B1's trap)",
+    owner: "permanent: zero SRD authors"
+  },
+  {
+    at: "spellcasting.**",
+    types: ["monster"],
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
+    owner: "permanent: built-character field"
+  },
+  {
+    at: "character.**",
+    types: ["monster"],
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
+    owner: "permanent: built-character field"
+  },
+  {
+    at: "startingInventory[].**",
+    types: ["monster"],
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
+    owner: "permanent: built-character field"
+  },
+  {
+    at: "startingCurrency.**",
+    types: ["monster"],
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
+    owner: "permanent: built-character field"
+  }
 ];
 
 /* ============================================================ the round-trip compare ==== */
@@ -536,10 +829,15 @@ export function comparableBody(type: HomebrewBodyType, body: Record<string, unkn
 
 /** The first path at which two bodies differ, or null when deep-equal. Arrays compare by index,
     objects by the sorted union of their keys. */
-export function firstDifference(api: unknown, editor: unknown, path = ""): { path: string; api: unknown; editor: unknown } | null {
+export function firstDifference(
+  api: unknown,
+  editor: unknown,
+  path = ""
+): { path: string; api: unknown; editor: unknown } | null {
   if (Object.is(api, editor)) return null;
   const bothArrays = Array.isArray(api) && Array.isArray(editor);
-  const bothObjects = !bothArrays && typeof api === "object" && typeof editor === "object" && api !== null && editor !== null;
+  const bothObjects =
+    !bothArrays && typeof api === "object" && typeof editor === "object" && api !== null && editor !== null;
   if (!bothArrays && !bothObjects) return { path: path || "(root)", api, editor };
   if (bothArrays) {
     if (api.length !== editor.length) return { path: `${path}.length`, api: api.length, editor: editor.length };
@@ -564,9 +862,14 @@ export function firstDifference(api: unknown, editor: unknown, path = ""): { pat
 /** Keys the system stamps and no GM authors, subtracted structurally rather than as exemption rows. */
 export const SYSTEM_FORCED = Object.freeze({
   /** Record identity and provenance, forced by `normalizeBody` or the row. */
-  recordKeys: ["id", "type", "schemaId", "schemaVersion",
+  recordKeys: [
+    "id",
+    "type",
+    "schemaId",
+    "schemaVersion",
     // The feat's singular feature is a record-scope object, so its id is a row-id stamp.
-    "feature.id"] as readonly string[],
+    "feature.id"
+  ] as readonly string[],
   /** The provenance bag (`source.externalId` is forced to the row id). */
   recordPrefixes: ["source."] as readonly string[],
   reason: "system-forced: stamped by the store, the row, or a rows editor's newRow — never authored by hand"
@@ -574,8 +877,12 @@ export const SYSTEM_FORCED = Object.freeze({
 
 export const isSystemForced = (address: ParityAddress): boolean => {
   if (address.within.length === 0) {
-    return SYSTEM_FORCED.recordKeys.includes(address.key)
-      || SYSTEM_FORCED.recordPrefixes.some((prefix) => address.key === prefix.slice(0, -1) || address.key.startsWith(prefix));
+    return (
+      SYSTEM_FORCED.recordKeys.includes(address.key) ||
+      SYSTEM_FORCED.recordPrefixes.some(
+        (prefix) => address.key === prefix.slice(0, -1) || address.key.startsWith(prefix)
+      )
+    );
   }
   // A row's own `id` is minted by `newRow` (and backfilled by `bodyForPublish`).
   return address.key === "id";
@@ -595,18 +902,20 @@ export async function bootHomebrewApi(): Promise<ApiFixture> {
   const app = express();
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
   app.use(express.json({ limit: "512kb" }));
-  app.use(createHomebrewRouter({
-    store,
-    authorizeGm: (token) => token === "gm-token",
-    authorizePlayer: (token) => token === "player-token",
-    notifyChanged: () => {},
-    validate: createHomebrewValidator({
-      forAudience: (audience) => contentLibrary.forAudience(audience),
-      publishedSpellLists: () => store.publishedFor("gm").spellLists,
-      authoredIndex: () => store.authoredIndex()
-    }),
-    catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
-  }));
+  app.use(
+    createHomebrewRouter({
+      store,
+      authorizeGm: (token) => token === "gm-token",
+      authorizePlayer: (token) => token === "player-token",
+      notifyChanged: () => {},
+      validate: createHomebrewValidator({
+        forAudience: (audience) => contentLibrary.forAudience(audience),
+        publishedSpellLists: () => store.publishedFor("gm").spellLists,
+        authoredIndex: () => store.authoredIndex()
+      }),
+      catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
+    })
+  );
   const server: Server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const bound = server.address();

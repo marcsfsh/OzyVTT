@@ -2,7 +2,14 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState, type RuleFamily } from "@vtt/domain";
-import { effectiveModeFor, familyModeFor, familyOf, overrideCovers, overrideReason, rememberOverride } from "../src/rules-families.js";
+import {
+  effectiveModeFor,
+  familyModeFor,
+  familyOf,
+  overrideCovers,
+  overrideReason,
+  rememberOverride
+} from "../src/rules-families.js";
 
 // Two properties of the rule-family map:
 // 1. Totality: every rule id the engine can throw maps to a family. An unclassified id falls back to
@@ -32,7 +39,9 @@ describe("rule families", () => {
     // A guard on the guard: if the extraction stops finding rule ids, the totality claim is vacuous.
     expect(ids.length).toBeGreaterThanOrEqual(15);
     const unclassified = ids.filter((rule) => familyOf(rule) === null);
-    expect(unclassified, `these rule ids belong to no family - add them to apps/server/src/rules-families.ts`).toEqual([]);
+    expect(unclassified, `these rule ids belong to no family - add them to apps/server/src/rules-families.ts`).toEqual(
+      []
+    );
   });
 
   it("puts each rule id in the family a GM would expect to switch off", () => {
@@ -92,7 +101,16 @@ describe("effective mode", () => {
   });
 
   it("falls back to the dial for an unclassified rule id (fails safe, never into a switched-off family)", () => {
-    const state = stateWith({ rulesMode: "strict", ruleExceptions: { movement: "freeform", economy: "freeform", resources: "freeform", targeting: "freeform", slots: "freeform" } });
+    const state = stateWith({
+      rulesMode: "strict",
+      ruleExceptions: {
+        movement: "freeform",
+        economy: "freeform",
+        resources: "freeform",
+        targeting: "freeform",
+        slots: "freeform"
+      }
+    });
     expect(effectiveModeFor(state.combat, "teapot.short-and-stout")).toBe("strict");
   });
 });
@@ -121,7 +139,17 @@ describe("per-turn override memory", () => {
     rememberOverride(state, "range.out-of-range");
     expect(state.combat.turn.rulesOverridden).toBe(true);
     // A turn persisted with only the boolean override keeps its two-prefix meaning.
-    const legacy = stateWith({ rulesMode: "strict", turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0, rulesOverridden: true } });
+    const legacy = stateWith({
+      rulesMode: "strict",
+      turn: {
+        actionUsed: false,
+        bonusActionUsed: false,
+        actionInstance: null,
+        turnUses: {},
+        movementUsedFeet: 0,
+        rulesOverridden: true
+      }
+    });
     expect(legacy.combat.turn.rulesOverriddenFamilies).toBeUndefined();
     expect(overrideCovers(legacy.combat.turn, "economy.action-used")).toBe(true);
     expect(overrideCovers(legacy.combat.turn, "range.out-of-range")).toBe(true);

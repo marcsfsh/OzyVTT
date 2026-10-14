@@ -37,34 +37,52 @@ export function AskTheGmPrompt({ onFeedback }: Readonly<{ onFeedback: (message: 
   if (!blocked) return null;
   const ask = () => {
     setBusy(true);
-    socket.emit("rules:ask", { commandId: newId(), type: blocked.asked.type as AskableCommand, payload: blocked.asked.payload },
+    socket.emit(
+      "rules:ask",
+      { commandId: newId(), type: blocked.asked.type as AskableCommand, payload: blocked.asked.payload },
       (result: { ok: boolean; message?: string; ran?: boolean }) => {
         setBusy(false);
-        if (!result.ok) { onFeedback(result.message ?? "That question could not be sent."); return; }
+        if (!result.ok) {
+          onFeedback(result.message ?? "That question could not be sent.");
+          return;
+        }
         // The server re-runs the command before parking it; if it is legal now it simply happens. Say which.
-        onFeedback(result.ran ? "That worked this time - no question needed." : "Asked the GM. Waiting for their call.");
+        onFeedback(
+          result.ran ? "That worked this time - no question needed." : "Asked the GM. Waiting for their call."
+        );
         clearBlockedPrompt();
-      });
+      }
+    );
   };
-  return <div className="rule-ask rule-ask-blocked" role="status">
-    <p className="rule-ask-reason">{blocked.blocked.message}</p>
-    <div className="rule-ask-actions">
-      <Button variant="primary" size="sm" disabled={busy} onClick={ask}>{busy ? "Asking…" : "Ask the GM"}</Button>
-      <Button variant="ghost" size="sm" disabled={busy} onClick={clearBlockedPrompt}>Never mind</Button>
+  return (
+    <div className="rule-ask rule-ask-blocked" role="status">
+      <p className="rule-ask-reason">{blocked.blocked.message}</p>
+      <div className="rule-ask-actions">
+        <Button variant="primary" size="sm" disabled={busy} onClick={ask}>
+          {busy ? "Asking…" : "Ask the GM"}
+        </Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={clearBlockedPrompt}>
+          Never mind
+        </Button>
+      </div>
     </div>
-  </div>;
+  );
 }
 
 /** The player's own waiting questions; their projection carries no payload. */
 export function MyPendingAsks({ state }: Readonly<{ state: PlayerView }>) {
   const asks = state.combat.pendingRuleAsks ?? [];
   if (asks.length === 0) return null;
-  return <ul className="rule-ask-list" aria-label="Questions waiting on the GM">
-    {asks.map((ask) => <li key={ask.id} className="rule-ask rule-ask-waiting">
-      <p className="rule-ask-reason">{ask.message}</p>
-      <p className="rule-ask-meta">Waiting on the GM · asked {askedAgo(ask.createdAt)}</p>
-    </li>)}
-  </ul>;
+  return (
+    <ul className="rule-ask-list" aria-label="Questions waiting on the GM">
+      {asks.map((ask) => (
+        <li key={ask.id} className="rule-ask rule-ask-waiting">
+          <p className="rule-ask-reason">{ask.message}</p>
+          <p className="rule-ask-meta">Waiting on the GM · asked {askedAgo(ask.createdAt)}</p>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /**
@@ -72,7 +90,10 @@ export function MyPendingAsks({ state }: Readonly<{ state: PlayerView }>) {
  * fail against current state (asks survive a turn advancing), so the failure is shown and the
  * question stays.
  */
-export function PendingAsksForGm({ state, onFeedback }: Readonly<{ state: GmView; onFeedback: (message: string) => void }>) {
+export function PendingAsksForGm({
+  state,
+  onFeedback
+}: Readonly<{ state: GmView; onFeedback: (message: string) => void }>) {
   const asks = state.combat.pendingRuleAsks ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   if (asks.length === 0) return null;
@@ -80,22 +101,45 @@ export function PendingAsksForGm({ state, onFeedback }: Readonly<{ state: GmView
     setBusyId(askId);
     socket.emit("rules:answer", { commandId: newId(), askId, allow }, (result: { ok: boolean; message?: string }) => {
       setBusyId(null);
-      if (!result.ok) { onFeedback(result.message ?? "That answer did not go through."); return; }
+      if (!result.ok) {
+        onFeedback(result.message ?? "That answer did not go through.");
+        return;
+      }
       onFeedback(allow ? `Allowed ${name}'s move.` : `Declined ${name}'s move.`);
     });
   };
-  return <ul className="rule-ask-list" aria-label="Questions from players">
-    {asks.map((ask) => {
-      const actor = state.actors.find((candidate) => candidate.id === ask.actorId);
-      const name = actor?.name ?? "A character";
-      return <li key={ask.id} className="rule-ask rule-ask-question">
-        <p className="rule-ask-who"><strong>{name}</strong> is asking</p>
-        <p className="rule-ask-reason">{ask.message}</p>
-        <div className="rule-ask-actions">
-          <Button variant="primary" size="sm" disabled={busyId === ask.id} onClick={() => answer(ask.id, true, name)}>Allow</Button>
-          <Button variant="secondary" size="sm" disabled={busyId === ask.id} onClick={() => answer(ask.id, false, name)}>Deny</Button>
-        </div>
-      </li>;
-    })}
-  </ul>;
+  return (
+    <ul className="rule-ask-list" aria-label="Questions from players">
+      {asks.map((ask) => {
+        const actor = state.actors.find((candidate) => candidate.id === ask.actorId);
+        const name = actor?.name ?? "A character";
+        return (
+          <li key={ask.id} className="rule-ask rule-ask-question">
+            <p className="rule-ask-who">
+              <strong>{name}</strong> is asking
+            </p>
+            <p className="rule-ask-reason">{ask.message}</p>
+            <div className="rule-ask-actions">
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={busyId === ask.id}
+                onClick={() => answer(ask.id, true, name)}
+              >
+                Allow
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={busyId === ask.id}
+                onClick={() => answer(ask.id, false, name)}
+              >
+                Deny
+              </Button>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }

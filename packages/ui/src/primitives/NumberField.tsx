@@ -76,13 +76,19 @@ export function NumberField({
     const parsed = parse(text);
     if (parsed === null) {
       setText("");
-      if (emitted.current !== null) { emitted.current = null; onChange(null); }
+      if (emitted.current !== null) {
+        emitted.current = null;
+        onChange(null);
+      }
       return;
     }
     const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, parsed));
     const settled = allowDecimal ? clamped : Math.round(clamped);
     setText(format(settled));
-    if (settled !== emitted.current) { emitted.current = settled; onChange(settled); }
+    if (settled !== emitted.current) {
+      emitted.current = settled;
+      onChange(settled);
+    }
   };
 
   return (
@@ -104,7 +110,11 @@ export function NumberField({
         onBlur={blur}
       />
       {/* Not aria-hidden: the unit changes the meaning, so the input is described by it. */}
-      {unit != null && <span className="nh-numberfield-unit" id={unitId}>{unit}</span>}
+      {unit != null && (
+        <span className="nh-numberfield-unit" id={unitId}>
+          {unit}
+        </span>
+      )}
     </div>
   );
 }

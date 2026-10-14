@@ -16,17 +16,39 @@ const HERO = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 const FOE = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d12";
 
 type Row = CharacterCreateRequestInput["choices"][number];
-type Mutable = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & { choices: Row[] };
+type Mutable = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
+  choices: Row[];
+};
 
 // The ASI rows a class owes at every ASI level at or below `level`. Spread across abilities nothing
 // else asserts, so no score hits the 20 cap and no assertion depends on which ASI landed where.
-const ASI_ABILITIES = [["con", "dex"], ["con", "dex"], ["str", "int"], ["str", "int"]] as const;
+const ASI_ABILITIES = [
+  ["con", "dex"],
+  ["con", "dex"],
+  ["str", "int"],
+  ["str", "int"]
+] as const;
 const asiRows = (classId: string, level: number): Row[] =>
-  [4, 8, 12, 16].filter((asi) => asi <= level).flatMap((asi, index) => ([
-    { level: asi, classId, kind: "asi-or-feat", id: "ability-score-improvement" },
-    { level: asi, kind: "ability-score", id: ASI_ABILITIES[index][0], payload: { featureId: "ability-score-improvement" } },
-    { level: asi, kind: "ability-score", id: ASI_ABILITIES[index][1], payload: { featureId: "ability-score-improvement" } }
-  ] as Row[]));
+  [4, 8, 12, 16]
+    .filter((asi) => asi <= level)
+    .flatMap(
+      (asi, index) =>
+        [
+          { level: asi, classId, kind: "asi-or-feat", id: "ability-score-improvement" },
+          {
+            level: asi,
+            kind: "ability-score",
+            id: ASI_ABILITIES[index][0],
+            payload: { featureId: "ability-score-improvement" }
+          },
+          {
+            level: asi,
+            kind: "ability-score",
+            id: ASI_ABILITIES[index][1],
+            payload: { featureId: "ability-score-improvement" }
+          }
+        ] as Row[]
+    );
 
 /** The Human's own two picks: Skillful's skill and Versatile's origin feat. */
 const HUMAN: Row[] = [
@@ -48,126 +70,179 @@ const ACOLYTE_FEAT: Row[] = [
 
 // A Druid of any level. `sage` is the background because it can raise Wisdom; its origin feat's
 // picks are tagged with their feature id, so they never touch the class budgets asserted below.
-const druid = (level: number, extra: Row[] = []): Mutable => ({
-  name: "Maelin",
-  speciesId: "human",
-  backgroundId: "sage",
-  classId: "druid",
-  level,
-  ...(level >= 3 ? { subclassId: "circle-of-the-land" } : {}),
-  abilityMethod: "standard-array",
-  baseScores: { str: 10, dex: 14, con: 13, int: 8, wis: 15, cha: 12 },
-  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "druid", kind: "skill", id: "nature" },
-    { level: 1, classId: "druid", kind: "skill", id: "perception" },
-    { level: 1, kind: "cantrip", id: "druidcraft" },
-    { level: 1, kind: "cantrip", id: "guidance" },
-    { level: 1, kind: "spell", id: "entangle" },
-    { level: 1, kind: "spell", id: "cure-wounds" },
-    ...HUMAN,
-    ...SAGE_FEAT,
-    ...(level >= 3 ? [
-      { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
-      // Circle Spells: "choose one type of land". Nature's Ward reads this answer at level 10.
-      { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } }
-    ] as Row[] : []),
-    ...asiRows("druid", level),
-    { level: 1, kind: "equipment", id: "druid-a" },
-    { level: 1, kind: "equipment", id: "sage-a" },
-    ...extra
-  ]
-} as Mutable);
+const druid = (level: number, extra: Row[] = []): Mutable =>
+  ({
+    name: "Maelin",
+    speciesId: "human",
+    backgroundId: "sage",
+    classId: "druid",
+    level,
+    ...(level >= 3 ? { subclassId: "circle-of-the-land" } : {}),
+    abilityMethod: "standard-array",
+    baseScores: { str: 10, dex: 14, con: 13, int: 8, wis: 15, cha: 12 },
+    backgroundBonusAllocation: [
+      { ability: "wis", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "druid", kind: "skill", id: "nature" },
+      { level: 1, classId: "druid", kind: "skill", id: "perception" },
+      { level: 1, kind: "cantrip", id: "druidcraft" },
+      { level: 1, kind: "cantrip", id: "guidance" },
+      { level: 1, kind: "spell", id: "entangle" },
+      { level: 1, kind: "spell", id: "cure-wounds" },
+      ...HUMAN,
+      ...SAGE_FEAT,
+      ...(level >= 3
+        ? ([
+            { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
+            // Circle Spells: "choose one type of land". Nature's Ward reads this answer at level 10.
+            { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } }
+          ] as Row[])
+        : []),
+      ...asiRows("druid", level),
+      { level: 1, kind: "equipment", id: "druid-a" },
+      { level: 1, kind: "equipment", id: "sage-a" },
+      ...extra
+    ]
+  }) as Mutable;
 
 const primalOrder = (id: "magician" | "warden"): Row =>
-  ({ level: 1, classId: "druid", kind: "primal-order", id, payload: { featureId: "primal-order" } } as Row);
+  ({ level: 1, classId: "druid", kind: "primal-order", id, payload: { featureId: "primal-order" } }) as Row;
 const elementalFury = (id: "potent-spellcasting" | "primal-strike"): Row =>
-  ({ level: 7, classId: "druid", kind: "elemental-fury", id, payload: { featureId: "elemental-fury" } } as Row);
+  ({ level: 7, classId: "druid", kind: "elemental-fury", id, payload: { featureId: "elemental-fury" } }) as Row;
 /** The level-19 Epic Boon pick, plus the ability point the chosen boon feat then asks for. */
-const epicBoon = (classId: string, featId: string, ability: string): Row[] => ([
-  { level: 19, classId, kind: "feat", id: featId, payload: { featureId: "epic-boon" } },
-  { level: 19, kind: "ability-score", id: ability, payload: { featureId: featId } }
-] as Row[]);
+const epicBoon = (classId: string, featId: string, ability: string): Row[] =>
+  [
+    { level: 19, classId, kind: "feat", id: featId, payload: { featureId: "epic-boon" } },
+    { level: 19, kind: "ability-score", id: ability, payload: { featureId: featId } }
+  ] as Row[];
 
 // A Bard of any level. `cha` is what Bardic Inspiration counts, so it is a parameter: 15 (+2 from
 // the Acolyte = 17, modifier +3) or 8 (modifier -1, which the authored `minimum` floors at 1).
-const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable => ({
-  name: "Ysolde",
-  speciesId: "human",
-  backgroundId: "acolyte",
-  classId: "bard",
-  level,
-  ...(level >= 3 ? { subclassId: "college-of-lore" } : {}),
-  abilityMethod: "standard-array",
-  baseScores: cha === 8
-    ? { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 }
-    : { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
-  backgroundBonusAllocation: cha === 8
-    ? [{ ability: "int", amount: 2 }, { ability: "wis", amount: 1 }]
-    : [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "bard", kind: "skill", id: "performance" },
-    { level: 1, classId: "bard", kind: "skill", id: "persuasion" },
-    { level: 1, classId: "bard", kind: "skill", id: "deception" },
-    { level: 1, kind: "cantrip", id: "vicious-mockery" },
-    { level: 1, kind: "cantrip", id: "mage-hand" },
-    { level: 1, kind: "spell", id: "charm-person" },
-    { level: 1, kind: "spell", id: "cure-wounds" },
-    ...HUMAN,
-    ...ACOLYTE_FEAT,
-    ...(level >= 2 ? [
-      { level: 2, classId: "bard", kind: "expertise", id: "performance", payload: { featureId: "expertise" } },
-      { level: 2, classId: "bard", kind: "expertise", id: "persuasion", payload: { featureId: "expertise" } }
-    ] as Row[] : []),
-    ...(level >= 3 ? [{ level: 3, classId: "bard", kind: "subclass", id: "college-of-lore" }] as Row[] : []),
-    ...(level >= 9 ? [
-      { level: 9, classId: "bard", kind: "expertise", id: "deception", payload: { featureId: "expertise" } },
-      { level: 9, classId: "bard", kind: "expertise", id: "stealth", payload: { featureId: "expertise" } }
-    ] as Row[] : []),
-    ...(level >= 10 ? [
-      { level: 10, classId: "bard", kind: "spell", id: "hypnotic-pattern", payload: { featureId: "magical-secrets" } },
-      { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
-    ] as Row[] : []),
-    // Magical Discoveries: two spells from the Cleric, Druid or Wizard list (the union slug). Neither is
-    // on the Bard list.
-    ...(level >= 6 ? [
-      { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
-      { level: 6, kind: "spell", id: "fireball", payload: { featureId: "magical-discoveries" } }
-    ] as Row[] : []),
-    ...asiRows("bard", level),
-    { level: 1, kind: "equipment", id: "bard-a" },
-    { level: 1, kind: "equipment", id: "acolyte-a" },
-    ...extra
-  ]
-} as Mutable);
+const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable =>
+  ({
+    name: "Ysolde",
+    speciesId: "human",
+    backgroundId: "acolyte",
+    classId: "bard",
+    level,
+    ...(level >= 3 ? { subclassId: "college-of-lore" } : {}),
+    abilityMethod: "standard-array",
+    baseScores:
+      cha === 8
+        ? { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 }
+        : { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    backgroundBonusAllocation:
+      cha === 8
+        ? [
+            { ability: "int", amount: 2 },
+            { ability: "wis", amount: 1 }
+          ]
+        : [
+            { ability: "cha", amount: 2 },
+            { ability: "wis", amount: 1 }
+          ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "bard", kind: "skill", id: "performance" },
+      { level: 1, classId: "bard", kind: "skill", id: "persuasion" },
+      { level: 1, classId: "bard", kind: "skill", id: "deception" },
+      { level: 1, kind: "cantrip", id: "vicious-mockery" },
+      { level: 1, kind: "cantrip", id: "mage-hand" },
+      { level: 1, kind: "spell", id: "charm-person" },
+      { level: 1, kind: "spell", id: "cure-wounds" },
+      ...HUMAN,
+      ...ACOLYTE_FEAT,
+      ...(level >= 2
+        ? ([
+            { level: 2, classId: "bard", kind: "expertise", id: "performance", payload: { featureId: "expertise" } },
+            { level: 2, classId: "bard", kind: "expertise", id: "persuasion", payload: { featureId: "expertise" } }
+          ] as Row[])
+        : []),
+      ...(level >= 3 ? ([{ level: 3, classId: "bard", kind: "subclass", id: "college-of-lore" }] as Row[]) : []),
+      ...(level >= 9
+        ? ([
+            { level: 9, classId: "bard", kind: "expertise", id: "deception", payload: { featureId: "expertise" } },
+            { level: 9, classId: "bard", kind: "expertise", id: "stealth", payload: { featureId: "expertise" } }
+          ] as Row[])
+        : []),
+      ...(level >= 10
+        ? ([
+            {
+              level: 10,
+              classId: "bard",
+              kind: "spell",
+              id: "hypnotic-pattern",
+              payload: { featureId: "magical-secrets" }
+            },
+            { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
+          ] as Row[])
+        : []),
+      // Magical Discoveries: two spells from the Cleric, Druid or Wizard list (the union slug). Neither is
+      // on the Bard list.
+      ...(level >= 6
+        ? ([
+            { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
+            { level: 6, kind: "spell", id: "fireball", payload: { featureId: "magical-discoveries" } }
+          ] as Row[])
+        : []),
+      ...asiRows("bard", level),
+      { level: 1, kind: "equipment", id: "bard-a" },
+      { level: 1, kind: "equipment", id: "acolyte-a" },
+      ...extra
+    ]
+  }) as Mutable;
 
 const loreSkills = (...ids: string[]): Row[] =>
-  ids.map((id) => ({ level: 3, kind: "skill", id, payload: { featureId: "bonus-proficiencies" } } as Row));
+  ids.map((id) => ({ level: 3, kind: "skill", id, payload: { featureId: "bonus-proficiencies" } }) as Row);
 
 const build = (input: Mutable) => buildCharacterDefinition(input, library, policy);
-const actionOf = (definition: ReturnType<typeof build>, id: string) => definition.actions.find((action) => action.id === id);
-const spellOf = (definition: ReturnType<typeof build>, id: string) => (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
+const actionOf = (definition: ReturnType<typeof build>, id: string) =>
+  definition.actions.find((action) => action.id === id);
+const spellOf = (definition: ReturnType<typeof build>, id: string) =>
+  (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
 
 /** An encounter where the foe holds the turn, so the action-economy slot never masks a use gate. */
 function encounterWith(definition: ReturnType<typeof build>): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1 });
   importActorDefinition(state, definition, HERO, "public");
-  state.actors.push({ ...state.actors[0], id: FOE, name: "Ghoul", kind: "monster", definitionId: undefined, actionUses: {} });
-  startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: FOE, score: 20 }, { actorId: HERO, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
+  state.actors.push({
+    ...state.actors[0],
+    id: FOE,
+    name: "Ghoul",
+    kind: "monster",
+    definitionId: undefined,
+    actionUses: {}
+  });
+  startEncounter(
+    state,
+    {
+      mapAssetId: "20000000-0000-5000-8000-000000000001",
+      entries: [
+        { actorId: FOE, score: 20 },
+        { actorId: HERO, score: 5 }
+      ]
+    },
+    () => 1,
+    { width: 900, height: 600, calibration: null }
+  );
   return state;
 }
 let commandSeq = 0;
 const deps = (definition: ReturnType<typeof build>): ResolveDependencies => ({
-  random: () => 3, newRollId: () => `40000000-0000-4000-8000-00000000000${(commandSeq += 1) % 10}`,
-  gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition
+  random: () => 3,
+  newRollId: () => `40000000-0000-4000-8000-00000000000${(commandSeq += 1) % 10}`,
+  gmSessionId: "30000000-0000-4000-8000-00000000000a",
+  now: () => "2026-07-27T00:00:00.000Z",
+  definition
 });
-const command = () => `50000000-0000-4000-8000-0000000000${String((commandSeq += 1) % 90 + 10)}`;
+const command = () => `50000000-0000-4000-8000-0000000000${String(((commandSeq += 1) % 90) + 10)}`;
 
 // Druid
 
@@ -176,11 +251,13 @@ describe("Primal Order - the twin of the bug that started this area (audit row 4
     // The printed level-1 row says two cantrips; Magician adds "one extra cantrip from the Druid spell list".
     const third: Row = { level: 1, kind: "cantrip", id: "shillelagh" };
     const magician = build(druid(1, [primalOrder("magician"), third]));
-    expect((magician.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id))
-      .toContain("shillelagh");
+    expect(
+      (magician.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id)
+    ).toContain("shillelagh");
     // Negative control: a composition that gave every Druid +1 would pass the assertion above.
-    expect(() => build(druid(1, [primalOrder("warden"), third])))
-      .toThrowError(/Druid knows 2 cantrips at level 1; got 3/);
+    expect(() => build(druid(1, [primalOrder("warden"), third]))).toThrowError(
+      /Druid knows 2 cantrips at level 1; got 3/
+    );
   });
 
   it("gives a WARDEN Martial weapons and Medium armor, and a Magician neither", () => {
@@ -204,25 +281,38 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
   it("does NOT charge the granted spell against the prepared budget", () => {
     // "Those spells don't count against the number of spells you can prepare." A level-1 Druid prepares
     // four: the grant plus four chosen spells is legal and a fifth is not.
-    const four: Row[] = [{ level: 1, kind: "spell", id: "faerie-fire" }, { level: 1, kind: "spell", id: "fog-cloud" }];
+    const four: Row[] = [
+      { level: 1, kind: "spell", id: "faerie-fire" },
+      { level: 1, kind: "spell", id: "fog-cloud" }
+    ];
     const full = build(druid(1, [primalOrder("magician"), ...four]));
     expect(spellOf(full, "speak-with-animals")?.alwaysPrepared).toBe(true);
-    expect((full.spellcasting?.spells ?? []).filter((spell) => spell.level === 1 && !spell.alwaysPrepared).map((spell) => spell.id).sort())
-      .toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud", "magic-missile"]); // 4 class + the Sage feat's own
-    expect(() => build(druid(1, [primalOrder("magician"), ...four, { level: 1, kind: "spell", id: "thunderwave" } as Row])))
-      .toThrowError(/Druid prepares 4 spells at level 1; got 5/);
+    expect(
+      (full.spellcasting?.spells ?? [])
+        .filter((spell) => spell.level === 1 && !spell.alwaysPrepared)
+        .map((spell) => spell.id)
+        .sort()
+    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud", "magic-missile"]); // 4 class + the Sage feat's own
+    expect(() =>
+      build(druid(1, [primalOrder("magician"), ...four, { level: 1, kind: "spell", id: "thunderwave" } as Row]))
+    ).toThrowError(/Druid prepares 4 spells at level 1; got 5/);
   });
 });
 
 describe("Wild Shape - the pool, read off the printed column (audit row 54)", () => {
   it("counts uses off the Wild Shape column and grows with it", () => {
     // 2 at level 2, 3 at level 6, 4 at level 17, from the printed column.
-    expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.uses)
-      .toEqual({ limit: 2, per: "long-rest" });
-    expect(actionOf(build(druid(6, [primalOrder("warden")])), "wild-shape")?.uses)
-      .toEqual({ limit: 3, per: "long-rest" });
-    expect(actionOf(build(druid(17, [primalOrder("warden"), elementalFury("primal-strike")])), "wild-shape")?.uses)
-      .toEqual({ limit: 4, per: "long-rest" });
+    expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.uses).toEqual({
+      limit: 2,
+      per: "long-rest"
+    });
+    expect(actionOf(build(druid(6, [primalOrder("warden")])), "wild-shape")?.uses).toEqual({
+      limit: 3,
+      per: "long-rest"
+    });
+    expect(
+      actionOf(build(druid(17, [primalOrder("warden"), elementalFury("primal-strike")])), "wild-shape")?.uses
+    ).toEqual({ limit: 4, per: "long-rest" });
     // ...and it is a Bonus Action, as the SRD prints.
     expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.activation).toBe("bonus-action");
   });
@@ -236,8 +326,9 @@ describe("Wild Shape - the pool, read off the printed column (audit row 54)", ()
     expect(state.actors[0].actionUses["wild-shape"]).toBe(1);
     resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
-    expect(() => resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition)))
-      .toThrowError(/no uses remaining \(2\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
+    ).toThrowError(/no uses remaining \(2\/long rest\)/);
   });
 });
 
@@ -261,22 +352,40 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
     // WIS 15 + 2 (background) = 17 -> +3, proficiency +2, so DC 13, derived from the character.
     expect(actionOf(definition, "lands-aid")?.save).toEqual({ ability: "con", dc: 13 });
     expect(actionOf(definition, "lands-aid")?.damage).toEqual([{ formula: "2d6", type: "necrotic" }]);
-    expect(actionOf(build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.damage)
-      .toEqual([{ formula: "3d6", type: "necrotic" }]);
-    expect(actionOf(build(druid(14, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.damage)
-      .toEqual([{ formula: "4d6", type: "necrotic" }]);
+    expect(
+      actionOf(build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.damage
+    ).toEqual([{ formula: "3d6", type: "necrotic" }]);
+    expect(
+      actionOf(build(druid(14, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.damage
+    ).toEqual([{ formula: "4d6", type: "necrotic" }]);
   });
 
   it("spends Wild Shape when it resolves, so the two features share one budget", () => {
     // Cast Land's Aid once and the Druid has one shape left, not two: SRD "expend a use of your Wild
     // Shape" means a shared key.
     const state = encounterWith(definition);
-    resolveDefinitionAction(state, actionOf(definition, "lands-aid")!, { actorId: HERO, targetIds: [FOE], commandId: command() }, deps(definition));
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "lands-aid")!,
+      { actorId: HERO, targetIds: [FOE], commandId: command() },
+      deps(definition)
+    );
     expect(state.actors[0].actionUses["wild-shape"]).toBe(1);
-    resolveDefinitionAction(state, actionOf(definition, "wild-shape")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "wild-shape")!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
-    expect(() => resolveDefinitionAction(state, actionOf(definition, "lands-aid")!, { actorId: HERO, targetIds: [FOE], commandId: command() }, deps(definition)))
-      .toThrowError(/no uses remaining \(2\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        actionOf(definition, "lands-aid")!,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        deps(definition)
+      )
+    ).toThrowError(/no uses remaining \(2\/long rest\)/);
   });
 });
 
@@ -294,15 +403,22 @@ describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
   it("gives the OTHER option no strike at all, and refuses an option that is on neither list", () => {
     const potent = build(druid(7, [primalOrder("warden"), elementalFury("potent-spellcasting")]));
     expect(actionOf(potent, "primal-strike")).toBeUndefined();
-    const bogus = druid(7, [primalOrder("warden"),
-      { level: 7, classId: "druid", kind: "elemental-fury", id: "storm-strike", payload: { featureId: "elemental-fury" } } as Row]);
+    const bogus = druid(7, [
+      primalOrder("warden"),
+      {
+        level: 7,
+        classId: "druid",
+        kind: "elemental-fury",
+        id: "storm-strike",
+        payload: { featureId: "elemental-fury" }
+      } as Row
+    ]);
     expect(() => build(bogus)).toThrowError(/not an offered option/);
   });
 
   it("refuses the build outright when the level-7 pick is missing", () => {
     // An unanswered pick is a rejection, not a silent skip.
-    expect(() => build(druid(7, [primalOrder("warden")])))
-      .toThrowError(/Elemental Fury/);
+    expect(() => build(druid(7, [primalOrder("warden")]))).toThrowError(/Elemental Fury/);
   });
 });
 
@@ -312,11 +428,22 @@ describe("Nature's Sanctuary - the third feature on the one Wild Shape counter",
     expect(actionOf(definition, "natures-sanctuary")?.uses).toMatchObject({ pool: "wild-shape", limit: 3 });
     const state = encounterWith(definition);
     for (const id of ["natures-sanctuary", "lands-aid", "wild-shape"]) {
-      resolveDefinitionAction(state, actionOf(definition, id)!, { actorId: HERO, targetIds: id === "lands-aid" ? [FOE] : [], commandId: command() }, deps(definition));
+      resolveDefinitionAction(
+        state,
+        actionOf(definition, id)!,
+        { actorId: HERO, targetIds: id === "lands-aid" ? [FOE] : [], commandId: command() },
+        deps(definition)
+      );
     }
     expect(state.actors[0].actionUses["wild-shape"]).toBe(3);
-    expect(() => resolveDefinitionAction(state, actionOf(definition, "natures-sanctuary")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition)))
-      .toThrowError(/no uses remaining \(3\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        actionOf(definition, "natures-sanctuary")!,
+        { actorId: HERO, targetIds: [], commandId: command() },
+        deps(definition)
+      )
+    ).toThrowError(/no uses remaining \(3\/long rest\)/);
   });
 });
 
@@ -331,19 +458,27 @@ describe("Nature's Ward - the half of audit row 65 that is authorable", () => {
 
 describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)", () => {
   it("makes a level-19 Druid pick one, and refuses a feat that is not an Epic Boon", () => {
-    const taken = build(druid(19, [primalOrder("warden"), elementalFury("primal-strike"),
-      ...epicBoon("druid", "boon-of-dimensional-travel", "cha")]));
+    const taken = build(
+      druid(19, [
+        primalOrder("warden"),
+        elementalFury("primal-strike"),
+        ...epicBoon("druid", "boon-of-dimensional-travel", "cha")
+      ])
+    );
     expect((taken.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
-    expect(() => build(druid(19, [primalOrder("warden"), elementalFury("primal-strike")])))
-      .toThrowError(/Epic Boon/);
-    const wrongFeat = druid(19, [primalOrder("warden"), elementalFury("primal-strike"),
-      { level: 19, classId: "druid", kind: "feat", id: "grappler", payload: { featureId: "epic-boon" } } as Row]);
+    expect(() => build(druid(19, [primalOrder("warden"), elementalFury("primal-strike")]))).toThrowError(/Epic Boon/);
+    const wrongFeat = druid(19, [
+      primalOrder("warden"),
+      elementalFury("primal-strike"),
+      { level: 19, classId: "druid", kind: "feat", id: "grappler", payload: { featureId: "epic-boon" } } as Row
+    ]);
     expect(() => build(wrongFeat)).toThrowError(/not an offered option/);
   });
 
   it("does the same for the Bard", () => {
-    const taken = build(bard(19, 15, [...loreSkills("history", "arcana", "nature"),
-      ...epicBoon("bard", "boon-of-spell-recall", "wis")]));
+    const taken = build(
+      bard(19, 15, [...loreSkills("history", "arcana", "nature"), ...epicBoon("bard", "boon-of-spell-recall", "wis")])
+    );
     expect((taken.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-spell-recall");
     expect(() => build(bard(19, 15, loreSkills("history", "arcana", "nature")))).toThrowError(/Epic Boon/);
   });
@@ -368,8 +503,9 @@ describe("Bardic Inspiration - the counter the class is built around", () => {
       resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
       expect(state.actors[0].actionUses["bardic-inspiration"]).toBe(spent);
     }
-    expect(() => resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition)))
-      .toThrowError(/no uses remaining \(3\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
+    ).toThrowError(/no uses remaining \(3\/long rest\)/);
   });
 
   it("lets Cutting Words and Peerless Skill spend that SAME counter", () => {
@@ -381,12 +517,33 @@ describe("Bardic Inspiration - the counter the class is built around", () => {
     expect(actionOf(definition, "cutting-words")?.activation).toBe("reaction");
 
     const state = encounterWith(definition);
-    resolveDefinitionAction(state, actionOf(definition, "cutting-words")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
-    resolveDefinitionAction(state, actionOf(definition, "peerless-skill")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
-    resolveDefinitionAction(state, actionOf(definition, "bardic-inspiration")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "cutting-words")!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "peerless-skill")!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "bardic-inspiration")!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
     expect(state.actors[0].actionUses["bardic-inspiration"]).toBe(3);
-    expect(() => resolveDefinitionAction(state, actionOf(definition, "cutting-words")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition)))
-      .toThrowError(/no uses remaining \(3\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        actionOf(definition, "cutting-words")!,
+        { actorId: HERO, targetIds: [], commandId: command() },
+        deps(definition)
+      )
+    ).toThrowError(/no uses remaining \(3\/long rest\)/);
   });
 });
 
@@ -404,16 +561,18 @@ describe("College of Lore Bonus Proficiencies - three skills that were promised 
 
 describe("Words of Creation - the level-20 grant (audit row 34)", () => {
   it("hands a level-20 Bard both Power Words, always prepared and uncharged", () => {
-    const definition = build(bard(20, 15, [...loreSkills("history", "arcana", "nature"),
-      ...epicBoon("bard", "boon-of-spell-recall", "wis")]));
+    const definition = build(
+      bard(20, 15, [...loreSkills("history", "arcana", "nature"), ...epicBoon("bard", "boon-of-spell-recall", "wis")])
+    );
     expect(spellOf(definition, "power-word-heal")).toMatchObject({ alwaysPrepared: true });
     expect(spellOf(definition, "power-word-kill")).toMatchObject({ alwaysPrepared: true });
     // Neither Power Word counts against the prepared cap ("always have prepared").
     const charged = (definition.spellcasting?.spells ?? []).filter((spell) => spell.level > 0 && !spell.alwaysPrepared);
     expect(charged.map((spell) => spell.id)).not.toContain("power-word-kill");
     // The negative control: a level-19 Bard has neither.
-    const nineteen = build(bard(19, 15, [...loreSkills("history", "arcana", "nature"),
-      ...epicBoon("bard", "boon-of-spell-recall", "wis")]));
+    const nineteen = build(
+      bard(19, 15, [...loreSkills("history", "arcana", "nature"), ...epicBoon("bard", "boon-of-spell-recall", "wis")])
+    );
     expect(spellOf(nineteen, "power-word-kill")).toBeUndefined();
   });
 });
@@ -421,30 +580,51 @@ describe("Words of Creation - the level-20 grant (audit row 34)", () => {
 // Cleric
 
 describe("Divine Intervention - a pool that now costs the action the SRD prints", () => {
-  const clericInput = (): Mutable => ({
-    name: "Sister Ael", speciesId: "human", backgroundId: "sage", classId: "cleric", level: 10,
-    subclassId: "life-domain", abilityMethod: "standard-array",
-    baseScores: { str: 10, dex: 12, con: 14, int: 8, wis: 15, cha: 13 },
-    backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "con", amount: 1 }],
-    hp: { mode: "average" },
-    choices: [
-      { level: 1, kind: "language", id: "dwarvish" },
-      { level: 1, kind: "language", id: "giant" },
-      { level: 1, classId: "cleric", kind: "skill", id: "religion" },
-      { level: 1, classId: "cleric", kind: "skill", id: "insight" },
-      { level: 1, classId: "cleric", kind: "divine-order", id: "thaumaturge", payload: { featureId: "divine-order" } },
-      { level: 1, kind: "cantrip", id: "guidance" },
-      { level: 1, kind: "cantrip", id: "sacred-flame" },
-      { level: 1, kind: "spell", id: "bless" },
-      ...HUMAN,
-      ...SAGE_FEAT,
-      { level: 3, classId: "cleric", kind: "subclass", id: "life-domain" },
-      { level: 7, classId: "cleric", kind: "blessed-strikes", id: "divine-strike", payload: { featureId: "blessed-strikes" } },
-      ...asiRows("cleric", 10),
-      { level: 1, kind: "equipment", id: "cleric-a" },
-      { level: 1, kind: "equipment", id: "sage-a" }
-    ]
-  } as Mutable);
+  const clericInput = (): Mutable =>
+    ({
+      name: "Sister Ael",
+      speciesId: "human",
+      backgroundId: "sage",
+      classId: "cleric",
+      level: 10,
+      subclassId: "life-domain",
+      abilityMethod: "standard-array",
+      baseScores: { str: 10, dex: 12, con: 14, int: 8, wis: 15, cha: 13 },
+      backgroundBonusAllocation: [
+        { ability: "wis", amount: 2 },
+        { ability: "con", amount: 1 }
+      ],
+      hp: { mode: "average" },
+      choices: [
+        { level: 1, kind: "language", id: "dwarvish" },
+        { level: 1, kind: "language", id: "giant" },
+        { level: 1, classId: "cleric", kind: "skill", id: "religion" },
+        { level: 1, classId: "cleric", kind: "skill", id: "insight" },
+        {
+          level: 1,
+          classId: "cleric",
+          kind: "divine-order",
+          id: "thaumaturge",
+          payload: { featureId: "divine-order" }
+        },
+        { level: 1, kind: "cantrip", id: "guidance" },
+        { level: 1, kind: "cantrip", id: "sacred-flame" },
+        { level: 1, kind: "spell", id: "bless" },
+        ...HUMAN,
+        ...SAGE_FEAT,
+        { level: 3, classId: "cleric", kind: "subclass", id: "life-domain" },
+        {
+          level: 7,
+          classId: "cleric",
+          kind: "blessed-strikes",
+          id: "divine-strike",
+          payload: { featureId: "blessed-strikes" }
+        },
+        ...asiRows("cleric", 10),
+        { level: 1, kind: "equipment", id: "cleric-a" },
+        { level: 1, kind: "equipment", id: "sage-a" }
+      ]
+    }) as Mutable;
 
   it("is a Magic action with one use per long rest, and the use really goes", () => {
     // A feature with `uses` and no `actions` gets a synthesized action; the SRD says "As a Magic action".
@@ -453,9 +633,20 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
     expect(intervention?.activation).toBe("action");
     expect(intervention?.uses).toEqual({ limit: 1, per: "long-rest" });
     const state = encounterWith(definition);
-    resolveDefinitionAction(state, intervention!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    resolveDefinitionAction(
+      state,
+      intervention!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
     expect(state.actors[0].actionUses["divine-intervention"]).toBe(1);
-    expect(() => resolveDefinitionAction(state, intervention!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition)))
-      .toThrowError(/no uses remaining \(1\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        intervention!,
+        { actorId: HERO, targetIds: [], commandId: command() },
+        deps(definition)
+      )
+    ).toThrowError(/no uses remaining \(1\/long rest\)/);
   });
 });

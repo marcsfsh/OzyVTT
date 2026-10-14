@@ -19,7 +19,10 @@ export interface BadgeProps {
     ("LIVE"), and metadata tags. Tone is decorative; the label carries meaning. */
 export function Badge({ tone = "neutral", solid = false, className, title, children }: BadgeProps) {
   return (
-    <span className={cx("nh-badge", tone !== "neutral" && `nh-badge--${tone}`, solid && "nh-badge--solid", className)} title={title}>
+    <span
+      className={cx("nh-badge", tone !== "neutral" && `nh-badge--${tone}`, solid && "nh-badge--solid", className)}
+      title={title}
+    >
       {children}
     </span>
   );

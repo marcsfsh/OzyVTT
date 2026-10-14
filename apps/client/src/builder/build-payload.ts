@@ -1,14 +1,35 @@
 import {
-  CatalogChoiceError, extraPickAmount, resolveCatalogChoice, resolvePickChoice,
-  type BuilderAbilityMethod, type BuilderPolicy, type CatalogChoiceOption, type ContentBackgroundSummary,
-  type ContentChoiceList, type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary,
-  type ContentFeatureSummary, type ContentSpeciesSummary, type ContentSubclassSummary
+  CatalogChoiceError,
+  extraPickAmount,
+  resolveCatalogChoice,
+  resolvePickChoice,
+  type BuilderAbilityMethod,
+  type BuilderPolicy,
+  type CatalogChoiceOption,
+  type ContentBackgroundSummary,
+  type ContentChoiceList,
+  type ContentClassSummary,
+  type ContentExtraPickSummary,
+  type ContentFeatSummary,
+  type ContentFeatureSummary,
+  type ContentSpeciesSummary,
+  type ContentSubclassSummary
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import {
-  ABILITIES, ABILITY_ROLL_FORMULA, abilityModifier, hitDieFaces, isPointBuyLegal, pointBuyRemaining,
-  POINT_BUY_BUDGET, POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY, validateAbilityFormula,
-  type Ability, type HitDie
+  ABILITIES,
+  ABILITY_ROLL_FORMULA,
+  abilityModifier,
+  hitDieFaces,
+  isPointBuyLegal,
+  pointBuyRemaining,
+  POINT_BUY_BUDGET,
+  POINT_BUY_MAXIMUM,
+  POINT_BUY_MINIMUM,
+  STANDARD_ARRAY,
+  validateAbilityFormula,
+  type Ability,
+  type HitDie
 } from "@vtt/rules-5e";
 import type { BuilderCatalogs } from "../content/catalogs";
 
@@ -58,14 +79,20 @@ export type BuilderDraft = {
 export function emptyDraft(): BuilderDraft {
   return {
     version: BUILDER_DRAFT_VERSION,
-    speciesId: null, backgroundId: null, classId: null, level: 1, subclassId: null,
+    speciesId: null,
+    backgroundId: null,
+    classId: null,
+    level: 1,
+    subclassId: null,
     abilityMethod: "standard-array",
     abilityPool: STANDARD_ARRAY.map((value, index) => ({ id: `sa-${index}`, value })),
     poolAssignment: {},
     spendScores: Object.fromEntries(ABILITIES.map((ability) => [ability, POINT_BUY_MINIMUM])),
     backgroundBonus: [],
-    hpMode: "average", hpEntries: [],
-    picks: {}, asiIncreases: {},
+    hpMode: "average",
+    hpEntries: [],
+    picks: {},
+    asiIncreases: {},
     name: ""
   };
 }
@@ -108,16 +135,22 @@ export type BuilderOffer = Readonly<{
  * `choice` is the first and `choices` the whole list, so read both.
  */
 const featurePicksOf = (feature: ContentFeatureSummary): readonly NonNullable<ContentFeatureSummary["choice"]>[] =>
-  feature.choices.length > 0 ? feature.choices : (feature.choice ? [feature.choice] : []);
+  feature.choices.length > 0 ? feature.choices : feature.choice ? [feature.choice] : [];
 
 const optionsOfIds = (ids: readonly string[], nameOf: (id: string) => string): CatalogChoiceOption[] =>
   ids.map((id) => ({ id, name: nameOf(id) }));
 
-const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+const titleize = (id: string) =>
+  id
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 /** Resolves a feature's choice to concrete options, never throwing: a gap becomes `unresolvable`. */
 function resolveChoice(
-  choice: NonNullable<ContentFeatureSummary["choice"]>, catalogs: BuilderCatalogs, nameOf: (id: string) => string,
+  choice: NonNullable<ContentFeatureSummary["choice"]>,
+  catalogs: BuilderCatalogs,
+  nameOf: (id: string) => string,
   answersFor: (offer: string) => readonly string[]
 ): { options: CatalogChoiceOption[]; unresolvable: string | null } {
   // Options drawn from the character's own earlier answers ("one of your known Warlock cantrips"),
@@ -125,7 +158,10 @@ function resolveChoice(
   // resolver's message instead of showing an empty list.
   if (choice.fromPicks) {
     try {
-      return { options: resolvePickChoice(choice.fromPicks, answersFor(choice.fromPicks.offer), catalogs.choice), unresolvable: null };
+      return {
+        options: resolvePickChoice(choice.fromPicks, answersFor(choice.fromPicks.offer), catalogs.choice),
+        unresolvable: null
+      };
     } catch (error) {
       if (!(error instanceof CatalogChoiceError)) throw error;
       return { options: [], unresolvable: error.message };
@@ -135,7 +171,9 @@ function resolveChoice(
   // A catalog plus bespoke inline options (e.g. "a Fighting Style feat or Blessed Warrior"): the two
   // are unioned, inline entries first, and an id in both keeps its inline record.
   if (!choice.fromCatalog) {
-    return named.length > 0 ? { options: named, unresolvable: null } : { options: [], unresolvable: "this pick names no option list." };
+    return named.length > 0
+      ? { options: named, unresolvable: null }
+      : { options: [], unresolvable: "this pick names no option list." };
   }
   try {
     const catalog = resolveCatalogChoice(choice.fromCatalog, catalogs.choice);
@@ -167,27 +205,36 @@ export function offerContext(draft: BuilderDraft, catalogs: BuilderCatalogs): Of
   const classRecord = catalogs.choice.classes.find((entry) => entry.id === draft.classId) ?? null;
   const subclass = catalogs.choice.subclasses.find((entry) => entry.id === draft.subclassId) ?? null;
   const originFeat = background?.originFeatId
-    ? catalogs.choice.feats.find((entry) => entry.id === background.originFeatId) ?? null
+    ? (catalogs.choice.feats.find((entry) => entry.id === background.originFeatId) ?? null)
     : null;
   const levelRow = classRecord?.levelTable.find((row) => row.level === draft.level) ?? null;
   // Mirrors the server's `subclass?.spellcasting ?? class.spellcasting` so the spell step offers the
   // list the server will accept.
   const casting = subclass?.spellcasting ?? classRecord?.spellcasting ?? null;
   return {
-    species, background, classRecord, subclass, originFeat, levelRow,
-    spellListId: casting ? casting.spellListId ?? classRecord?.id ?? null : null,
+    species,
+    background,
+    classRecord,
+    subclass,
+    originFeat,
+    levelRow,
+    spellListId: casting ? (casting.spellListId ?? classRecord?.id ?? null) : null,
     hitDie: (classRecord?.hitDie as HitDie | undefined) ?? null
   };
 }
 
 /** The class features a level-`level` character has been granted, with how many times. */
-function grantedClassFeatures(classRecord: ContentClassSummary, level: number): Array<{ feature: ContentFeatureSummary; level: number }> {
+function grantedClassFeatures(
+  classRecord: ContentClassSummary,
+  level: number
+): Array<{ feature: ContentFeatureSummary; level: number }> {
   const granted: Array<{ feature: ContentFeatureSummary; level: number }> = [];
   for (const feature of classRecord.features) {
     // `grantedAtLevels` is the level table's server-resolved repeat count, the only thing that agrees
     // with the server's `choose x grants` capacity (Expertise at 1 and 6, Metamagic at 2, 10, 17...).
     if (feature.grantedAtLevels.length > 0) {
-      for (const grantLevel of feature.grantedAtLevels) if (grantLevel <= level) granted.push({ feature, level: grantLevel });
+      for (const grantLevel of feature.grantedAtLevels)
+        if (grantLevel <= level) granted.push({ feature, level: grantLevel });
       continue;
     }
     // No level-table grant: a species trait, a feat, a subclass feature. `level` stands alone.
@@ -219,8 +266,13 @@ const PROVENANCE_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool",
 /** What to call one of these picks in an instruction. */
 const kindNoun = (kind: string) =>
   // `expertise` options are skills, so name them as such.
-  kind === "skill" || kind === "expertise" ? "skill"
-    : kind === "tool" ? "tool" : kind === "language" ? "language" : "option";
+  kind === "skill" || kind === "expertise"
+    ? "skill"
+    : kind === "tool"
+      ? "tool"
+      : kind === "language"
+        ? "language"
+        : "option";
 
 /**
  * Every pick this build owes, in step order. Mirrors `character-build.ts`'s offer machinery (same
@@ -249,7 +301,10 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     heldProficiencies.set(skill, `already granted by ${context.background!.name}`);
   }
   /** The already-held subset of these options, or null for a kind without this rule. */
-  const unavailableOf = (kind: string, options: readonly CatalogChoiceOption[]): Readonly<Record<string, string>> | null => {
+  const unavailableOf = (
+    kind: string,
+    options: readonly CatalogChoiceOption[]
+  ): Readonly<Record<string, string>> | null => {
     if (!PROVENANCE_KINDS.has(kind)) return null;
     const held: Record<string, string> = {};
     for (const option of options) {
@@ -296,7 +351,10 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     // with the server. With no class yet the table is empty and nothing is added.
     const table = context.classRecord?.levelTable ?? [];
     for (const grant of grants ?? []) {
-      extraPicks.set(grant.offer, (extraPicks.get(grant.offer) ?? 0) + extraPickAmount(grant, table, draft.level) * times);
+      extraPicks.set(
+        grant.offer,
+        (extraPicks.get(grant.offer) ?? 0) + extraPickAmount(grant, table, draft.level) * times
+      );
     }
   };
   /**
@@ -307,17 +365,30 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     answersInDraft(gate.offer).includes(gate.id);
   /** Every answer this budget already holds; the draft-side mirror of the server's `answersFor`. */
   const answersInDraft = (offer: string): readonly string[] =>
-    Object.entries(draft.picks).flatMap(([key, ids]) => budgetKeyOf(key).split("@")[0] === offer ? ids : []);
+    Object.entries(draft.picks).flatMap(([key, ids]) => (budgetKeyOf(key).split("@")[0] === offer ? ids : []));
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   // Options use full names ("Strength"), matching the review; three-letter forms are for dense strips.
   const nameOfKind = (kind: string) => (id: string) =>
-    kind === "skill" || kind === "expertise" || kind === "skill-or-tool" ? skillName(id)
-      : kind === "spell" || kind === "cantrip" ? spellName(id)
-        : kind === "ability-score" ? (ABILITIES.includes(id as Ability) ? ABILITY_LABELS[id as Ability] : titleize(id))
+    kind === "skill" || kind === "expertise" || kind === "skill-or-tool"
+      ? skillName(id)
+      : kind === "spell" || kind === "cantrip"
+        ? spellName(id)
+        : kind === "ability-score"
+          ? ABILITIES.includes(id as Ability)
+            ? ABILITY_LABELS[id as Ability]
+            : titleize(id)
           : titleize(id);
 
-  const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: ContentChoiceList | { choose: number; from: readonly string[]; fromCatalog?: string | null } | null | undefined, classId: string | null) => {
+  const listOffer = (
+    key: string,
+    step: OfferStep,
+    kind: string,
+    label: string,
+    list:
+      ContentChoiceList | { choose: number; from: readonly string[]; fromCatalog?: string | null } | null | undefined,
+    classId: string | null
+  ) => {
     if (!list || list.choose <= 0) return;
     const offerKey = uniqueKey(key);
     // A "choose N" list may also name an open catalog (e.g. the species language budget), resolved
@@ -336,14 +407,31 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       }
     }
     offers.push({
-      key: offerKey, step, featureId: null, kind, label, help: null, capacity: list.choose,
-      options, maxSpellLevel: null, level: 1, classId, unresolvable,
+      key: offerKey,
+      step,
+      featureId: null,
+      kind,
+      label,
+      help: null,
+      capacity: list.choose,
+      options,
+      maxSpellLevel: null,
+      level: 1,
+      classId,
+      unresolvable,
       unavailable: unavailableOf(kind, options)
     });
     recordHeld(offerKey, kind, label);
   };
 
-  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, times = 1) => {
+  const featureOffer = (
+    key: string,
+    step: OfferStep,
+    feature: ContentFeatureSummary,
+    level: number,
+    classId: string | null,
+    times = 1
+  ) => {
     // Before the early return: a feature may raise a budget without asking for a pick of its own.
     addExtraPicks(feature.extraPicks, times);
     // Every pick the record owes, mirroring the server's `featurePicks` loop (Magic Initiate owes two
@@ -351,12 +439,18 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     // "#n" is the same pick again and shares a budget, "/n" is a different pick on the same record.
     const picks = featurePicksOf(feature);
     picks.forEach((choice, index) =>
-      featurePickOffer(index === 0 ? key : `${key}/${index + 1}`, step, feature, choice, level, classId, times));
+      featurePickOffer(index === 0 ? key : `${key}/${index + 1}`, step, feature, choice, level, classId, times)
+    );
   };
 
   const featurePickOffer = (
-    key: string, step: OfferStep, feature: ContentFeatureSummary, choice: NonNullable<ContentFeatureSummary["choice"]>,
-    level: number, classId: string | null, times = 1
+    key: string,
+    step: OfferStep,
+    feature: ContentFeatureSummary,
+    choice: NonNullable<ContentFeatureSummary["choice"]>,
+    level: number,
+    classId: string | null,
+    times = 1
   ) => {
     if (choice.choose <= 0) return;
     const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind), answersInDraft);
@@ -375,7 +469,9 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
     // Drop feats this build already has (see `heldFeatIds`); the "asi" shorthand is never a feat.
     let offerable = FEAT_KINDS.has(choice.kind)
-      ? filtered.filter((option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id))
+      ? filtered.filter(
+          (option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id)
+        )
       : filtered;
     /**
      * Options gated on an earlier answer (`requires`), mirroring the server. Unmet gates drop the
@@ -407,11 +503,18 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       unavailable = merged;
     }
     offers.push({
-      key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
+      key: offerKey,
+      step,
+      featureId: feature.id,
+      kind: choice.kind,
+      label: feature.name,
       help: feature.description || null,
       capacity: choice.choose * times,
       options: offerable,
-      maxSpellLevel: ceiling ?? null, level, classId, unresolvable,
+      maxSpellLevel: ceiling ?? null,
+      level,
+      classId,
+      unresolvable,
       unavailable
     });
     if (FEAT_KINDS.has(choice.kind)) {
@@ -435,10 +538,19 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     for (const option of choice.options ?? []) {
       if (!picked.has(option.id)) continue;
       addExtraPicks(option.extraPicks, times);
-      const nested = option.choices.length > 0 ? option.choices : (option.choice ? [option.choice] : []);
+      const nested = option.choices.length > 0 ? option.choices : option.choice ? [option.choice] : [];
       const asFeature = { ...feature, id: option.id, name: option.name, description: option.description };
       nested.forEach((pick, index) =>
-        featurePickOffer(index === 0 ? `feature:${option.id}` : `feature:${option.id}/${index + 1}`, step, asFeature, pick, level, classId, times));
+        featurePickOffer(
+          index === 0 ? `feature:${option.id}` : `feature:${option.id}/${index + 1}`,
+          step,
+          asFeature,
+          pick,
+          level,
+          classId,
+          times
+        )
+      );
     }
   };
 
@@ -447,30 +559,85 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   // a pick, so nothing is mis-offered.
   if (context.species) {
     for (const trait of context.species.features) featureOffer(`feature:${trait.id}`, "species", trait, 1, null);
-    listOffer("species-languages", "species", "language", `${context.species.name} languages`, context.species.languageChoices, null);
+    listOffer(
+      "species-languages",
+      "species",
+      "language",
+      `${context.species.name} languages`,
+      context.species.languageChoices,
+      null
+    );
     if (context.species.sizes.length > 1) {
       offers.push({
-        key: uniqueKey("species-size"), step: "species", featureId: null, kind: "size", label: "Size", help: null, capacity: 1,
-        options: optionsOfIds(context.species.sizes, titleize), maxSpellLevel: null, level: 1, classId: null, unresolvable: null, unavailable: null
+        key: uniqueKey("species-size"),
+        step: "species",
+        featureId: null,
+        kind: "size",
+        label: "Size",
+        help: null,
+        capacity: 1,
+        options: optionsOfIds(context.species.sizes, titleize),
+        maxSpellLevel: null,
+        level: 1,
+        classId: null,
+        unresolvable: null,
+        unavailable: null
       });
     }
   }
 
   // Step 2: background lists, its features' picks, and the origin feat it grants.
   if (context.background) {
-    listOffer("background-skills", "background", "skill", `${context.background.name} skills`, context.background.skillChoices, null);
-    listOffer("background-tools", "background", "tool", `${context.background.name} tools`, context.background.toolChoices, null);
-    listOffer("background-languages", "background", "language", `${context.background.name} languages`, context.background.languageChoices, null);
-    for (const feature of context.background.features) featureOffer(`feature:${feature.id}`, "background", feature, 1, null);
-    if (context.originFeat) featureOffer(`feature:${context.originFeat.feature.id}`, "background", context.originFeat.feature, 1, null);
+    listOffer(
+      "background-skills",
+      "background",
+      "skill",
+      `${context.background.name} skills`,
+      context.background.skillChoices,
+      null
+    );
+    listOffer(
+      "background-tools",
+      "background",
+      "tool",
+      `${context.background.name} tools`,
+      context.background.toolChoices,
+      null
+    );
+    listOffer(
+      "background-languages",
+      "background",
+      "language",
+      `${context.background.name} languages`,
+      context.background.languageChoices,
+      null
+    );
+    for (const feature of context.background.features)
+      featureOffer(`feature:${feature.id}`, "background", feature, 1, null);
+    if (context.originFeat)
+      featureOffer(`feature:${context.originFeat.feature.id}`, "background", context.originFeat.feature, 1, null);
   }
 
   // Step 3: class and level; the proficiency lists the class opens.
   if (context.classRecord) {
-    listOffer("class-skills", "class", "skill", `${context.classRecord.name} skills`,
-      context.classRecord.skillChoiceCount > 0 ? { choose: context.classRecord.skillChoiceCount, from: context.classRecord.skillChoices } : null,
-      context.classRecord.id);
-    listOffer("class-tools", "class", "tool", `${context.classRecord.name} tools`, context.classRecord.toolChoices, context.classRecord.id);
+    listOffer(
+      "class-skills",
+      "class",
+      "skill",
+      `${context.classRecord.name} skills`,
+      context.classRecord.skillChoiceCount > 0
+        ? { choose: context.classRecord.skillChoiceCount, from: context.classRecord.skillChoices }
+        : null,
+      context.classRecord.id
+    );
+    listOffer(
+      "class-tools",
+      "class",
+      "tool",
+      `${context.classRecord.name} tools`,
+      context.classRecord.toolChoices,
+      context.classRecord.id
+    );
   }
 
   // Step 4: class features (subclass, fighting style, weapon mastery, expertise), one decision per
@@ -500,7 +667,14 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
      */
     const takenFeatIds = offers
       .filter((offer) => FEAT_KINDS.has(offer.kind))
-      .flatMap((offer) => (draft.picks[offer.key] ?? []).map((id) => ({ id, step: offer.step, level: offer.level, classId: offer.classId })));
+      .flatMap((offer) =>
+        (draft.picks[offer.key] ?? []).map((id) => ({
+          id,
+          step: offer.step,
+          level: offer.level,
+          classId: offer.classId
+        }))
+      );
     for (const taken of takenFeatIds) {
       if (taken.id === ASI_SHORTHAND) continue;
       const feat = catalogs.choice.feats.find((entry) => entry.id === taken.id);
@@ -515,25 +689,52 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       const slug = `${context.spellListId}-spells`;
       let list: CatalogChoiceOption[] = [];
       let unresolvable: string | null = null;
-      try { list = resolveCatalogChoice(slug, catalogs.choice); }
-      catch (error) { if (error instanceof CatalogChoiceError) unresolvable = error.message; else throw error; }
-      const maxSlotLevel = (row.spellSlots ?? []).reduce((highest, count, index) => count > 0 ? index + 1 : highest, 0);
+      try {
+        list = resolveCatalogChoice(slug, catalogs.choice);
+      } catch (error) {
+        if (error instanceof CatalogChoiceError) unresolvable = error.message;
+        else throw error;
+      }
+      const maxSlotLevel = (row.spellSlots ?? []).reduce(
+        (highest, count, index) => (count > 0 ? index + 1 : highest),
+        0
+      );
       if ((row.cantripsKnown ?? 0) > 0) {
         offers.push({
-          key: uniqueKey("class-cantrips"), step: "features", featureId: null, kind: "cantrip",
-          label: `${context.classRecord.name} cantrips`, help: null, capacity: row.cantripsKnown!,
-          options: list.filter((option) => option.level === 0), maxSpellLevel: 0, level: 1,
-          classId: context.classRecord.id, unresolvable, unavailable: null
+          key: uniqueKey("class-cantrips"),
+          step: "features",
+          featureId: null,
+          kind: "cantrip",
+          label: `${context.classRecord.name} cantrips`,
+          help: null,
+          capacity: row.cantripsKnown!,
+          options: list.filter((option) => option.level === 0),
+          maxSpellLevel: 0,
+          level: 1,
+          classId: context.classRecord.id,
+          unresolvable,
+          unavailable: null
         });
       }
       const preparedCap = row.preparedCount ?? row.spellsKnown ?? 0;
       if (preparedCap > 0 && maxSlotLevel > 0) {
         offers.push({
-          key: uniqueKey("class-spells"), step: "features", featureId: null, kind: "spell",
-          label: context.classRecord.spellcasting?.prepares === "known" ? `${context.classRecord.name} spells known` : `${context.classRecord.name} prepared spells`,
-          help: null, capacity: preparedCap,
+          key: uniqueKey("class-spells"),
+          step: "features",
+          featureId: null,
+          kind: "spell",
+          label:
+            context.classRecord.spellcasting?.prepares === "known"
+              ? `${context.classRecord.name} spells known`
+              : `${context.classRecord.name} prepared spells`,
+          help: null,
+          capacity: preparedCap,
           options: list.filter((option) => (option.level ?? 0) >= 1 && (option.level ?? 0) <= maxSlotLevel),
-          maxSpellLevel: maxSlotLevel, level: 1, classId: context.classRecord.id, unresolvable, unavailable: null
+          maxSpellLevel: maxSlotLevel,
+          level: 1,
+          classId: context.classRecord.id,
+          unresolvable,
+          unavailable: null
         });
       }
     }
@@ -542,18 +743,36 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   // Step 6: equipment. One class option and one background option.
   if (context.classRecord && context.classRecord.startingEquipmentOptions.length > 0) {
     offers.push({
-      key: uniqueKey("class-equipment"), step: "equipment", featureId: null, kind: "equipment",
-      label: `${context.classRecord.name} starting equipment`, help: null, capacity: 1,
+      key: uniqueKey("class-equipment"),
+      step: "equipment",
+      featureId: null,
+      kind: "equipment",
+      label: `${context.classRecord.name} starting equipment`,
+      help: null,
+      capacity: 1,
       options: context.classRecord.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
-      maxSpellLevel: null, level: 1, classId: context.classRecord.id, unresolvable: null, unavailable: null
+      maxSpellLevel: null,
+      level: 1,
+      classId: context.classRecord.id,
+      unresolvable: null,
+      unavailable: null
     });
   }
   if (context.background && context.background.startingEquipmentOptions.length > 0) {
     offers.push({
-      key: uniqueKey("background-equipment"), step: "equipment", featureId: null, kind: "equipment",
-      label: `${context.background.name} starting equipment`, help: null, capacity: 1,
+      key: uniqueKey("background-equipment"),
+      step: "equipment",
+      featureId: null,
+      kind: "equipment",
+      label: `${context.background.name} starting equipment`,
+      help: null,
+      capacity: 1,
       options: context.background.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
-      maxSpellLevel: null, level: 1, classId: null, unresolvable: null, unavailable: null
+      maxSpellLevel: null,
+      level: 1,
+      classId: null,
+      unresolvable: null,
+      unavailable: null
     });
   }
 
@@ -582,7 +801,10 @@ function withGrantedPicks(offers: readonly BuilderOffer[], extraPicks: ReadonlyM
  * sources, not a step-order accumulation, and `heldProficiencies` also holds tools and languages.
  */
 function withExpertiseReach(
-  offers: BuilderOffer[], context: OfferContext, catalogs: BuilderCatalogs, draft: BuilderDraft
+  offers: BuilderOffer[],
+  context: OfferContext,
+  catalogs: BuilderCatalogs,
+  draft: BuilderDraft
 ): BuilderOffer[] {
   if (!offers.some((offer) => offer.kind === "expertise")) return offers;
   // The server's split: a "skill-or-tool" pick counts as a skill only if the id is one.
@@ -623,19 +845,25 @@ export function prunePicks(draft: BuilderDraft, offers: readonly BuilderOffer[])
   let changed = false;
   for (const [key, chosen] of Object.entries(draft.picks)) {
     const offer = byKey.get(key);
-    if (!offer) { changed = true; continue; }
-    const legal = chosen.filter((id) => (offer.kind === "asi-or-feat" && id === ASI_SHORTHAND) || offer.options.some((option) => option.id === id));
+    if (!offer) {
+      changed = true;
+      continue;
+    }
+    const legal = chosen.filter(
+      (id) => (offer.kind === "asi-or-feat" && id === ASI_SHORTHAND) || offer.options.some((option) => option.id === id)
+    );
     const capped = legal.slice(0, offer.capacity);
     if (capped.length !== chosen.length) changed = true;
     if (capped.length > 0) picks[key] = capped;
   }
   const asiIncreases: Record<string, ReadonlyArray<{ ability: Ability; amount: number }>> = {};
   for (const [key, increases] of Object.entries(draft.asiIncreases)) {
-    if (byKey.has(key)) asiIncreases[key] = increases; else changed = true;
+    if (byKey.has(key)) asiIncreases[key] = increases;
+    else changed = true;
   }
   // The subclass offer is the subclass answer; the top-level id only mirrors it.
   const subclassOffer = offers.find((offer) => offer.kind === "subclass");
-  const mirrored = subclassOffer ? (picks[subclassOffer.key] ?? [])[0] ?? null : null;
+  const mirrored = subclassOffer ? ((picks[subclassOffer.key] ?? [])[0] ?? null) : null;
   if (mirrored !== draft.subclassId) changed = true;
   return changed ? { ...draft, picks, asiIncreases, subclassId: mirrored } : draft;
 }
@@ -656,7 +884,12 @@ export function offerFilled(offer: BuilderOffer, draft: BuilderDraft): boolean {
 // Ability scores
 
 export const ABILITY_LABELS: Readonly<Record<Ability, string>> = {
-  str: "Strength", dex: "Dexterity", con: "Constitution", int: "Intelligence", wis: "Wisdom", cha: "Charisma"
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
 };
 
 /** Assign-mode methods hand out a fixed pool; point buy spends against a budget. */
@@ -681,7 +914,11 @@ export function baseScoresOf(draft: BuilderDraft): Record<Ability, number | null
  * player's own ability picks (ASI split, feat `ability-score` picks). Riders that raise scores stay
  * server-side, so this is a preview; the server's total is what lands on the sheet.
  */
-export function abilityBonusesOf(draft: BuilderDraft, catalogs: BuilderCatalogs, offers: readonly BuilderOffer[]): Record<Ability, number> {
+export function abilityBonusesOf(
+  draft: BuilderDraft,
+  catalogs: BuilderCatalogs,
+  offers: readonly BuilderOffer[]
+): Record<Ability, number> {
   const bonuses = Object.fromEntries(ABILITIES.map((ability) => [ability, 0])) as Record<Ability, number>;
   for (const entry of draft.backgroundBonus) bonuses[entry.ability] += entry.amount;
   const species = catalogs.choice.species.find((entry) => entry.id === draft.speciesId);
@@ -727,7 +964,11 @@ export type AbilityCapPreview = Readonly<{
  * check, not a game outcome: the background spread and each ASI row reject above 20, while species
  * increases and feat `ability-score` picks clamp. The server recomputes all of it.
  */
-export function abilityCapPreview(draft: BuilderDraft, catalogs: BuilderCatalogs, offers: readonly BuilderOffer[]): AbilityCapPreview {
+export function abilityCapPreview(
+  draft: BuilderDraft,
+  catalogs: BuilderCatalogs,
+  offers: readonly BuilderOffer[]
+): AbilityCapPreview {
   const before = new Map<string, Record<Ability, number>>();
   const base = baseScoresOf(draft);
   if (ABILITIES.some((ability) => base[ability] == null)) return { breach: null, before };
@@ -737,7 +978,9 @@ export function abilityCapPreview(draft: BuilderDraft, catalogs: BuilderCatalogs
   const overflowed = (ability: Ability, offerKey: string | null, fix: string) => {
     if (scores[ability] <= ABILITY_SCORE_CAP || breach) return;
     breach = {
-      ability, total: scores[ability], offerKey,
+      ability,
+      total: scores[ability],
+      offerKey,
       reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]} — no ability may go above ${ABILITY_SCORE_CAP}. ${fix}`
     };
   };
@@ -745,7 +988,11 @@ export function abilityCapPreview(draft: BuilderDraft, catalogs: BuilderCatalogs
   const background = catalogs.backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null;
   for (const entry of draft.backgroundBonus) {
     scores[entry.ability] += entry.amount;
-    overflowed(entry.ability, null, `Move ${background ? `${background.name}'s` : "the background's"} increase, or lower ${ABILITY_LABELS[entry.ability]}.`);
+    overflowed(
+      entry.ability,
+      null,
+      `Move ${background ? `${background.name}'s` : "the background's"} increase, or lower ${ABILITY_LABELS[entry.ability]}.`
+    );
   }
   const species = catalogs.choice.species.find((entry) => entry.id === draft.speciesId);
   for (const bonus of species?.abilityBonuses ?? []) {
@@ -760,7 +1007,11 @@ export function abilityCapPreview(draft: BuilderDraft, catalogs: BuilderCatalogs
     if ((draft.picks[offer.key] ?? [])[0] !== ASI_SHORTHAND) continue;
     for (const increase of draft.asiIncreases[offer.key] ?? []) {
       scores[increase.ability] += increase.amount;
-      overflowed(increase.ability, offer.key, `Change the level ${offer.level} improvement, or lower ${ABILITY_LABELS[increase.ability]}.`);
+      overflowed(
+        increase.ability,
+        offer.key,
+        `Change the level ${offer.level} improvement, or lower ${ABILITY_LABELS[increase.ability]}.`
+      );
     }
   }
   return { breach, before };
@@ -817,7 +1068,8 @@ export function buildCreatePayload(draft: BuilderDraft, offers: readonly Builder
     if (value == null) throw new Error(`${ABILITY_LABELS[ability]} has no score yet.`);
     scores[ability] = value;
   }
-  if (!draft.speciesId || !draft.backgroundId || !draft.classId) throw new Error("Species, background, and class are all required.");
+  if (!draft.speciesId || !draft.backgroundId || !draft.classId)
+    throw new Error("Species, background, and class are all required.");
   return {
     name: draft.name.trim(),
     speciesId: draft.speciesId,
@@ -853,10 +1105,21 @@ export type RosterCapacity = Readonly<{
 export function rosterCapacity(definitions: number, actors: number): RosterCapacity {
   const line = `Sheet library ${definitions} of ${DEFINITION_LIMIT}; roster ${actors} of ${ACTOR_LIMIT}.`;
   if (definitions >= DEFINITION_LIMIT || actors >= ACTOR_LIMIT) {
-    return { definitions, actors, warning: null, blockedReason: `${line} Remove a character or combatant you no longer need, then create this one.` };
+    return {
+      definitions,
+      actors,
+      warning: null,
+      blockedReason: `${line} Remove a character or combatant you no longer need, then create this one.`
+    };
   }
-  const near = definitions >= DEFINITION_LIMIT * CAPACITY_WARNING_FRACTION || actors >= ACTOR_LIMIT * CAPACITY_WARNING_FRACTION;
-  return { definitions, actors, blockedReason: null, warning: near ? `${line} Remove characters you no longer need to keep room for new ones.` : null };
+  const near =
+    definitions >= DEFINITION_LIMIT * CAPACITY_WARNING_FRACTION || actors >= ACTOR_LIMIT * CAPACITY_WARNING_FRACTION;
+  return {
+    definitions,
+    actors,
+    blockedReason: null,
+    warning: near ? `${line} Remove characters you no longer need to keep room for new ones.` : null
+  };
 }
 
 // Per-step gating: every blocked Next says why.
@@ -864,21 +1127,36 @@ export function rosterCapacity(definitions: number, actors: number): RosterCapac
 export const STEP_IDS = ["species", "background", "class", "features", "abilities", "equipment", "review"] as const;
 export type StepId = (typeof STEP_IDS)[number];
 export const STEP_LABELS: Readonly<Record<StepId, string>> = {
-  species: "Species", background: "Background", class: "Class & level", features: "Class features",
-  abilities: "Ability scores", equipment: "Equipment", review: "Name & review"
+  species: "Species",
+  background: "Background",
+  class: "Class & level",
+  features: "Class features",
+  abilities: "Ability scores",
+  equipment: "Equipment",
+  review: "Name & review"
 };
 /** The phone rail's names: shorter only where nothing is lost. The level control lives on the
     class step, so it stays "Class & level". */
 export const STEP_SHORT: Readonly<Record<StepId, string>> = {
-  species: "Species", background: "Background", class: "Class & level", features: "Features",
-  abilities: "Abilities", equipment: "Equipment", review: "Review"
+  species: "Species",
+  background: "Background",
+  class: "Class & level",
+  features: "Features",
+  abilities: "Abilities",
+  equipment: "Equipment",
+  review: "Review"
 };
 
-const offersForStep = (offers: readonly BuilderOffer[], step: OfferStep) => offers.filter((offer) => offer.step === step);
+const offersForStep = (offers: readonly BuilderOffer[], step: OfferStep) =>
+  offers.filter((offer) => offer.step === step);
 
 /** The first unmet requirement of a step, phrased as an instruction, or null when the step is done. */
 export function stepBlockedReason(
-  step: StepId, draft: BuilderDraft, catalogs: BuilderCatalogs, offers: readonly BuilderOffer[], policy: BuilderPolicy
+  step: StepId,
+  draft: BuilderDraft,
+  catalogs: BuilderCatalogs,
+  offers: readonly BuilderOffer[],
+  policy: BuilderPolicy
 ): string | null {
   const context = offerContext(draft, catalogs);
   const unfilled = (owner: OfferStep) => offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
@@ -892,7 +1170,8 @@ export function stepBlockedReason(
     const ambiguous = offersForStep(offers, offer.step).filter((sibling) => sibling.label === offer.label).length > 1;
     const named = ambiguous ? `level ${offer.level} ${offer.label}` : offer.label;
     const chosen = (draft.picks[offer.key] ?? []).length;
-    if (offer.kind === "asi-or-feat" && chosen === offer.capacity) return `Split the +2 from ${named} across your abilities.`;
+    if (offer.kind === "asi-or-feat" && chosen === offer.capacity)
+      return `Split the +2 from ${named} across your abilities.`;
     return offer.capacity === 1
       ? `Choose your ${named} to continue.`
       : `Choose ${offer.capacity} for ${named} to continue — ${chosen} of ${offer.capacity} so far.`;
@@ -944,7 +1223,8 @@ export function stepBlockedReason(
       if (classRecord && draft.level >= classRecord.subclassLevel && !draft.subclassId) {
         const subclassOffer = offers.find((offer) => offer.kind === "subclass");
         if (!subclassOffer || subclassOffer.options.length === 0) {
-          const escape = classRecord.subclassLevel > 1 ? ` Drop to level ${classRecord.subclassLevel - 1} to continue.` : "";
+          const escape =
+            classRecord.subclassLevel > 1 ? ` Drop to level ${classRecord.subclassLevel - 1} to continue.` : "";
           return `No ${classRecord.name} subclasses are available yet — a level ${classRecord.subclassLevel} ${classRecord.name} must have one.${escape}`;
         }
       }
@@ -952,16 +1232,18 @@ export function stepBlockedReason(
       if (conflict) return conflict;
       const offer = unfilled("features");
       // Name the subclass only when it is the first unmet requirement.
-      if (offer) return offer.kind === "subclass"
-        ? `Choose a ${classRecord?.subclassLabel ?? "subclass"} to continue.`
-        : pickReason(offer);
+      if (offer)
+        return offer.kind === "subclass"
+          ? `Choose a ${classRecord?.subclassLabel ?? "subclass"} to continue.`
+          : pickReason(offer);
       // An ASI past 20 is chosen here but only visible once scores exist, so both steps guard the cap
       // with the same sentence.
       const breach = abilityCapPreview(draft, catalogs, offers).breach;
       return breach && breach.offerKey !== null ? breach.reason : null;
     }
     case "abilities": {
-      if (!policy.allowedAbilityMethods.includes(draft.abilityMethod)) return "Your GM does not allow that ability method — pick another.";
+      if (!policy.allowedAbilityMethods.includes(draft.abilityMethod))
+        return "Your GM does not allow that ability method — pick another.";
       const base = baseScoresOf(draft);
       const missing = ABILITIES.filter((ability) => base[ability] == null);
       if (missing.length > 0) return `Assign a score to ${ABILITY_LABELS[missing[0]]} to continue.`;
@@ -969,24 +1251,31 @@ export function stepBlockedReason(
         return "That spread is over the 27-point budget — lower a score to continue.";
       }
       if (draft.abilityMethod === "standard-array") {
-        const sorted = ABILITIES.map((ability) => base[ability]!).sort((left, right) => right - left).join(",");
-        if (sorted !== [...STANDARD_ARRAY].join(",")) return `Use each standard-array value once (${STANDARD_ARRAY.join(", ")}).`;
+        const sorted = ABILITIES.map((ability) => base[ability]!)
+          .sort((left, right) => right - left)
+          .join(",");
+        if (sorted !== [...STANDARD_ARRAY].join(","))
+          return `Use each standard-array value once (${STANDARD_ARRAY.join(", ")}).`;
       }
       // Rolled or GM-formula scores are typed by the player, and the server bound-checks them against
       // the formula, so the step checks the same bounds.
       if (draft.abilityMethod === "roll" || draft.abilityMethod === "custom") {
-        const formula = draft.abilityMethod === "custom" ? policy.customFormula ?? ABILITY_ROLL_FORMULA : ABILITY_ROLL_FORMULA;
+        const formula =
+          draft.abilityMethod === "custom" ? (policy.customFormula ?? ABILITY_ROLL_FORMULA) : ABILITY_ROLL_FORMULA;
         const check = validateAbilityFormula(formula);
         if (check.ok) {
           const outside = ABILITIES.find((ability) => base[ability]! < check.minimum || base[ability]! > check.maximum);
-          if (outside) return `A ${formula} roll produces ${check.minimum}-${check.maximum} — ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
+          if (outside)
+            return `A ${formula} roll produces ${check.minimum}-${check.maximum} — ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
         }
       }
       const options = context.background?.abilityOptions ?? null;
       if (options) {
         const total = draft.backgroundBonus.reduce((sum, entry) => sum + entry.amount, 0);
         if (total === 0) return `Spend ${context.background!.name}'s ability increases to continue.`;
-        const spread = [...draft.backgroundBonus.map((entry) => entry.amount)].sort((left, right) => right - left).join("/");
+        const spread = [...draft.backgroundBonus.map((entry) => entry.amount)]
+          .sort((left, right) => right - left)
+          .join("/");
         if (!options.spreads.some((legal) => [...legal].sort((left, right) => right - left).join("/") === spread)) {
           return `${context.background!.name} allows ${options.spreads.map((legal) => `+${legal.join("/+")}`).join(" or ")} — adjust the split.`;
         }
@@ -1000,8 +1289,10 @@ export function stepBlockedReason(
       if (draft.hpMode === "entries") {
         const needed = draft.level - 1;
         const faces = context.hitDie ? hitDieFaces(context.hitDie) : 12;
-        if (draft.hpEntries.length !== needed) return `Enter your hit-point roll for level ${draft.hpEntries.length + 2} (${needed - draft.hpEntries.length} to go).`;
-        if (draft.hpEntries.some((entry) => entry < 1 || entry > faces)) return `A ${context.hitDie} roll is 1-${faces} — fix the out-of-range entry.`;
+        if (draft.hpEntries.length !== needed)
+          return `Enter your hit-point roll for level ${draft.hpEntries.length + 2} (${needed - draft.hpEntries.length} to go).`;
+        if (draft.hpEntries.some((entry) => entry < 1 || entry > faces))
+          return `A ${context.hitDie} roll is 1-${faces} — fix the out-of-range entry.`;
       }
       return null;
     }
@@ -1024,4 +1315,4 @@ export function stepBlockedReason(
 }
 
 /** Preview only: the modifier the allocator shows beside a total. */
-export const previewModifier = (total: number | null) => total == null ? null : abilityModifier(total);
+export const previewModifier = (total: number | null) => (total == null ? null : abilityModifier(total));

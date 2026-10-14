@@ -4,8 +4,9 @@ import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) =>
+  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
     <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+  )
 }));
 
 const listPages = vi.fn();
@@ -47,7 +48,13 @@ vi.mock("./api", async (importOriginal) => {
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      timeline: (...a: unknown[]) => timeline(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forMarker: (...a: unknown[]) => forMarker(...a)
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     standingApi: { ...actual.standingApi, list: (...a: unknown[]) => listStanding(...a) },
     atlasApi: {
@@ -74,36 +81,123 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexChronicleRecord, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
+import type {
+  CodexCalendar,
+  CodexChronicleRecord,
+  CodexJournalEntry,
+  CodexMap,
+  CodexPageSummary,
+  PlayerCodexChronicleRecord,
+  PlayerCodexMap,
+  PlayerCodexPageSummary
+} from "./api";
 
-const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [], currentDate: { year: 1492, month: 0, day: 3 } };
+const CALENDAR: CodexCalendar = {
+  yearName: "DR",
+  months: [{ name: "Hammer", days: 30 }],
+  weekdays: [],
+  currentDate: { year: 1492, month: 0, day: 3 }
+};
 
-const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"], tags: string[] = []): CodexPageSummary => ({
-  id, title, entityType, fields: {}, folder: null, tags, revealedToPlayers: false,
-  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+const summary = (
+  id: string,
+  title: string,
+  entityType: CodexPageSummary["entityType"],
+  tags: string[] = []
+): CodexPageSummary => ({
+  id,
+  title,
+  entityType,
+  fields: {},
+  folder: null,
+  tags,
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1", playerText: "The party crossed the mists.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "j1",
+  playerText: "The party crossed the mists.",
+  gmText: null,
+  revealedToPlayers: false,
+  kind: "note",
+  attachMarkerId: null,
+  attachPageId: null,
+  sourceEncounterId: null,
+  payload: null,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 /** One GM chronicle row; the dashboard reads the chronicle. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "The party crossed the mists.",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
-const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
-const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", revealedToPlayers: true };
+const MAP_OTHER: CodexMap = {
+  id: "m0",
+  assetId: "a0",
+  name: "Castle Ravenloft",
+  kind: "battlemap",
+  parentMapId: null,
+  revealedToPlayers: false,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
+const MAP_TARGET: CodexMap = {
+  ...MAP_OTHER,
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia map",
+  kind: "regional",
+  revealedToPlayers: true
+};
 
-const renderWorkspace = () => (goTo("/codex"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () =>
+  (goTo("/codex"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 const gmDefaults = () => {
   listPages.mockResolvedValue(PAGES);
   listRelationships.mockResolvedValue([]);
@@ -124,13 +218,60 @@ const gmDefaults = () => {
 };
 
 const PLAYER_PAGES: PlayerCodexPageSummary[] = [
-  { id: "p1", title: "Strahd", entityType: "character", folder: null, tags: ["villain"], bannerAssetId: null, updatedAt: "2026-07-28T00:00:00.000Z" }
+  {
+    id: "p1",
+    title: "Strahd",
+    entityType: "character",
+    folder: null,
+    tags: ["villain"],
+    bannerAssetId: null,
+    updatedAt: "2026-07-28T00:00:00.000Z"
+  }
 ];
-const PLAYER_MAPS: PlayerCodexMap[] = [{ id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", parentMapId: null, tags: [] }];
-const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionId: null, sessionNumber: 3, realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false, createdAt: "2026-07-20T00:00:00.000Z" };
-const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionId: null, sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
+const PLAYER_MAPS: PlayerCodexMap[] = [
+  { id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", parentMapId: null, tags: [] }
+];
+const PLAYER_ENTRY: PlayerCodexChronicleRecord = {
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "The party crossed the mists.",
+  sessionId: null,
+  sessionNumber: 3,
+  realDate: null,
+  inWorldLabel: null,
+  inWorldDate: null,
+  calendarInstant: null,
+  tags: [],
+  payload: null,
+  fired: false,
+  createdAt: "2026-07-20T00:00:00.000Z"
+};
+const PLAYER_OLDER: PlayerCodexChronicleRecord = {
+  ...PLAYER_ENTRY,
+  id: "j0",
+  text: "They left Daggerford.",
+  sessionId: null,
+  sessionNumber: 1,
+  createdAt: "2026-07-01T00:00:00.000Z"
+};
 /** A revealed dated `event` page on the same chronicle. */
-const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false, createdAt: "2026-07-10T00:00:00.000Z" };
+const PLAYER_EVENT: PlayerCodexChronicleRecord = {
+  kind: "event",
+  id: "p9",
+  title: "The Sundering",
+  text: "The sky tore open.",
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: "Hammer 1, 1492 DR",
+  inWorldDate: null,
+  calendarInstant: null,
+  tags: [],
+  payload: null,
+  fired: false,
+  createdAt: "2026-07-10T00:00:00.000Z"
+};
 const playerDefaults = () => {
   playerListPages.mockResolvedValue(PLAYER_PAGES);
   playerListMaps.mockResolvedValue(PLAYER_MAPS);
@@ -151,7 +292,9 @@ describe("Home is the section name, and 'World' is not a destination (CI-7 / D1)
 
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
     // "World" is a nav group eyebrow, not a destination.
-    expect(within(screen.getByRole("navigation", { name: "Codex sections" })).queryByRole("button", { name: "World" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Codex sections" })).queryByRole("button", { name: "World" })
+    ).not.toBeInTheDocument();
   });
 
   it("on the PLAYER mode bar too — the split the plan warned about is between these two", async () => {
@@ -160,7 +303,9 @@ describe("Home is the section name, and 'World' is not a destination (CI-7 / D1)
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
 
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
-    expect(within(screen.getAllByRole("navigation", { name: "Codex sections" })[0]).queryByRole("button", { name: "World" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getAllByRole("navigation", { name: "Codex sections" })[0]).queryByRole("button", { name: "World" })
+    ).not.toBeInTheDocument();
     // Players land here too.
     expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
   });
@@ -188,7 +333,13 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     /** Server order is ascending, so any recency the dashboard shows is its own work. */
     chronicle.mockResolvedValue([
       RECORD({ id: "j1", text: "The party crossed the mists.", createdAt: "2026-07-01T00:00:00.000Z" }),
-      RECORD({ kind: "combat", id: "j2", text: "A battle was fought here.", sourceEncounterId: 7, createdAt: "2026-07-20T00:00:00.000Z" })
+      RECORD({
+        kind: "combat",
+        id: "j2",
+        text: "A battle was fought here.",
+        sourceEncounterId: 7,
+        createdAt: "2026-07-20T00:00:00.000Z"
+      })
     ]);
     listMaps.mockResolvedValue([MAP_OTHER, MAP_TARGET]);
   });
@@ -274,12 +425,27 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
  */
 describe("A record with a card of its own does not also sit in the feed (owner decision, 2026-07-30)", () => {
   const DEADLINE = RECORD({
-    kind: "deadline", id: "d1", text: "The duke's ultimatum expires.", fired: false,
-    inWorldLabel: "Hammer 10, 1492 DR", calendarInstant: 1492 * 30 + 9, inWorldDate: { year: 1492, month: 0, day: 10 }
+    kind: "deadline",
+    id: "d1",
+    text: "The duke's ultimatum expires.",
+    fired: false,
+    inWorldLabel: "Hammer 10, 1492 DR",
+    calendarInstant: 1492 * 30 + 9,
+    inWorldDate: { year: 1492, month: 0, day: 10 }
   });
-  const STANDING = RECORD({ kind: "standing", id: "s1", text: "", payload: { factionPageId: "p1", delta: -2, reason: "the stolen ledger" } });
+  const STANDING = RECORD({
+    kind: "standing",
+    id: "s1",
+    text: "",
+    payload: { factionPageId: "p1", delta: -2, reason: "the stolen ledger" }
+  });
   const MILESTONE = RECORD({ kind: "milestone", id: "m1", text: "", payload: { level: 5, reason: "Barovia" } });
-  const DOWNTIME = RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging", days: 7, characterPageId: null, applied: false } });
+  const DOWNTIME = RECORD({
+    kind: "downtime",
+    id: "w1",
+    text: "A quiet tenday.",
+    payload: { who: "Aldric", activity: "Forging", days: 7, characterPageId: null, applied: false }
+  });
 
   beforeEach(() => {
     gmDefaults();
@@ -300,7 +466,9 @@ describe("A record with a card of its own does not also sit in the feed (owner d
     const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(feed.queryByText("The duke's ultimatum expires.")).not.toBeInTheDocument();
     // Still shown, in its card: de-duplicated, not deleted.
-    expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByText("The duke's ultimatum expires.")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Deadlines" })).getByText("The duke's ultimatum expires.")
+    ).toBeInTheDocument();
   });
 
   it("keeps standing changes out of the feed, where five of them used to crowd out every real entry", async () => {
@@ -335,7 +503,9 @@ describe("A record with a card of its own does not also sit in the feed (owner d
     const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(feed.queryByText("A quiet tenday.")).not.toBeInTheDocument();
     // Still shown, in its card.
-    expect(within(screen.getByRole("navigation", { name: "Downtime pending" })).getByText(/Aldric/)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Downtime pending" })).getByText(/Aldric/)
+    ).toBeInTheDocument();
   });
 });
 
@@ -348,8 +518,10 @@ describe("The player's Campaign dashboard is the server's projection (CI-7, view
 
     const journal = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(journal.getByText("The party crossed the mists.")).toBeInTheDocument();
-    expect((journal.getAllByRole("button")[0].textContent ?? "")).toContain("The party crossed the mists.");
-    expect(within(await screen.findByRole("navigation", { name: "Maps in the atlas" })).getByText("Barovia map")).toBeInTheDocument();
+    expect(journal.getAllByRole("button")[0].textContent ?? "").toContain("The party crossed the mists.");
+    expect(
+      within(await screen.findByRole("navigation", { name: "Maps in the atlas" })).getByText("Barovia map")
+    ).toBeInTheDocument();
     // Player map rows carry no reveal state, so neither visibility marker appears.
     expect(screen.queryByText("GM only")).not.toBeInTheDocument();
     expect(screen.queryByText("Shown")).not.toBeInTheDocument();
@@ -361,9 +533,15 @@ describe("The player's Campaign dashboard is the server's projection (CI-7, view
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
 
-    await user.click(within(await screen.findByRole("navigation", { name: "Latest journal activity" })).getByText("The party crossed the mists."));
+    await user.click(
+      within(await screen.findByRole("navigation", { name: "Latest journal activity" })).getByText(
+        "The party crossed the mists."
+      )
+    );
 
     expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
-    await waitFor(() => expect(document.getElementById("codex-player-entry-j1")).toHaveAttribute("aria-current", "true"));
+    await waitFor(() =>
+      expect(document.getElementById("codex-player-entry-j1")).toHaveAttribute("aria-current", "true")
+    );
   });
 });

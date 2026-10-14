@@ -38,12 +38,28 @@ describe("StableSwap", () => {
 
 describe("Switch with a state-dependent label", () => {
   it("reserves the other state's width, and swaps the two on toggle", () => {
-    const view = render(<Switch checked onChange={() => {}} label="Shown to players" labelAlternate="Hidden from players" aria-label="Show this page to players" />);
+    const view = render(
+      <Switch
+        checked
+        onChange={() => {}}
+        label="Shown to players"
+        labelAlternate="Hidden from players"
+        aria-label="Show this page to players"
+      />
+    );
     const button = screen.getByRole("switch");
     expect(button.textContent).toBe("Shown to players");
     expect(ghostOf(button)!.getAttribute("data-stable-swap-alt")).toBe("Hidden from players");
 
-    view.rerender(<Switch checked={false} onChange={() => {}} label="Hidden from players" labelAlternate="Shown to players" aria-label="Show this page to players" />);
+    view.rerender(
+      <Switch
+        checked={false}
+        onChange={() => {}}
+        label="Hidden from players"
+        labelAlternate="Shown to players"
+        aria-label="Show this page to players"
+      />
+    );
     expect(screen.getByRole("switch").textContent).toBe("Hidden from players");
     // The reservation swaps with the label, so the wider string is reserved in both states.
     expect(ghostOf(screen.getByRole("switch"))!.getAttribute("data-stable-swap-alt")).toBe("Shown to players");

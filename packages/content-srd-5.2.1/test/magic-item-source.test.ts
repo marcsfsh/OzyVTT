@@ -11,16 +11,20 @@ import { describe, expect, it } from "vitest";
  * italics: every entry, creatures included, has an italic second line.
  */
 
-const SOURCE = fileURLToPath(
-  new URL("../sources/dnd-5e-srd-markdown/magic-items.md", import.meta.url)
-);
-const PROVENANCE = fileURLToPath(
-  new URL("../sources/dnd-5e-srd-markdown/PROVENANCE.json", import.meta.url)
-);
+const SOURCE = fileURLToPath(new URL("../sources/dnd-5e-srd-markdown/magic-items.md", import.meta.url));
+const PROVENANCE = fileURLToPath(new URL("../sources/dnd-5e-srd-markdown/PROVENANCE.json", import.meta.url));
 
 /** The nine category words an SRD magic-item type line opens with. */
 const CATEGORY_WORDS = [
-  "Wondrous Item", "Weapon", "Potion", "Ring", "Armor", "Wand", "Staff", "Rod", "Scroll"
+  "Wondrous Item",
+  "Weapon",
+  "Potion",
+  "Ring",
+  "Armor",
+  "Wand",
+  "Staff",
+  "Rod",
+  "Scroll"
 ] as const;
 
 /** The two embedded creature stat blocks in the A-Z run. Named, because a silent filter hides a parse bug. */
@@ -29,7 +33,11 @@ const NOT_ITEMS = ["Giant Fly", "Avatar of Death"] as const;
 const raw = readFileSync(SOURCE, "utf8");
 const lines = raw.split("\n");
 
-interface Entry { name: string; typeLine: string; line: number }
+interface Entry {
+  name: string;
+  typeLine: string;
+  line: number;
+}
 
 const azHeadingIndex = lines.findIndex((l) => l.startsWith("## Magic Items A"));
 
@@ -52,8 +60,9 @@ const nonItems = entries.filter((e) => !opensWithCategory(e.typeLine));
 
 describe("the vendored magic-item source", () => {
   it("is the exact file C5 vendored, byte for byte", () => {
-    expect(createHash("sha256").update(raw).digest("hex"))
-      .toBe("96c71ad35dddf0e79e47ac3d7bbe96704b5209c1f6e1bf01d543080789e18e98");
+    expect(createHash("sha256").update(raw).digest("hex")).toBe(
+      "96c71ad35dddf0e79e47ac3d7bbe96704b5209c1f6e1bf01d543080789e18e98"
+    );
     // `wc -l` counts newlines; the trailing newline yields one extra empty element in `lines`.
     expect(lines.length - 1).toBe(5015);
     expect(Buffer.byteLength(raw, "utf8")).toBe(244314);
@@ -61,7 +70,9 @@ describe("the vendored magic-item source", () => {
 
   it("is recorded in PROVENANCE.json as vendored, not as deliberately left out", () => {
     const provenance = JSON.parse(readFileSync(PROVENANCE, "utf8")) as {
-      files: string[]; notVendored: string; commit: string;
+      files: string[];
+      notVendored: string;
+      commit: string;
     };
     expect(provenance.files).toContain("magic-items.md");
     expect(provenance.notVendored).not.toContain("magic-items.md");
@@ -81,8 +92,7 @@ describe("the vendored magic-item source", () => {
     expect(entries.filter((e) => /^_.*_$/.test(e.typeLine))).toHaveLength(260);
     expect(items).toHaveLength(258);
     expect(nonItems.map((e) => e.name)).toEqual([...NOT_ITEMS]);
-    expect(nonItems.map((e) => e.typeLine))
-      .toEqual(["_Large Beast, Unaligned_", "_Medium Undead, Neutral Evil_"]);
+    expect(nonItems.map((e) => e.typeLine)).toEqual(["_Large Beast, Unaligned_", "_Medium Undead, Neutral Evil_"]);
   });
 
   it("distributes those 258 items over the nine categories C6 maps to slots", () => {
@@ -93,8 +103,15 @@ describe("the vendored magic-item source", () => {
       histogram[word] = (histogram[word] ?? 0) + 1;
     }
     expect(histogram).toEqual({
-      "Wondrous Item": 127, Weapon: 33, Potion: 24, Ring: 22, Armor: 19,
-      Wand: 13, Staff: 12, Rod: 7, Scroll: 1
+      "Wondrous Item": 127,
+      Weapon: 33,
+      Potion: 24,
+      Ring: 22,
+      Armor: 19,
+      Wand: 13,
+      Staff: 12,
+      Rod: 7,
+      Scroll: 1
     });
     expect(Object.values(histogram).reduce((a, b) => a + b, 0)).toBe(258);
   });

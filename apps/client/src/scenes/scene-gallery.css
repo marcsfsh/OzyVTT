@@ -1,15 +1,43 @@
 /* Scene gallery hub frame; cards and grid come from @vtt/ui `.nh-gallery` / `.nh-card`. */
-.scene-gallery-hub { display: flex; flex-direction: column; gap: var(--space-4); }
+.scene-gallery-hub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
 /* The head is a row: the helper sits on the heading's baseline, and wraps below ~560px. */
-.scene-gallery-head { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); }
-.scene-gallery-head h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h1); }
-.scene-gallery-head p { margin: 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.scene-gallery-head {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.scene-gallery-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-h1);
+}
+.scene-gallery-head p {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
 
-.scene-gallery-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.scene-gallery-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 
 /* The "New scene" door takes the resting glow (`--nh-glow`, the Button primitive's own hook, which
    follows the chamfer). */
-.scene-gallery-bar .nh-btn--primary { --nh-glow: var(--glow-drop-magenta); }
+.scene-gallery-bar .nh-btn--primary {
+  --nh-glow: var(--glow-drop-magenta);
+}
 
 /* Each card's Go live is a magenta edge rather than a magenta fill at rest, so nine of them do not
    drown out the door above; hover keeps the primitive's fill and glow. */
@@ -19,47 +47,103 @@
   color: var(--magenta-hi);
 }
 
-.scene-live-note { color: var(--magenta); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .02em; }
+.scene-live-note {
+  color: var(--magenta);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
 
-.scenes-open-row { display: flex; margin-bottom: var(--space-3); }
-.scenes-open { max-width: 100%; }
-.scenes-open .scenes-open-icon { margin-right: var(--space-1); font-size: 1.05em; line-height: 1; }
-.scenes-open .scenes-open-caret { margin-left: var(--space-1); font-size: .8em; opacity: .7; }
+.scenes-open-row {
+  display: flex;
+  margin-bottom: var(--space-3);
+}
+.scenes-open {
+  max-width: 100%;
+}
+.scenes-open .scenes-open-icon {
+  margin-right: var(--space-1);
+  font-size: 1.05em;
+  line-height: 1;
+}
+.scenes-open .scenes-open-caret {
+  margin-left: var(--space-1);
+  font-size: 0.8em;
+  opacity: 0.7;
+}
 
 /* Square cards in the hub and the picker: the thumbnail flexes to fill the space above the title and
    actions. `align-items: start` stops the grid stretching the aspect ratio. */
-.scene-gallery-hub .nh-gallery { align-items: start; }
-.scene-gallery-hub .nh-card { aspect-ratio: 1 / 1; min-height: 0; }
-.scene-gallery-hub .nh-card-thumb { flex: 1 1 auto; aspect-ratio: auto; min-height: 0; }
-.scene-gallery-hub .nh-card--new { aspect-ratio: 1 / 1; height: auto; min-height: 0; }
+.scene-gallery-hub .nh-gallery {
+  align-items: start;
+}
+.scene-gallery-hub .nh-card {
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+}
+.scene-gallery-hub .nh-card-thumb {
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+  min-height: 0;
+}
+.scene-gallery-hub .nh-card--new {
+  aspect-ratio: 1 / 1;
+  height: auto;
+  min-height: 0;
+}
 
 /* As the Scenes tab surface (`.pane-frame`, the surface instance only) the heading and command bar
    are pinned and the wrapper around the grid is the scroll region; the grid itself must not be (a
    definite block size stops it sizing rows from cards). The gutter keeps card hover lifts and ⋯
    popovers from being clipped. */
-.scene-gallery-grid { min-width: 0; }
+.scene-gallery-grid {
+  min-width: 0;
+}
 /* The bottom padding restates the sky's horizon band (styles.css `.pane-scene > .scroll-y`), because
    this more specific selector would otherwise override it. */
 .scene-gallery-hub.pane-frame > .scene-gallery-grid {
-  padding: var(--space-1) var(--space-1) calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
+  padding: var(--space-1) var(--space-1)
+    calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
 }
 
 /* Phone: two columns with the 16/10 thumb instead of 358px squares, and stacked actions so each
    keeps a full-width 44px target. The reorder grip has no edge-autoscroll, so off-screen cards are
    reordered via the ⋯ menu's Move earlier / later. */
 @media (max-width: 560px) {
-  .scene-gallery-hub .nh-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
-  .scene-gallery-hub .nh-card { aspect-ratio: auto; }
-  .scene-gallery-hub .nh-card--new { aspect-ratio: auto; min-height: 9rem; }
-  .scene-gallery-hub .nh-card-thumb { flex: none; aspect-ratio: 16 / 10; }
+  .scene-gallery-hub .nh-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .scene-gallery-hub .nh-card {
+    aspect-ratio: auto;
+  }
+  .scene-gallery-hub .nh-card--new {
+    aspect-ratio: auto;
+    min-height: 9rem;
+  }
+  .scene-gallery-hub .nh-card-thumb {
+    flex: none;
+    aspect-ratio: 16 / 10;
+  }
   /* One line of meta at this width. */
-  .scene-gallery-hub .nh-card-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .scene-gallery-hub .nh-card-actions { flex-direction: column; align-items: stretch; }
+  .scene-gallery-hub .nh-card-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .scene-gallery-hub .nh-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* The picker popup widens the dialog so the squares have room. */
-.nh-modal.scenes-modal { max-width: min(100vw - 2rem, 68rem); }
-.scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.nh-modal.scenes-modal {
+  max-width: min(100vw - 2rem, 68rem);
+}
+.scenes-modal .nh-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
 
 /* Drag-to-reorder grip (pointer + touch; keyboard uses the ⋯ menu). Same 1.75rem paint and
    `.tap-target` hit area as the ⋯ trigger beside it. */
@@ -78,7 +162,9 @@
   line-height: 1;
   cursor: grab;
   touch-action: none;
-  transition: color var(--dur-hover), background var(--dur-hover);
+  transition:
+    color var(--dur-hover),
+    background var(--dur-hover);
 }
 .scene-card-grip::after {
   content: "";
@@ -89,11 +175,27 @@
   height: max(100%, var(--tap-min));
   transform: translate(-50%, -50%);
 }
-.scene-card-grip:hover { color: var(--text); background: var(--surface-2); }
-.scene-card-grip:active { cursor: grabbing; }
-.scene-card-grip:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
-.nh-card.is-dragging { opacity: .55; }
+.scene-card-grip:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.scene-card-grip:active {
+  cursor: grabbing;
+}
+.scene-card-grip:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+.nh-card.is-dragging {
+  opacity: 0.55;
+}
 
 /* Lift a card whose ⋯ menu is open above its neighbours so the popover is not clipped. */
-.scene-gallery-hub .nh-card:has(details[open]) { z-index: 5; }
-@media (prefers-reduced-motion: reduce) { .scene-card-grip { transition: none; } }
+.scene-gallery-hub .nh-card:has(details[open]) {
+  z-index: 5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-card-grip {
+    transition: none;
+  }
+}

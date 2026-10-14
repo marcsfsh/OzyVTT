@@ -1,19 +1,45 @@
 import { describe, expect, it } from "vitest";
 import {
-  EPIC_BOON_LEVEL, SRD_CLASS_IDS, SRD_CLASS_PROGRESSION, asiLevelsFor, casterProgressionFor,
-  hitDieFor, isAsiLevel, meetsMulticlassPrerequisites, statPriorityFor
+  EPIC_BOON_LEVEL,
+  SRD_CLASS_IDS,
+  SRD_CLASS_PROGRESSION,
+  asiLevelsFor,
+  casterProgressionFor,
+  hitDieFor,
+  isAsiLevel,
+  meetsMulticlassPrerequisites,
+  statPriorityFor
 } from "../src/class-data.js";
 import {
-  FULL_CASTER_SLOTS, hitDicePool, hitDieAverage, hitPointPool, hitPointsAtLevel1, hitPointsPerLevel,
-  multiclassCasterLevel, multiclassPactSlots, multiclassSpellSlots, pactSlotsForLevel, spellSlotsForClass
+  FULL_CASTER_SLOTS,
+  hitDicePool,
+  hitDieAverage,
+  hitPointPool,
+  hitPointsAtLevel1,
+  hitPointsPerLevel,
+  multiclassCasterLevel,
+  multiclassPactSlots,
+  multiclassSpellSlots,
+  pactSlotsForLevel,
+  spellSlotsForClass
 } from "../src/progression.js";
 import { proficiencyBonusForLevel } from "../src/character.js";
 
 describe("SRD class data", () => {
   it("covers the twelve SRD classes with a complete stat priority each", () => {
     expect(SRD_CLASS_IDS).toEqual([
-      "barbarian", "bard", "cleric", "druid", "fighter", "monk",
-      "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"
+      "barbarian",
+      "bard",
+      "cleric",
+      "druid",
+      "fighter",
+      "monk",
+      "paladin",
+      "ranger",
+      "rogue",
+      "sorcerer",
+      "warlock",
+      "wizard"
     ]);
     for (const classId of SRD_CLASS_IDS) {
       const priority = statPriorityFor(classId);
@@ -105,7 +131,9 @@ describe("hit points", () => {
   });
 
   it("uses the SRD fixed averages", () => {
-    expect([hitDieAverage("d6"), hitDieAverage("d8"), hitDieAverage("d10"), hitDieAverage("d12")]).toEqual([4, 5, 6, 7]);
+    expect([hitDieAverage("d6"), hitDieAverage("d8"), hitDieAverage("d10"), hitDieAverage("d12")]).toEqual([
+      4, 5, 6, 7
+    ]);
     expect(hitPointsPerLevel("d10", 2)).toBe(8); // 6 + 2
     expect(hitPointsPerLevel("d6", 1)).toBe(5); // 4 + 1
   });
@@ -136,9 +164,25 @@ describe("hit points", () => {
 
   it("totals a multiclass pool from the STARTING class's maximum die", () => {
     // Fighter 3 / Wizard 2, CON +2: 12 (F1 max) + 2x8 (F2-3) + 2x6 (W1-2 average d6+2) = 40
-    expect(hitPointPool([{ classId: "fighter", level: 3 }, { classId: "wizard", level: 2 }], 2)).toBe(12 + 16 + 12);
+    expect(
+      hitPointPool(
+        [
+          { classId: "fighter", level: 3 },
+          { classId: "wizard", level: 2 }
+        ],
+        2
+      )
+    ).toBe(12 + 16 + 12);
     // Reversing the order changes level 1, exactly as the SRD does.
-    expect(hitPointPool([{ classId: "wizard", level: 2 }, { classId: "fighter", level: 3 }], 2)).toBe(8 + 6 + 24);
+    expect(
+      hitPointPool(
+        [
+          { classId: "wizard", level: 2 },
+          { classId: "fighter", level: 3 }
+        ],
+        2
+      )
+    ).toBe(8 + 6 + 24);
   });
 
   it("consumes supplied rolls in order and falls back to the average when they run out", () => {
@@ -147,14 +191,24 @@ describe("hit points", () => {
   });
 
   it("pools hit DICE for the short-rest tracker, biggest die first", () => {
-    expect(hitDicePool([{ classId: "fighter", level: 3 }, { classId: "wizard", level: 2 }]))
-      .toEqual([{ die: "d10", count: 3 }, { die: "d6", count: 2 }]);
+    expect(
+      hitDicePool([
+        { classId: "fighter", level: 3 },
+        { classId: "wizard", level: 2 }
+      ])
+    ).toEqual([
+      { die: "d10", count: 3 },
+      { die: "d6", count: 2 }
+    ]);
     // Two d8 classes merge into one row.
-    expect(hitDicePool([{ classId: "rogue", level: 2 }, { classId: "cleric", level: 1 }]))
-      .toEqual([{ die: "d8", count: 3 }]);
+    expect(
+      hitDicePool([
+        { classId: "rogue", level: 2 },
+        { classId: "cleric", level: 1 }
+      ])
+    ).toEqual([{ die: "d8", count: 3 }]);
     // An explicit per-class hit die (the sheet's own `character.classes[].hitDie`) wins over the table.
-    expect(hitDicePool([{ classId: "moon-warden", level: 4, hitDie: "d12" }]))
-      .toEqual([{ die: "d12", count: 4 }]);
+    expect(hitDicePool([{ classId: "moon-warden", level: 4, hitDie: "d12" }])).toEqual([{ die: "d12", count: 4 }]);
   });
 });
 
@@ -215,41 +269,86 @@ describe("spell slots", () => {
 
 describe("multiclass casting", () => {
   it("gives a Fighter 1 / Wizard 1 a caster level of 1", () => {
-    expect(multiclassCasterLevel([{ classId: "fighter", level: 1 }, { classId: "wizard", level: 1 }])).toBe(1);
+    expect(
+      multiclassCasterLevel([
+        { classId: "fighter", level: 1 },
+        { classId: "wizard", level: 1 }
+      ])
+    ).toBe(1);
     expect(multiclassSpellSlots(1)).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
   it("counts full levels whole, half-caster levels halved ROUNDING UP, third-caster levels thirded", () => {
-    expect(multiclassCasterLevel([{ classId: "wizard", level: 5 }, { classId: "cleric", level: 3 }])).toBe(8);
+    expect(
+      multiclassCasterLevel([
+        { classId: "wizard", level: 5 },
+        { classId: "cleric", level: 3 }
+      ])
+    ).toBe(8);
     // SRD 5.2.1 Multiclassing: Paladin and Ranger levels count half, rounded up.
     expect(multiclassCasterLevel([{ classId: "paladin", level: 5 }])).toBe(3);
-    expect(multiclassCasterLevel([{ classId: "paladin", level: 6 }, { classId: "wizard", level: 4 }])).toBe(7);
-    expect(multiclassCasterLevel([{ classId: "ranger", level: 3 }, { classId: "druid", level: 2 }])).toBe(4);
+    expect(
+      multiclassCasterLevel([
+        { classId: "paladin", level: 6 },
+        { classId: "wizard", level: 4 }
+      ])
+    ).toBe(7);
+    expect(
+      multiclassCasterLevel([
+        { classId: "ranger", level: 3 },
+        { classId: "druid", level: 2 }
+      ])
+    ).toBe(4);
     // Third-casters keep the round-down default; the SRD names only Paladin and Ranger for round-up.
     expect(multiclassCasterLevel([{ classId: "fighter", level: 7, casterProgression: "third" }])).toBe(2);
   });
 
   it("gives a Paladin 3 / Wizard 1 the 2nd-level slot row the round-down bug ate", () => {
     // Paladin 3 -> ceil(3/2) = 2, Wizard 1 -> 1: caster level 3, which is 4/2 on the shared table.
-    expect(multiclassCasterLevel([{ classId: "paladin", level: 3 }, { classId: "wizard", level: 1 }])).toBe(3);
-    expect(multiclassSpellSlots(multiclassCasterLevel([{ classId: "paladin", level: 3 }, { classId: "wizard", level: 1 }])))
-      .toEqual([4, 2, 0, 0, 0, 0, 0, 0, 0]);
+    expect(
+      multiclassCasterLevel([
+        { classId: "paladin", level: 3 },
+        { classId: "wizard", level: 1 }
+      ])
+    ).toBe(3);
+    expect(
+      multiclassSpellSlots(
+        multiclassCasterLevel([
+          { classId: "paladin", level: 3 },
+          { classId: "wizard", level: 1 }
+        ])
+      )
+    ).toEqual([4, 2, 0, 0, 0, 0, 0, 0, 0]);
     // A half-caster on its own agrees with the single-class table at every level (both round up).
     for (let level = 1; level <= 20; level += 1) {
-      expect(multiclassSpellSlots(multiclassCasterLevel([{ classId: "paladin", level }])), `paladin ${level}`)
-        .toEqual(spellSlotsForClass("paladin", level));
+      expect(multiclassSpellSlots(multiclassCasterLevel([{ classId: "paladin", level }])), `paladin ${level}`).toEqual(
+        spellSlotsForClass("paladin", level)
+      );
     }
   });
 
   it("excludes Warlock levels from the caster level and tracks pact slots separately", () => {
-    expect(multiclassCasterLevel([{ classId: "warlock", level: 5 }, { classId: "sorcerer", level: 3 }])).toBe(3);
-    expect(multiclassPactSlots([{ classId: "warlock", level: 5 }, { classId: "sorcerer", level: 3 }])).toEqual({ level: 3, slots: 2 });
+    expect(
+      multiclassCasterLevel([
+        { classId: "warlock", level: 5 },
+        { classId: "sorcerer", level: 3 }
+      ])
+    ).toBe(3);
+    expect(
+      multiclassPactSlots([
+        { classId: "warlock", level: 5 },
+        { classId: "sorcerer", level: 3 }
+      ])
+    ).toEqual({ level: 3, slots: 2 });
     expect(multiclassPactSlots([{ classId: "sorcerer", level: 3 }])).toBeNull();
   });
 
   it("reads the shared multiclass table at the combined caster level", () => {
     // Paladin 6 / Wizard 4 -> caster level 7 -> 4/3/3/1
-    const casterLevel = multiclassCasterLevel([{ classId: "paladin", level: 6 }, { classId: "wizard", level: 4 }]);
+    const casterLevel = multiclassCasterLevel([
+      { classId: "paladin", level: 6 },
+      { classId: "wizard", level: 4 }
+    ]);
     expect(multiclassSpellSlots(casterLevel)).toEqual([4, 3, 3, 1, 0, 0, 0, 0, 0]);
     expect(multiclassSpellSlots(0)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(multiclassSpellSlots(20)).toEqual([4, 3, 3, 3, 3, 2, 2, 1, 1]);
@@ -257,8 +356,9 @@ describe("multiclass casting", () => {
 
   it("agrees with the single-class table for a single full caster", () => {
     for (let level = 1; level <= 20; level += 1) {
-      expect(multiclassSpellSlots(multiclassCasterLevel([{ classId: "wizard", level }])), `level ${level}`)
-        .toEqual(spellSlotsForClass("wizard", level));
+      expect(multiclassSpellSlots(multiclassCasterLevel([{ classId: "wizard", level }])), `level ${level}`).toEqual(
+        spellSlotsForClass("wizard", level)
+      );
     }
   });
 });

@@ -21,14 +21,35 @@ import "./scene-prep.css";
 const RECENT_COUNT = 10;
 
 const emit = (event: string, payload: Record<string, unknown>, onError: (message: string) => void, failure: string) => {
-  (socket.emit as (event: string, payload: unknown, ack: (result: MutationResult) => void) => void)(event, { commandId: newId(), ...payload }, (result) => {
-    if (!result.ok) onError(result.message ?? failure);
-  });
+  (socket.emit as (event: string, payload: unknown, ack: (result: MutationResult) => void) => void)(
+    event,
+    { commandId: newId(), ...payload },
+    (result) => {
+      if (!result.ok) onError(result.message ?? failure);
+    }
+  );
 };
 
 export function ScenePrepPanel({
-  heading, actors, staged, placedIds, onAdd, onRemove, mapName, mapNote, mapLocked, selectedMapId, onSelectMap,
-  mapToken, mapFallback, stagingRevealed, combatActive, busy = false, footer, emptyNote, placementHint
+  heading,
+  actors,
+  staged,
+  placedIds,
+  onAdd,
+  onRemove,
+  mapName,
+  mapNote,
+  mapLocked,
+  selectedMapId,
+  onSelectMap,
+  mapToken,
+  mapFallback,
+  stagingRevealed,
+  combatActive,
+  busy = false,
+  footer,
+  emptyNote,
+  placementHint
 }: Readonly<{
   /** The panel's own title. Omit when the surface already has one. */
   heading?: string;
@@ -72,7 +93,17 @@ export function ScenePrepPanel({
   const live = rosterActors(actors).filter((actor) => !actor.archived);
   const entries: readonly StagingEntry[] = staged.flatMap((actorId) => {
     const actor = byId.get(actorId);
-    return actor ? [{ actorId, name: actor.name, kind: actor.kind, placed: placedIds?.has(actorId) ?? false, revealed: actor.visibility !== "gm-only" }] : [];
+    return actor
+      ? [
+          {
+            actorId,
+            name: actor.name,
+            kind: actor.kind,
+            placed: placedIds?.has(actorId) ?? false,
+            revealed: actor.visibility !== "gm-only"
+          }
+        ]
+      : [];
   });
   const stagedSet = new Set(staged);
   const addableCharacters = live.filter((actor) => actor.kind !== "monster" && !stagedSet.has(actor.id));
@@ -85,69 +116,150 @@ export function ScenePrepPanel({
   /** The tray-level choice is the table's standing default, so every door agrees. */
   const setTrayReveal = (revealed: boolean) => {
     setRevealNew(revealed);
-    emit("table:set-staging-defaults", { visibility: revealed ? "public" : "gm-only" }, fail, "The staging default could not be changed.");
+    emit(
+      "table:set-staging-defaults",
+      { visibility: revealed ? "public" : "gm-only" },
+      fail,
+      "The staging default could not be changed."
+    );
     // The toast repeats exactly what the control now reads.
     toast(revealed ? "Shown to players." : "Hidden from players.", { tone: "info" });
   };
   const setEntryReveal = (actorId: string, revealed: boolean) => {
-    emit("actor:set-visibility", { actorId, visibility: revealed ? "public" : "gm-only" }, fail, "The token's visibility could not be changed.");
+    emit(
+      "actor:set-visibility",
+      { actorId, visibility: revealed ? "public" : "gm-only" },
+      fail,
+      "The token's visibility could not be changed."
+    );
   };
   /** Remove: out of this list, still on the roster. Mid-fight it is disruptive, so it asks. */
   const removeEntry = async (entry: StagingEntry) => {
-    if (combatActive && !(await confirm({ title: `Remove ${entry.name} from this fight?`, body: `${entry.name} stays on the roster.`, confirmLabel: "Remove" }))) return;
+    if (
+      combatActive &&
+      !(await confirm({
+        title: `Remove ${entry.name} from this fight?`,
+        body: `${entry.name} stays on the roster.`,
+        confirmLabel: "Remove"
+      }))
+    )
+      return;
     onRemove(entry.actorId);
   };
 
-  return <div className="scene-prep">
-    {heading && <h3 className="scene-prep-heading">{heading}</h3>}
+  return (
+    <div className="scene-prep">
+      {heading && <h3 className="scene-prep-heading">{heading}</h3>}
 
-    <div className="scene-prep-map">
-      <span className="scene-prep-map-name">Map: <strong>{mapName ?? "None yet"}</strong></span>
-      {!mapLocked && onSelectMap && <Button variant="secondary" size="sm" aria-expanded={pickingMap} onClick={() => setPickingMap((open) => !open)}>{pickingMap ? "Done" : mapName ? "Change" : "Pick a map"}</Button>}
+      <div className="scene-prep-map">
+        <span className="scene-prep-map-name">
+          Map: <strong>{mapName ?? "None yet"}</strong>
+        </span>
+        {!mapLocked && onSelectMap && (
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-expanded={pickingMap}
+            onClick={() => setPickingMap((open) => !open)}
+          >
+            {pickingMap ? "Done" : mapName ? "Change" : "Pick a map"}
+          </Button>
+        )}
+      </div>
+      {mapNote && pickingMap && <p className="scene-prep-note">{mapNote}</p>}
+      {pickingMap && !mapLocked && onSelectMap && (
+        <MapPicker
+          token={mapToken}
+          selectedId={selectedMapId}
+          fallback={mapFallback}
+          // A tile tap is a decision, so the picker folds away. After an upload it stays open, because the
+          // line under it says whether the new map's grid is set.
+          onSelect={(map, meta) => {
+            onSelectMap(map);
+            if (!meta?.fromUpload) setPickingMap(false);
+          }}
+        />
+      )}
+
+      <StagingTray
+        entries={entries}
+        revealNew={revealNew}
+        onRevealNewChange={setTrayReveal}
+        onRevealEntryChange={setEntryReveal}
+        onRemove={(entry) => void removeEntry(entry)}
+        busy={busy}
+        emptyNote={emptyNote}
+        placementHint={placementHint}
+      />
+
+      <div className="scene-prep-adds">
+        <Button
+          variant="secondary"
+          disabled={busy}
+          aria-expanded={addingCharacters}
+          onClick={() => setAddingCharacters((open) => !open)}
+        >
+          <IconPlus /> Add characters
+        </Button>
+        <Button variant="secondary" disabled={busy} onClick={() => setBrowsing(true)}>
+          <IconPlus /> Add monsters
+        </Button>
+      </div>
+      {addingCharacters && (
+        <div className="scene-prep-picklist scroll-y" role="group" aria-label="Add characters">
+          {addableCharacters.length === 0 ? (
+            <p className="scene-prep-note">Everyone on the roster is already staged.</p>
+          ) : (
+            addableCharacters.map((actor) => (
+              <button
+                key={actor.id}
+                type="button"
+                className="scene-prep-pick"
+                disabled={busy}
+                onClick={() => onAdd(actor.id)}
+              >
+                <strong>{actor.name}</strong>
+                <small>{actor.kind === "player-character" ? "Character" : "NPC"}</small>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Collapsed, below the Add button, last ten. */}
+      <details className="scene-prep-recent">
+        <summary>Recent{recent.length > 0 ? ` (${recent.length})` : ""}</summary>
+        {recent.length === 0 ? (
+          <p className="scene-prep-note">Monsters you have used before show up here.</p>
+        ) : (
+          <div className="scene-prep-picklist scroll-y">
+            {recent.map((actor) => (
+              <button
+                key={actor.id}
+                type="button"
+                className="scene-prep-pick"
+                disabled={busy}
+                onClick={() => onAdd(actor.id)}
+              >
+                <strong>{actor.name}</strong>
+                <small>{actor.visibility === "gm-only" ? "GM only" : "Shown to players"}</small>
+              </button>
+            ))}
+          </div>
+        )}
+      </details>
+
+      {footer && <div className="scene-prep-footer">{footer}</div>}
+
+      {browsing && (
+        <MonsterBrowser
+          visibility={revealNew ? "public" : "gm-only"}
+          joinEncounter={combatActive}
+          onClose={() => setBrowsing(false)}
+          onAdded={(actorId) => onAdd(actorId)}
+        />
+      )}
+      {dialog}
     </div>
-    {mapNote && pickingMap && <p className="scene-prep-note">{mapNote}</p>}
-    {pickingMap && !mapLocked && onSelectMap && <MapPicker
-      token={mapToken} selectedId={selectedMapId} fallback={mapFallback}
-      // A tile tap is a decision, so the picker folds away. After an upload it stays open, because the
-      // line under it says whether the new map's grid is set.
-      onSelect={(map, meta) => { onSelectMap(map); if (!meta?.fromUpload) setPickingMap(false); }}
-    />}
-
-    <StagingTray
-      entries={entries} revealNew={revealNew} onRevealNewChange={setTrayReveal} onRevealEntryChange={setEntryReveal}
-      onRemove={(entry) => void removeEntry(entry)} busy={busy} emptyNote={emptyNote} placementHint={placementHint}
-    />
-
-    <div className="scene-prep-adds">
-      <Button variant="secondary" disabled={busy} aria-expanded={addingCharacters} onClick={() => setAddingCharacters((open) => !open)}><IconPlus /> Add characters</Button>
-      <Button variant="secondary" disabled={busy} onClick={() => setBrowsing(true)}><IconPlus /> Add monsters</Button>
-    </div>
-    {addingCharacters && <div className="scene-prep-picklist scroll-y" role="group" aria-label="Add characters">
-      {addableCharacters.length === 0
-        ? <p className="scene-prep-note">Everyone on the roster is already staged.</p>
-        : addableCharacters.map((actor) => <button key={actor.id} type="button" className="scene-prep-pick" disabled={busy} onClick={() => onAdd(actor.id)}>
-            <strong>{actor.name}</strong><small>{actor.kind === "player-character" ? "Character" : "NPC"}</small>
-          </button>)}
-    </div>}
-
-    {/* Collapsed, below the Add button, last ten. */}
-    <details className="scene-prep-recent">
-      <summary>Recent{recent.length > 0 ? ` (${recent.length})` : ""}</summary>
-      {recent.length === 0
-        ? <p className="scene-prep-note">Monsters you have used before show up here.</p>
-        : <div className="scene-prep-picklist scroll-y">{recent.map((actor) => <button key={actor.id} type="button" className="scene-prep-pick" disabled={busy} onClick={() => onAdd(actor.id)}>
-            <strong>{actor.name}</strong><small>{actor.visibility === "gm-only" ? "GM only" : "Shown to players"}</small>
-          </button>)}</div>}
-    </details>
-
-    {footer && <div className="scene-prep-footer">{footer}</div>}
-
-    {browsing && <MonsterBrowser
-      visibility={revealNew ? "public" : "gm-only"}
-      joinEncounter={combatActive}
-      onClose={() => setBrowsing(false)}
-      onAdded={(actorId) => onAdd(actorId)}
-    />}
-    {dialog}
-  </div>;
+  );
 }

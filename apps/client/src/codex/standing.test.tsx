@@ -11,38 +11,76 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    standingApi: { ...actual.standingApi, set: (...a: unknown[]) => setStanding(...a), reveal: (...a: unknown[]) => revealStanding(...a) }
+    standingApi: {
+      ...actual.standingApi,
+      set: (...a: unknown[]) => setStanding(...a),
+      reveal: (...a: unknown[]) => revealStanding(...a)
+    }
   };
 });
 
 import { CampaignHome, type CampaignStanding } from "./CampaignHome";
 import { StandingAdjuster } from "./StandingAdjuster";
 import {
-  CHRONICLE_KIND_META, STANDING_MAX, STANDING_METER_MAX, STANDING_MIN, STANDING_TIERS,
-  clampStanding, milestoneOf, milestoneSummaryLabel, standingChangeLabel, standingLabel,
-  standingMeterValue, standingOf, standingTier, standingValueLabel, downtimeOf, chronicleRowSummary } from "./chronicle";
+  CHRONICLE_KIND_META,
+  STANDING_MAX,
+  STANDING_METER_MAX,
+  STANDING_MIN,
+  STANDING_TIERS,
+  clampStanding,
+  milestoneOf,
+  milestoneSummaryLabel,
+  standingChangeLabel,
+  standingLabel,
+  standingMeterValue,
+  standingOf,
+  standingTier,
+  standingValueLabel,
+  downtimeOf,
+  chronicleRowSummary
+} from "./chronicle";
 import { CODEX_ICONS } from "./icons";
 import type { CodexChronicleRecord, CodexStanding } from "./api";
 
-
 const STANDING = (value: number, revealed = false): CodexStanding => ({
-  id: "s1", factionPageId: "f1", value, revealedToPlayers: revealed,
-  createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z"
+  id: "s1",
+  factionPageId: "f1",
+  value,
+  revealedToPlayers: revealed,
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z"
 });
 
 const CARD = (value: number, name = "The Zhentarim"): CampaignStanding => ({ factionPageId: "f1", name, value });
 
 const renderCard = (standing: readonly CampaignStanding[], onAdjustStanding?: (id: string) => void) =>
-  render(<CampaignHome pages={[]} standing={standing} onAdjustStanding={onAdjustStanding}
-    onPickType={vi.fn()} onPickTag={vi.fn()} onOpenPage={vi.fn()} onOpenEntry={vi.fn()} onOpenMap={vi.fn()} />);
+  render(
+    <CampaignHome
+      pages={[]}
+      standing={standing}
+      onAdjustStanding={onAdjustStanding}
+      onPickType={vi.fn()}
+      onPickTag={vi.fn()}
+      onOpenPage={vi.fn()}
+      onOpenEntry={vi.fn()}
+      onOpenMap={vi.fn()}
+    />
+  );
 
 const meterWidth = () => (document.querySelector(".nh-meter-fill") as HTMLElement).style.width;
 
 describe("The seven tiers are a reading rule with hard edges (CT-6 / M12-B)", () => {
   it("every tier is reachable, and each named boundary lands on the side it should", () => {
     // Worst to best; every tier must be reachable.
-    expect(STANDING_TIERS.map((tier) => tier.label))
-      .toEqual(["Hunted", "Hostile", "Unfriendly", "Uninvested", "Friendly", "Allied", "Exalted"]);
+    expect(STANDING_TIERS.map((tier) => tier.label)).toEqual([
+      "Hunted",
+      "Hostile",
+      "Unfriendly",
+      "Uninvested",
+      "Friendly",
+      "Allied",
+      "Exalted"
+    ]);
     expect(new Set(STANDING_TIERS.map((tier) => standingTier(tier.min))).size).toBe(7);
 
     // Each pair straddles one band edge.
@@ -141,15 +179,25 @@ describe("The card says where you stand, in words (CT-6 / R2)", () => {
 
   it("lists the factions that have taken a side first, either side", () => {
     renderCard([CARD(0, "Neutral guild"), CARD(-90, "The hunters"), CARD(30, "The friends")]);
-    const names = [...document.querySelectorAll(".codex-campaign-standingname .codex-list-title")].map((node) => node.textContent);
+    const names = [...document.querySelectorAll(".codex-campaign-standingname .codex-list-title")].map(
+      (node) => node.textContent
+    );
     expect(names).toEqual(["The hunters", "The friends", "Neutral guild"]);
   });
 });
 
 describe("Adjusting standing writes the reason with it (CT-6)", () => {
   const renderAdjuster = (standing: CodexStanding | null, onSaved = vi.fn()) => {
-    render(<StandingAdjuster gmToken="gm" factionPageId="f1" factionName="The Zhentarim" standing={standing}
-      onSaved={onSaved} onClose={vi.fn()} />);
+    render(
+      <StandingAdjuster
+        gmToken="gm"
+        factionPageId="f1"
+        factionName="The Zhentarim"
+        standing={standing}
+        onSaved={onSaved}
+        onClose={vi.fn()}
+      />
+    );
     return onSaved;
   };
 
@@ -183,13 +231,26 @@ describe("Adjusting standing writes the reason with it (CT-6)", () => {
 
   /** `setStanding` writes no prose, so the dashboard must summarise from the payload like the Journal does. */
   it("summarises a standing change and a milestone from their payload, not from empty prose", () => {
-    expect(chronicleRowSummary({ kind: "standing", text: "", gmText: null, payload: { factionPageId: "f1", delta: -80, reason: "Stole the Crown from under them." } }))
-      .toContain("Stole the Crown from under them.");
-    expect(chronicleRowSummary({ kind: "milestone", text: "", gmText: null, payload: { level: 5, reason: "Survived the drow city." } }))
-      .toContain("Survived the drow city.");
+    expect(
+      chronicleRowSummary({
+        kind: "standing",
+        text: "",
+        gmText: null,
+        payload: { factionPageId: "f1", delta: -80, reason: "Stole the Crown from under them." }
+      })
+    ).toContain("Stole the Crown from under them.");
+    expect(
+      chronicleRowSummary({
+        kind: "milestone",
+        text: "",
+        gmText: null,
+        payload: { level: 5, reason: "Survived the drow city." }
+      })
+    ).toContain("Survived the drow city.");
     // Prose still wins when present.
-    expect(chronicleRowSummary({ kind: "entry", text: "The party crossed the mists.", gmText: null, payload: null }))
-      .toBe("The party crossed the mists.");
+    expect(
+      chronicleRowSummary({ kind: "entry", text: "The party crossed the mists.", gmText: null, payload: null })
+    ).toBe("The party crossed the mists.");
     expect(chronicleRowSummary({ kind: "entry", text: "", gmText: null, payload: null })).toBe("");
   });
 
@@ -197,7 +258,9 @@ describe("Adjusting standing writes the reason with it (CT-6)", () => {
   it("explains why it will not arm when nothing has moved", async () => {
     renderAdjuster(STANDING(10));
     expect(screen.getByRole("button", { name: "Record change" })).toBeDisabled();
-    expect(screen.getByText("Type a different number to record a change. A change of zero records nothing.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Type a different number to record a change. A change of zero records nothing.")
+    ).toBeInTheDocument();
   });
 
   it("will not arm when nothing actually moved", async () => {
@@ -223,14 +286,30 @@ describe("Adjusting standing writes the reason with it (CT-6)", () => {
   });
 
   it("has nothing to reveal until a standing exists, and reveals through the shared route once it does", async () => {
-    const { unmount } = render(<StandingAdjuster gmToken="gm" factionPageId="f1" factionName="The Zhentarim"
-      standing={null} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const { unmount } = render(
+      <StandingAdjuster
+        gmToken="gm"
+        factionPageId="f1"
+        factionName="The Zhentarim"
+        standing={null}
+        onSaved={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
     expect(screen.queryByLabelText("Show this standing to players")).not.toBeInTheDocument();
     unmount();
 
     revealStanding.mockResolvedValue(STANDING(10, true));
-    render(<StandingAdjuster gmToken="gm" factionPageId="f1" factionName="The Zhentarim"
-      standing={STANDING(10)} onSaved={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <StandingAdjuster
+        gmToken="gm"
+        factionPageId="f1"
+        factionName="The Zhentarim"
+        standing={STANDING(10)}
+        onSaved={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
     await userEvent.setup().click(screen.getByLabelText("Show this standing to players"));
 
     await waitFor(() => expect(revealStanding).toHaveBeenCalledWith("gm", "f1", true));
@@ -255,13 +334,34 @@ describe("M12's two new chronicle kinds read by icon AND word (R2)", () => {
   it("a payload is only ever read as the kind it actually is", () => {
     // Without the kind gate a payload could render as the wrong kind.
     const record = (over: Partial<CodexChronicleRecord>): CodexChronicleRecord => ({
-      kind: "entry", id: "x", title: null, text: "", gmText: null, revealedToPlayers: false,
-      sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-      tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null,
-      fired: false, proposedDate: null, createdAt: "", updatedAt: "", ...over
+      kind: "entry",
+      id: "x",
+      title: null,
+      text: "",
+      gmText: null,
+      revealedToPlayers: false,
+      sessionId: null,
+      sessionNumber: null,
+      realDate: null,
+      inWorldLabel: null,
+      calendarInstant: null,
+      inWorldDate: null,
+      tags: [],
+      attachPageId: null,
+      attachMarkerId: null,
+      sourceEncounterId: null,
+      payload: null,
+      fired: false,
+      proposedDate: null,
+      createdAt: "",
+      updatedAt: "",
+      ...over
     });
     const milestone = record({ kind: "milestone", payload: { level: 5, reason: "Cleared the citadel" } });
-    const standing = record({ kind: "standing", payload: { factionPageId: "f1", delta: -20, reason: "Burned the caravan" } });
+    const standing = record({
+      kind: "standing",
+      payload: { factionPageId: "f1", delta: -20, reason: "Burned the caravan" }
+    });
 
     expect(milestoneOf(milestone)).toEqual({ level: 5, reason: "Cleared the citadel" });
     expect(standingOf(standing)).toEqual({ factionPageId: "f1", delta: -20, reason: "Burned the caravan" });
@@ -274,10 +374,13 @@ describe("M12's two new chronicle kinds read by icon AND word (R2)", () => {
   });
 
   it("says what each record was, in one line", () => {
-    expect(milestoneSummaryLabel({ level: 5, reason: "Cleared the citadel" })).toBe("Reached level 5 · Cleared the citadel");
+    expect(milestoneSummaryLabel({ level: 5, reason: "Cleared the citadel" })).toBe(
+      "Reached level 5 · Cleared the citadel"
+    );
     expect(milestoneSummaryLabel({ level: 5, reason: "  " })).toBe("Reached level 5");
-    expect(standingChangeLabel({ factionPageId: "f1", delta: -20, reason: "Burned the caravan" }, "The Zhentarim"))
-      .toBe("The Zhentarim · down 20 · Burned the caravan");
+    expect(
+      standingChangeLabel({ factionPageId: "f1", delta: -20, reason: "Burned the caravan" }, "The Zhentarim")
+    ).toBe("The Zhentarim · down 20 · Burned the caravan");
     expect(standingChangeLabel({ factionPageId: "f1", delta: 15, reason: "" }, "Harpers")).toBe("Harpers · up 15");
     expect(standingChangeLabel({ factionPageId: "f1", delta: 15, reason: "" }, null)).toBe("A faction · up 15");
   });

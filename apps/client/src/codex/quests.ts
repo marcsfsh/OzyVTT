@@ -13,7 +13,13 @@ export const QUEST_STATUS_LABEL: Readonly<Record<CodexQuestStatus, string>> = {
 };
 
 /** Lifecycle order (not alphabetical), and the only order a status picker offers. */
-export const QUEST_STATUS_ORDER: readonly CodexQuestStatus[] = ["not-started", "active", "completed", "failed", "canceled"];
+export const QUEST_STATUS_ORDER: readonly CodexQuestStatus[] = [
+  "not-started",
+  "active",
+  "completed",
+  "failed",
+  "canceled"
+];
 
 /**
  * Decorative only; `QUEST_STATUS_LABEL` carries the meaning. Both quiet states are `neutral`: a canceled
@@ -30,7 +36,9 @@ export function openQuests<T extends QuestStatusRef>(quests: readonly T[]): read
   return quests.filter((quest) => quest.status === "not-started" || quest.status === "active");
 }
 
-export function questProgress(objectives: readonly Readonly<{ done: boolean }>[]): Readonly<{ done: number; total: number; label: string }> {
+export function questProgress(
+  objectives: readonly Readonly<{ done: boolean }>[]
+): Readonly<{ done: number; total: number; label: string }> {
   const done = objectives.filter((objective) => objective.done).length;
   // Words, not "2/5", so it reads aloud.
   return { done, total: objectives.length, label: `${done} of ${objectives.length} done` };

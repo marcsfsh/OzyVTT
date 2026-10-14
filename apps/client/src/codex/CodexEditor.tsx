@@ -34,15 +34,30 @@ export type CodexEditorProps = Readonly<{
 }>;
 
 export function CodexEditor({
-  token, value, onChange, ariaLabel, placeholder, pages, excludePageId, onNavigate, gmLayer = false, knownTitles, fill = false, rows, id
+  token,
+  value,
+  onChange,
+  ariaLabel,
+  placeholder,
+  pages,
+  excludePageId,
+  onNavigate,
+  gmLayer = false,
+  knownTitles,
+  fill = false,
+  rows,
+  id
 }: CodexEditorProps) {
-  const suggest = useCallback((query: string) => {
-    const needle = query.trim().toLowerCase();
-    return pages
-      .filter((page) => page.id !== excludePageId && page.title.toLowerCase().includes(needle))
-      .slice(0, 6)
-      .map((page) => ({ id: page.id, label: page.title }));
-  }, [pages, excludePageId]);
+  const suggest = useCallback(
+    (query: string) => {
+      const needle = query.trim().toLowerCase();
+      return pages
+        .filter((page) => page.id !== excludePageId && page.title.toLowerCase().includes(needle))
+        .slice(0, 6)
+        .map((page) => ({ id: page.id, label: page.title }));
+    },
+    [pages, excludePageId]
+  );
 
   const titles = useMemo(
     () => knownTitles ?? new Set(pages.map((page) => pageLinkKey(page.title))),
@@ -59,7 +74,9 @@ export function CodexEditor({
         placeholder={placeholder}
         rows={rows}
         suggest={suggest}
-        renderPreview={(markdown) => <CodexMarkdown text={markdown} onNavigate={onNavigate} token={token} knownTitles={titles} />}
+        renderPreview={(markdown) => (
+          <CodexMarkdown text={markdown} onNavigate={onNavigate} token={token} knownTitles={titles} />
+        )}
         onUploadImage={async (file) => {
           const asset = await uploadCodexAsset(token, file);
           return `\n![${file.name.replace(/\.[^.]+$/, "")}](codex-asset:${asset.id})\n`;

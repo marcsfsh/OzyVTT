@@ -1,21 +1,43 @@
 /* The map takes whatever height the rows above leave, never a fraction of the viewport. */
-.encounter-map-interaction { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.encounter-map-interaction {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
 /* The tray floats over the map's top edge, so it appearing (on drag or with unplaced tokens) does not
    shove the map down. */
-.encounter-map-interaction:not(.enlarged) .encounter-token-tray { position: absolute; z-index: 4; top: 0; left: 0; right: 0; margin-bottom: 0; }
+.encounter-map-interaction:not(.enlarged) .encounter-token-tray {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-bottom: 0;
+}
 /* In enlarged mode (a flex column) an in-flow tray would steal height from the stage and jitter the
    map on every grab, so it floats here too, inset to the container's padding. */
-.encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: var(--space-4); left: var(--space-4); right: var(--space-4); margin-bottom: 0; }
+.encounter-map-interaction.enlarged .encounter-token-tray {
+  position: absolute;
+  z-index: 4;
+  top: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  margin-bottom: 0;
+}
 /* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc. The cut
    stays on a backing layer: `.tray-token` is the drag surface, and `clip-path` clips hit-testing. */
 .encounter-token-tray {
   position: relative;
   isolation: isolate;
   min-height: 3.6rem;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-2);
-  padding: var(--space-2) .7rem;
+  padding: var(--space-2) 0.7rem;
   border: 1px solid transparent;
   border-radius: 0;
   background: none;
@@ -36,21 +58,42 @@
   background: var(--material-fill);
   background-origin: border-box;
   background-clip: border-box;
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.encounter-token-tray.receiving { --tray-edge: var(--cyan); --material-fill: color-mix(in srgb, var(--surface-2) 92%, var(--cyan)); }
-.encounter-token-tray.receiving::before { border-style: dashed; }
-.encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
-.encounter-token-tray > div:first-child span { margin-top: .15rem; color: var(--text-muted); font-size: .72rem; }
-.encounter-token-tray-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
+.encounter-token-tray.receiving {
+  --tray-edge: var(--cyan);
+  --material-fill: color-mix(in srgb, var(--surface-2) 92%, var(--cyan));
+}
+.encounter-token-tray.receiving::before {
+  border-style: dashed;
+}
+.encounter-token-tray > div:first-child strong,
+.encounter-token-tray > div:first-child span {
+  display: block;
+}
+.encounter-token-tray > div:first-child span {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.encounter-token-tray-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
 /* `--chamfer-cut` must be restated, not just `--chamfer`: a custom property's `var()`s are substituted
    where it is declared, so it inherits from `:root` as a fixed polygon (see Badge.css). `--team` is
    the one value the three kinds change. */
 .tray-token {
   position: relative;
   isolation: isolate;
-  display: flex; align-items: center; gap: .45rem;
-  padding: .42rem .6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.6rem;
   border: 1px solid transparent;
   border-radius: 0;
   background: none;
@@ -59,8 +102,15 @@
   touch-action: none;
   --team: var(--cyan);
   --team-edge: color-mix(in srgb, var(--team) 45%, var(--line-strong));
-  --chamfer: .32rem;
-  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --chamfer: 0.32rem;
+  --chamfer-cut: polygon(
+    0 var(--chamfer),
+    var(--chamfer) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    0 100%
+  );
 }
 .tray-token::before {
   content: "";
@@ -74,25 +124,73 @@
   background: var(--material-plate);
   background-origin: border-box;
   background-clip: border-box;
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
 /* The edge brightens on hover, focus and press (touch has no hover). `border-color` is pinned
    transparent because the base `button:hover` rule (styles.css) would paint a second edge. */
-.tray-token:hover:not(:disabled), .tray-token:focus-visible, .tray-token:active:not(:disabled) { border-color: transparent; }
-.tray-token:hover:not(:disabled)::before, .tray-token:focus-visible::before, .tray-token:active:not(:disabled)::before { border-color: color-mix(in srgb, var(--team) 75%, var(--line-strong)); }
-.tray-token:active { cursor: grabbing; }
-.tray-token > span { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin: 0; border-radius: 50%; background: color-mix(in srgb, var(--team) 45%, var(--void)); color: #fff; font-weight: 900; }
+.tray-token:hover:not(:disabled),
+.tray-token:focus-visible,
+.tray-token:active:not(:disabled) {
+  border-color: transparent;
+}
+.tray-token:hover:not(:disabled)::before,
+.tray-token:focus-visible::before,
+.tray-token:active:not(:disabled)::before {
+  border-color: color-mix(in srgb, var(--team) 75%, var(--line-strong));
+}
+.tray-token:active {
+  cursor: grabbing;
+}
+.tray-token > span {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  margin: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--team) 45%, var(--void));
+  color: #fff;
+  font-weight: 900;
+}
 /* `--void` is light in daybreak, so white initials on the disc fail contrast there; daybreak alone
    switches to `--text`. */
-:root[data-theme="light"] .tray-token > span { color: var(--text); }
-.tray-token > strong { font-size: .75rem; }
-.tray-token.monster { --team: var(--magenta); }
-.tray-token.npc { --team: var(--indigo); }
-.tray-token.npc > span { background: color-mix(in srgb, var(--team) 48%, var(--void)); }
-.tray-token.hidden::before { border-style: dashed; }
-.tray-token.hidden { opacity: .76; }
+:root[data-theme="light"] .tray-token > span {
+  color: var(--text);
+}
+.tray-token > strong {
+  font-size: 0.75rem;
+}
+.tray-token.monster {
+  --team: var(--magenta);
+}
+.tray-token.npc {
+  --team: var(--indigo);
+}
+.tray-token.npc > span {
+  background: color-mix(in srgb, var(--team) 48%, var(--void));
+}
+.tray-token.hidden::before {
+  border-style: dashed;
+}
+.tray-token.hidden {
+  opacity: 0.76;
+}
 /* The stage: a 2px rim and corner ticks painted in front; nothing is painted behind the map. */
-.encounter-map-stage { --dock-side-width: 22rem; position: relative; flex: 1; min-height: 12rem; display: grid; place-items: center; overflow: hidden; border: var(--rim-w) solid var(--rim-color); border-radius: var(--radius-md); background: var(--void); touch-action: none; }
+.encounter-map-stage {
+  --dock-side-width: 22rem;
+  position: relative;
+  flex: 1;
+  min-height: 12rem;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: var(--rim-w) solid var(--rim-color);
+  border-radius: var(--radius-md);
+  background: var(--void);
+  touch-action: none;
+}
 /* The corner ticks: eight background layers on one `::after` (`::before` is left free for the
    material utilities). `pointer-events: none` is required: this box spans the stage and would
    otherwise swallow every press on the map. z-index 1 is above the map svg and below every control:
@@ -106,24 +204,43 @@
   --map-tick-len: 1.1rem;
   --map-tick-w: 2px;
   --map-tick: linear-gradient(var(--rim-color-hi), var(--rim-color-hi));
-  background-image: var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick);
+  background-image:
+    var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick),
+    var(--map-tick), var(--map-tick);
   background-repeat: no-repeat;
   background-size:
-    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
-    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
-    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
-    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len);
+    var(--map-tick-len) var(--map-tick-w),
+    var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w),
+    var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w),
+    var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w),
+    var(--map-tick-w) var(--map-tick-len);
   background-position:
-    left top, left top,
-    right top, right top,
-    left bottom, left bottom,
-    right bottom, right bottom;
+    left top,
+    left top,
+    right top,
+    right top,
+    left bottom,
+    left bottom,
+    right bottom,
+    right bottom;
 }
 /* No viewport cap: the stage takes the frame's leftover height (below 980px it states its own band
    height, end of file). `> svg` only: @vtt/ui glyphs in the stage are `<svg width="1em">`, and a
    descendant selector would size them all. Keep the :fullscreen and .enlarged variants scoped too. */
-.encounter-map-stage > svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
-.encounter-map-stage > p { padding: var(--space-8); text-align: center; }
+.encounter-map-stage > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--void);
+  user-select: none;
+}
+.encounter-map-stage > p {
+  padding: var(--space-8);
+  text-align: center;
+}
 /* A selected token wears corner brackets, never a second ring (it may already have an HP ring).
    SVG shapes have no pseudo-elements, so `clip-path` bites the body's rim at N/E/S/W; percentages
    resolve against the fill box, so one polygon fits any size. The bites cost a little hit area at the
@@ -131,100 +248,330 @@
 .encounter-token {
   outline: none;
   --token-bracket-cut: polygon(
-    -20% -20%, 30% -20%, 30% 11%, 70% 11%, 70% -20%, 120% -20%,
-    120% 30%, 89% 30%, 89% 70%, 120% 70%, 120% 120%,
-    70% 120%, 70% 89%, 30% 89%, 30% 120%, -20% 120%,
-    -20% 70%, 11% 70%, 11% 30%, -20% 30%);
+    -20% -20%,
+    30% -20%,
+    30% 11%,
+    70% 11%,
+    70% -20%,
+    120% -20%,
+    120% 30%,
+    89% 30%,
+    89% 70%,
+    120% 70%,
+    120% 120%,
+    70% 120%,
+    70% 89%,
+    30% 89%,
+    30% 120%,
+    -20% 120%,
+    -20% 70%,
+    11% 70%,
+    11% 30%,
+    -20% 30%
+  );
 }
-.encounter-token.movable { cursor: grab; }
-.encounter-token.dragging { cursor: grabbing; opacity: .82; }
-.encounter-token-body { fill: color-mix(in srgb, var(--cyan) 40%, var(--void)); stroke: var(--cyan-hi); stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
-.encounter-token.monster .encounter-token-body { fill: color-mix(in srgb, var(--magenta) 40%, var(--void)); stroke: var(--magenta-hi); }
-.encounter-token.npc .encounter-token-body { fill: color-mix(in srgb, var(--indigo) 45%, var(--void)); stroke: var(--violet-hi); }
-.encounter-token.hidden .encounter-token-body { stroke-dasharray: 6 4; opacity: .72; }
+.encounter-token.movable {
+  cursor: grab;
+}
+.encounter-token.dragging {
+  cursor: grabbing;
+  opacity: 0.82;
+}
+.encounter-token-body {
+  fill: color-mix(in srgb, var(--cyan) 40%, var(--void));
+  stroke: var(--cyan-hi);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 3px 4px #000);
+}
+.encounter-token.monster .encounter-token-body {
+  fill: color-mix(in srgb, var(--magenta) 40%, var(--void));
+  stroke: var(--magenta-hi);
+}
+.encounter-token.npc .encounter-token-body {
+  fill: color-mix(in srgb, var(--indigo) 45%, var(--void));
+  stroke: var(--violet-hi);
+}
+.encounter-token.hidden .encounter-token-body {
+  stroke-dasharray: 6 4;
+  opacity: 0.72;
+}
 /* Active turn: magenta ring and glow, pulsing once. The ring only renders while active, so the
    one-shot animation runs on each turn change. `transform-box: fill-box` is required, or the SVG
    default (view box) would scale it about the centre of the whole map. */
-.encounter-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); transform-box: fill-box; transform-origin: center; animation: encounter-turn-pulse .72s var(--ease-settle, ease-out) 1; }
-@keyframes encounter-turn-pulse {
-  0%   { transform: scale(.72); opacity: 0; }
-  38%  { transform: scale(1.14); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+.encounter-token-turn {
+  fill: rgb(255 46 154 / 18%);
+  stroke: var(--magenta);
+  stroke-width: 5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%));
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: encounter-turn-pulse 0.72s var(--ease-settle, ease-out) 1;
 }
-@media (prefers-reduced-motion: reduce) { .encounter-token-turn { animation: none; } }
+@keyframes encounter-turn-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  38% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .encounter-token-turn {
+    animation: none;
+  }
+}
 /* Token ink: a literal on purpose, since it sits on map art and must stay light in every theme.
    `.replay-token` is listed because the replay canvas reuses these glyph classes in its own group. */
-.encounter-token, .replay-token, .encounter-token-initials, .encounter-token-name { --token-ink: #fff; }
-.encounter-token-initials, .encounter-token-name { pointer-events: none; fill: var(--token-ink); text-anchor: middle; dominant-baseline: central; font-family: var(--font-body); font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
-.encounter-token-name { dominant-baseline: hanging; }
+.encounter-token,
+.replay-token,
+.encounter-token-initials,
+.encounter-token-name {
+  --token-ink: #fff;
+}
+.encounter-token-initials,
+.encounter-token-name {
+  pointer-events: none;
+  fill: var(--token-ink);
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-family: var(--font-body);
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: #0a0805;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.encounter-token-name {
+  dominant-baseline: hanging;
+}
 /* Keyboard selection uses the token ink rather than cyan, which would merge with a healthy (cyan) HP
    ring. */
-.encounter-token.movable:focus-visible .encounter-token-body { stroke: var(--token-ink); stroke-width: 6; clip-path: var(--token-bracket-cut); }
-.encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
+.encounter-token.movable:focus-visible .encounter-token-body {
+  stroke: var(--token-ink);
+  stroke-width: 6;
+  clip-path: var(--token-bracket-cut);
+}
+.encounter-token.locked .encounter-token-body {
+  opacity: 0.78;
+  filter: none;
+}
 /* z-index 5, above the staging tray's 4: on a short landscape map the tray can overlap this cluster,
    and the Scenes menu inside it must win. */
-.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
-.encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
+.encounter-map-zoom {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  max-width: calc(100% - 1.4rem);
+}
+.encounter-map-zoom.zoom-dock-right {
+  right: auto;
+  left: 0.7rem;
+  justify-content: flex-start;
+}
 /* Fixed rem widths per edge (never a viewport %), so the dock does not reflow on resize. The dock does
    not scroll: it bounds the tracker as a flex column so `.encounter-region` is the one scroller
    (otherwise the region becomes a zero-extent scrollport inside a scrolling dock). */
-.encounter-map-dock { position: absolute; z-index: 2; display: flex; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
+.encounter-map-dock {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  padding: 0.6rem;
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+}
 /* The dock's inner edge is the map/panel boundary, so it carries the horizon rule (--rule-beam-v)
    through `border-image` (a border cannot hold a gradient; a pseudo would scroll with the content).
    The table gets no sky: a horizon would compete with the map. */
-.encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
-.encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
+.encounter-map-dock.dock-right {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--dock-side-width);
+  border-left: 1px solid var(--line);
+  border-image: var(--rule-beam-v) 1;
+}
+.encounter-map-dock.dock-left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--dock-side-width);
+  border-right: 1px solid var(--line);
+  border-image: var(--rule-beam-v) 1;
+}
 /* A bounded flex column, so `.encounter-region` has something to flex against. `>` so a nested panel
    (a sheet inside the tracker) does not take this. */
-.encounter-map-dock > .encounter-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: 0; background: transparent; padding: 0; }
+.encounter-map-dock > .encounter-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
 /* The dock is the frame, so the panel's own `::before` frame (and scanline) is dropped. */
-.encounter-map-dock .encounter-panel::before { display: none; }
+.encounter-map-dock .encounter-panel::before {
+  display: none;
+}
 /* Grab strip on the dock's inner edge, full height. It sits exactly on the dock's border (z-index 3
    vs 2), so it is transparent at rest or it would cover the beam; it paints only while grabbed. */
-.encounter-map-dock-resize { position: absolute; top: 0; bottom: 0; width: 14px; z-index: 3; cursor: col-resize; touch-action: none; }
-.encounter-map-dock-resize.dock-resize-left { left: calc(var(--dock-side-width) - 7px); }
-.encounter-map-dock-resize.dock-resize-right { right: calc(var(--dock-side-width) - 7px); }
-.encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; transition: background .15s, width .15s; }
-.encounter-map-dock-resize:hover::before, .encounter-map-dock-resize:active::before { background: var(--cyan); width: 3px; }
-.encounter-map-zoom .nh-btn { box-shadow: var(--shadow-1); }
-.encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: var(--void); }
+.encounter-map-dock-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+}
+.encounter-map-dock-resize.dock-resize-left {
+  left: calc(var(--dock-side-width) - 7px);
+}
+.encounter-map-dock-resize.dock-resize-right {
+  right: calc(var(--dock-side-width) - 7px);
+}
+.encounter-map-dock-resize::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition:
+    background 0.15s,
+    width 0.15s;
+}
+.encounter-map-dock-resize:hover::before,
+.encounter-map-dock-resize:active::before {
+  background: var(--cyan);
+  width: 3px;
+}
+.encounter-map-zoom .nh-btn {
+  box-shadow: var(--shadow-1);
+}
+.encounter-map-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  place-items: center;
+  background: var(--void);
+}
 /* Direct child only: on every stage svg this would blow each toolbar glyph up to 100vh. */
-.encounter-map-stage:fullscreen > svg { max-height: 100vh; height: 100vh; }
+.encounter-map-stage:fullscreen > svg {
+  max-height: 100vh;
+  height: 100vh;
+}
 /* "Enlarge map" is an in-tab overlay (not the Fullscreen API): the interaction area floats over the
    page and the stage flex-fills it. Nothing in it scrolls (the docked tracker's region does), so it
    declares no scroll. */
-.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); }
-.encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
+.encounter-map-interaction.enlarged {
+  position: fixed;
+  inset: 1rem;
+  z-index: 40;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg) 97%, transparent);
+  box-shadow: var(--shadow-2);
+}
+.encounter-map-interaction.enlarged .encounter-map-stage {
+  flex: 1;
+  min-height: 0;
+}
 /* Direct child only, like the stage rule. */
-.encounter-map-interaction.enlarged .encounter-map-stage > svg { max-height: none; height: 100%; }
-.encounter-map-saving { margin: var(--space-2) 0 0; color: var(--text-dim); font-size: .85rem; }
+.encounter-map-interaction.enlarged .encounter-map-stage > svg {
+  max-height: none;
+  height: 100%;
+}
+.encounter-map-saving {
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
 /* The "Saving move…" line is out of flow at every width, or mounting it on token release would steal
    height from the flex stage and make the map jump until the server acks. `bottom: 0` puts it in
    the row the feedback line reserves; the two never show together (`submitMove` clears the message
    first). `scripts/map-stability-audit.mjs` guards this. */
-.encounter-map-interaction .encounter-map-saving { position: absolute; z-index: 4; left: 0; bottom: 0; margin: 0; }
+.encounter-map-interaction .encounter-map-saving {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  bottom: 0;
+  margin: 0;
+}
 /* Enlarged mode floats it over the map with a plate; `--space-4` tracks the container's padding. */
-.encounter-map-interaction.enlarged .encounter-map-saving { left: var(--space-4); bottom: var(--space-4); padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
-.encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: var(--text-dim); font-size: .78rem; }
+.encounter-map-interaction.enlarged .encounter-map-saving {
+  left: var(--space-4);
+  bottom: var(--space-4);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--void) 78%, transparent);
+}
+.encounter-map-feedback {
+  min-height: 1.25rem;
+  margin: 0.45rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
 
 /* The map toolbar: one non-wrapping bar, everything else one tap deeper in a bounded panel.
    The overlay spans the stage but is `pointer-events: none`, so the map behind the empty part of the
    row stays draggable; only the bar, panel and rail take input. `inset` gives the panel a height to
    shrink into, so it scrolls rather than spilling out of the stage's `overflow: hidden`. */
-.encounter-map-overlay { position: absolute; left: .7rem; right: .7rem; bottom: .7rem; top: calc(.7rem + var(--tray-height, 0px)); z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; pointer-events: none; }
-.encounter-map-overlay > * { pointer-events: auto; }
+.encounter-map-overlay {
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  top: calc(0.7rem + var(--tray-height, 0px));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+.encounter-map-overlay > * {
+  pointer-events: auto;
+}
 /* Phone form (≤560px): one `Tools` button at the bottom-left (thumb reach), opening a rail upward.
    It ignores the tray offset: the tray is at the top edge, and on a short stage paying for it would
    push the button out of the stage. */
-.encounter-map-overlay.compact { top: .7rem; justify-content: flex-end; }
+.encounter-map-overlay.compact {
+  top: 0.7rem;
+  justify-content: flex-end;
+}
 /* Open, the rail outranks the token tray (z-index 4) so it can use the whole stage height. */
-.encounter-map-overlay.compact.open { z-index: 5; }
+.encounter-map-overlay.compact.open {
+  z-index: 5;
+}
 /* The bar, panel, rail and Tools button take the full material. The cut is a `mask-image`, not the
    `.chamfer` backing layer, because the panel and rail scroll and an absolute backing layer would
    scroll away with their content; a mask also does not clip hit-testing. The stop is `--chamfer / √2`
    (stops run along the gradient axis). Masked elements show no box-shadow, so the plate is 94% opaque
    and the rim separates them from the map. */
-.map-toolbar, .map-toolbar-panel, .map-toolbar-rail, .map-toolbar-toggle {
+.map-toolbar,
+.map-toolbar-panel,
+.map-toolbar-rail,
+.map-toolbar-toggle {
   --chamfer-mask-stop: calc(var(--chamfer) / 1.4142);
   -webkit-mask-image:
     linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
@@ -237,186 +584,790 @@
   border: var(--rim-w) solid var(--rim-color);
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: var(--space-1); border-radius: var(--radius-md); background: var(--material-scanline), linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 94%, transparent), color-mix(in srgb, var(--surface-1) 94%, transparent)); }
+.map-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background:
+    var(--material-scanline),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-2) 94%, transparent),
+      color-mix(in srgb, var(--surface-1) 94%, transparent)
+    );
+}
 /* The rim brightens on hover, focus and press (touch has no hover). Only the phone's Tools button is
    a control here; the bar itself is not. */
-.map-toolbar-toggle:hover, .map-toolbar-toggle:focus-visible, .map-toolbar-toggle:active, .map-toolbar-toggle[aria-expanded="true"] { border-color: var(--rim-color-hi); }
+.map-toolbar-toggle:hover,
+.map-toolbar-toggle:focus-visible,
+.map-toolbar-toggle:active,
+.map-toolbar-toggle[aria-expanded="true"] {
+  border-color: var(--rim-color-hi);
+}
 /* The 44px floor as real paint, not an overhang, so neighbours can never steal taps at any gap. */
-.map-toolbar .nh-iconbtn { width: 2.75rem; height: 2.75rem; background: transparent; border-color: transparent; font-size: 1.15rem; }
-.map-toolbar .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.map-toolbar .nh-iconbtn[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
+.map-toolbar .nh-iconbtn {
+  width: 2.75rem;
+  height: 2.75rem;
+  background: transparent;
+  border-color: transparent;
+  font-size: 1.15rem;
+}
+.map-toolbar .nh-iconbtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-toolbar .nh-iconbtn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
 /* The three constant tools. `.encounter-map-tools` keeps its name and .35rem gap (codex.css cites it). */
-.encounter-map-tools { display: flex; gap: .35rem; }
-.map-toolbar-divider { align-self: stretch; width: 1px; margin: .2rem .1rem; background: var(--line-strong); }
+.encounter-map-tools {
+  display: flex;
+  gap: 0.35rem;
+}
+.map-toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.2rem 0.1rem;
+  background: var(--line-strong);
+}
 /* A group button is icon + word at every width above the collapse: a phone has no hover. */
-.map-toolbar-group { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.map-toolbar-group:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.map-toolbar-group[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
-.map-toolbar-group-icon { display: grid; place-items: center; font-size: 1.05rem; }
-.map-toolbar-caret { display: grid; place-items: center; font-size: .8rem; color: var(--text-muted); transition: transform .16s ease; }
-.map-toolbar-caret.open { transform: rotate(180deg); }
+.map-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.map-toolbar-group:hover {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-toolbar-group[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+.map-toolbar-group-icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+}
+.map-toolbar-caret {
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: transform 0.16s ease;
+}
+.map-toolbar-caret.open {
+  transform: rotate(180deg);
+}
 /* One open group at a time, in one bounded surface that shrinks to the stage and scrolls itself
    (`.scroll-y` in the markup). Rim, bezel and cut on a flat opaque plate: no texture behind fields
    being edited, and no shadow (it is masked). */
-.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: var(--space-2); padding: .6rem .7rem; border-radius: var(--radius-md); background: var(--surface-2); overscroll-behavior: contain; }
-.map-toolbar-panel-title { margin: 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
-.map-toolbar-panel .nh-field, .map-toolbar-panel-body .nh-field { gap: .2rem; }
-.map-toolbar-field { font-size: .78rem; }
-.map-toolbar-label { display: flex; align-items: center; gap: .35rem; margin: .1rem 0 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
-.map-toolbar-label span { display: grid; place-items: center; font-size: .95rem; }
-.map-toolbar-note { margin: 0; color: var(--text-muted); font-size: .7rem; line-height: 1.35; }
-.map-toolbar-choices { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; }
-.map-toolbar-choice { display: flex; align-items: center; justify-content: center; gap: .3rem; min-height: 2.5rem; padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; cursor: pointer; }
-.map-toolbar-choice:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.map-toolbar-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
-.map-toolbar-choice:disabled { color: var(--text-muted); cursor: not-allowed; }
-.map-toolbar-actions { display: flex; flex-direction: column; gap: .3rem; }
-.map-toolbar-actions-row { flex-direction: row; }
-.map-toolbar-actions-row .nh-btn { flex: 1; }
+.map-toolbar-panel {
+  min-height: 0;
+  width: min(19rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overscroll-behavior: contain;
+}
+.map-toolbar-panel-title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.map-toolbar-panel .nh-field,
+.map-toolbar-panel-body .nh-field {
+  gap: 0.2rem;
+}
+.map-toolbar-field {
+  font-size: 0.78rem;
+}
+.map-toolbar-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.map-toolbar-label span {
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+.map-toolbar-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+.map-toolbar-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+.map-toolbar-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 2.5rem;
+  padding: 0.3rem var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.map-toolbar-choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-toolbar-choice[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+.map-toolbar-choice:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.map-toolbar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.map-toolbar-actions-row {
+  flex-direction: row;
+}
+.map-toolbar-actions-row .nh-btn {
+  flex: 1;
+}
 /* Switches stack, so their paint grows to 44px rather than overlapping `::after` hit boxes. */
-.map-toolbar-switch { align-self: flex-start; min-height: var(--tap-min); font-size: .78rem; }
-.map-toolbar-segmented { width: 100%; }
-.map-toolbar-segmented .nh-segmented-option { min-height: var(--tap-min); }
-.map-toolbar-custom-colour { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2.75rem; color: var(--text-dim); font-size: .72rem; }
-.map-toolbar-custom-colour input { width: 3rem; height: 2.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); }
+.map-toolbar-switch {
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  font-size: 0.78rem;
+}
+.map-toolbar-segmented {
+  width: 100%;
+}
+.map-toolbar-segmented .nh-segmented-option {
+  min-height: var(--tap-min);
+}
+.map-toolbar-custom-colour {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+.map-toolbar-custom-colour input {
+  width: 3rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
 /* The phone's one door onto the toolbar: masked, with 2.75rem of real paint (`tap-audit.mjs 375`). */
-.map-toolbar-toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .7rem; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 94%, transparent); color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; cursor: pointer; }
-.map-toolbar-toggle[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); }
-.map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border-radius: var(--radius-md); background: var(--surface-2); overscroll-behavior: contain; }
-.map-toolbar-rail-tools { display: flex; flex-direction: column; gap: .15rem; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
-.map-toolbar-rail-section + .map-toolbar-rail-section { border-top: 1px solid var(--line); }
-.map-toolbar-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 2.75rem; padding: .3rem var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }
-.map-toolbar-row:disabled { color: var(--text-muted); cursor: not-allowed; }
-.map-toolbar-row[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
-.map-toolbar-row-icon { display: grid; place-items: center; font-size: 1.1rem; }
-.map-toolbar-rail-head .map-toolbar-caret { margin-left: auto; }
-.map-toolbar-panel-body { display: flex; flex-direction: column; gap: var(--space-2); padding: .1rem var(--space-2) var(--space-2); }
+.map-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0 0.7rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.map-toolbar-toggle[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+}
+.map-toolbar-rail {
+  min-height: 0;
+  width: min(17rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overscroll-behavior: contain;
+}
+.map-toolbar-rail-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+.map-toolbar-rail-section + .map-toolbar-rail-section {
+  border-top: 1px solid var(--line);
+}
+.map-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.3rem var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.map-toolbar-row:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.map-toolbar-row[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+.map-toolbar-row-icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+.map-toolbar-rail-head .map-toolbar-caret {
+  margin-left: auto;
+}
+.map-toolbar-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0.1rem var(--space-2) var(--space-2);
+}
 /* The rail scrolls when the stage is shorter than it (`.scroll-y` in the markup); a newly opened
    section is scrolled into view. */
-.map-toolbar-rail { scroll-behavior: smooth; }
-.map-button-icon { display: inline-grid; place-items: center; margin-right: .35rem; font-size: 1rem; vertical-align: -.15em; }
-.encounter-target-arrow { display: inline-grid; place-items: center; vertical-align: -.1em; }
+.map-toolbar-rail {
+  scroll-behavior: smooth;
+}
+.map-button-icon {
+  display: inline-grid;
+  place-items: center;
+  margin-right: 0.35rem;
+  font-size: 1rem;
+  vertical-align: -0.15em;
+}
+.encounter-target-arrow {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -0.1em;
+}
 /* Swatches: 2.25rem of paint plus `.tap-target` reaches 44px, and the .3rem gap clears the 4px
    overhang per side. They wrap rather than shrink. */
-.encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 100%; }
-.encounter-map-swatches button { width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; }
-.encounter-map-swatches button.selected { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
-.encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
-.encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
+.encounter-map-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 100%;
+}
+.encounter-map-swatches button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.encounter-map-swatches button.selected {
+  outline: 2px solid var(--cyan-hi);
+  outline-offset: 1px;
+}
+.encounter-shape-editor-color {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+.encounter-shape-editor-color input {
+  width: 2.4rem;
+  height: 1.7rem;
+  padding: 0;
+}
 
-.annotation-handle { fill: var(--cyan-hi); stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; }
-.annotation-handle-move { cursor: move; }
-.annotation-handle-resize { cursor: nwse-resize; }
-.annotation-shape.selected .annotation-shape-body { stroke-width: 4.5; }
-.annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
+.annotation-handle {
+  fill: var(--cyan-hi);
+  stroke: #0a0805;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+.annotation-handle-move {
+  cursor: move;
+}
+.annotation-handle-resize {
+  cursor: nwse-resize;
+}
+.annotation-shape.selected .annotation-shape-body {
+  stroke-width: 4.5;
+}
+.annotation-shape.live .annotation-shape-body {
+  stroke-dasharray: 4 4;
+}
 
-.encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: var(--space-2); padding: .7rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); }
-.encounter-map-stage.has-dock-left .encounter-map-overlay { left: calc(var(--dock-side-width) + .7rem); }
-.encounter-map-stage.has-dock-right .encounter-shape-editor { right: calc(var(--dock-side-width) + .7rem); }
-.encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.encounter-shape-editor-head strong { text-transform: capitalize; }
-.encounter-shape-editor-head span { color: var(--text-muted); font-size: .7rem; }
-.encounter-shape-editor label { display: flex; flex-direction: column; gap: var(--space-1); color: var(--text-dim); font-size: .75rem; }
-.encounter-shape-editor select { padding: .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
-.encounter-shape-editor-check { align-self: start; }
-.encounter-shape-editor .danger { padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); text-align: center; cursor: pointer; }
-.encounter-shape-editor .danger:hover { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
-.encounter-shape-editor-note { margin: 0; color: var(--text-muted); font-size: .75rem; }
+.encounter-shape-editor {
+  position: absolute;
+  right: 0.7rem;
+  top: 0.7rem;
+  z-index: 4;
+  width: 15rem;
+  max-width: calc(100% - 1.4rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 96%, transparent);
+  box-shadow: var(--shadow-2);
+}
+.encounter-map-stage.has-dock-left .encounter-map-overlay {
+  left: calc(var(--dock-side-width) + 0.7rem);
+}
+.encounter-map-stage.has-dock-right .encounter-shape-editor {
+  right: calc(var(--dock-side-width) + 0.7rem);
+}
+.encounter-shape-editor-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.encounter-shape-editor-head strong {
+  text-transform: capitalize;
+}
+.encounter-shape-editor-head span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.encounter-shape-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+.encounter-shape-editor select {
+  padding: 0.45rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+}
+.encounter-shape-editor-check {
+  align-self: start;
+}
+.encounter-shape-editor .danger {
+  padding: 0.55rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--danger-hi);
+  text-align: center;
+  cursor: pointer;
+}
+.encounter-shape-editor .danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-on-neon);
+  box-shadow: var(--glow-danger);
+}
+.encounter-shape-editor-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
 
-.encounter-live-distance { fill: var(--cyan-hi); font: 800 15px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: #0a0805; stroke-width: 4; stroke-linejoin: round; pointer-events: none; }
-.encounter-move-guide { pointer-events: none; }
-.encounter-move-line { stroke: var(--cyan); stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.encounter-live-distance {
+  fill: var(--cyan-hi);
+  font: 800 15px var(--font-mono);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #0a0805;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.encounter-move-guide {
+  pointer-events: none;
+}
+.encounter-move-line {
+  stroke: var(--cyan);
+  stroke-width: 3;
+  stroke-dasharray: 6 5;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+}
 
 /* Phone form of the map. The toolbar collapses to its Tools button in JS at the same breakpoint
    (MapToolbar's COMPACT_QUERY); these rules keep the two floating clusters in opposite bottom corners
    so a saved right dock never stacks them. */
 @media (max-width: 560px) {
-  .encounter-map-stage { min-height: 14rem; }
-  .encounter-token-name { display: none; }
-  .encounter-shape-editor { width: 12rem; }
-  .encounter-map-zoom, .encounter-map-zoom.zoom-dock-right { right: .7rem; left: auto; justify-content: flex-end; max-width: calc(100% - 8rem); }
-  .map-toolbar-rail, .map-toolbar-panel { width: min(17rem, calc(100vw - 2.8rem)); }
+  .encounter-map-stage {
+    min-height: 14rem;
+  }
+  .encounter-token-name {
+    display: none;
+  }
+  .encounter-shape-editor {
+    width: 12rem;
+  }
+  .encounter-map-zoom,
+  .encounter-map-zoom.zoom-dock-right {
+    right: 0.7rem;
+    left: auto;
+    justify-content: flex-end;
+    max-width: calc(100% - 8rem);
+  }
+  .map-toolbar-rail,
+  .map-toolbar-panel {
+    width: min(17rem, calc(100vw - 2.8rem));
+  }
 }
-.token-health { stroke: var(--void); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.token-health-bloodied { fill: var(--magenta); }
-.token-health-down { fill: var(--danger); }
+.token-health {
+  stroke: var(--void);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.token-health-bloodied {
+  fill: var(--magenta);
+}
+.token-health-down {
+  fill: var(--danger);
+}
 /* Token health indicators (GM opt-in): an HP bar under the token, or a ring around it.
    `healthFillClass()` returns one band class for three element kinds that each need a different
    property (ring `stroke`, bar `fill`, aura `stop-color`). So the band class only sets `--hp-band`
    and each consumer maps it to its own property; setting all three on the band class painted the
    ring as a solid disc. mapImage.tsx always emits the band class on the same element. */
-.token-health-bar-track { fill: var(--void); fill-opacity: .8; }
-.token-health-bar-fill { fill: var(--hp-band); stroke: none; }
-.token-health-ring-track { fill: none; stroke: var(--void); stroke-opacity: .5; }
-.token-health-ring-fill { fill: none; stroke: var(--hp-band); }
+.token-health-bar-track {
+  fill: var(--void);
+  fill-opacity: 0.8;
+}
+.token-health-bar-fill {
+  fill: var(--hp-band);
+  stroke: none;
+}
+.token-health-ring-track {
+  fill: none;
+  stroke: var(--void);
+  stroke-opacity: 0.5;
+}
+.token-health-ring-fill {
+  fill: none;
+  stroke: var(--hp-band);
+}
 /* Decorative and larger than the token, so it must never capture pointer events. */
-.token-health-aura { pointer-events: none; }
-.token-health-aura stop { stop-color: var(--hp-band); }
-.hp-fill-healthy { --hp-band: var(--cyan); }
-.hp-fill-bloodied { --hp-band: var(--magenta); }
-.hp-fill-down { --hp-band: var(--danger); }
+.token-health-aura {
+  pointer-events: none;
+}
+.token-health-aura stop {
+  stop-color: var(--hp-band);
+}
+.hp-fill-healthy {
+  --hp-band: var(--cyan);
+}
+.hp-fill-bloodied {
+  --hp-band: var(--magenta);
+}
+.hp-fill-down {
+  --hp-band: var(--danger);
+}
 /* Fog of war. The GM sees a translucent violet veil (violet is the GM-only hue); players get opaque
    neutral cover, so the two states differ in both opacity and hue and a GM can tell at a glance what
    players see. The edge is a binary SVG `<mask>` (`FogOverlay`) and must stay hard: never add blur,
    shadows or strokes to the overlay, and never give fog a neon outline (that is the ruler's and
    ping's look). */
-.fog-overlay-gm { fill: color-mix(in srgb, var(--void) 72%, var(--violet)); fill-opacity: .48; }
-.fog-overlay-player { fill: var(--void); fill-opacity: 1; }
-.fog-stroke-preview { fill-opacity: .3; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
-.fog-stroke-reveal { fill: var(--cyan); stroke: var(--cyan); }
-.fog-stroke-hide { fill: var(--violet); stroke: var(--violet-hi); }
+.fog-overlay-gm {
+  fill: color-mix(in srgb, var(--void) 72%, var(--violet));
+  fill-opacity: 0.48;
+}
+.fog-overlay-player {
+  fill: var(--void);
+  fill-opacity: 1;
+}
+.fog-stroke-preview {
+  fill-opacity: 0.3;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.fog-stroke-reveal {
+  fill: var(--cyan);
+  stroke: var(--cyan);
+}
+.fog-stroke-hide {
+  fill: var(--violet);
+  stroke: var(--violet-hi);
+}
 
-.token-condition circle { fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet)); stroke: var(--violet); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.token-condition text { fill: var(--violet-hi); font-weight: 800; text-anchor: middle; dominant-baseline: central; }
-.token-condition-glyph { fill: var(--violet-hi); }
-.token-condition-more circle { fill: var(--surface-2); stroke: var(--line-strong); }
+.token-condition circle {
+  fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet));
+  stroke: var(--violet);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.token-condition text {
+  fill: var(--violet-hi);
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.token-condition-glyph {
+  fill: var(--violet-hi);
+}
+.token-condition-more circle {
+  fill: var(--surface-2);
+  stroke: var(--line-strong);
+}
 
-.encounter-token.targetable { cursor: crosshair; }
-.encounter-token.targetable .encounter-token-body { stroke: var(--cyan-hi); stroke-dasharray: 5 4; }
-.encounter-token.targeted .encounter-token-body { stroke: var(--danger); stroke-width: 6; stroke-dasharray: none; clip-path: var(--token-bracket-cut); }
-.encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: var(--space-2) .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); font-size: .85rem; }
+.encounter-token.targetable {
+  cursor: crosshair;
+}
+.encounter-token.targetable .encounter-token-body {
+  stroke: var(--cyan-hi);
+  stroke-dasharray: 5 4;
+}
+.encounter-token.targeted .encounter-token-body {
+  stroke: var(--danger);
+  stroke-width: 6;
+  stroke-dasharray: none;
+  clip-path: var(--token-bracket-cut);
+}
+.encounter-target-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 3.7rem;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: min(94%, 34rem);
+  padding: var(--space-2) 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 96%, transparent);
+  box-shadow: var(--shadow-2);
+  font-size: 0.85rem;
+}
 /* Centre transient overlays over the map area, not the whole stage, when a dock takes part of it. */
-.encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
-.encounter-map-stage.has-dock-right .encounter-target-bar { left: calc(50% - var(--dock-side-width) / 2); }
-.encounter-target-bar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.encounter-target-bar-buttons { display: inline-flex; flex: none; gap: .4rem; }
-.encounter-target-bar-buttons button { padding: .45rem .8rem; font-size: .8rem; text-align: center; }
+.encounter-map-stage.has-dock-left .encounter-target-bar {
+  left: calc(50% + var(--dock-side-width) / 2);
+}
+.encounter-map-stage.has-dock-right .encounter-target-bar {
+  left: calc(50% - var(--dock-side-width) / 2);
+}
+.encounter-target-bar > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.encounter-target-bar-buttons {
+  display: inline-flex;
+  flex: none;
+  gap: 0.4rem;
+}
+.encounter-target-bar-buttons button {
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8rem;
+  text-align: center;
+}
 
 /* The token menu, portaled to clear the dock/enlarged stacking contexts. It scrolls itself when the
    viewport cannot hold it (`.scroll-y` plus a measured inline max-height); overscroll-behavior stops
    a flick chaining to the locked page. */
-.token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
-.token-context-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.token-context-head strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.token-context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 12.5rem;
+  max-width: 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  overscroll-behavior: contain;
+}
+.token-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.token-context-head strong {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The close is the shared IconButton; this only quiets it into the header (keeps its 44px target). */
-.token-context-head .nh-iconbtn { flex: none; background: transparent; border-color: transparent; }
-.token-context-head .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.token-context-head .nh-iconbtn {
+  flex: none;
+  background: transparent;
+  border-color: transparent;
+}
+.token-context-head .nh-iconbtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
 /* Wraps so the damage-type chooser takes its own line under Dmg/Heal (the menu is narrow, and its
    `inset-inline: 0` listbox needs the width). Child combinators keep `min-height` off the chooser's
    own option buttons (see `.hp-editor` in encounter-panel.css). */
-.token-context-hp { display: flex; flex-wrap: wrap; gap: .3rem; }
-.token-context-hp > input { width: 3.4rem; margin: 0; padding: var(--space-2); text-align: center; }
-.token-context-hp .damage-type-field { flex: 1 0 100%; }
-.token-context-hp > button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer; }
-.token-context-hp > button { flex: 1; text-align: center; }
-.token-context-item { text-align: left; }
-.token-context-hp > button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.token-context-size select { width: 100%; margin: 0; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
-.token-context-item[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); }
-.token-context-conditions { display: grid; gap: .3rem; margin-top: .1rem; }
-.token-context-conditions-summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; list-style: none; }
-.token-context-conditions-summary::-webkit-details-marker { display: none; }
-.token-context-conditions-summary::after { content: "▾"; color: var(--text-muted); }
-.token-context-conditions[open] .token-context-conditions-summary::after { content: "▴"; }
-.token-context-feedback { margin: .1rem 0 0; color: var(--text-dim); font-size: .75rem; }
+.token-context-hp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.token-context-hp > input {
+  width: 3.4rem;
+  margin: 0;
+  padding: var(--space-2);
+  text-align: center;
+}
+.token-context-hp .damage-type-field {
+  flex: 1 0 100%;
+}
+.token-context-hp > button,
+.token-context-item {
+  min-height: 2.6rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.token-context-hp > button {
+  flex: 1;
+  text-align: center;
+}
+.token-context-item {
+  text-align: left;
+}
+.token-context-hp > button:hover:not(:disabled),
+.token-context-item:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.token-context-size {
+  display: grid;
+  grid-template-columns: 4rem 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.token-context-size select {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.token-context-item[aria-pressed="true"] {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--text-muted);
+}
+.token-context-conditions {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+.token-context-conditions-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  list-style: none;
+}
+.token-context-conditions-summary::-webkit-details-marker {
+  display: none;
+}
+.token-context-conditions-summary::after {
+  content: "▾";
+  color: var(--text-muted);
+}
+.token-context-conditions[open] .token-context-conditions-summary::after {
+  content: "▴";
+}
+.token-context-feedback {
+  margin: 0.1rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
 
-.encounter-map-scene-live { display: inline-flex; gap: .35rem; }
+.encounter-map-scene-live {
+  display: inline-flex;
+  gap: 0.35rem;
+}
 
 @media (max-width: 650px) {
-  .encounter-map-dock.dock-right, .encounter-map-dock.dock-left { width: min(var(--dock-side-width), 62vw); }
+  .encounter-map-dock.dock-right,
+  .encounter-map-dock.dock-left {
+    width: min(var(--dock-side-width), 62vw);
+  }
 }
 
 /* Below 980px the map is a band with a stated height on the stage (not the interaction, which also
@@ -425,28 +1376,69 @@
    hence the ceiling `100dvh - 204px` (tab bar 44 + sheet floor 132 + padding 20 + gap 8, from
    styles.css; update together). */
 @media (max-width: 979px) {
-  .encounter-map-interaction:not(.enlarged) { flex: 0 1 auto; min-height: 0; }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 0 1 14rem; min-height: 9rem; max-height: calc(100dvh - 12.75rem); height: auto; }
+  .encounter-map-interaction:not(.enlarged) {
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-stage {
+    flex: 0 1 14rem;
+    min-height: 9rem;
+    max-height: calc(100dvh - 12.75rem);
+    height: auto;
+  }
   /* Below 980px "Saving move…" stays in flow: the stage height is stated, so it grows the interaction
      instead of shrinking the map, and floating it would cover the compact Tools button. */
-  .encounter-map-interaction:not(.enlarged) .encounter-map-saving { position: static; margin: var(--space-2) 0 0; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-saving {
+    position: static;
+    margin: var(--space-2) 0 0;
+  }
   /* The status line folds when empty (it usually is), so it costs nothing below 980px until there is
      something to read; it keeps its `role="status"`. When shown, the height comes out of the sheet,
      never the map. */
-  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: var(--space-1) 0 0; }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty { display: none; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback {
+    min-height: 0;
+    margin: var(--space-1) 0 0;
+  }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty {
+    display: none;
+  }
   /* One row of tray wherever the map is a band, with horizontal scroll, so the tray cannot cover the
      map or the dock's tab bar. `justify-content: flex-start` is required: with `flex-end`, nowrap and
      `overflow-x` the overflow goes off the start edge, out of `scrollLeft`'s reach. The hint text is
      hidden (it would wrap). Keep this the last tray rule: source order decides at equal specificity. */
-  .encounter-token-tray { flex-direction: row; align-items: center; gap: .3rem; }
-  .encounter-token-tray > div:first-child { flex: 0 0 auto; }
-  .encounter-token-tray > div:first-child span { display: none; }
-  .encounter-token-tray-list { flex: 1 1 auto; min-width: 0; justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
-  .encounter-token-tray-list > .tray-token { flex: none; }
+  .encounter-token-tray {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .encounter-token-tray > div:first-child {
+    flex: 0 0 auto;
+  }
+  .encounter-token-tray > div:first-child span {
+    display: none;
+  }
+  .encounter-token-tray-list {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 0.15rem;
+  }
+  .encounter-token-tray-list > .tray-token {
+    flex: none;
+  }
 }
 
 /* The map's Scenes button is a menu with both errands. A `<summary>` trigger needs the button shadow
    stated; `Menu` clamps its own horizontal overflow. */
-.encounter-map-scene-menu > .encounter-map-scene-trigger { box-shadow: var(--shadow-1); }
-.encounter-map-scene-live-name { margin: 0; padding: var(--space-2) var(--space-3) var(--space-1); color: var(--text-muted); font-size: var(--fs-xs); }
+.encounter-map-scene-menu > .encounter-map-scene-trigger {
+  box-shadow: var(--shadow-1);
+}
+.encounter-map-scene-live-name {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}

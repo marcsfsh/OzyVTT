@@ -1,6 +1,12 @@
 import type {
-  ContentClassSummary, ContentEquipmentSummary, ContentFeatSummary, ContentLanguageSummary,
-  ContentSkillSummary, ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary
+  ContentClassSummary,
+  ContentEquipmentSummary,
+  ContentFeatSummary,
+  ContentLanguageSummary,
+  ContentSkillSummary,
+  ContentSpeciesSummary,
+  ContentSpellSummary,
+  ContentSubclassSummary
 } from "./index.js";
 
 /**
@@ -38,7 +44,10 @@ export type CatalogChoiceCatalogs = Readonly<{
 
 /** A `fromCatalog` slug that could not be resolved to a non-empty option list. */
 export class CatalogChoiceError extends Error {
-  constructor(public readonly slug: string, message: string) {
+  constructor(
+    public readonly slug: string,
+    message: string
+  ) {
     super(message);
     this.name = "CatalogChoiceError";
   }
@@ -59,15 +68,27 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       const union: CatalogChoiceOption[] = [];
       for (const part of parts) {
         let resolved: CatalogChoiceOption[];
-        try { resolved = resolveCatalogChoice(part, catalogs); }
-        catch (error) { if (error instanceof CatalogChoiceError) continue; throw error; }
-        for (const option of resolved) if (!seen.has(option.id)) { seen.add(option.id); union.push(option); }
+        try {
+          resolved = resolveCatalogChoice(part, catalogs);
+        } catch (error) {
+          if (error instanceof CatalogChoiceError) continue;
+          throw error;
+        }
+        for (const option of resolved)
+          if (!seen.has(option.id)) {
+            seen.add(option.id);
+            union.push(option);
+          }
       }
       return nonEmpty(slug, union, `None of ${parts.map((part) => `"${part}"`).join(", ")} resolved to any option.`);
     }
   }
   if (slug === "skills") {
-    return nonEmpty(slug, catalogs.skills.map((skill) => ({ id: skill.id, name: skill.name })), "The skills catalog is empty.");
+    return nonEmpty(
+      slug,
+      catalogs.skills.map((skill) => ({ id: skill.id, name: skill.name })),
+      "The skills catalog is empty."
+    );
   }
   if (slug === "weapons") {
     return nonEmpty(
@@ -85,7 +106,11 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
     );
   }
   if (slug === "languages") {
-    return nonEmpty(slug, catalogs.languages.map((entry) => ({ id: entry.id, name: entry.name })), "The languages catalog is empty.");
+    return nonEmpty(
+      slug,
+      catalogs.languages.map((entry) => ({ id: entry.id, name: entry.name })),
+      "The languages catalog is empty."
+    );
   }
   // Narrowing to one table matters: the base "two languages from the Standard Languages table" must not offer
   // Druidic or Thieves' Cant, which the SRD grants only through class features.
@@ -101,16 +126,21 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
     const listId = slug.slice(0, -"-spells".length);
     return nonEmpty(
       slug,
-      catalogs.spells.filter((spell) => spell.classes.includes(listId)).map((spell) => ({ id: spell.id, name: spell.name, level: spell.level })),
+      catalogs.spells
+        .filter((spell) => spell.classes.includes(listId))
+        .map((spell) => ({ id: spell.id, name: spell.name, level: spell.level })),
       `No spells are tagged for the "${listId}" spell list.`
     );
   }
   if (slug.endsWith("-subclasses")) {
     const classId = slug.slice(0, -"-subclasses".length);
-    if (!catalogs.classes.some((entry) => entry.id === classId)) throw new CatalogChoiceError(slug, `No class "${classId}" is in the catalog.`);
+    if (!catalogs.classes.some((entry) => entry.id === classId))
+      throw new CatalogChoiceError(slug, `No class "${classId}" is in the catalog.`);
     return nonEmpty(
       slug,
-      catalogs.subclasses.filter((entry) => entry.classId === classId).map((entry) => ({ id: entry.id, name: entry.name })),
+      catalogs.subclasses
+        .filter((entry) => entry.classId === classId)
+        .map((entry) => ({ id: entry.id, name: entry.name })),
       `No subclasses are authored for "${classId}" yet.`
     );
   }
@@ -118,7 +148,9 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
     const category = slug.slice(0, -"-feats".length);
     return nonEmpty(
       slug,
-      catalogs.feats.filter((entry) => entry.category === category).map((entry) => ({ id: entry.id, name: entry.name })),
+      catalogs.feats
+        .filter((entry) => entry.category === category)
+        .map((entry) => ({ id: entry.id, name: entry.name })),
       `No "${category}" feats are authored yet.`
     );
   }
@@ -132,7 +164,10 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       `"${species.name}" has no lineages authored.`
     );
   }
-  throw new CatalogChoiceError(slug, `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, *-languages, *-spells, *-subclasses, *-feats, *-lineages).`);
+  throw new CatalogChoiceError(
+    slug,
+    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, *-languages, *-spells, *-subclasses, *-feats, *-lineages).`
+  );
 }
 
 /** One `fromPicks` source: which budget's answers, narrowed by which closed predicate. */
@@ -144,7 +179,11 @@ export type PickSourceReference = Readonly<{ offer: string; where?: string | nul
  * `answered` is the ledger on the server or the draft in the wizard. Unknown spell ids are dropped. Throws
  * `CatalogChoiceError` when nothing survives, which both consumers treat as "defer", not "reject".
  */
-export function resolvePickChoice(source: PickSourceReference, answered: readonly string[], catalogs: CatalogChoiceCatalogs): CatalogChoiceOption[] {
+export function resolvePickChoice(
+  source: PickSourceReference,
+  answered: readonly string[],
+  catalogs: CatalogChoiceCatalogs
+): CatalogChoiceOption[] {
   const spellsById = new Map(catalogs.spells.map((spell) => [spell.id, spell]));
   const matches = (id: string): boolean => {
     if (!source.where) return true;

@@ -1,32 +1,109 @@
 /* The frames of the two prep surfaces ("Prepare a scene" and the staging workspace); their contents
    are styled in `scene-prep.css` and `staging-tray.css`. */
-.scene-panel { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid transparent; }
-.scene-panel-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-8); }
-.scene-panel-heading h2 { font-size: var(--fs-h1); font-family: var(--font-display); }
-.scene-panel-heading p { max-width: 26rem; margin: 0; font-size: .9rem; text-align: right; }
+.scene-panel {
+  margin-top: var(--space-10);
+  padding: var(--space-6);
+  border: 1px solid transparent;
+}
+.scene-panel-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+.scene-panel-heading h2 {
+  font-size: var(--fs-h1);
+  font-family: var(--font-display);
+}
+.scene-panel-heading p {
+  max-width: 26rem;
+  margin: 0;
+  font-size: 0.9rem;
+  text-align: right;
+}
 
 /* `min-width: 0` throughout: inside a 390px Modal a grid item's `auto` minimum lets a long map name
    widen the form past the dialog. */
-.scene-create { display: grid; gap: .8rem; min-width: 0; margin-top: 1.3rem; padding: var(--space-4); border: 1px solid transparent; }
-.scene-create > * { min-width: 0; }
-.scene-create label { display: block; color: var(--text-dim); font-size: .8rem; }
-.scene-create-optional { color: var(--text-muted); font-weight: 400; }
-
-.scene-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: .88rem; color: var(--text-dim); }
-
-@media (max-width: 560px) {
-  .scene-panel { padding: .9rem; }
-  .scene-panel-heading { display: block; }
-  .scene-panel-heading p { text-align: left; margin-top: .6rem; }
-  .scene-create { padding: .7rem; }
+.scene-create {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  margin-top: 1.3rem;
+  padding: var(--space-4);
+  border: 1px solid transparent;
+}
+.scene-create > * {
+  min-width: 0;
+}
+.scene-create label {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.scene-create-optional {
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
-.scene-builder { min-width: 0; margin-top: 0; padding: 1.3rem; border: 1px solid transparent; }
-.scene-builder-head h2 { font-size: var(--fs-h1); font-family: var(--font-display); margin: .15rem 0 .3rem; }
-.scene-builder-head p { margin: 0 0 .8rem; font-size: .85rem; }
-.scene-builder-feedback { min-height: 1.2rem; margin: var(--space-2) 0 0; color: var(--text-dim); font-size: .85rem; }
-.scene-rename { margin-left: .45rem; padding: .1rem .4rem; border: 1px solid transparent; border-radius: 0; background: transparent; color: var(--text-muted); font-size: .78rem; cursor: pointer; vertical-align: middle; }
-.scene-rename:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
+.scene-feedback {
+  min-height: 1.2rem;
+  margin: 0.8rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 560px) {
+  .scene-panel {
+    padding: 0.9rem;
+  }
+  .scene-panel-heading {
+    display: block;
+  }
+  .scene-panel-heading p {
+    text-align: left;
+    margin-top: 0.6rem;
+  }
+  .scene-create {
+    padding: 0.7rem;
+  }
+}
+
+.scene-builder {
+  min-width: 0;
+  margin-top: 0;
+  padding: 1.3rem;
+  border: 1px solid transparent;
+}
+.scene-builder-head h2 {
+  font-size: var(--fs-h1);
+  font-family: var(--font-display);
+  margin: 0.15rem 0 0.3rem;
+}
+.scene-builder-head p {
+  margin: 0 0 0.8rem;
+  font-size: 0.85rem;
+}
+.scene-builder-feedback {
+  min-height: 1.2rem;
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.scene-rename {
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.scene-rename:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
 
 /* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
    The two outer panels take the scanline; `.scene-create` is nested and gets rim + bezel. The
@@ -56,8 +133,18 @@
   background-clip: border-box;
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.scene-panel, .scene-builder { --material-fill: var(--material-scanline), var(--material-plate); }
-.scene-create { --material-fill: var(--material-plate); }
-.scene-builder::before { border-color: var(--violet); outline-color: color-mix(in srgb, var(--violet) 42%, transparent); }
+.scene-panel,
+.scene-builder {
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.scene-create {
+  --material-fill: var(--material-plate);
+}
+.scene-builder::before {
+  border-color: var(--violet);
+  outline-color: color-mix(in srgb, var(--violet) 42%, transparent);
+}

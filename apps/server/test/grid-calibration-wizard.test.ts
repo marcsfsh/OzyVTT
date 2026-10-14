@@ -12,10 +12,12 @@ import {
 } from "../src/grid-calibration-wizard.js";
 
 function measuredWizard() {
-  return measureKnownGridSpan(
-    createGridCalibrationWizard({ assetId: "map-1", mapWidthPx: 1200, mapHeightPx: 800 }),
-    { start: { x: 100, y: 100 }, end: { x: 500, y: 100 }, cellsBetween: 8, axis: "horizontal" }
-  );
+  return measureKnownGridSpan(createGridCalibrationWizard({ assetId: "map-1", mapWidthPx: 1200, mapHeightPx: 800 }), {
+    start: { x: 100, y: 100 },
+    end: { x: 500, y: 100 },
+    cellsBetween: 8,
+    axis: "horizontal"
+  });
 }
 
 describe("grid calibration wizard", () => {
@@ -84,11 +86,18 @@ describe("grid calibration wizard", () => {
 
   it("rejects invalid setup, premature actions, and unsafe values", () => {
     expect(() => createGridCalibrationWizard({ assetId: " ", mapWidthPx: 100, mapHeightPx: 100 })).toThrow("asset ID");
-    expect(() => createGridCalibrationWizard({ assetId: "map", mapWidthPx: Number.NaN, mapHeightPx: 100 })).toThrow("positive finite");
+    expect(() => createGridCalibrationWizard({ assetId: "map", mapWidthPx: Number.NaN, mapHeightPx: 100 })).toThrow(
+      "positive finite"
+    );
     const newWizard = createGridCalibrationWizard({ assetId: "map", mapWidthPx: 100, mapHeightPx: 100 });
     expect(() => adjustWizardGrid(newWizard, { cellSizeDeltaPx: 1 })).toThrow("Measure");
     expect(() => verifyWizardIntersection(newWizard, { x: 0, y: 0 })).toThrow("Measure");
-    const measured = measureKnownGridSpan(newWizard, { start: { x: 0, y: 0 }, end: { x: 50, y: 0 }, cellsBetween: 5, axis: "horizontal" });
+    const measured = measureKnownGridSpan(newWizard, {
+      start: { x: 0, y: 0 },
+      end: { x: 50, y: 0 },
+      cellsBetween: 5,
+      axis: "horizontal"
+    });
     expect(() => verifyWizardIntersection(measured, { x: 101, y: 0 })).toThrow("bounds");
     expect(() => adjustWizardGrid(measured, { distancePerCell: 0 })).toThrow("greater than zero");
   });

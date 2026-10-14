@@ -12,7 +12,13 @@ import { socket } from "../socket";
 import { CreateRecordModal, type CreateRequest } from "./CreateRecordModal";
 import { HomebrewRail, EMPTY_FILTERS, type RailFilters } from "./HomebrewRail";
 import { RecordDetail } from "./RecordDetail";
-import { HomebrewRequestError, homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
+import {
+  HomebrewRequestError,
+  homebrewApi,
+  listAllHomebrew,
+  type HomebrewRecordDocument,
+  type HomebrewRecordSummary
+} from "./api";
 import { blankDraft } from "./defaults";
 import { typeLabel } from "./types";
 import "./homebrew.css";
@@ -147,9 +153,16 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       const copied = companions.length - failed.length;
       if (failed.length > 0) {
         // `info`, not `error`: the requested record was created.
-        toast(`${made} created, but ${failed.join(" and ")} couldn't be copied. Add a subclass before publishing.`, { tone: "info" });
+        toast(`${made} created, but ${failed.join(" and ")} couldn't be copied. Add a subclass before publishing.`, {
+          tone: "info"
+        });
       } else {
-        toast(copied > 0 ? `${made} created, with ${copied} ${copied === 1 ? "subclass" : "subclasses"}.` : `${made} created.`, { tone: "success" });
+        toast(
+          copied > 0
+            ? `${made} created, with ${copied} ${copied === 1 ? "subclass" : "subclasses"}.`
+            : `${made} created.`,
+          { tone: "success" }
+        );
       }
     } catch (error) {
       toast(error instanceof Error ? error.message : "Couldn't create that record.", { tone: "error" });
@@ -174,7 +187,9 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   if (load === "loading") {
     return (
       <div className="hb-root">
-        <div className="hb-modebar"><Skeleton width="12rem" /></div>
+        <div className="hb-modebar">
+          <Skeleton width="12rem" />
+        </div>
         {/* Mirrors the real layout so the pane doesn't jump when data lands. */}
         <div className="hb-workspace">
           <aside className="hb-rail">
@@ -182,7 +197,9 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
             <Skeleton variant="block" height="2.75rem" />
             <Skeleton variant="block" height="12rem" />
           </aside>
-          <section className="hb-main"><Skeleton variant="block" height="16rem" /></section>
+          <section className="hb-main">
+            <Skeleton variant="block" height="16rem" />
+          </section>
         </div>
       </div>
     );
@@ -191,13 +208,24 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   if (load !== "ready") {
     return (
       <div className="hb-root">
-        <Alert tone={load === "unavailable" ? "info" : "warning"} title={load === "unavailable" ? "Homebrew isn't switched on yet" : "Couldn't load your homebrew"}>
+        <Alert
+          tone={load === "unavailable" ? "info" : "warning"}
+          title={load === "unavailable" ? "Homebrew isn't switched on yet" : "Couldn't load your homebrew"}
+        >
           <p className="hb-unavailable-text">
             {load === "unavailable"
               ? "This table's server doesn't have the homebrew library yet, so there's nothing to show. Nothing you've made has been lost — it just isn't reachable from here."
               : loadMessage}
           </p>
-          <Button variant="secondary" onClick={() => { setLoad("loading"); void refresh(); }}>Try again</Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setLoad("loading");
+              void refresh();
+            }}
+          >
+            Try again
+          </Button>
         </Alert>
       </div>
     );
@@ -209,10 +237,14 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       <div className="hb-modebar">
         <p className="hb-count">
           {counts.total} {counts.total === 1 ? "record" : "records"}
-          {counts.drafts > 0 && <> &middot; {counts.drafts} {counts.drafts === 1 ? "draft" : "drafts"}</>}
+          {counts.drafts > 0 && (
+            <>
+              {" "}
+              &middot; {counts.drafts} {counts.drafts === 1 ? "draft" : "drafts"}
+            </>
+          )}
         </p>
       </div>
-
 
       <div className={`hb-workspace frame-fill${hasSelection ? " has-selection" : ""}`}>
         <HomebrewRail
@@ -231,34 +263,49 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
               variant="ghost"
               size="sm"
               className="hb-back tap-target"
-              onClick={() => { setSelectedId(null); setSelected(null); }}
+              onClick={() => {
+                setSelectedId(null);
+                setSelected(null);
+              }}
             >
-              <span className="hb-back-icon" aria-hidden="true"><IconChevron /></span>
+              <span className="hb-back-icon" aria-hidden="true">
+                <IconChevron />
+              </span>
               All homebrew
             </Button>
           )}
 
-          {selectError
-            ? <Alert tone="warning" title="Couldn't open that record"><p>{selectError}</p></Alert>
-            : selected
-              ? <RecordDetail
-                  key={selected.id}
-                  gmToken={gmToken}
-                  record={selected}
-                  records={records}
-                  usageCount={usageCount}
-                  onChanged={(next) => { setSelected(next); patchRow(next); }}
-                  onSelect={(id) => void select(id)}
-                />
-              : hasSelection
-                ? <Skeleton variant="block" height="16rem" />
-                : <div className="nh-empty">
-                    <span className="nh-empty-title">Select a record</span>
-                    <span className="nh-empty-text">
-                      Every record starts as a draft only you can see. Publish it when it&rsquo;s ready, and choose then whether players can browse it.
-                    </span>
-                    <Button variant="primary" onClick={() => setCreateOpen(true)}>New homebrew</Button>
-                  </div>}
+          {selectError ? (
+            <Alert tone="warning" title="Couldn't open that record">
+              <p>{selectError}</p>
+            </Alert>
+          ) : selected ? (
+            <RecordDetail
+              key={selected.id}
+              gmToken={gmToken}
+              record={selected}
+              records={records}
+              usageCount={usageCount}
+              onChanged={(next) => {
+                setSelected(next);
+                patchRow(next);
+              }}
+              onSelect={(id) => void select(id)}
+            />
+          ) : hasSelection ? (
+            <Skeleton variant="block" height="16rem" />
+          ) : (
+            <div className="nh-empty">
+              <span className="nh-empty-title">Select a record</span>
+              <span className="nh-empty-text">
+                Every record starts as a draft only you can see. Publish it when it&rsquo;s ready, and choose then
+                whether players can browse it.
+              </span>
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
+                New homebrew
+              </Button>
+            </div>
+          )}
         </section>
       </div>
 

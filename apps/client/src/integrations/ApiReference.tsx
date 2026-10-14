@@ -16,7 +16,15 @@ type Operation = Readonly<{
   security?: ReadonlyArray<Record<string, readonly string[]>>;
   parameters?: ReadonlyArray<{ name: string; in: string; required?: boolean; schema?: Schema }>;
   requestBody?: { required?: boolean; content: Record<string, { schema?: Schema }> };
-  responses: Record<string, { description?: string; content?: Record<string, { schema?: Schema }>; headers?: Record<string, unknown>; $ref?: string }>;
+  responses: Record<
+    string,
+    {
+      description?: string;
+      content?: Record<string, { schema?: Schema }>;
+      headers?: Record<string, unknown>;
+      $ref?: string;
+    }
+  >;
 }>;
 type OpenApiDocument = Readonly<{
   info: { title: string; description?: string };
@@ -44,13 +52,25 @@ function toPythonLiteral(value: unknown, indent = 0): string {
   if (typeof value === "boolean") return value ? "True" : "False";
   if (typeof value === "number") return String(value);
   if (typeof value === "string") return JSON.stringify(value);
-  if (Array.isArray(value)) return value.length === 0 ? "[]" : `[\n${value.map((entry) => inner + toPythonLiteral(entry, indent + 1)).join(",\n")}\n${pad}]`;
+  if (Array.isArray(value))
+    return value.length === 0
+      ? "[]"
+      : `[\n${value.map((entry) => inner + toPythonLiteral(entry, indent + 1)).join(",\n")}\n${pad}]`;
   const entries = Object.entries(value as Record<string, unknown>);
-  return entries.length === 0 ? "{}" : `{\n${entries.map(([key, entry]) => `${inner}${JSON.stringify(key)}: ${toPythonLiteral(entry, indent + 1)}`).join(",\n")}\n${pad}}`;
+  return entries.length === 0
+    ? "{}"
+    : `{\n${entries.map(([key, entry]) => `${inner}${JSON.stringify(key)}: ${toPythonLiteral(entry, indent + 1)}`).join(",\n")}\n${pad}}`;
 }
 
 /** A runnable request sample for one endpoint in the chosen language. Placeholders stand in for a real token and ids. */
-function codeSample(language: Language, method: string, url: string, needsAuth: boolean, body: Record<string, unknown> | null, rawBodyTypes: readonly string[]): string {
+function codeSample(
+  language: Language,
+  method: string,
+  url: string,
+  needsAuth: boolean,
+  body: Record<string, unknown> | null,
+  rawBodyTypes: readonly string[]
+): string {
   const upper = method.toUpperCase();
   const bodyJson = body ? JSON.stringify(body) : null;
   const bodyPretty = body ? JSON.stringify(body, null, 2) : null;
@@ -59,8 +79,13 @@ function codeSample(language: Language, method: string, url: string, needsAuth: 
   if (language === "shell") {
     const lines = [`curl -X ${upper} ${url}`];
     if (needsAuth) lines.push(`  -H "Authorization: Bearer $TOKEN"`);
-    if (bodyJson) { lines.push(`  -H "content-type: application/json"`); lines.push(`  -d '${bodyJson}'`); }
-    else if (rawType) { lines.push(`  -H "content-type: ${rawType}"`); lines.push(`  --data-binary @image.png`); }
+    if (bodyJson) {
+      lines.push(`  -H "content-type: application/json"`);
+      lines.push(`  -d '${bodyJson}'`);
+    } else if (rawType) {
+      lines.push(`  -H "content-type: ${rawType}"`);
+      lines.push(`  --data-binary @image.png`);
+    }
     return lines.join(" \\\n");
   }
 
@@ -86,8 +111,13 @@ function codeSample(language: Language, method: string, url: string, needsAuth: 
     if (bodyPretty) lines.push(`$body = @'\n${bodyPretty}\n'@`);
     const args = [`-Method ${capital}`, `-Uri "${url}"`];
     if (needsAuth) args.push("-Headers $headers");
-    if (bodyPretty) { args.push(`-ContentType "application/json"`); args.push("-Body $body"); }
-    else if (rawType) { args.push(`-ContentType "${rawType}"`); args.push(`-InFile "image.png"`); }
+    if (bodyPretty) {
+      args.push(`-ContentType "application/json"`);
+      args.push("-Body $body");
+    } else if (rawType) {
+      args.push(`-ContentType "${rawType}"`);
+      args.push(`-InFile "image.png"`);
+    }
     lines.push(`Invoke-RestMethod ${args.join(" ")}`);
     return lines.join("\n");
   }
@@ -102,7 +132,10 @@ function codeSample(language: Language, method: string, url: string, needsAuth: 
 }
 
 const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }> = [
-  { title: "System & discovery", match: (path) => path.startsWith("/api/v1/system") || path === "/api/v1/openapi.json" },
+  {
+    title: "System & discovery",
+    match: (path) => path.startsWith("/api/v1/system") || path === "/api/v1/openapi.json"
+  },
   { title: "Integration credentials (GM)", match: (path) => path.startsWith("/api/v1/gm/integration-credentials") },
   { title: "Player sessions", match: (path) => path.startsWith("/api/v1/sessions") },
   { title: "Live game", match: (path) => path.startsWith("/api/v1/game") },
@@ -129,7 +162,10 @@ function authOptions(operation: Operation): readonly string[] {
   const security = operation.security;
   if (!security || security.length === 0) return ["public - no credentials"];
   return security.map((entry) => {
-    if ("bearerAuth" in entry) return entry.bearerAuth.length > 0 ? `integration (${entry.bearerAuth.join(", ")})` : "integration (scope per command type)";
+    if ("bearerAuth" in entry)
+      return entry.bearerAuth.length > 0
+        ? `integration (${entry.bearerAuth.join(", ")})`
+        : "integration (scope per command type)";
     if ("gmAuth" in entry) return "GM session";
     if ("playerAuth" in entry) return "player session";
     if ("viewerCookieAuth" in entry) return "paired viewer";
@@ -153,7 +189,8 @@ function authChips(operation: Operation): readonly string[] {
 function typeLabel(schema: Schema | undefined, components: Components): string {
   if (!schema) return "unknown";
   if (typeof schema.$ref === "string") return refName(schema.$ref);
-  if (Array.isArray(schema.oneOf)) return schema.oneOf.map((branch: Schema) => typeLabel(branch, components)).join(" | ");
+  if (Array.isArray(schema.oneOf))
+    return schema.oneOf.map((branch: Schema) => typeLabel(branch, components)).join(" | ");
   if (schema.const !== undefined) return `const ${JSON.stringify(schema.const)}`;
   if (Array.isArray(schema.enum)) return schema.enum.map((value: unknown) => String(value)).join(" | ");
   if (schema.type === "array") return `${typeLabel(schema.items, components)}[]`;
@@ -190,16 +227,22 @@ function fieldRows(schema: Schema, components: Components): FieldRow[] {
   const rows: FieldRow[] = [];
   for (const [name, property] of Object.entries(properties)) {
     rows.push({ name, type: typeLabel(property, components), required: required.has(name), note: noteOf(property) });
-    const nested = property.type === "object" && property.properties
-      ? property
-      : property.type === "array" && property.items?.type === "object" && property.items?.properties
-        ? property.items
-        : undefined;
+    const nested =
+      property.type === "object" && property.properties
+        ? property
+        : property.type === "array" && property.items?.type === "object" && property.items?.properties
+          ? property.items
+          : undefined;
     if (nested) {
       const prefix = property.type === "array" ? `${name}[]` : name;
       const nestedRequired = new Set<string>(nested.required ?? []);
       for (const [nestedName, nestedProperty] of Object.entries(nested.properties as Record<string, Schema>)) {
-        rows.push({ name: `${prefix}.${nestedName}`, type: typeLabel(nestedProperty, components), required: nestedRequired.has(nestedName), note: noteOf(nestedProperty) });
+        rows.push({
+          name: `${prefix}.${nestedName}`,
+          type: typeLabel(nestedProperty, components),
+          required: nestedRequired.has(nestedName),
+          note: noteOf(nestedProperty)
+        });
       }
     }
   }
@@ -207,7 +250,12 @@ function fieldRows(schema: Schema, components: Components): FieldRow[] {
 }
 
 /** A synthetic example value for a schema - enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
-function exampleValue(schema: Schema | undefined, components: Components, depth = 0, seen: ReadonlySet<string> = new Set()): unknown {
+function exampleValue(
+  schema: Schema | undefined,
+  components: Components,
+  depth = 0,
+  seen: ReadonlySet<string> = new Set()
+): unknown {
   if (!schema || depth > 6) return null;
   if (typeof schema.$ref === "string") {
     if (seen.has(schema.$ref)) return {};
@@ -216,13 +264,16 @@ function exampleValue(schema: Schema | undefined, components: Components, depth 
   if (Array.isArray(schema.oneOf)) return exampleValue(schema.oneOf[0], components, depth + 1, seen);
   if (schema.const !== undefined) return schema.const;
   if (Array.isArray(schema.enum)) return schema.enum[0];
-  const type = Array.isArray(schema.type) ? schema.type.find((entry: string) => entry !== "null") ?? schema.type[0] : schema.type;
+  const type = Array.isArray(schema.type)
+    ? (schema.type.find((entry: string) => entry !== "null") ?? schema.type[0])
+    : schema.type;
   if (type === "object") {
     const properties = schema.properties as Record<string, Schema> | undefined;
     if (!properties) return {};
     const required = new Set<string>(schema.required ?? []);
     const out: Record<string, unknown> = {};
-    for (const [name, property] of Object.entries(properties)) if (required.has(name)) out[name] = exampleValue(property, components, depth + 1, seen);
+    for (const [name, property] of Object.entries(properties))
+      if (required.has(name)) out[name] = exampleValue(property, components, depth + 1, seen);
     return out;
   }
   if (type === "array") return [exampleValue(schema.items, components, depth + 1, seen)];
@@ -256,71 +307,172 @@ function responseDataSchema(schemaRef: Schema | undefined, components: Component
 
 function FieldTable({ rows }: Readonly<{ rows: readonly FieldRow[] }>) {
   if (rows.length === 0) return <p className="api-detail-empty">No fields.</p>;
-  return <table className="api-field-table">
-    <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Notes</th></tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.name}><td><code>{row.name}</code></td><td>{row.type}</td><td>{row.required ? "yes" : "-"}</td><td>{row.note}</td></tr>)}</tbody>
-  </table>;
+  return (
+    <table className="api-field-table">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Type</th>
+          <th>Req</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.name}>
+            <td>
+              <code>{row.name}</code>
+            </td>
+            <td>{row.type}</td>
+            <td>{row.required ? "yes" : "-"}</td>
+            <td>{row.note}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
-function EndpointDetails({ method, path, operation, components, origin, language }: Readonly<{ method: string; path: string; operation: Operation; components: Components; origin: string; language: Language }>) {
+function EndpointDetails({
+  method,
+  path,
+  operation,
+  components,
+  origin,
+  language
+}: Readonly<{
+  method: string;
+  path: string;
+  operation: Operation;
+  components: Components;
+  origin: string;
+  language: Language;
+}>) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const parameters = operation.parameters ?? [];
   const jsonBody = operation.requestBody?.content?.["application/json"]?.schema;
-  const bodySchema = jsonBody ? (typeof jsonBody.$ref === "string" ? resolveRef(jsonBody.$ref, components) : jsonBody) : undefined;
+  const bodySchema = jsonBody
+    ? typeof jsonBody.$ref === "string"
+      ? resolveRef(jsonBody.$ref, components)
+      : jsonBody
+    : undefined;
   const rawBodyTypes = operation.requestBody && !jsonBody ? Object.keys(operation.requestBody.content ?? {}) : [];
   const needsAuth = !authOptions(operation).some((label) => label.startsWith("public"));
 
   const examplePath = path.replace(/\{[a-zA-Z]+\}/g, EXAMPLE_UUID);
   const exampleJson = bodySchema ? exampleBody(bodySchema, components) : null;
   const sample = codeSample(language, method, `${origin}${examplePath}`, needsAuth, exampleJson, rawBodyTypes);
-  const copySample = async () => { try { await navigator.clipboard.writeText(sample); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked; the code is selectable */ } };
+  const copySample = async () => {
+    try {
+      await navigator.clipboard.writeText(sample);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked; the code is selectable */
+    }
+  };
 
-  return <details className="api-endpoint" onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
-    <summary>
-      <span className="api-reference-route">
-        <code className={`api-method api-method-${method}`}>{method.toUpperCase()}</code>
-        <code className="api-path">{path}</code>
-        <span className="api-auth">{authChips(operation).map((chip) => <em key={chip}>{chip}</em>)}</span>
-      </span>
-      {operation.description && <span className="api-endpoint-summary">{operation.description}</span>}
-    </summary>
-    {open && <div className="api-endpoint-body">
-      <p className="api-detail-line"><strong>Authorized principals:</strong> {authOptions(operation).join(" · ")}</p>
+  return (
+    <details className="api-endpoint" onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
+      <summary>
+        <span className="api-reference-route">
+          <code className={`api-method api-method-${method}`}>{method.toUpperCase()}</code>
+          <code className="api-path">{path}</code>
+          <span className="api-auth">
+            {authChips(operation).map((chip) => (
+              <em key={chip}>{chip}</em>
+            ))}
+          </span>
+        </span>
+        {operation.description && <span className="api-endpoint-summary">{operation.description}</span>}
+      </summary>
+      {open && (
+        <div className="api-endpoint-body">
+          <p className="api-detail-line">
+            <strong>Authorized principals:</strong> {authOptions(operation).join(" · ")}
+          </p>
 
-      {parameters.length > 0 && <div className="api-detail-block">
-        <h4>Parameters</h4>
-        <table className="api-field-table">
-          <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Req</th></tr></thead>
-          <tbody>{parameters.map((parameter) => <tr key={`${parameter.in}-${parameter.name}`}><td><code>{parameter.name}</code></td><td>{parameter.in}</td><td>{typeLabel(parameter.schema, components)}</td><td>{parameter.required ? "yes" : "-"}</td></tr>)}</tbody>
-        </table>
-      </div>}
+          {parameters.length > 0 && (
+            <div className="api-detail-block">
+              <h4>Parameters</h4>
+              <table className="api-field-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>In</th>
+                    <th>Type</th>
+                    <th>Req</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parameters.map((parameter) => (
+                    <tr key={`${parameter.in}-${parameter.name}`}>
+                      <td>
+                        <code>{parameter.name}</code>
+                      </td>
+                      <td>{parameter.in}</td>
+                      <td>{typeLabel(parameter.schema, components)}</td>
+                      <td>{parameter.required ? "yes" : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-      {bodySchema && <div className="api-detail-block">
-        <h4>Request body{operation.requestBody?.required ? "" : " (optional)"}</h4>
-        <FieldTable rows={fieldRows(bodySchema, components)} />
-      </div>}
-      {rawBodyTypes.length > 0 && <div className="api-detail-block"><h4>Request body</h4><p className="api-detail-line">Raw <code>{rawBodyTypes.join(", ")}</code> bytes.</p></div>}
+          {bodySchema && (
+            <div className="api-detail-block">
+              <h4>Request body{operation.requestBody?.required ? "" : " (optional)"}</h4>
+              <FieldTable rows={fieldRows(bodySchema, components)} />
+            </div>
+          )}
+          {rawBodyTypes.length > 0 && (
+            <div className="api-detail-block">
+              <h4>Request body</h4>
+              <p className="api-detail-line">
+                Raw <code>{rawBodyTypes.join(", ")}</code> bytes.
+              </p>
+            </div>
+          )}
 
-      <div className="api-detail-block">
-        <div className="api-code-header"><h4>Example request</h4><span className="api-code-lang">{LANGUAGES.find((entry) => entry.id === language)?.label}</span><button type="button" className="api-copy" onClick={copySample}>{copied ? "Copied ✓" : "Copy"}</button></div>
-        <pre className="api-code"><code>{sample}</code></pre>
-      </div>
+          <div className="api-detail-block">
+            <div className="api-code-header">
+              <h4>Example request</h4>
+              <span className="api-code-lang">{LANGUAGES.find((entry) => entry.id === language)?.label}</span>
+              <button type="button" className="api-copy" onClick={copySample}>
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
+            </div>
+            <pre className="api-code">
+              <code>{sample}</code>
+            </pre>
+          </div>
 
-      <div className="api-detail-block">
-        <h4>Responses</h4>
-        {Object.entries(operation.responses).map(([code, response]) => {
-          const isError = typeof response.$ref === "string" || (code >= "400");
-          const schemaRef = response.content?.["application/json"]?.schema;
-          const dataSchema = responseDataSchema(schemaRef, components);
-          return <div key={code} className={`api-response ${isError ? "api-response-error" : "api-response-ok"}`}>
-            <p><code className="api-response-code">{code}</code> {response.description ?? (typeof response.$ref === "string" ? "Stable API error" : "")}{schemaRef && typeof schemaRef.$ref === "string" ? <em className="api-response-schema"> - {refName(schemaRef.$ref)}</em> : null}</p>
-            {dataSchema && <FieldTable rows={fieldRows(dataSchema, components)} />}
-          </div>;
-        })}
-      </div>
-    </div>}
-  </details>;
+          <div className="api-detail-block">
+            <h4>Responses</h4>
+            {Object.entries(operation.responses).map(([code, response]) => {
+              const isError = typeof response.$ref === "string" || code >= "400";
+              const schemaRef = response.content?.["application/json"]?.schema;
+              const dataSchema = responseDataSchema(schemaRef, components);
+              return (
+                <div key={code} className={`api-response ${isError ? "api-response-error" : "api-response-ok"}`}>
+                  <p>
+                    <code className="api-response-code">{code}</code>{" "}
+                    {response.description ?? (typeof response.$ref === "string" ? "Stable API error" : "")}
+                    {schemaRef && typeof schemaRef.$ref === "string" ? (
+                      <em className="api-response-schema"> - {refName(schemaRef.$ref)}</em>
+                    ) : null}
+                  </p>
+                  {dataSchema && <FieldTable rows={fieldRows(dataSchema, components)} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </details>
+  );
 }
 
 /** Downloads the full OpenAPI 3.1 spec (for Postman, openapi-generator, etc.). */
@@ -343,7 +495,12 @@ function exportSpec(document: OpenApiDocument) {
 const API_REFERENCE_PATH = "/settings/api";
 
 function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
-  const [state, setState] = useState<{ status: "idle" | "loading" | "ready" | "error"; document: OpenApiDocument | null; commands: readonly CatalogCommand[]; message: string }>({ status: "idle", document: null, commands: [], message: "" });
+  const [state, setState] = useState<{
+    status: "idle" | "loading" | "ready" | "error";
+    document: OpenApiDocument | null;
+    commands: readonly CatalogCommand[];
+    message: string;
+  }>({ status: "idle", document: null, commands: [], message: "" });
   const [language, setLanguage] = useState<Language>("shell");
 
   const load = () => {
@@ -351,94 +508,195 @@ function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
     setState((current) => ({ ...current, status: "loading", message: "" }));
     Promise.all([
       fetch("/api/v1/openapi.json").then((response) => response.json()),
-      fetch("/api/v1/game/commands", { headers: { authorization: `Bearer ${gmToken}` } }).then((response) => response.json())
+      fetch("/api/v1/game/commands", { headers: { authorization: `Bearer ${gmToken}` } }).then((response) =>
+        response.json()
+      )
     ])
-      .then(([document, catalog]) => setState({ status: "ready", document: document as OpenApiDocument, commands: (catalog?.data?.commands ?? []) as readonly CatalogCommand[], message: "" }))
-      .catch(() => setState({ status: "error", document: null, commands: [], message: "The reference could not be loaded from the server." }));
+      .then(([document, catalog]) =>
+        setState({
+          status: "ready",
+          document: document as OpenApiDocument,
+          commands: (catalog?.data?.commands ?? []) as readonly CatalogCommand[],
+          message: ""
+        })
+      )
+      .catch(() =>
+        setState({
+          status: "error",
+          document: null,
+          commands: [],
+          message: "The reference could not be loaded from the server."
+        })
+      );
   };
 
   /**
    * Fetched on mount: both presentations mount this body only when it is about to be read. Idempotent
    * via the guard above, so StrictMode's double mount is safe.
    */
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const document = state.document;
   const components = document?.components?.schemas ?? {};
   const origin = window.location.origin;
-  const operationCount = document ? Object.values(document.paths).reduce((total, operations) => total + Object.keys(operations).length, 0) : 0;
+  const operationCount = document
+    ? Object.values(document.paths).reduce((total, operations) => total + Object.keys(operations).length, 0)
+    : 0;
 
-  return <>
-    <div className="api-reference-body">
-      <p className="api-reference-intro">
-        Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> - a credential from above, your GM session, or a player session.
-        {/* `.tap-target` grows the link's hit area to the floor; the paragraph has no other control. */}
-        The machine-readable contract lives at <a className="tap-target" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>.
-      </p>
-      {/* The idempotency and revision rules come from the served contract's description, never restated
+  return (
+    <>
+      <div className="api-reference-body">
+        <p className="api-reference-intro">
+          Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> -
+          a credential from above, your GM session, or a player session.
+          {/* `.tap-target` grows the link's hit area to the floor; the paragraph has no other control. */}
+          The machine-readable contract lives at{" "}
+          <a className="tap-target" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">
+            /api/v1/openapi.json
+          </a>
+          .
+        </p>
+        {/* The idempotency and revision rules come from the served contract's description, never restated
           here, so they cannot diverge per surface. */}
-      {document?.info.description && <p className="api-reference-intro">{document.info.description}</p>}
-      {state.status === "loading" && <p>Loading the contract…</p>}
-      {state.status === "error" && <p className="api-reference-error">{state.message} <Button variant="ghost" onClick={load}>Retry</Button></p>}
-      {document && <>
-        <div className="api-reference-toolbar">
-          <div className="api-lang-tabs">
-            <span className="api-lang-label">Language</span>
-            <SegmentedControl
-              ariaLabel="Example request language"
-              size="sm"
-              value={language}
-              onChange={(value) => setLanguage(value as typeof language)}
-              options={LANGUAGES.map((entry) => ({ value: entry.id, label: entry.label }))}
-            />
-          </div>
-          <Button variant="secondary" className="api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</Button>
-        </div>
-        <p className="api-reference-count">{operationCount} operations across {Object.keys(document.paths).length} paths. Example values are synthetic - real ids come from the game state.</p>
-        {GROUPS.map((group) => {
-          const paths = Object.entries(document.paths).filter(([path]) => group.match(path));
-          if (paths.length === 0) return null;
-          return <section key={group.title} className="api-reference-group">
-            <h3>{group.title}</h3>
-            <div className="api-endpoint-list">
-              {paths.flatMap(([path, operations]) => METHOD_ORDER.filter((method) => operations[method]).map((method) => (
-                <EndpointDetails key={`${method} ${path}`} method={method} path={path} operation={operations[method]} components={components} origin={origin} language={language} />
-              )))}
+        {document?.info.description && <p className="api-reference-intro">{document.info.description}</p>}
+        {state.status === "loading" && <p>Loading the contract…</p>}
+        {state.status === "error" && (
+          <p className="api-reference-error">
+            {state.message}{" "}
+            <Button variant="ghost" onClick={load}>
+              Retry
+            </Button>
+          </p>
+        )}
+        {document && (
+          <>
+            <div className="api-reference-toolbar">
+              <div className="api-lang-tabs">
+                <span className="api-lang-label">Language</span>
+                <SegmentedControl
+                  ariaLabel="Example request language"
+                  size="sm"
+                  value={language}
+                  onChange={(value) => setLanguage(value as typeof language)}
+                  options={LANGUAGES.map((entry) => ({ value: entry.id, label: entry.label }))}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                className="api-export-spec"
+                onClick={() => exportSpec(document)}
+                title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool."
+              >
+                ⬇ Export OpenAPI spec
+              </Button>
             </div>
-          </section>;
-        })}
-        {(() => {
-          const rest = ungrouped(Object.keys(document.paths));
-          if (rest.length === 0) return null;
-          return <section className="api-reference-group">
-            <h3>Other</h3>
-            <div className="api-endpoint-list">
-              {rest.flatMap((path) => METHOD_ORDER.filter((method) => document.paths[path][method]).map((method) => (
-                <EndpointDetails key={`${method} ${path}`} method={method} path={path} operation={document.paths[path][method]!} components={components} origin={origin} language={language} />
-              )))}
-            </div>
-          </section>;
-        })()}
-        {state.commands.length > 0 && <section className="api-reference-group">
-          <h3>Command catalog (typed routes + the <code>POST /game/commands</code> tunnel)</h3>
-          <table className="api-command-table">
-            <thead><tr><th>Command type</th><th>Scope</th><th>What it does</th></tr></thead>
-            <tbody>{state.commands.map((command) => <tr key={command.type}><td><code>{command.type}</code></td><td><code>{command.scope}</code></td><td>{command.summary}</td></tr>)}</tbody>
-          </table>
-        </section>}
-      </>}
-    </div>
-  </>;
+            <p className="api-reference-count">
+              {operationCount} operations across {Object.keys(document.paths).length} paths. Example values are
+              synthetic - real ids come from the game state.
+            </p>
+            {GROUPS.map((group) => {
+              const paths = Object.entries(document.paths).filter(([path]) => group.match(path));
+              if (paths.length === 0) return null;
+              return (
+                <section key={group.title} className="api-reference-group">
+                  <h3>{group.title}</h3>
+                  <div className="api-endpoint-list">
+                    {paths.flatMap(([path, operations]) =>
+                      METHOD_ORDER.filter((method) => operations[method]).map((method) => (
+                        <EndpointDetails
+                          key={`${method} ${path}`}
+                          method={method}
+                          path={path}
+                          operation={operations[method]}
+                          components={components}
+                          origin={origin}
+                          language={language}
+                        />
+                      ))
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+            {(() => {
+              const rest = ungrouped(Object.keys(document.paths));
+              if (rest.length === 0) return null;
+              return (
+                <section className="api-reference-group">
+                  <h3>Other</h3>
+                  <div className="api-endpoint-list">
+                    {rest.flatMap((path) =>
+                      METHOD_ORDER.filter((method) => document.paths[path][method]).map((method) => (
+                        <EndpointDetails
+                          key={`${method} ${path}`}
+                          method={method}
+                          path={path}
+                          operation={document.paths[path][method]!}
+                          components={components}
+                          origin={origin}
+                          language={language}
+                        />
+                      ))
+                    )}
+                  </div>
+                </section>
+              );
+            })()}
+            {state.commands.length > 0 && (
+              <section className="api-reference-group">
+                <h3>
+                  Command catalog (typed routes + the <code>POST /game/commands</code> tunnel)
+                </h3>
+                <table className="api-command-table">
+                  <thead>
+                    <tr>
+                      <th>Command type</th>
+                      <th>Scope</th>
+                      <th>What it does</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.commands.map((command) => (
+                      <tr key={command.type}>
+                        <td>
+                          <code>{command.type}</code>
+                        </td>
+                        <td>
+                          <code>{command.scope}</code>
+                        </td>
+                        <td>{command.summary}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
 }
 
 /** The Settings-page presentation: the disclosure plus the link to the full-page address. */
 export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
   const [open, setOpen] = useState(false);
-  return <details className="api-reference" open={open} onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
-    <summary><strong>API reference</strong><span>Every endpoint this server exposes, straight from its own contract - click one for its full spec.</span></summary>
-    {/* Mounted only while open, so the fetch happens on first open, not every Settings visit. */}
-    {open && <ApiReferenceBody gmToken={gmToken} />}
-  </details>;
+  return (
+    <details
+      className="api-reference"
+      open={open}
+      onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+    >
+      <summary>
+        <strong>API reference</strong>
+        <span>Every endpoint this server exposes, straight from its own contract - click one for its full spec.</span>
+      </summary>
+      {/* Mounted only while open, so the fetch happens on first open, not every Settings visit. */}
+      {open && <ApiReferenceBody gmToken={gmToken} />}
+    </details>
+  );
 }
 
 /**
@@ -447,17 +705,30 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
  * for the GM password rather than receiving a copied credential.
  */
 export function ApiReferencePage({ gmToken, onBack }: Readonly<{ gmToken: string; onBack: () => void }>) {
-  return <section className="api-reference-page pane-frame pane-scene scanlines frame-col anim-view" aria-label="API reference">
-    <div className="pane-sky" aria-hidden="true" />
-    <div className="api-reference-page-head neon-beam">
-      <h2>API reference</h2>
-      <div className="api-reference-page-actions">
-        <Button variant="ghost" onClick={onBack}>Back to Settings</Button>
-        <Button variant="secondary" title="The new tab asks for the GM password once — the GM token is never persisted." onClick={() => window.open(API_REFERENCE_PATH, "_blank", "noopener")}>Open in a new tab</Button>
+  return (
+    <section
+      className="api-reference-page pane-frame pane-scene scanlines frame-col anim-view"
+      aria-label="API reference"
+    >
+      <div className="pane-sky" aria-hidden="true" />
+      <div className="api-reference-page-head neon-beam">
+        <h2>API reference</h2>
+        <div className="api-reference-page-actions">
+          <Button variant="ghost" onClick={onBack}>
+            Back to Settings
+          </Button>
+          <Button
+            variant="secondary"
+            title="The new tab asks for the GM password once — the GM token is never persisted."
+            onClick={() => window.open(API_REFERENCE_PATH, "_blank", "noopener")}
+          >
+            Open in a new tab
+          </Button>
+        </div>
       </div>
-    </div>
-    <div className="api-reference-page-body scroll-y frame-fill">
-      <ApiReferenceBody gmToken={gmToken} />
-    </div>
-  </section>;
+      <div className="api-reference-page-body scroll-y frame-fill">
+        <ApiReferenceBody gmToken={gmToken} />
+      </div>
+    </section>
+  );
 }

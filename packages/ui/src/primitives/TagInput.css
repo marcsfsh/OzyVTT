@@ -16,11 +16,24 @@
   padding: 0;
   list-style: none;
 }
-.nh-taginput-tags > li { display: flex; min-width: 0; }
+.nh-taginput-tags > li {
+  display: flex;
+  min-width: 0;
+}
 
 /* A tag is a slug, so it uses the data face. */
-.nh-taginput-tags .nh-chip-label { font-family: var(--font-mono); }
+.nh-taginput-tags .nh-chip-label {
+  font-family: var(--font-mono);
+}
 
-.nh-taginput-hint { margin: 0; font-size: var(--fs-sm); color: var(--text-dim); }
+.nh-taginput-hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
 /* Full strength, never dimmed with the disabled input beside it. */
-.nh-taginput-reason { margin: 0; font-size: var(--fs-sm); color: var(--caution-hi); }
+.nh-taginput-reason {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--caution-hi);
+}

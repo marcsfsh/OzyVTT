@@ -7,7 +7,12 @@ import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { STANDARD_ARRAY, statPriorityFor } from "@vtt/rules-5e";
-import { buildCharacterDefinition, computeServerOffers, levelOfPick, storedHitPointRolls } from "../src/character-build.js";
+import {
+  buildCharacterDefinition,
+  computeServerOffers,
+  levelOfPick,
+  storedHitPointRolls
+} from "../src/character-build.js";
 import { generateCharacterRequest } from "../src/character-generate.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { importActorDefinition } from "../src/actor-roster.js";
@@ -71,10 +76,11 @@ const CLASS_SIGNATURE: Readonly<Record<string, Readonly<{ atOne: string | null; 
 };
 
 /** Everything on the effective list this character owns rather than carries: actions and pools, minus item-derived ones. */
-const ownContent = (actions: readonly ActorDefinition["actions"][number][]): Set<string> => new Set([
-  ...actions.filter((action) => !isItemActionId(action.id)).map((action) => action.id),
-  ...actionPools(actions).map((pool) => pool.id)
-]);
+const ownContent = (actions: readonly ActorDefinition["actions"][number][]): Set<string> =>
+  new Set([
+    ...actions.filter((action) => !isItemActionId(action.id)).map((action) => action.id),
+    ...actionPools(actions).map((pool) => pool.id)
+  ]);
 
 describe("random character generator - the far end", () => {
   it("rolls all twelve classes at levels 1/5/11/20, and each one round-trips through its own ledger", () => {
@@ -96,23 +102,33 @@ describe("random character generator - the far end", () => {
           const rolls = storedHitPointRolls(ledger, level);
           expect(rolls, `${classId} L${level} recorded no hit-point rolls`).not.toBeNull();
           const rebuilt = buildCharacterDefinition(
-            { ...generated.request, choices: ledger, hp: { mode: "entries", entries: rolls! } }, library, defaultPolicy);
+            { ...generated.request, choices: ledger, hp: { mode: "entries", entries: rolls! } },
+            library,
+            defaultPolicy
+          );
           expect(rebuilt, `${classId} L${level} did not round-trip`).toEqual(definition);
 
           // The class's primary ability got the good number: the standard array's top value is 15 (+2) and the
           // background spread can only add to it.
           const primary = statPriorityFor(classId, library.classProgressionTable())[0];
-          expect(definition.abilityScores[primary], `${classId} L${level} put ${primary.toUpperCase()} at ${definition.abilityScores[primary]}`)
-            .toBeGreaterThanOrEqual(15);
+          expect(
+            definition.abilityScores[primary],
+            `${classId} L${level} put ${primary.toUpperCase()} at ${definition.abilityScores[primary]}`
+          ).toBeGreaterThanOrEqual(15);
 
           // Something to do on its turn, and something its own class gave it.
           const { actions } = assemble(definition);
-          const onTurn = actions.filter((action) => action.activation === "action" || action.activation === "bonus-action");
+          const onTurn = actions.filter(
+            (action) => action.activation === "action" || action.activation === "bonus-action"
+          );
           expect(onTurn.length, `${classId} L${level} has no action to take on its turn`).toBeGreaterThan(0);
           const owed = level === 1 ? CLASS_SIGNATURE[classId].atOne : CLASS_SIGNATURE[classId].later;
           const own = ownContent(actions);
           if (owed !== null) {
-            expect(own.has(owed), `${classId} L${level} has no "${owed}" of its own - it holds ${[...own].sort().join(", ") || "nothing"}`).toBe(true);
+            expect(
+              own.has(owed),
+              `${classId} L${level} has no "${owed}" of its own - it holds ${[...own].sort().join(", ") || "nothing"}`
+            ).toBe(true);
           }
         } catch (error) {
           failures.push(`${classId} L${level}: ${(error as Error).message}`);
@@ -127,14 +143,22 @@ describe("random character generator - the far end", () => {
       const { request } = generateCharacterRequest({ classId, level: 5 }, library, defaultPolicy, seeded(7));
       const priority = statPriorityFor(classId, library.classProgressionTable());
       // Exactly the standard array, in priority order: 15 on what the class needs most.
-      expect([...Object.values(request.baseScores)].sort((a, b) => b - a), classId).toEqual([...STANDARD_ARRAY]);
-      expect(priority.map((ability) => request.baseScores[ability]), classId).toEqual([...STANDARD_ARRAY]);
+      expect(
+        [...Object.values(request.baseScores)].sort((a, b) => b - a),
+        classId
+      ).toEqual([...STANDARD_ARRAY]);
+      expect(
+        priority.map((ability) => request.baseScores[ability]),
+        classId
+      ).toEqual([...STANDARD_ARRAY]);
       // The background's printed +2/+1 goes to the best two abilities that background may raise.
       const background = library.backgroundRecord(request.backgroundId)!;
       const allowed = background.abilityOptions?.from ?? [];
       const ranked = [...allowed].sort((left, right) => priority.indexOf(left) - priority.indexOf(right));
-      expect(request.backgroundBonusAllocation.map((entry) => entry.ability), `${classId}/${request.backgroundId}`)
-        .toEqual(ranked.slice(0, request.backgroundBonusAllocation.length));
+      expect(
+        request.backgroundBonusAllocation.map((entry) => entry.ability),
+        `${classId}/${request.backgroundId}`
+      ).toEqual(ranked.slice(0, request.backgroundBonusAllocation.length));
       expect(request.backgroundBonusAllocation.map((entry) => entry.amount)).toEqual([2, 1]);
     }
   });
@@ -150,14 +174,17 @@ describe("random character generator - the far end", () => {
 
   it("draws the class too when none is asked for, and names the character from its own species", () => {
     const drawn = new Set<string>();
-    for (let seed = 1; seed <= 40; seed += 1) drawn.add(generateCharacterRequest({ level: 3 }, library, defaultPolicy, seeded(seed)).request.classId);
+    for (let seed = 1; seed <= 40; seed += 1)
+      drawn.add(generateCharacterRequest({ level: 3 }, library, defaultPolicy, seeded(seed)).request.classId);
     expect(drawn.size).toBeGreaterThan(1);
     const generated = generateCharacterRequest({ level: 3 }, library, defaultPolicy, seeded(11));
     const bundle = library.nameBundles().find((entry) => entry.speciesId === generated.request.speciesId)!;
     const pool = bundle.pools.flatMap((entry) => entry.names);
     expect(generated.request.name.split(" ").every((word) => pool.includes(word))).toBe(true);
     // A requested name is used verbatim.
-    expect(generateCharacterRequest({ level: 3, name: "  Bramblefoot  " }, library, defaultPolicy, seeded(11)).request.name).toBe("Bramblefoot");
+    expect(
+      generateCharacterRequest({ level: 3, name: "  Bramblefoot  " }, library, defaultPolicy, seeded(11)).request.name
+    ).toBe("Bramblefoot");
   });
 
   it("only ever picks expertise in a skill it is already proficient in", () => {
@@ -186,12 +213,22 @@ describe("random character generator - the far end", () => {
           const ledger = buildCharacterDefinition(request, library, defaultPolicy).character!.choices!;
           for (const offer of computeServerOffers(request, library, defaultPolicy).offers) {
             for (const [index, id] of offer.taken.entries()) {
-              const want = { level: levelOfPick(offer, index), kind: offer.kind, classId: offer.classId, featureId: offer.featureId };
-              const found = ledger.some((row) => row.id === id
-                && row.level === want.level && row.kind === want.kind
-                && (row.classId ?? null) === want.classId
-                && ((row.payload?.featureId as string | undefined) ?? null) === want.featureId);
-              if (!found) misses.push(`${classId} L${level} s${seed}: no row answers ${JSON.stringify(want)} with "${id}"`);
+              const want = {
+                level: levelOfPick(offer, index),
+                kind: offer.kind,
+                classId: offer.classId,
+                featureId: offer.featureId
+              };
+              const found = ledger.some(
+                (row) =>
+                  row.id === id &&
+                  row.level === want.level &&
+                  row.kind === want.kind &&
+                  (row.classId ?? null) === want.classId &&
+                  ((row.payload?.featureId as string | undefined) ?? null) === want.featureId
+              );
+              if (!found)
+                misses.push(`${classId} L${level} s${seed}: no row answers ${JSON.stringify(want)} with "${id}"`);
             }
           }
         }
@@ -203,15 +240,28 @@ describe("random character generator - the far end", () => {
   it("records a chosen feat's own picks at the ASI that took it, not at the first one", () => {
     // A feat's own picks must sit at the level the feat was taken, not at the first ASI level. A generated
     // cleric 11 takes Grappler at the level-8 ASI.
-    const cleric = generateCharacterRequest({ classId: "cleric", level: 11 }, library, defaultPolicy, seeded(11)).request;
+    const cleric = generateCharacterRequest(
+      { classId: "cleric", level: 11 },
+      library,
+      defaultPolicy,
+      seeded(11)
+    ).request;
     const ledger = buildCharacterDefinition(cleric, library, defaultPolicy).character!.choices!;
-    expect(ledger.find((row) => row.kind === "asi-or-feat" && row.id === "grappler"))
-      .toMatchObject({ level: 8, classId: "cleric" });
-    expect(ledger.find((row) => row.payload?.featureId === "grappler"))
-      .toMatchObject({ level: 8, kind: "ability-score" });
+    expect(ledger.find((row) => row.kind === "asi-or-feat" && row.id === "grappler")).toMatchObject({
+      level: 8,
+      classId: "cleric"
+    });
+    expect(ledger.find((row) => row.payload?.featureId === "grappler")).toMatchObject({
+      level: 8,
+      kind: "ability-score"
+    });
     // ...and the subclass row.
-    expect(ledger.find((row) => row.kind === "subclass"))
-      .toMatchObject({ level: 3, classId: "cleric", id: "life-domain", payload: { featureId: "cleric-subclass" } });
+    expect(ledger.find((row) => row.kind === "subclass")).toMatchObject({
+      level: 3,
+      classId: "cleric",
+      id: "life-domain",
+      payload: { featureId: "cleric-subclass" }
+    });
 
     // Across the sweep, every row a chosen feat's own pick wrote sits at that feat's level.
     // `ability-score-improvement` is excluded: the class feature shares its id with the catalog feat, so
@@ -223,10 +273,15 @@ describe("random character generator - the far end", () => {
         for (const seed of [1, 7, 11]) {
           const { request } = generateCharacterRequest({ classId, level }, library, defaultPolicy, seeded(seed));
           const rows = buildCharacterDefinition(request, library, defaultPolicy).character!.choices!;
-          for (const feat of rows.filter((row) => row.kind === "asi-or-feat" && row.id !== "asi" && row.id !== "ability-score-improvement")) {
+          for (const feat of rows.filter(
+            (row) => row.kind === "asi-or-feat" && row.id !== "asi" && row.id !== "ability-score-improvement"
+          )) {
             for (const own of rows.filter((row) => row.payload?.featureId === feat.id)) {
               checked += 1;
-              if (own.level !== feat.level) misses.push(`${classId} L${level} s${seed}: ${feat.id} taken at ${feat.level}, its ${own.kind} "${own.id}" filed at ${own.level}`);
+              if (own.level !== feat.level)
+                misses.push(
+                  `${classId} L${level} s${seed}: ${feat.id} taken at ${feat.level}, its ${own.kind} "${own.id}" filed at ${own.level}`
+                );
             }
           }
         }
@@ -239,15 +294,18 @@ describe("random character generator - the far end", () => {
 
   it("refuses when the table has withdrawn the standard array, and says which setting to change", () => {
     const noArray = BuilderPolicySchema.parse({ allowedAbilityMethods: ["point-buy"] });
-    expect(() => generateCharacterRequest({ classId: "cleric", level: 3 }, library, noArray, seeded(1)))
-      .toThrow(/standard array/i);
+    expect(() => generateCharacterRequest({ classId: "cleric", level: 3 }, library, noArray, seeded(1))).toThrow(
+      /standard array/i
+    );
   });
 });
 
 // The role gate, over HTTP.
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
 async function boot() {
   const directory = await mkdtemp(join(tmpdir(), "vtt-generate-"));
@@ -266,12 +324,19 @@ async function boot() {
   await new Promise<void>((resolve) => server.httpServer.listen(0, "127.0.0.1", resolve));
   const address = server.httpServer.address();
   if (!address || typeof address === "string") throw new Error("Server did not bind.");
-  cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken };
 }
 
 const post = (base: string, path: string, token: string, body: unknown) =>
-  fetch(base + path, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+  fetch(base + path, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
 
 describe("random character generator - the role gate", () => {
   it("is closed to players by default, opens on the GM's setting, and auto-claims what a player rolls", async () => {
@@ -284,7 +349,11 @@ describe("random character generator - the role gate", () => {
     expect(denied.status).toBe(403);
 
     // The GM always may, whatever the setting says.
-    const byGm = await post(base, GAME_PATHS.charactersRandom, gmToken, { commandId: randomUUID(), level: 3, classId: "cleric" });
+    const byGm = await post(base, GAME_PATHS.charactersRandom, gmToken, {
+      commandId: randomUUID(),
+      level: 3,
+      classId: "cleric"
+    });
     expect(byGm.status).toBe(200);
     const gmActorId = (await byGm.json()).data.actorId as string;
     const gmActor = server.store.snapshot.actors.find((actor) => actor.id === gmActorId)!;
@@ -292,8 +361,11 @@ describe("random character generator - the role gate", () => {
     expect(gmActor.definitionId).toBe(`import-${gmActorId}`);
 
     // The GM opens the door...
-    const opened = await post(base, GAME_PATHS.builderPolicy, gmToken,
-      { commandId: randomUUID(), allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], playerRandom: "open" });
+    const opened = await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"],
+      playerRandom: "open"
+    });
     expect(opened.status).toBe(200);
 
     // ...and now the same player call lands, auto-claimed by its roller.
@@ -309,8 +381,11 @@ describe("random character generator - the role gate", () => {
     expect(second.status).toBe(409);
 
     // The table's level cap is enforced against the stored policy, not the caller's word.
-    const capped = await post(base, GAME_PATHS.builderPolicy, gmToken,
-      { commandId: randomUUID(), allowedAbilityMethods: ["standard-array"], maxLevel: 5 });
+    const capped = await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ["standard-array"],
+      maxLevel: 5
+    });
     expect(capped.status).toBe(200);
     const tooHigh = await post(base, GAME_PATHS.charactersRandom, gmToken, { commandId: randomUUID(), level: 9 });
     expect(tooHigh.status).toBe(409);

@@ -2,9 +2,20 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, GEAR_CATEGORY_IDS, MAGIC_SCHOOL_IDS,
-  RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS,
-  loadConditions, loadDamageTypes, loadEquipment, loadMonsterDefinitions, loadSpells, loadWeaponProperties
+  CONDITION_IDS,
+  CREATURE_TYPE_IDS,
+  DAMAGE_TYPE_IDS,
+  GEAR_CATEGORY_IDS,
+  MAGIC_SCHOOL_IDS,
+  RARITY_IDS,
+  WEAPON_MASTERY_IDS,
+  WEAPON_PROPERTY_IDS,
+  loadConditions,
+  loadDamageTypes,
+  loadEquipment,
+  loadMonsterDefinitions,
+  loadSpells,
+  loadWeaponProperties
 } from "../src/index.js";
 
 /** The extension bag the bestiary reads challenge rating and creature type from. */
@@ -50,14 +61,24 @@ describe("canonical SRD vocabularies", () => {
   it("GEAR_CATEGORY_IDS covers every hand-authored gear category", () => {
     // Weapons, armour and magic items are excluded so only the hand-authored gear categories remain.
     const authored = sorted([
-      ...new Set(loadEquipment().filter((item) => !item.weapon && !item.armor && !item.isMagic).map((item) => item.category))
+      ...new Set(
+        loadEquipment()
+          .filter((item) => !item.weapon && !item.armor && !item.isMagic)
+          .map((item) => item.category)
+      )
     ]);
     expect(GEAR_CATEGORY_IDS).toEqual(authored);
   });
 
   it("RARITY_IDS contains every rarity the bundles declare — the weaker assertion, and the honest one", () => {
     // Rarity has no bundle to project, so this asserts containment rather than equality.
-    const declared = sorted([...new Set(loadEquipment().map((item) => item.rarity).filter((rarity): rarity is string => !!rarity))]);
+    const declared = sorted([
+      ...new Set(
+        loadEquipment()
+          .map((item) => item.rarity)
+          .filter((rarity): rarity is string => !!rarity)
+      )
+    ]);
     for (const rarity of declared) expect(RARITY_IDS, `equipment rarity "${rarity}"`).toContain(rarity);
     expect(RARITY_IDS).toEqual(["common", "uncommon", "rare", "very-rare", "legendary", "artifact", "varies"]);
   });

@@ -38,7 +38,8 @@ export function setAt<T>(source: T, path: string, value: unknown): T {
       return array;
     }
 
-    const object = node && typeof node === "object" && !Array.isArray(node) ? { ...(node as Record<string, unknown>) } : {};
+    const object =
+      node && typeof node === "object" && !Array.isArray(node) ? { ...(node as Record<string, unknown>) } : {};
     object[key] = last ? value : write(object[key], depth + 1);
     return object;
   };

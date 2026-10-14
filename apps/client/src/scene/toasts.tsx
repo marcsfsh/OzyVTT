@@ -24,7 +24,9 @@ export function TableEventToasts() {
   useEffect(() => {
     const onEvent = (event: TableEvent) => toast(event.text, { tone: TONE_FOR_KIND[event.kind] ?? "info" });
     socket.on("table:event", onEvent);
-    return () => { socket.off("table:event", onEvent); };
+    return () => {
+      socket.off("table:event", onEvent);
+    };
   }, [toast]);
   return null;
 }

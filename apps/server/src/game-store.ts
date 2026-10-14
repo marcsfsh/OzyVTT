@@ -7,12 +7,23 @@ export class CommandRejectedError extends Error {}
 /** A rules-mode rejection (ADR-0020); rolls back without burning the commandId and carries the rule id and
  *  whether `override: {reason}` may bypass it. */
 export class RulesBlockedError extends CommandRejectedError {
-  constructor(public readonly rule: string, message: string, public readonly overridable: boolean = true) { super(message); }
+  constructor(
+    public readonly rule: string,
+    message: string,
+    public readonly overridable: boolean = true
+  ) {
+    super(message);
+  }
 }
 export class RevisionConflictError extends Error {}
 /** A timeline navigation needs GM confirmation first. Thrown before any transaction, so it burns no receipt, revision or event; the client re-sends with the confirm flag and a fresh commandId. */
 export class TimelineConfirmationRequired extends Error {
-  constructor(public readonly confirm: "rewrite-history" | "discard-changes", message: string) { super(message); }
+  constructor(
+    public readonly confirm: "rewrite-history" | "discard-changes",
+    message: string
+  ) {
+    super(message);
+  }
 }
 
 type Command = {
@@ -28,10 +39,28 @@ type Command = {
 type ReceiptRow = { revision: number };
 type StateRow = { state_json: string };
 type TurnSnapshotRow = { idx: number; kind: "turn" | "return"; label: string; revision: number; created_at: string };
-type JournalRow = { seq: number; command_id: string; command_type: string; actor_id: string | null; principal: string; payload_json: string; revision: number; at: string };
+type JournalRow = {
+  seq: number;
+  command_id: string;
+  command_type: string;
+  actor_id: string | null;
+  principal: string;
+  payload_json: string;
+  revision: number;
+  at: string;
+};
 
 /** One journaled command from the live fight: enough for an external tool to replay or audit it. */
-export type JournalEntry = Readonly<{ seq: number; commandId: string; type: string; actorId: string | null; principal: string; payload: unknown; revision: number; at: string }>;
+export type JournalEntry = Readonly<{
+  seq: number;
+  commandId: string;
+  type: string;
+  actorId: string | null;
+  principal: string;
+  payload: unknown;
+  revision: number;
+  at: string;
+}>;
 const PLACEHOLDER_ROSTER_SEED = "phase-1-placeholder-roster-v1";
 
 export type GameStoreOptions = Readonly<{
@@ -63,12 +92,26 @@ export type TimelineOps = Readonly<{
   clearJournal: (exceptCommandId?: string) => void;
 }>;
 
-export type EncounterArchiveInput = Readonly<{ commandId: string; startedAt: string | null; endedAt: string; turnCount: number; documentJson: string }>;
-export type EncounterArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number; /** Shared with players by the GM? Default false. */ playerVisible: boolean }>;
+export type EncounterArchiveInput = Readonly<{
+  commandId: string;
+  startedAt: string | null;
+  endedAt: string;
+  turnCount: number;
+  documentJson: string;
+}>;
+export type EncounterArchiveSummary = Readonly<{
+  id: number;
+  archivedAt: string;
+  startedAt: string | null;
+  endedAt: string;
+  turnCount: number;
+  /** Shared with players by the GM? Default false. */ playerVisible: boolean;
+}>;
 
-const MIGRATIONS = [{
-  version: 1,
-  sql: `
+const MIGRATIONS = [
+  {
+    version: 1,
+    sql: `
     CREATE TABLE game_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       schema_version INTEGER NOT NULL,
@@ -97,17 +140,19 @@ const MIGRATIONS = [{
       created_at TEXT NOT NULL
     ) STRICT;
   `
-}, {
-  version: 2,
-  sql: `
+  },
+  {
+    version: 2,
+    sql: `
     CREATE TABLE application_seeds (
       seed_key TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
     ) STRICT;
   `
-}, {
-  version: 3,
-  sql: `
+  },
+  {
+    version: 3,
+    sql: `
     CREATE TABLE turn_snapshots (
       idx INTEGER PRIMARY KEY,
       kind TEXT NOT NULL CHECK (kind IN ('turn', 'return')),
@@ -117,9 +162,10 @@ const MIGRATIONS = [{
       created_at TEXT NOT NULL
     ) STRICT;
   `
-}, {
-  version: 4,
-  sql: `
+  },
+  {
+    version: 4,
+    sql: `
     CREATE TABLE encounter_archives (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       command_id TEXT NOT NULL UNIQUE,
@@ -130,9 +176,10 @@ const MIGRATIONS = [{
       document_json TEXT NOT NULL
     ) STRICT;
   `
-}, {
-  version: 5,
-  sql: `
+  },
+  {
+    version: 5,
+    sql: `
     CREATE TABLE encounter_journal (
       seq INTEGER PRIMARY KEY AUTOINCREMENT,
       command_id TEXT NOT NULL,
@@ -144,11 +191,13 @@ const MIGRATIONS = [{
       at TEXT NOT NULL
     ) STRICT;
   `
-}, {
-  version: 6,
-  // Per-archive sharing: additive column defaulting to 0, so existing archives stay hidden.
-  sql: `ALTER TABLE encounter_archives ADD COLUMN player_visible INTEGER NOT NULL DEFAULT 0;`
-}];
+  },
+  {
+    version: 6,
+    // Per-archive sharing: additive column defaulting to 0, so existing archives stay hidden.
+    sql: `ALTER TABLE encounter_archives ADD COLUMN player_visible INTEGER NOT NULL DEFAULT 0;`
+  }
+];
 
 /** The one-time repair that re-keys `example-*` starter sheets as ordinary `import-<actorId>` ones. */
 const EXAMPLE_PARTY_NORMALIZATION_SEED = "example-party-normalization-v1";
@@ -161,7 +210,11 @@ export class GameStore {
   private database?: DatabaseSync;
   private commandQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly databasePath: string, initialState?: GameState, private readonly options: GameStoreOptions = {}) {
+  constructor(
+    private readonly databasePath: string,
+    initialState?: GameState,
+    private readonly options: GameStoreOptions = {}
+  ) {
     this.initialState = initialState ? structuredClone(initialState) : GameStateSchema.parse({ schemaVersion: 1 });
     this.state = structuredClone(this.initialState);
   }
@@ -170,7 +223,9 @@ export class GameStore {
     await mkdir(dirname(this.databasePath), { recursive: true });
     this.database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
     this.database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-    this.database.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+    this.database.exec(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
+    );
     this.migrate();
     const row = this.database.prepare("SELECT state_json FROM game_state WHERE id = 1").get() as StateRow | undefined;
     if (row) this.state = GameStateSchema.parse(JSON.parse(row.state_json));
@@ -180,17 +235,24 @@ export class GameStore {
     this.applyExamplePartyNormalizationSeed();
     // An older server build may have stripped historyCursor while turn_snapshots rows survived; drop the
     // stale return-point.
-    if (this.state.combat.historyCursor === null) this.database.exec("DELETE FROM turn_snapshots WHERE kind = 'return'");
+    if (this.state.combat.historyCursor === null)
+      this.database.exec("DELETE FROM turn_snapshots WHERE kind = 'return'");
   }
 
-  get snapshot() { return structuredClone(this.state); }
+  get snapshot() {
+    return structuredClone(this.state);
+  }
 
   async execute(command: Command, mutate: (state: GameState) => void) {
     return this.enqueue(command, (nextState) => {
       mutate(nextState);
       // While rewound, any change a restore would roll back needs GM confirmation before history can move;
       // marked here so every command is covered.
-      if (nextState.combat.historyCursor !== null && !nextState.combat.historyDirty && this.options.timelineDirtied?.(this.state, nextState)) {
+      if (
+        nextState.combat.historyCursor !== null &&
+        !nextState.combat.historyDirty &&
+        this.options.timelineDirtied?.(this.state, nextState)
+      ) {
         nextState.combat.historyDirty = true;
       }
       return [];
@@ -203,23 +265,68 @@ export class GameStore {
     return this.enqueue(command, (nextState) => {
       const database = this.requireDatabase();
       const pending: Array<{ sql: string; params: readonly (string | number)[] }> = [];
-      let nextIndex = ((database.prepare("SELECT MAX(idx) AS max_idx FROM turn_snapshots").get() as { max_idx: number | null }).max_idx ?? -1) + 1;
+      let nextIndex =
+        ((database.prepare("SELECT MAX(idx) AS max_idx FROM turn_snapshots").get() as { max_idx: number | null })
+          .max_idx ?? -1) + 1;
       const timeline: TimelineOps = {
-        entries: () => (database.prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx").all() as TurnSnapshotRow[])
-          .map((row) => ({ index: row.idx, kind: row.kind, label: row.label, revision: row.revision, at: row.created_at })),
+        entries: () =>
+          (
+            database
+              .prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx")
+              .all() as TurnSnapshotRow[]
+          ).map((row) => ({
+            index: row.idx,
+            kind: row.kind,
+            label: row.label,
+            revision: row.revision,
+            at: row.created_at
+          })),
         read: (index) => {
-          const row = database.prepare("SELECT state_json FROM turn_snapshots WHERE idx = ?").get(index) as StateRow | undefined;
+          const row = database.prepare("SELECT state_json FROM turn_snapshots WHERE idx = ?").get(index) as
+            StateRow | undefined;
           return row ? GameStateSchema.parse(JSON.parse(row.state_json)) : null;
         },
         capture: (kind, label, stateToCapture) => {
-          pending.push({ sql: "INSERT INTO turn_snapshots (idx, kind, label, revision, state_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", params: [nextIndex++, kind, label, stateToCapture.revision, JSON.stringify(stateToCapture), new Date().toISOString()] });
+          pending.push({
+            sql: "INSERT INTO turn_snapshots (idx, kind, label, revision, state_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            params: [
+              nextIndex++,
+              kind,
+              label,
+              stateToCapture.revision,
+              JSON.stringify(stateToCapture),
+              new Date().toISOString()
+            ]
+          });
         },
         // Truncations move the next-capture cursor so a capture in the same plan lands at the freed idx.
-        truncateFrom: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx >= ?", params: [index] }); nextIndex = Math.min(nextIndex, index); },
-        truncateAll: () => { pending.push({ sql: "DELETE FROM turn_snapshots", params: [] }); nextIndex = 0; },
-        remove: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx = ?", params: [index] }); },
-        prune: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx < ?", params: [index] }); },
-        archive: (row) => { pending.push({ sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json) VALUES (?, ?, ?, ?, ?, ?)", params: [row.commandId, new Date().toISOString(), row.startedAt ?? "", row.endedAt, row.turnCount, row.documentJson] }); },
+        truncateFrom: (index) => {
+          pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx >= ?", params: [index] });
+          nextIndex = Math.min(nextIndex, index);
+        },
+        truncateAll: () => {
+          pending.push({ sql: "DELETE FROM turn_snapshots", params: [] });
+          nextIndex = 0;
+        },
+        remove: (index) => {
+          pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx = ?", params: [index] });
+        },
+        prune: (index) => {
+          pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx < ?", params: [index] });
+        },
+        archive: (row) => {
+          pending.push({
+            sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json) VALUES (?, ?, ?, ?, ?, ?)",
+            params: [
+              row.commandId,
+              new Date().toISOString(),
+              row.startedAt ?? "",
+              row.endedAt,
+              row.turnCount,
+              row.documentJson
+            ]
+          });
+        },
         journalEntries: () => this.listJournal(),
         clearJournal: (exceptCommandId) => {
           if (exceptCommandId === undefined) pending.push({ sql: "DELETE FROM encounter_journal", params: [] });
@@ -233,32 +340,73 @@ export class GameStore {
 
   /** Timeline metadata for the GM view (labels can name hidden combatants; never send to players). */
   listTurnSnapshots(): readonly TurnHistoryEntry[] {
-    return (this.requireDatabase().prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx").all() as TurnSnapshotRow[])
-      .map((row) => ({ index: row.idx, kind: row.kind, label: row.label, revision: row.revision, at: row.created_at }));
+    return (
+      this.requireDatabase()
+        .prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx")
+        .all() as TurnSnapshotRow[]
+    ).map((row) => ({ index: row.idx, kind: row.kind, label: row.label, revision: row.revision, at: row.created_at }));
   }
 
   /** Current revision without cloning the whole state (cheap enough for ETag checks). */
-  get revision(): number { return this.state.revision; }
+  get revision(): number {
+    return this.state.revision;
+  }
 
   /** The live fight's command journal, oldest first. GM-grade: payloads can reference hidden combatants. */
   listJournal(): readonly JournalEntry[] {
-    return (this.requireDatabase().prepare("SELECT seq, command_id, command_type, actor_id, principal, payload_json, revision, at FROM encounter_journal ORDER BY seq").all() as JournalRow[])
-      .map((row) => ({ seq: row.seq, commandId: row.command_id, type: row.command_type, actorId: row.actor_id, principal: row.principal, payload: JSON.parse(row.payload_json) as unknown, revision: row.revision, at: row.at }));
+    return (
+      this.requireDatabase()
+        .prepare(
+          "SELECT seq, command_id, command_type, actor_id, principal, payload_json, revision, at FROM encounter_journal ORDER BY seq"
+        )
+        .all() as JournalRow[]
+    ).map((row) => ({
+      seq: row.seq,
+      commandId: row.command_id,
+      type: row.command_type,
+      actorId: row.actor_id,
+      principal: row.principal,
+      payload: JSON.parse(row.payload_json) as unknown,
+      revision: row.revision,
+      at: row.at
+    }));
   }
 
   /** Permanent records of ended encounters, newest first. GM-only: the document holds full state. */
   listEncounterArchives(): readonly EncounterArchiveSummary[] {
-    return (this.requireDatabase().prepare("SELECT id, archived_at, started_at, ended_at, turn_count, player_visible FROM encounter_archives ORDER BY id DESC").all() as Array<{ id: number; archived_at: string; started_at: string | null; ended_at: string; turn_count: number; player_visible: number }>)
-      .map((row) => ({ id: row.id, archivedAt: row.archived_at, startedAt: row.started_at || null, endedAt: row.ended_at, turnCount: row.turn_count, playerVisible: row.player_visible === 1 }));
+    return (
+      this.requireDatabase()
+        .prepare(
+          "SELECT id, archived_at, started_at, ended_at, turn_count, player_visible FROM encounter_archives ORDER BY id DESC"
+        )
+        .all() as Array<{
+        id: number;
+        archived_at: string;
+        started_at: string | null;
+        ended_at: string;
+        turn_count: number;
+        player_visible: number;
+      }>
+    ).map((row) => ({
+      id: row.id,
+      archivedAt: row.archived_at,
+      startedAt: row.started_at || null,
+      endedAt: row.ended_at,
+      turnCount: row.turn_count,
+      playerVisible: row.player_visible === 1
+    }));
   }
   /** Shares or un-shares an archived fight; false if missing. Players only ever get the computed replay projection. */
   setEncounterArchiveVisibility(id: number, playerVisible: boolean): boolean {
-    const result = this.requireDatabase().prepare("UPDATE encounter_archives SET player_visible = ? WHERE id = ?").run(playerVisible ? 1 : 0, id);
+    const result = this.requireDatabase()
+      .prepare("UPDATE encounter_archives SET player_visible = ? WHERE id = ?")
+      .run(playerVisible ? 1 : 0, id);
     return Number(result.changes) > 0;
   }
   /** The full archive document (JSON string) for one encounter, or null if unknown. */
   getEncounterArchive(id: number): string | null {
-    const row = this.requireDatabase().prepare("SELECT document_json FROM encounter_archives WHERE id = ?").get(id) as { document_json: string } | undefined;
+    const row = this.requireDatabase().prepare("SELECT document_json FROM encounter_archives WHERE id = ?").get(id) as
+      { document_json: string } | undefined;
     return row?.document_json ?? null;
   }
   /** Remove one archived encounter (GM housekeeping). */
@@ -266,12 +414,17 @@ export class GameStore {
     this.requireDatabase().prepare("DELETE FROM encounter_archives WHERE id = ?").run(id);
   }
 
-  private async enqueue(command: Command, operate: (nextState: GameState) => ReadonlyArray<{ sql: string; params: readonly (string | number)[] }>) {
+  private async enqueue(
+    command: Command,
+    operate: (nextState: GameState) => ReadonlyArray<{ sql: string; params: readonly (string | number)[] }>
+  ) {
     const operation = async () => {
       const database = this.requireDatabase();
-      const receipt = database.prepare("SELECT revision FROM command_receipts WHERE command_id = ?").get(command.id) as ReceiptRow | undefined;
+      const receipt = database.prepare("SELECT revision FROM command_receipts WHERE command_id = ?").get(command.id) as
+        ReceiptRow | undefined;
       if (receipt) return { state: this.snapshot, duplicate: true };
-      if (command.expectedRevision !== undefined && command.expectedRevision !== this.state.revision) throw new RevisionConflictError("Your view is outdated. Reloading the current state is required.");
+      if (command.expectedRevision !== undefined && command.expectedRevision !== this.state.revision)
+        throw new RevisionConflictError("Your view is outdated. Reloading the current state is required.");
 
       const nextState = structuredClone(this.state);
       const pendingTimelineWrites = operate(nextState);
@@ -280,15 +433,39 @@ export class GameStore {
 
       database.exec("BEGIN IMMEDIATE");
       try {
-        database.prepare("INSERT INTO command_receipts (command_id, revision, command_type, accepted_at) VALUES (?, ?, ?, ?)").run(command.id, nextState.revision, command.type, acceptedAt);
-        database.prepare("INSERT INTO domain_events (sequence, command_id, event_type, actor_id, occurred_at) VALUES (?, ?, ?, ?, ?)").run(nextState.revision, command.id, command.type, command.actorId ?? null, acceptedAt);
-        database.prepare("UPDATE game_state SET schema_version = ?, revision = ?, state_json = ?, updated_at = ? WHERE id = 1").run(nextState.schemaVersion, nextState.revision, JSON.stringify(nextState), acceptedAt);
-        if (nextState.revision % 50 === 0) database.prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)").run(nextState.revision, JSON.stringify(nextState), "periodic", acceptedAt);
+        database
+          .prepare("INSERT INTO command_receipts (command_id, revision, command_type, accepted_at) VALUES (?, ?, ?, ?)")
+          .run(command.id, nextState.revision, command.type, acceptedAt);
+        database
+          .prepare(
+            "INSERT INTO domain_events (sequence, command_id, event_type, actor_id, occurred_at) VALUES (?, ?, ?, ?, ?)"
+          )
+          .run(nextState.revision, command.id, command.type, command.actorId ?? null, acceptedAt);
+        database
+          .prepare(
+            "UPDATE game_state SET schema_version = ?, revision = ?, state_json = ?, updated_at = ? WHERE id = 1"
+          )
+          .run(nextState.schemaVersion, nextState.revision, JSON.stringify(nextState), acceptedAt);
+        if (nextState.revision % 50 === 0)
+          database
+            .prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)")
+            .run(nextState.revision, JSON.stringify(nextState), "periodic", acceptedAt);
         // Journal every accepted command while an encounter is live, including start and end. Runs before the
         // plan's queued writes so an encounter-lifecycle clearJournal can supersede it in the same transaction.
         if (this.state.combat.active || nextState.combat.active) {
-          database.prepare("INSERT INTO encounter_journal (command_id, command_type, actor_id, principal, payload_json, revision, at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            .run(command.id, command.type, command.actorId ?? null, command.principal ?? "unknown", JSON.stringify(command.payload ?? null), nextState.revision, acceptedAt);
+          database
+            .prepare(
+              "INSERT INTO encounter_journal (command_id, command_type, actor_id, principal, payload_json, revision, at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            )
+            .run(
+              command.id,
+              command.type,
+              command.actorId ?? null,
+              command.principal ?? "unknown",
+              JSON.stringify(command.payload ?? null),
+              nextState.revision,
+              acceptedAt
+            );
         }
         for (const write of pendingTimelineWrites) database.prepare(write.sql).run(...write.params);
         database.exec("COMMIT");
@@ -300,21 +477,33 @@ export class GameStore {
       return { state: this.snapshot, duplicate: false };
     };
     const result = this.commandQueue.then(operation);
-    this.commandQueue = result.then(() => undefined, () => undefined);
+    this.commandQueue = result.then(
+      () => undefined,
+      () => undefined
+    );
     return result;
   }
 
-  close() { this.database?.close(); this.database = undefined; }
+  close() {
+    this.database?.close();
+    this.database = undefined;
+  }
 
   private migrate() {
     const database = this.requireDatabase();
-    const applied = new Set((database.prepare("SELECT version FROM schema_migrations").all() as Array<{ version: number }>).map(({ version }) => version));
+    const applied = new Set(
+      (database.prepare("SELECT version FROM schema_migrations").all() as Array<{ version: number }>).map(
+        ({ version }) => version
+      )
+    );
     for (const migration of MIGRATIONS) {
       if (applied.has(migration.version)) continue;
       database.exec("BEGIN IMMEDIATE");
       try {
         database.exec(migration.sql);
-        database.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)").run(migration.version, new Date().toISOString());
+        database
+          .prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)")
+          .run(migration.version, new Date().toISOString());
         database.exec("COMMIT");
       } catch (error) {
         database.exec("ROLLBACK");
@@ -326,8 +515,12 @@ export class GameStore {
   private insertInitialState() {
     const database = this.requireDatabase();
     const now = new Date().toISOString();
-    database.prepare("INSERT INTO game_state (id, schema_version, revision, state_json, updated_at) VALUES (1, ?, ?, ?, ?)").run(this.state.schemaVersion, this.state.revision, JSON.stringify(this.state), now);
-    database.prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)").run(this.state.revision, JSON.stringify(this.state), "initial", now);
+    database
+      .prepare("INSERT INTO game_state (id, schema_version, revision, state_json, updated_at) VALUES (1, ?, ?, ?, ?)")
+      .run(this.state.schemaVersion, this.state.revision, JSON.stringify(this.state), now);
+    database
+      .prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)")
+      .run(this.state.revision, JSON.stringify(this.state), "initial", now);
   }
 
   private applyPlaceholderRosterSeed() {
@@ -344,10 +537,16 @@ export class GameStore {
     database.exec("BEGIN IMMEDIATE");
     try {
       if (nextState.actors.length !== this.state.actors.length) {
-        database.prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1").run(JSON.stringify(nextState), now);
-        database.prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?").run(JSON.stringify(nextState), nextState.revision);
+        database
+          .prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1")
+          .run(JSON.stringify(nextState), now);
+        database
+          .prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?")
+          .run(JSON.stringify(nextState), nextState.revision);
       }
-      database.prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)").run(PLACEHOLDER_ROSTER_SEED, now);
+      database
+        .prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)")
+        .run(PLACEHOLDER_ROSTER_SEED, now);
       database.exec("COMMIT");
       this.state = nextState;
     } catch (error) {
@@ -360,7 +559,8 @@ export class GameStore {
    *  removed. A row still referenced elsewhere is left alone. */
   private applyExamplePartyNormalizationSeed() {
     const database = this.requireDatabase();
-    if (database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(EXAMPLE_PARTY_NORMALIZATION_SEED)) return;
+    if (database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(EXAMPLE_PARTY_NORMALIZATION_SEED))
+      return;
     const nextState = structuredClone(this.state);
     let changed = false;
     for (const actor of nextState.actors) {
@@ -371,24 +571,36 @@ export class GameStore {
       const replacement = `import-${actor.id}`;
       // Never overwrite a definition that already exists under the target key.
       if (!nextState.definitions.some((entry) => entry.id === replacement)) {
-        nextState.definitions = [...nextState.definitions, { id: replacement, definition: structuredClone(stored.definition) }];
+        nextState.definitions = [
+          ...nextState.definitions,
+          { id: replacement, definition: structuredClone(stored.definition) }
+        ];
       }
       actor.definitionId = replacement;
       changed = true;
     }
     if (changed) {
       // Drop only the `example-*` rows nothing points at any more.
-      nextState.definitions = nextState.definitions.filter((entry) =>
-        !entry.id.startsWith(EXAMPLE_DEFINITION_ID_PREFIX) || nextState.actors.some((actor) => actor.definitionId === entry.id));
+      nextState.definitions = nextState.definitions.filter(
+        (entry) =>
+          !entry.id.startsWith(EXAMPLE_DEFINITION_ID_PREFIX) ||
+          nextState.actors.some((actor) => actor.definitionId === entry.id)
+      );
     }
     const now = new Date().toISOString();
     database.exec("BEGIN IMMEDIATE");
     try {
       if (changed) {
-        database.prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1").run(JSON.stringify(nextState), now);
-        database.prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?").run(JSON.stringify(nextState), nextState.revision);
+        database
+          .prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1")
+          .run(JSON.stringify(nextState), now);
+        database
+          .prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?")
+          .run(JSON.stringify(nextState), nextState.revision);
       }
-      database.prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)").run(EXAMPLE_PARTY_NORMALIZATION_SEED, now);
+      database
+        .prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)")
+        .run(EXAMPLE_PARTY_NORMALIZATION_SEED, now);
       database.exec("COMMIT");
       this.state = nextState;
     } catch (error) {

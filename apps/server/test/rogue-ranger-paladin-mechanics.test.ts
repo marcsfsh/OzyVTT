@@ -29,10 +29,19 @@ const GM_SCOPE = { role: "gm" } as const;
 
 type MutableInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
   choices: Array<CharacterCreateRequestInput["choices"][number]>;
-  backgroundBonusAllocation: Array<{ ability: CharacterCreateRequestInput["backgroundBonusAllocation"][number]["ability"]; amount: number }>;
+  backgroundBonusAllocation: Array<{
+    ability: CharacterCreateRequestInput["backgroundBonusAllocation"][number]["ability"];
+    amount: number;
+  }>;
 };
 
-type Table = Readonly<{ definition: ActorDefinition; state: GameState; hero: Actor; foe: Actor; catalog: ReturnType<typeof equipmentCatalogOf> }>;
+type Table = Readonly<{
+  definition: ActorDefinition;
+  state: GameState;
+  hero: Actor;
+  foe: Actor;
+  catalog: ReturnType<typeof equipmentCatalogOf>;
+}>;
 
 /** Build the sheet through the real builder, put it on a table, and start a fight. */
 function table(input: MutableInput, foeHp = 60): Table {
@@ -40,27 +49,55 @@ function table(input: MutableInput, foeHp = 60): Table {
   const catalog = equipmentCatalogOf(library);
   const state = GameStateSchema.parse({
     schemaVersion: 1,
-    actors: [{ id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: foeHp, maximum: foeHp }, armorClass: 10 }]
+    actors: [
+      {
+        id: IDS.foe,
+        name: "Foe",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: foeHp, maximum: foeHp },
+        armorClass: 10
+      }
+    ]
   }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.hero, score: 20 },
+        { actorId: IDS.foe, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return {
-    definition, state, catalog,
+    definition,
+    state,
+    catalog,
     hero: state.actors.find((actor) => actor.id === IDS.hero)!,
     foe: state.actors.find((actor) => actor.id === IDS.foe)!
   };
 }
 
 let commandSeed = 0;
-const nextCommandId = () => `50000000-0000-4000-8000-${String(commandSeed += 1).padStart(12, "0")}`;
+const nextCommandId = () => `50000000-0000-4000-8000-${String((commandSeed += 1)).padStart(12, "0")}`;
 
 function deps(built: Table, faces: number[]): ResolveDependencies {
   let rollSeed = 0;
   return {
-    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
-    newRollId: () => `40000000-0000-4000-8000-${String(rollSeed += 1).padStart(12, "0")}`,
-    gmSessionId: IDS.gm, now: () => "2026-08-07T00:00:00.000Z",
-    definition: built.definition, catalog: built.catalog,
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
+    newRollId: () => `40000000-0000-4000-8000-${String((rollSeed += 1)).padStart(12, "0")}`,
+    gmSessionId: IDS.gm,
+    now: () => "2026-08-07T00:00:00.000Z",
+    definition: built.definition,
+    catalog: built.catalog,
     resolveDefinition: (id: string) => resolveIn(built.state, id)
   };
 }
@@ -68,9 +105,15 @@ function deps(built: Table, faces: number[]): ResolveDependencies {
 /** The table's definition store: `importActorDefinition` keys it `import-<actorId>`, not by the record's id. */
 const resolveIn = (state: GameState, id: string) => state.definitions.find((entry) => entry.id === id)?.definition;
 
-const actionOf = (built: Table, id: string) => effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id);
+const actionOf = (built: Table, id: string) =>
+  effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id);
 const resolve = (built: Table, id: string, faces: number[], targetIds: string[] = [IDS.foe]) =>
-  resolveDefinitionAction(built.state, actionOf(built, id)!, { actorId: IDS.hero, targetIds, commandId: nextCommandId() }, deps(built, faces));
+  resolveDefinitionAction(
+    built.state,
+    actionOf(built, id)!,
+    { actorId: IDS.hero, targetIds, commandId: nextCommandId() },
+    deps(built, faces)
+  );
 
 // A fresh turn. The action economy is per turn, so draining a pool must happen over several turns or
 // the economy, not the pool, would block the second use.
@@ -82,7 +125,10 @@ function newTurn(built: Table): void {
 }
 
 /** Spend one use of a pool on its own turn. */
-const spend = (built: Table, id: string) => { newTurn(built); return resolve(built, id, [], []); };
+const spend = (built: Table, id: string) => {
+  newTurn(built);
+  return resolve(built, id, [], []);
+};
 
 // Rogue
 
@@ -92,11 +138,18 @@ const rogueInput = (level: number): MutableInput => {
   const asiLevels = [4, 8, 10, 12, 16].filter((asi) => asi <= level);
   const expertiseLevels = [1, 6].filter((entry) => entry <= level);
   return {
-    name: "Nim", speciesId: "halfling", backgroundId: "criminal", classId: "rogue", level,
+    name: "Nim",
+    speciesId: "halfling",
+    backgroundId: "criminal",
+    classId: "rogue",
+    level,
     ...(level >= 3 ? { subclassId: "thief" } : {}),
     abilityMethod: "standard-array",
     baseScores: { str: 10, dex: 15, con: 14, int: 13, wis: 12, cha: 8 },
-    backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
+    backgroundBonusAllocation: [
+      { ability: "dex", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
     hp: { mode: "average" },
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
@@ -109,19 +162,35 @@ const rogueInput = (level: number): MutableInput => {
       { level: 1, classId: "rogue", kind: "skill", id: "deception" },
       { level: 1, classId: "rogue", kind: "weapon-mastery", id: "dagger" },
       { level: 1, classId: "rogue", kind: "weapon-mastery", id: "shortbow" },
-      ...expertiseLevels.flatMap((entry) => entry === 1
-        ? [{ level: 1, classId: "rogue", kind: "expertise", id: "stealth" }, { level: 1, classId: "rogue", kind: "expertise", id: "sleight-of-hand" }]
-        : [{ level: 6, classId: "rogue", kind: "expertise", id: "perception" }, { level: 6, classId: "rogue", kind: "expertise", id: "investigation" }]),
+      ...expertiseLevels.flatMap((entry) =>
+        entry === 1
+          ? [
+              { level: 1, classId: "rogue", kind: "expertise", id: "stealth" },
+              { level: 1, classId: "rogue", kind: "expertise", id: "sleight-of-hand" }
+            ]
+          : [
+              { level: 6, classId: "rogue", kind: "expertise", id: "perception" },
+              { level: 6, classId: "rogue", kind: "expertise", id: "investigation" }
+            ]
+      ),
       ...(level >= 3 ? [{ level: 3, classId: "rogue", kind: "subclass", id: "thief" }] : []),
       ...asiLevels.flatMap((asi) => [
         { level: asi, classId: "rogue", kind: "asi-or-feat", id: "ability-score-improvement" },
         { level: asi, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } },
         { level: asi, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
       ]),
-      ...(level >= 19 ? [
-        { level: 19, classId: "rogue", kind: "feat", id: "boon-of-irresistible-offense", payload: { featureId: "epic-boon" } },
-        { level: 19, kind: "ability-score", id: "dex", payload: { featureId: "boon-of-irresistible-offense" } }
-      ] : []),
+      ...(level >= 19
+        ? [
+            {
+              level: 19,
+              classId: "rogue",
+              kind: "feat",
+              id: "boon-of-irresistible-offense",
+              payload: { featureId: "epic-boon" }
+            },
+            { level: 19, kind: "ability-score", id: "dex", payload: { featureId: "boon-of-irresistible-offense" } }
+          ]
+        : []),
       { level: 1, kind: "equipment", id: "rogue-a" },
       { level: 1, kind: "equipment", id: "criminal-a" }
     ] as MutableInput["choices"]
@@ -145,8 +214,9 @@ describe("Rogue - Sneak Attack rolls the printed column", () => {
     const built = table(rogueInput(11));
     resolve(built, "sneak-attack", [1, 1, 1, 1, 1, 1], []);
     expect(built.state.combat.turn.turnUses[`${IDS.hero}:sneak-attack`]).toBe(1);
-    expect(() => resolve(built, "sneak-attack", [1, 1, 1, 1, 1, 1], []))
-      .toThrowError(/Sneak Attack: no uses remaining \(1\/turn\)/);
+    expect(() => resolve(built, "sneak-attack", [1, 1, 1, 1, 1, 1], [])).toThrowError(
+      /Sneak Attack: no uses remaining \(1\/turn\)/
+    );
     // ...and nothing was spent by the refusal.
     expect(built.state.combat.turn.turnUses[`${IDS.hero}:sneak-attack`]).toBe(1);
   });
@@ -158,21 +228,31 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
     // resolver offers the prompt, and answering it applies half. Without it full damage lands (below).
     const built = table(rogueInput(11));
     const bite = {
-      id: "bite", name: "Bite", activation: "action" as const,
-      description: "A bite.", damage: [{ formula: "2d6", type: "piercing" }],
+      id: "bite",
+      name: "Bite",
+      activation: "action" as const,
+      description: "A bite.",
+      damage: [{ formula: "2d6", type: "piercing" }],
       attack: { bonus: 20 }
     };
     const before = built.hero.hp.current;
-    const hit = resolveDefinitionAction(built.state, bite, { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextCommandId() },
-      { ...deps(built, [18, 5, 5]), definition: undefined });
+    const hit = resolveDefinitionAction(
+      built.state,
+      bite,
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextCommandId() },
+      { ...deps(built, [18, 5, 5]), definition: undefined }
+    );
     expect(hit.attack?.outcome).toBe("hit");
     const pending = built.state.combat.pendingReactions;
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({ kind: "hit-by-attack", actionName: "Uncanny Dodge", proposedDamage: 10 });
 
     const outcome = answerReaction(built.state, nextCommandId(), pending[0].id, true, undefined, GM_SCOPE, {
-      random: () => 1, newRollId: () => "40000000-0000-4000-8000-0000000000ff",
-      gmSessionId: IDS.gm, now: () => "2026-08-07T00:00:00.000Z", catalog: built.catalog,
+      random: () => 1,
+      newRollId: () => "40000000-0000-4000-8000-0000000000ff",
+      gmSessionId: IDS.gm,
+      now: () => "2026-08-07T00:00:00.000Z",
+      catalog: built.catalog,
       resolveDefinition: (id: string) => resolveIn(built.state, id)
     });
     expect(outcome.appliedDamage).toBe(5); // 10 halved, floor, before defenses
@@ -183,11 +263,19 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
     // Negative control: Uncanny Dodge is a level-5 feature.
     const built = table(rogueInput(4));
     const bite = {
-      id: "bite", name: "Bite", activation: "action" as const,
-      description: "A bite.", damage: [{ formula: "2d6", type: "piercing" }], attack: { bonus: 20 }
+      id: "bite",
+      name: "Bite",
+      activation: "action" as const,
+      description: "A bite.",
+      damage: [{ formula: "2d6", type: "piercing" }],
+      attack: { bonus: 20 }
     };
-    resolveDefinitionAction(built.state, bite, { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextCommandId() },
-      { ...deps(built, [18, 5, 5]), definition: undefined });
+    resolveDefinitionAction(
+      built.state,
+      bite,
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextCommandId() },
+      { ...deps(built, [18, 5, 5]), definition: undefined }
+    );
     expect(built.state.combat.pendingReactions).toEqual([]);
   });
 });
@@ -209,12 +297,15 @@ describe("Rogue - the flat grants and the pick", () => {
   it("REFUSES a level-19 Rogue with no Epic Boon feat, and puts the chosen one on the sheet", () => {
     // The level-19 feat pick must be offered, so a build without it is refused.
     const missing = rogueInput(19);
-    missing.choices = missing.choices.filter((row) =>
-      row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-irresistible-offense");
-    expect(() => buildCharacterDefinition(missing, library, policy))
-      .toThrowError(/"Epic Boon" needs 1 pick\(s\) of kind "feat"/);
-    expect(table(rogueInput(19)).definition.character?.feats?.map((feat) => feat.id))
-      .toContain("boon-of-irresistible-offense");
+    missing.choices = missing.choices.filter(
+      (row) => row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-irresistible-offense"
+    );
+    expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
+      /"Epic Boon" needs 1 pick\(s\) of kind "feat"/
+    );
+    expect(table(rogueInput(19)).definition.character?.feats?.map((feat) => feat.id)).toContain(
+      "boon-of-irresistible-offense"
+    );
   });
 
   it("spends Stroke of Luck's one use and refuses the second", () => {
@@ -222,8 +313,9 @@ describe("Rogue - the flat grants and the pick", () => {
     const built = table(rogueInput(20));
     resolve(built, "stroke-of-luck", [], []);
     expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
-    expect(() => resolve(built, "stroke-of-luck", [], []))
-      .toThrowError(/Stroke Of Luck: no uses remaining \(1\/short rest\)/);
+    expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
+      /Stroke Of Luck: no uses remaining \(1\/short rest\)/
+    );
   });
 
   it("gives Steady Aim's Bonus Action a real Advantage effect", () => {
@@ -231,7 +323,9 @@ describe("Rogue - the flat grants and the pick", () => {
     expect(actionOf(built, "steady-aim")?.activation).toBe("bonus-action");
     resolve(built, "steady-aim", [], []);
     const granted = built.hero.effects.find((effect) => effect.tags.includes("steady-aim"));
-    expect(granted?.modifiers).toEqual([{ type: "roll-mode", roll: "attack", mode: "advantage", when: [], scope: undefined }]);
+    expect(granted?.modifiers).toEqual([
+      { type: "roll-mode", roll: "attack", mode: "advantage", when: [], scope: undefined }
+    ]);
   });
 
   it("makes the Thief's Fast Hands a Bonus Action", () => {
@@ -245,12 +339,20 @@ describe("Rogue - the flat grants and the pick", () => {
 function preparedPicks(classId: string, level: number, granted: readonly string[]): string[] {
   const record = library.classRecord(classId)!;
   const row = record.levelTable[level - 1];
-  const maxSlotLevel = (row.spellSlots ?? []).reduce((highest, count, index) => count > 0 ? index + 1 : highest, 0);
-  const pool = library.spellSummaries()
-    .filter((spell) => spell.classes.includes(record.spellcasting!.spellListId!) && spell.level >= 1 && spell.level <= maxSlotLevel && !granted.includes(spell.id))
+  const maxSlotLevel = (row.spellSlots ?? []).reduce((highest, count, index) => (count > 0 ? index + 1 : highest), 0);
+  const pool = library
+    .spellSummaries()
+    .filter(
+      (spell) =>
+        spell.classes.includes(record.spellcasting!.spellListId!) &&
+        spell.level >= 1 &&
+        spell.level <= maxSlotLevel &&
+        !granted.includes(spell.id)
+    )
     .map((spell) => spell.id);
   const owed = row.preparedCount ?? 0;
-  if (pool.length < owed) throw new Error(`${classId} ${level} owes ${owed} prepared spells and the list offers ${pool.length}`);
+  if (pool.length < owed)
+    throw new Error(`${classId} ${level} owes ${owed} prepared spells and the list offers ${pool.length}`);
   return pool.slice(0, owed);
 }
 
@@ -259,11 +361,18 @@ const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): Mutab
   const asiLevels = [4, 8, 12, 16].filter((asi) => asi <= level);
   const bumped = options.wisFocus ? "wis" : "dex";
   return {
-    name: "Ash", speciesId: "halfling", backgroundId: "criminal", classId: "ranger", level,
+    name: "Ash",
+    speciesId: "halfling",
+    backgroundId: "criminal",
+    classId: "ranger",
+    level,
     ...(level >= 3 ? { subclassId: "hunter" } : {}),
     abilityMethod: "standard-array",
     baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
-    backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
+    backgroundBonusAllocation: [
+      { ability: "dex", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
     hp: { mode: "average" },
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
@@ -271,35 +380,66 @@ const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): Mutab
       // Deft Explorer raises `species-languages` by two from level 2 ("you learn two languages of your
       // choice"), so a Ranger past level 1 is offered four.
       ...(level >= 2
-        ? [{ level: 2, kind: "language", id: "goblin" }, { level: 2, kind: "language", id: "orc" }]
+        ? [
+            { level: 2, kind: "language", id: "goblin" },
+            { level: 2, kind: "language", id: "orc" }
+          ]
         : []),
       { level: 1, classId: "ranger", kind: "skill", id: "survival" },
       { level: 1, classId: "ranger", kind: "skill", id: "perception" },
       { level: 1, classId: "ranger", kind: "skill", id: "nature" },
       { level: 1, classId: "ranger", kind: "weapon-mastery", id: "longbow" },
       { level: 1, classId: "ranger", kind: "weapon-mastery", id: "shortsword" },
-      ...(level >= 2 ? [
-        { level: 2, classId: "ranger", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-        { level: 2, classId: "ranger", kind: "expertise", id: "perception", payload: { featureId: "deft-explorer" } }
-      ] : []),
-      ...(level >= 3 ? [
-        { level: 3, classId: "ranger", kind: "subclass", id: "hunter" },
-        { level: 3, kind: "hunters-prey", id: "colossus-slayer", payload: { featureId: "hunters-prey" } }
-      ] : []),
-      ...(level >= 7 ? [{ level: 7, kind: "defensive-tactics", id: "escape-the-horde", payload: { featureId: "defensive-tactics" } }] : []),
-      ...(level >= 9 ? [
-        { level: 9, classId: "ranger", kind: "expertise", id: "survival", payload: { featureId: "expertise" } },
-        { level: 9, classId: "ranger", kind: "expertise", id: "nature", payload: { featureId: "expertise" } }
-      ] : []),
+      ...(level >= 2
+        ? [
+            {
+              level: 2,
+              classId: "ranger",
+              kind: "fighting-style",
+              id: "defense",
+              payload: { featureId: "fighting-style" }
+            },
+            {
+              level: 2,
+              classId: "ranger",
+              kind: "expertise",
+              id: "perception",
+              payload: { featureId: "deft-explorer" }
+            }
+          ]
+        : []),
+      ...(level >= 3
+        ? [
+            { level: 3, classId: "ranger", kind: "subclass", id: "hunter" },
+            { level: 3, kind: "hunters-prey", id: "colossus-slayer", payload: { featureId: "hunters-prey" } }
+          ]
+        : []),
+      ...(level >= 7
+        ? [{ level: 7, kind: "defensive-tactics", id: "escape-the-horde", payload: { featureId: "defensive-tactics" } }]
+        : []),
+      ...(level >= 9
+        ? [
+            { level: 9, classId: "ranger", kind: "expertise", id: "survival", payload: { featureId: "expertise" } },
+            { level: 9, classId: "ranger", kind: "expertise", id: "nature", payload: { featureId: "expertise" } }
+          ]
+        : []),
       ...asiLevels.flatMap((asi) => [
         { level: asi, classId: "ranger", kind: "asi-or-feat", id: "ability-score-improvement" },
         { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } },
         { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } }
       ]),
-      ...(level >= 19 ? [
-        { level: 19, classId: "ranger", kind: "feat", id: "boon-of-dimensional-travel", payload: { featureId: "epic-boon" } },
-        { level: 19, kind: "ability-score", id: "con", payload: { featureId: "boon-of-dimensional-travel" } }
-      ] : []),
+      ...(level >= 19
+        ? [
+            {
+              level: 19,
+              classId: "ranger",
+              kind: "feat",
+              id: "boon-of-dimensional-travel",
+              payload: { featureId: "epic-boon" }
+            },
+            { level: 19, kind: "ability-score", id: "con", payload: { featureId: "boon-of-dimensional-travel" } }
+          ]
+        : []),
       ...preparedPicks("ranger", level, ["hunters-mark"]).map((id) => ({ level: 1, kind: "spell" as const, id })),
       { level: 1, kind: "equipment", id: "ranger-a" },
       { level: 1, kind: "equipment", id: "criminal-a" }
@@ -324,14 +464,16 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
     resolve(first, "favored-enemy", [], []);
     resolve(first, "favored-enemy", [], []);
     expect(first.hero.actionUses["favored-enemy"]).toBe(2);
-    expect(() => resolve(first, "favored-enemy", [], []))
-      .toThrowError(/Favored Enemy: no uses remaining \(2\/long rest\)/);
+    expect(() => resolve(first, "favored-enemy", [], [])).toThrowError(
+      /Favored Enemy: no uses remaining \(2\/long rest\)/
+    );
 
     const late = table(rangerInput(17));
     for (let cast = 0; cast < 6; cast += 1) resolve(late, "favored-enemy", [], []);
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
-    expect(() => resolve(late, "favored-enemy", [], []))
-      .toThrowError(/Favored Enemy: no uses remaining \(6\/long rest\)/);
+    expect(() => resolve(late, "favored-enemy", [], [])).toThrowError(
+      /Favored Enemy: no uses remaining \(6\/long rest\)/
+    );
   });
 });
 
@@ -339,8 +481,9 @@ describe("Ranger - the rest of the kit", () => {
   it("REFUSES a level-2 Ranger with no Deft Explorer Expertise, and grants it when chosen", () => {
     const missing = rangerInput(2);
     missing.choices = missing.choices.filter((row) => row.payload?.featureId !== "deft-explorer");
-    expect(() => buildCharacterDefinition(missing, library, policy))
-      .toThrowError(/"Deft Explorer" needs 1 pick\(s\) of kind "expertise"/);
+    expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
+      /"Deft Explorer" needs 1 pick\(s\) of kind "expertise"/
+    );
     const skills = table(rangerInput(2)).definition.proficiencies?.skills ?? [];
     expect(skills.find((skill) => skill.id === "perception")?.proficiency).toBe("expertise");
   });
@@ -353,19 +496,17 @@ describe("Ranger - the rest of the kit", () => {
   it("scales Tireless off the FINAL Wisdom modifier, so an ASI moves the pool", () => {
     // `scaling: {type: "ability-modifier"}` resolves against the built scores: same record, same level,
     // two different numbers.
-    const plain = table(rangerInput(10));                      // Wis 15 -> +2
+    const plain = table(rangerInput(10)); // Wis 15 -> +2
     for (let use = 0; use < 2; use += 1) spend(plain, "tireless");
     expect(plain.hero.actionUses["tireless"]).toBe(2);
     newTurn(plain);
-    expect(() => resolve(plain, "tireless", [], []))
-      .toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
+    expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
 
     const focused = table(rangerInput(10, { wisFocus: true })); // Wis 15 + 4 -> +4
     for (let use = 0; use < 4; use += 1) spend(focused, "tireless");
     expect(focused.hero.actionUses["tireless"]).toBe(4);
     newTurn(focused);
-    expect(() => resolve(focused, "tireless", [], []))
-      .toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
+    expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
   });
 
   it("makes Nature's Veil a Bonus Action with its own Wisdom-sized pool", () => {
@@ -377,23 +518,28 @@ describe("Ranger - the rest of the kit", () => {
     // A separate pool from Tireless's, as the SRD reads it.
     expect(built.hero.actionUses["tireless"]).toBeUndefined();
     newTurn(built);
-    expect(() => resolve(built, "natures-veil", [], []))
-      .toThrowError(/Nature's Veil: no uses remaining \(2\/long rest\)/);
+    expect(() => resolve(built, "natures-veil", [], [])).toThrowError(
+      /Nature's Veil: no uses remaining \(2\/long rest\)/
+    );
   });
 
   it("REFUSES a level-19 Ranger with no Epic Boon feat", () => {
     const missing = rangerInput(19);
-    missing.choices = missing.choices.filter((row) =>
-      row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-dimensional-travel");
-    expect(() => buildCharacterDefinition(missing, library, policy))
-      .toThrowError(/"Epic Boon" needs 1 pick\(s\) of kind "feat"/);
+    missing.choices = missing.choices.filter(
+      (row) => row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-dimensional-travel"
+    );
+    expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
+      /"Epic Boon" needs 1 pick\(s\) of kind "feat"/
+    );
   });
 
   it("carries Feral Senses as a rider on the sheet - display-level, and knowingly so", () => {
     // `CARRIER_RIDER_DISPOSITION` records `sense` as display-only: it reaches the rider carriers and no
     // consumer applies it. Asserted only at that seam.
     const built = table(rangerInput(18));
-    const carrier = deriveEquipment(built.hero, built.definition, built.catalog).carriers.find((entry) => entry.label === "Feral Senses");
+    const carrier = deriveEquipment(built.hero, built.definition, built.catalog).carriers.find(
+      (entry) => entry.label === "Feral Senses"
+    );
     expect(carrier?.modifiers).toEqual([{ type: "sense", sense: "blindsight", feet: 30, when: [], scope: undefined }]);
   });
 
@@ -402,7 +548,9 @@ describe("Ranger - the rest of the kit", () => {
     // inventory), so `effective-actions.ts` raises the count on the derived weapon swings.
     const built = table(rangerInput(5));
     expect(built.definition.character?.features?.map((entry) => entry.id)).toContain("extra-attack");
-    const bow = effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === "item-longbow");
+    const bow = effectiveActions(built.definition, built.hero, built.catalog).find(
+      (entry) => entry.id === "item-longbow"
+    );
     expect(bow?.attack?.count).toBe(2);
 
     // A second arrow that really resolves.
@@ -412,7 +560,9 @@ describe("Ranger - the rest of the kit", () => {
 
     // Level 4, one level before the feature: still one arrow.
     const before = table(rangerInput(4));
-    const single = effectiveActions(before.definition, before.hero, before.catalog).find((entry) => entry.id === "item-longbow");
+    const single = effectiveActions(before.definition, before.hero, before.catalog).find(
+      (entry) => entry.id === "item-longbow"
+    );
     expect(single?.attack?.count ?? 1).toBe(1);
   });
 });
@@ -422,26 +572,32 @@ describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", (
     // The Hunter's picks are real: a build without them is refused.
     const missing = rangerInput(3);
     missing.choices = missing.choices.filter((row) => row.kind !== "hunters-prey");
-    expect(() => buildCharacterDefinition(missing, library, policy))
-      .toThrowError(/"Hunter's Prey" needs 1 pick\(s\) of kind "hunters-prey"/);
+    expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
+      /"Hunter's Prey" needs 1 pick\(s\) of kind "hunters-prey"/
+    );
 
-    const traits = (table(rangerInput(3)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    const traits = (
+      table(rangerInput(3)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }
+    ).traits.map((trait) => trait.name);
     expect(traits).toContain("Colossus Slayer");
     expect(traits).not.toContain("Horde Breaker");
   });
 
   it("refuses an option that is not one of the two printed", () => {
     const bogus = rangerInput(3);
-    bogus.choices = bogus.choices.map((row) => row.kind === "hunters-prey" ? { ...row, id: "colossal-slayer" } : row);
+    bogus.choices = bogus.choices.map((row) => (row.kind === "hunters-prey" ? { ...row, id: "colossal-slayer" } : row));
     expect(() => buildCharacterDefinition(bogus, library, policy)).toThrowError(/not an offered option/);
   });
 
   it("offers Defensive Tactics at level 7 and refuses a build that skipped it", () => {
     const missing = rangerInput(7);
     missing.choices = missing.choices.filter((row) => row.kind !== "defensive-tactics");
-    expect(() => buildCharacterDefinition(missing, library, policy))
-      .toThrowError(/"Defensive Tactics" needs 1 pick\(s\) of kind "defensive-tactics"/);
-    const traits = (table(rangerInput(7)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
+      /"Defensive Tactics" needs 1 pick\(s\) of kind "defensive-tactics"/
+    );
+    const traits = (
+      table(rangerInput(7)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }
+    ).traits.map((trait) => trait.name);
     expect(traits).toContain("Escape the Horde");
   });
 });
@@ -459,11 +615,18 @@ const paladinGranted = (level: number): string[] => [
 const paladinInput = (level: number): MutableInput => {
   const asiLevels = [4, 8, 12, 16].filter((asi) => asi <= level);
   return {
-    name: "Bree", speciesId: "halfling", backgroundId: "criminal", classId: "paladin", level,
+    name: "Bree",
+    speciesId: "halfling",
+    backgroundId: "criminal",
+    classId: "paladin",
+    level,
     ...(level >= 3 ? { subclassId: "oath-of-devotion" } : {}),
     abilityMethod: "standard-array",
     baseScores: { str: 15, dex: 12, con: 13, int: 8, wis: 10, cha: 14 },
-    backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
+    backgroundBonusAllocation: [
+      { ability: "dex", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
     hp: { mode: "average" },
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
@@ -472,17 +635,35 @@ const paladinInput = (level: number): MutableInput => {
       { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
       { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
       { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
-      ...(level >= 2 ? [{ level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } }] : []),
+      ...(level >= 2
+        ? [
+            {
+              level: 2,
+              classId: "paladin",
+              kind: "fighting-style",
+              id: "defense",
+              payload: { featureId: "fighting-style" }
+            }
+          ]
+        : []),
       ...(level >= 3 ? [{ level: 3, classId: "paladin", kind: "subclass", id: "oath-of-devotion" }] : []),
       ...asiLevels.flatMap((asi) => [
         { level: asi, classId: "paladin", kind: "asi-or-feat", id: "ability-score-improvement" },
         { level: asi, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
         { level: asi, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } }
       ]),
-      ...(level >= 19 ? [
-        { level: 19, classId: "paladin", kind: "feat", id: "boon-of-truesight", payload: { featureId: "epic-boon" } },
-        { level: 19, kind: "ability-score", id: "cha", payload: { featureId: "boon-of-truesight" } }
-      ] : []),
+      ...(level >= 19
+        ? [
+            {
+              level: 19,
+              classId: "paladin",
+              kind: "feat",
+              id: "boon-of-truesight",
+              payload: { featureId: "epic-boon" }
+            },
+            { level: 19, kind: "ability-score", id: "cha", payload: { featureId: "boon-of-truesight" } }
+          ]
+        : []),
       ...preparedPicks("paladin", level, paladinGranted(level)).map((id) => ({ level: 1, kind: "spell" as const, id })),
       { level: 1, kind: "equipment", id: "paladin-a" },
       { level: 1, kind: "equipment", id: "criminal-a" }
@@ -502,14 +683,17 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     spend(built, "paladins-smite");
     expect(built.hero.actionUses["paladins-smite"]).toBe(1);
     newTurn(built);
-    expect(() => resolve(built, "paladins-smite", [], []))
-      .toThrowError(/Paladins Smite: no uses remaining \(1\/long rest\)/);
+    expect(() => resolve(built, "paladins-smite", [], [])).toThrowError(
+      /Paladins Smite: no uses remaining \(1\/long rest\)/
+    );
   });
 
   it("always has Find Steed prepared from level 5, on its OWN pool", () => {
     const built = table(paladinInput(5));
-    expect((built.definition.spellcasting?.spells ?? []).find((spell) => spell.id === "find-steed"))
-      .toMatchObject({ alwaysPrepared: true, level: 2 });
+    expect((built.definition.spellcasting?.spells ?? []).find((spell) => spell.id === "find-steed")).toMatchObject({
+      alwaysPrepared: true,
+      level: 2
+    });
     spend(built, "faithful-steed");
     expect(built.hero.actionUses["faithful-steed"]).toBe(1);
     expect(built.hero.actionUses["paladins-smite"]).toBeUndefined();
@@ -528,8 +712,9 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     spend(built, "sacred-weapon");
     expect(built.hero.actionUses["channel-divinity"]).toBe(2);
     newTurn(built);
-    expect(() => resolve(built, "abjure-foes", [], [IDS.foe]))
-      .toThrowError(/Abjure Foes: no uses remaining \(2\/long rest\)/);
+    expect(() => resolve(built, "abjure-foes", [], [IDS.foe])).toThrowError(
+      /Abjure Foes: no uses remaining \(2\/long rest\)/
+    );
   });
 
   it("follows the column to 3 uses at level 11", () => {
@@ -537,8 +722,9 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     for (let use = 0; use < 3; use += 1) spend(built, "divine-sense");
     expect(built.hero.actionUses["channel-divinity"]).toBe(3);
     newTurn(built);
-    expect(() => resolve(built, "divine-sense", [], []))
-      .toThrowError(/Divine Sense: no uses remaining \(3\/long rest\)/);
+    expect(() => resolve(built, "divine-sense", [], [])).toThrowError(
+      /Divine Sense: no uses remaining \(3\/long rest\)/
+    );
   });
 
   it("holds Abjure Foes' targets to THIS Paladin's spell save DC", () => {
@@ -557,7 +743,9 @@ describe("Paladin - the auras that are really immunities", () => {
     // negative control.
     const brave = table(paladinInput(10));
     const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
-    expect(events).toEqual([{ kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero }]);
+    expect(events).toEqual([
+      { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero }
+    ]);
     expect(brave.hero.conditions).toEqual([]);
 
     const earlier = table(paladinInput(9));
@@ -567,8 +755,9 @@ describe("Paladin - the auras that are really immunities", () => {
 
   it("REFUSES Charmed from Oath of Devotion's level-7 aura", () => {
     const devoted = table(paladinInput(7));
-    expect(setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE)[0].text)
-      .toBe("Bree is immune to Charmed - not applied.");
+    expect(setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE)[0].text).toBe(
+      "Bree is immune to Charmed - not applied."
+    );
     // Frightened is not immune yet: the class aura is level 10.
     setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
     expect(devoted.hero.conditions).toEqual([{ id: "frightened" }]);
@@ -598,13 +787,26 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
     expect(actionOf(built, "item-longsword")?.attack?.reachFeet).toBe(5);
     expect(actionOf(built, "item-javelin")?.attack).toMatchObject({ reachFeet: 5, rangeNormalFeet: 30 });
 
-    const atDistance = (feet: number, faces: number[]): ResolveDependencies => ({ ...deps(built, faces), distanceFeet: () => feet });
+    const atDistance = (feet: number, faces: number[]): ResolveDependencies => ({
+      ...deps(built, faces),
+      distanceFeet: () => feet
+    });
     const action = actionOf(built, "item-javelin")!;
-    const throwIt = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() }, atDistance(30, [19, 4]));
+    const throwIt = resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() },
+      atDistance(30, [19, 4])
+    );
     expect(throwIt.attack?.outcome).toBe("hit");
     expect(throwIt.damage.some((part) => part.type === "radiant")).toBe(false);
 
-    const stabIt = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() }, atDistance(5, [19, 4, 7]));
+    const stabIt = resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() },
+      atDistance(5, [19, 4, 7])
+    );
     expect(stabIt.attack?.outcome).toBe("hit");
     expect(stabIt.damage.find((part) => part.type === "radiant")).toMatchObject({ formula: "1d8", total: 7 });
   });
@@ -635,13 +837,17 @@ describe("Paladin - Oath of Devotion, audit row 28 (first tier only)", () => {
     // Known limitation: `grants.spells` has no level gate and the overlay cannot mint per-tier records,
     // so the level-5/9/13/17 oath spells stay in the prose.
     const built = table(paladinInput(17));
-    const ids = (built.definition.spellcasting?.spells ?? []).filter((spell) => spell.alwaysPrepared).map((spell) => spell.id);
+    const ids = (built.definition.spellcasting?.spells ?? [])
+      .filter((spell) => spell.alwaysPrepared)
+      .map((spell) => spell.id);
     expect(ids).toEqual(expect.arrayContaining(["protection-from-evil-and-good", "shield-of-faith"]));
     for (const later of ["aid", "zone-of-truth", "beacon-of-hope", "commune", "flame-strike"]) {
       expect(ids).not.toContain(later);
     }
     // ...and the description carries the table the player reads them from.
-    const oath = library.subclassRecord("oath-of-devotion")!.features.find((feature) => feature.id === "oath-of-devotion-spells")!;
+    const oath = library
+      .subclassRecord("oath-of-devotion")!
+      .features.find((feature) => feature.id === "oath-of-devotion-spells")!;
     expect(oath.description).toContain("Flame Strike");
   });
 
@@ -651,15 +857,16 @@ describe("Paladin - Oath of Devotion, audit row 28 (first tier only)", () => {
     spend(built, "holy-nimbus");
     expect(built.hero.actionUses["holy-nimbus"]).toBe(1);
     newTurn(built);
-    expect(() => resolve(built, "holy-nimbus", [], []))
-      .toThrowError(/Holy Nimbus: no uses remaining \(1\/long rest\)/);
+    expect(() => resolve(built, "holy-nimbus", [], [])).toThrowError(/Holy Nimbus: no uses remaining \(1\/long rest\)/);
   });
 
   it("REFUSES a level-19 Paladin with no Epic Boon feat", () => {
     const missing = paladinInput(19);
-    missing.choices = missing.choices.filter((row) =>
-      row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-truesight");
-    expect(() => buildCharacterDefinition(missing, library, policy))
-      .toThrowError(/"Epic Boon" needs 1 pick\(s\) of kind "feat"/);
+    missing.choices = missing.choices.filter(
+      (row) => row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-truesight"
+    );
+    expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
+      /"Epic Boon" needs 1 pick\(s\) of kind "feat"/
+    );
   });
 });

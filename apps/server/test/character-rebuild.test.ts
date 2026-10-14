@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domain";
-import { buildCharacterDefinition, hitPointRollRows, storedHitPointRolls, type CharacterCreateRequestInput } from "../src/character-build.js";
+import {
+  buildCharacterDefinition,
+  hitPointRollRows,
+  storedHitPointRolls,
+  type CharacterCreateRequestInput
+} from "../src/character-build.js";
 import { importActorDefinition, rebuildActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { createScene } from "../src/scenes.js";
@@ -27,7 +32,10 @@ const fighter = (over: Partial<CharacterCreateRequestInput> = {}): CharacterCrea
   subclassId: "champion",
   abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -54,7 +62,11 @@ const fighter = (over: Partial<CharacterCreateRequestInput> = {}): CharacterCrea
 
 // The client's prefill: the wizard supplies the choices for every level up to the target, and the
 // hit-point dice come from the sheet's recorded rolls, the half a player cannot re-answer.
-function prefillFor(built: { character?: { choices?: readonly { level: number; kind: string }[] } }, level: number, base: CharacterCreateRequestInput): CharacterCreateRequestInput {
+function prefillFor(
+  built: { character?: { choices?: readonly { level: number; kind: string }[] } },
+  level: number,
+  base: CharacterCreateRequestInput
+): CharacterCreateRequestInput {
   const rolls = storedHitPointRolls((built.character?.choices ?? []) as never, level);
   return {
     ...base,
@@ -66,7 +78,15 @@ function prefillFor(built: { character?: { choices?: readonly { level: number; k
 
 function tableWith(level = 5) {
   const state: GameState = GameStateSchema.parse({ schemaVersion: 1 });
-  const definition = buildCharacterDefinition(fighter({ level, ...(level < 5 ? { choices: fighter().choices.filter((row) => row.level <= level) } : {}), hp: { mode: "entries", entries: fighter().hp.entries!.slice(0, level - 1) } }), library, policy);
+  const definition = buildCharacterDefinition(
+    fighter({
+      level,
+      ...(level < 5 ? { choices: fighter().choices.filter((row) => row.level <= level) } : {}),
+      hp: { mode: "entries", entries: fighter().hp.entries!.slice(0, level - 1) }
+    }),
+    library,
+    policy
+  );
   importActorDefinition(state, definition, ACTOR_ID, "public");
   return { state, definition };
 }
@@ -133,7 +153,12 @@ describe("rebuilding a live character", () => {
     actor.notes = "Owes the innkeeper 40gp";
     actor.currency = { cp: 0, sp: 0, ep: 0, gp: 77, pp: 0 };
     actor.actionUses = { "second-wind": 1 };
-    setInventoryItem(state, ACTOR_ID, InventoryItemSchema.parse({ id: "trophy", name: "Owlbear Skull", quantity: 1 }), () => definition);
+    setInventoryItem(
+      state,
+      ACTOR_ID,
+      InventoryItemSchema.parse({ id: "trophy", name: "Owlbear Skull", quantity: 1 }),
+      () => definition
+    );
     const damaged = definition.hitPoints.maximum - 7;
     actor.hp = { current: damaged, maximum: definition.hitPoints.maximum, temporary: 0 };
 
@@ -154,7 +179,9 @@ describe("rebuilding a live character", () => {
     expect(actor.hp.maximum).toBe(built.hitPoints.maximum);
     expect(actor.hp.current).toBe(Math.max(0, built.hitPoints.maximum - 7));
     // And the stored sheet is the new one, under the same import key.
-    expect(state.definitions.find((entry) => entry.id === `import-${ACTOR_ID}`)!.definition.hitPoints.maximum).toBe(built.hitPoints.maximum);
+    expect(state.definitions.find((entry) => entry.id === `import-${ACTOR_ID}`)!.definition.hitPoints.maximum).toBe(
+      built.hitPoints.maximum
+    );
     expect(state.definitions).toHaveLength(1);
   });
 
@@ -167,7 +194,15 @@ describe("rebuilding a live character", () => {
 
     // Park that fight into a scene: it is paused, not over, and still owns this character's economy.
     createScene(state, { sceneId: SCENE_ID, name: "Ambush", mapAssetId: MAP_ID, combatantIds: [] }, GEOMETRY);
-    state.combat = { ...state.combat, scenes: state.combat.scenes.map((scene) => ({ ...scene, combat: { ...scene.combat, active: true, initiative: [{ actorId: ACTOR_ID, score: 10, tieBreaker: 0 }] } })), active: false, initiative: [] };
+    state.combat = {
+      ...state.combat,
+      scenes: state.combat.scenes.map((scene) => ({
+        ...scene,
+        combat: { ...scene.combat, active: true, initiative: [{ actorId: ACTOR_ID, score: 10, tieBreaker: 0 }] }
+      })),
+      active: false,
+      initiative: []
+    };
     expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/paused encounter/i);
 
     state.combat = { ...state.combat, scenes: [], historyCursor: 3 };

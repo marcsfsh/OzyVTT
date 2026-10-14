@@ -19,12 +19,27 @@ describe("the retired table-wide roll mode", () => {
     const stored = {
       schemaVersion: 1,
       revision: 12,
-      actors: [{ id: HERO, name: "Old Save Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } }],
+      actors: [
+        {
+          id: HERO,
+          name: "Old Save Hero",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 10, maximum: 10 }
+        }
+      ],
       combat: {
-        active: true, round: 3, turnActorId: HERO, mapAssetId: MAP, rollMode: "manual", rulesMode: "assisted",
+        active: true,
+        round: 3,
+        turnActorId: HERO,
+        mapAssetId: MAP,
+        rollMode: "manual",
+        rulesMode: "assisted",
         initiative: [{ actorId: HERO, score: 18 }],
         tokens: [{ actorId: HERO, position: { x: 50, y: 50 }, sizePx: 40, gridSizePx: 50 }],
-        scenes: [{ id: SCENE, name: "Parked Ambush", mapAssetId: MAP, combat: { rollMode: "auto", rulesMode: "freeform" } }]
+        scenes: [
+          { id: SCENE, name: "Parked Ambush", mapAssetId: MAP, combat: { rollMode: "auto", rulesMode: "freeform" } }
+        ]
       }
     };
 
@@ -60,9 +75,20 @@ describe("the retired table-wide roll mode", () => {
   it("keeps the advantage/disadvantage `rollMode` request fields it is not about", () => {
     // The identically named per-roll field must survive; a purge that removed it too would pass
     // every assertion above.
-    const schemas = (openApiDocument.components?.schemas ?? {}) as Record<string, { properties?: Record<string, { enum?: readonly string[] }> }>;
-    for (const request of ["InitiativeRollSelfRequest", "ActionResolveRequest", "SaveAnswerRequest", "DeathSaveRollRequest", "ReactionAnswerRequest"]) {
-      expect(schemas[request]?.properties?.rollMode?.enum, `${request} lost its advantage/disadvantage choice`).toEqual(["advantage", "disadvantage", "normal"]);
+    const schemas = (openApiDocument.components?.schemas ?? {}) as Record<
+      string,
+      { properties?: Record<string, { enum?: readonly string[] }> }
+    >;
+    for (const request of [
+      "InitiativeRollSelfRequest",
+      "ActionResolveRequest",
+      "SaveAnswerRequest",
+      "DeathSaveRollRequest",
+      "ReactionAnswerRequest"
+    ]) {
+      expect(schemas[request]?.properties?.rollMode?.enum, `${request} lost its advantage/disadvantage choice`).toEqual(
+        ["advantage", "disadvantage", "normal"]
+      );
     }
   });
 });

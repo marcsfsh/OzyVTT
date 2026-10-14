@@ -1,16 +1,38 @@
-.nh-namefield { display: grid; gap: var(--space-3); }
-.nh-namefield-row { display: flex; align-items: center; gap: var(--space-2); }
-.nh-namefield-row .nh-input { flex: 1 1 auto; min-width: 0; }
-.nh-namefield-shuffle { flex: none; }
+.nh-namefield {
+  display: grid;
+  gap: var(--space-3);
+}
+.nh-namefield-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.nh-namefield-row .nh-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nh-namefield-shuffle {
+  flex: none;
+}
 
-.nh-namefield-suggestions { display: grid; gap: var(--space-2); }
+.nh-namefield-suggestions {
+  display: grid;
+  gap: var(--space-2);
+}
 .nh-namefield-suggestions-label {
   color: var(--text-muted);
   font: 800 var(--fs-xs) / 1.3 var(--font-body);
   text-transform: uppercase;
   letter-spacing: var(--tracking-eyebrow);
 }
-.nh-namefield-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.nh-namefield-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 /* A suggestion is a chip, so it takes the chip's shape. */
 .nh-namefield-suggestion {
   display: inline-flex;
@@ -24,7 +46,16 @@
   font: 600 var(--fs-sm) / 1 var(--font-body);
   cursor: pointer;
 }
-.nh-namefield-suggestion:hover:not(:disabled) { background: var(--surface-3); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.nh-namefield-suggestion:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
 /* The one already in the field: a quiet cyan selection edge, no glow. */
-.nh-namefield-suggestion.is-taken { border-color: var(--cyan); color: var(--text); }
-.nh-namefield-suggestion:disabled { color: var(--text-muted); cursor: not-allowed; }
+.nh-namefield-suggestion.is-taken {
+  border-color: var(--cyan);
+  color: var(--text);
+}
+.nh-namefield-suggestion:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}

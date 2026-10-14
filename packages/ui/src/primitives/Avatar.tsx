@@ -27,9 +27,13 @@ function monogram(name: string) {
 export function Avatar({ name, src, size = "md", presence, className }: AvatarProps) {
   return (
     <span className={cx("nh-avatar", `nh-avatar--${size}`, className)} role="img" aria-label={name}>
-      {src
-        ? <img className="nh-avatar-img" src={src} alt="" />
-        : <span className="nh-avatar-initials" aria-hidden="true">{monogram(name)}</span>}
+      {src ? (
+        <img className="nh-avatar-img" src={src} alt="" />
+      ) : (
+        <span className="nh-avatar-initials" aria-hidden="true">
+          {monogram(name)}
+        </span>
+      )}
       {presence && <span className={cx("nh-avatar-presence", `nh-avatar-presence--${presence}`)} aria-hidden="true" />}
     </span>
   );

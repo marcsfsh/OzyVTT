@@ -25,7 +25,11 @@
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
-.nh-wizard-titles { min-width: 0; display: grid; gap: var(--space-1); }
+.nh-wizard-titles {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
 /* Display face, not the wordmark: the step indicator is already the loud element in this region. */
 .nh-wizard-title {
   margin: 0;
@@ -33,10 +37,18 @@
   color: var(--text);
   letter-spacing: var(--tracking-display);
 }
-.nh-wizard-headops { display: flex; align-items: center; gap: var(--space-2); }
-.nh-wizard-progress { grid-column: 1 / -1; }
+.nh-wizard-headops {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.nh-wizard-progress {
+  grid-column: 1 / -1;
+}
 
-.nh-wizard-resume { padding: 0 var(--space-4); }
+.nh-wizard-resume {
+  padding: 0 var(--space-4);
+}
 
 /* The step body is the scrolling region (`.scroll-y` in the markup): it takes the leftover height, so head and
    foot stay put. scroll-padding keeps focused or anchored content clear of the sticky head and foot. */
@@ -48,7 +60,9 @@
   scroll-padding-top: var(--space-6);
   scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
 }
-.nh-wizard-main { min-width: 0; }
+.nh-wizard-main {
+  min-width: 0;
+}
 
 /* Detail / preview pane. */
 .nh-wizard-detail {
@@ -61,11 +75,25 @@
   border-radius: var(--radius-lg);
   background: var(--surface-1);
 }
-.nh-wizard-detail-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
-.nh-wizard-detail-body { min-width: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.nh-wizard-detail-title {
+  margin: 0;
+  font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+}
+.nh-wizard-detail-body {
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 /* The master-detail pair are ghost Buttons; these rules only place them and hide each where it makes no sense. */
-.nh-wizard-detail-open { display: none; margin-bottom: var(--space-3); }
-.nh-wizard-detail-back { display: none; align-self: flex-start; }
+.nh-wizard-detail-open {
+  display: none;
+  margin-bottom: var(--space-3);
+}
+.nh-wizard-detail-back {
+  display: none;
+  align-self: flex-start;
+}
 /* The disclosure caret turned a quarter to point back at the list (static, so nothing to reduce for motion). */
 .nh-wizard-detail-back-icon {
   flex: none;
@@ -90,8 +118,17 @@
 }
 /* Back plus an optional second action. Wraps rather than squeezing, because `.nh-btn` is `nowrap` and a shrunk
    button would spill its label. */
-.nh-wizard-foot-back { justify-self: start; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
-.nh-wizard-foot-next { justify-self: end; }
+.nh-wizard-foot-back {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.nh-wizard-foot-next {
+  justify-self: end;
+}
 /* The gating reason keeps its row even when empty so the footer never jumps; role="status" announces it. */
 .nh-wizard-blocked {
   display: flex;
@@ -105,9 +142,18 @@
   color: var(--caution-hi);
   font-size: var(--fs-sm);
 }
-.nh-wizard-blocked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
-.nh-wizard-blocked.is-clear { color: transparent; }
-.nh-wizard-blocked.is-clear .nh-wizard-blocked-icon { display: none; }
+.nh-wizard-blocked-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
+.nh-wizard-blocked.is-clear {
+  color: transparent;
+}
+.nh-wizard-blocked.is-clear .nh-wizard-blocked-icon {
+  display: none;
+}
 
 /* Inside the step column, so it needs only the gap from the step's last card. */
 .nh-wizard-footnote {
@@ -119,20 +165,42 @@
 
 /* ---- Narrow: master-detail (swap panes rather than stacking them). 760px, the same step Steps uses. ---- */
 @media (max-width: 760px) {
-  .nh-wizard-body--split.has-detail .nh-wizard-main { display: none; }
-  .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail { display: none; }
-  .nh-wizard-detail-open, .nh-wizard-detail-back { display: inline-flex; }
+  .nh-wizard-body--split.has-detail .nh-wizard-main {
+    display: none;
+  }
+  .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail {
+    display: none;
+  }
+  .nh-wizard-detail-open,
+  .nh-wizard-detail-back {
+    display: inline-flex;
+  }
 }
 
 @media (max-width: 560px) {
   /* At phone width the reason needs its own line, or Back/Next get squeezed to nothing. */
-  .nh-wizard-foot { grid-template-columns: 1fr 1fr; }
-  .nh-wizard-blocked { grid-row: 1; grid-column: 1 / -1; }
-  .nh-wizard-foot-back, .nh-wizard-foot-next { grid-row: 2; }
+  .nh-wizard-foot {
+    grid-template-columns: 1fr 1fr;
+  }
+  .nh-wizard-blocked {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+  .nh-wizard-foot-back,
+  .nh-wizard-foot-next {
+    grid-row: 2;
+  }
   /* Back fills its half of the footer, sharing it with a second action when both fit; otherwise they wrap. */
-  .nh-wizard-foot-back .nh-btn { flex: 1 1 auto; }
-  .nh-wizard-foot-next .nh-btn { width: 100%; }
-  .nh-wizard-foot-back, .nh-wizard-foot-next { justify-self: stretch; }
+  .nh-wizard-foot-back .nh-btn {
+    flex: 1 1 auto;
+  }
+  .nh-wizard-foot-next .nh-btn {
+    width: 100%;
+  }
+  .nh-wizard-foot-back,
+  .nh-wizard-foot-next {
+    justify-self: stretch;
+  }
 }
 
 /* ---- Laptop: a full page inside the app shell, not a floating card ---- */

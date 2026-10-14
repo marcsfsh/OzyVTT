@@ -14,5 +14,9 @@ export interface FieldGridProps {
     `className="nh-fieldgrid-wide"`. */
 export function FieldGrid({ children, min, className }: FieldGridProps) {
   const style = min ? ({ "--nh-fg-min": min } as CSSProperties) : undefined;
-  return <div className={cx("nh-fieldgrid", className)} style={style}>{children}</div>;
+  return (
+    <div className={cx("nh-fieldgrid", className)} style={style}>
+      {children}
+    </div>
+  );
 }

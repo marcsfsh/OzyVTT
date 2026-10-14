@@ -36,7 +36,10 @@ function useScrollEdges(active: boolean, contentKey: number) {
   const [edges, setEdges] = useState<{ top: boolean; bottom: boolean }>({ top: false, bottom: false });
   useEffect(() => {
     const el = ref.current;
-    if (!el || !active) { setEdges({ top: false, bottom: false }); return; }
+    if (!el || !active) {
+      setEdges({ top: false, bottom: false });
+      return;
+    }
     const measure = () => {
       const room = el.scrollHeight - el.clientHeight;
       // 1px, not 0: sub-pixel layout leaves fractional room on boxes that don't overflow.
@@ -47,21 +50,38 @@ function useScrollEdges(active: boolean, contentKey: number) {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     for (const child of Array.from(el.children)) observer.observe(child);
-    return () => { el.removeEventListener("scroll", measure); observer.disconnect(); };
+    return () => {
+      el.removeEventListener("scroll", measure);
+      observer.disconnect();
+    };
   }, [active, contentKey]);
   return { ref, edges };
 }
 
-export function SidebarNav({ groups, activePath, collapsed = false, onNavigate, onAction, header, footer }: SidebarNavProps) {
+export function SidebarNav({
+  groups,
+  activePath,
+  collapsed = false,
+  onNavigate,
+  onAction,
+  header,
+  footer
+}: SidebarNavProps) {
   // Only the rail needs the fade. The group count re-keys the observer when children change.
   const { ref: groupsRef, edges } = useScrollEdges(collapsed, groups.length);
   return (
     <nav className={`codex-sidebar${collapsed ? " is-rail" : ""}`} aria-label="Codex sections">
       {header && <div className="codex-sidebar-head">{header}</div>}
       {/* Scrolls so the Tools group stays reachable on short screens. */}
-      <div ref={groupsRef} className={`codex-sidebar-groups scroll-y${edges.top ? " has-fade-top" : ""}${edges.bottom ? " has-fade-bottom" : ""}`}>
+      <div
+        ref={groupsRef}
+        className={`codex-sidebar-groups scroll-y${edges.top ? " has-fade-top" : ""}${edges.bottom ? " has-fade-bottom" : ""}`}
+      >
         {groups.map((group, index) => (
-          <div key={group.label ?? `group-${index}`} className={`codex-sidebar-group${group.label === "Tools" ? " is-tools" : ""}`}>
+          <div
+            key={group.label ?? `group-${index}`}
+            className={`codex-sidebar-group${group.label === "Tools" ? " is-tools" : ""}`}
+          >
             {group.label && !collapsed && <span className="codex-sidebar-grouplabel eyebrow">{group.label}</span>}
             <ul className="codex-sidebar-list">
               {group.items.map((item) => {
@@ -74,7 +94,10 @@ export function SidebarNav({ groups, activePath, collapsed = false, onNavigate, 
                       aria-current={active ? "page" : undefined}
                       title={collapsed ? item.label : undefined}
                       aria-label={collapsed ? item.label : undefined}
-                      onClick={() => { if (item.path) onNavigate(item.path); else if (item.action) onAction?.(item.action); }}
+                      onClick={() => {
+                        if (item.path) onNavigate(item.path);
+                        else if (item.action) onAction?.(item.action);
+                      }}
                     >
                       <CodexIcon iconId={item.iconId} className="codex-navitem-icon" />
                       {!collapsed && <span className="codex-navitem-label">{item.label}</span>}

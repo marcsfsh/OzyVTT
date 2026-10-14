@@ -13,10 +13,17 @@
   background: transparent;
   color: var(--text-dim);
   font: 700 var(--fs-xs) / 1.5 var(--font-body);
-  letter-spacing: .03em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
-  --chamfer: .3rem;
-  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --chamfer: 0.3rem;
+  --chamfer-cut: polygon(
+    0 var(--chamfer),
+    var(--chamfer) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    0 100%
+  );
   --nh-fill: var(--surface-3);
   --nh-rim: var(--line-strong);
 }
@@ -34,24 +41,64 @@
 }
 
 /* Soft outline tones: a coloured edge and readable tinted text on a quiet surface. */
-.nh-badge--primary { --nh-rim: var(--magenta); color: var(--magenta-hi); }
-.nh-badge--success { --nh-rim: var(--success); color: var(--cyan-hi); }
-.nh-badge--caution { --nh-rim: var(--caution); color: var(--caution-hi); }
-.nh-badge--danger  { --nh-rim: var(--danger); color: var(--danger-hi); }
-.nh-badge--info    { --nh-rim: var(--info); color: var(--indigo); }
+.nh-badge--primary {
+  --nh-rim: var(--magenta);
+  color: var(--magenta-hi);
+}
+.nh-badge--success {
+  --nh-rim: var(--success);
+  color: var(--cyan-hi);
+}
+.nh-badge--caution {
+  --nh-rim: var(--caution);
+  color: var(--caution-hi);
+}
+.nh-badge--danger {
+  --nh-rim: var(--danger);
+  color: var(--danger-hi);
+}
+.nh-badge--info {
+  --nh-rim: var(--info);
+  color: var(--indigo);
+}
 /* Daybreak's outline info badge needs deeper ink. `:not(.nh-badge--solid)` is required: without it this beats
    the solid variant's `--text-on-neon` and paints info ink on an info fill. */
-:root[data-theme="light"] .nh-badge--info:not(.nh-badge--solid) { color: var(--info); }
+:root[data-theme="light"] .nh-badge--info:not(.nh-badge--solid) {
+  color: var(--info);
+}
 
 /* Solid: filled tone for counts and high emphasis, dark ink on neon. */
-.nh-badge--solid { --nh-rim: transparent; color: var(--text-on-neon); }
-.nh-badge--solid.nh-badge--primary { --nh-fill: var(--primary); }
-.nh-badge--solid.nh-badge--success { --nh-fill: var(--success); }
-.nh-badge--solid.nh-badge--caution { --nh-fill: var(--caution); }
-.nh-badge--solid.nh-badge--danger  { --nh-fill: var(--danger); }
-.nh-badge--solid.nh-badge--info    { --nh-fill: var(--info); }
-.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not([class*="nh-badge--caution"]):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) { --nh-fill: var(--line-strong); color: var(--text); }
+.nh-badge--solid {
+  --nh-rim: transparent;
+  color: var(--text-on-neon);
+}
+.nh-badge--solid.nh-badge--primary {
+  --nh-fill: var(--primary);
+}
+.nh-badge--solid.nh-badge--success {
+  --nh-fill: var(--success);
+}
+.nh-badge--solid.nh-badge--caution {
+  --nh-fill: var(--caution);
+}
+.nh-badge--solid.nh-badge--danger {
+  --nh-fill: var(--danger);
+}
+.nh-badge--solid.nh-badge--info {
+  --nh-fill: var(--info);
+}
+.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not(
+    [class*="nh-badge--caution"]
+  ):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) {
+  --nh-fill: var(--line-strong);
+  color: var(--text);
+}
 
 /* Violet is reserved for GM-only content. A tone so `GmOnlyTag` uses this component. */
-.nh-badge--violet { --nh-rim: var(--violet); color: var(--violet-hi); }
-.nh-badge--solid.nh-badge--violet { --nh-fill: var(--violet); }
+.nh-badge--violet {
+  --nh-rim: var(--violet);
+  color: var(--violet-hi);
+}
+.nh-badge--solid.nh-badge--violet {
+  --nh-fill: var(--violet);
+}

@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const fixtureMetadata = { purpose: "Representative actors, encounters, import files, and golden outcomes for cross-workspace tests." } as const;
+export const fixtureMetadata = {
+  purpose: "Representative actors, encounters, import files, and golden outcomes for cross-workspace tests."
+} as const;
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 

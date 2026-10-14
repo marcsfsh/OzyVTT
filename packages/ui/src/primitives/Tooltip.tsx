@@ -18,8 +18,12 @@ export function Tooltip({ content, children, placement = "top", className }: Too
   const id = useId();
   return (
     <span className={cx("nh-tooltip", `nh-tooltip--${placement}`, className)}>
-      <span className="nh-tooltip-trigger" aria-describedby={id}>{children}</span>
-      <span role="tooltip" id={id} className="nh-tooltip-bubble">{content}</span>
+      <span className="nh-tooltip-trigger" aria-describedby={id}>
+        {children}
+      </span>
+      <span role="tooltip" id={id} className="nh-tooltip-bubble">
+        {content}
+      </span>
     </span>
   );
 }

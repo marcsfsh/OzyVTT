@@ -26,7 +26,10 @@ function valueExports(barrel: string): string[] {
   const names = new Set<string>();
   for (const block of barrel.matchAll(/export\s*\{([\s\S]*?)\}/g)) {
     for (const raw of block[1].split(",")) {
-      const part = raw.trim().replace(/\/\/.*$/, "").trim();
+      const part = raw
+        .trim()
+        .replace(/\/\/.*$/, "")
+        .trim();
       if (!part || part.startsWith("type ")) continue;
       const segments = part.split(/\s+as\s+/);
       const name = segments[segments.length - 1].trim();
@@ -44,7 +47,10 @@ describe("every primitive is demoed in /styleguide", () => {
 
   // The styleguide's own files, pinned; if the demo splits across files, this list changes with it.
   const files = walk(STYLEGUIDE_DIR, (n) => !n.includes(".test."));
-  const demoed = files.filter((n) => n.endsWith(".tsx")).map((n) => readFileSync(`${STYLEGUIDE_DIR}/${n}`, "utf8")).join("\n");
+  const demoed = files
+    .filter((n) => n.endsWith(".tsx"))
+    .map((n) => readFileSync(`${STYLEGUIDE_DIR}/${n}`, "utf8"))
+    .join("\n");
 
   it("reads the whole barrel and the whole styleguide", () => {
     expect(

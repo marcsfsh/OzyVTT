@@ -9,13 +9,13 @@ HTTP paths.
 
 Node 24+. Run from the repo root.
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Client on `:5173`, server on `:3001`. |
-| `npm run check` | Typecheck every workspace. |
-| `npm test` | All tests. |
-| `npm run build` | Build client and server. |
-| `npm run map` | Regenerate `docs/app-map.md`; a test fails if it is stale. |
+| Command         | What it does                                               |
+| --------------- | ---------------------------------------------------------- |
+| `npm run dev`   | Client on `:5173`, server on `:3001`.                      |
+| `npm run check` | Typecheck every workspace.                                 |
+| `npm test`      | All tests.                                                 |
+| `npm run build` | Build client and server.                                   |
+| `npm run map`   | Regenerate `docs/app-map.md`; a test fails if it is stale. |
 
 ## Invariants
 

@@ -2,8 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
-  ContentBackgroundSummary, ContentClassLevelRow, ContentClassSummary, ContentFeatureSummary,
-  ContentSkillSummary, ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary, GmView
+  ContentBackgroundSummary,
+  ContentClassLevelRow,
+  ContentClassSummary,
+  ContentFeatureSummary,
+  ContentSkillSummary,
+  ContentSpeciesSummary,
+  ContentSpellSummary,
+  ContentSubclassSummary,
+  GmView
 } from "@vtt/domain";
 
 /**
@@ -14,48 +21,124 @@ import type {
 
 // Fixtures
 
-const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">): ContentFeatureSummary => ({
-  level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
+const feature = (
+  over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">
+): ContentFeatureSummary => ({
+  level: null,
+  description: "",
+  tags: [],
+  choice: null,
+  choices: [],
+  grantedAtLevels: [],
+  extraPicks: [],
+  ...over
 });
-const choice = (kind: string, chooseCount: number, from: readonly string[]) =>
-  ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [] });
+const choice = (kind: string, chooseCount: number, from: readonly string[]) => ({
+  kind,
+  choose: chooseCount,
+  from,
+  fromCatalog: null,
+  maxSpellLevel: null,
+  minSpellLevel: null,
+  fromPicks: null,
+  options: []
+});
 
 const SKILL_IDS = ["insight", "perception", "survival", "history", "medicine", "religion"] as const;
 const skills: readonly ContentSkillSummary[] = SKILL_IDS.map((id) => ({
-  id, name: id.charAt(0).toUpperCase() + id.slice(1), description: "", ability: "wis"
+  id,
+  name: id.charAt(0).toUpperCase() + id.slice(1),
+  description: "",
+  ability: "wis"
 }));
 
 /** Twelve cantrips: over `SEARCH_THRESHOLD`, so this offer gets a search box. */
-const CANTRIPS = ["Guidance", "Light", "Mending", "Resistance", "Sacred Flame", "Spare the Dying",
-  "Thaumaturgy", "Toll the Dead", "Word of Radiance", "Druidcraft", "Message", "Prestidigitation"];
+const CANTRIPS = [
+  "Guidance",
+  "Light",
+  "Mending",
+  "Resistance",
+  "Sacred Flame",
+  "Spare the Dying",
+  "Thaumaturgy",
+  "Toll the Dead",
+  "Word of Radiance",
+  "Druidcraft",
+  "Message",
+  "Prestidigitation"
+];
 const spell = (name: string, level: number): ContentSpellSummary => ({
-  id: name.toLowerCase().replace(/ /g, "-"), name, level, school: "evocation",
-  castingTime: "action", rangeText: level === 0 ? "Touch" : "60 feet", componentsText: "V, S",
-  duration: "Instantaneous", concentration: false, ritual: false, attackRoll: false, rangeFeet: 120,
+  id: name.toLowerCase().replace(/ /g, "-"),
+  name,
+  level,
+  school: "evocation",
+  castingTime: "action",
+  rangeText: level === 0 ? "Touch" : "60 feet",
+  componentsText: "V, S",
+  duration: "Instantaneous",
+  concentration: false,
+  ritual: false,
+  attackRoll: false,
+  rangeFeet: 120,
   description: `${name} does exactly what ${name} says on the tin, and this sentence is its rules text.`,
-  higherLevel: null, classes: ["cleric"], damageRoll: null, damageTypes: [], castingOptions: []
+  higherLevel: null,
+  classes: ["cleric"],
+  damageRoll: null,
+  damageTypes: [],
+  castingOptions: []
 });
 const spells: readonly ContentSpellSummary[] = [
   ...CANTRIPS.map((name) => spell(name, 0)),
-  spell("Bless", 1), spell("Cure Wounds", 1), spell("Healing Word", 1)
+  spell("Bless", 1),
+  spell("Cure Wounds", 1),
+  spell("Healing Word", 1)
 ];
 
 const levelRow = (level: number, over: Partial<ContentClassLevelRow> = {}): ContentClassLevelRow => ({
-  level, proficiencyBonus: 2, spellSlots: null, pactSlots: null, cantripsKnown: null,
-  spellsKnown: null, preparedFormula: null, preparedCount: null, classResources: [], ...over
+  level,
+  proficiencyBonus: 2,
+  spellSlots: null,
+  pactSlots: null,
+  cantripsKnown: null,
+  spellsKnown: null,
+  preparedFormula: null,
+  preparedCount: null,
+  classResources: [],
+  ...over
 });
 
 /** A Cleric cut to what these tests read: a level-3 subclass pick and a cantrip budget. */
 const cleric = {
-  id: "cleric", name: "Cleric", source: "srd", summary: "A priestly champion.",
-  description: "Clerics are conduits for divine power.", hitDie: "d8",
-  statPriority: ["wis"], primaryAbilities: ["wis"], savingThrows: ["wis", "cha"],
-  skillChoiceCount: 0, skillChoices: [],
-  armorProficiencies: ["light"], weaponProficiencies: ["simple"], toolProficiencies: [],
-  toolChoices: null, multiclassProficiencies: null, multiclassPrerequisites: null,
-  subclassLevel: 3, subclassLabel: "Cleric Subclass", asiLevels: [4],
-  spellcastingAbility: "wis", spellcastingProgression: "full",
-  spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: null, progression: "full", spellListId: "cleric" },
+  id: "cleric",
+  name: "Cleric",
+  source: "srd",
+  summary: "A priestly champion.",
+  description: "Clerics are conduits for divine power.",
+  hitDie: "d8",
+  statPriority: ["wis"],
+  primaryAbilities: ["wis"],
+  savingThrows: ["wis", "cha"],
+  skillChoiceCount: 0,
+  skillChoices: [],
+  armorProficiencies: ["light"],
+  weaponProficiencies: ["simple"],
+  toolProficiencies: [],
+  toolChoices: null,
+  multiclassProficiencies: null,
+  multiclassPrerequisites: null,
+  subclassLevel: 3,
+  subclassLabel: "Cleric Subclass",
+  asiLevels: [4],
+  spellcastingAbility: "wis",
+  spellcastingProgression: "full",
+  spellcasting: {
+    ability: "wis",
+    prepares: "prepared",
+    ritual: true,
+    focus: null,
+    progression: "full",
+    spellListId: "cleric"
+  },
   levelTable: [
     levelRow(1, { cantripsKnown: 3, spellSlots: [2], preparedCount: 4 }),
     levelRow(2, { cantripsKnown: 3, spellSlots: [3], preparedCount: 5 }),
@@ -64,50 +147,104 @@ const cleric = {
   startingEquipmentOptions: [],
   features: [
     feature({
-      id: "cleric-subclass", name: "Cleric Subclass", level: 3, grantedAtLevels: [3],
+      id: "cleric-subclass",
+      name: "Cleric Subclass",
+      level: 3,
+      grantedAtLevels: [3],
       description: "You gain a Cleric subclass of your choice.",
-      choice: { kind: "subclass", choose: 1, from: [], fromCatalog: "cleric-subclasses", maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [] }
+      choice: {
+        kind: "subclass",
+        choose: 1,
+        from: [],
+        fromCatalog: "cleric-subclasses",
+        maxSpellLevel: null,
+        minSpellLevel: null,
+        fromPicks: null,
+        options: []
+      }
     })
   ]
 } as unknown as ContentClassSummary;
 
 const lifeDomain = {
-  id: "life-domain", name: "Life Domain", source: "srd", classId: "cleric",
+  id: "life-domain",
+  name: "Life Domain",
+  source: "srd",
+  classId: "cleric",
   summary: "Healers of the positive plane.",
   description: "The Life Domain focuses on the positive energy that sustains all life.",
-  subclassLevel: null, spellcastingAbility: null, spellcastingProgression: null, spellcasting: null,
-  features: [feature({ id: "disciple-of-life", name: "Disciple of Life", level: 3, description: "Your healing spells restore extra Hit Points." })]
+  subclassLevel: null,
+  spellcastingAbility: null,
+  spellcastingProgression: null,
+  spellcasting: null,
+  features: [
+    feature({
+      id: "disciple-of-life",
+      name: "Disciple of Life",
+      level: 3,
+      description: "Your healing spells restore extra Hit Points."
+    })
+  ]
 } as unknown as ContentSubclassSummary;
 
 /** An Elf whose Keen Senses is choose one of three. */
 const elf = {
-  id: "elf", name: "Elf", source: "srd", summary: "Long-lived and keen-sensed.",
+  id: "elf",
+  name: "Elf",
+  source: "srd",
+  summary: "Long-lived and keen-sensed.",
   description: "Elves are magical people of otherworldly grace.",
-  sizes: ["medium"], speedFeet: 30, darkvisionFeet: 60, creatureType: "humanoid",
-  abilityBonuses: [], abilityBonusChoice: null, languages: ["common"], languageChoices: null,
+  sizes: ["medium"],
+  speedFeet: 30,
+  darkvisionFeet: 60,
+  creatureType: "humanoid",
+  abilityBonuses: [],
+  abilityBonusChoice: null,
+  languages: ["common"],
+  languageChoices: null,
   lineages: [],
-  features: [feature({
-    id: "elf-keen-senses", name: "Keen Senses",
-    description: "You have proficiency in the Insight, Perception, or Survival skill.",
-    choice: choice("skill", 1, ["insight", "perception", "survival"])
-  })]
+  features: [
+    feature({
+      id: "elf-keen-senses",
+      name: "Keen Senses",
+      description: "You have proficiency in the Insight, Perception, or Survival skill.",
+      choice: choice("skill", 1, ["insight", "perception", "survival"])
+    })
+  ]
 } as unknown as ContentSpeciesSummary;
 
 /** A second species whose trait asks for two of three. */
 const halfling = {
-  ...elf, id: "halfling", name: "Halfling", summary: "Small and lucky.",
-  features: [feature({
-    id: "halfling-lore", name: "Halfling Lore",
-    description: "You gain proficiency in two skills of your choice.",
-    choice: choice("skill", 2, ["insight", "perception", "survival"])
-  })]
+  ...elf,
+  id: "halfling",
+  name: "Halfling",
+  summary: "Small and lucky.",
+  features: [
+    feature({
+      id: "halfling-lore",
+      name: "Halfling Lore",
+      description: "You gain proficiency in two skills of your choice.",
+      choice: choice("skill", 2, ["insight", "perception", "survival"])
+    })
+  ]
 } as unknown as ContentSpeciesSummary;
 
 const acolyte = {
-  id: "acolyte", name: "Acolyte", source: "srd", summary: "A temple servant.", description: "You served in a temple.",
-  abilityOptions: null, originFeatId: null, skillProficiencies: ["religion"], skillChoices: null,
-  toolProficiencies: [], toolChoices: null, languages: [], languageChoices: null,
-  startingEquipmentOptions: [], features: []
+  id: "acolyte",
+  name: "Acolyte",
+  source: "srd",
+  summary: "A temple servant.",
+  description: "You served in a temple.",
+  abilityOptions: null,
+  originFeatId: null,
+  skillProficiencies: ["religion"],
+  skillChoices: null,
+  toolProficiencies: [],
+  toolChoices: null,
+  languages: [],
+  languageChoices: null,
+  startingEquipmentOptions: [],
+  features: []
 } as unknown as ContentBackgroundSummary;
 
 const CATALOG_ANSWERS: Readonly<Record<string, unknown>> = {
@@ -117,18 +254,61 @@ const CATALOG_ANSWERS: Readonly<Record<string, unknown>> = {
   "content:backgrounds": { ok: true, backgrounds: [acolyte], attribution: "SRD 5.2.1, CC BY 4.0." },
   // An empty catalog is never cached (`makeCatalog` refuses a miss), so the wizard would re-emit
   // forever and never load; one row each avoids that.
-  "content:feats": { ok: true, feats: [{ id: "alert", name: "Alert", source: "srd", summary: "You are hard to surprise.", description: "", category: "origin", repeatable: false, prerequisiteLevel: null, prerequisiteAbilities: [], prerequisiteRequires: [], prerequisiteText: null, feature: feature({ id: "alert-feature", name: "Alert" }) }], attribution: "SRD 5.2.1, CC BY 4.0." },
-  "content:names": { ok: true, names: [{ speciesId: "elf", source: "srd", pools: [{ id: "given", label: "Given", names: ["Aerin"] }] }], attribution: "SRD 5.2.1, CC BY 4.0." },
+  "content:feats": {
+    ok: true,
+    feats: [
+      {
+        id: "alert",
+        name: "Alert",
+        source: "srd",
+        summary: "You are hard to surprise.",
+        description: "",
+        category: "origin",
+        repeatable: false,
+        prerequisiteLevel: null,
+        prerequisiteAbilities: [],
+        prerequisiteRequires: [],
+        prerequisiteText: null,
+        feature: feature({ id: "alert-feature", name: "Alert" })
+      }
+    ],
+    attribution: "SRD 5.2.1, CC BY 4.0."
+  },
+  "content:names": {
+    ok: true,
+    names: [{ speciesId: "elf", source: "srd", pools: [{ id: "given", label: "Given", names: ["Aerin"] }] }],
+    attribution: "SRD 5.2.1, CC BY 4.0."
+  },
   "content:skills": { ok: true, skills, attribution: "SRD 5.2.1, CC BY 4.0." },
   // `useBuilderCatalogs` waits on every catalog, so a missing one keeps the wizard loading forever.
-  "content:languages": { ok: true, languages: [{ id: "dwarvish", name: "Dwarvish", description: "A standard language.", table: "standard" }], attribution: "SRD 5.2.1, CC BY 4.0." },
+  "content:languages": {
+    ok: true,
+    languages: [{ id: "dwarvish", name: "Dwarvish", description: "A standard language.", table: "standard" }],
+    attribution: "SRD 5.2.1, CC BY 4.0."
+  },
   "content:spells": { ok: true, spells, attribution: "SRD 5.2.1, CC BY 4.0." },
-  "content:equipment": { ok: true, equipment: [{ id: "club", name: "Club", category: "weapon", costGp: 1, weightLb: 2, description: null, weapon: null, armor: null }], attribution: "SRD 5.2.1, CC BY 4.0." }
+  "content:equipment": {
+    ok: true,
+    equipment: [
+      {
+        id: "club",
+        name: "Club",
+        category: "weapon",
+        costGp: 1,
+        weightLb: 2,
+        description: null,
+        weapon: null,
+        armor: null
+      }
+    ],
+    attribution: "SRD 5.2.1, CC BY 4.0."
+  }
 };
 
 vi.mock("../socket", () => ({
   socket: {
-    on: vi.fn(), off: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
     emit: vi.fn((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       if (ack) ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
@@ -140,7 +320,10 @@ import { ToastProvider } from "@vtt/ui";
 import { CharacterBuilder } from "./CharacterBuilder";
 
 const gmView = {
-  revision: 1, actors: [], definitions: [], rolls: [],
+  revision: 1,
+  actors: [],
+  definitions: [],
+  rolls: [],
   builderPolicy: { allowedAbilityMethods: ["standard-array"], customFormula: null, maxLevel: 20, playerBuilder: "open" }
 } as unknown as GmView;
 
@@ -162,8 +345,12 @@ const offerNamed = (label: string) => {
 };
 /** Every option card in an offer, as `name -> disabled`. */
 const cardsIn = (section: HTMLElement) =>
-  Object.fromEntries(within(section).queryAllByRole("radio").concat(within(section).queryAllByRole("checkbox"))
-    .map((card) => [card.textContent?.replace(/\s+/g, " ").trim() ?? "", (card as HTMLButtonElement).disabled]));
+  Object.fromEntries(
+    within(section)
+      .queryAllByRole("radio")
+      .concat(within(section).queryAllByRole("checkbox"))
+      .map((card) => [card.textContent?.replace(/\s+/g, " ").trim() ?? "", (card as HTMLButtonElement).disabled])
+  );
 
 /** Walk to the class step and choose the Cleric at `level`. */
 async function toClassFeatures(user: ReturnType<typeof userEvent.setup>, level: number) {
@@ -274,7 +461,10 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     await toClassFeatures(user, 1);
 
     const cantrips = () => offerNamed("Cleric cantrips");
-    const disabledIn = () => Object.entries(cardsIn(cantrips())).filter(([, off]) => off).map(([name]) => name);
+    const disabledIn = () =>
+      Object.entries(cardsIn(cantrips()))
+        .filter(([, off]) => off)
+        .map(([name]) => name);
     expect(disabledIn()).toEqual([]);
 
     for (const name of ["Guidance", "Light", "Mending"]) {
@@ -307,7 +497,9 @@ describe("Issue 2b — the class features step and its subclass", () => {
      * In the step body, not the detail pane, which is hidden on narrow screens. jsdom loads no
      * stylesheet, so this asserts structure: the note is in the step and the pane is not rendered.
      */
-    expect(document.querySelector(".cb-step")).toContainElement(screen.getByText("You choose a cleric subclass at level 3."));
+    expect(document.querySelector(".cb-step")).toContainElement(
+      screen.getByText("You choose a cleric subclass at level 3.")
+    );
     expect(document.querySelector(".nh-wizard-detail")).toBeNull();
   });
 
@@ -341,9 +533,11 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
 
     const cantrips = () => offerNamed("Cleric cantrips");
     await user.click(within(cantrips()).getByRole("checkbox", { name: /^Guidance/ }));
-    const picked = () => within(cantrips()).queryAllByRole("checkbox")
-      .filter((card) => card.getAttribute("aria-checked") === "true")
-      .map((card) => card.querySelector(".nh-choice-title")?.textContent);
+    const picked = () =>
+      within(cantrips())
+        .queryAllByRole("checkbox")
+        .filter((card) => card.getAttribute("aria-checked") === "true")
+        .map((card) => card.querySelector(".nh-choice-title")?.textContent);
     expect(picked()).toEqual(["Guidance"]);
 
     // The control is a sibling of the card, never inside it: a `ChoiceCard` is a <button>, and a

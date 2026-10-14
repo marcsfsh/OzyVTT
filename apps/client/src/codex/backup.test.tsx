@@ -37,7 +37,11 @@ function bundleFile(name: string, body: unknown): File {
 
 const renderBackup = () => {
   const onChanged = vi.fn();
-  render(<ToastProvider><BackupView gmToken="gm" onChanged={onChanged} /></ToastProvider>);
+  render(
+    <ToastProvider>
+      <BackupView gmToken="gm" onChanged={onChanged} />
+    </ToastProvider>
+  );
   return { onChanged };
 };
 
@@ -55,15 +59,20 @@ describe("The restore confirmation states what the file holds (D16)", () => {
     await choose(user, bundleFile("partial.json", { codex: { pages: [{ id: "p1" }, { id: "p2" }] } }));
 
     const dialog = await screen.findByRole("dialog", { name: "Restore this backup?" });
-    expect(dialog).toHaveTextContent("That file contains 2 pages, 0 maps, 0 pins, 0 journal entries, 0 sessions, 0 quests.");
+    expect(dialog).toHaveTextContent(
+      "That file contains 2 pages, 0 maps, 0 pins, 0 journal entries, 0 sessions, 0 quests."
+    );
   });
 
   it("says 'journal entries', not 'journal entrys'", async () => {
     const user = userEvent.setup();
     renderBackup();
-    await choose(user, bundleFile("full.json", {
-      codex: { pages: [], maps: [], markers: [], journal: [{ id: "j1" }, { id: "j2" }], sessions: [], quests: [] }
-    }));
+    await choose(
+      user,
+      bundleFile("full.json", {
+        codex: { pages: [], maps: [], markers: [], journal: [{ id: "j1" }, { id: "j2" }], sessions: [], quests: [] }
+      })
+    );
 
     const dialog = await screen.findByRole("dialog", { name: "Restore this backup?" });
     expect(dialog).toHaveTextContent("2 journal entries");
@@ -73,7 +82,10 @@ describe("The restore confirmation states what the file holds (D16)", () => {
   it("uses the singular for exactly one, and the plural for zero", async () => {
     const user = userEvent.setup();
     renderBackup();
-    await choose(user, bundleFile("one.json", { codex: { pages: [{ id: "p1" }], journal: [{ id: "j1" }], markers: [] } }));
+    await choose(
+      user,
+      bundleFile("one.json", { codex: { pages: [{ id: "p1" }], journal: [{ id: "j1" }], markers: [] } })
+    );
 
     const dialog = await screen.findByRole("dialog", { name: "Restore this backup?" });
     expect(dialog).toHaveTextContent("1 page, 0 maps, 0 pins, 1 journal entry, 0 sessions, 0 quests");
@@ -97,13 +109,23 @@ describe("The restore confirmation states what the file holds (D16)", () => {
     const user = userEvent.setup();
     importBundle.mockResolvedValue({ counts: { pages: 1, journal: 0, maps: 0 } });
     const { onChanged } = renderBackup();
-    await choose(user, bundleFile("b.json", { codex: { pages: [{ id: "p1" }] }, exportedAt: "2026-07-30T00:00:00.000Z", bundleVersion: 1 }));
+    await choose(
+      user,
+      bundleFile("b.json", {
+        codex: { pages: [{ id: "p1" }] },
+        exportedAt: "2026-07-30T00:00:00.000Z",
+        bundleVersion: 1
+      })
+    );
 
     await screen.findByRole("dialog", { name: "Restore this backup?" });
     await user.click(screen.getByRole("button", { name: "Replace everything" }));
 
     await waitFor(() => expect(importBundle).toHaveBeenCalledTimes(1));
-    const [, sent] = importBundle.mock.calls[0] as [string, { codex: unknown; exportedAt?: string; bundleVersion?: number; commandId: string }];
+    const [, sent] = importBundle.mock.calls[0] as [
+      string,
+      { codex: unknown; exportedAt?: string; bundleVersion?: number; commandId: string }
+    ];
     expect(sent.codex).toEqual({ pages: [{ id: "p1" }] });
     expect(sent.exportedAt).toBe("2026-07-30T00:00:00.000Z");
     expect(sent.bundleVersion).toBe(1);
@@ -114,14 +136,20 @@ describe("The restore confirmation states what the file holds (D16)", () => {
   it("quotes the server's refusal verbatim, because it names the section and the row", async () => {
     const user = userEvent.setup();
     importBundle.mockRejectedValue(
-      new CodexRequestError('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.', 400, "validation_failed")
+      new CodexRequestError(
+        'That backup\'s "pages" entry 37 is not valid: Codex id is malformed.',
+        400,
+        "validation_failed"
+      )
     );
     renderBackup();
     await choose(user, bundleFile("bad.json", { codex: { pages: [{ id: "!" }] } }));
     await screen.findByRole("dialog", { name: "Restore this backup?" });
     await user.click(screen.getByRole("button", { name: "Replace everything" }));
 
-    expect(await screen.findByText('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.')
+    ).toBeInTheDocument();
   });
 
   it("refuses a file that is not a backup at all, without opening the dialog", async () => {

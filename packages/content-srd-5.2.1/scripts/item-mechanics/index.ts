@@ -17,8 +17,18 @@ import { WORN_WONDROUS } from "./worn-wondrous.js";
 export const ITEM_MECHANICS_LANES: readonly ItemMechanicsLane[] = [
   { lane: "C7a", categories: ["weapon", "armor", "shield", "ammunition"], entries: WEAPONS_ARMOUR },
   { lane: "C7b", categories: ["wand", "staff", "rod", "ring", "consumable"], entries: WANDS_RODS_RINGS },
-  { lane: "C7c", categories: ["wondrous-item"], slots: ["neck", "shoulders", "head", "feet", "hands", "belt"], entries: WORN_WONDROUS },
-  { lane: "C7d", categories: ["wondrous-item", "consumable"], slots: ["wondrous", "consumable"], entries: CARRIED_AND_POTIONS },
+  {
+    lane: "C7c",
+    categories: ["wondrous-item"],
+    slots: ["neck", "shoulders", "head", "feet", "hands", "belt"],
+    entries: WORN_WONDROUS
+  },
+  {
+    lane: "C7d",
+    categories: ["wondrous-item", "consumable"],
+    slots: ["wondrous", "consumable"],
+    entries: CARRIED_AND_POTIONS
+  }
   // Categories are the ETL's `category` column; `slots` optionally narrows a lane by the `slot` column.
   // An entry on a row outside either fails the build.
 ];

@@ -30,7 +30,10 @@ export type ForcedMove = Readonly<{
  *  tokens are stacked. Each branch measures the way the table does: on a square grid distance is
  *  Chebyshev, so the longest axis equals the pushed distance; on a scaled gridless map it is Euclidean. */
 function pushDestination(
-  geometry: TokenMapGeometry, from: EncounterTokenPosition, source: EncounterTokenPosition, distanceFeet: number
+  geometry: TokenMapGeometry,
+  from: EncounterTokenPosition,
+  source: EncounterTokenPosition,
+  distanceFeet: number
 ): EncounterTokenPosition | null {
   if (geometry.calibration) {
     const fromGrid = imageToGrid(geometry.calibration, from);
@@ -41,7 +44,10 @@ function pushDestination(
     if (longest === 0) return null;
     const cells = distanceFeet / geometry.calibration.distancePerCell;
     const scale = cells / longest;
-    return gridToImage(geometry.calibration, { column: fromGrid.column + column * scale, row: fromGrid.row + row * scale });
+    return gridToImage(geometry.calibration, {
+      column: fromGrid.column + column * scale,
+      row: fromGrid.row + row * scale
+    });
   }
   if (geometry.scale) {
     const dx = from.x - source.x;
@@ -58,7 +64,9 @@ function pushDestination(
  *  after the snap (a push into the map edge is clamped). Null means nothing moved and the GM should
  *  place the token by hand. */
 export function pushTokenAway(
-  state: GameState, input: ForcedMove, geometry: TokenMapGeometry | null
+  state: GameState,
+  input: ForcedMove,
+  geometry: TokenMapGeometry | null
 ): Readonly<{ value: number; unit: string }> | null {
   if (!geometry) return null;
   const from = state.combat.tokens.find((token) => token.actorId === input.actorId)?.position ?? null;

@@ -8,21 +8,39 @@ type ResolveDefinition = (definitionId: string) => ActorDefinition | undefined;
 
 /** Sets the remaining slots for one level, clamped to 0..max. Covers spending and restoring (Arcane
  *  Recovery); the caller computes the target. Rejects if the actor has no pool at that level. */
-export function setSpellSlotRemaining(state: GameState, actorId: string, level: number, remaining: number, resolveDefinition: ResolveDefinition, catalog?: EquipmentCatalog): void {
+export function setSpellSlotRemaining(
+  state: GameState,
+  actorId: string,
+  level: number,
+  remaining: number,
+  resolveDefinition: ResolveDefinition,
+  catalog?: EquipmentCatalog
+): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const slot = actor.spellSlots?.find((entry) => entry.level === level);
   if (!slot) throw new CommandRejectedError(`${actor.name} has no level-${level} spell slots.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   // The same maxima seeding and the long rest use, so derived multiclass tables aren't clamped down.
-  const max = spellSlotMaxima(definition, deriveEquipment(actor, definition, catalog).spellSlots).find((entry) => entry.level === level)?.max ?? slot.remaining;
+  const max =
+    spellSlotMaxima(definition, deriveEquipment(actor, definition, catalog).spellSlots).find(
+      (entry) => entry.level === level
+    )?.max ?? slot.remaining;
   const clamped = Math.max(0, Math.min(max, remaining));
-  actor.spellSlots = actor.spellSlots!.map((entry) => entry.level === level ? { ...entry, remaining: clamped } : entry);
+  actor.spellSlots = actor.spellSlots!.map((entry) =>
+    entry.level === level ? { ...entry, remaining: clamped } : entry
+  );
 }
 
 /** Prepare or un-prepare a known spell on the actor's live prepared set. Validated against the
  *  definition's known list; cantrips and always-prepared spells can't be toggled. */
-export function setPreparedSpell(state: GameState, actorId: string, spellId: string, prepared: boolean, resolveDefinition: ResolveDefinition): void {
+export function setPreparedSpell(
+  state: GameState,
+  actorId: string,
+  spellId: string,
+  prepared: boolean,
+  resolveDefinition: ResolveDefinition
+): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;

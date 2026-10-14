@@ -14,7 +14,17 @@ import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { CatalogPicker } from "./CatalogPicker";
 import { FieldRenderer } from "./FieldRenderer";
-import { damagePartsField, diceValidate, grouped, opt, suggestionLabel, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
+import {
+  damagePartsField,
+  diceValidate,
+  grouped,
+  opt,
+  suggestionLabel,
+  type Draft,
+  type FieldDef,
+  type SchemaContext,
+  type SelectOption
+} from "./schema";
 
 export type RiderKind = "modifiers" | "grants" | "uses" | "tags" | "actions" | "effects";
 
@@ -24,11 +34,22 @@ export type RiderKind = "modifiers" | "grants" | "uses" | "tags" | "actions" | "
 export type RiderScope = "feature" | "item" | "statblock";
 
 const ABILITIES = [
-  opt("str", "Strength"), opt("dex", "Dexterity"), opt("con", "Constitution"),
-  opt("int", "Intelligence"), opt("wis", "Wisdom"), opt("cha", "Charisma")
+  opt("str", "Strength"),
+  opt("dex", "Dexterity"),
+  opt("con", "Constitution"),
+  opt("int", "Intelligence"),
+  opt("wis", "Wisdom"),
+  opt("cha", "Charisma")
 ];
 
-const SIZES = [opt("tiny", "Tiny"), opt("small", "Small"), opt("medium", "Medium"), opt("large", "Large"), opt("huge", "Huge"), opt("gargantuan", "Gargantuan")];
+const SIZES = [
+  opt("tiny", "Tiny"),
+  opt("small", "Small"),
+  opt("medium", "Medium"),
+  opt("large", "Large"),
+  opt("huge", "Huge"),
+  opt("gargantuan", "Gargantuan")
+];
 
 /* ------------------------------------------------------- gating conditions ------ */
 
@@ -79,7 +100,10 @@ const TRIGGER_TYPES: readonly SelectOption[] = [
 ];
 
 const TRIGGER_KINDS: Readonly<Record<string, TriggerKind>> = Object.fromEntries(
-  TRIGGER_TYPES.map((entry) => [entry.value, entry.group === "Only when…" ? "moment" : entry.group === "Only for…" ? "filter" : "gate"] as const)
+  TRIGGER_TYPES.map(
+    (entry) =>
+      [entry.value, entry.group === "Only when…" ? "moment" : entry.group === "Only for…" ? "filter" : "gate"] as const
+  )
 );
 
 export const triggerKindOf = (type: unknown): TriggerKind | null => TRIGGER_KINDS[String(type ?? "")] ?? null;
@@ -89,43 +113,88 @@ export const triggerLabelOf = (type: unknown): string =>
 /** Switching condition replaces the row: the union is `.strict()`, so leftover keys fail the parse. */
 function blankTrigger(type: string): Draft {
   switch (type) {
-    case "while-armored": return { type };
-    case "while-unarmored": return { type, allowShield: false };
-    case "while-shield": return { type, wielding: true };
-    case "while-character-is": return { type, classIds: [], speciesIds: [] };
-    case "while-proficient-with": return { type, kind: "weapon", ids: [] };
-    case "while-effect-tag": return { type, tags: [] };
-    case "while-hp-at-or-below": return { type, percent: 50 };
-    case "while-condition": return { type, conditionIds: [], present: true };
-    case "attack-kind-is": return { type, kinds: [] };
-    case "weapon-property-is": return { type, properties: [] };
-    case "damage-type-is": return { type, damageTypes: [] };
-    case "ability-is": return { type, abilities: [] };
-    case "skill-is": return { type, skills: [] };
-    case "spell-school-is": return { type, schools: [] };
-    case "spell-level-is": return { type, levels: [] };
-    case "spell-id-is": return { type, spellIds: [] };
-    case "versus-size": return { type, sizes: [] };
-    case "versus-condition": return { type, conditionIds: [] };
-    case "versus-creature-type": return { type, creatureTypes: [] };
-    default: return { type };
+    case "while-armored":
+      return { type };
+    case "while-unarmored":
+      return { type, allowShield: false };
+    case "while-shield":
+      return { type, wielding: true };
+    case "while-character-is":
+      return { type, classIds: [], speciesIds: [] };
+    case "while-proficient-with":
+      return { type, kind: "weapon", ids: [] };
+    case "while-effect-tag":
+      return { type, tags: [] };
+    case "while-hp-at-or-below":
+      return { type, percent: 50 };
+    case "while-condition":
+      return { type, conditionIds: [], present: true };
+    case "attack-kind-is":
+      return { type, kinds: [] };
+    case "weapon-property-is":
+      return { type, properties: [] };
+    case "damage-type-is":
+      return { type, damageTypes: [] };
+    case "ability-is":
+      return { type, abilities: [] };
+    case "skill-is":
+      return { type, skills: [] };
+    case "spell-school-is":
+      return { type, schools: [] };
+    case "spell-level-is":
+      return { type, levels: [] };
+    case "spell-id-is":
+      return { type, spellIds: [] };
+    case "versus-size":
+      return { type, sizes: [] };
+    case "versus-condition":
+      return { type, conditionIds: [] };
+    case "versus-creature-type":
+      return { type, creatureTypes: [] };
+    default:
+      return { type };
   }
 }
 
-const hasType = (...types: readonly string[]) => (row: Draft) => types.includes(String(row.type ?? ""));
+const hasType =
+  (...types: readonly string[]) =>
+  (row: Draft) =>
+    types.includes(String(row.type ?? ""));
 
 /** These fields are ids (`ContentIdSchema`, `/^[a-z0-9-]+$/`), validated while typing. Also used for
     `FeatureEditor`'s `extraPicks` column id. */
 export const slugValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "" || /^[a-z0-9-]+$/.test(text)) return null;
-  return `Write it as ${text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "lowercase-with-dashes"} — lowercase, no spaces.`;
+  return `Write it as ${
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "lowercase-with-dashes"
+  } — lowercase, no spaces.`;
 };
 
 /** A collapsed row's label, e.g. "Only for: A damage type — fire, cold". */
 function triggerRowLabel(row: Draft): string {
   const name = triggerLabelOf(row.type);
-  const values = [row.weights, row.classIds, row.speciesIds, row.ids, row.tags, row.conditionIds, row.kinds, row.properties, row.damageTypes, row.abilities, row.skills, row.schools, row.levels, row.spellIds, row.sizes, row.creatureTypes]
+  const values = [
+    row.weights,
+    row.classIds,
+    row.speciesIds,
+    row.ids,
+    row.tags,
+    row.conditionIds,
+    row.kinds,
+    row.properties,
+    row.damageTypes,
+    row.abilities,
+    row.skills,
+    row.schools,
+    row.levels,
+    row.spellIds,
+    row.sizes,
+    row.creatureTypes
+  ]
     .filter(Array.isArray)
     .flat()
     .map(String);
@@ -173,27 +242,157 @@ const whenField = (): FieldDef => ({
         return cleared;
       }
     },
-    { key: "allowShield", label: "A shield still counts as unarmoured", kind: "switch", visibleWhen: hasType("while-unarmored") },
-    { key: "wielding", label: "The shield is", kind: "select", options: [opt("true", "In hand"), opt("false", "Not in hand")], visibleWhen: hasType("while-shield"), read: (row) => String(row.wielding !== false), write: (next, row) => ({ ...row, wielding: next === "true" }) },
-    { key: "classIds", label: "Classes", kind: "multiselect", options: (ctx) => ctx.classes, visibleWhen: hasType("while-character-is") },
-    { key: "speciesIds", label: "Species", kind: "multiselect", options: (ctx) => ctx.species, visibleWhen: hasType("while-character-is") },
-    { key: "kind", label: "Proficient with", kind: "select", options: [opt("weapon", "A weapon"), opt("armor", "Armour"), opt("tool", "A tool"), opt("skill", "A skill")], visibleWhen: hasType("while-proficient-with") },
-    { key: "ids", label: "Which", kind: "tags", visibleWhen: hasType("while-proficient-with"), placeholder: "longsword" },
-    { key: "tags", label: "Effect tags", kind: "tags", visibleWhen: hasType("while-effect-tag"), suggestions: ["raging", "blessed", "concentrating", "inspired"] },
-    { key: "percent", label: "Hit points at or below", kind: "number", min: 1, max: 99, unit: "%", visibleWhen: hasType("while-hp-at-or-below") },
-    { key: "conditionIds", label: "Conditions", kind: "tags", visibleWhen: hasType("while-condition", "versus-condition"), suggestions: (ctx) => ctx.conditions },
-    { key: "present", label: "It has the condition", kind: "switch", visibleWhen: hasType("while-condition"), help: "Turn off for “only while you don't have it”." },
-    { key: "kinds", label: "Kinds of attack", kind: "multiselect", options: [opt("melee", "Melee"), opt("ranged", "Ranged"), opt("spell", "Spell"), opt("unarmed", "Unarmed"), opt("thrown", "Thrown"), opt("reaction", "Reaction"), opt("opportunity", "Opportunity")], visibleWhen: hasType("attack-kind-is") },
-    { key: "properties", label: "Weapon properties", kind: "tags", visibleWhen: hasType("weapon-property-is"), suggestions: (ctx) => ctx.weaponProperties },
+    {
+      key: "allowShield",
+      label: "A shield still counts as unarmoured",
+      kind: "switch",
+      visibleWhen: hasType("while-unarmored")
+    },
+    {
+      key: "wielding",
+      label: "The shield is",
+      kind: "select",
+      options: [opt("true", "In hand"), opt("false", "Not in hand")],
+      visibleWhen: hasType("while-shield"),
+      read: (row) => String(row.wielding !== false),
+      write: (next, row) => ({ ...row, wielding: next === "true" })
+    },
+    {
+      key: "classIds",
+      label: "Classes",
+      kind: "multiselect",
+      options: (ctx) => ctx.classes,
+      visibleWhen: hasType("while-character-is")
+    },
+    {
+      key: "speciesIds",
+      label: "Species",
+      kind: "multiselect",
+      options: (ctx) => ctx.species,
+      visibleWhen: hasType("while-character-is")
+    },
+    {
+      key: "kind",
+      label: "Proficient with",
+      kind: "select",
+      options: [opt("weapon", "A weapon"), opt("armor", "Armour"), opt("tool", "A tool"), opt("skill", "A skill")],
+      visibleWhen: hasType("while-proficient-with")
+    },
+    {
+      key: "ids",
+      label: "Which",
+      kind: "tags",
+      visibleWhen: hasType("while-proficient-with"),
+      placeholder: "longsword"
+    },
+    {
+      key: "tags",
+      label: "Effect tags",
+      kind: "tags",
+      visibleWhen: hasType("while-effect-tag"),
+      suggestions: ["raging", "blessed", "concentrating", "inspired"]
+    },
+    {
+      key: "percent",
+      label: "Hit points at or below",
+      kind: "number",
+      min: 1,
+      max: 99,
+      unit: "%",
+      visibleWhen: hasType("while-hp-at-or-below")
+    },
+    {
+      key: "conditionIds",
+      label: "Conditions",
+      kind: "tags",
+      visibleWhen: hasType("while-condition", "versus-condition"),
+      suggestions: (ctx) => ctx.conditions
+    },
+    {
+      key: "present",
+      label: "It has the condition",
+      kind: "switch",
+      visibleWhen: hasType("while-condition"),
+      help: "Turn off for “only while you don't have it”."
+    },
+    {
+      key: "kinds",
+      label: "Kinds of attack",
+      kind: "multiselect",
+      options: [
+        opt("melee", "Melee"),
+        opt("ranged", "Ranged"),
+        opt("spell", "Spell"),
+        opt("unarmed", "Unarmed"),
+        opt("thrown", "Thrown"),
+        opt("reaction", "Reaction"),
+        opt("opportunity", "Opportunity")
+      ],
+      visibleWhen: hasType("attack-kind-is")
+    },
+    {
+      key: "properties",
+      label: "Weapon properties",
+      kind: "tags",
+      visibleWhen: hasType("weapon-property-is"),
+      suggestions: (ctx) => ctx.weaponProperties
+    },
     // A mistyped slug here never fires rather than failing, so use the canonical list.
-    { key: "damageTypes", label: "Damage types", kind: "tags", pick: true, visibleWhen: hasType("damage-type-is"), suggestions: (ctx) => ctx.damageTypes },
-    { key: "abilities", label: "Abilities", kind: "multiselect", options: ABILITIES, visibleWhen: hasType("ability-is") },
-    { key: "skills", label: "Skills", kind: "multiselect", options: (ctx) => ctx.skills, visibleWhen: hasType("skill-is") },
-    { key: "schools", label: "Schools", kind: "tags", visibleWhen: hasType("spell-school-is"), suggestions: (ctx) => ctx.schools },
-    { key: "levels", label: "Spell levels", kind: "multiselect", options: Array.from({ length: 10 }, (_, level) => opt(String(level), level === 0 ? "Cantrip" : `Level ${level}`)), visibleWhen: hasType("spell-level-is"), read: (row) => (Array.isArray(row.levels) ? row.levels.map(String) : []), write: (next, row) => ({ ...row, levels: (next as string[]).map(Number) }) },
-    { key: "spellIds", label: "Spells", kind: "tags", visibleWhen: hasType("spell-id-is"), suggestions: (ctx) => ctx.spells.map((entry) => entry.id), help: "Only when this exact spell is cast — “when you cast Eldritch Blast”. A school or a level names a category; this names one." },
+    {
+      key: "damageTypes",
+      label: "Damage types",
+      kind: "tags",
+      pick: true,
+      visibleWhen: hasType("damage-type-is"),
+      suggestions: (ctx) => ctx.damageTypes
+    },
+    {
+      key: "abilities",
+      label: "Abilities",
+      kind: "multiselect",
+      options: ABILITIES,
+      visibleWhen: hasType("ability-is")
+    },
+    {
+      key: "skills",
+      label: "Skills",
+      kind: "multiselect",
+      options: (ctx) => ctx.skills,
+      visibleWhen: hasType("skill-is")
+    },
+    {
+      key: "schools",
+      label: "Schools",
+      kind: "tags",
+      visibleWhen: hasType("spell-school-is"),
+      suggestions: (ctx) => ctx.schools
+    },
+    {
+      key: "levels",
+      label: "Spell levels",
+      kind: "multiselect",
+      options: Array.from({ length: 10 }, (_, level) => opt(String(level), level === 0 ? "Cantrip" : `Level ${level}`)),
+      visibleWhen: hasType("spell-level-is"),
+      read: (row) => (Array.isArray(row.levels) ? row.levels.map(String) : []),
+      write: (next, row) => ({ ...row, levels: (next as string[]).map(Number) })
+    },
+    {
+      key: "spellIds",
+      label: "Spells",
+      kind: "tags",
+      visibleWhen: hasType("spell-id-is"),
+      suggestions: (ctx) => ctx.spells.map((entry) => entry.id),
+      help: "Only when this exact spell is cast — “when you cast Eldritch Blast”. A school or a level names a category; this names one."
+    },
     { key: "sizes", label: "Sizes", kind: "multiselect", options: SIZES, visibleWhen: hasType("versus-size") },
-    { key: "creatureTypes", label: "Kinds of creature", kind: "tags", visibleWhen: hasType("versus-creature-type"), suggestions: (ctx) => ctx.creatureTypes, note: "Not checked yet — a creature doesn't record its kind." }
+    {
+      key: "creatureTypes",
+      label: "Kinds of creature",
+      kind: "tags",
+      visibleWhen: hasType("versus-creature-type"),
+      suggestions: (ctx) => ctx.creatureTypes,
+      note: "Not checked yet — a creature doesn't record its kind."
+    }
   ]
 });
 
@@ -238,29 +437,52 @@ export const modifierLabel = (type: unknown): string =>
 /** Switching variant replaces the row: the union is `.strict()`, so leftover keys fail the parse. */
 function blankModifier(type: string): Draft {
   switch (type) {
-    case "ability-score": return { type, ability: "str", amount: 1 };
-    case "hit-points-per-level": return { type, amount: 1 };
-    case "speed": return { type, amount: 10 };
-    case "armor-class": return { type, amount: 1, whileArmored: false };
-    case "initiative": return { type, amount: 1 };
-    case "extra-attack": return { type, count: 1 };
-    case "unarmored-defense": return { type, ability: "con", allowShield: false };
-    case "darkvision": return { type, feet: 60 };
-    case "attack-bonus": return { type, amount: 1 };
-    case "damage-bonus": return { type, amount: 1 };
-    case "save-bonus": return { type, amount: 1 };
-    case "check-bonus": return { type, amount: 1 };
-    case "extra-damage": return { type, formula: "1d6", damageType: "", doubleOnCritical: false };
-    case "roll-mode": return { type, roll: "attack", mode: "advantage" };
-    case "spell-save-dc": return { type, amount: 1 };
-    case "spell-attack-bonus": return { type, amount: 1 };
-    case "spell-slot": return { type, level: 1, amount: 1 };
-    case "resource-bonus": return { type, poolId: "", amount: 1 };
-    case "critical-range": return { type, threshold: 19 };
-    case "critical-bonus-dice": return { type, count: 1 };
-    case "damage-reduction": return { type, amount: 1 };
-    case "sense": return { type, sense: "", feet: 30 };
-    default: return { type };
+    case "ability-score":
+      return { type, ability: "str", amount: 1 };
+    case "hit-points-per-level":
+      return { type, amount: 1 };
+    case "speed":
+      return { type, amount: 10 };
+    case "armor-class":
+      return { type, amount: 1, whileArmored: false };
+    case "initiative":
+      return { type, amount: 1 };
+    case "extra-attack":
+      return { type, count: 1 };
+    case "unarmored-defense":
+      return { type, ability: "con", allowShield: false };
+    case "darkvision":
+      return { type, feet: 60 };
+    case "attack-bonus":
+      return { type, amount: 1 };
+    case "damage-bonus":
+      return { type, amount: 1 };
+    case "save-bonus":
+      return { type, amount: 1 };
+    case "check-bonus":
+      return { type, amount: 1 };
+    case "extra-damage":
+      return { type, formula: "1d6", damageType: "", doubleOnCritical: false };
+    case "roll-mode":
+      return { type, roll: "attack", mode: "advantage" };
+    case "spell-save-dc":
+      return { type, amount: 1 };
+    case "spell-attack-bonus":
+      return { type, amount: 1 };
+    case "spell-slot":
+      return { type, level: 1, amount: 1 };
+    case "resource-bonus":
+      return { type, poolId: "", amount: 1 };
+    case "critical-range":
+      return { type, threshold: 19 };
+    case "critical-bonus-dice":
+      return { type, count: 1 };
+    case "damage-reduction":
+      return { type, amount: 1 };
+    case "sense":
+      return { type, sense: "", feet: 30 };
+    default:
+      return { type };
   }
 }
 
@@ -275,8 +497,13 @@ const ITEM_REFUSED = ["ability-score", "hit-points-per-level"];
 
 /** The rolls a roll-mode variant can target; `RollModeVariantSchema` is shared by modifiers and effects. */
 const ROLL_MODE_ROLLS: readonly SelectOption[] = [
-  opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"),
-  opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")
+  opt("attack", "Attack rolls"),
+  opt("incoming-attack", "Attacks against you"),
+  opt("save", "Saving throws"),
+  opt("check", "Ability checks"),
+  opt("initiative", "Initiative"),
+  opt("death-save", "Death saves"),
+  opt("concentration", "Concentration")
 ];
 const ROLL_MODE_WAYS: readonly SelectOption[] = [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")];
 
@@ -295,9 +522,12 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
   rowLabel: (row) => {
     const modifier = row as Record<string, unknown>;
     const name = MODIFIER_TYPES.find((entry) => entry.value === modifier.type)?.label ?? "Modifier";
-    if (modifier.type === "roll-mode") return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
-    if (modifier.type === "extra-damage") return `${name} ${modifier.formula ?? ""} ${modifier.damageType ?? ""}`.trim();
-    if (modifier.type === "spell-slot") return `${name} ${signed(Number(modifier.amount ?? 0))} at level ${modifier.level ?? 1}`;
+    if (modifier.type === "roll-mode")
+      return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
+    if (modifier.type === "extra-damage")
+      return `${name} ${modifier.formula ?? ""} ${modifier.damageType ?? ""}`.trim();
+    if (modifier.type === "spell-slot")
+      return `${name} ${signed(Number(modifier.amount ?? 0))} at level ${modifier.level ?? 1}`;
     const amount = modifier.amount ?? modifier.count ?? modifier.feet ?? modifier.threshold;
     return typeof amount === "number" ? `${name} ${signed(amount)}` : name;
   },
@@ -307,46 +537,225 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "What it changes",
       kind: "select",
       // The refusal belongs to the item carrier; a stat block is not an item.
-      options: scope === "item" ? MODIFIER_TYPES.filter((entry) => !ITEM_REFUSED.includes(entry.value)) : MODIFIER_TYPES,
+      options:
+        scope === "item" ? MODIFIER_TYPES.filter((entry) => !ITEM_REFUSED.includes(entry.value)) : MODIFIER_TYPES,
       // Replace the whole row so no key from the previous variant survives.
       write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankModifier(String(next)) })
     },
-    { key: "ability", label: "Ability", kind: "select", options: ABILITIES, visibleWhen: hasType("ability-score", "unarmored-defense") },
+    {
+      key: "ability",
+      label: "Ability",
+      kind: "select",
+      options: ABILITIES,
+      visibleWhen: hasType("ability-score", "unarmored-defense")
+    },
     /* One `amount` field per bound set, because each variant declares its own server-side range;
        `visibleWhen` makes them mutually exclusive. All amounts are signed (negative for curses). */
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -5, max: 5, help: "Negative for a curse.", visibleWhen: hasType("ability-score", "hit-points-per-level", "armor-class", "spell-save-dc", "spell-attack-bonus") },
+    {
+      key: "amount",
+      label: "Amount",
+      kind: "number",
+      allowNegative: true,
+      min: -5,
+      max: 5,
+      help: "Negative for a curse.",
+      visibleWhen: hasType(
+        "ability-score",
+        "hit-points-per-level",
+        "armor-class",
+        "spell-save-dc",
+        "spell-attack-bonus"
+      )
+    },
     /* On a feature the builder bakes this into `speedFeet`; on an item nothing reads the summed
        value yet, so the item gets a note. */
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -30, max: 60, unit: "ft", help: "Negative for a curse.", visibleWhen: hasType("speed"),
-      ...(scope === "item" ? { note: "Not read on an item — a worn item's speed bonus reaches no rule yet. Say it on a feature or a feat instead." } : {}) },
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -5, max: 10, help: "Negative for a curse.", visibleWhen: hasType("initiative") },
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -10, max: 10, help: "Negative for a curse.", visibleWhen: hasType("attack-bonus", "damage-bonus", "save-bonus", "check-bonus") },
-    { key: "amount", label: "Extra slots", kind: "number", allowNegative: true, min: -4, max: 4, visibleWhen: hasType("spell-slot") },
-    { key: "amount", label: "Extra uses", kind: "number", allowNegative: true, min: -20, max: 20, visibleWhen: hasType("resource-bonus") },
-    { key: "amount", label: "Damage reduced by", kind: "number", min: 1, max: 30, visibleWhen: hasType("damage-reduction") },
-    { key: "maximum", label: "Raises the cap to", kind: "number", min: 1, max: 30, visibleWhen: hasType("ability-score"), help: "Leave empty to keep the usual 20." },
+    {
+      key: "amount",
+      label: "Amount",
+      kind: "number",
+      allowNegative: true,
+      min: -30,
+      max: 60,
+      unit: "ft",
+      help: "Negative for a curse.",
+      visibleWhen: hasType("speed"),
+      ...(scope === "item"
+        ? {
+            note: "Not read on an item — a worn item's speed bonus reaches no rule yet. Say it on a feature or a feat instead."
+          }
+        : {})
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      kind: "number",
+      allowNegative: true,
+      min: -5,
+      max: 10,
+      help: "Negative for a curse.",
+      visibleWhen: hasType("initiative")
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      kind: "number",
+      allowNegative: true,
+      min: -10,
+      max: 10,
+      help: "Negative for a curse.",
+      visibleWhen: hasType("attack-bonus", "damage-bonus", "save-bonus", "check-bonus")
+    },
+    {
+      key: "amount",
+      label: "Extra slots",
+      kind: "number",
+      allowNegative: true,
+      min: -4,
+      max: 4,
+      visibleWhen: hasType("spell-slot")
+    },
+    {
+      key: "amount",
+      label: "Extra uses",
+      kind: "number",
+      allowNegative: true,
+      min: -20,
+      max: 20,
+      visibleWhen: hasType("resource-bonus")
+    },
+    {
+      key: "amount",
+      label: "Damage reduced by",
+      kind: "number",
+      min: 1,
+      max: 30,
+      visibleWhen: hasType("damage-reduction")
+    },
+    {
+      key: "maximum",
+      label: "Raises the cap to",
+      kind: "number",
+      min: 1,
+      max: 30,
+      visibleWhen: hasType("ability-score"),
+      help: "Leave empty to keep the usual 20."
+    },
     { key: "count", label: "Extra attacks", kind: "number", min: 1, max: 3, visibleWhen: hasType("extra-attack") },
-    { key: "count", label: "Extra dice", kind: "number", min: 1, max: 4, visibleWhen: hasType("critical-bonus-dice"), help: "The weapon's own die, rolled again. For a typed extra like 1d6 fire, use Extra damage on a critical hit instead." },
-    { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("darkvision"), note: "Display only." },
+    {
+      key: "count",
+      label: "Extra dice",
+      kind: "number",
+      min: 1,
+      max: 4,
+      visibleWhen: hasType("critical-bonus-dice"),
+      help: "The weapon's own die, rolled again. For a typed extra like 1d6 fire, use Extra damage on a critical hit instead."
+    },
+    {
+      key: "feet",
+      label: "Distance",
+      kind: "number",
+      min: 0,
+      max: 240,
+      unit: "ft",
+      visibleWhen: hasType("darkvision"),
+      note: "Display only."
+    },
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     /* On an item nothing reads `unarmored-defense` (it is builder-baked from features and feats
        only), so items get a note; features and feats need none. */
-    { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"),
+    {
+      key: "allowShield",
+      label: "A shield still counts",
+      kind: "switch",
+      visibleWhen: hasType("unarmored-defense"),
       help: "On is the Barbarian's rule, off the Monk's — off, a shield replaces this defence with the ordinary 10 + Dexterity.",
-      ...(scope === "item" ? { note: "Not read on an item — this defence only reaches a sheet from a feature or a feat." } : {}) },
-    { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage"), help: "Dice. Leave it empty to add only an ability modifier." },
-    { key: "abilityModifier", label: "Plus an ability modifier", kind: "select", options: ABILITIES, emptyValue: "omit", visibleWhen: hasType("extra-damage"), help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”." },
+      ...(scope === "item"
+        ? { note: "Not read on an item — this defence only reaches a sheet from a feature or a feat." }
+        : {})
+    },
+    {
+      key: "formula",
+      label: "Damage",
+      placeholder: "1d6",
+      validate: diceValidate,
+      visibleWhen: hasType("extra-damage"),
+      help: "Dice. Leave it empty to add only an ability modifier."
+    },
+    {
+      key: "abilityModifier",
+      label: "Plus an ability modifier",
+      kind: "select",
+      options: ABILITIES,
+      emptyValue: "omit",
+      visibleWhen: hasType("extra-damage"),
+      help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”."
+    },
     /* Left empty, the type inherits the weapon's own (`damageType ?? damage[0].type`), so `"untyped"`
        is not offered: picking it would override that inheritance. The box stays open. */
-    { key: "damageType", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
-    { key: "doubleOnCritical", label: "Doubled on a critical hit", kind: "switch", visibleWhen: hasType("extra-damage"), help: "Off is the 5e rule — dice added after the attack aren't doubled." },
-    { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
-    { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
-    { key: "classId", label: "For one class only", kind: "select", options: (ctx) => ctx.classes, visibleWhen: hasType("spell-save-dc", "spell-attack-bonus"), help: "Leave empty for every class on the sheet." },
+    {
+      key: "damageType",
+      label: "Damage type",
+      pick: true,
+      placeholder: "fire",
+      suggestions: (ctx) => ctx.damageTypes,
+      visibleWhen: hasType("extra-damage")
+    },
+    {
+      key: "doubleOnCritical",
+      label: "Doubled on a critical hit",
+      kind: "switch",
+      visibleWhen: hasType("extra-damage"),
+      help: "Off is the 5e rule — dice added after the attack aren't doubled."
+    },
+    {
+      key: "roll",
+      label: "On which roll",
+      kind: "select",
+      options: ROLL_MODE_ROLLS,
+      visibleWhen: hasType("roll-mode")
+    },
+    {
+      key: "mode",
+      label: "Which way",
+      kind: "select",
+      options: ROLL_MODE_WAYS,
+      visibleWhen: hasType("roll-mode"),
+      help: "Disadvantage is how a cursed item bites."
+    },
+    {
+      key: "classId",
+      label: "For one class only",
+      kind: "select",
+      options: (ctx) => ctx.classes,
+      visibleWhen: hasType("spell-save-dc", "spell-attack-bonus"),
+      help: "Leave empty for every class on the sheet."
+    },
     { key: "level", label: "Slot level", kind: "stepper", min: 1, max: 9, visibleWhen: hasType("spell-slot") },
-    { key: "poolId", label: "Which pool", placeholder: "lay-on-hands", validate: slugValidate, visibleWhen: hasType("resource-bonus"), help: "The shared-pool name a feature already uses. One more of whatever that pool counts." },
-    { key: "threshold", label: "Critical hit on", kind: "number", min: 15, max: 20, visibleWhen: hasType("critical-range"), help: "20 is the usual. 19 gives a champion's improved critical." },
-    { key: "sense", label: "Which sense", placeholder: "tremorsense", validate: slugValidate, visibleWhen: hasType("sense"), note: "Display only." },
+    {
+      key: "poolId",
+      label: "Which pool",
+      placeholder: "lay-on-hands",
+      validate: slugValidate,
+      visibleWhen: hasType("resource-bonus"),
+      help: "The shared-pool name a feature already uses. One more of whatever that pool counts."
+    },
+    {
+      key: "threshold",
+      label: "Critical hit on",
+      kind: "number",
+      min: 15,
+      max: 20,
+      visibleWhen: hasType("critical-range"),
+      help: "20 is the usual. 19 gives a champion's improved critical."
+    },
+    {
+      key: "sense",
+      label: "Which sense",
+      placeholder: "tremorsense",
+      validate: slugValidate,
+      visibleWhen: hasType("sense"),
+      note: "Display only."
+    },
     { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("sense") },
     whenField(),
     {
@@ -381,9 +790,21 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
       /** `class-resource` (a feature-only option) reads the count from the class table's column at the
           character's level. Items can't resolve it (`scaledLimit` returns `undefined`: a built
           definition has no class table), so it is not offered there. */
-      options: scope === "feature"
-        ? [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level"), opt("class-resource", "A column on the class table")]
-        : [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
+      options:
+        scope === "feature"
+          ? [
+              opt("flat", "A flat number"),
+              opt("proficiency-bonus", "Proficiency bonus"),
+              opt("ability-modifier", "Ability modifier"),
+              opt("by-level", "By level"),
+              opt("class-resource", "A column on the class table")
+            ]
+          : [
+              opt("flat", "A flat number"),
+              opt("proficiency-bonus", "Proficiency bonus"),
+              opt("ability-modifier", "Ability modifier"),
+              opt("by-level", "By level")
+            ],
       // `mode` is not stored; it is read back from the shape (`uses.scaling.type`, whose values match
       // the option values). Without `read` the select would always show "Not set". An item body with
       // a `class-resource` scaling reads as "Not set", since items can't resolve it.
@@ -433,25 +854,44 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
         return { ...scope_, uses };
       }
     },
-    { key: "uses.scaling.ability", label: "Which ability", kind: "select", options: ABILITIES, visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier" },
-    { key: "uses.scaling.minimum", label: "At least", kind: "number", min: 0, max: 5, visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier" },
+    {
+      key: "uses.scaling.ability",
+      label: "Which ability",
+      kind: "select",
+      options: ABILITIES,
+      visibleWhen: (scope_) =>
+        (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier"
+    },
+    {
+      key: "uses.scaling.minimum",
+      label: "At least",
+      kind: "number",
+      min: 0,
+      max: 5,
+      visibleWhen: (scope_) =>
+        (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier"
+    },
     // The `classResources` id from the level table (e.g. "rage"). A typo resolves to 0 uses, so it is
     // validated while typing. Absent (not hidden) at other scopes, which offer no `class-resource` mode.
     ...(scope === "feature"
-      ? [{
-        key: "uses.scaling.id",
-        label: "Which column",
-        placeholder: "rage",
-        validate: slugValidate,
-        help: "The column's id on the class's level table — the count is read from it at the character's own level.",
-        visibleWhen: (scope_: Draft) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "class-resource"
-      }]
+      ? [
+          {
+            key: "uses.scaling.id",
+            label: "Which column",
+            placeholder: "rage",
+            validate: slugValidate,
+            help: "The column's id on the class's level table — the count is read from it at the character's own level.",
+            visibleWhen: (scope_: Draft) =>
+              (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "class-resource"
+          }
+        ]
       : []),
     {
       key: "uses.scaling.table",
       label: "By level",
       kind: "rows",
-      visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "by-level",
+      visibleWhen: (scope_) =>
+        (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "by-level",
       addLabel: "Add a level",
       emptyText: "No levels yet.",
       maxRows: 20,
@@ -466,12 +906,25 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
       key: "uses.per",
       label: "Comes back",
       kind: "select",
-      options: [opt("turn", "Every turn"), opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"), opt("long-rest", "On a long rest")],
+      options: [
+        opt("turn", "Every turn"),
+        opt("encounter", "Every encounter"),
+        opt("short-rest", "On a short rest"),
+        opt("long-rest", "On a long rest")
+      ],
       // No "day" option: a long rest is this app's day.
       ...(scope === "item" ? { help: "A long rest is this table's day, so “once per day” is “on a long rest”." } : {})
     },
     // Anything naming the same pool shares one counter.
-    { key: "uses.pool", label: "Shared pool", help: scope === "item" ? "Items and features sharing a pool share one counter." : "Features sharing a pool share one counter.", placeholder: "channel-divinity" }
+    {
+      key: "uses.pool",
+      label: "Shared pool",
+      help:
+        scope === "item"
+          ? "Items and features sharing a pool share one counter."
+          : "Features sharing a pool share one counter.",
+      placeholder: "channel-divinity"
+    }
   ]
 });
 
@@ -483,8 +936,25 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
  */
 const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
   scope === "statblock"
-    ? [{ key: "attack.bonus", label: "To hit", kind: "number", allowNegative: true, min: -5, max: 20, help: "The flat bonus the stat block prints — the +9 in “+9 to hit”." }]
-    : [{ key: "attack.ability", label: "Uses", kind: "select", options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")] }];
+    ? [
+        {
+          key: "attack.bonus",
+          label: "To hit",
+          kind: "number",
+          allowNegative: true,
+          min: -5,
+          max: 20,
+          help: "The flat bonus the stat block prints — the +9 in “+9 to hit”."
+        }
+      ]
+    : [
+        {
+          key: "attack.ability",
+          label: "Uses",
+          kind: "select",
+          options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")]
+        }
+      ];
 
 /**
  * An action's own limited uses (`ActionUsesSchema`), a different schema from the record-level
@@ -494,8 +964,11 @@ const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
  * forward a threshold from record-level uses, which would make the character unbuildable.
  */
 const ACTION_USES_PER: readonly SelectOption[] = [
-  opt("turn", "Every turn"), opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"),
-  opt("long-rest", "On a long rest"), opt("recharge", "On a die roll")
+  opt("turn", "Every turn"),
+  opt("encounter", "Every encounter"),
+  opt("short-rest", "On a short rest"),
+  opt("long-rest", "On a long rest"),
+  opt("recharge", "On a die roll")
 ];
 
 const actionUses = (scope_: Draft) => ({ ...(scope_.uses as Record<string, unknown> | undefined) });
@@ -552,7 +1025,13 @@ const actionUsesField = (): FieldDef => ({
       help: "A d6 at the start of its turn: 5 is a printed “Recharge 5–6”. The table sees the die either way.",
       visibleWhen: (scope_) => (scope_.uses as { per?: string } | undefined)?.per === "recharge"
     },
-    { key: "uses.pool", label: "Shared pool", placeholder: "breath-weapon", validate: slugValidate, help: "Actions sharing a pool share one counter — and one recharge roll." }
+    {
+      key: "uses.pool",
+      label: "Shared pool",
+      placeholder: "breath-weapon",
+      validate: slugValidate,
+      help: "Actions sharing a pool share one counter — and one recharge roll."
+    }
   ]
 });
 
@@ -570,7 +1049,17 @@ const actionsField = (scope: RiderScope): FieldDef => ({
   rowLabel: (row) => (row as { name?: string }).name || "Unnamed action",
   rows: [
     { key: "name", label: "Name" },
-    { key: "activation", label: "Costs", kind: "select", options: [opt("action", "An action"), opt("bonus-action", "A bonus action"), opt("reaction", "A reaction"), opt("other", "No action")] },
+    {
+      key: "activation",
+      label: "Costs",
+      kind: "select",
+      options: [
+        opt("action", "An action"),
+        opt("bonus-action", "A bonus action"),
+        opt("reaction", "A reaction"),
+        opt("other", "No action")
+      ]
+    },
     { key: "description", label: "Description", kind: "textarea", wide: true },
     damagePartsField("damage", { label: "Damage", max: 8, newId, help: "Every part is rolled on a hit." }),
     {
@@ -580,10 +1069,26 @@ const actionsField = (scope: RiderScope): FieldDef => ({
       rows: [
         ...toHitFields(scope),
         { key: "attack.reachFeet", label: "Reach", kind: "number", min: 1, max: 120, unit: "ft" },
-        { key: "attack.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", help: "The farthest this can reach at all." },
+        {
+          key: "attack.rangeFeet",
+          label: "Range",
+          kind: "number",
+          min: 1,
+          max: 1000,
+          unit: "ft",
+          help: "The farthest this can reach at all."
+        },
         /* Normal range ("80" in "range 80/320"): past it, up to the range, the attack rolls at
            disadvantage (`action-resolution.ts`). Both attack schemas have this key. */
-        { key: "attack.rangeNormalFeet", label: "Normal range", kind: "number", min: 1, max: 1000, unit: "ft", help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage." }
+        {
+          key: "attack.rangeNormalFeet",
+          label: "Normal range",
+          kind: "number",
+          min: 1,
+          max: 1000,
+          unit: "ft",
+          help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage."
+        }
       ]
     },
     {
@@ -592,7 +1097,14 @@ const actionsField = (scope: RiderScope): FieldDef => ({
       kind: "group",
       rows: [
         { key: "save.ability", label: "Target rolls", kind: "select", options: ABILITIES },
-        { key: "save.dc", label: "DC", kind: "number", min: 1, max: 40, help: "Leave empty to use the character's own spell save DC." }
+        {
+          key: "save.dc",
+          label: "DC",
+          kind: "number",
+          min: 1,
+          max: 40,
+          help: "Leave empty to use the character's own spell save DC."
+        }
       ]
     },
     actionUsesField()
@@ -600,7 +1112,12 @@ const actionsField = (scope: RiderScope): FieldDef => ({
 });
 
 /** Built here rather than inline so `riderFieldsForTest` can list the complete rider surface. */
-const tagsField = (label: string): FieldDef => ({ key: "tags", label, kind: "tags", help: "Grouping only — no mechanical effect." });
+const tagsField = (label: string): FieldDef => ({
+  key: "tags",
+  label,
+  kind: "tags",
+  help: "Grouping only — no mechanical effect."
+});
 
 /* ------------------------------------------------------- effect modifiers ------ */
 
@@ -631,10 +1148,14 @@ const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = [
 /** The union is `.strict()`, so switching variant replaces the row. */
 function blankEffectModifier(type: string): Draft {
   switch (type) {
-    case "roll-mode": return { type, roll: "attack", mode: "advantage" };
-    case "damage-resistance": return { type, damageTypes: [] };
-    case "speed": return { type, amount: 10 };
-    default: return { type };
+    case "roll-mode":
+      return { type, roll: "attack", mode: "advantage" };
+    case "damage-resistance":
+      return { type, damageTypes: [] };
+    case "speed":
+      return { type, amount: 10 };
+    default:
+      return { type };
   }
 }
 
@@ -653,9 +1174,11 @@ const effectModifiersField = (scope: RiderScope): FieldDef => ({
   rowLabel: (row) => {
     const modifier = row as Record<string, unknown>;
     const name = EFFECT_MODIFIER_TYPES.find((entry) => entry.value === modifier.type)?.label ?? "Modifier";
-    if (modifier.type === "roll-mode") return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
+    if (modifier.type === "roll-mode")
+      return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
     // Feet only for `speed`; a stored `damage-bonus`/`attack-bonus` must not read as "+2 ft".
-    if (modifier.type === "speed" && typeof modifier.amount === "number") return `${name} ${signed(modifier.amount)} ft`;
+    if (modifier.type === "speed" && typeof modifier.amount === "number")
+      return `${name} ${signed(modifier.amount)} ft`;
     const types = Array.isArray(modifier.damageTypes) ? modifier.damageTypes.map(String) : [];
     return types.length > 0 ? `${name} — ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
   },
@@ -665,17 +1188,53 @@ const effectModifiersField = (scope: RiderScope): FieldDef => ({
       label: "What it does",
       kind: "select",
       options: EFFECT_MODIFIER_TYPES,
-      write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankEffectModifier(String(next)) })
+      write: (next, row) => ({
+        rowId: (row as { rowId?: string }).rowId ?? newId(),
+        ...blankEffectModifier(String(next))
+      })
     },
-    { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
-    { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a curse bites." },
+    {
+      key: "roll",
+      label: "On which roll",
+      kind: "select",
+      options: ROLL_MODE_ROLLS,
+      visibleWhen: hasType("roll-mode")
+    },
+    {
+      key: "mode",
+      label: "Which way",
+      kind: "select",
+      options: ROLL_MODE_WAYS,
+      visibleWhen: hasType("roll-mode"),
+      help: "Disadvantage is how a curse bites."
+    },
     /* Same bounds as the build-time `speed` row, signed (Longstrider and the `slow` mastery are one
        row). On an item nothing reads the result, hence the note. */
-    { key: "amount", label: "Amount", kind: "number", allowNegative: true, min: -30, max: 60, unit: "ft", visibleWhen: hasType("speed"),
+    {
+      key: "amount",
+      label: "Amount",
+      kind: "number",
+      allowNegative: true,
+      min: -30,
+      max: 60,
+      unit: "ft",
+      visibleWhen: hasType("speed"),
       help: "Negative for a curse. The bearer's Speed while this effect lasts, given back when it ends.",
-      ...(scope === "item" ? { note: "Not read on an item — an item's effect becomes a standing rider, and no rule reads a rider's speed. Say it on a feature or a feat instead." } : {}) },
+      ...(scope === "item"
+        ? {
+            note: "Not read on an item — an item's effect becomes a standing rider, and no rule reads a rider's speed. Say it on a feature or a feat instead."
+          }
+        : {})
+    },
     // Half damage of every type named here.
-    { key: "damageTypes", label: "Damage types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("damage-resistance") }
+    {
+      key: "damageTypes",
+      label: "Damage types",
+      kind: "tags",
+      pick: true,
+      suggestions: (ctx) => ctx.damageTypes,
+      visibleWhen: hasType("damage-resistance")
+    }
   ]
 });
 
@@ -707,9 +1266,32 @@ const effectsField = (scope: RiderScope): FieldDef => ({
   rowLabel: (row) => (row as { name?: string }).name || "Unnamed effect",
   rows: [
     { key: "name", label: "Name" },
-    { key: "tags", label: "Tags", kind: "tags", help: "The sheet groups effects by these.", suggestions: ["raging", "blessed", "concentrating", "inspired"] },
-    { key: "duration.type", label: "Lasts", kind: "select", options: [opt("rounds", "A number of rounds"), opt("until-source-next-turn", "Until your next turn"), opt("encounter", "The whole encounter"), opt("manual", "Until removed by hand")] },
-    { key: "duration.rounds", label: "Rounds", kind: "number", min: 1, max: 100, visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "rounds" },
+    {
+      key: "tags",
+      label: "Tags",
+      kind: "tags",
+      help: "The sheet groups effects by these.",
+      suggestions: ["raging", "blessed", "concentrating", "inspired"]
+    },
+    {
+      key: "duration.type",
+      label: "Lasts",
+      kind: "select",
+      options: [
+        opt("rounds", "A number of rounds"),
+        opt("until-source-next-turn", "Until your next turn"),
+        opt("encounter", "The whole encounter"),
+        opt("manual", "Until removed by hand")
+      ]
+    },
+    {
+      key: "duration.rounds",
+      label: "Rounds",
+      kind: "number",
+      min: 1,
+      max: 100,
+      visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "rounds"
+    },
     { key: "concentration", label: "Needs concentration", kind: "switch" },
     // Nested `rows`, the same depth `whenField` renders at inside `modifiersField`.
     effectModifiersField(scope)
@@ -745,15 +1327,14 @@ export type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly 
  * the caster's own.
  */
 export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[] {
-  return GRANT_KINDS
-    .filter((kind) => Array.isArray(grants[kind.key]))
-    .map((kind) => ({
-      rowId: kind.key,
-      kind: kind.key,
-      values: kind.key === "spells"
+  return GRANT_KINDS.filter((kind) => Array.isArray(grants[kind.key])).map((kind) => ({
+    rowId: kind.key,
+    kind: kind.key,
+    values:
+      kind.key === "spells"
         ? (grants.spells as ReadonlyArray<{ id?: string }>).map((spell) => String(spell?.id ?? ""))
         : ((grants[kind.key] as string[]) ?? [])
-    }));
+  }));
 }
 
 /**
@@ -764,13 +1345,14 @@ export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[
  * `FeatureGrantsFieldsSchema.shape`. A carried key keeps the block alive with zero rows, so the gate
  * is never dropped.
  */
-export function grantsFromRows(rows: readonly GrantRow[], previous: Record<string, unknown>): Record<string, unknown> | undefined {
+export function grantsFromRows(
+  rows: readonly GrantRow[],
+  previous: Record<string, unknown>
+): Record<string, unknown> | undefined {
   const bag: Record<string, unknown> = {};
   for (const row of rows) {
     if (!row.kind) continue;
-    bag[row.kind] = row.kind === "spells"
-      ? row.values.map((id) => ({ id, alwaysPrepared: true }))
-      : row.values;
+    bag[row.kind] = row.kind === "spells" ? row.values.map((id) => ({ id, alwaysPrepared: true })) : row.values;
   }
   for (const [key, carried] of Object.entries(previous)) {
     if (!GRANT_KINDS.some((kind) => kind.key === key)) bag[key] = carried;
@@ -841,25 +1423,33 @@ function GrantsEditor({
         rowLabel={(row) => {
           const label = GRANT_KINDS.find((kind) => kind.key === row.kind)?.label ?? "Grant";
           // A collapsed spells row shows names, not ids.
-          const shown = row.kind === "spells" ? row.values.map((id) => ctx.spells.find((entry) => entry.id === id)?.name ?? id) : row.values;
+          const shown =
+            row.kind === "spells"
+              ? row.values.map((id) => ctx.spells.find((entry) => entry.id === id)?.name ?? id)
+              : row.values;
           return shown.length > 0 ? `${label}: ${shown.join(", ")}` : label;
         }}
         renderRow={(row, index) => {
           const meta = GRANT_KINDS.find((kind) => kind.key === row.kind);
-          const options = row.kind === "saves" ? ABILITIES : row.kind === "skills" || row.kind === "expertise" ? ctx.skills : null;
-          const replace = (patch: Partial<GrantRow>) => write(rows.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)));
+          const options =
+            row.kind === "saves" ? ABILITIES : row.kind === "skills" || row.kind === "expertise" ? ctx.skills : null;
+          const replace = (patch: Partial<GrantRow>) =>
+            write(rows.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)));
           // A body carrying a kind this scope doesn't offer (e.g. an imported item's spell grant)
           // still shows its own row.
-          const kindOptions = kinds.some((kind) => kind.key === row.kind) ? kinds : [...kinds, ...GRANT_KINDS.filter((kind) => kind.key === row.kind)];
+          const kindOptions = kinds.some((kind) => kind.key === row.kind)
+            ? kinds
+            : [...kinds, ...GRANT_KINDS.filter((kind) => kind.key === row.kind)];
           return (
             <FieldGrid>
               <Field label="What">
-                <Select
-                  value={row.kind}
-                  onChange={(event) => replace({ kind: event.target.value, values: [] })}
-                >
+                <Select value={row.kind} onChange={(event) => replace({ kind: event.target.value, values: [] })}>
                   {kindOptions.map((kind) => (
-                    <option key={kind.key} value={kind.key} disabled={kind.key !== row.kind && rows.some((entry) => entry.kind === kind.key)}>
+                    <option
+                      key={kind.key}
+                      value={kind.key}
+                      disabled={kind.key !== row.kind && rows.some((entry) => entry.kind === kind.key)}
+                    >
                       {kind.label}
                     </option>
                   ))}
@@ -885,7 +1475,9 @@ function GrantsEditor({
                     <CatalogPicker
                       entries={ctx.spells.filter((entry) => !row.values.includes(entry.id))}
                       value={null}
-                      onChange={(next) => { if (next) replace({ values: [...row.values, next] }); }}
+                      onChange={(next) => {
+                        if (next) replace({ values: [...row.values, next] });
+                      }}
                       emptyLabel="Add a spell"
                       title="Spells this grants"
                       searchPlaceholder="Search spells…"
@@ -900,7 +1492,13 @@ function GrantsEditor({
                         <Chip
                           key={option.value}
                           pressed={on}
-                          onClick={() => replace({ values: on ? row.values.filter((entry) => entry !== option.value) : [...row.values, option.value] })}
+                          onClick={() =>
+                            replace({
+                              values: on
+                                ? row.values.filter((entry) => entry !== option.value)
+                                : [...row.values, option.value]
+                            })
+                          }
                         >
                           {option.label}
                         </Chip>
@@ -983,7 +1581,8 @@ export function RiderEditor({
   const fields = useMemo<readonly FieldDef[]>(() => {
     const list: FieldDef[] = [];
     if (enabled.includes("modifiers")) list.push(modifiersField(label("modifiers", "Modifiers"), scope));
-    if (enabled.includes("uses")) list.push(usesField(label("uses", scope === "item" ? "Charges" : "Limited uses"), scope));
+    if (enabled.includes("uses"))
+      list.push(usesField(label("uses", scope === "item" ? "Charges" : "Limited uses"), scope));
     if (enabled.includes("tags")) list.push(tagsField(label("tags", "Tags")));
     if (enabled.includes("actions")) list.push(actionsField(scope));
     if (enabled.includes("effects")) list.push(effectsField(scope));
@@ -1005,9 +1604,7 @@ export function RiderEditor({
       </p>
 
       {/* Display-only preview of what the sheet will show for this item's attack. */}
-      {scope === "item" && attackReadout(value) && (
-        <p className="hb-riders-readout tabular">{attackReadout(value)}</p>
-      )}
+      {scope === "item" && attackReadout(value) && <p className="hb-riders-readout tabular">{attackReadout(value)}</p>}
 
       <FieldGrid>
         {enabled.includes("modifiers") && (
@@ -1056,7 +1653,8 @@ export function attackReadout(value: Draft): string {
     damage.push(`${weapon.damageDice.trim()}${weapon.damageType ? ` ${String(weapon.damageType).trim()}` : ""}`);
   }
   for (const modifier of modifiers) {
-    if (modifier.type !== "extra-damage" || typeof modifier.formula !== "string" || modifier.formula.trim() === "") continue;
+    if (modifier.type !== "extra-damage" || typeof modifier.formula !== "string" || modifier.formula.trim() === "")
+      continue;
     damage.push(`${modifier.formula.trim()}${modifier.damageType ? ` ${String(modifier.damageType).trim()}` : ""}`);
   }
 
@@ -1072,7 +1670,10 @@ export function riderSummary(value: Draft): string {
   const modifiers = Array.isArray(value.modifiers) ? value.modifiers.length : 0;
   const actions = Array.isArray(value.actions) ? value.actions.length : 0;
   const effects = Array.isArray(value.effects) ? value.effects.length : 0;
-  const grants = value.grants && typeof value.grants === "object" ? Object.values(value.grants as object).filter((entry) => Array.isArray(entry) && entry.length > 0).length : 0;
+  const grants =
+    value.grants && typeof value.grants === "object"
+      ? Object.values(value.grants as object).filter((entry) => Array.isArray(entry) && entry.length > 0).length
+      : 0;
   if (modifiers) parts.push(`${modifiers} ${modifiers === 1 ? "modifier" : "modifiers"}`);
   if (grants) parts.push(`${grants} ${grants === 1 ? "grant" : "grants"}`);
   if (actions) parts.push(`${actions} ${actions === 1 ? "action" : "actions"}`);

@@ -10,4 +10,6 @@
 }
 
 /* A textarea, nested fieldset or row editor takes the whole row. */
-.nh-fieldgrid-wide { grid-column: 1 / -1; }
+.nh-fieldgrid-wide {
+  grid-column: 1 / -1;
+}

@@ -8,7 +8,15 @@ export type NoticeMessage = { tone: NoticeTone; text: string } | null;
 export function Notice({ notice }: { notice: NoticeMessage }) {
   if (!notice) return null;
   const isError = notice.tone === "error";
-  return <p className={`notice notice-${notice.tone}`} role={isError ? "alert" : "status"} aria-live={isError ? "assertive" : "polite"}>{notice.text}</p>;
+  return (
+    <p
+      className={`notice notice-${notice.tone}`}
+      role={isError ? "alert" : "status"}
+      aria-live={isError ? "assertive" : "polite"}
+    >
+      {notice.text}
+    </p>
+  );
 }
 
 /**
@@ -17,7 +25,14 @@ export function Notice({ notice }: { notice: NoticeMessage }) {
  * A caller that offers this owes the GM a way to turn the warning back on.
  */
 export type ConfirmSuppress = { label: string; onChange: (suppressed: boolean) => void };
-type ConfirmOptions = { title: string; body: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; suppress?: ConfirmSuppress };
+type ConfirmOptions = {
+  title: string;
+  body: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  suppress?: ConfirmSuppress;
+};
 type ConfirmRequest = ConfirmOptions & { resolve: (confirmed: boolean) => void };
 
 /**
@@ -28,7 +43,14 @@ export function useConfirm() {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   // Reset per request: a stale `true` from a previous dialog would suppress a warning the GM never saw.
   const [suppressed, setSuppressed] = useState(false);
-  const confirm = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => { setSuppressed(false); setRequest({ ...options, resolve }); }), []);
+  const confirm = useCallback(
+    (options: ConfirmOptions) =>
+      new Promise<boolean>((resolve) => {
+        setSuppressed(false);
+        setRequest({ ...options, resolve });
+      }),
+    []
+  );
   const settle = (confirmed: boolean) => {
     if (confirmed && request?.suppress) request.suppress.onChange(suppressed);
     request?.resolve(confirmed);
@@ -41,10 +63,18 @@ export function useConfirm() {
       size="sm"
       title={request?.title}
       ariaLabel={request?.title ?? "Confirm"}
-      footer={request && <>
-        <Button variant="secondary" onClick={() => settle(false)}>{request.cancelLabel ?? "Cancel"}</Button>
-        <Button variant={request.danger ? "destructive" : "primary"} autoFocus onClick={() => settle(true)}>{request.confirmLabel ?? "Confirm"}</Button>
-      </>}
+      footer={
+        request && (
+          <>
+            <Button variant="secondary" onClick={() => settle(false)}>
+              {request.cancelLabel ?? "Cancel"}
+            </Button>
+            <Button variant={request.danger ? "destructive" : "primary"} autoFocus onClick={() => settle(true)}>
+              {request.confirmLabel ?? "Confirm"}
+            </Button>
+          </>
+        )
+      }
     >
       {request && <p>{request.body}</p>}
       {/* `Switch` carries its own 44px tap floor; there is no styled checkbox primitive. The label says
@@ -59,7 +89,14 @@ export function useConfirm() {
   return { confirm, dialog };
 }
 
-type PromptOptions = { title: string; body?: string; defaultValue?: string; placeholder?: string; confirmLabel?: string; cancelLabel?: string };
+type PromptOptions = {
+  title: string;
+  body?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
 type PromptRequest = PromptOptions & { resolve: (value: string | null) => void };
 
 /**
@@ -77,8 +114,14 @@ export function usePrompt() {
       }),
     []
   );
-  const settle = (result: string | null) => { request?.resolve(result); setRequest(null); };
-  const submit = () => { const trimmed = value.trim(); settle(trimmed ? trimmed : null); };
+  const settle = (result: string | null) => {
+    request?.resolve(result);
+    setRequest(null);
+  };
+  const submit = () => {
+    const trimmed = value.trim();
+    settle(trimmed ? trimmed : null);
+  };
   const dialog = (
     <Modal
       open={!!request}
@@ -86,21 +129,36 @@ export function usePrompt() {
       size="sm"
       title={request?.title}
       ariaLabel={request?.title ?? "Enter a value"}
-      footer={request && <>
-        <Button variant="secondary" onClick={() => settle(null)}>{request.cancelLabel ?? "Cancel"}</Button>
-        <Button variant="primary" onClick={submit}>{request.confirmLabel ?? "OK"}</Button>
-      </>}
+      footer={
+        request && (
+          <>
+            <Button variant="secondary" onClick={() => settle(null)}>
+              {request.cancelLabel ?? "Cancel"}
+            </Button>
+            <Button variant="primary" onClick={submit}>
+              {request.confirmLabel ?? "OK"}
+            </Button>
+          </>
+        )
+      }
     >
-      {request && <>
-        {request.body && <p>{request.body}</p>}
-        <Input
-          autoFocus
-          value={value}
-          placeholder={request.placeholder}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submit(); } }}
-        />
-      </>}
+      {request && (
+        <>
+          {request.body && <p>{request.body}</p>}
+          <Input
+            autoFocus
+            value={value}
+            placeholder={request.placeholder}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submit();
+              }
+            }}
+          />
+        </>
+      )}
     </Modal>
   );
   return { prompt, dialog };

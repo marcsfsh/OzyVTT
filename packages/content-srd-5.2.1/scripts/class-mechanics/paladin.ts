@@ -9,13 +9,18 @@ export const paladin: ClassMechanicsModule = {
      */
     "fighting-style": {
       choice: {
-        kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats",
-        options: [{
-          id: "blessed-warrior",
-          name: "Blessed Warrior",
-          description: "You learn two Cleric cantrips of your choice. Charisma is your spellcasting ability for them. Whenever you gain a Paladin level, you can replace one of these cantrips with another Cleric cantrip.",
-          choice: { kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 }
-        }]
+        kind: "fighting-style",
+        choose: 1,
+        fromCatalog: "fighting-style-feats",
+        options: [
+          {
+            id: "blessed-warrior",
+            name: "Blessed Warrior",
+            description:
+              "You learn two Cleric cantrips of your choice. Charisma is your spellcasting ability for them. Whenever you gain a Paladin level, you can replace one of these cantrips with another Cleric cantrip.",
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 }
+          }
+        ]
       }
     },
 
@@ -33,13 +38,16 @@ export const paladin: ClassMechanicsModule = {
     "channel-divinity": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
       tags: ["channel-divinity"],
-      actions: [{
-        id: "divine-sense",
-        name: "Channel Divinity: Divine Sense",
-        activation: "bonus-action",
-        description: "You open your awareness to detect Celestials, Fiends, and Undead. For the next 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types within 60 feet of yourself, and you know its creature type. Within the same radius, you also detect any place or object that has been consecrated or desecrated, as with the Hallow spell.",
-        damage: []
-      }]
+      actions: [
+        {
+          id: "divine-sense",
+          name: "Channel Divinity: Divine Sense",
+          activation: "bonus-action",
+          description:
+            "You open your awareness to detect Celestials, Fiends, and Undead. For the next 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types within 60 feet of yourself, and you know its creature type. Within the same radius, you also detect any place or object that has been consecrated or desecrated, as with the Hallow spell.",
+          damage: []
+        }
+      ]
     },
 
     // Applies only to actions the feature declares; a Paladin's swings come from inventory, so this
@@ -59,14 +67,17 @@ export const paladin: ClassMechanicsModule = {
      */
     "abjure-foes": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
-      actions: [{
-        id: "abjure-foes",
-        name: "Channel Divinity: Abjure Foes",
-        activation: "action",
-        description: "As a Magic action, you expend one use of this class's Channel Divinity and target a number of creatures equal to your Charisma modifier (minimum of one) that you can see within 60 feet. Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened this way, a target can do only one of the following on its turns: move, take an action, or take a Bonus Action.",
-        damage: [],
-        save: { ability: "wis", dc: "spellcasting" }
-      }]
+      actions: [
+        {
+          id: "abjure-foes",
+          name: "Channel Divinity: Abjure Foes",
+          activation: "action",
+          description:
+            "As a Magic action, you expend one use of this class's Channel Divinity and target a number of creatures equal to your Charisma modifier (minimum of one) that you can see within 60 feet. Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened this way, a target can do only one of the following on its turns: move, take an action, or take a Bonus Action.",
+          damage: [],
+          save: { ability: "wis", dc: "spellcasting" }
+        }
+      ]
     },
 
     // The Paladin is always inside their own aura; immunity for allies is not expressible.
@@ -75,10 +86,14 @@ export const paladin: ClassMechanicsModule = {
     },
 
     "radiant-strikes": {
-      modifiers: [{
-        type: "extra-damage", formula: "1d8", damageType: "radiant",
-        when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee", "unarmed"] }]
-      }]
+      modifiers: [
+        {
+          type: "extra-damage",
+          formula: "1d8",
+          damageType: "radiant",
+          when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee", "unarmed"] }]
+        }
+      ]
     },
 
     "epic-boon": {
@@ -104,14 +119,21 @@ export const paladin: ClassMechanicsModule = {
       // A subclass spender of the class's Channel Divinity pool. The Charisma-modifier attack bonus is
       // not expressible (`attack-bonus` is a flat integer).
       "sacred-weapon": {
-        uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
-        actions: [{
-          id: "sacred-weapon",
-          name: "Channel Divinity: Sacred Weapon",
-          activation: "other",
-          description: "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
-          damage: []
-        }]
+        uses: {
+          scaling: { type: "class-resource", id: "channel-divinity" },
+          per: "long-rest",
+          pool: "channel-divinity"
+        },
+        actions: [
+          {
+            id: "sacred-weapon",
+            name: "Channel Divinity: Sacred Weapon",
+            activation: "other",
+            description:
+              "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
+            damage: []
+          }
+        ]
       },
 
       // Same reading as Aura of Courage.
@@ -123,13 +145,16 @@ export const paladin: ClassMechanicsModule = {
       // and the sunlight stay prose.
       "holy-nimbus": {
         uses: { limit: 1, per: "long-rest" },
-        actions: [{
-          id: "holy-nimbus",
-          name: "Holy Nimbus",
-          activation: "bonus-action",
-          description: "You imbue your Aura of Protection with holy power for 10 minutes or until you end it (no action required). You have Advantage on saving throws forced by Fiends and Undead; an enemy that starts its turn in the aura takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus; and the aura is filled with Bright Light that is sunlight. You can restore your use of this feature by expending a level 5 spell slot.",
-          damage: []
-        }]
+        actions: [
+          {
+            id: "holy-nimbus",
+            name: "Holy Nimbus",
+            activation: "bonus-action",
+            description:
+              "You imbue your Aura of Protection with holy power for 10 minutes or until you end it (no action required). You have Advantage on saving throws forced by Fiends and Undead; an enemy that starts its turn in the aura takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus; and the aura is filled with Bright Light that is sunlight. You can restore your use of this feature by expending a level 5 spell slot.",
+            damage: []
+          }
+        ]
       }
     }
   },

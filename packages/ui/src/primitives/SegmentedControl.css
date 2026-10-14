@@ -14,8 +14,15 @@
   border: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  --chamfer: .42rem;
-  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --chamfer: 0.42rem;
+  --chamfer-cut: polygon(
+    0 var(--chamfer),
+    var(--chamfer) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    0 100%
+  );
 }
 .nh-segmented::before {
   content: "";
@@ -47,32 +54,42 @@
   cursor: pointer;
   /* The cue at this control's scale; the root token's inset would paint through the first letter. Keep the 1:2
      w:h ratio. Wider than the button's because this mark is a persistent state. */
-  --cue-w: .4rem;
-  --cue-h: .8rem;
-  --cue-inset: .3rem;
+  --cue-w: 0.4rem;
+  --cue-h: 0.8rem;
+  --cue-inset: 0.3rem;
 }
 .nh-segmented--sm .nh-segmented-option {
   min-height: 1.85rem;
   padding: var(--space-1) var(--space-2) var(--space-1) calc(var(--space-2) + var(--cue-w) + var(--space-1));
-  --cue-w: .34rem;
-  --cue-h: .68rem;
-  --cue-inset: .26rem;
+  --cue-w: 0.34rem;
+  --cue-h: 0.68rem;
+  --cue-inset: 0.26rem;
 }
 /* Label and icon state their own ink: the client's `button span { color: var(--text-dim); margin-top }` would
    otherwise beat the inherited pressed colour (leaving unreadable text on the fill) and push the label down. */
-.nh-segmented-label, .nh-segmented-icon { color: inherit; margin: 0; font: inherit; }
+.nh-segmented-label,
+.nh-segmented-icon {
+  color: inherit;
+  margin: 0;
+  font: inherit;
+}
 /* `:active` says what `:hover` says. */
-.nh-segmented-option:hover, .nh-segmented-option:active { color: var(--text); }
+.nh-segmented-option:hover,
+.nh-segmented-option:active {
+  color: var(--text);
+}
 /* Pressed = the per-theme fill plus the leading tick, no glow (a filter shouldn't outshine the answer it
    filters). The tick is a background because `::after` is the `.tap-target` extension; it sits inside the
    left padding, so pressing can't reflow the row. */
 .nh-segmented-option[aria-pressed="true"] {
   background-color: var(--state-on, var(--magenta));
   color: var(--state-on-ink);
-  background-image:
-    var(--cue-mark);
+  background-image: var(--cue-mark);
   background-repeat: no-repeat;
   background-size: var(--cue-w) var(--cue-h);
   background-position: var(--cue-inset) center;
 }
-.nh-segmented-icon { font-size: 1em; line-height: 1; }
+.nh-segmented-icon {
+  font-size: 1em;
+  line-height: 1;
+}

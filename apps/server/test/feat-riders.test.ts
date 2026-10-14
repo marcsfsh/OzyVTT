@@ -61,23 +61,45 @@ const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
 
 // Harness: a real ContentLibrary with one GM-authored homebrew feat (and optionally one item).
 
-type Homebrew = Readonly<{ modifiers?: readonly unknown[]; actions?: readonly unknown[]; effects?: readonly unknown[]; grantsItem?: boolean }>;
+type Homebrew = Readonly<{
+  modifiers?: readonly unknown[];
+  actions?: readonly unknown[];
+  effects?: readonly unknown[];
+  grantsItem?: boolean;
+}>;
 
 function libraryWith(brew: Homebrew): ContentLibrary {
   const feat = FeatReferenceSchema.parse({
-    id: "hb-warcaller", name: "Warcaller", source: "homebrew", category: "origin",
+    id: "hb-warcaller",
+    name: "Warcaller",
+    source: "homebrew",
+    category: "origin",
     summary: "A homebrew origin feat.",
     feature: {
-      id: "hb-warcaller", name: "Warcaller", description: "A homebrew origin feat.",
-      modifiers: brew.modifiers ?? [], actions: brew.actions ?? [], effects: brew.effects ?? []
+      id: "hb-warcaller",
+      name: "Warcaller",
+      description: "A homebrew origin feat.",
+      modifiers: brew.modifiers ?? [],
+      actions: brew.actions ?? [],
+      effects: brew.effects ?? []
     }
   });
   const equipment = brew.grantsItem
-    ? [EquipmentReferenceSchema.parse({
-        id: "hb-war-horn", name: "War Horn", source: "homebrew", category: "wondrous", costGp: 0,
-        weightLb: 0, description: null, slot: "neck", isMagic: true, cursed: false,
-        grantsFeatIds: ["hb-warcaller"]
-      })]
+    ? [
+        EquipmentReferenceSchema.parse({
+          id: "hb-war-horn",
+          name: "War Horn",
+          source: "homebrew",
+          category: "wondrous",
+          costGp: 0,
+          weightLb: 0,
+          description: null,
+          slot: "neck",
+          isMagic: true,
+          cursed: false,
+          grantsFeatIds: ["hb-warcaller"]
+        })
+      ]
     : [];
   const source: HomebrewContentSource = {
     revision: 1,
@@ -91,10 +113,18 @@ function libraryWith(brew: Homebrew): ContentLibrary {
 // the shipped `defense` feat, whose `armor-class` rider is baked, so every build doubles as a
 // double-counting check.
 const heroInput = (): CharacterCreateRequestInput => ({
-  name: "Borin", speciesId: "human", backgroundId: "soldier", classId: "fighter", level: 5,
-  subclassId: "champion", abilityMethod: "standard-array",
+  name: "Borin",
+  speciesId: "human",
+  backgroundId: "soldier",
+  classId: "fighter",
+  level: 5,
+  subclassId: "champion",
+  abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -132,36 +162,70 @@ function build(brew: Homebrew = {}): Built {
   const catalog = equipmentCatalogOf(view);
   const state = GameStateSchema.parse({
     schemaVersion: 1,
-    actors: [{ id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: 12 }]
+    actors: [
+      {
+        id: IDS.foe,
+        name: "Foe",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        armorClass: 12
+      }
+    ]
   }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
   return { definition, catalog, state, hero: state.actors.find((actor) => actor.id === IDS.hero)! };
 }
 
 function fight(built: Built, first: string = IDS.hero): Built {
-  startEncounter(built.state, { mapAssetId: IDS.map, entries: [{ actorId: first, score: 20 }, { actorId: first === IDS.hero ? IDS.foe : IDS.hero, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    built.state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: first, score: 20 },
+        { actorId: first === IDS.hero ? IDS.foe : IDS.hero, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return built;
 }
 
 function deps(built: Built, faces: number[]): ResolveDependencies {
   let index = 0;
   return {
-    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
     newRollId: () => `40000000-0000-4000-8000-0000000000${String(index++).padStart(2, "0")}`,
-    gmSessionId: IDS.gmSession, now: () => "2026-07-28T00:00:00.000Z",
-    definition: built.definition, catalog: built.catalog
+    gmSessionId: IDS.gmSession,
+    now: () => "2026-07-28T00:00:00.000Z",
+    definition: built.definition,
+    catalog: built.catalog
   };
 }
 
-const actionOf = (built: Built, id: string) => effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id)!;
-const featCarrier = (built: Built) => deriveEquipment(built.hero, built.definition, built.catalog).carriers.find((carrier) => carrier.label === "Warcaller");
+const actionOf = (built: Built, id: string) =>
+  effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id)!;
+const featCarrier = (built: Built) =>
+  deriveEquipment(built.hero, built.definition, built.catalog).carriers.find(
+    (carrier) => carrier.label === "Warcaller"
+  );
 
 describe("a feat the builder put on the sheet is a rider carrier", () => {
   it("resolves the taken feat's riders through the catalog with NO sourceItemId", () => {
     const built = build({ modifiers: [{ type: "attack-bonus", amount: 2 }] });
     // The builder recorded it: a builder-taken feat, not a hand-written definition.
-    expect(built.definition.character?.feats.map((feat) => feat.id).sort())
-      .toEqual(["ability-score-improvement", "defense", "hb-warcaller", "savage-attacker"]);
+    expect(built.definition.character?.feats.map((feat) => feat.id).sort()).toEqual([
+      "ability-score-improvement",
+      "defense",
+      "hb-warcaller",
+      "savage-attacker"
+    ]);
 
     const carrier = featCarrier(built)!;
     expect(carrier).toBeDefined();
@@ -174,7 +238,10 @@ describe("a feat the builder put on the sheet is a rider carrier", () => {
   it("reaches all FOURTEEN roll-time variants, and NONE of the seven the builder already baked", () => {
     for (const modifier of ROLL_TIME_RIDERS) {
       const carrier = featCarrier(build({ modifiers: [modifier] }));
-      expect(carrier?.modifiers.map((entry) => entry.type), `${modifier.type} must reach the collector`).toEqual([modifier.type]);
+      expect(
+        carrier?.modifiers.map((entry) => entry.type),
+        `${modifier.type} must reach the collector`
+      ).toEqual([modifier.type]);
     }
     for (const modifier of BUILD_TIME_RIDERS) {
       const carrier = featCarrier(build({ modifiers: [modifier] }));
@@ -198,7 +265,12 @@ describe("a feat's attack-bonus reaches the rolled to-hit", () => {
     expect(action.attack!.bonus).toBe(9);
 
     // The roll, not just the number: d20 = 10 -> 19 total against AC 12.
-    const resolution = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" }, deps(built, [10, 4, 6]));
+    const resolution = resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" },
+      deps(built, [10, 4, 6])
+    );
     expect(resolution.attack).toMatchObject({ total: 19, naturalRoll: 10, targetAc: 12, outcome: "hit" });
   });
 
@@ -221,9 +293,17 @@ describe("a feat's save-bonus reaches the saving throw", () => {
     const bare = build();
     expect(saveRiderBonus(deriveEquipment(bare.hero, bare.definition, bare.catalog), "wis")).toBe(0);
 
-    const narrowed = build({ modifiers: [{ type: "save-bonus", amount: 2, when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] }] });
+    const narrowed = build({
+      modifiers: [
+        {
+          type: "save-bonus",
+          amount: 2,
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+        }
+      ]
+    });
     const narrowedDerivation = deriveEquipment(narrowed.hero, narrowed.definition, narrowed.catalog);
-    expect(narrowedDerivation.saveBonus).toBe(0);          // a gated rider is not in the standing pass
+    expect(narrowedDerivation.saveBonus).toBe(0); // a gated rider is not in the standing pass
     expect(saveRiderBonus(narrowedDerivation, "dex")).toBe(2);
     expect(saveRiderBonus(narrowedDerivation, "wis")).toBe(0); // `ability-is` really narrows it
   });
@@ -231,9 +311,12 @@ describe("a feat's save-bonus reaches the saving throw", () => {
 
 describe("a feat's spell-save-dc raises the DC the target is held to", () => {
   const WAR_CRY = {
-    id: "war-cry", name: "War Cry", activation: "action",
+    id: "war-cry",
+    name: "War Cry",
+    activation: "action",
     description: "Wisdom Saving Throw: DC 13. Failure: 2d6 Thunder damage.",
-    save: { ability: "wis", dc: 13 }, damage: [{ formula: "2d6", type: "thunder" }]
+    save: { ability: "wis", dc: 13 },
+    damage: [{ formula: "2d6", type: "thunder" }]
   };
 
   it("folds into the action's DC and into the pending save the foe must beat", () => {
@@ -244,7 +327,12 @@ describe("a feat's spell-save-dc raises the DC the target is held to", () => {
     const action = actionOf(built, "war-cry");
     expect(action.save!.dc).toBe(15);
 
-    const resolution = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000010" }, deps(built, [3, 4]));
+    const resolution = resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000010" },
+      deps(built, [3, 4])
+    );
     expect(resolution.save!.dc).toBe(15);
     expect(built.state.combat.pendingSaves[0].dc).toBe(15); // the DC actually enforced, not just shown
   });
@@ -260,7 +348,12 @@ describe("a feat's resource-bonus raises a pool the engine actually spends from"
 
     built.hero.actionUses = { "second-wind": 3 };
     const action = actionOf(built, "second-wind");
-    resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" }, deps(built, []));
+    resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" },
+      deps(built, [])
+    );
     expect(built.hero.actionUses["second-wind"]).toBe(4);
   });
 
@@ -272,7 +365,9 @@ describe("a feat's resource-bonus raises a pool the engine actually spends from"
 
 describe("a feat's moment-gated roll-mode fires only at its moment", () => {
   const RECKLESS = {
-    type: "roll-mode", roll: "attack", mode: "advantage",
+    type: "roll-mode",
+    roll: "attack",
+    mode: "advantage",
     when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["melee"] }]
   };
 
@@ -283,28 +378,53 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
     expect(featCarrier(built)!.modifiers).toHaveLength(1);
     // ...but the standing collection does not. Narrowed to the feat under test because the Champion's
     // Improved Critical and Remarkable Athlete are genuinely standing subclass riders.
-    expect(collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter((rider) => rider.label === "Warcaller")).toEqual([]);
+    expect(
+      collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter(
+        (rider) => rider.label === "Warcaller"
+      )
+    ).toEqual([]);
   });
 
   it("grants advantage on a MELEE attack and leaves a ranged one a single die", () => {
     const melee = fight(build({ modifiers: [RECKLESS] }));
     const sword = actionOf(melee, "item-greatsword");
     // Two d20s (advantage keeps 18), then the 2d6 greatsword damage.
-    const swung = resolveDefinitionAction(melee.state, sword, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" }, deps(melee, [4, 18, 3, 5]));
+    const swung = resolveDefinitionAction(
+      melee.state,
+      sword,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" },
+      deps(melee, [4, 18, 3, 5])
+    );
     expect(swung.rollMode).toMatchObject({ mode: "advantage", advantage: ["Warcaller"] });
     expect(swung.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
 
     const ranged = fight(build({ modifiers: [RECKLESS] }));
     const bow = actionOf(ranged, "item-shortbow");
-    const shot = resolveDefinitionAction(ranged.state, bow, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" }, deps(ranged, [4, 3]));
+    const shot = resolveDefinitionAction(
+      ranged.state,
+      bow,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" },
+      deps(ranged, [4, 3])
+    );
     expect(shot.rollMode).toBeUndefined();
     expect(shot.attack!.naturalRoll).toBe(4); // one die: `attack-kind-is` filtered
   });
 
   it("routes a save roll-mode to saves only, and to the named ability only", () => {
-    const built = build({ modifiers: [{ type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["con"] }] }] });
+    const built = build({
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "save",
+          mode: "advantage",
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["con"] }]
+        }
+      ]
+    });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
-    expect(saveRollSources(built.hero, "con", derivation).advantage).toEqual([{ source: "item:Warcaller", label: "Warcaller" }]);
+    expect(saveRollSources(built.hero, "con", derivation).advantage).toEqual([
+      { source: "item:Warcaller", label: "Warcaller" }
+    ]);
     expect(saveRollSources(built.hero, "int", derivation).advantage).toEqual([]);
   });
 
@@ -317,7 +437,13 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
     expect(criticalThreshold(derivation, built.hero, sword)).toBe(18);
 
     const bare = build();
-    expect(criticalThreshold(deriveEquipment(bare.hero, bare.definition, bare.catalog), bare.hero, actionOf(bare, "item-greatsword"))).toBe(19);
+    expect(
+      criticalThreshold(
+        deriveEquipment(bare.hero, bare.definition, bare.catalog),
+        bare.hero,
+        actionOf(bare, "item-greatsword")
+      )
+    ).toBe(19);
   });
 });
 
@@ -343,23 +469,29 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     // baked families or this number drifts.
     const built = build();
     expect(built.definition.character?.feats.map((feat) => feat.id)).toContain("defense");
-    expect(built.definition.armorClass).toBe(17);   // chain mail 16 + Defense 1
-    expect(built.hero.armorClass).toBe(17);         // and the live actor agrees
+    expect(built.definition.armorClass).toBe(17); // chain mail 16 + Defense 1
+    expect(built.hero.armorClass).toBe(17); // and the live actor agrees
     expect(deriveEquipment(built.hero, built.definition, built.catalog).armorClass).toBe(0);
   });
 
   it("bakes a homebrew feat's speed / initiative / AC exactly once", () => {
-    const built = build({ modifiers: [{ type: "speed", amount: 10 }, { type: "initiative", amount: 2 }, { type: "armor-class", amount: 1 }] });
+    const built = build({
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "initiative", amount: 2 },
+        { type: "armor-class", amount: 1 }
+      ]
+    });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(derivation.speed).toBe(0);
     expect(derivation.initiative).toBe(0);
     expect(derivation.armorClass).toBe(0);
 
-    expect(built.definition.speedFeet).toBe(40);                 // 30 + 10, once
+    expect(built.definition.speedFeet).toBe(40); // 30 + 10, once
     expect(built.hero.speedFeet).toBe(40);
-    expect(built.definition.initiativeBonus).toBe(3);            // Dex +1, rider +2, once
+    expect(built.definition.initiativeBonus).toBe(3); // Dex +1, rider +2, once
     expect(built.hero.initiative).toBe(3);
-    expect(built.definition.armorClass).toBe(18);                // chain mail 16 + Defense 1 + rider 1
+    expect(built.definition.armorClass).toBe(18); // chain mail 16 + Defense 1 + rider 1
     expect(built.hero.armorClass).toBe(18);
   });
 
@@ -368,29 +500,50 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
   // activation and is summed by `effectiveSpeedFeet` on every read, so the feet come back when the
   // effect ends. Asserted through the movement refusal a player reads.
   it("a feat's EFFECT carrying a runtime `speed` modifier reaches the movement refusal (U18)", () => {
-    const built = fight(build({
-      effects: [{ name: "Striding", tags: ["striding"], duration: { type: "encounter" }, modifiers: [{ type: "speed", amount: 10 }] }]
-    }));
+    const built = fight(
+      build({
+        effects: [
+          {
+            name: "Striding",
+            tags: ["striding"],
+            duration: { type: "encounter" },
+            modifiers: [{ type: "speed", amount: 10 }]
+          }
+        ]
+      })
+    );
     const feet = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(b.x - a.x, b.y - a.y);
-    const moveTo = (x: number) => applyMovementRules(built.state, {
-      actorId: IDS.hero, from: { x: 0, y: 0 }, to: { x, y: 0 }, distance: feet, override: null,
-      resolveDefinition: () => built.definition, catalog: built.catalog,
-      newPromptId: () => "70000000-0000-4000-8000-000000000001", now: () => 0,
-      commandId: "50000000-0000-4000-8000-000000000030"
-    });
+    const moveTo = (x: number) =>
+      applyMovementRules(built.state, {
+        actorId: IDS.hero,
+        from: { x: 0, y: 0 },
+        to: { x, y: 0 },
+        distance: feet,
+        override: null,
+        resolveDefinition: () => built.definition,
+        catalog: built.catalog,
+        newPromptId: () => "70000000-0000-4000-8000-000000000001",
+        now: () => 0,
+        commandId: "50000000-0000-4000-8000-000000000030"
+      });
 
-    expect(built.hero.speedFeet).toBe(30);                       // the sheet's own number, untouched
+    expect(built.hero.speedFeet).toBe(30); // the sheet's own number, untouched
     expect(() => moveTo(35)).toThrow("Borin has 30 ft of movement left (this move needs 35 ft).");
 
     // The builder mints an activation for a feature with an effect and no action, and that action's
     // `grants` is the authored effect.
     const action = actionOf(built, "hb-warcaller");
     expect(action.grants?.modifiers).toEqual([{ type: "speed", amount: 10 }]);
-    resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000031" }, deps(built, []));
+    resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000031" },
+      deps(built, [])
+    );
 
-    expect(built.hero.speedFeet).toBe(30);                       // still the sheet's own number
+    expect(built.hero.speedFeet).toBe(30); // still the sheet's own number
     expect(() => moveTo(45)).toThrow("Borin has 40 ft of movement left (this move needs 45 ft).");
-    expect(moveTo(35).warning).toBeNull();                       // the move the effect made possible
+    expect(moveTo(35).warning).toBeNull(); // the move the effect made possible
   });
 
   it("does not grant an item-granted feat the character ALREADY took", () => {
@@ -398,14 +551,17 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     // the item would double every rider.
     const built = build({ modifiers: [{ type: "attack-bonus", amount: 2 }], grantsItem: true });
     setInventoryItem(
-      built.state, IDS.hero,
+      built.state,
+      IDS.hero,
       InventoryItemSchema.parse({ id: "hb-war-horn", name: "War Horn", equipped: true, category: "wondrous" }),
       (definitionId) => built.state.definitions.find((entry) => entry.id === definitionId)?.definition,
       { catalog: built.catalog, role: "gm" }
     );
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(derivation.featIds).toEqual([]); // already held, so the item grants nothing
-    expect(derivation.carriers.filter((carrier) => carrier.modifiers.some((modifier) => modifier.type === "attack-bonus"))).toHaveLength(1);
+    expect(
+      derivation.carriers.filter((carrier) => carrier.modifiers.some((modifier) => modifier.type === "attack-bonus"))
+    ).toHaveLength(1);
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(9); // +2 once, not +4
   });
 });
@@ -418,6 +574,9 @@ describe("the feat carriers fail open", () => {
     const forgetful = equipmentCatalogOf(new ContentLibrary().forAudience("gm"));
     const derivation = deriveEquipment(built.hero, built.definition, forgetful);
     expect(derivation.carriers.some((carrier) => carrier.label === "Warcaller")).toBe(false);
-    expect(effectiveActions(built.definition, built.hero, forgetful).find((entry) => entry.id === "item-greatsword")!.attack!.bonus).toBe(7);
+    expect(
+      effectiveActions(built.definition, built.hero, forgetful).find((entry) => entry.id === "item-greatsword")!.attack!
+        .bonus
+    ).toBe(7);
   });
 });

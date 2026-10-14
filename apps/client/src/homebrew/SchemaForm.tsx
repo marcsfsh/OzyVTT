@@ -46,12 +46,22 @@ export function SchemaForm({ schema, draft, onDraft, ctx, custom, disabled }: Sc
         .filter((section) => !section.visibleWhen || section.visibleWhen(draft))
         .map((section) =>
           section.advanced ? (
-            <details key={section.id} className="hb-section hb-section--advanced" id={sectionDomId(schema.type, section.id)}>
+            <details
+              key={section.id}
+              className="hb-section hb-section--advanced"
+              id={sectionDomId(schema.type, section.id)}
+            >
               <summary className="hb-section-summary">{section.title}</summary>
               {body(section)}
             </details>
           ) : (
-            <section key={section.id} className="hb-section" id={sectionDomId(schema.type, section.id)} tabIndex={-1} aria-labelledby={`${sectionDomId(schema.type, section.id)}-title`}>
+            <section
+              key={section.id}
+              className="hb-section"
+              id={sectionDomId(schema.type, section.id)}
+              tabIndex={-1}
+              aria-labelledby={`${sectionDomId(schema.type, section.id)}-title`}
+            >
               <h3 className="hb-section-title" id={`${sectionDomId(schema.type, section.id)}-title`}>
                 {section.title}
               </h3>

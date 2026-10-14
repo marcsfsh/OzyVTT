@@ -2,14 +2,35 @@ import { randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import {
-  API_VERSION, HOMEBREW_PATHS, HomebrewContentTypeSchema, HomebrewContentStateSchema,
-  type ApiErrorCode, type HomebrewContentType, type HomebrewValidationIssue, type HomebrewValidity
+  API_VERSION,
+  HOMEBREW_PATHS,
+  HomebrewContentTypeSchema,
+  HomebrewContentStateSchema,
+  type ApiErrorCode,
+  type HomebrewContentType,
+  type HomebrewValidationIssue,
+  type HomebrewValidity
 } from "@vtt/api-contract";
 import {
-  HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, copyName, overwriteRefusal, recordName,
-  type HomebrewBody, type HomebrewRecordRow, type HomebrewRevalidator, type HomebrewStore, type HomebrewSummaryRow
+  HomebrewNotFoundError,
+  HomebrewRevisionConflictError,
+  HomebrewStateError,
+  copyName,
+  overwriteRefusal,
+  recordName,
+  type HomebrewBody,
+  type HomebrewRecordRow,
+  type HomebrewRevalidator,
+  type HomebrewStore,
+  type HomebrewSummaryRow
 } from "./homebrew-store.js";
-import { isMintedHomebrewId, mintHomebrewId, slugify, HOMEBREW_ID_MAX_LENGTH, HOMEBREW_ID_PREFIX } from "./homebrew-ids.js";
+import {
+  isMintedHomebrewId,
+  mintHomebrewId,
+  slugify,
+  HOMEBREW_ID_MAX_LENGTH,
+  HOMEBREW_ID_PREFIX
+} from "./homebrew-ids.js";
 import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.js";
 
 /**
@@ -19,23 +40,31 @@ import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.
 
 const RecordBodySchema = z.record(z.string(), z.unknown());
 const CreateSchema = z.object({ record: RecordBodySchema }).strict();
-const UpdateSchema = z.object({ record: RecordBodySchema, expectedRev: z.number().int().nonnegative().optional() }).strict();
+const UpdateSchema = z
+  .object({ record: RecordBodySchema, expectedRev: z.number().int().nonnegative().optional() })
+  .strict();
 const DuplicateSchema = z.object({ name: z.string().min(1).max(120).optional() }).strict();
 const StateChangeSchema = z.object({ expectedRev: z.number().int().nonnegative().optional() }).strict();
-const VisibilitySchema = z.object({ visibleToPlayers: z.boolean(), expectedRev: z.number().int().nonnegative().optional() }).strict();
-const PackSchema = z.object({
-  schemaId: z.literal("vtt.homebrew-pack"),
-  schemaVersion: z.literal(1),
-  name: z.string().min(1).max(120),
-  attribution: z.string().max(400).nullable(),
-  exportedAt: z.string().datetime({ offset: true }),
-  records: z.array(RecordBodySchema)
-}).strict();
-const PackImportSchema = z.object({
-  pack: PackSchema,
-  onIdCollision: z.enum(["remint", "overwrite"]).default("remint"),
-  dryRun: z.boolean().default(false)
-}).strict();
+const VisibilitySchema = z
+  .object({ visibleToPlayers: z.boolean(), expectedRev: z.number().int().nonnegative().optional() })
+  .strict();
+const PackSchema = z
+  .object({
+    schemaId: z.literal("vtt.homebrew-pack"),
+    schemaVersion: z.literal(1),
+    name: z.string().min(1).max(120),
+    attribution: z.string().max(400).nullable(),
+    exportedAt: z.string().datetime({ offset: true }),
+    records: z.array(RecordBodySchema)
+  })
+  .strict();
+const PackImportSchema = z
+  .object({
+    pack: PackSchema,
+    onIdCollision: z.enum(["remint", "overwrite"]).default("remint"),
+    dryRun: z.boolean().default(false)
+  })
+  .strict();
 
 /** Query booleans arrive as strings; accept the two spellings a browser or curl actually sends. */
 const QueryBoolean = z.enum(["true", "false", "1", "0"]).transform((value) => value === "true" || value === "1");
@@ -64,7 +93,10 @@ export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody) 
 const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [] });
 
 /** Reference scan over GameState (`homebrew-usages.ts`). */
-export type HomebrewUsageLookup = (type: HomebrewContentType, id: string) => readonly { actorId: string; actorName: string; kind: string; detail: string | null }[];
+export type HomebrewUsageLookup = (
+  type: HomebrewContentType,
+  id: string
+) => readonly { actorId: string; actorName: string; kind: string; detail: string | null }[];
 const NO_USAGES: HomebrewUsageLookup = () => [];
 
 /** The merged GM catalog behind `/duplicate`: the record an id names, deep-copied, or undefined. */
@@ -125,12 +157,21 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   function envelope(response: Response, status: number, data: unknown) {
     return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
   }
-  function failure(response: Response, status: number, code: ApiErrorCode, message: string, details?: Record<string, unknown>, currentRevision?: number) {
+  function failure(
+    response: Response,
+    status: number,
+    code: ApiErrorCode,
+    message: string,
+    details?: Record<string, unknown>,
+    currentRevision?: number
+  ) {
     return response.status(status).json({
       ok: false,
       apiVersion: API_VERSION,
       error: {
-        code, message, requestId: response.locals.requestId ?? randomUUID(),
+        code,
+        message,
+        requestId: response.locals.requestId ?? randomUUID(),
         ...(details ? { details } : {}),
         ...(currentRevision !== undefined ? { currentRevision } : {})
       }
@@ -139,14 +180,24 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   /** Zod issues become the same `{ path, message }` tuples publish validation emits, so failures look alike. */
   function malformed(response: Response, error: unknown) {
     if (error instanceof z.ZodError) {
-      const issues: HomebrewValidationIssue[] = error.issues.map((issue) => ({ path: [...issue.path] as (string | number)[], message: issue.message, recordId: null }));
+      const issues: HomebrewValidationIssue[] = error.issues.map((issue) => ({
+        path: [...issue.path] as (string | number)[],
+        message: issue.message,
+        recordId: null
+      }));
       return failure(response, 400, "validation_failed", issues[0]?.message ?? "The request is malformed.", { issues });
     }
-    return failure(response, 400, "validation_failed", error instanceof Error ? error.message : "The request is malformed.");
+    return failure(
+      response,
+      400,
+      "validation_failed",
+      error instanceof Error ? error.message : "The request is malformed."
+    );
   }
   /** One mapping for every store failure, so REST semantics stay uniform across all 13 operations. */
   function storeError(response: Response, error: unknown) {
-    if (error instanceof HomebrewRevisionConflictError) return failure(response, 409, "conflict", error.message, undefined, error.currentRev);
+    if (error instanceof HomebrewRevisionConflictError)
+      return failure(response, 409, "conflict", error.message, undefined, error.currentRev);
     if (error instanceof HomebrewNotFoundError) return failure(response, 404, "not_found", error.message);
     if (error instanceof HomebrewStateError) return failure(response, 409, "conflict", error.message);
     return malformed(response, error);
@@ -162,14 +213,27 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   /** `type` lives on the row, not the body, but is put back here so pack records are self-describing. */
   const documentOf = (row: HomebrewRecordRow) => ({
-    id: row.id, type: row.type, state: row.state, visibleToPlayers: row.visibleToPlayers,
-    deletedAt: row.deletedAt, rev: row.rev, createdAt: row.createdAt, updatedAt: row.updatedAt,
+    id: row.id,
+    type: row.type,
+    state: row.state,
+    visibleToPlayers: row.visibleToPlayers,
+    deletedAt: row.deletedAt,
+    rev: row.rev,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
     validity: validate(row.type, row.body),
     record: { ...row.body, type: row.type }
   });
   const summaryOf = (row: HomebrewSummaryRow, record: HomebrewRecordRow | undefined) => ({
-    id: row.id, type: row.type, name: row.name, source: "homebrew" as const, state: row.state,
-    visibleToPlayers: row.visibleToPlayers, deletedAt: row.deletedAt, rev: row.rev, updatedAt: row.updatedAt,
+    id: row.id,
+    type: row.type,
+    name: row.name,
+    source: "homebrew" as const,
+    state: row.state,
+    visibleToPlayers: row.visibleToPlayers,
+    deletedAt: row.deletedAt,
+    rev: row.rev,
+    updatedAt: row.updatedAt,
     valid: record ? validate(row.type, record.body).valid : true,
     usageCount: usagesOf(row.type, row.id).length
   });
@@ -181,7 +245,8 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   /** The `type` discriminator is read off the submitted record - the same place the pack format keeps it. */
   function typeOf(record: Record<string, unknown>): HomebrewContentType {
     const parsed = HomebrewContentTypeSchema.safeParse(record.type);
-    if (!parsed.success) throw new HomebrewStateError(`"${String(record.type)}" is not one of the nine homebrew content types.`);
+    if (!parsed.success)
+      throw new HomebrewStateError(`"${String(record.type)}" is not one of the nine homebrew content types.`);
     return parsed.data;
   }
 
@@ -196,14 +261,18 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
         nextCursor: page.nextCursor,
         total: page.total
       });
-    } catch (error) { return malformed(response, error); }
+    } catch (error) {
+      return malformed(response, error);
+    }
   });
 
   router.post(route(HOMEBREW_PATHS.content), requireGm, (request, response) => {
     try {
       const { record } = CreateSchema.parse(request.body);
       return sent(response, store.create({ type: typeOf(record), body: record }), 201);
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   router.get(route(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
@@ -218,7 +287,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       const { record, expectedRev } = UpdateSchema.parse(request.body);
       const revalidate: HomebrewRevalidator = (type, body) => validate(type, body).valid;
       return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm", revalidate));
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   // Idempotent: an unknown or already-deleted id is still a 200. Soft delete keeps the row's data.
@@ -226,12 +297,21 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     const id = pathParam(request, "id");
     const deleted = store.softDelete(id);
     if (deleted) options.notifyChanged();
-    return envelope(response, 200, deleted ? { id: deleted.id, deleted: true, deletedAt: deleted.deletedAt } : { id, deleted: true, deletedAt: new Date().toISOString() });
+    return envelope(
+      response,
+      200,
+      deleted
+        ? { id: deleted.id, deleted: true, deletedAt: deleted.deletedAt }
+        : { id, deleted: true, deletedAt: new Date().toISOString() }
+    );
   });
 
   router.post(route(HOMEBREW_PATHS.contentRestore), requireGm, (request, response) => {
-    try { return sent(response, store.restore(pathParam(request, "id"))); }
-    catch (error) { return storeError(response, error); }
+    try {
+      return sent(response, store.restore(pathParam(request, "id")));
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   // Homebrew row first, else an SRD record; the reserved `hb-` prefix means they cannot collide.
@@ -249,7 +329,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       const mintedId = mintHomebrewId(source.type, copied, (candidate) => store.get(candidate) !== undefined);
       const body = rewriteForNewId(source.type, { ...source.body, name: copied }, id, mintedId);
       return sent(response, store.importRecord(mintedId, source.type, body, false, "homebrew:duplicate"), 201);
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   /** Publishing requires validity. 409, not 400: the request is fine, the stored draft is not. */
@@ -260,23 +342,32 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       const existing = store.get(id);
       if (!existing) return failure(response, 404, "not_found", "That record was not found.");
       const validity = validate(existing.type, existing.body);
-      if (!validity.valid) return failure(response, 409, "conflict", "This draft cannot be published until it is valid.", { invalid: { issues: validity.issues } });
+      if (!validity.valid)
+        return failure(response, 409, "conflict", "This draft cannot be published until it is valid.", {
+          invalid: { issues: validity.issues }
+        });
       return sent(response, store.setState(id, "published", expectedRev));
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   router.post(route(HOMEBREW_PATHS.contentUnpublish), requireGm, (request, response) => {
     try {
       const { expectedRev } = StateChangeSchema.parse(request.body ?? {});
       return sent(response, store.setState(pathParam(request, "id"), "draft", expectedRev));
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   router.post(route(HOMEBREW_PATHS.contentVisibility), requireGm, (request, response) => {
     try {
       const { visibleToPlayers, expectedRev } = VisibilitySchema.parse(request.body);
       return sent(response, store.setVisibility(pathParam(request, "id"), visibleToPlayers, expectedRev));
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   // Always `safeToDelete`: built characters are self-contained, so the count is informational.
@@ -307,12 +398,17 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       } while (cursor);
       return envelope(response, 200, {
         pack: {
-          schemaId: "vtt.homebrew-pack", schemaVersion: 1,
-          name: "Homebrew", attribution: null, exportedAt: new Date().toISOString(),
+          schemaId: "vtt.homebrew-pack",
+          schemaVersion: 1,
+          name: "Homebrew",
+          attribution: null,
+          exportedAt: new Date().toISOString(),
           records: rows.map((row) => ({ ...row.body, type: row.type }))
         }
       });
-    } catch (error) { return malformed(response, error); }
+    } catch (error) {
+      return malformed(response, error);
+    }
   });
 
   // Every record lands as an invisible draft; references to re-minted ids are not rewritten (publish catches
@@ -347,26 +443,48 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
           const refusal = overwrite && heldRow ? overwriteRefusal(heldRow) : null;
           if (refusal) throw new HomebrewStateError(refusal);
           const needsMint = originalId === "" || foreign || claimed.has(originalId) || (held && !overwrite);
-          const id = needsMint ? mintHomebrewId(type, name, (candidate) => claimed.has(candidate) || store.get(candidate) !== undefined) : originalId;
+          const id = needsMint
+            ? mintHomebrewId(type, name, (candidate) => claimed.has(candidate) || store.get(candidate) !== undefined)
+            : originalId;
           // The contract allows two reasons: outside `hb-` is the bundle's reserved namespace, inside is ours.
           if (needsMint && originalId !== "") {
-            reminted.push({ originalId: reportedId, id, reason: originalId.startsWith(HOMEBREW_ID_PREFIX) ? "homebrew-collision" : "srd-collision" });
+            reminted.push({
+              originalId: reportedId,
+              id,
+              reason: originalId.startsWith(HOMEBREW_ID_PREFIX) ? "homebrew-collision" : "srd-collision"
+            });
           }
           claimed.add(id);
           if (!dryRun) store.importRecord(id, type, record, overwrite);
           if (overwrite) overwritten.push({ id, type, name });
           imported.push({ id, type, name, originalId: originalId === "" ? id : reportedId });
         } catch (error) {
-          rejected.push({ originalId: reportedId, issues: [{ path: [], message: error instanceof Error ? error.message : "That record could not be imported.", recordId: null }] });
+          rejected.push({
+            originalId: reportedId,
+            issues: [
+              {
+                path: [],
+                message: error instanceof Error ? error.message : "That record could not be imported.",
+                recordId: null
+              }
+            ]
+          });
         }
       }
       if (!dryRun && imported.length > 0) options.notifyChanged();
       return envelope(response, 200, { imported, reminted, overwritten, rejected, dryRun });
-    } catch (error) { return storeError(response, error); }
+    } catch (error) {
+      return storeError(response, error);
+    }
   });
 
   router.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-    return failure(response, 500, "internal_error", error instanceof Error ? error.message : "The homebrew request failed.");
+    return failure(
+      response,
+      500,
+      "internal_error",
+      error instanceof Error ? error.message : "The homebrew request failed."
+    );
   });
   return router;
 }

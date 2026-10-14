@@ -40,19 +40,37 @@ function StandaloneSheet() {
         } else setStatus("denied");
       });
     }
-    return () => { socket.off("state:updated", onState); };
+    return () => {
+      socket.off("state:updated", onState);
+    };
   }, []);
 
-  if (status === "denied") return <Message>Open your character sheet from the table first, then use <strong>New tab</strong>.</Message>;
+  if (status === "denied")
+    return (
+      <Message>
+        Open your character sheet from the table first, then use <strong>New tab</strong>.
+      </Message>
+    );
   if (!actorId) return <Message>No character was specified for this tab.</Message>;
   if (!state) return <Message>Connecting to the table…</Message>;
   const actor = (state.actors as Array<GmActor | PlayerActor>).find((candidate) => candidate.id === actorId);
-  if (!actor) return <Message>That character isn’t available to you. Claim it at the table, then reopen this tab.</Message>;
+  if (!actor)
+    return <Message>That character isn’t available to you. Claim it at the table, then reopen this tab.</Message>;
   return <CharacterSheet actor={actor} role="player" state={state} standalone onClose={() => window.close()} />;
 }
 
 function Message({ children }: Readonly<{ children: ReactNode }>) {
-  return <div className="sheet-standalone-msg"><p>{children}</p></div>;
+  return (
+    <div className="sheet-standalone-msg">
+      <p>{children}</p>
+    </div>
+  );
 }
 
-createRoot(document.getElementById("sheet-root")!).render(<StrictMode><AppErrorBoundary><StandaloneSheet /></AppErrorBoundary></StrictMode>);
+createRoot(document.getElementById("sheet-root")!).render(
+  <StrictMode>
+    <AppErrorBoundary>
+      <StandaloneSheet />
+    </AppErrorBoundary>
+  </StrictMode>
+);

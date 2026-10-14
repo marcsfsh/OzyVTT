@@ -36,10 +36,18 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   // Matches the Hide check's `{dex, stealth}` narrow. Silent steps are not modeled.
   "boots-of-elvenkind": {
-    modifiers: [{
-      type: "roll-mode", roll: "check", mode: "advantage",
-      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }]
-    }]
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
+        when: [
+          { type: "on-ability-check" },
+          { type: "ability-is", abilities: ["dex"] },
+          { type: "skill-is", skills: ["stealth"] }
+        ]
+      }
+    ]
   },
 
   // `boots-of-levitation` - the Levitate cast would prompt the wearer to save against their own boots.
@@ -53,11 +61,16 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   // Charge-alone: 4 charges exact; the Fly Speed is GM-adjudicated.
   "winged-boots": {
-    actions: [{
-      id: "fly", name: "Winged Flight", activation: "action",
-      description: "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
-      uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" }
-    }]
+    actions: [
+      {
+        id: "fly",
+        name: "Winged Flight",
+        activation: "action",
+        description:
+          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
+        uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" }
+      }
+    ]
   },
 
   // ---- Hands -----------------------------------------------------------------------------------
@@ -79,10 +92,13 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   // `on-ability-check` puts it in the momentary pass; `skill-is` keeps it to Sleight of Hand.
   "gloves-of-thievery": {
-    modifiers: [{
-      type: "check-bonus", amount: 5,
-      when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["sleight-of-hand"] }]
-    }]
+    modifiers: [
+      {
+        type: "check-bonus",
+        amount: 5,
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["sleight-of-hand"] }]
+      }
+    ]
   },
 
   // ---- Head ------------------------------------------------------------------------------------
@@ -91,10 +107,13 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   // One-charge Charm Person at DC 13. Higher-level casts for extra charges are not expressible.
   "eyes-of-charming": {
-    casts: [{
-      spellId: "charm-person", saveDc: 13,
-      uses: { limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" }
-    }]
+    casts: [
+      {
+        spellId: "charm-person",
+        saveDc: 13,
+        uses: { limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" }
+      }
+    ]
   },
 
   // `eyes-of-minute-seeing` - Darkvision, and Investigation advantage limited to within one foot.
@@ -114,7 +133,11 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
   // Two pools: each spell is limited independently. Telepathy is not modeled.
   "helm-of-telepathy": {
     casts: [
-      { spellId: "detect-thoughts", saveDc: 13, uses: { limit: 1, per: "long-rest", pool: "helm-of-telepathy-detect-thoughts" } },
+      {
+        spellId: "detect-thoughts",
+        saveDc: 13,
+        uses: { limit: 1, per: "long-rest", pool: "helm-of-telepathy-detect-thoughts" }
+      },
       { spellId: "suggestion", saveDc: 13, uses: { limit: 1, per: "long-rest", pool: "helm-of-telepathy-suggestion" } }
     ]
   },
@@ -131,10 +154,13 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
   "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
 
   "medallion-of-thoughts": {
-    casts: [{
-      spellId: "detect-thoughts", saveDc: 13,
-      uses: { limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" }
-    }]
+    casts: [
+      {
+        spellId: "detect-thoughts",
+        saveDc: 13,
+        uses: { limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" }
+      }
+    ]
   },
 
   // `necklace-of-adaptation` - breathing anywhere, and Poisoned-save advantage (save source).
@@ -168,19 +194,32 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   // Requires attunement, so it applies only once attuned. Disadvantage on others' Perception against the wearer is not expressible.
   "cloak-of-elvenkind": {
-    modifiers: [{
-      type: "roll-mode", roll: "check", mode: "advantage",
-      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }]
-    }]
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
+        when: [
+          { type: "on-ability-check" },
+          { type: "ability-is", abilities: ["dex"] },
+          { type: "skill-is", skills: ["stealth"] }
+        ]
+      }
+    ]
   },
 
   // Charge-alone: 3 charges exact; the GM applies the Invisible condition.
   "cloak-of-invisibility": {
-    actions: [{
-      id: "vanish", name: "Pull Up the Hood", activation: "action",
-      description: "Expend 1 charge to give yourself the Invisible condition for 1 hour. The effect ends early if you pull the hood down (no action required) or cease wearing the cloak.",
-      uses: { limit: 3, per: "long-rest", pool: "cloak-of-invisibility-charges" }
-    }]
+    actions: [
+      {
+        id: "vanish",
+        name: "Pull Up the Hood",
+        activation: "action",
+        description:
+          "Expend 1 charge to give yourself the Invisible condition for 1 hour. The effect ends early if you pull the hood down (no action required) or cease wearing the cloak.",
+        uses: { limit: 3, per: "long-rest", pool: "cloak-of-invisibility-charges" }
+      }
+    ]
   },
 
   "cloak-of-protection": {
@@ -192,10 +231,18 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
 
   // Stealth advantage is unqualified. The Fly Speed (light-level gated) and the self-Polymorph cast are not expressible.
   "cloak-of-the-bat": {
-    modifiers: [{
-      type: "roll-mode", roll: "check", mode: "advantage",
-      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["dex"] }, { type: "skill-is", skills: ["stealth"] }]
-    }]
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
+        when: [
+          { type: "on-ability-check" },
+          { type: "ability-is", abilities: ["dex"] },
+          { type: "skill-is", skills: ["stealth"] }
+        ]
+      }
+    ]
   },
 
   // `cloak-of-the-manta-ray` - underwater breathing and Swim Speed are not modeled.
@@ -207,16 +254,21 @@ export const WORN_WONDROUS: ItemMechanicsModule = {
    * the attack disadvantage for the duration, and the stun ending with the effect (the GM clears it).
    */
   "robe-of-scintillating-colors": {
-    actions: [{
-      id: "dazzle", name: "Scintillating Colors", activation: "action",
-      description: "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
-      save: { ability: "wis", dc: 15 },
-      uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" }
-    }]
+    actions: [
+      {
+        id: "dazzle",
+        name: "Scintillating Colors",
+        activation: "action",
+        description:
+          "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
+        save: { ability: "wis", dc: 15 },
+        uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" }
+      }
+    ]
   },
 
   // The level-5 Magic Missile stars and Astral travel are not expressible.
-  "robe-of-stars": { modifiers: [{ type: "save-bonus", amount: 1 }] },
+  "robe-of-stars": { modifiers: [{ type: "save-bonus", amount: 1 }] }
 
   // `robe-of-the-archmagi` - `spell-save-dc` would raise every printed DC on the sheet; spell attack
   //     bonus has no reader; the AC 15 + Dex base replacement and spell-save advantage are not expressible.

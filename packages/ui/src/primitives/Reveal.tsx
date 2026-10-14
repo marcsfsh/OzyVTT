@@ -22,7 +22,14 @@ const HIDDEN = "Hidden from players";
  * the tooltip for pointers, and `title` for long-press on touch devices. A GM misreading this state leaks
  * secrets, so all three must stay.
  */
-export function RevealSwitch({ revealed, onChange, ariaLabel, banded = false, disabled = false, className }: Readonly<{
+export function RevealSwitch({
+  revealed,
+  onChange,
+  ariaLabel,
+  banded = false,
+  disabled = false,
+  className
+}: Readonly<{
   revealed: boolean;
   onChange: (next: boolean) => void;
   ariaLabel?: string;
@@ -76,5 +83,9 @@ export function HiddenFromPlayers() {
 /** The "this content is GM-only" pill (violet is reserved for GM-only). `floating` pins it to the
  * block's top-right corner; the block supplies the positioning context. */
 export function GmOnlyTag({ floating = false }: Readonly<{ floating?: boolean }>) {
-  return <Badge tone="violet" className={`nh-reveal-pill${floating ? " nh-reveal-pill--floating" : ""}`}>GM only</Badge>;
+  return (
+    <Badge tone="violet" className={`nh-reveal-pill${floating ? " nh-reveal-pill--floating" : ""}`}>
+      GM only
+    </Badge>
+  );
 }

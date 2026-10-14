@@ -4,8 +4,12 @@ import type { CharacterChoice } from "@vtt/schemas";
 import { ABILITIES, hitDieFaces, STANDARD_ARRAY, statPriorityFor, type Ability } from "@vtt/rules-5e";
 import type { ClassReference } from "@vtt/content-srd-5.2.1";
 import {
-  computeServerOffers, levelOfPick, withinOfferSpellWindow,
-  type CharacterCreateRequestInput, type ChoiceOffer, type ServerOfferSurvey
+  computeServerOffers,
+  levelOfPick,
+  withinOfferSpellWindow,
+  type CharacterCreateRequestInput,
+  type ChoiceOffer,
+  type ServerOfferSurvey
 } from "./character-build.js";
 import type { ContentView } from "./content-library.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -41,7 +45,9 @@ const GENERATOR_ABILITY_METHOD = "standard-array" as const;
 /** A hard stop on the fixpoint below; a level-20 Wizard settles in under 40 passes. */
 const MAX_PASSES = 400;
 
-function reject(message: string): never { throw new CommandRejectedError(message); }
+function reject(message: string): never {
+  throw new CommandRejectedError(message);
+}
 
 /** One item, uniformly. Ids are sorted first so the same seed draws the same character regardless of Set order. */
 function drawOne<T>(items: readonly T[], random: DiceRandom): T {
@@ -75,24 +81,33 @@ function standardArrayFor(classId: string, library: ContentView): Record<Ability
   const ordered = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
   const scores = {} as Record<Ability, number>;
   for (const ability of ABILITIES) scores[ability] = STANDARD_ARRAY[STANDARD_ARRAY.length - 1];
-  ordered.forEach((ability, index) => { scores[ability] = STANDARD_ARRAY[Math.min(index, STANDARD_ARRAY.length - 1)]; });
+  ordered.forEach((ability, index) => {
+    scores[ability] = STANDARD_ARRAY[Math.min(index, STANDARD_ARRAY.length - 1)];
+  });
   return scores;
 }
 
 /** The background's +2/+1, placed on the two highest-priority abilities the background may raise. */
 function backgroundAllocationFor(
-  classId: string, library: ContentView, options: { from: readonly Ability[]; spreads: ReadonlyArray<readonly number[]> } | undefined
+  classId: string,
+  library: ContentView,
+  options: { from: readonly Ability[]; spreads: ReadonlyArray<readonly number[]> } | undefined
 ): Array<{ ability: Ability; amount: number }> {
   if (!options) return [];
   const priority = statPriorityFor(classId, library.classProgressionTable());
   const ranked = [...options.from].sort((left, right) => {
-    const rank = (ability: Ability) => { const at = priority.indexOf(ability); return at === -1 ? ABILITIES.length : at; };
+    const rank = (ability: Ability) => {
+      const at = priority.indexOf(ability);
+      return at === -1 ? ABILITIES.length : at;
+    };
     return rank(left) - rank(right);
   });
   // Prefer the +2/+1 spread; a background that only prints +1/+1/+1 takes that instead.
   const twoOne = options.spreads.find((spread) => [...spread].sort((a, b) => b - a).join("/") === "2/1");
   const spread = [...(twoOne ?? options.spreads[0] ?? [])].sort((left, right) => right - left);
-  return spread.map((amount, index) => ({ ability: ranked[index], amount })).filter((entry) => entry.ability !== undefined);
+  return spread
+    .map((amount, index) => ({ ability: ranked[index], amount }))
+    .filter((entry) => entry.ability !== undefined);
 }
 
 // Answering one offer.
@@ -107,7 +122,9 @@ function rowFor(offer: ChoiceOffer, id: string, index: number, payload?: Record<
     ...(offer.classId ? { classId: offer.classId } : {}),
     kind: offer.kind,
     id,
-    ...(offer.featureId || payload ? { payload: { ...(offer.featureId ? { featureId: offer.featureId } : {}), ...payload } } : {})
+    ...(offer.featureId || payload
+      ? { payload: { ...(offer.featureId ? { featureId: offer.featureId } : {}), ...payload } }
+      : {})
   };
 }
 
@@ -134,7 +151,14 @@ function heldOfKind(survey: ServerOfferSurvey, kind: string): Set<string> {
   for (const { record } of survey.granted) {
     const grants = record.grants;
     if (!grants) continue;
-    for (const id of kind === "skill" ? grants.skills : kind === "tool" ? grants.tools : kind === "language" ? grants.languages : []) held.add(id);
+    for (const id of kind === "skill"
+      ? grants.skills
+      : kind === "tool"
+        ? grants.tools
+        : kind === "language"
+          ? grants.languages
+          : [])
+      held.add(id);
   }
   return held;
 }
@@ -163,7 +187,12 @@ function projectedScores(survey: ServerOfferSurvey, choices: readonly CharacterC
 }
 
 /** The +2 (or +1/+1) for an "asi" row, by class priority; null when nothing has headroom. */
-function asiIncreases(survey: ServerOfferSurvey, choices: readonly CharacterChoice[], classId: string, library: ContentView): Array<{ ability: Ability; amount: number }> | null {
+function asiIncreases(
+  survey: ServerOfferSurvey,
+  choices: readonly CharacterChoice[],
+  classId: string,
+  library: ContentView
+): Array<{ ability: Ability; amount: number }> | null {
   const scores = projectedScores(survey, choices);
   const priority = statPriorityFor(classId, library.classProgressionTable());
   const ranked = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
@@ -174,7 +203,13 @@ function asiIncreases(survey: ServerOfferSurvey, choices: readonly CharacterChoi
 }
 
 /** Whether a feat is legally takeable now. Held feats are never redrawn, which only narrows the draw. */
-function featIsTakeable(id: string, survey: ServerOfferSurvey, level: number, scores: Record<Ability, number>, library: ContentView): boolean {
+function featIsTakeable(
+  id: string,
+  survey: ServerOfferSurvey,
+  level: number,
+  scores: Record<Ability, number>,
+  library: ContentView
+): boolean {
   if (survey.heldFeatIds.has(id)) return false;
   const feat = library.featRecord(id);
   if (!feat) return true; // an inline option rather than a catalog feat; the offer already vouched for it
@@ -186,8 +221,12 @@ const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-
 
 /** Rows answering every outstanding pick on one offer; empty means the content can't answer it. */
 function answerOffer(
-  offer: ChoiceOffer, survey: ServerOfferSurvey, choices: readonly CharacterChoice[],
-  input: GenerateCharacterInput & { classId: string }, library: ContentView, random: DiceRandom
+  offer: ChoiceOffer,
+  survey: ServerOfferSurvey,
+  choices: readonly CharacterChoice[],
+  input: GenerateCharacterInput & { classId: string },
+  library: ContentView,
+  random: DiceRandom
 ): CharacterChoice[] {
   const outstanding = offer.capacity - offer.taken.length;
   const scores = projectedScores(survey, choices);
@@ -198,9 +237,9 @@ function answerOffer(
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
   }
 
-  const legal = sortedIds(offer.options).filter((id) =>
-    withinOfferSpellWindow(offer, id)
-    && (offer.repeatable || !offer.taken.includes(id)));
+  const legal = sortedIds(offer.options).filter(
+    (id) => withinOfferSpellWindow(offer, id) && (offer.repeatable || !offer.taken.includes(id))
+  );
 
   // Hard filters remove ids the validator would refuse; preferences only reorder legal ids, so running
   // out of preferred ids falls through instead of leaving the pick unanswerable.
@@ -213,11 +252,19 @@ function answerOffer(
     // SRD: expertise must be in skills you are proficient in; step 8 rejects otherwise.
     const proficient = proficientSkills(survey);
     const reachable = legal.filter((id) => proficient.has(id));
-    if (reachable.length > 0) { candidates = reachable; preferred = reachable; }
+    if (reachable.length > 0) {
+      candidates = reachable;
+      preferred = reachable;
+    }
   } else if (offer.kind === "ability-score") {
     const ceiling = offer.maximum ?? 20;
     preferred = legal.filter((id) => !ABILITY_IDS.has(id) || scores[id as Ability] < ceiling);
-  } else if (offer.kind === "skill" || offer.kind === "tool" || offer.kind === "language" || offer.kind === "skill-or-tool") {
+  } else if (
+    offer.kind === "skill" ||
+    offer.kind === "tool" ||
+    offer.kind === "language" ||
+    offer.kind === "skill-or-tool"
+  ) {
     // A duplicate proficiency is legal and worthless: it spends the pick and merges into one entry.
     const held = heldOfKind(survey, offer.kind === "skill-or-tool" ? "skill" : offer.kind);
     preferred = legal.filter((id) => !held.has(id));
@@ -247,36 +294,55 @@ function spellListOf(survey: ServerOfferSurvey): { options: readonly SpellOption
   if (!casting) return null;
   const slug = `${casting.spellListId ?? survey.classRecord.id}-spells`;
   let options: readonly SpellOption[];
-  try { options = resolveCatalogChoice(slug, survey.catalogs); }
-  catch (error) {
+  try {
+    options = resolveCatalogChoice(slug, survey.catalogs);
+  } catch (error) {
     if (!(error instanceof CatalogChoiceError)) throw error;
     reject(`The ${survey.classRecord.name} spell list could not be resolved: ${error.message}`);
   }
   const row = survey.levelRow;
   const slots = row.pactSlots
-    ? (row.pactSlots.slots > 0 ? [{ level: row.pactSlots.level }] : [])
+    ? row.pactSlots.slots > 0
+      ? [{ level: row.pactSlots.level }]
+      : []
     : (row.spellSlots ?? []).map((count, index) => ({ level: index + 1, count })).filter((slot) => slot.count > 0);
   return { options, maxSlotLevel: slots.reduce((highest, slot) => Math.max(highest, slot.level), 0) };
 }
 
 /** Fills the class cantrip and prepared-spell budgets to step 9's caps (printed column plus `extraPicks`). */
-function fillSpellBudgets(survey: ServerOfferSurvey, choices: readonly CharacterChoice[], random: DiceRandom): CharacterChoice[] {
+function fillSpellBudgets(
+  survey: ServerOfferSurvey,
+  choices: readonly CharacterChoice[],
+  random: DiceRandom
+): CharacterChoice[] {
   const list = spellListOf(survey);
   if (!list) return [];
   const claimed = new Set(choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id));
-  const untagged = (kind: string) => choices.filter((row) => row.kind === kind && typeof row.payload?.featureId !== "string").length;
+  const untagged = (kind: string) =>
+    choices.filter((row) => row.kind === kind && typeof row.payload?.featureId !== "string").length;
   const rows: CharacterChoice[] = [];
   const top = (kind: "cantrip" | "spell", cap: number, eligible: readonly SpellOption[]) => {
     const missing = cap - untagged(kind);
     if (missing <= 0) return;
-    for (const option of drawSome(eligible.filter((spell) => !claimed.has(spell.id)), missing, random)) {
+    for (const option of drawSome(
+      eligible.filter((spell) => !claimed.has(spell.id)),
+      missing,
+      random
+    )) {
       claimed.add(option.id);
       rows.push({ level: 1, classId: survey.classRecord.id, kind, id: option.id });
     }
   };
-  top("cantrip", survey.printedCantrips + (survey.extraPickBudgets.get("class-cantrips") ?? 0), list.options.filter((spell) => (spell.level ?? 0) === 0));
-  top("spell", survey.printedPrepared + (survey.extraPickBudgets.get("class-spells") ?? 0),
-    list.options.filter((spell) => (spell.level ?? 0) >= 1 && (spell.level ?? 0) <= list.maxSlotLevel));
+  top(
+    "cantrip",
+    survey.printedCantrips + (survey.extraPickBudgets.get("class-cantrips") ?? 0),
+    list.options.filter((spell) => (spell.level ?? 0) === 0)
+  );
+  top(
+    "spell",
+    survey.printedPrepared + (survey.extraPickBudgets.get("class-spells") ?? 0),
+    list.options.filter((spell) => (spell.level ?? 0) >= 1 && (spell.level ?? 0) <= list.maxSlotLevel)
+  );
   return rows;
 }
 
@@ -298,10 +364,15 @@ function equipmentRows(survey: ServerOfferSurvey, random: DiceRandom): Character
 
 /** A complete `character.create` request; throws an actionable `CommandRejectedError` on content gaps. */
 export function generateCharacterRequest(
-  input: GenerateCharacterInput, library: ContentView, policy: BuilderPolicy, random: DiceRandom
+  input: GenerateCharacterInput,
+  library: ContentView,
+  policy: BuilderPolicy,
+  random: DiceRandom
 ): GeneratedCharacter {
   if (!policy.allowedAbilityMethods.includes(GENERATOR_ABILITY_METHOD)) {
-    reject("The generator sets ability scores with the standard array, which this table does not allow - enable it in Settings first.");
+    reject(
+      "The generator sets ability scores with the standard array, which this table does not allow - enable it in Settings first."
+    );
   }
   const classId = input.classId ?? drawOne(sortedIds(library.classSummaries().map((entry) => entry.id)), random);
   const classRecord = library.classRecord(classId) ?? reject(`No class "${classId}" is in the content catalog.`);
@@ -312,8 +383,16 @@ export function generateCharacterRequest(
 
   let subclassId: string | undefined;
   if (input.level >= classRecord.subclassLevel) {
-    const available = sortedIds(library.subclassSummaries().filter((entry) => entry.classId === classId).map((entry) => entry.id));
-    if (available.length === 0) reject(`No ${classRecord.name} ${classRecord.subclassLabel ?? "subclass"} is in the content catalog, and a level-${input.level} ${classRecord.name} needs one.`);
+    const available = sortedIds(
+      library
+        .subclassSummaries()
+        .filter((entry) => entry.classId === classId)
+        .map((entry) => entry.id)
+    );
+    if (available.length === 0)
+      reject(
+        `No ${classRecord.name} ${classRecord.subclassLabel ?? "subclass"} is in the content catalog, and a level-${input.level} ${classRecord.name} needs one.`
+      );
     subclassId = drawOne(available, random);
   }
 
@@ -324,7 +403,10 @@ export function generateCharacterRequest(
   const identity = {
     // Drawn from the species' name bundle (the same one the wizard suggests from).
     name: input.name?.trim() || generateName(speciesId, library, random) || `${species.name} ${classRecord.name}`,
-    speciesId, backgroundId, classId, level: input.level,
+    speciesId,
+    backgroundId,
+    classId,
+    level: input.level,
     ...(subclassId ? { subclassId } : {}),
     abilityMethod: GENERATOR_ABILITY_METHOD,
     baseScores: standardArrayFor(classId, library),
@@ -339,10 +421,12 @@ export function generateCharacterRequest(
   // level, which `level-ledger.ts` matches on for level-up prefill.
   if (subclassId) {
     const offer = opening.offers.find((candidate) => candidate.kind === "subclass");
-    choices.push(offer
-      ? rowFor(offer, subclassId, 0)
-      // A class with no subclass offer still needs the row (step 4 checks it), so fall back to a plain row.
-      : { level: classRecord.subclassLevel, classId, kind: "subclass", id: subclassId });
+    choices.push(
+      offer
+        ? rowFor(offer, subclassId, 0)
+        : // A class with no subclass offer still needs the row (step 4 checks it), so fall back to a plain row.
+          { level: classRecord.subclassLevel, classId, kind: "subclass", id: subclassId }
+    );
   }
   // Size has no server offer (step 11 reads the row directly), so it is drawn here.
   if (species.sizes.length > 1) choices.push({ level: 1, kind: "size", id: drawOne([...species.sizes], random) });
@@ -352,15 +436,21 @@ export function generateCharacterRequest(
     const survey = computeServerOffers({ ...identity, choices }, library, policy);
     // Fill spell budgets first: they only grow, and `fromPicks` offers need known spells present.
     const spells = fillSpellBudgets(survey, choices, random);
-    if (spells.length > 0) { choices.push(...spells); continue; }
-    const open = survey.offers.find((offer) =>
-      offer.unresolvable === null && offer.kind !== "subclass" && offer.taken.length < offer.capacity);
+    if (spells.length > 0) {
+      choices.push(...spells);
+      continue;
+    }
+    const open = survey.offers.find(
+      (offer) => offer.unresolvable === null && offer.kind !== "subclass" && offer.taken.length < offer.capacity
+    );
     if (!open) {
       return { request: { ...identity, choices }, hitPointRolls, hitDieFaces: faces, summary: summaryOf(survey) };
     }
     const rows = answerOffer(open, survey, choices, { ...input, classId }, library, random);
     if (rows.length === 0) {
-      reject(`"${open.label}" asks for ${open.capacity} "${open.kind}" pick(s) and the generator found no legal option for it - that is a gap in the content, not in the request.`);
+      reject(
+        `"${open.label}" asks for ${open.capacity} "${open.kind}" pick(s) and the generator found no legal option for it - that is a gap in the content, not in the request.`
+      );
     }
     choices.push(...rows);
   }

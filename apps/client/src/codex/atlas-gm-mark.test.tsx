@@ -29,15 +29,39 @@ import type { CodexMap } from "./api";
 
 /** The "players can't see this map yet" mark is the `IconEyeOff` SVG (inheriting colour) named "GM only" for screen readers. */
 const MAP = (id: string, name: string, revealedToPlayers: boolean, parentMapId: string | null = null): CodexMap => ({
-  id, assetId: `a-${id}`, name, kind: "regional", parentMapId, revealedToPlayers, sortKey: 0, tags: [],
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id,
+  assetId: `a-${id}`,
+  name,
+  kind: "regional",
+  parentMapId,
+  revealedToPlayers,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
 /** Two roots (so the top-level switcher renders) and a child (so "Drill into" renders). Only the unrevealed chips carry the mark. */
 const MAPS = [MAP("m1", "Barovia", false), MAP("m2", "Faerûn", true), MAP("m3", "Castle Ravenloft", false, "m1")];
 
 const renderAtlas = () =>
-  render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
+  render(
+    <ToastProvider>
+      <AtlasView
+        gmToken="gm"
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        onActivateScene={vi.fn()}
+        mapId={null}
+        pinId={null}
+        autosave={{ enabled: true, intervalSeconds: 1 }}
+        onQuickCreate={vi.fn()}
+        onNavigate={vi.fn()}
+        onReplaceQuery={vi.fn()}
+      />
+    </ToastProvider>
+  );
 
 describe("Atlas GM-only mark — an SVG glyph, never an emoji (design-language §0)", () => {
   beforeEach(() => {

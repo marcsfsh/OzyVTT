@@ -54,18 +54,38 @@ import type { CodexCalendar, CodexPage, CodexQuest } from "./api";
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const PAGE: CodexPage = {
-  id: "p1", title: "Strahd von Zarovich", entityType: "character", fields: {}, gmFields: {},
-  folder: null, tags: [], playerBody: "", gmBody: "", revealedToPlayers: false,
-  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 3, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id: "p1",
+  title: "Strahd von Zarovich",
+  entityType: "character",
+  fields: {},
+  gmFields: {},
+  folder: null,
+  tags: [],
+  playerBody: "",
+  gmBody: "",
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 3,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 };
 
 const QUEST: CodexQuest = {
-  id: "q1", title: "The Sunless Crown", status: "active",
+  id: "q1",
+  title: "The Sunless Crown",
+  status: "active",
   playerBody: "The burgomaster wants the crown returned.",
   gmBody: "The crown is a phylactery and the burgomaster knows it.",
-  objectives: [], entityIds: [], revealedToPlayers: false, tags: [], rev: 3,
-  createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-02T00:00:00.000Z"
+  objectives: [],
+  entityIds: [],
+  revealedToPlayers: false,
+  tags: [],
+  rev: 3,
+  createdAt: "2026-07-01T00:00:00.000Z",
+  updatedAt: "2026-07-02T00:00:00.000Z"
 };
 
 /** Both options on screen under the canonical names. */
@@ -81,7 +101,11 @@ beforeEach(() => {
   listPages.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
   markersForPage.mockResolvedValue([]);
-  getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: false, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 10 } });
+  getSettings.mockResolvedValue({
+    revealWarn: true,
+    autosave: { enabled: false, intervalSeconds: 1 },
+    revisionHistory: { enabled: true, windowMinutes: 10 }
+  });
 });
 
 describe("The two-layer notes control names its layers the same way everywhere (5a.1 / 5c)", () => {
@@ -94,7 +118,9 @@ describe("The two-layer notes control names its layers the same way everywhere (
   /** All four journal kinds, switched by tapping the kind control. */
   for (const kind of ["Entry", "Deadline", "Downtime", "Milestone"] as const) {
     it(`says it the same way on a ${kind.toLowerCase()} as on every other kind`, async () => {
-      render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
+      render(
+        <JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />
+      );
       await waitFor(() => expect(chronicle).toHaveBeenCalled());
       await userEvent.setup().click(screen.getByRole("button", { name: kind }));
       await expectCanonicalPair();
@@ -105,8 +131,18 @@ describe("The two-layer notes control names its layers the same way everywhere (
 
   it("says it the same way in the quest editor", async () => {
     render(
-      <QuestsView gmToken="gm" quests={[QUEST]} pages={[]} loading={false} error={null} openQuestId="q1"
-        onOpenQuest={vi.fn()} onChanged={vi.fn()} onOpenPage={vi.fn()} autosave={{ enabled: false, intervalSeconds: 1 }} />
+      <QuestsView
+        gmToken="gm"
+        quests={[QUEST]}
+        pages={[]}
+        loading={false}
+        error={null}
+        openQuestId="q1"
+        onOpenQuest={vi.fn()}
+        onChanged={vi.fn()}
+        onOpenPage={vi.fn()}
+        autosave={{ enabled: false, intervalSeconds: 1 }}
+      />
     );
     await expectCanonicalPair();
     await userEvent.setup().click(screen.getByRole("button", { name: BODY_LAYER.gm.label }));
@@ -116,8 +152,18 @@ describe("The two-layer notes control names its layers the same way everywhere (
   it("says it the same way in the page editor", async () => {
     (goTo("/codex/pages/p1"), render)(
       <ToastProvider>
-        <PageEditor gmToken="gm" page={PAGE} pages={[]} connections={[]} autosave={{ enabled: false, intervalSeconds: 1 }}
-          onChange={vi.fn()} onDeleted={vi.fn()} onNavigate={vi.fn()} onConnectionsChanged={vi.fn()} onOpenConnection={vi.fn()} />
+        <PageEditor
+          gmToken="gm"
+          page={PAGE}
+          pages={[]}
+          connections={[]}
+          autosave={{ enabled: false, intervalSeconds: 1 }}
+          onChange={vi.fn()}
+          onDeleted={vi.fn()}
+          onNavigate={vi.fn()}
+          onConnectionsChanged={vi.fn()}
+          onOpenConnection={vi.fn()}
+        />
       </ToastProvider>
     );
     await expectCanonicalPair();
@@ -126,7 +172,11 @@ describe("The two-layer notes control names its layers the same way everywhere (
   });
 
   it("says it the same way on the notes importer, which asks the same question about a destination", async () => {
-    render(<ToastProvider><BackupView gmToken="gm" onChanged={vi.fn()} /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <BackupView gmToken="gm" onChanged={vi.fn()} />
+      </ToastProvider>
+    );
     await expectCanonicalPair();
     // GM first here (the import default); the order is this surface's choice, the words are not.
     expect(screen.getByRole("group", { name: "Which layer to import into" })).toBeInTheDocument();

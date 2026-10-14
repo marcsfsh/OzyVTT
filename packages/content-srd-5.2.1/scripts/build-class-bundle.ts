@@ -9,14 +9,23 @@
  * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { CLASS_MECHANICS, HAND_AUTHORED, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
+import {
+  CLASS_MECHANICS,
+  HAND_AUTHORED,
+  LIVE_CLASS_RESOURCES,
+  SUBCLASS_MECHANICS,
+  applyMechanics
+} from "./class-mechanics/index.js";
 import { slug, strip, tableAsText, withTables } from "./markdown.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { statPriorityFor } from "@vtt/rules-5e";
 import {
-  ClassReferenceSchema, SubclassReferenceSchema, type ClassReference, type ClassLevelRow
+  ClassReferenceSchema,
+  SubclassReferenceSchema,
+  type ClassReference,
+  type ClassLevelRow
 } from "../src/character-content.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -72,7 +81,8 @@ function featuresTable(body: string, className: string): { columns: string[]; ro
   if (!table) throw new Error(`no features table for ${className}`);
   const headRows = [...(table[1].match(/<thead>([\s\S]*?)<\/thead>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)];
   const columns: string[] = [];
-  for (const [, cell, attrs] of headRows[0]?.[1].matchAll(/<th(?:\s+colspan="(\d+)")?>([\s\S]*?)<\/th>/g) ?? []) void [cell, attrs];
+  for (const [, cell, attrs] of headRows[0]?.[1].matchAll(/<th(?:\s+colspan="(\d+)")?>([\s\S]*?)<\/th>/g) ?? [])
+    void [cell, attrs];
   for (const match of headRows[0]?.[1].matchAll(/<th([^>]*)>([\s\S]*?)<\/th>/g) ?? []) {
     const span = Number(match[1].match(/colspan="(\d+)"/)?.[1] ?? 1);
     for (let i = 0; i < span; i += 1) columns.push(strip(match[2]));
@@ -103,8 +113,13 @@ function optionSection(body: string, heading: string) {
   for (let i = 1; i < parts.length; i += 2) {
     const name = strip(parts[i]);
     const description = withTables(parts[i + 1])
-      .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
-      .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" ")
+      .replace(/[*_]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000) });
   }
   return options;
@@ -121,8 +136,13 @@ function featureProse(body: string): Map<string, string> {
   for (let i = 1; i < parts.length; i += 2) {
     const heading = strip(parts[i]);
     const text = withTables(parts[i + 1].split(/\n#{3,6} /)[0])
-      .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
-      .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" ")
+      .replace(/[*_]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!text) continue;
     const bare = heading.match(LEVEL_HEADING)?.[2];
     // First write wins: "Level 4: Ability Score Improvement" repeats at 4, 8, 12, 16 and 19.
@@ -166,9 +186,24 @@ type ClassConfig = {
 };
 
 const ALL_SKILLS = [
-  "acrobatics", "animal-handling", "arcana", "athletics", "deception", "history", "insight",
-  "intimidation", "investigation", "medicine", "nature", "perception", "performance", "persuasion",
-  "religion", "sleight-of-hand", "stealth", "survival"
+  "acrobatics",
+  "animal-handling",
+  "arcana",
+  "athletics",
+  "deception",
+  "history",
+  "insight",
+  "intimidation",
+  "investigation",
+  "medicine",
+  "nature",
+  "perception",
+  "performance",
+  "persuasion",
+  "religion",
+  "sleight-of-hand",
+  "stealth",
+  "survival"
 ];
 
 // `repeatable`: an ASI may be taken at several levels, and the server rejects a repeated option id
@@ -183,39 +218,48 @@ const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromC
 const BLURBS: Record<string, { summary: string; description: string }> = {
   barbarian: {
     summary: "A primal fighter who turns rage into overwhelming physical force.",
-    description: "Barbarians fight in a fury they can enter at will, shrugging off punishment that would drop anyone else. Rage powers their damage and their resilience, and the pool of rages is the resource the class is built around."
+    description:
+      "Barbarians fight in a fury they can enter at will, shrugging off punishment that would drop anyone else. Rage powers their damage and their resilience, and the pool of rages is the resource the class is built around."
   },
   bard: {
     summary: "A performer whose magic works through music, words and sheer presence.",
-    description: "Bards are full casters who support the party as much as they threaten enemies. Bardic Inspiration hands out a die that other characters spend, and expertise makes the Bard the party's most reliable skill user."
+    description:
+      "Bards are full casters who support the party as much as they threaten enemies. Bardic Inspiration hands out a die that other characters spend, and expertise makes the Bard the party's most reliable skill user."
   },
   druid: {
     summary: "A full caster drawing on the natural world, able to take animal form.",
-    description: "Druids cast from the nature list and can spend Wild Shape to become a beast. The class trades some direct damage for versatility, control, and the ability to change what it is on the battlefield."
+    description:
+      "Druids cast from the nature list and can spend Wild Shape to become a beast. The class trades some direct damage for versatility, control, and the ability to change what it is on the battlefield."
   },
   monk: {
     summary: "An unarmoured martial artist spending focus on fast, precise strikes.",
-    description: "Monks fight without armour, using a martial-arts die that grows with level and Focus Points that buy extra attacks and mobility. Speed and action economy are the class's real weapons."
+    description:
+      "Monks fight without armour, using a martial-arts die that grows with level and Focus Points that buy extra attacks and mobility. Speed and action economy are the class's real weapons."
   },
   paladin: {
     summary: "An oath-bound warrior blending heavy-armour combat with divine magic.",
-    description: "Paladins are half casters who fight on the front line. Channel Divinity and spell slots spent on smites give the class burst damage on top of the durability of full plate and a shield."
+    description:
+      "Paladins are half casters who fight on the front line. Channel Divinity and spell slots spent on smites give the class burst damage on top of the durability of full plate and a shield."
   },
   ranger: {
     summary: "A half-caster tracker at home on the borders of the wild.",
-    description: "Rangers combine martial skill with a small nature spell list and strong exploration tools. Expertise and a wide skill list make the class as useful between fights as in them."
+    description:
+      "Rangers combine martial skill with a small nature spell list and strong exploration tools. Expertise and a wide skill list make the class as useful between fights as in them."
   },
   rogue: {
     summary: "A precise, stealthy opportunist who strikes where it hurts most.",
-    description: "Rogues deal their damage through Sneak Attack, which scales to 10d6, and gain more expertise than any other class. The class is built to pick its moment rather than trade blows."
+    description:
+      "Rogues deal their damage through Sneak Attack, which scales to 10d6, and gain more expertise than any other class. The class is built to pick its moment rather than trade blows."
   },
   sorcerer: {
     summary: "A caster whose magic is innate, reshaped on the fly through Metamagic.",
-    description: "Sorcerers know fewer spells than a Wizard but bend the ones they have. Sorcery Points buy Metamagic - twinning, quickening, or subtly casting a spell - which is what the class spends its resources on."
+    description:
+      "Sorcerers know fewer spells than a Wizard but bend the ones they have. Sorcery Points buy Metamagic - twinning, quickening, or subtly casting a spell - which is what the class spends its resources on."
   },
   warlock: {
     summary: "A caster powered by a pact, with few slots that always cast at full strength.",
-    description: "Warlocks use Pact Magic: a small number of slots, all at the highest level available, refreshed on a short rest. Eldritch Invocations are the class's real customisation, reshaping what it can do at will."
+    description:
+      "Warlocks use Pact Magic: a small number of slots, all at the highest level available, refreshed on a short rest. Eldritch Invocations are the class's real customisation, reshaping what it can do at will."
   }
 };
 
@@ -235,7 +279,14 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   bard: {
     subclassLevel: 3,
-    spellcasting: { ability: "cha", prepares: "prepared", ritual: true, focus: "arcane-focus", multiclassProgression: "full", spellListId: "bard" },
+    spellcasting: {
+      ability: "cha",
+      prepares: "prepared",
+      ritual: true,
+      focus: "arcane-focus",
+      multiclassProgression: "full",
+      spellListId: "bard"
+    },
     columns: {
       "Bardic Die": { id: "bardic-inspiration", name: "Bardic Die", dice: true, display: true },
       Cantrips: "cantrips",
@@ -250,7 +301,14 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   druid: {
     subclassLevel: 3,
-    spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: "druidic-focus", multiclassProgression: "full", spellListId: "druid" },
+    spellcasting: {
+      ability: "wis",
+      prepares: "prepared",
+      ritual: true,
+      focus: "druidic-focus",
+      multiclassProgression: "full",
+      spellListId: "druid"
+    },
     columns: {
       "Wild Shape": { id: "wild-shape", name: "Wild Shape", display: true },
       Cantrips: "cantrips",
@@ -275,7 +333,14 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   paladin: {
     subclassLevel: 3,
-    spellcasting: { ability: "cha", prepares: "prepared", ritual: false, focus: "holy-symbol", multiclassProgression: "half", spellListId: "paladin" },
+    spellcasting: {
+      ability: "cha",
+      prepares: "prepared",
+      ritual: false,
+      focus: "holy-symbol",
+      multiclassProgression: "half",
+      spellListId: "paladin"
+    },
     columns: {
       "Channel Divinity": { id: "channel-divinity", name: "Channel Divinity", display: true },
       "Prepared Spells": "prepared"
@@ -290,7 +355,14 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   ranger: {
     subclassLevel: 3,
-    spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: "druidic-focus", multiclassProgression: "half", spellListId: "ranger" },
+    spellcasting: {
+      ability: "wis",
+      prepares: "prepared",
+      ritual: true,
+      focus: "druidic-focus",
+      multiclassProgression: "half",
+      spellListId: "ranger"
+    },
     columns: {
       "Favored Enemy": { id: "favored-enemy", name: "Favored Enemy", display: true },
       "Prepared Spells": "prepared"
@@ -315,7 +387,14 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   sorcerer: {
     subclassLevel: 3,
-    spellcasting: { ability: "cha", prepares: "prepared", ritual: false, focus: "arcane-focus", multiclassProgression: "full", spellListId: "sorcerer" },
+    spellcasting: {
+      ability: "cha",
+      prepares: "prepared",
+      ritual: false,
+      focus: "arcane-focus",
+      multiclassProgression: "full",
+      spellListId: "sorcerer"
+    },
     columns: {
       "Sorcery Points": { id: "sorcery-points", name: "Sorcery Points", display: true },
       Cantrips: "cantrips",
@@ -329,7 +408,14 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   warlock: {
     subclassLevel: 3,
-    spellcasting: { ability: "cha", prepares: "prepared", ritual: true, focus: "arcane-focus", multiclassProgression: "pact", spellListId: "warlock" },
+    spellcasting: {
+      ability: "cha",
+      prepares: "prepared",
+      ritual: true,
+      focus: "arcane-focus",
+      multiclassProgression: "pact",
+      spellListId: "warlock"
+    },
     columns: {
       "Eldritch Invocations": { id: "eldritch-invocations", name: "Eldritch Invocations", display: true },
       Cantrips: "cantrips",
@@ -348,8 +434,12 @@ const CONFIG: Record<string, ClassConfig> = {
 // ---- Trait interpretation -----------------------------------------------------------------------
 
 const ABILITY: Record<string, string> = {
-  Strength: "str", Dexterity: "dex", Constitution: "con",
-  Intelligence: "int", Wisdom: "wis", Charisma: "cha"
+  Strength: "str",
+  Dexterity: "dex",
+  Constitution: "con",
+  Intelligence: "int",
+  Wisdom: "wis",
+  Charisma: "cha"
 };
 const abilitiesIn = (text: string) =>
   [...text.matchAll(/Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma/g)].map((m) => ABILITY[m[0]]);
@@ -388,7 +478,10 @@ function skillsOf(text: string): { choose: number; from: string[] } {
   const choose = Number(text.match(/Choose (?:any )?(\d+)/i)?.[1] ?? 2);
   if (/choose any/i.test(text)) return { choose, from: [...ALL_SKILLS] };
   const list = text.replace(/^Choose\s+\d+\s*:?/i, "");
-  const from = list.split(/,| or /i).map((part) => slug(part)).filter((id) => ALL_SKILLS.includes(id));
+  const from = list
+    .split(/,| or /i)
+    .map((part) => slug(part))
+    .filter((id) => ALL_SKILLS.includes(id));
   return { choose, from };
 }
 
@@ -433,7 +526,12 @@ function catalogIndex(): CatalogIndex {
  * -> two StartingEquipmentOptions with resolved catalog ids.
  */
 function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unresolved: string[]) {
-  const options: { id: string; label: string; items: { id: string; name: string; quantity: number }[]; goldPieces: number }[] = [];
+  const options: {
+    id: string;
+    label: string;
+    items: { id: string; name: string; quantity: number }[];
+    goldPieces: number;
+  }[] = [];
   const parts = [...text.matchAll(/\(([A-C])\)\s*([^;]+?)(?=;\s*or\s*\(|;\s*\(|$)/g)];
   for (const [, letter, chunk] of parts) {
     const label = chunk.replace(/^\s*|\s*$/g, "").replace(/\.$/, "");
@@ -447,7 +545,7 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
       const name = piece.replace(/^\d+\s+/, "").trim();
       const key = slug(name);
       const id = ITEM_ALIASES[key] ?? (catalog.has(key) ? (catalog.get(key) as string) : null);
-      const resolved = id && catalog.has(id) ? id : (catalog.has(key) ? key : null);
+      const resolved = id && catalog.has(id) ? id : catalog.has(key) ? key : null;
       if (!resolved) {
         if (ITEM_POINTERS.some((pattern) => pattern.test(name))) continue;
         unresolved.push(`${classId}: "${name}" (${key})`);
@@ -489,13 +587,21 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
     let pact: { level: number; slots: number } | null = null;
     columns.forEach((column, index) => {
       const cell = cells[index] ?? "";
-      if (column === "Level") { row.level = intOf(cell); return; }
-      if (column === "Proficiency Bonus") { row.proficiencyBonus = intOf(cell); return; }
+      if (column === "Level") {
+        row.level = intOf(cell);
+        return;
+      }
+      if (column === "Proficiency Bonus") {
+        row.proficiencyBonus = intOf(cell);
+        return;
+      }
       // Read positionally below, because every printed class table puts it at index 2.
       if (column === "Class Features") return;
       if (/^[1-9]$/.test(column)) {
-        if (!blank(cell)) { slots[Number(column) - 1] = intOf(cell) ?? 0; sawSlot = true; }
-        else sawSlot = sawSlot || false;
+        if (!blank(cell)) {
+          slots[Number(column) - 1] = intOf(cell) ?? 0;
+          sawSlot = true;
+        } else sawSlot = sawSlot || false;
         return;
       }
       const spec = config.columns[column];
@@ -505,20 +611,40 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       }
       if (spec === "features") return;
       if (blank(cell)) return;
-      if (spec === "cantrips") { row.cantripsKnown = intOf(cell) ?? 0; return; }
-      if (spec === "prepared") { row.preparedCount = intOf(cell) ?? 0; return; }
-      if (spec === "pact-slots") { pact = { ...(pact ?? { level: 1, slots: 0 }), slots: intOf(cell) ?? 0 }; return; }
-      if (spec === "pact-level") { pact = { ...(pact ?? { level: 1, slots: 0 }), level: intOf(cell) ?? 1 }; return; }
+      if (spec === "cantrips") {
+        row.cantripsKnown = intOf(cell) ?? 0;
+        return;
+      }
+      if (spec === "prepared") {
+        row.preparedCount = intOf(cell) ?? 0;
+        return;
+      }
+      if (spec === "pact-slots") {
+        pact = { ...(pact ?? { level: 1, slots: 0 }), slots: intOf(cell) ?? 0 };
+        return;
+      }
+      if (spec === "pact-level") {
+        pact = { ...(pact ?? { level: 1, slots: 0 }), level: intOf(cell) ?? 1 };
+        return;
+      }
       const amount = spec.dice ? strip(cell).toLowerCase().replace(/^d/, "1d") : intOf(cell);
       if (amount === null || amount === "") return;
       // `display: true` is cleared for columns the overlay wires to a real pool (`LIVE_CLASS_RESOURCES`).
       const live = (LIVE_CLASS_RESOURCES[entryId] ?? []).includes(spec.id);
-      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount, ...(spec.display && !live ? { display: true } : {}) });
+      (row.classResources as unknown[]).push({
+        id: spec.id,
+        name: spec.name,
+        amount,
+        ...(spec.display && !live ? { display: true } : {})
+      });
     });
     // The features column is always index 2. Em-dash cells slug to "" and are dropped. "Subclass
     // feature" is dropped too: it is a reminder row with no prose, and the real feature lives on the
     // subclass record.
-    const named = strip(cells[2] ?? "").split(",").map((part) => part.trim()).filter(Boolean);
+    const named = strip(cells[2] ?? "")
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
     row.features = named.map((label) => slug(label)).filter((id) => id && id !== "subclass-feature");
     for (const id of row.features as string[]) featureIds.set(id, (featureIds.get(id) ?? row.level) as number);
     if (sawSlot && slots.some((count) => count > 0)) row.spellSlots = slots;
@@ -548,10 +674,11 @@ for (const [id, entry] of parsed) {
   const equipment = equipmentOf(traits["Starting Equipment"] ?? "", id, catalog, unresolvedItems);
 
   const features = [...featureIds].map(([featureId, level]) => {
-    const description = entry.prose.get(featureId)
-      ?? entry.prose.get(featureId.replace(new RegExp(`^${id}-`), ""))
-      ?? proseByPrefix(entry.prose, featureId)
-      ?? `See the ${entry.name} class description in SRD 5.2.1.`;
+    const description =
+      entry.prose.get(featureId) ??
+      entry.prose.get(featureId.replace(new RegExp(`^${id}-`), "")) ??
+      proseByPrefix(entry.prose, featureId) ??
+      `See the ${entry.name} class description in SRD 5.2.1.`;
     const configured = config.choices?.[featureId];
     const choice = configured?.optionsFrom
       ? (() => {
@@ -562,7 +689,10 @@ for (const [id, entry] of parsed) {
       : configured;
     return {
       id: featureId,
-      name: featureId.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
+      name: featureId
+        .split("-")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" "),
       level,
       description: description.slice(0, 4000),
       ...(choice ? { choice } : {})
@@ -583,7 +713,7 @@ for (const [id, entry] of parsed) {
     skillChoices: skills,
     armorProficiencies: armorOf(traits["Armor Training"] ?? ""),
     weaponProficiencies: weaponsOf(traits["Weapon Proficiencies"] ?? ""),
-    toolProficiencies: /choose/i.test(toolText) ? [] : (toolText ? [slug(toolText)] : []),
+    toolProficiencies: /choose/i.test(toolText) ? [] : toolText ? [slug(toolText)] : [],
     startingEquipment: equipment,
     multiclassPrerequisites: {
       mode: anyOf ? "any" : "all",
@@ -603,7 +733,9 @@ for (const [id, entry] of parsed) {
   ClassReferenceSchema.parse(record);
   built.push(record);
   const overlaid = Object.keys(CLASS_MECHANICS[id] ?? {}).length;
-  report.push(`${entry.name}: ${table.length} rows, ${features.length} features, ${equipment.length} equipment options${overlaid ? `, ${overlaid} with mechanics` : ""}`);
+  report.push(
+    `${entry.name}: ${table.length} rows, ${features.length} features, ${equipment.length} equipment options${overlaid ? `, ${overlaid} with mechanics` : ""}`
+  );
 }
 
 console.log(report.join("\n"));
@@ -639,17 +771,33 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
   const title = strip(heading[1]).split(": ")[1];
   const tail = entry.body.split(heading[0])[1].split(/^### /m)[0];
   const parts = tail.split(/^#### (.+)$/m);
-  const intro = parts[0].split("\n").map((line) => line.trim()).filter(Boolean)
-    .filter((line) => !line.startsWith("_")).join(" ").replace(/[*_]/g, "").trim();
+  const intro = parts[0]
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !line.startsWith("_"))
+    .join(" ")
+    .replace(/[*_]/g, "")
+    .trim();
   const features: ParsedSubclass["features"] = [];
   for (let i = 1; i < parts.length; i += 2) {
     const match = strip(parts[i]).match(LEVEL_HEADING);
     if (!match) continue;
     const description = withTables(parts[i + 1])
-      .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
-      .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" ")
+      .replace(/[*_]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!description) continue;
-    features.push({ id: slug(match[2]), name: strip(match[2]), level: Number(match[1]), description: description.slice(0, 4000) });
+    features.push({
+      id: slug(match[2]),
+      name: strip(match[2]),
+      level: Number(match[1]),
+      description: description.slice(0, 4000)
+    });
   }
   return { title, intro, features };
 }
@@ -659,7 +807,10 @@ for (const [id, entry] of parsed) {
   const { title, intro, features } = parseSubclass(entry);
   const subclassId = slug(title);
   const record = {
-    id: subclassId, name: title, source: "srd", classId: id,
+    id: subclassId,
+    name: title,
+    source: "srd",
+    classId: id,
     subclassLevel: CONFIG[id].subclassLevel,
     summary: intro.split(". ")[0].slice(0, 200) || `${title}, the SRD 5.2.1 ${entry.name} subclass.`,
     description: intro.slice(0, 4000) || `${title}.`,
@@ -674,16 +825,21 @@ for (const [id, entry] of parsed) {
   if (overlaid) console.log(`${title}: ${features.length} features, ${overlaid} with mechanics`);
 }
 
-
 // ---- Cross-check: the hand-authored three, re-parsed from this source ---------------------------
 
 // Only the hand-authored records are carried over: the script writes over its own input and must be idempotent.
-const existingClasses = (JSON.parse(readFileSync(join(bundles, "classes.v1.json"), "utf8")) as ClassReference[])
-  .filter((record) => HAND_AUTHORED.has(record.id));
+const existingClasses = (JSON.parse(readFileSync(join(bundles, "classes.v1.json"), "utf8")) as ClassReference[]).filter(
+  (record) => HAND_AUTHORED.has(record.id)
+);
 // Read before the write below, and typed for the feature comparison.
-const existingSubclassRecords = (JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as {
-  id: string; name: string; classId: string; features: { id: string; level?: number }[];
-}[]).filter((record) => HAND_AUTHORED.has(record.classId));
+const existingSubclassRecords = (
+  JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as {
+    id: string;
+    name: string;
+    classId: string;
+    features: { id: string; level?: number }[];
+  }[]
+).filter((record) => HAND_AUTHORED.has(record.classId));
 
 /**
  * The overlay also applies to the hand-authored classes. Their records are read from and written
@@ -710,7 +866,10 @@ if (overlayMisses.length) {
 const disagreements: string[] = [];
 for (const record of existingClasses) {
   const entry = parsed.get(record.id);
-  if (!entry) { disagreements.push(`${record.id}: not present in the source at all`); continue; }
+  if (!entry) {
+    disagreements.push(`${record.id}: not present in the source at all`);
+    continue;
+  }
   const traits = entry.traits;
   const die = (traits["Hit Point Die"] ?? "").match(/[Dd](\d+)/)?.[0].toLowerCase();
   if (die !== record.hitDie) disagreements.push(`${record.id}.hitDie: source ${die} vs bundle ${record.hitDie}`);
@@ -721,20 +880,30 @@ for (const record of existingClasses) {
     }
   }
   const skills = skillsOf(traits["Skill Proficiencies"] ?? "");
-  if (skills.choose !== record.skillChoices.choose) disagreements.push(`${record.id}.skillChoices.choose: source ${skills.choose} vs bundle ${record.skillChoices.choose}`);
+  if (skills.choose !== record.skillChoices.choose)
+    disagreements.push(
+      `${record.id}.skillChoices.choose: source ${skills.choose} vs bundle ${record.skillChoices.choose}`
+    );
   if ([...skills.from].sort().join() !== [...record.skillChoices.from].sort().join()) {
     disagreements.push(`${record.id}.skillChoices.from: source ${skills.from} vs bundle ${record.skillChoices.from}`);
   }
   const config: ClassConfig = { subclassLevel: record.subclassLevel, columns: {} };
   for (const column of entry.table.columns) {
     if (["Level", "Proficiency Bonus", "Class Features", ""].includes(column) || /^[1-9]$/.test(column)) continue;
-    config.columns[column] = column === "Cantrips" ? "cantrips" : column === "Prepared Spells" ? "prepared"
-      : { id: slug(column), name: column, dice: /die$/i.test(column) };
+    config.columns[column] =
+      column === "Cantrips"
+        ? "cantrips"
+        : column === "Prepared Spells"
+          ? "prepared"
+          : { id: slug(column), name: column, dice: /die$/i.test(column) };
   }
   const { table } = levelTable(entry, config);
   table.forEach((row, index) => {
     const mine = record.levelTable[index];
-    if (row.proficiencyBonus !== mine.proficiencyBonus) disagreements.push(`${record.id}.L${row.level}.proficiencyBonus: source ${row.proficiencyBonus} vs bundle ${mine.proficiencyBonus}`);
+    if (row.proficiencyBonus !== mine.proficiencyBonus)
+      disagreements.push(
+        `${record.id}.L${row.level}.proficiencyBonus: source ${row.proficiencyBonus} vs bundle ${mine.proficiencyBonus}`
+      );
     const a = JSON.stringify(row.spellSlots ?? null);
     const b = JSON.stringify(mine.spellSlots ?? null);
     if (a !== b) disagreements.push(`${record.id}.L${row.level}.spellSlots: source ${a} vs bundle ${b}`);
@@ -745,13 +914,21 @@ for (const record of existingClasses) {
   if (authoredSubclass) {
     const fromSource = parseSubclass(entry);
     if (slug(fromSource.title) !== authoredSubclass.id) {
-      disagreements.push(`${record.id}: source prints subclass "${fromSource.title}" vs bundle "${authoredSubclass.name}"`);
+      disagreements.push(
+        `${record.id}: source prints subclass "${fromSource.title}" vs bundle "${authoredSubclass.name}"`
+      );
     } else {
       const sourceLevels = new Map(fromSource.features.map((feature) => [feature.id, feature.level]));
       const bundleLevels = new Map(authoredSubclass.features.map((feature) => [feature.id, feature.level]));
       for (const [id, level] of sourceLevels) {
-        if (!bundleLevels.has(id)) disagreements.push(`${authoredSubclass.id}: source has "${id}" at level ${level}; the bundle does not have it at all`);
-        else if (bundleLevels.get(id) !== level) disagreements.push(`${authoredSubclass.id}.${id}: source level ${level} vs bundle level ${bundleLevels.get(id)}`);
+        if (!bundleLevels.has(id))
+          disagreements.push(
+            `${authoredSubclass.id}: source has "${id}" at level ${level}; the bundle does not have it at all`
+          );
+        else if (bundleLevels.get(id) !== level)
+          disagreements.push(
+            `${authoredSubclass.id}.${id}: source level ${level} vs bundle level ${bundleLevels.get(id)}`
+          );
       }
       for (const id of bundleLevels.keys()) {
         if (!sourceLevels.has(id) && !STAGED_FEATURES.has(id)) {
@@ -762,7 +939,9 @@ for (const record of existingClasses) {
   }
 }
 if (disagreements.length) {
-  console.error(`\nCROSS-CHECK: ${disagreements.length} disagreement(s) between the source and the hand-authored bundle:`);
+  console.error(
+    `\nCROSS-CHECK: ${disagreements.length} disagreement(s) between the source and the hand-authored bundle:`
+  );
   for (const line of disagreements) console.error(`  ${line}`);
   console.error("Resolve against the SRD text before trusting this source for new content.");
   process.exit(1);
@@ -772,10 +951,12 @@ console.log(`cross-check: ${existingClasses.length} hand-authored classes agree 
 // ---- Validate and write -------------------------------------------------------------------------
 
 const allClasses = [...existingClasses, ...built].sort((left, right) =>
-  (left as ClassReference).name.localeCompare((right as ClassReference).name));
+  (left as ClassReference).name.localeCompare((right as ClassReference).name)
+);
 const existingSubclasses = existingSubclassRecords;
 const allSubclasses = [...existingSubclasses, ...builtSubclasses].sort((left, right) =>
-  (left as { name: string }).name.localeCompare((right as { name: string }).name));
+  (left as { name: string }).name.localeCompare((right as { name: string }).name)
+);
 
 const fail = (label: string, error: z.ZodError) => {
   console.error(`\n${label} VALIDATION FAILED:`);
@@ -793,17 +974,25 @@ if (!subclassesOut.success) fail("subclasses", subclassesOut.error);
  */
 const STUB_DESCRIPTION = /^See the .* in SRD 5\.2\.1\.$/;
 const stubs = [
-  ...allClasses.flatMap((record) => (record as ClassReference).features
-    .filter((feature) => STUB_DESCRIPTION.test(feature.description))
-    .map((feature) => `${(record as ClassReference).id}.${feature.id}`)),
-  ...allSubclasses.flatMap((record) => ((record as { id: string; features: { id: string; description: string }[] }).features ?? [])
-    .filter((feature) => STUB_DESCRIPTION.test(feature.description))
-    .map((feature) => `${(record as { id: string }).id}.${feature.id}`))
+  ...allClasses.flatMap((record) =>
+    (record as ClassReference).features
+      .filter((feature) => STUB_DESCRIPTION.test(feature.description))
+      .map((feature) => `${(record as ClassReference).id}.${feature.id}`)
+  ),
+  ...allSubclasses.flatMap((record) =>
+    ((record as { id: string; features: { id: string; description: string }[] }).features ?? [])
+      .filter((feature) => STUB_DESCRIPTION.test(feature.description))
+      .map((feature) => `${(record as { id: string }).id}.${feature.id}`)
+  )
 ];
 if (stubs.length) {
-  console.error(`\n${stubs.length} emitted feature description(s) are the "See the ... in SRD 5.2.1." STUB, not real prose:`);
+  console.error(
+    `\n${stubs.length} emitted feature description(s) are the "See the ... in SRD 5.2.1." STUB, not real prose:`
+  );
   for (const line of stubs.slice(0, 40)) console.error(`  ${line}`);
-  console.error("A stub means featureProse could not key the heading. Fix the keying (see featureProse); do not lower this bar.");
+  console.error(
+    "A stub means featureProse could not key the heading. Fix the keying (see featureProse); do not lower this bar."
+  );
   process.exit(1);
 }
 

@@ -1,6 +1,12 @@
 import { useMemo, useState } from "react";
 import { Alert, Badge, Button, Combobox, GmOnlyTag, Input, Switch } from "@vtt/ui";
-import { codexApi, CONNECTION_LABEL_MAX, type CodexPageConnection, type CodexPageSummary, type PlayerCodexPageConnection } from "./api";
+import {
+  codexApi,
+  CONNECTION_LABEL_MAX,
+  type CodexPageConnection,
+  type CodexPageSummary,
+  type PlayerCodexPageConnection
+} from "./api";
 import { CodexIcon, EntityIcon } from "./icons";
 import { CONNECTION_LABEL_SUGGESTIONS } from "./entities";
 import { newId } from "../lib/ids";
@@ -15,10 +21,16 @@ import { newId } from "../lib/ids";
 type AnyConnection = CodexPageConnection | PlayerCodexPageConnection;
 
 const OTHER_KIND_ICON: Readonly<Record<AnyConnection["otherKind"], string>> = {
-  page: "scroll", session: "sessions", quest: "quest", journal: "book"
+  page: "scroll",
+  session: "sessions",
+  quest: "quest",
+  journal: "book"
 };
 const OTHER_KIND_LABEL: Readonly<Record<AnyConnection["otherKind"], string>> = {
-  page: "Page", session: "Session", quest: "Quest", journal: "Journal entry"
+  page: "Page",
+  session: "Session",
+  quest: "Quest",
+  journal: "Journal entry"
 };
 
 export type ConnectionsPanelProps = Readonly<{
@@ -48,9 +60,15 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
 
   const Wrapper = standalone ? "section" : "div";
   const options = useMemo(
-    () => (write?.pages ?? [])
-      .filter((page) => page.id !== write?.pageId)
-      .map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} />, meta: undefined })),
+    () =>
+      (write?.pages ?? [])
+        .filter((page) => page.id !== write?.pageId)
+        .map((page) => ({
+          id: page.id,
+          label: page.title,
+          icon: <EntityIcon type={page.entityType} />,
+          meta: undefined
+        })),
     [write?.pages, write?.pageId]
   );
   /** Suggestions plus labels already in use; never a closed vocabulary. */
@@ -62,7 +80,8 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
 
   const add = async () => {
     if (!write || !target || busy) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       await codexApi.addConnection(write.gmToken, write.pageId, {
         toPageId: target,
@@ -70,31 +89,53 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
         layer: gmLayer ? "gm" : "player",
         commandId: newId()
       });
-      setTarget(null); setLabel(""); setGmLayer(false); setAdding(false);
+      setTarget(null);
+      setLabel("");
+      setGmLayer(false);
+      setAdding(false);
       write.onChanged();
-    } catch (addError) { setError(addError instanceof Error ? addError.message : "Couldn't add that connection."); }
-    finally { setBusy(false); }
+    } catch (addError) {
+      setError(addError instanceof Error ? addError.message : "Couldn't add that connection.");
+    } finally {
+      setBusy(false);
+    }
   };
   const relabel = async (id: string) => {
     if (!write) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
-      await codexApi.updateConnection(write.gmToken, id, { label: editLabel.trim() ? editLabel.trim().slice(0, CONNECTION_LABEL_MAX) : null, commandId: newId() });
-      setEditing(null); write.onChanged();
-    } catch (patchError) { setError(patchError instanceof Error ? patchError.message : "Couldn't rename that connection."); }
-    finally { setBusy(false); }
+      await codexApi.updateConnection(write.gmToken, id, {
+        label: editLabel.trim() ? editLabel.trim().slice(0, CONNECTION_LABEL_MAX) : null,
+        commandId: newId()
+      });
+      setEditing(null);
+      write.onChanged();
+    } catch (patchError) {
+      setError(patchError instanceof Error ? patchError.message : "Couldn't rename that connection.");
+    } finally {
+      setBusy(false);
+    }
   };
   const remove = async (id: string) => {
     if (!write) return;
     setError(null);
-    try { await codexApi.removeConnection(write.gmToken, id); write.onChanged(); }
-    catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "Couldn't remove that connection."); }
+    try {
+      await codexApi.removeConnection(write.gmToken, id);
+      write.onChanged();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Couldn't remove that connection.");
+    }
   };
 
   return (
     /* A named region when standalone, so it is a landmark. */
     <Wrapper className="codex-connections-panel" {...(standalone ? { "aria-labelledby": "codex-connections-h" } : {})}>
-      {standalone && <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>}
+      {standalone && (
+        <h4 className="codex-backlinks-title" id="codex-connections-h">
+          Connections
+        </h4>
+      )}
       {connections.length === 0 && <p className="codex-page-timeline-empty">Nothing is connected to this page yet.</p>}
       {connections.length > 0 && (
         <ul className="codex-conn-list">
@@ -105,14 +146,22 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
             return (
               <li key={key} className="codex-conn-row">
                 <span className={`codex-conn-arrow${row.direction === "in" ? " is-in" : ""}`} aria-hidden="true" />
-                <span className="nh-sr-only">{row.direction === "out" ? "This page points to" : "Points at this page"}</span>
+                <span className="nh-sr-only">
+                  {row.direction === "out" ? "This page points to" : "Points at this page"}
+                </span>
                 <button type="button" className="codex-conn-target" onClick={() => onOpen(row.otherKind, row.otherId)}>
-                  {row.otherKind === "page" && row.otherEntityType
-                    ? <EntityIcon type={row.otherEntityType} />
-                    : <CodexIcon iconId={OTHER_KIND_ICON[row.otherKind]} className="codex-ent-icon" />}
+                  {row.otherKind === "page" && row.otherEntityType ? (
+                    <EntityIcon type={row.otherEntityType} />
+                  ) : (
+                    <CodexIcon iconId={OTHER_KIND_ICON[row.otherKind]} className="codex-ent-icon" />
+                  )}
                   <span className="codex-list-title">{row.otherTitle}</span>
                 </button>
-                {row.label && <Badge tone="info" className="codex-conn-label">{row.label}</Badge>}
+                {row.label && (
+                  <Badge tone="info" className="codex-conn-label">
+                    {row.label}
+                  </Badge>
+                )}
                 {row.otherKind !== "page" && <span className="codex-conn-kind">{OTHER_KIND_LABEL[row.otherKind]}</span>}
                 {/* Why a mention has no Label or Remove, in visible words (touch devices never show `title`). */}
                 {row.origin === "mention" && (
@@ -121,8 +170,19 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                 {isGmLayer && <GmOnlyTag />}
                 {write && declaredId && editing !== declaredId && (
                   <span className="codex-conn-actions">
-                    <Button variant="ghost" size="sm" onClick={() => { setEditing(declaredId); setEditLabel(row.label ?? ""); }}>Label</Button>
-                    <Button variant="ghost" size="sm" onClick={() => void remove(declaredId)}>Remove</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditing(declaredId);
+                        setEditLabel(row.label ?? "");
+                      }}
+                    >
+                      Label
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => void remove(declaredId)}>
+                      Remove
+                    </Button>
                   </span>
                 )}
                 {write && !declaredId && row.origin === "mention" && (
@@ -130,12 +190,27 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                 )}
                 {write && declaredId && editing === declaredId && (
                   <span className="codex-conn-actions">
-                    <Input aria-label="Connection label" value={editLabel} maxLength={CONNECTION_LABEL_MAX} autoFocus
+                    <Input
+                      aria-label="Connection label"
+                      value={editLabel}
+                      maxLength={CONNECTION_LABEL_MAX}
+                      autoFocus
                       list="codex-conn-labels"
                       onChange={(event) => setEditLabel(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void relabel(declaredId); } if (event.key === "Escape") setEditing(null); }} />
-                    <Button variant="secondary" size="sm" disabled={busy} onClick={() => void relabel(declaredId)}>Save</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void relabel(declaredId);
+                        }
+                        if (event.key === "Escape") setEditing(null);
+                      }}
+                    />
+                    <Button variant="secondary" size="sm" disabled={busy} onClick={() => void relabel(declaredId)}>
+                      Save
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
+                      Cancel
+                    </Button>
                   </span>
                 )}
               </li>
@@ -144,24 +219,57 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
         </ul>
       )}
 
-      {write && !adding && <Button variant="ghost" size="sm" className="codex-conn-add" onClick={() => setAdding(true)}>Add connection</Button>}
+      {write && !adding && (
+        <Button variant="ghost" size="sm" className="codex-conn-add" onClick={() => setAdding(true)}>
+          Add connection
+        </Button>
+      )}
       {write && adding && (
         <div className="codex-conn-form">
-          <Combobox options={options} value={target} onChange={setTarget} ariaLabel="Connect to page" placeholder="Search pages" />
-          <Input aria-label="Label (optional)" placeholder="ally of, located in" value={label} maxLength={CONNECTION_LABEL_MAX}
-            list="codex-conn-labels" onChange={(event) => setLabel(event.target.value)} />
+          <Combobox
+            options={options}
+            value={target}
+            onChange={setTarget}
+            ariaLabel="Connect to page"
+            placeholder="Search pages"
+          />
+          <Input
+            aria-label="Label (optional)"
+            placeholder="ally of, located in"
+            value={label}
+            maxLength={CONNECTION_LABEL_MAX}
+            list="codex-conn-labels"
+            onChange={(event) => setLabel(event.target.value)}
+          />
           {/* A GM-layer connection never reaches players, so it carries the violet mark. */}
           <label className="codex-conn-gmswitch">
             <Switch checked={gmLayer} onChange={setGmLayer} label="GM only" aria-label="Keep this connection GM-only" />
             <GmOnlyTag />
           </label>
           <div className="codex-conn-formactions">
-            <Button variant="secondary" size="sm" disabled={!target || busy} onClick={() => void add()}>Add</Button>
-            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setTarget(null); setLabel(""); setGmLayer(false); }}>Cancel</Button>
+            <Button variant="secondary" size="sm" disabled={!target || busy} onClick={() => void add()}>
+              Add
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setAdding(false);
+                setTarget(null);
+                setLabel("");
+                setGmLayer(false);
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </div>
       )}
-      <datalist id="codex-conn-labels">{labelSuggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist>
+      <datalist id="codex-conn-labels">
+        {labelSuggestions.map((suggestion) => (
+          <option key={suggestion} value={suggestion} />
+        ))}
+      </datalist>
       {error && <Alert tone="danger">{error}</Alert>}
     </Wrapper>
   );

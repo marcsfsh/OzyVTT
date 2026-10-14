@@ -44,8 +44,12 @@ export function Drawer({ open, onClose, title, children, side = "right", ariaLab
       onKeyDown={onKeyDown}
     >
       <header className="nh-drawer-head">
-        <h2 className="nh-drawer-title" id={titleId}>{title}</h2>
-        <button type="button" className="nh-drawer-close tap-target interactive" aria-label="Close" onClick={onClose}><IconX /></button>
+        <h2 className="nh-drawer-title" id={titleId}>
+          {title}
+        </h2>
+        <button type="button" className="nh-drawer-close tap-target interactive" aria-label="Close" onClick={onClose}>
+          <IconX />
+        </button>
       </header>
       <div className="nh-drawer-body scroll-y">{children}</div>
     </aside>

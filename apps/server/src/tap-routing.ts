@@ -18,7 +18,10 @@ export const NOT_YOUR_TURN = "economy.not-your-turn";
 
 /** Which route a tap takes, before anything is rolled. `loose` covers "no fight" and "not in the fight":
  *  a creature outside the turn order is not off-turn. */
-export function routeForTap(combat: Pick<CombatState, "active" | "turnActorId" | "initiative">, actorId: string): TapRoute {
+export function routeForTap(
+  combat: Pick<CombatState, "active" | "turnActorId" | "initiative">,
+  actorId: string
+): TapRoute {
   if (!combat.active) return "loose";
   if (!combat.initiative.some((entry) => entry.actorId === actorId)) return "loose";
   return combat.turnActorId === actorId ? "resolved" : "blocked";
@@ -27,7 +30,11 @@ export function routeForTap(combat: Pick<CombatState, "active" | "turnActorId" |
 /** Off-turn: refuse, warn or allow per the `economy` family's mode. Reactions and legendary actions are
  *  exempt (taken on others' turns by design; `evaluateActionEconomy` owns their rules). A GM Allow earlier
  *  this turn covers the family. */
-export function offTurnVerdict(state: GameState, action: Pick<ActorAction, "activation" | "legendary">, currentName: string): Readonly<{ blocked: false; warning: string | null }> {
+export function offTurnVerdict(
+  state: GameState,
+  action: Pick<ActorAction, "activation" | "legendary">,
+  currentName: string
+): Readonly<{ blocked: false; warning: string | null }> {
   if (action.activation === "reaction" || action.legendary !== undefined) return { blocked: false, warning: null };
   const mode = effectiveModeFor(state.combat, NOT_YOUR_TURN);
   if (mode === "freeform" || overrideCovers(state.combat.turn, NOT_YOUR_TURN)) return { blocked: false, warning: null };
@@ -39,15 +46,23 @@ export function offTurnVerdict(state: GameState, action: Pick<ActorAction, "acti
 /** The dice a loose tap rolls: the attack roll (honouring an explicit roll mode) and, only if asked, each
  *  damage part (opt-in so a sheet with its own damage chip can't double-roll). Never moves hit points;
  *  returns formulas for the caller to roll and attribute. */
-export function looseRollPlan(action: Pick<ActorAction, "name" | "attack" | "damage">, options: Readonly<{ includeDamage: boolean; rollMode?: "advantage" | "disadvantage" | "normal" }>): ReadonlyArray<Readonly<{ formula: string; purpose: "attack" | "damage"; label: string }>> {
+export function looseRollPlan(
+  action: Pick<ActorAction, "name" | "attack" | "damage">,
+  options: Readonly<{ includeDamage: boolean; rollMode?: "advantage" | "disadvantage" | "normal" }>
+): ReadonlyArray<Readonly<{ formula: string; purpose: "attack" | "damage"; label: string }>> {
   const plan: Array<{ formula: string; purpose: "attack" | "damage"; label: string }> = [];
   if (action.attack) {
     const die = options.rollMode === "advantage" ? "2d20kh1" : options.rollMode === "disadvantage" ? "2d20kl1" : "1d20";
     const bonus = action.attack.bonus;
-    plan.push({ formula: `${die}${bonus === 0 ? "" : bonus < 0 ? ` - ${Math.abs(bonus)}` : ` + ${bonus}`}`, purpose: "attack", label: action.name });
+    plan.push({
+      formula: `${die}${bonus === 0 ? "" : bonus < 0 ? ` - ${Math.abs(bonus)}` : ` + ${bonus}`}`,
+      purpose: "attack",
+      label: action.name
+    });
   }
   if (options.includeDamage) {
-    for (const part of action.damage) plan.push({ formula: part.formula, purpose: "damage", label: `${action.name} (${part.type})` });
+    for (const part of action.damage)
+      plan.push({ formula: part.formula, purpose: "damage", label: `${action.name} (${part.type})` });
   }
   return plan;
 }

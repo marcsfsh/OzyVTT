@@ -58,7 +58,14 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let warning: string | null = null;
   let overridden: string | null = null;
   // The movement family owns both the speed budget and the opportunity-attack prompts.
-  if (!mover || !state.combat.active || state.combat.turnActorId !== actorId || from === null || to === null || familyModeFor(state.combat, "movement") === "freeform") {
+  if (
+    !mover ||
+    !state.combat.active ||
+    state.combat.turnActorId !== actorId ||
+    from === null ||
+    to === null ||
+    familyModeFor(state.combat, "movement") === "freeform"
+  ) {
     return { warning, overridden, prompts };
   }
 
@@ -69,11 +76,13 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     const overrun = used + moved > effective + 1e-6;
     const rule = effective === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed";
     if (overrun && !input.override) {
-      const message = effective === 0
-        ? `${mover.name} can't move - its Speed is 0.`
-        : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft).`;
+      const message =
+        effective === 0
+          ? `${mover.name} can't move - its Speed is 0.`
+          : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft).`;
       // A GM Allow earlier this turn already covers the movement family.
-      if (effectiveModeFor(state.combat, rule) === "strict" && !overrideCovers(state.combat.turn, rule)) throw new RulesBlockedError(rule, message);
+      if (effectiveModeFor(state.combat, rule) === "strict" && !overrideCovers(state.combat.turn, rule))
+        throw new RulesBlockedError(rule, message);
       warning = message;
     }
     if (overrun && input.override) {
@@ -83,28 +92,68 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
   }
 
-  if (mover.visibility !== "gm-only" && mover.kind !== "npc" && !mover.effects.some((effect) => effect.tags.includes("disengaged"))) {
+  if (
+    mover.visibility !== "gm-only" &&
+    mover.kind !== "npc" &&
+    !mover.effects.some((effect) => effect.tags.includes("disengaged"))
+  ) {
     const enemyKind = mover.kind === "player-character" ? "monster" : "player-character";
     for (const entry of state.combat.initiative) {
       if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
       const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
-      if (!enemy || enemy.kind !== enemyKind || state.combat.reactionsUsed.includes(enemy.id) || isIncapacitated(enemy)) continue;
+      if (!enemy || enemy.kind !== enemyKind || state.combat.reactionsUsed.includes(enemy.id) || isIncapacitated(enemy))
+        continue;
       const enemyPosition = state.combat.tokens.find((token) => token.actorId === enemy.id)?.position ?? null;
       if (!enemyPosition) continue;
       const enemyDefinition = enemy.definitionId ? input.resolveDefinition(enemy.definitionId) : undefined;
       // The enemy's effective actions, so a reach-granting item widens the trigger.
-      const reach = Math.max(5, ...effectiveActions(enemyDefinition, enemy, input.catalog).flatMap((candidate) => candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []));
-      const measure = input.creatureDistance ?? ((target: Readonly<{ actorId: string; position: Point }>, point: Point) => input.distance(target.position, point));
+      const reach = Math.max(
+        5,
+        ...effectiveActions(enemyDefinition, enemy, input.catalog).flatMap((candidate) =>
+          candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []
+        )
+      );
+      const measure =
+        input.creatureDistance ??
+        ((target: Readonly<{ actorId: string; position: Point }>, point: Point) =>
+          input.distance(target.position, point));
       const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, from);
       const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, to);
       // Tolerance both ways: "was in reach" forgives noise at exactly reach, and "now out" needs a real step past it.
-      if (wasIn === null || nowOut === null || wasIn > reach + DISTANCE_TOLERANCE_FEET || nowOut <= reach + DISTANCE_TOLERANCE_FEET) continue;
-      if (state.combat.pendingReactions.some((prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId)) continue;
-      state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, {
-        id: input.newPromptId(), kind: "leaves-reach" as const, actorId: enemy.id, actionId: "opportunity-attack", actionName: "Opportunity Attack",
-        sourceActorId: actorId, sourceName: mover.name, targetActorId: actorId, triggerCommandId: input.commandId,
-        proposedDamage: 0, proposedDamageParts: [], critical: false, createdAt: input.now()
-      }] };
+      if (
+        wasIn === null ||
+        nowOut === null ||
+        wasIn > reach + DISTANCE_TOLERANCE_FEET ||
+        nowOut <= reach + DISTANCE_TOLERANCE_FEET
+      )
+        continue;
+      if (
+        state.combat.pendingReactions.some(
+          (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId
+        )
+      )
+        continue;
+      state.combat = {
+        ...state.combat,
+        pendingReactions: [
+          ...state.combat.pendingReactions,
+          {
+            id: input.newPromptId(),
+            kind: "leaves-reach" as const,
+            actorId: enemy.id,
+            actionId: "opportunity-attack",
+            actionName: "Opportunity Attack",
+            sourceActorId: actorId,
+            sourceName: mover.name,
+            targetActorId: actorId,
+            triggerCommandId: input.commandId,
+            proposedDamage: 0,
+            proposedDamageParts: [],
+            critical: false,
+            createdAt: input.now()
+          }
+        ]
+      };
       prompts.push({ actorId: enemy.id, name: enemy.name });
     }
   }

@@ -7,19 +7,43 @@ import { createRequire } from "node:module";
 import { z } from "zod";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import type {
-  BackgroundReference, ClassReference, FeatReference, NamePoolReference,
-  SpeciesReference, SubclassReference
+  BackgroundReference,
+  ClassReference,
+  FeatReference,
+  NamePoolReference,
+  SpeciesReference,
+  SubclassReference
 } from "./character-content.js";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, FeatReferenceSchema, NamePoolReferenceSchema,
-  SpeciesReferenceSchema, SubclassReferenceSchema
+  BackgroundReferenceSchema,
+  ClassReferenceSchema,
+  FeatReferenceSchema,
+  NamePoolReferenceSchema,
+  SpeciesReferenceSchema,
+  SubclassReferenceSchema
 } from "./character-content.js";
 import {
-  ArmorReferenceSchema, ConditionReferenceSchema, ContentAttributionSchema, EquipmentReferenceSchema,
-  LanguageReferenceSchema, RuleReferenceSchema, SkillReferenceSchema, SpellReferenceSchema, SRD_SKILL_ABILITY,
-  WeaponPropertyReferenceSchema, WeaponReferenceSchema,
-  type ArmorReference, type ConditionReference, type ContentAttribution, type EquipmentReference, type LanguageReference, type RuleReference,
-  type SkillReference, type SpellReference, type WeaponPropertyReference, type WeaponReference
+  ArmorReferenceSchema,
+  ConditionReferenceSchema,
+  ContentAttributionSchema,
+  EquipmentReferenceSchema,
+  LanguageReferenceSchema,
+  RuleReferenceSchema,
+  SkillReferenceSchema,
+  SpellReferenceSchema,
+  SRD_SKILL_ABILITY,
+  WeaponPropertyReferenceSchema,
+  WeaponReferenceSchema,
+  type ArmorReference,
+  type ConditionReference,
+  type ContentAttribution,
+  type EquipmentReference,
+  type LanguageReference,
+  type RuleReference,
+  type SkillReference,
+  type SpellReference,
+  type WeaponPropertyReference,
+  type WeaponReference
 } from "./schemas.js";
 
 /**
@@ -69,9 +93,9 @@ export function loadArmor(): readonly ArmorReference[] {
 
 /** The 18 SRD 5.2.1 skill descriptions, each with the ability its check uses (bundle column first, SRD fallback second). */
 export function loadSkills(): readonly SkillReference[] {
-  return loadBundle("skills.v1.json", z.array(SkillReferenceSchema)).map((skill) => (
+  return loadBundle("skills.v1.json", z.array(SkillReferenceSchema)).map((skill) =>
     skill.ability ? skill : { ...skill, ability: SRD_SKILL_ABILITY[skill.id] }
-  ));
+  );
 }
 
 /** The 19 SRD 5.2.1 languages (10 Standard, 9 Rare), each tagged with the table it is printed in. */
@@ -95,24 +119,71 @@ export function loadMagicItems(): readonly EquipmentReference[] {
 export function loadEquipment(): readonly EquipmentReference[] {
   // `weapon`/`armor` are always present (null when absent), so consumers can branch on `item.weapon === null`.
   const gear: EquipmentReference[] = loadBundle("equipment.v1.json", z.array(EquipmentReferenceSchema)).map((item) => ({
-    ...item, weapon: item.weapon ?? null, armor: item.armor ?? null
+    ...item,
+    weapon: item.weapon ?? null,
+    armor: item.armor ?? null
   }));
   // Hand-built rows must state these: the schema's `.default()`s make them required on the output type.
-  const mundane = (): Pick<EquipmentReference, "isMagic" | "cursed" | "casts" | "grantsFeatIds" | "tags" | "actions" | "effects" | "modifiers"> =>
-    ({ isMagic: false, cursed: false, casts: [], grantsFeatIds: [], tags: [], actions: [], effects: [], modifiers: [] });
+  const mundane = (): Pick<
+    EquipmentReference,
+    "isMagic" | "cursed" | "casts" | "grantsFeatIds" | "tags" | "actions" | "effects" | "modifiers"
+  > => ({
+    isMagic: false,
+    cursed: false,
+    casts: [],
+    grantsFeatIds: [],
+    tags: [],
+    actions: [],
+    effects: [],
+    modifiers: []
+  });
   // Mapped rows keep their own bundle's source, so a homebrew weapon or armor stays homebrew here.
-  const weapons: EquipmentReference[] = loadWeapons().filter((weapon) => !weapon.improvised).map((weapon) => ({
-    id: weapon.id, name: weapon.name, source: weapon.source, category: "weapon", slot: "weapon", costGp: null, weightLb: null, description: null,
-    weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet, mastery: weapon.mastery, properties: weapon.properties }, armor: null,
-    ...mundane()
-  }));
+  const weapons: EquipmentReference[] = loadWeapons()
+    .filter((weapon) => !weapon.improvised)
+    .map((weapon) => ({
+      id: weapon.id,
+      name: weapon.name,
+      source: weapon.source,
+      category: "weapon",
+      slot: "weapon",
+      costGp: null,
+      weightLb: null,
+      description: null,
+      weapon: {
+        category: weapon.category,
+        damageDice: weapon.damage.dice,
+        damageType: weapon.damage.type,
+        rangeFeet: weapon.rangeFeet,
+        longRangeFeet: weapon.longRangeFeet,
+        mastery: weapon.mastery,
+        properties: weapon.properties
+      },
+      armor: null,
+      ...mundane()
+    }));
   const armor: EquipmentReference[] = loadArmor().map((piece) => ({
-    id: piece.id, name: piece.name, source: piece.source, category: piece.acBase <= 3 ? "shield" : "armor", slot: piece.acBase <= 3 ? "shield" : "armor", costGp: null, weightLb: null, description: null,
-    weapon: null, armor: { acBase: piece.acBase, addDexModifier: piece.addDexModifier, dexModifierCap: piece.dexModifierCap, stealthDisadvantage: piece.stealthDisadvantage, strengthRequired: piece.strengthRequired },
+    id: piece.id,
+    name: piece.name,
+    source: piece.source,
+    category: piece.acBase <= 3 ? "shield" : "armor",
+    slot: piece.acBase <= 3 ? "shield" : "armor",
+    costGp: null,
+    weightLb: null,
+    description: null,
+    weapon: null,
+    armor: {
+      acBase: piece.acBase,
+      addDexModifier: piece.addDexModifier,
+      dexModifierCap: piece.dexModifierCap,
+      stealthDisadvantage: piece.stealthDisadvantage,
+      strengthRequired: piece.strengthRequired
+    },
     ...mundane()
   }));
   const magic: EquipmentReference[] = loadMagicItems().map((item) => ({
-    ...item, weapon: item.weapon ?? null, armor: item.armor ?? null
+    ...item,
+    weapon: item.weapon ?? null,
+    armor: item.armor ?? null
   }));
   return [...gear, ...weapons, ...armor, ...magic].sort((left, right) => left.name.localeCompare(right.name));
 }

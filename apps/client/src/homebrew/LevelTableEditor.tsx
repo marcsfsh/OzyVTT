@@ -55,7 +55,11 @@ function generateFor(level: number, progression: Progression, classId: string) {
   if (progression === undefined) return { proficiencyBonus, spellSlots: undefined, pactSlots: undefined };
   if (progression === "pact") {
     const pact = pactSlotsForLevel(level);
-    return { proficiencyBonus, spellSlots: undefined, pactSlots: pact ? { level: pact.level, slots: pact.slots } : undefined };
+    return {
+      proficiencyBonus,
+      spellSlots: undefined,
+      pactSlots: pact ? { level: pact.level, slots: pact.slots } : undefined
+    };
   }
   return { proficiencyBonus, spellSlots: [...spellSlotsForClass(classId, level, progression)], pactSlots: undefined };
 }
@@ -89,7 +93,9 @@ function describeSlots(slots: readonly number[]): string {
 /** Narrow-viewport detection; the one-level-at-a-time fold needs JS to pick which row to
     show. 760 matches the CSS. */
 function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches);
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches
+  );
   useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
     const onChange = () => setNarrow(query.matches);
@@ -106,7 +112,10 @@ export function LevelTableEditor({
   classId
 }: Readonly<{ draft: Draft; onDraft: (next: Draft) => void; classId: string }>) {
   const progression = progressionOf(draft);
-  const rows = useMemo(() => (Array.isArray(draft.levelTable) ? (draft.levelTable as LevelRow[]) : []), [draft.levelTable]);
+  const rows = useMemo(
+    () => (Array.isArray(draft.levelTable) ? (draft.levelTable as LevelRow[]) : []),
+    [draft.levelTable]
+  );
   const features = useMemo(
     () => (Array.isArray(draft.features) ? (draft.features as ReadonlyArray<{ id?: string; name?: string }>) : []),
     [draft.features]
@@ -145,9 +154,10 @@ export function LevelTableEditor({
 
       const before = generateFor(value, wasProgression, classId);
       const now = generated[index];
-      const followed = sameSlots(stored?.spellSlots, before.spellSlots) && samePact(stored?.pactSlots, before.pactSlots);
+      const followed =
+        sameSlots(stored?.spellSlots, before.spellSlots) && samePact(stored?.pactSlots, before.pactSlots);
       if (followed) {
-      // Omit, never null: the row schema is `.strict()` with `.optional()` columns.
+        // Omit, never null: the row schema is `.strict()` with `.optional()` columns.
         if (now.spellSlots) row.spellSlots = now.spellSlots;
         else delete row.spellSlots;
         if (now.pactSlots) row.pactSlots = now.pactSlots;
@@ -177,7 +187,9 @@ export function LevelTableEditor({
   const isOverridden = (index: number) => {
     const row = rows[index];
     if (!row) return false;
-    return !sameSlots(row.spellSlots, generated[index].spellSlots) || !samePact(row.pactSlots, generated[index].pactSlots);
+    return (
+      !sameSlots(row.spellSlots, generated[index].spellSlots) || !samePact(row.pactSlots, generated[index].pactSlots)
+    );
   };
 
   const slotText = (index: number): { text: string; label: string } => {
@@ -207,7 +219,7 @@ export function LevelTableEditor({
       changed amounts, and names any resource that disappears. */
   const resourceText = (index: number) => {
     const list = rows[index]?.classResources ?? [];
-    const before = index === 0 ? [] : rows[index - 1]?.classResources ?? [];
+    const before = index === 0 ? [] : (rows[index - 1]?.classResources ?? []);
     const wasAt = new Map(before.map((resource) => [resource.id, resource]));
     const parts = list
       .filter((resource) => {
@@ -259,7 +271,9 @@ export function LevelTableEditor({
               <span className="hb-lt-micro">Spell slots</span>
               {/* Real visually-hidden text, not `aria-label`: an aria-label on a roleless
                   <span> is ignored by the accessible-name computation. */}
-              <span className="tabular hb-lt-derived" aria-hidden="true">{slots.text}</span>
+              <span className="tabular hb-lt-derived" aria-hidden="true">
+                {slots.text}
+              </span>
               <span className="nh-sr-only">{slots.label}</span>
               {overridden && <Badge tone="caution">Overridden</Badge>}
             </span>
@@ -304,7 +318,10 @@ export function LevelTableEditor({
         {editing && (
           <div className="hb-lt-strip">
             {progression === undefined ? (
-              <p className="nh-field-help">This class has no spellcasting, so it has no slots to override. Turn on a caster progression above first.</p>
+              <p className="nh-field-help">
+                This class has no spellcasting, so it has no slots to override. Turn on a caster progression above
+                first.
+              </p>
             ) : progression === "pact" ? (
               /* Each half falls back to the generated value, not zero, so clearing one field
                  never silently zeroes the row. */
@@ -317,7 +334,10 @@ export function LevelTableEditor({
                     max={9}
                     onChange={(next) =>
                       writeRow(index, {
-                        pactSlots: next == null ? undefined : { level: next, slots: row.pactSlots?.slots ?? generated[index].pactSlots?.slots ?? 1 }
+                        pactSlots:
+                          next == null
+                            ? undefined
+                            : { level: next, slots: row.pactSlots?.slots ?? generated[index].pactSlots?.slots ?? 1 }
                       })
                     }
                   />
@@ -330,7 +350,10 @@ export function LevelTableEditor({
                     max={4}
                     onChange={(next) =>
                       writeRow(index, {
-                        pactSlots: next == null ? undefined : { level: row.pactSlots?.level ?? generated[index].pactSlots?.level ?? 1, slots: next }
+                        pactSlots:
+                          next == null
+                            ? undefined
+                            : { level: row.pactSlots?.level ?? generated[index].pactSlots?.level ?? 1, slots: next }
                       })
                     }
                   />
@@ -360,7 +383,9 @@ export function LevelTableEditor({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => writeRow(index, { spellSlots: generated[index].spellSlots, pactSlots: generated[index].pactSlots })}
+                onClick={() =>
+                  writeRow(index, { spellSlots: generated[index].spellSlots, pactSlots: generated[index].pactSlots })
+                }
               >
                 Reset to default
               </Button>
@@ -369,7 +394,9 @@ export function LevelTableEditor({
             <div className="hb-lt-resources">
               <span className="nh-field-label">Class resources</span>
               <p className="nh-field-help">
-                <em className="hb-note">Shown on the level table only. For a pool the game tracks, give a feature limited uses instead.</em>
+                <em className="hb-note">
+                  Shown on the level table only. For a pool the game tracks, give a feature limited uses instead.
+                </em>
               </p>
               <RowEditor
                 rows={row.classResources ?? []}
@@ -390,7 +417,9 @@ export function LevelTableEditor({
                         className="nh-input"
                         value={(resource as ClassResource).name ?? ""}
                         onChange={(event) => {
-                          const list = (row.classResources ?? []).map((entry, i) => (i === resourceIndex ? { ...entry, name: event.target.value } : entry));
+                          const list = (row.classResources ?? []).map((entry, i) =>
+                            i === resourceIndex ? { ...entry, name: event.target.value } : entry
+                          );
                           writeRow(index, { classResources: list });
                         }}
                       />
@@ -404,7 +433,9 @@ export function LevelTableEditor({
                           const raw = event.target.value;
                           // An amount is a number or a dice string ("3d6"); coerce only all-digit input.
                           const amount = /^\d+$/.test(raw) ? Number(raw) : raw;
-                          const list = (row.classResources ?? []).map((entry, i) => (i === resourceIndex ? { ...entry, amount } : entry));
+                          const list = (row.classResources ?? []).map((entry, i) =>
+                            i === resourceIndex ? { ...entry, amount } : entry
+                          );
                           writeRow(index, { classResources: list });
                         }}
                       />
@@ -433,9 +464,7 @@ export function LevelTableEditor({
         <strong className="tabular">{placed}</strong> {placed === 1 ? "feature" : "features"} placed
       </p>
 
-      {narrow && !showAll && (
-        <Stepper value={level} onChange={setLevel} min={1} max={20} label="Level" announceValue />
-      )}
+      {narrow && !showAll && <Stepper value={level} onChange={setLevel} min={1} max={20} label="Level" announceValue />}
 
       <div className="hb-lt-scroll">
         <div className={`hb-lt-table${casts ? "" : " hb-lt-table--nocast"}`} role="group" aria-label="Level table">

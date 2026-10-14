@@ -16,7 +16,12 @@ export function setPreviewScene(sceneId: string | null) {
 
 export function usePreviewScene(): string | null {
   return useSyncExternalStore(
-    (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     () => previewSceneId,
     () => previewSceneId
   );

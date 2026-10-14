@@ -1,5 +1,27 @@
 import { deadlineFired } from "./codex-store.js";
-import type { CodexCalendar, CodexCalendarEra, CodexCalendarMonth, CodexChronicleRecord, CodexConnectionRow, CodexConnectionSourceKind, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexPageConnectionRow, CodexRecordKind, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
+import type {
+  CodexCalendar,
+  CodexCalendarEra,
+  CodexCalendarMonth,
+  CodexChronicleRecord,
+  CodexConnectionRow,
+  CodexConnectionSourceKind,
+  CodexEntityType,
+  CodexInWorldDate,
+  CodexJournalKind,
+  CodexJournalRow,
+  CodexMapRow,
+  CodexMarkerRow,
+  CodexPageRow,
+  CodexPageSummaryRow,
+  CodexQuestObjective,
+  CodexQuestRow,
+  CodexQuestStatus,
+  CodexPageConnectionRow,
+  CodexRecordKind,
+  CodexSessionRow,
+  CodexStandingRow
+} from "./codex-store.js";
 
 /**
  * The Codex viewer-safety boundary: every player-facing Codex read projects through here. Player shapes are
@@ -32,7 +54,6 @@ export type PlayerCodexPageSummary = Readonly<{
   updatedAt: string;
 }>;
 
-
 export function projectGmPage(row: CodexPageRow): GmCodexPage {
   return row;
 }
@@ -41,7 +62,17 @@ export function projectGmPage(row: CodexPageRow): GmCodexPage {
 export function projectPlayerPage(row: CodexPageRow): PlayerCodexPage | null {
   if (!row.revealedToPlayers) return null;
   // Allow-list: gmBody, gmFields and rev never enter the result (GM-only attributes live in `gmFields`).
-  return { id: row.id, title: row.title, entityType: row.entityType, fields: row.fields, folder: row.folder, tags: row.tags, body: row.playerBody, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
+  return {
+    id: row.id,
+    title: row.title,
+    entityType: row.entityType,
+    fields: row.fields,
+    folder: row.folder,
+    tags: row.tags,
+    body: row.playerBody,
+    bannerAssetId: row.bannerAssetId,
+    updatedAt: row.updatedAt
+  };
 }
 
 export function projectGmPageSummary(row: CodexPageSummaryRow): GmCodexPageSummary {
@@ -50,7 +81,15 @@ export function projectGmPageSummary(row: CodexPageSummaryRow): GmCodexPageSumma
 
 export function projectPlayerPageSummary(row: CodexPageSummaryRow): PlayerCodexPageSummary | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, title: row.title, entityType: row.entityType, folder: row.folder, tags: row.tags, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
+  return {
+    id: row.id,
+    title: row.title,
+    entityType: row.entityType,
+    folder: row.folder,
+    tags: row.tags,
+    bannerAssetId: row.bannerAssetId,
+    updatedAt: row.updatedAt
+  };
 }
 
 // Connections (one gate for declared and mention edges)
@@ -65,7 +104,11 @@ export type PlayerConnectionContext = Readonly<{
 
 const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
 
-function connectionSourceVisible(kind: CodexConnectionSourceKind, sourceId: string, context: PlayerConnectionContext): boolean {
+function connectionSourceVisible(
+  kind: CodexConnectionSourceKind,
+  sourceId: string,
+  context: PlayerConnectionContext
+): boolean {
   return kind === "page" ? context.revealedPageIds.has(sourceId) : context.revealedSourceIds.has(sourceId);
 }
 
@@ -82,11 +125,27 @@ export type PlayerCodexConnection = Readonly<{
   origin: "declared" | "mention";
 }>;
 
-export function projectPlayerConnections(edges: readonly CodexConnectionRow[], context: PlayerConnectionContext): PlayerCodexConnection[] {
-  return edges
-    .filter((edge) => edge.layer === "player" && context.revealedPageIds.has(edge.toPageId) && connectionSourceVisible(edge.fromKind, edge.fromId, context))
-    // Allow-list: a field added to `CodexConnectionRow` stays secret until added here.
-    .map((edge) => ({ fromKind: edge.fromKind, fromId: edge.fromId, toPageId: edge.toPageId, label: edge.label, origin: edge.origin }));
+export function projectPlayerConnections(
+  edges: readonly CodexConnectionRow[],
+  context: PlayerConnectionContext
+): PlayerCodexConnection[] {
+  return (
+    edges
+      .filter(
+        (edge) =>
+          edge.layer === "player" &&
+          context.revealedPageIds.has(edge.toPageId) &&
+          connectionSourceVisible(edge.fromKind, edge.fromId, context)
+      )
+      // Allow-list: a field added to `CodexConnectionRow` stays secret until added here.
+      .map((edge) => ({
+        fromKind: edge.fromKind,
+        fromId: edge.fromId,
+        toPageId: edge.toPageId,
+        label: edge.label,
+        origin: edge.origin
+      }))
+  );
 }
 
 export function projectGmPageConnections(rows: readonly CodexPageConnectionRow[]): CodexPageConnectionRow[] {
@@ -105,22 +164,53 @@ export type PlayerCodexPageConnection = Readonly<{
   section: string | null;
 }>;
 
-export function projectPlayerPageConnections(rows: readonly CodexPageConnectionRow[], context: PlayerConnectionContext): PlayerCodexPageConnection[] {
+export function projectPlayerPageConnections(
+  rows: readonly CodexPageConnectionRow[],
+  context: PlayerConnectionContext
+): PlayerCodexPageConnection[] {
   return rows
     .filter((row) => row.layer === "player" && connectionSourceVisible(row.otherKind, row.otherId, context))
-    .map((row) => ({ direction: row.direction, otherKind: row.otherKind, otherId: row.otherId, otherTitle: row.otherTitle, otherEntityType: row.otherEntityType, label: row.label, origin: row.origin, section: row.section }));
+    .map((row) => ({
+      direction: row.direction,
+      otherKind: row.otherKind,
+      otherId: row.otherId,
+      otherTitle: row.otherTitle,
+      otherEntityType: row.otherEntityType,
+      label: row.label,
+      origin: row.origin,
+      section: row.section
+    }));
 }
 
 // Maps
 
 export type GmCodexMap = CodexMapRow;
-export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: CodexMapRow["kind"]; parentMapId: string | null; tags: readonly string[] }>;
+export type PlayerCodexMap = Readonly<{
+  id: string;
+  assetId: string;
+  name: string;
+  kind: CodexMapRow["kind"];
+  parentMapId: string | null;
+  tags: readonly string[];
+}>;
 
-export function projectGmMap(row: CodexMapRow): GmCodexMap { return row; }
+export function projectGmMap(row: CodexMapRow): GmCodexMap {
+  return row;
+}
 /** null unless revealed. `parentMapId` survives only if the parent is revealed, or it would leak a secret ancestor. */
-export function projectPlayerMap(row: CodexMapRow, context: Readonly<{ parentRevealed: boolean }>): PlayerCodexMap | null {
+export function projectPlayerMap(
+  row: CodexMapRow,
+  context: Readonly<{ parentRevealed: boolean }>
+): PlayerCodexMap | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, assetId: row.assetId, name: row.name, kind: row.kind, parentMapId: context.parentRevealed ? row.parentMapId : null, tags: row.tags };
+  return {
+    id: row.id,
+    assetId: row.assetId,
+    name: row.name,
+    kind: row.kind,
+    parentMapId: context.parentRevealed ? row.parentMapId : null,
+    tags: row.tags
+  };
 }
 
 // Markers
@@ -128,18 +218,38 @@ export function projectPlayerMap(row: CodexMapRow, context: Readonly<{ parentRev
 export type GmCodexMarker = CodexMarkerRow;
 /** No scene/actor links (GM-only); page/sub-map links only when their targets are revealed. */
 export type PlayerCodexMarker = Readonly<{
-  id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null;
+  id: string;
+  mapId: string;
+  x: number;
+  y: number;
+  iconId: string;
+  iconColor: string;
+  label: string | null;
+  pageIds: string[];
+  subMapId: string | null;
   tags: readonly string[];
   isParty: boolean;
 }>;
 
-export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker { return row; }
+export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker {
+  return row;
+}
 
 /** null unless revealed. Unrevealed page/sub-map links are dropped and scene/actor links stripped. `isParty` grants no visibility. */
-export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ revealedPageIds: ReadonlySet<string>; subMapRevealed: boolean }>): PlayerCodexMarker | null {
+export function projectPlayerMarker(
+  row: CodexMarkerRow,
+  context: Readonly<{ revealedPageIds: ReadonlySet<string>; subMapRevealed: boolean }>
+): PlayerCodexMarker | null {
   if (!row.revealedToPlayers) return null;
   return {
-    id: row.id, mapId: row.mapId, x: row.x, y: row.y, iconId: row.iconId, iconColor: row.iconColor, label: row.label, tags: row.tags,
+    id: row.id,
+    mapId: row.mapId,
+    x: row.x,
+    y: row.y,
+    iconId: row.iconId,
+    iconColor: row.iconColor,
+    label: row.label,
+    tags: row.tags,
     pageIds: row.pageIds.filter((pageId) => context.revealedPageIds.has(pageId)),
     subMapId: context.subMapRevealed ? row.subMapId : null,
     isParty: row.isParty
@@ -157,7 +267,10 @@ export type CodexPageMarkerRecord = Readonly<{
 /** null unless player-visible: a pin on an unrevealed map is hidden (as `GET /codex/maps/:id/markers`), then `projectPlayerMarker`. */
 export function projectPlayerPageMarker(record: CodexPageMarkerRecord): PlayerCodexMarker | null {
   if (!record.mapRevealed) return null;
-  return projectPlayerMarker(record.marker, { revealedPageIds: record.revealedPageIds, subMapRevealed: record.subMapRevealed });
+  return projectPlayerMarker(record.marker, {
+    revealedPageIds: record.revealedPageIds,
+    subMapRevealed: record.subMapRevealed
+  });
 }
 
 // Journal
@@ -165,10 +278,16 @@ export function projectPlayerPageMarker(record: CodexPageMarkerRecord): PlayerCo
 export type GmCodexJournalEntry = CodexJournalRow;
 /** Player text only, no gmText or GM-only linkage, only when revealed. */
 export type PlayerCodexJournalEntry = Readonly<{
-  id: string; text: string; kind: CodexJournalRow["kind"];
+  id: string;
+  text: string;
+  kind: CodexJournalRow["kind"];
   /** Both `sessionId` and `sessionNumber` are null unless the linked session is revealed: either half reveals it exists. */
   sessionId: string | null;
-  sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
+  sessionNumber: number | null;
+  realDate: string | null;
+  inWorldLabel: string | null;
+  tags: readonly string[];
+  createdAt: string;
 }>;
 
 /** Default for an unsupplied revealed-id set: nothing is revealed, so nothing travels. */
@@ -200,19 +319,37 @@ function playerQuestEventVisible(row: CodexJournalRow, context: PlayerSessionNum
 }
 
 /** Unrevealed session: both halves null. Revealed: both pass. Bare number with no join (left by deleting a revealed session): passes. */
-function playerSessionLink(row: CodexJournalRow, context: PlayerSessionNumberContext): { sessionId: string | null; sessionNumber: number | null } {
+function playerSessionLink(
+  row: CodexJournalRow,
+  context: PlayerSessionNumberContext
+): { sessionId: string | null; sessionNumber: number | null } {
   if (row.sessionId === null) return { sessionId: null, sessionNumber: row.sessionNumber };
   if (context.unrevealedSessionIds.has(row.sessionId)) return { sessionId: null, sessionNumber: null };
   return { sessionId: row.sessionId, sessionNumber: row.sessionNumber };
 }
 
-export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
-export function projectPlayerJournalEntry(row: CodexJournalRow, context: PlayerSessionNumberContext): PlayerCodexJournalEntry | null {
+export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry {
+  return row;
+}
+export function projectPlayerJournalEntry(
+  row: CodexJournalRow,
+  context: PlayerSessionNumberContext
+): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
   if (!playerStandingVisible(row, context)) return null;
   if (!playerQuestEventVisible(row, context)) return null;
   const session = playerSessionLink(row, context);
-  return { id: row.id, text: row.playerText, kind: row.kind, sessionId: session.sessionId, sessionNumber: session.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
+  return {
+    id: row.id,
+    text: row.playerText,
+    kind: row.kind,
+    sessionId: session.sessionId,
+    sessionNumber: session.sessionNumber,
+    realDate: row.realDate,
+    inWorldLabel: row.inWorldLabel,
+    tags: row.tags,
+    createdAt: row.createdAt
+  };
 }
 
 // Sessions: prep is the GM half, recap is the player half
@@ -228,7 +365,9 @@ export type PlayerCodexSession = Readonly<{
   tags: readonly string[];
 }>;
 
-export function projectGmSession(row: CodexSessionRow): GmCodexSession { return row; }
+export function projectGmSession(row: CodexSessionRow): GmCodexSession {
+  return row;
+}
 
 export function projectPlayerSession(row: CodexSessionRow): PlayerCodexSession | null {
   if (!row.revealedToPlayers) return null;
@@ -251,14 +390,22 @@ export type PlayerCodexQuest = Readonly<{
   tags: readonly string[];
 }>;
 
-export function projectGmQuest(row: CodexQuestRow): GmCodexQuest { return row; }
+export function projectGmQuest(row: CodexQuestRow): GmCodexQuest {
+  return row;
+}
 
 /** null when unrevealed. `entityIds` keeps only revealed pages, so a quest never advertises secret page ids. */
-export function projectPlayerQuest(row: CodexQuestRow, context: Readonly<{ revealedEntityIds: ReadonlySet<string> }>): PlayerCodexQuest | null {
+export function projectPlayerQuest(
+  row: CodexQuestRow,
+  context: Readonly<{ revealedEntityIds: ReadonlySet<string> }>
+): PlayerCodexQuest | null {
   if (!row.revealedToPlayers) return null;
   // Allow-list: a field added to `CodexQuestRow` stays secret until added here.
   return {
-    id: row.id, title: row.title, status: row.status, body: row.playerBody,
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    body: row.playerBody,
     objectives: row.objectives,
     entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId)),
     tags: row.tags
@@ -271,10 +418,15 @@ export type GmCodexStanding = CodexStandingRow;
 /** Omits the row `id` (the faction page id identifies it), the reveal flag and timestamps. `value` is -100..100. */
 export type PlayerCodexStanding = Readonly<{ factionPageId: string; value: number }>;
 
-export function projectGmStanding(row: CodexStandingRow): GmCodexStanding { return row; }
+export function projectGmStanding(row: CodexStandingRow): GmCodexStanding {
+  return row;
+}
 
 /** null unless both the standing and its faction page are revealed: a titleless bar for a secret faction would still leak. */
-export function projectPlayerStanding(row: CodexStandingRow, context: Readonly<{ factionRevealed: boolean }>): PlayerCodexStanding | null {
+export function projectPlayerStanding(
+  row: CodexStandingRow,
+  context: Readonly<{ factionRevealed: boolean }>
+): PlayerCodexStanding | null {
   if (!row.revealedToPlayers) return null;
   if (!context.factionRevealed) return null;
   return { factionPageId: row.factionPageId, value: row.value };
@@ -290,27 +442,46 @@ function excerpt(text: string): string {
 // The chronicle: one timeline of journal entries and dated `event` pages
 
 /** The client's `CHRONICLE_KIND_META` is keyed by this, so a new kind is a compile error until it has an icon and label. */
-export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
+export type CodexChronicleKind =
+  "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 
 /** Exhaustive, no `default`: a new journal kind is a compile error here rather than rendering as a plain entry. */
 function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
   switch (kind) {
-    case "note": return "entry";
-    case "combat": return "combat";
-    case "deadline": return "deadline";
-    case "downtime": return "downtime";
-    case "milestone": return "milestone";
-    case "standing": return "standing";
-    case "quest": return "quest";
+    case "note":
+      return "entry";
+    case "combat":
+      return "combat";
+    case "deadline":
+      return "deadline";
+    case "downtime":
+      return "downtime";
+    case "milestone":
+      return "milestone";
+    case "standing":
+      return "standing";
+    case "quest":
+      return "quest";
   }
 }
 
 // `fired` for players is measured against the published date, never the GM clock, or it would leak prep.
 
 /** `applied` is GM workflow state and stays GM-only. Kinds without a payload carry `null`. */
-export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean; characterPageId: string | null }>;
+export type GmCodexDowntime = Readonly<{
+  who: string;
+  activity: string;
+  days: number;
+  applied: boolean;
+  characterPageId: string | null;
+}>;
 /** `characterPageId` travels only when that page is revealed; the row itself stays meaningful without it. */
-export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number; characterPageId: string | null }>;
+export type PlayerCodexDowntime = Readonly<{
+  who: string;
+  activity: string;
+  days: number;
+  characterPageId: string | null;
+}>;
 
 /** Separate GM/player shapes so new fields default to secret. A standing's `factionPageId` is nulled unless revealed. */
 export type GmCodexMilestone = Readonly<{ level: number; reason: string }>;
@@ -324,37 +495,78 @@ export type PlayerCodexQuestEvent = Readonly<{ questId: string | null; status: C
 /** Every payload shape a GM chronicle row can carry. `null` for the kinds that carry none. */
 export type GmCodexChroniclePayload = GmCodexDowntime | GmCodexMilestone | GmCodexStandingChange | GmCodexQuestEvent;
 /** Every payload shape a player chronicle row can carry, each narrower than or equal to its GM twin. */
-export type PlayerCodexChroniclePayload = PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange | PlayerCodexQuestEvent;
+export type PlayerCodexChroniclePayload =
+  PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange | PlayerCodexQuestEvent;
 
 // Dispatch on the entry's `kind` so a payload only rides out on its own kind; `in` guards fail closed.
 function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | null {
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
-    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied, characterPageId: payload.characterPageId } : null;
-    case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
-    case "standing": return "delta" in payload ? { factionPageId: payload.factionPageId, delta: payload.delta, reason: payload.reason } : null;
-    case "quest": return "questId" in payload ? { questId: payload.questId, status: payload.status } : null;
-    case "note": case "combat": case "deadline": return null;
+    case "downtime":
+      return "who" in payload
+        ? {
+            who: payload.who,
+            activity: payload.activity,
+            days: payload.days,
+            applied: payload.applied,
+            characterPageId: payload.characterPageId
+          }
+        : null;
+    case "milestone":
+      return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
+    case "standing":
+      return "delta" in payload
+        ? { factionPageId: payload.factionPageId, delta: payload.delta, reason: payload.reason }
+        : null;
+    case "quest":
+      return "questId" in payload ? { questId: payload.questId, status: payload.status } : null;
+    case "note":
+    case "combat":
+    case "deadline":
+      return null;
   }
 }
 // Player allow-list per kind: `applied` dropped, page/quest ids only when revealed.
-function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlySet<string>, revealedQuestIds: ReadonlySet<string>): PlayerCodexChroniclePayload | null {
+function projectPlayerPayload(
+  entry: CodexJournalRow,
+  revealedPageIds: ReadonlySet<string>,
+  revealedQuestIds: ReadonlySet<string>
+): PlayerCodexChroniclePayload | null {
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
-    case "downtime": return "who" in payload
-      ? { who: payload.who, activity: payload.activity, days: payload.days, characterPageId: payload.characterPageId !== null && revealedPageIds.has(payload.characterPageId) ? payload.characterPageId : null }
-      : null;
-    case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
-    case "standing": return "delta" in payload
-      ? { factionPageId: revealedPageIds.has(payload.factionPageId) ? payload.factionPageId : null, delta: payload.delta, reason: payload.reason }
-      : null;
+    case "downtime":
+      return "who" in payload
+        ? {
+            who: payload.who,
+            activity: payload.activity,
+            days: payload.days,
+            characterPageId:
+              payload.characterPageId !== null && revealedPageIds.has(payload.characterPageId)
+                ? payload.characterPageId
+                : null
+          }
+        : null;
+    case "milestone":
+      return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
+    case "standing":
+      return "delta" in payload
+        ? {
+            factionPageId: revealedPageIds.has(payload.factionPageId) ? payload.factionPageId : null,
+            delta: payload.delta,
+            reason: payload.reason
+          }
+        : null;
     // The row is already hidden unless the quest is revealed; nulling `questId` is a second line of defence.
-    case "quest": return "questId" in payload
-      ? { questId: revealedQuestIds.has(payload.questId) ? payload.questId : null, status: payload.status }
-      : null;
-    case "note": case "combat": case "deadline": return null;
+    case "quest":
+      return "questId" in payload
+        ? { questId: revealedQuestIds.has(payload.questId) ? payload.questId : null, status: payload.status }
+        : null;
+    case "note":
+    case "combat":
+    case "deadline":
+      return null;
   }
 }
 
@@ -367,11 +579,12 @@ export type GmChronicleContext = Readonly<{
 }>;
 
 /** `publishedInstant`, not `campaignInstant`, so the GM context is not assignable here by accident. */
-export type PlayerChronicleContext = PlayerSessionNumberContext & Readonly<{
-  publishedInstant?: number | null;
-  /** Revealed page ids, for payload links to pages. Absent means empty, which nulls the id. */
-  revealedPageIds?: ReadonlySet<string>;
-}>;
+export type PlayerChronicleContext = PlayerSessionNumberContext &
+  Readonly<{
+    publishedInstant?: number | null;
+    /** Revealed page ids, for payload links to pages. Absent means empty, which nulls the id. */
+    revealedPageIds?: ReadonlySet<string>;
+  }>;
 
 /** Every key present on every kind. For an `event` page, `text`/`gmText` are bounded excerpts of its bodies. */
 export type GmCodexChronicleRecord = Readonly<{
@@ -422,59 +635,111 @@ export type PlayerCodexChronicleRecord = Readonly<{
   createdAt: string;
 }>;
 
-export function projectGmChronicleRecord(record: CodexChronicleRecord, context: GmChronicleContext = {}): GmCodexChronicleRecord {
+export function projectGmChronicleRecord(
+  record: CodexChronicleRecord,
+  context: GmChronicleContext = {}
+): GmCodexChronicleRecord {
   if (record.kind === "entry") {
     const entry = record.entry;
     return {
-      kind: chronicleKindOf(entry.kind), id: entry.id, title: null,
-      text: entry.playerText, gmText: entry.gmText, revealedToPlayers: entry.revealedToPlayers,
-      sessionId: entry.sessionId, sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
-      calendarInstant: entry.calendarInstant, inWorldDate: entry.inWorldDate, tags: entry.tags,
-      attachPageId: entry.attachPageId, attachMarkerId: entry.attachMarkerId, sourceEncounterId: entry.sourceEncounterId,
+      kind: chronicleKindOf(entry.kind),
+      id: entry.id,
+      title: null,
+      text: entry.playerText,
+      gmText: entry.gmText,
+      revealedToPlayers: entry.revealedToPlayers,
+      sessionId: entry.sessionId,
+      sessionNumber: entry.sessionNumber,
+      realDate: entry.realDate,
+      inWorldLabel: entry.inWorldLabel,
+      calendarInstant: entry.calendarInstant,
+      inWorldDate: entry.inWorldDate,
+      tags: entry.tags,
+      attachPageId: entry.attachPageId,
+      attachMarkerId: entry.attachMarkerId,
+      sourceEncounterId: entry.sourceEncounterId,
       // `deadlineFired` answers false for non-deadlines and undated rows.
       fired: deadlineFired(entry, context.campaignInstant ?? null),
-      payload: projectGmPayload(entry), proposedDate: context.proposedDate ?? null,
-      createdAt: entry.createdAt, updatedAt: entry.updatedAt
+      payload: projectGmPayload(entry),
+      proposedDate: context.proposedDate ?? null,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt
     };
   }
   const page = record.page;
   return {
-    kind: "event", id: page.id, title: page.title,
-    text: excerpt(page.playerBody), gmText: page.gmBody.trim() ? excerpt(page.gmBody) : null,
+    kind: "event",
+    id: page.id,
+    title: page.title,
+    text: excerpt(page.playerBody),
+    gmText: page.gmBody.trim() ? excerpt(page.gmBody) : null,
     revealedToPlayers: page.revealedToPlayers,
-    sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
-    calendarInstant: page.calendarInstant, inWorldDate: page.inWorldDate, tags: page.tags,
-    attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
-    fired: false, payload: null, proposedDate: null,
-    createdAt: page.createdAt, updatedAt: page.updatedAt
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldLabel: page.inWorldLabel,
+    calendarInstant: page.calendarInstant,
+    inWorldDate: page.inWorldDate,
+    tags: page.tags,
+    attachPageId: null,
+    attachMarkerId: null,
+    sourceEncounterId: null,
+    fired: false,
+    payload: null,
+    proposedDate: null,
+    createdAt: page.createdAt,
+    updatedAt: page.updatedAt
   };
 }
 
 /** null when not player-visible; the chronicle's only gate. Delegates to `projectPlayerJournalEntry` / `projectPlayerPage`. */
-export function projectPlayerChronicleRecord(record: CodexChronicleRecord, context: PlayerChronicleContext): PlayerCodexChronicleRecord | null {
+export function projectPlayerChronicleRecord(
+  record: CodexChronicleRecord,
+  context: PlayerChronicleContext
+): PlayerCodexChronicleRecord | null {
   if (record.kind === "entry") {
     const projected = projectPlayerJournalEntry(record.entry, context);
     if (!projected) return null;
     // No kind filter: `projectPlayerJournalEntry` already applied the reveal, standing and quest gates.
     return {
-      kind: chronicleKindOf(projected.kind), id: projected.id, title: null, text: projected.text,
-      sessionId: projected.sessionId, sessionNumber: projected.sessionNumber, realDate: projected.realDate,
+      kind: chronicleKindOf(projected.kind),
+      id: projected.id,
+      title: null,
+      text: projected.text,
+      sessionId: projected.sessionId,
+      sessionNumber: projected.sessionNumber,
+      realDate: projected.realDate,
       inWorldLabel: projected.inWorldLabel,
       // Both date forms come from the store, already resolved against the live calendar.
-      inWorldDate: record.entry.inWorldDate, calendarInstant: record.entry.calendarInstant,
+      inWorldDate: record.entry.inWorldDate,
+      calendarInstant: record.entry.calendarInstant,
       tags: projected.tags,
       fired: deadlineFired(record.entry, context.publishedInstant ?? null),
-      payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS, context.revealedQuestIds ?? EMPTY_PAGE_IDS),
+      payload: projectPlayerPayload(
+        record.entry,
+        context.revealedPageIds ?? EMPTY_PAGE_IDS,
+        context.revealedQuestIds ?? EMPTY_PAGE_IDS
+      ),
       createdAt: projected.createdAt
     };
   }
   const projected = projectPlayerPage(record.page);
   if (!projected) return null;
   return {
-    kind: "event", id: projected.id, title: projected.title, text: excerpt(projected.body),
-    sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
-    inWorldDate: record.page.inWorldDate, calendarInstant: record.page.calendarInstant,
-    tags: projected.tags, fired: false, payload: null, createdAt: record.page.createdAt
+    kind: "event",
+    id: projected.id,
+    title: projected.title,
+    text: excerpt(projected.body),
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldLabel: record.page.inWorldLabel,
+    inWorldDate: record.page.inWorldDate,
+    calendarInstant: record.page.calendarInstant,
+    tags: projected.tags,
+    fired: false,
+    payload: null,
+    createdAt: record.page.createdAt
   };
 }
 
@@ -502,11 +767,27 @@ export type PlayerCodexCalendar = Readonly<{
 }>;
 
 export function projectGmCalendar(calendar: CodexCalendar, publishedDate: CodexInWorldDate | null): GmCodexCalendar {
-  return { yearName: calendar.yearName, eras: calendar.eras ?? [], months: calendar.months, weekdays: calendar.weekdays, currentDate: calendar.currentDate ?? null, publishedDate };
+  return {
+    yearName: calendar.yearName,
+    eras: calendar.eras ?? [],
+    months: calendar.months,
+    weekdays: calendar.weekdays,
+    currentDate: calendar.currentDate ?? null,
+    publishedDate
+  };
 }
 
-export function projectPlayerCalendar(calendar: CodexCalendar, publishedDate: CodexInWorldDate | null): PlayerCodexCalendar {
-  return { yearName: calendar.yearName, eras: calendar.eras ?? [], months: calendar.months, weekdays: calendar.weekdays, currentDate: publishedDate };
+export function projectPlayerCalendar(
+  calendar: CodexCalendar,
+  publishedDate: CodexInWorldDate | null
+): PlayerCodexCalendar {
+  return {
+    yearName: calendar.yearName,
+    eras: calendar.eras ?? [],
+    months: calendar.months,
+    weekdays: calendar.weekdays,
+    currentDate: publishedDate
+  };
 }
 
 // Suite-wide search: one index, one result list, every record kind
@@ -539,56 +820,159 @@ export type CodexSearchHit = Readonly<{
 }>;
 
 /** null when not player-visible, matching each kind's player list endpoint (markers also need their map revealed). */
-export function projectPlayerSearchHit(record: CodexSearchRecord, context: PlayerSessionNumberContext): CodexSearchHit | null {
+export function projectPlayerSearchHit(
+  record: CodexSearchRecord,
+  context: PlayerSessionNumberContext
+): CodexSearchHit | null {
   switch (record.kind) {
     case "page":
-      return record.page.revealedToPlayers ? { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null } : null;
+      return record.page.revealedToPlayers
+        ? {
+            kind: "page",
+            id: record.page.id,
+            title: record.page.title,
+            tags: record.page.tags,
+            entityType: record.page.entityType,
+            mapId: null
+          }
+        : null;
     case "journal":
       // Delegates so this arm also gets the standing and quest gates.
       return projectPlayerJournalEntry(record.entry, context) === null
         ? null
-        : { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText), tags: record.entry.tags, entityType: null, mapId: null };
+        : {
+            kind: "journal",
+            id: record.entry.id,
+            title: excerpt(record.entry.playerText),
+            tags: record.entry.tags,
+            entityType: null,
+            mapId: null
+          };
     case "map":
-      return record.map.revealedToPlayers ? { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null } : null;
+      return record.map.revealedToPlayers
+        ? {
+            kind: "map",
+            id: record.map.id,
+            title: record.map.name,
+            tags: record.map.tags,
+            entityType: null,
+            mapId: null
+          }
+        : null;
     case "marker":
       return record.marker.revealedToPlayers && record.mapRevealed
-        ? { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId }
+        ? {
+            kind: "marker",
+            id: record.marker.id,
+            title: record.marker.label ?? "",
+            tags: record.marker.tags,
+            entityType: null,
+            mapId: record.marker.mapId
+          }
         : null;
     case "session": {
       // Delegates to `projectPlayerSession`; prep and attendees never enter the player index at all.
       const projected = projectPlayerSession(record.session);
       return projected === null
         ? null
-        : { kind: "session", id: projected.id, title: sessionDisplayTitle(projected), tags: projected.tags, entityType: null, mapId: null };
+        : {
+            kind: "session",
+            id: projected.id,
+            title: sessionDisplayTitle(projected),
+            tags: projected.tags,
+            entityType: null,
+            mapId: null
+          };
     }
     case "quest":
       return record.quest.revealedToPlayers
-        ? { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null }
+        ? {
+            kind: "quest",
+            id: record.quest.id,
+            title: record.quest.title,
+            tags: record.quest.tags,
+            entityType: null,
+            mapId: null
+          }
         : null;
   }
 }
 
-
 export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
   switch (record.kind) {
-    case "page": return { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null };
+    case "page":
+      return {
+        kind: "page",
+        id: record.page.id,
+        title: record.page.title,
+        tags: record.page.tags,
+        entityType: record.page.entityType,
+        mapId: null
+      };
     // The GM may see either layer, so an entry with no player text still shows something useful.
-    case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
-    case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
-    case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
-    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null };
+    case "journal":
+      return {
+        kind: "journal",
+        id: record.entry.id,
+        title: excerpt(record.entry.playerText || record.entry.gmText || ""),
+        tags: record.entry.tags,
+        entityType: null,
+        mapId: null
+      };
+    case "map":
+      return {
+        kind: "map",
+        id: record.map.id,
+        title: record.map.name,
+        tags: record.map.tags,
+        entityType: null,
+        mapId: null
+      };
+    case "marker":
+      return {
+        kind: "marker",
+        id: record.marker.id,
+        title: record.marker.label ?? "",
+        tags: record.marker.tags,
+        entityType: null,
+        mapId: record.marker.mapId
+      };
+    case "quest":
+      return {
+        kind: "quest",
+        id: record.quest.id,
+        title: record.quest.title,
+        tags: record.quest.tags,
+        entityType: null,
+        mapId: null
+      };
     // The GM sees a session hit whatever its reveal state.
-    case "session": return { kind: "session", id: record.session.id, title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }), tags: record.session.tags, entityType: null, mapId: null };
+    case "session":
+      return {
+        kind: "session",
+        id: record.session.id,
+        title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }),
+        tags: record.session.tags,
+        entityType: null,
+        mapId: null
+      };
   }
 }
-
 
 // The reveal audit: one GM view of everything the party can currently see
 
 /** Read-only: every row comes from that kind's player projection. Never add a raw `revealed` test here. */
 export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
 /** Report order. A new reveal route must be added here; the HTTP test checks the audit against real player reads. */
-export const CODEX_REVEAL_AUDIT_KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journal", "session", "quest", "standing"];
+export const CODEX_REVEAL_AUDIT_KINDS: readonly CodexRevealAuditKind[] = [
+  "page",
+  "map",
+  "marker",
+  "journal",
+  "session",
+  "quest",
+  "standing"
+];
 
 /** One record the audit considers, with exactly the context its player projection needs. */
 export type CodexRevealAuditRecord =
@@ -618,7 +1002,11 @@ export type CodexRevealAuditSection = Readonly<{
   rows: readonly CodexRevealAuditRow[];
 }>;
 
-export type CodexRevealAudit = Readonly<{ sections: readonly CodexRevealAuditSection[]; revealed: number; total: number }>;
+export type CodexRevealAudit = Readonly<{
+  sections: readonly CodexRevealAuditSection[];
+  revealed: number;
+  total: number;
+}>;
 
 /** Fallback title for a journal record with no player prose; keyed by kind so a new kind fails to compile. */
 const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
@@ -645,13 +1033,20 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
     case "marker": {
       // `projectPlayerPageMarker`, not `projectPlayerMarker`: the map gate applies here too.
       const projected = projectPlayerPageMarker(record);
-      return projected === null ? null : { kind: "marker", id: projected.id, title: projected.label ?? "", journalKind: null };
+      return projected === null
+        ? null
+        : { kind: "marker", id: projected.id, title: projected.label ?? "", journalKind: null };
     }
     case "journal": {
       const projected = projectPlayerJournalEntry(record.entry, record.sessionContext);
       if (projected === null) return null;
       // The record's own text, else its kind; never an empty string (standing records have no player text).
-      return { kind: "journal", id: projected.id, title: excerpt(projected.text) || AUDIT_JOURNAL_FALLBACK[record.entry.kind], journalKind: projected.kind };
+      return {
+        kind: "journal",
+        id: projected.id,
+        title: excerpt(projected.text) || AUDIT_JOURNAL_FALLBACK[record.entry.kind],
+        journalKind: projected.kind
+      };
     }
     case "session": {
       const projected = projectPlayerSession(record.session);
@@ -665,14 +1060,18 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
     case "standing": {
       const projected = projectPlayerStanding(record.standing, { factionRevealed: record.factionRevealed });
       // The faction page was just confirmed revealed, so its title is one the party can already read.
-      return projected === null ? null : { kind: "standing", id: projected.factionPageId, title: record.factionTitle ?? "", journalKind: null };
+      return projected === null
+        ? null
+        : { kind: "standing", id: projected.factionPageId, title: record.factionTitle ?? "", journalKind: null };
     }
   }
 }
 
 /** Counts and rows per reveal surface plus totals. A standing row's `id` is its faction page id. */
 export function projectRevealAudit(records: readonly CodexRevealAuditRecord[]): CodexRevealAudit {
-  const rowsByKind = new Map<CodexRevealAuditKind, CodexRevealAuditRow[]>(CODEX_REVEAL_AUDIT_KINDS.map((kind) => [kind, []]));
+  const rowsByKind = new Map<CodexRevealAuditKind, CodexRevealAuditRow[]>(
+    CODEX_REVEAL_AUDIT_KINDS.map((kind) => [kind, []])
+  );
   const totalByKind = new Map<CodexRevealAuditKind, number>(CODEX_REVEAL_AUDIT_KINDS.map((kind) => [kind, 0]));
   for (const record of records) {
     totalByKind.set(record.kind, (totalByKind.get(record.kind) ?? 0) + 1);

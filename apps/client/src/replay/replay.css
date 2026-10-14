@@ -1,90 +1,326 @@
 /* Replay viewer frame: header, transport and step label are fixed rows; `.replay-layout` is the one
    region row taking the leftover height. No sky: a horizon behind a battle map competes with it. */
-.replay-viewer { gap: var(--space-2); outline: none; }
+.replay-viewer {
+  gap: var(--space-2);
+  outline: none;
+}
 /* The frame is full-bleed to the pane, so an outer focus ring would be clipped at the edges. */
-.replay-viewer:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-color); }
+.replay-viewer:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-ring-color);
+}
 /* `.pane-frame` has no bottom padding (its region normally owns it); this region runs to the pane's
    edge, so the frame keeps the last row off it. Two classes to win on specificity, not bundle order. */
-.replay-viewer.pane-frame { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
-.replay-notice { gap: var(--space-3); align-items: flex-start; }
+.replay-viewer.pane-frame {
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+}
+.replay-notice {
+  gap: var(--space-3);
+  align-items: flex-start;
+}
 
 /* The header wraps (and its actions wrap inside it) so long buttons cannot overflow a phone. */
-.replay-header { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
-.replay-header-text { flex: 1 1 12rem; min-width: 0; }
-.replay-header-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
-.replay-row-actions { display: flex; gap: var(--space-2); justify-content: flex-end; flex-wrap: wrap; }
-.replay-header h2 { margin: 0; }
-.replay-meta { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.9rem; }
-.replay-error { color: var(--danger-hi); }
+.replay-header {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+.replay-header-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.replay-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.replay-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.replay-header h2 {
+  margin: 0;
+}
+.replay-meta {
+  margin: 0.15rem 0 0;
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+.replay-error {
+  color: var(--danger-hi);
+}
 
 /* A refused launch and its way out: a chrome row that takes its own height, so appearing never
    makes the surface scroll. The actions wrap on a phone. */
-.replay-refusal { margin: 0; }
-.replay-refusal p { margin: 0; }
-.replay-refusal-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.replay-refusal {
+  margin: 0;
+}
+.replay-refusal p {
+  margin: 0;
+}
+.replay-refusal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
 
-.replay-transport { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.replay-transport input[type="range"] { flex: 1; min-width: 8rem; }
-.replay-position { font-family: var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
-.replay-step-label { margin: 0; }
+.replay-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.replay-transport input[type="range"] {
+  flex: 1;
+  min-width: 8rem;
+}
+.replay-position {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.replay-step-label {
+  margin: 0;
+}
 
 /* `stretch`, not `start`: both columns are full height, and the row is a definite `1fr` so a long
    turn order cannot lengthen the surface. */
-.replay-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); align-items: stretch; }
+.replay-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: stretch;
+}
 /* The stage, like `.viewer-stage`: a centring grid whose svg fills it and letterboxes via
    `preserveAspectRatio`. */
-.replay-stage { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; overflow: hidden; }
+.replay-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
 /* `> svg`, not a descendant match: every @vtt/ui glyph is an `<svg width="1em">`, and a class rule
    beats a presentation attribute. */
-.replay-stage > svg { width: 100%; height: 100%; display: block; border-radius: 0; background: var(--void); }
+.replay-stage > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 0;
+  background: var(--void);
+}
 /* A missing stage is an empty surface with one designed frame (the material, below). */
-.replay-stage-missing { position: relative; isolation: isolate; display: grid; gap: 0.35rem; place-content: center; border: 1px solid transparent; border-radius: 0; padding: var(--space-4); text-align: center; opacity: 0.85; }
-.replay-token-hidden { opacity: 0.65; }
-.replay-token-hidden .encounter-token-body { stroke-dasharray: 4 3; }
+.replay-stage-missing {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 0.35rem;
+  place-content: center;
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: var(--space-4);
+  text-align: center;
+  opacity: 0.85;
+}
+.replay-token-hidden {
+  opacity: 0.65;
+}
+.replay-token-hidden .encounter-token-body {
+  stroke-dasharray: 4 3;
+}
 
 /* The side lists: one declared region (`.scroll-y` in the markup). The tab strip only shows below 850px. */
-.replay-side { min-width: 0; gap: var(--space-2); }
-.replay-side-tabs { display: none; }
-.replay-side-scroll { display: flex; flex-direction: column; gap: var(--space-3); }
-.replay-side h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
-.replay-initiative { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-.replay-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.replay-side {
+  min-width: 0;
+  gap: var(--space-2);
+}
+.replay-side-tabs {
+  display: none;
+}
+.replay-side-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.replay-side h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+.replay-initiative {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.replay-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
 /* Side lists: hairline rules and no fill; `gap: 0` because the rule is the separation. */
-.replay-initiative li { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 0 var(--space-2); padding: 0.35rem 0.55rem; border-bottom: 1px solid var(--line); border-radius: 0; }
+.replay-initiative li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 var(--space-2);
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
 /* The active combatant keeps its magenta bar, tick and glow: the region's one glowing element. */
-.replay-initiative li.active { padding-inline-start: 1.15rem; border-bottom-color: var(--magenta); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
-.replay-initiative li.active::before { content: ""; position: absolute; inset-inline-start: .4rem; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
-.replay-initiative li > strong { grid-column: 2; grid-row: 1; font-family: var(--font-mono); }
-.replay-init-hp { font-family: var(--font-mono); font-size: 0.82rem; opacity: 0.8; grid-column: 1; }
-.replay-init-conditions { font-size: 0.78rem; opacity: 0.7; grid-column: 1 / -1; }
-.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: 0; padding: 0 0.3rem; margin-left: 0.4rem; }
-.replay-log li { padding: 0.3rem 0.55rem; border-left: 2px solid var(--line-strong); border-radius: 0; font-size: 0.88rem; }
-.replay-log li.replay-log-gm { border-left-style: dashed; }
-.replay-log-empty { opacity: 0.7; }
+.replay-initiative li.active {
+  padding-inline-start: 1.15rem;
+  border-bottom-color: var(--magenta);
+  box-shadow:
+    inset 2px 0 0 var(--magenta),
+    var(--glow-magenta-strong);
+}
+.replay-initiative li.active::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.4rem;
+  top: 50%;
+  width: var(--cue-w);
+  height: var(--cue-h);
+  transform: translateY(-50%);
+  color: var(--magenta);
+  background: var(--cue-mark);
+  pointer-events: none;
+}
+.replay-initiative li > strong {
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--font-mono);
+}
+.replay-init-hp {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  opacity: 0.8;
+  grid-column: 1;
+}
+.replay-init-conditions {
+  font-size: 0.78rem;
+  opacity: 0.7;
+  grid-column: 1 / -1;
+}
+.replay-hidden-tag {
+  font-style: normal;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  padding: 0 0.3rem;
+  margin-left: 0.4rem;
+}
+.replay-log li {
+  padding: 0.3rem 0.55rem;
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0;
+  font-size: 0.88rem;
+}
+.replay-log li.replay-log-gm {
+  border-left-style: dashed;
+}
+.replay-log-empty {
+  opacity: 0.7;
+}
 
 /* The replays list (its own surface): a heading row, then rows separated by hairline rules with no
    fill; the last row drops its rule. Rows still meet the 44px floor (`--row-h`). */
-.replay-list-page .replay-list-head { max-width: 60rem; margin-inline: auto; width: 100%; }
-.replay-list-page .replay-list-body { max-width: 60rem; margin-inline: auto; width: 100%; }
-.replay-list-back { align-self: flex-start; margin-bottom: var(--space-2); }
-.replay-rows { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.replay-row { display: flex; flex-direction: row; align-items: center; gap: var(--space-3); min-height: var(--row-h); padding: var(--space-3); border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
-.replay-row:last-child { border-bottom: 0; }
-.replay-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.replay-row-title { color: var(--text); font-weight: 700; }
-.replay-row-meta { color: var(--text-muted); font-size: var(--fs-xs); }
-@media (max-width: 560px) { .replay-row { flex-wrap: wrap; } .replay-row-text { flex: 1 0 100%; } }
+.replay-list-page .replay-list-head {
+  max-width: 60rem;
+  margin-inline: auto;
+  width: 100%;
+}
+.replay-list-page .replay-list-body {
+  max-width: 60rem;
+  margin-inline: auto;
+  width: 100%;
+}
+.replay-list-back {
+  align-self: flex-start;
+  margin-bottom: var(--space-2);
+}
+.replay-rows {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.replay-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--row-h);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+}
+.replay-row:last-child {
+  border-bottom: 0;
+}
+.replay-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.replay-row-title {
+  color: var(--text);
+  font-weight: 700;
+}
+.replay-row-meta {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 560px) {
+  .replay-row {
+    flex-wrap: wrap;
+  }
+  .replay-row-text {
+    flex: 1 0 100%;
+  }
+}
 
 /* Below 850px the two columns become one: the map keeps a band and the side lists take the rest as
    tabs. 2:3 rows with a 6rem floor under the map, so the stage never collapses on a short phone. */
 @media (max-width: 849px) {
-  .replay-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(6rem, 2fr) minmax(0, 3fr); }
-  .replay-side-tabs { display: flex; }
-  .replay-side-tabs .nh-segmented-option { flex: 1 1 0; }
+  .replay-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(6rem, 2fr) minmax(0, 3fr);
+  }
+  .replay-side-tabs {
+    display: flex;
+  }
+  .replay-side-tabs .nh-segmented-option {
+    flex: 1 1 0;
+  }
   /* The tab already names the list, so the heading is hidden. */
-  .replay-side-pane > h3 { display: none; }
+  .replay-side-pane > h3 {
+    display: none;
+  }
   .replay-side.is-order .replay-side-log,
-  .replay-side.is-log .replay-side-order { display: none; }
+  .replay-side.is-log .replay-side-order {
+    display: none;
+  }
 }
 
 /* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.

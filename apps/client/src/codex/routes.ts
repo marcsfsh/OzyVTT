@@ -7,9 +7,19 @@ import type { CodexSearchHit } from "./api";
 import { withQuery } from "../router";
 
 export type CodexSection =
-  | "home" | "pages" | "atlas" | "graph"
-  | "sessions" | "quests" | "journal" | "calendar" | "downtime"
-  | "tags" | "audit" | "backup" | "settings";
+  | "home"
+  | "pages"
+  | "atlas"
+  | "graph"
+  | "sessions"
+  | "quests"
+  | "journal"
+  | "calendar"
+  | "downtime"
+  | "tags"
+  | "audit"
+  | "backup"
+  | "settings";
 
 export const CODEX_ROOT = "/codex";
 
@@ -37,10 +47,29 @@ export function codexSectionOf(segments: readonly string[]): CodexSection | null
 /** Sections whose address may carry one record id: `/codex/pages/:id`. */
 export const RECORD_SECTION_IDS: readonly CodexSection[] = ["pages", "atlas", "sessions", "quests"];
 /** Sections that are exactly their own address. The journal focuses an entry with `?entry=`. */
-export const BARE_SECTION_IDS: readonly CodexSection[] = ["journal", "calendar", "downtime", "graph", "audit", "backup", "settings"];
+export const BARE_SECTION_IDS: readonly CodexSection[] = [
+  "journal",
+  "calendar",
+  "downtime",
+  "graph",
+  "audit",
+  "backup",
+  "settings"
+];
 
 const CODEX_SECTION_IDS: readonly CodexSection[] = [
-  "pages", "atlas", "graph", "sessions", "quests", "journal", "calendar", "downtime", "tags", "audit", "backup", "settings"
+  "pages",
+  "atlas",
+  "graph",
+  "sessions",
+  "quests",
+  "journal",
+  "calendar",
+  "downtime",
+  "tags",
+  "audit",
+  "backup",
+  "settings"
 ];
 
 /** The record id inside a section address (`/codex/pages/:id`), or null when the list itself is open. */
@@ -99,9 +128,19 @@ export const PLAYER_SIDEBAR: readonly SidebarGroup[] = [
 
 /** What the codex top bar calls the section it is showing. */
 export const SECTION_TITLE: Readonly<Record<CodexSection, string>> = {
-  home: "Home", pages: "Pages", atlas: "Atlas", graph: "Graph",
-  sessions: "Sessions", quests: "Quests", journal: "Journal", calendar: "Calendar", downtime: "Downtime",
-  tags: "Tag", audit: "Reveal audit", backup: "Backup", settings: "Settings"
+  home: "Home",
+  pages: "Pages",
+  atlas: "Atlas",
+  graph: "Graph",
+  sessions: "Sessions",
+  quests: "Quests",
+  journal: "Journal",
+  calendar: "Calendar",
+  downtime: "Downtime",
+  tags: "Tag",
+  audit: "Reveal audit",
+  backup: "Backup",
+  settings: "Settings"
 };
 
 // ----- Jump targets -----
@@ -114,18 +153,25 @@ export const atlasPath = (mapId: string | null, markerId?: string | null) =>
 export const journalEntryPath = (entryId: string) => withQuery(`${CODEX_ROOT}/journal`, { entry: entryId });
 export const sessionPath = (id: string) => `${CODEX_ROOT}/sessions/${id}`;
 export const questPath = (id: string) => `${CODEX_ROOT}/quests/${id}`;
-export const graphPath = (focusPageId?: string | null) => withQuery(`${CODEX_ROOT}/graph`, { focus: focusPageId ?? null });
+export const graphPath = (focusPageId?: string | null) =>
+  withQuery(`${CODEX_ROOT}/graph`, { focus: focusPageId ?? null });
 export const tagPath = (tag: string) => `${CODEX_ROOT}/tags/${encodeURIComponent(tag)}`;
 
 /** Where a search hit opens, shared by every result list. */
 export function pathForHit(hit: CodexSearchHit): string {
   switch (hit.kind) {
-    case "page": return pagePath(hit.id);
-    case "map": return atlasPath(hit.id);
+    case "page":
+      return pagePath(hit.id);
+    case "map":
+      return atlasPath(hit.id);
     // A map-less pin still works: the Atlas resolves its map via `GET /codex/markers/{id}`.
-    case "marker": return atlasPath(hit.mapId, hit.id);
-    case "journal": return journalEntryPath(hit.id);
-    case "quest": return questPath(hit.id);
-    case "session": return sessionPath(hit.id);
+    case "marker":
+      return atlasPath(hit.mapId, hit.id);
+    case "journal":
+      return journalEntryPath(hit.id);
+    case "quest":
+      return questPath(hit.id);
+    case "session":
+      return sessionPath(hit.id);
   }
 }

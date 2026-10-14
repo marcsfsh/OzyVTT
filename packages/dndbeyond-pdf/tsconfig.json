@@ -1,1 +1,5 @@
-{ "extends": "../../tsconfig.node.json", "compilerOptions": { "resolveJsonModule": true, "types": ["node"] }, "include": ["src", "test"] }
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": { "resolveJsonModule": true, "types": ["node"] },
+  "include": ["src", "test"]
+}

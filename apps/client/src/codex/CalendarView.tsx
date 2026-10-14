@@ -1,8 +1,15 @@
 import { useMemo, useState } from "react";
 import { Alert, Badge, Button, GmOnlyTag, IconChevron, Input, Skeleton } from "@vtt/ui";
 import {
-  calendarApi, calendarDaysPerYear, dateToInstant, formatWorldDate, formatWorldYear,
-  type CodexCalendarEra, type CodexChronicleRecord, type CodexInWorldDate, type GmCodexCalendar
+  calendarApi,
+  calendarDaysPerYear,
+  dateToInstant,
+  formatWorldDate,
+  formatWorldYear,
+  type CodexCalendarEra,
+  type CodexChronicleRecord,
+  type CodexInWorldDate,
+  type GmCodexCalendar
 } from "./api";
 import { CHRONICLE_KIND_META, chronicleRowSummary, sameInWorldDate } from "./chronicle";
 import { CalendarEditor, CampaignDateEditor } from "./CalendarEditor";
@@ -31,7 +38,19 @@ export type CalendarViewProps = Readonly<{
   onOpenPage: (pageId: string) => void;
 }>;
 
-export function CalendarView({ gmToken, calendar, records, loading, error, onChanged, year, month, onMonthChange, onOpenEntry, onOpenPage }: CalendarViewProps) {
+export function CalendarView({
+  gmToken,
+  calendar,
+  records,
+  loading,
+  error,
+  onChanged,
+  year,
+  month,
+  onMonthChange,
+  onOpenEntry,
+  onOpenPage
+}: CalendarViewProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   /** The GM's clock editor, separate from the world's structure. */
   const [dateOpen, setDateOpen] = useState(false);
@@ -43,10 +62,11 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
   const published = calendar?.publishedDate ?? null;
   const monthCount = calendar?.months.length ?? 0;
   // The URL wins, else the GM's clock, else the first month of year 0.
-  const viewYear = year !== null && Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : now?.year ?? 0;
-  const viewMonth = month !== null && Number.isFinite(Number(month))
-    ? Math.max(0, Math.min(Math.trunc(Number(month)), Math.max(0, monthCount - 1)))
-    : now?.month ?? 0;
+  const viewYear = year !== null && Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : (now?.year ?? 0);
+  const viewMonth =
+    month !== null && Number.isFinite(Number(month))
+      ? Math.max(0, Math.min(Math.trunc(Number(month)), Math.max(0, monthCount - 1)))
+      : (now?.month ?? 0);
 
   const grid = useMemo(() => {
     if (!calendar || calendar.months.length === 0) return null;
@@ -88,26 +108,56 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
     onMonthChange(nextYear, nextMonth);
   };
   const publish = async () => {
-    setPublishing(true); setPublishError(null);
-    try { await calendarApi.publish(gmToken); onChanged(); }
-    catch (failure) { setPublishError(failure instanceof Error ? failure.message : "Couldn't publish the date."); }
-    finally { setPublishing(false); }
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      await calendarApi.publish(gmToken);
+      onChanged();
+    } catch (failure) {
+      setPublishError(failure instanceof Error ? failure.message : "Couldn't publish the date.");
+    } finally {
+      setPublishing(false);
+    }
   };
 
-  if (loading && !calendar) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
-  if (error) return <Alert tone="danger" title="Couldn't load the calendar">{error}</Alert>;
+  if (loading && !calendar)
+    return (
+      <div className="codex-main-loading">
+        {[0, 1, 2].map((row) => (
+          <Skeleton key={row} variant="text" />
+        ))}
+      </div>
+    );
+  if (error)
+    return (
+      <Alert tone="danger" title="Couldn't load the calendar">
+        {error}
+      </Alert>
+    );
   if (!calendar || !grid) {
     return (
       <div className="codex-main-empty">
         <h3>No calendar yet</h3>
         <p>Define the months and weekdays of the world. Dated records are placed on this calendar.</p>
-        <Button variant="primary" onClick={() => setEditorOpen(true)}>Edit calendar</Button>
-        {editorOpen && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={() => { setEditorOpen(false); onChanged(); }} onClose={() => setEditorOpen(false)} />}
+        <Button variant="primary" onClick={() => setEditorOpen(true)}>
+          Edit calendar
+        </Button>
+        {editorOpen && (
+          <CalendarEditor
+            gmToken={gmToken}
+            calendar={calendar}
+            onSaved={() => {
+              setEditorOpen(false);
+              onChanged();
+            }}
+            onClose={() => setEditorOpen(false)}
+          />
+        )}
       </div>
     );
   }
 
-  const selectedRecords = selectedInstant === null ? [] : byInstant.get(selectedInstant) ?? [];
+  const selectedRecords = selectedInstant === null ? [] : (byInstant.get(selectedInstant) ?? []);
 
   return (
     <div className="codex-calendar">
@@ -115,8 +165,12 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
         <div className="codex-calendar-clock">
           <span className="codex-calendar-clocklabel">Your date</span>
           {/* Grows its own paint to 44px rather than overhanging the clock beside it. */}
-          <button type="button" className="codex-calendar-clockset" onClick={() => setDateOpen(true)}
-            aria-label={now ? `Your date is ${formatWorldDate(calendar, now)}. Change it.` : "Set your date"}>
+          <button
+            type="button"
+            className="codex-calendar-clockset"
+            onClick={() => setDateOpen(true)}
+            aria-label={now ? `Your date is ${formatWorldDate(calendar, now)}. Change it.` : "Set your date"}
+          >
             {now ? formatWorldDate(calendar, now) : "Set your date"}
           </button>
           <GmOnlyTag />
@@ -126,38 +180,67 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
           <strong>{published ? formatWorldDate(calendar, published) : "Not shared yet"}</strong>
         </div>
         {/* This view's primary action, always rendered so the GM learns it exists. */}
-        <Button variant="primary" disabled={publishing || !diverged} onClick={() => void publish()}>Publish the date</Button>
-        <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>Edit calendar</Button>
+        <Button variant="primary" disabled={publishing || !diverged} onClick={() => void publish()}>
+          Publish the date
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
+          Edit calendar
+        </Button>
       </header>
       {/* Three states: in sync, ahead of the players, or players have no date yet. */}
       <p className="codex-calendar-clockhint">
-        {!now ? "Your date is the campaign's now — every new record is dated by it. The party sees it only when you publish."
-          : !published ? "The party has no date yet. Publishing shares the date above with them; until then it is yours alone."
-          : diverged ? "You are running ahead of the party. Publishing moves their date to yours."
-          : "The party is on your date. Move yours and this becomes a date only you can see, until you publish again."}
+        {!now
+          ? "Your date is the campaign's now — every new record is dated by it. The party sees it only when you publish."
+          : !published
+            ? "The party has no date yet. Publishing shares the date above with them; until then it is yours alone."
+            : diverged
+              ? "You are running ahead of the party. Publishing moves their date to yours."
+              : "The party is on your date. Move yours and this becomes a date only you can see, until you publish again."}
       </p>
       {publishError && <Alert tone="danger">{publishError}</Alert>}
 
       <div className="codex-calendar-monthbar">
-        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}><IconChevron className="codex-chevron-left" /></Button>
-        <h3 className="codex-calendar-monthname">{grid.monthDef.name} {formatWorldYear(calendar, viewYear)}</h3>
-        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}><IconChevron className="codex-chevron-right" /></Button>
+        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>
+          <IconChevron className="codex-chevron-left" />
+        </Button>
+        <h3 className="codex-calendar-monthname">
+          {grid.monthDef.name} {formatWorldYear(calendar, viewYear)}
+        </h3>
+        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>
+          <IconChevron className="codex-chevron-right" />
+        </Button>
         <label className="codex-calendar-yearjump">
           <span className="nh-sr-only">Jump to year</span>
-          <Input type="number" inputMode="numeric" aria-label="Jump to year" value={String(viewYear)}
-            onChange={(event) => { const next = Number(event.target.value); if (Number.isFinite(next)) onMonthChange(Math.trunc(next), viewMonth); }} />
+          <Input
+            type="number"
+            inputMode="numeric"
+            aria-label="Jump to year"
+            value={String(viewYear)}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) onMonthChange(Math.trunc(next), viewMonth);
+            }}
+          />
         </label>
       </div>
 
-      <div className="codex-calendar-grid" role="grid" aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
-        style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}>
+      <div
+        className="codex-calendar-grid"
+        role="grid"
+        aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
+        style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}
+      >
         {grid.weekdays.map((weekday) => (
           <div key={weekday} className="codex-calendar-weekday" role="columnheader">
             <span className="codex-calendar-weekdayfull">{weekday}</span>
-            <span className="codex-calendar-weekdayshort" aria-hidden="true">{weekday.slice(0, 2)}</span>
+            <span className="codex-calendar-weekdayshort" aria-hidden="true">
+              {weekday.slice(0, 2)}
+            </span>
           </div>
         ))}
-        {Array.from({ length: grid.lead }, (_, index) => <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />)}
+        {Array.from({ length: grid.lead }, (_, index) => (
+          <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />
+        ))}
         {grid.days.map(({ day, instant }) => {
           const dayRecords = byInstant.get(instant) ?? [];
           const isNow = nowInstant === instant;
@@ -165,16 +248,23 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
           const kinds = [...new Set(dayRecords.map((record) => record.kind))].slice(0, 3);
           return (
             /* The cell is the tap target; ::after boxes would overlap across the grid. */
-            <button key={instant} type="button"
+            <button
+              key={instant}
+              type="button"
               className={`codex-calendar-cell${isNow ? " is-now" : ""}${isPublished ? " is-published" : ""}${selectedInstant === instant ? " is-selected" : ""}`}
               aria-pressed={selectedInstant === instant}
               aria-label={`${grid.monthDef.name} ${day}${dayRecords.length ? `, ${dayRecords.length} record${dayRecords.length === 1 ? "" : "s"}` : ""}${isNow ? ", your date" : ""}${isPublished ? ", players' date" : ""}`}
-              onClick={() => setSelectedInstant(selectedInstant === instant ? null : instant)}>
+              onClick={() => setSelectedInstant(selectedInstant === instant ? null : instant)}
+            >
               <span className="codex-calendar-daynum">{day}</span>
               {kinds.length > 0 && (
                 <span className="codex-calendar-marks" aria-hidden="true">
-                  {kinds.map((kind) => <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />)}
-                  {dayRecords.length > kinds.length && <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>}
+                  {kinds.map((kind) => (
+                    <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />
+                  ))}
+                  {dayRecords.length > kinds.length && (
+                    <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>
+                  )}
                 </span>
               )}
             </button>
@@ -185,36 +275,87 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
       {selectedInstant !== null && (
         <section className="codex-calendar-day" aria-label="Records on this day">
           <h4 className="codex-campaign-h">
-            {grid.monthDef.name} {selectedInstant - dateToInstant(calendar, { year: viewYear, month: viewMonth, day: 1 }) + 1}, {formatWorldYear(calendar, viewYear)}
+            {grid.monthDef.name}{" "}
+            {selectedInstant - dateToInstant(calendar, { year: viewYear, month: viewMonth, day: 1 }) + 1},{" "}
+            {formatWorldYear(calendar, viewYear)}
           </h4>
-          {selectedRecords.length === 0
-            ? <p className="codex-list-empty">Nothing happened on this day.</p>
-            : <nav className="codex-campaign-recent" aria-label="Records on this day">
-                {selectedRecords.map((record) => {
-                  const meta = CHRONICLE_KIND_META[record.kind];
-                  return (
-                    <button key={`${record.kind}-${record.id}`} type="button" className="codex-campaign-recentitem"
-                      onClick={() => (record.kind === "event" ? onOpenPage(record.id) : onOpenEntry(record.id))}>
-                      <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
-                      <span className="codex-list-title">{record.title ?? chronicleRowSummary(record) ?? meta.label}</span>
-                      <Badge tone={meta.tone}>{meta.label}</Badge>
-                    </button>
-                  );
-                })}
-              </nav>}
+          {selectedRecords.length === 0 ? (
+            <p className="codex-list-empty">Nothing happened on this day.</p>
+          ) : (
+            <nav className="codex-campaign-recent" aria-label="Records on this day">
+              {selectedRecords.map((record) => {
+                const meta = CHRONICLE_KIND_META[record.kind];
+                return (
+                  <button
+                    key={`${record.kind}-${record.id}`}
+                    type="button"
+                    className="codex-campaign-recentitem"
+                    onClick={() => (record.kind === "event" ? onOpenPage(record.id) : onOpenEntry(record.id))}
+                  >
+                    <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
+                    <span className="codex-list-title">
+                      {record.title ?? chronicleRowSummary(record) ?? meta.label}
+                    </span>
+                    <Badge tone={meta.tone}>{meta.label}</Badge>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
         </section>
       )}
 
-      {editorOpen && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={() => { setEditorOpen(false); onChanged(); }} onClose={() => setEditorOpen(false)} />}
-      {dateOpen && <CampaignDateEditor gmToken={gmToken} calendar={calendar} onSaved={() => { setDateOpen(false); onChanged(); }} onClose={() => setDateOpen(false)} />}
+      {editorOpen && (
+        <CalendarEditor
+          gmToken={gmToken}
+          calendar={calendar}
+          onSaved={() => {
+            setEditorOpen(false);
+            onChanged();
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
+      {dateOpen && (
+        <CampaignDateEditor
+          gmToken={gmToken}
+          calendar={calendar}
+          onSaved={() => {
+            setDateOpen(false);
+            onChanged();
+          }}
+          onClose={() => setDateOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
 /** The player's Calendar: one clock, revealed records only, no structure editing. */
-export function PlayerCalendarView({ calendar, records, year, month, onMonthChange, onOpenEntry }: Readonly<{
-  calendar: Readonly<{ yearName: string; eras?: readonly CodexCalendarEra[]; months: readonly Readonly<{ name: string; days: number }>[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }> | null;
-  records: ReadonlyArray<Readonly<{ id: string; kind: CodexChronicleRecord["kind"]; title: string | null; text: string; calendarInstant: number | null }>>;
+export function PlayerCalendarView({
+  calendar,
+  records,
+  year,
+  month,
+  onMonthChange,
+  onOpenEntry
+}: Readonly<{
+  calendar: Readonly<{
+    yearName: string;
+    eras?: readonly CodexCalendarEra[];
+    months: readonly Readonly<{ name: string; days: number }>[];
+    weekdays: readonly string[];
+    currentDate?: CodexInWorldDate | null;
+  }> | null;
+  records: ReadonlyArray<
+    Readonly<{
+      id: string;
+      kind: CodexChronicleRecord["kind"];
+      title: string | null;
+      text: string;
+      calendarInstant: number | null;
+    }>
+  >;
   year: string | null;
   month: string | null;
   onMonthChange: (year: number, month: number) => void;
@@ -223,10 +364,11 @@ export function PlayerCalendarView({ calendar, records, year, month, onMonthChan
   const [selectedInstant, setSelectedInstant] = useState<number | null>(null);
   const today = calendar?.currentDate ?? null;
   const monthCount = calendar?.months.length ?? 0;
-  const viewYear = year !== null && Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : today?.year ?? 0;
-  const viewMonth = month !== null && Number.isFinite(Number(month))
-    ? Math.max(0, Math.min(Math.trunc(Number(month)), Math.max(0, monthCount - 1)))
-    : today?.month ?? 0;
+  const viewYear = year !== null && Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : (today?.year ?? 0);
+  const viewMonth =
+    month !== null && Number.isFinite(Number(month))
+      ? Math.max(0, Math.min(Math.trunc(Number(month)), Math.max(0, monthCount - 1)))
+      : (today?.month ?? 0);
 
   const grid = useMemo(() => {
     if (!calendar || calendar.months.length === 0 || calendarDaysPerYear(calendar) === 0) return null;
@@ -234,27 +376,42 @@ export function PlayerCalendarView({ calendar, records, year, month, onMonthChan
     const weekdays = calendar.weekdays.length > 0 ? calendar.weekdays : ["Day"];
     const firstInstant = dateToInstant(calendar, { year: viewYear, month: viewMonth, day: 1 });
     const lead = ((firstInstant % weekdays.length) + weekdays.length) % weekdays.length;
-    return { monthDef, weekdays, lead, days: Array.from({ length: monthDef.days }, (_, index) => ({ day: index + 1, instant: firstInstant + index })) };
+    return {
+      monthDef,
+      weekdays,
+      lead,
+      days: Array.from({ length: monthDef.days }, (_, index) => ({ day: index + 1, instant: firstInstant + index }))
+    };
   }, [calendar, viewYear, viewMonth]);
 
   const byInstant = useMemo(() => {
-    const map = new Map<number, typeof records[number][]>();
+    const map = new Map<number, (typeof records)[number][]>();
     for (const record of records) {
       if (record.calendarInstant === null) continue;
       const bucket = map.get(record.calendarInstant) ?? [];
-      bucket.push(record); map.set(record.calendarInstant, bucket);
+      bucket.push(record);
+      map.set(record.calendarInstant, bucket);
     }
     return map;
   }, [records]);
 
-  if (!calendar || !grid) return <div className="codex-main-empty"><h3>No calendar yet</h3><p>When your GM sets up the world's calendar, it appears here.</p></div>;
+  if (!calendar || !grid)
+    return (
+      <div className="codex-main-empty">
+        <h3>No calendar yet</h3>
+        <p>When your GM sets up the world's calendar, it appears here.</p>
+      </div>
+    );
   const todayInstant = today ? dateToInstant(calendar, today) : null;
   const step = (delta: number) => {
     const total = viewYear * calendar.months.length + viewMonth + delta;
     setSelectedInstant(null);
-    onMonthChange(Math.floor(total / calendar.months.length), ((total % calendar.months.length) + calendar.months.length) % calendar.months.length);
+    onMonthChange(
+      Math.floor(total / calendar.months.length),
+      ((total % calendar.months.length) + calendar.months.length) % calendar.months.length
+    );
   };
-  const selectedRecords = selectedInstant === null ? [] : byInstant.get(selectedInstant) ?? [];
+  const selectedRecords = selectedInstant === null ? [] : (byInstant.get(selectedInstant) ?? []);
 
   return (
     <div className="codex-calendar">
@@ -265,33 +422,54 @@ export function PlayerCalendarView({ calendar, records, year, month, onMonthChan
         </div>
       </header>
       <div className="codex-calendar-monthbar">
-        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}><IconChevron className="codex-chevron-left" /></Button>
-        <h3 className="codex-calendar-monthname">{grid.monthDef.name} {formatWorldYear(calendar, viewYear)}</h3>
-        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}><IconChevron className="codex-chevron-right" /></Button>
+        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>
+          <IconChevron className="codex-chevron-left" />
+        </Button>
+        <h3 className="codex-calendar-monthname">
+          {grid.monthDef.name} {formatWorldYear(calendar, viewYear)}
+        </h3>
+        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>
+          <IconChevron className="codex-chevron-right" />
+        </Button>
       </div>
-      <div className="codex-calendar-grid" role="grid" aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
-        style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}>
+      <div
+        className="codex-calendar-grid"
+        role="grid"
+        aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
+        style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}
+      >
         {grid.weekdays.map((weekday) => (
           <div key={weekday} className="codex-calendar-weekday" role="columnheader">
             <span className="codex-calendar-weekdayfull">{weekday}</span>
-            <span className="codex-calendar-weekdayshort" aria-hidden="true">{weekday.slice(0, 2)}</span>
+            <span className="codex-calendar-weekdayshort" aria-hidden="true">
+              {weekday.slice(0, 2)}
+            </span>
           </div>
         ))}
-        {Array.from({ length: grid.lead }, (_, index) => <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />)}
+        {Array.from({ length: grid.lead }, (_, index) => (
+          <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />
+        ))}
         {grid.days.map(({ day, instant }) => {
           const dayRecords = byInstant.get(instant) ?? [];
           const kinds = [...new Set(dayRecords.map((record) => record.kind))].slice(0, 3);
           return (
-            <button key={instant} type="button"
+            <button
+              key={instant}
+              type="button"
               className={`codex-calendar-cell${todayInstant === instant ? " is-published" : ""}${selectedInstant === instant ? " is-selected" : ""}`}
               aria-pressed={selectedInstant === instant}
               aria-label={`${grid.monthDef.name} ${day}${dayRecords.length ? `, ${dayRecords.length} record${dayRecords.length === 1 ? "" : "s"}` : ""}${todayInstant === instant ? ", today" : ""}`}
-              onClick={() => setSelectedInstant(selectedInstant === instant ? null : instant)}>
+              onClick={() => setSelectedInstant(selectedInstant === instant ? null : instant)}
+            >
               <span className="codex-calendar-daynum">{day}</span>
               {kinds.length > 0 && (
                 <span className="codex-calendar-marks" aria-hidden="true">
-                  {kinds.map((kind) => <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />)}
-                  {dayRecords.length > kinds.length && <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>}
+                  {kinds.map((kind) => (
+                    <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />
+                  ))}
+                  {dayRecords.length > kinds.length && (
+                    <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>
+                  )}
                 </span>
               )}
             </button>
@@ -300,20 +478,27 @@ export function PlayerCalendarView({ calendar, records, year, month, onMonthChan
       </div>
       {selectedInstant !== null && (
         <section className="codex-calendar-day" aria-label="Records on this day">
-          {selectedRecords.length === 0
-            ? <p className="codex-list-empty">Nothing happened on this day.</p>
-            : <nav className="codex-campaign-recent" aria-label="Records on this day">
-                {selectedRecords.map((record) => {
-                  const meta = CHRONICLE_KIND_META[record.kind];
-                  return (
-                    <button key={`${record.kind}-${record.id}`} type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
-                      <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
-                      <span className="codex-list-title">{record.title ?? record.text ?? meta.label}</span>
-                      <Badge tone={meta.tone}>{meta.label}</Badge>
-                    </button>
-                  );
-                })}
-              </nav>}
+          {selectedRecords.length === 0 ? (
+            <p className="codex-list-empty">Nothing happened on this day.</p>
+          ) : (
+            <nav className="codex-campaign-recent" aria-label="Records on this day">
+              {selectedRecords.map((record) => {
+                const meta = CHRONICLE_KIND_META[record.kind];
+                return (
+                  <button
+                    key={`${record.kind}-${record.id}`}
+                    type="button"
+                    className="codex-campaign-recentitem"
+                    onClick={() => onOpenEntry(record.id)}
+                  >
+                    <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
+                    <span className="codex-list-title">{record.title ?? record.text ?? meta.label}</span>
+                    <Badge tone={meta.tone}>{meta.label}</Badge>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
         </section>
       )}
     </div>

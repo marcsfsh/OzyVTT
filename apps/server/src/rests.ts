@@ -24,12 +24,23 @@ function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDice
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
  *  The caller rolls the faces before the store executes (so retries never reroll) and records them; this
  *  owns validation, healing (via healActor) and the pool decrement. */
-export function spendHitDice(state: GameState, actorId: string, faces: readonly number[], scope: ActorScope, resolveDefinition: (definitionId: string) => ActorDefinition | undefined): { healed: number; events: EffectNarration[]; conModifier: number } {
+export function spendHitDice(
+  state: GameState,
+  actorId: string,
+  faces: readonly number[],
+  scope: ActorScope,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): { healed: number; events: EffectNarration[]; conModifier: number } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
-  if (!actor.hitDice) throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
-  if (actor.hitDice.remaining < faces.length) throw new CommandRejectedError(`${actor.name} has ${actor.hitDice.remaining} Hit ${actor.hitDice.remaining === 1 ? "Die" : "Dice"} left.`);
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
+    throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
+  if (!actor.hitDice)
+    throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
+  if (actor.hitDice.remaining < faces.length)
+    throw new CommandRejectedError(
+      `${actor.name} has ${actor.hitDice.remaining} Hit ${actor.hitDice.remaining === 1 ? "Die" : "Dice"} left.`
+    );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
   const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
@@ -51,10 +62,17 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
  * Long: remaining effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
  * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
  */
-export function applyRest(state: GameState, actorId: string, kind: "long" | "short", resolveDefinition: (definitionId: string) => ActorDefinition | undefined, catalog?: EquipmentCatalog): EffectNarration[] {
+export function applyRest(
+  state: GameState,
+  actorId: string,
+  kind: "long" | "short",
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog
+): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("End the encounter before resting a combatant who is in it.");
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
+    throw new CommandRejectedError("End the encounter before resting a combatant who is in it.");
   const events: EffectNarration[] = [];
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
@@ -76,7 +94,8 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").
-  if (actor.hitDice) actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
+  if (actor.hitDice)
+    actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
   actor.actionUses = {};
@@ -85,7 +104,10 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
   if (exhaustion) {
     if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
-    else actor.conditions = actor.conditions.map((condition) => condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition);
+    else
+      actor.conditions = actor.conditions.map((condition) =>
+        condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition
+      );
   }
   // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
   // No spellcasting leaves these untouched.
@@ -93,11 +115,21 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the
     // spend clamp.
-    const maxByLevel = new Map(spellSlotMaxima(longRestDefinition, deriveEquipment(actor, longRestDefinition, catalog).spellSlots).map((entry) => [entry.level, entry.max] as const));
-    actor.spellSlots = actor.spellSlots.map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level) ?? slot.remaining }));
+    const maxByLevel = new Map(
+      spellSlotMaxima(longRestDefinition, deriveEquipment(actor, longRestDefinition, catalog).spellSlots).map(
+        (entry) => [entry.level, entry.max] as const
+      )
+    );
+    actor.spellSlots = actor.spellSlots.map((slot) => ({
+      ...slot,
+      remaining: maxByLevel.get(slot.level) ?? slot.remaining
+    }));
   }
   const pactMaximum = actor.pactSlots ? pactSlotMaximum(longRestDefinition) : null;
   if (actor.pactSlots && pactMaximum) actor.pactSlots = { ...actor.pactSlots, remaining: pactMaximum.max };
-  if (longRestDefinition?.spellcasting) actor.preparedSpellIds = longRestDefinition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id);
+  if (longRestDefinition?.spellcasting)
+    actor.preparedSpellIds = longRestDefinition.spellcasting.spells
+      .filter((spell) => spell.prepared || spell.alwaysPrepared)
+      .map((spell) => spell.id);
   return events;
 }

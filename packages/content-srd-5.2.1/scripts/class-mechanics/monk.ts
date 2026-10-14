@@ -8,8 +8,18 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 /** Every damage type but Force - Superior Defense's "Resistance to all damage except Force damage". */
 const ALL_BUT_FORCE = [
-  "acid", "bludgeoning", "cold", "fire", "lightning", "necrotic",
-  "piercing", "poison", "psychic", "radiant", "slashing", "thunder"
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder"
 ] as const;
 
 export const monk: ClassMechanicsModule = {
@@ -38,14 +48,16 @@ export const monk: ClassMechanicsModule = {
           id: "patient-defense",
           name: "Patient Defense",
           activation: "bonus-action",
-          description: "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point.",
+          description:
+            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point.",
           damage: []
         },
         {
           id: "step-of-the-wind",
           name: "Step of the Wind",
           activation: "bonus-action",
-          description: "Expend 1 Focus Point to take both the Disengage and Dash actions as a Bonus Action, and your jump distance is doubled for the turn. Taking Dash alone as a Bonus Action costs no Focus Point.",
+          description:
+            "Expend 1 Focus Point to take both the Disengage and Dash actions as a Bonus Action, and your jump distance is doubled for the turn. Taking Dash alone as a Bonus Action costs no Focus Point.",
           damage: []
         }
       ]
@@ -65,14 +77,17 @@ export const monk: ClassMechanicsModule = {
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
-      actions: [{
-        id: "stunning-strike",
-        name: "Stunning Strike",
-        activation: "other",
-        description: "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage.",
-        damage: [],
-        save: { ability: "con", dc: { base: 8, ability: "wis", proficiencyBonus: true } }
-      }]
+      actions: [
+        {
+          id: "stunning-strike",
+          name: "Stunning Strike",
+          activation: "other",
+          description:
+            "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage.",
+          damage: [],
+          save: { ability: "con", dc: { base: 8, ability: "wis", proficiencyBonus: true } }
+        }
+      ]
     },
     /** "Your physical and mental discipline grant you proficiency in all saving throws." */
     "disciplined-survivor": {
@@ -81,12 +96,14 @@ export const monk: ClassMechanicsModule = {
     // Authored as `effects` so an activation is synthesised. The 3-point price and the Incapacitated
     // end condition stay prose.
     "superior-defense": {
-      effects: [{
-        name: "Superior Defense",
-        tags: ["superior-defense"],
-        duration: { type: "rounds", rounds: 10 },
-        modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
-      }]
+      effects: [
+        {
+          name: "Superior Defense",
+          tags: ["superior-defense"],
+          duration: { type: "rounds", rounds: 10 },
+          modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+        }
+      ]
     },
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
@@ -108,24 +125,30 @@ export const monk: ClassMechanicsModule = {
       // Uses equal the Wisdom modifier (minimum 1); the Martial Arts die heal stays prose.
       "wholeness-of-body": {
         uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
-        actions: [{
-          id: "wholeness-of-body",
-          name: "Wholeness of Body",
-          activation: "bonus-action",
-          description: "Roll your Martial Arts die and regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).",
-          damage: []
-        }]
+        actions: [
+          {
+            id: "wholeness-of-body",
+            name: "Wholeness of Body",
+            activation: "bonus-action",
+            description:
+              "Roll your Martial Arts die and regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).",
+            damage: []
+          }
+        ]
       },
       // Flat 10d12 against the Monk's derived DC. The 4-point price, duration and one-target rule stay prose.
       "quivering-palm": {
-        actions: [{
-          id: "quivering-palm",
-          name: "Quivering Palm",
-          activation: "action",
-          description: "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
-          damage: [{ formula: "10d12", type: "force" }],
-          save: { ability: "con", dc: { base: 8, ability: "wis", proficiencyBonus: true } }
-        }]
+        actions: [
+          {
+            id: "quivering-palm",
+            name: "Quivering Palm",
+            activation: "action",
+            description:
+              "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
+            damage: [{ formula: "10d12", type: "force" }],
+            save: { ability: "con", dc: { base: 8, ability: "wis", proficiencyBonus: true } }
+          }
+        ]
       }
       // Not modeled: Open Hand Technique (per-hit choice with different saves) and Fleet Step (extra Bonus Action).
     }

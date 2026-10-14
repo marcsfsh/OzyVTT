@@ -17,16 +17,39 @@ import { beginTargeting, clearTargeting, resolveTargeting, toggleTarget } from "
  */
 
 const ATTACK: ContentActionSummary = {
-  id: "dagger", name: "Dagger", activation: "action", description: "A dagger.",
-  attackBonus: 5, reachFeet: 5, rangeFeet: null, rangeNormalFeet: null,
-  saveAbility: null, saveDc: null, damage: [{ formula: "1d4+2", type: "piercing" }],
-  area: null, attackCount: null, usesLimit: null, usesPer: null, usesRecharge: null,
-  usesPool: null, requiresEffectTag: null, multiattack: null, grants: false, reaction: null,
+  id: "dagger",
+  name: "Dagger",
+  activation: "action",
+  description: "A dagger.",
+  attackBonus: 5,
+  reachFeet: 5,
+  rangeFeet: null,
+  rangeNormalFeet: null,
+  saveAbility: null,
+  saveDc: null,
+  damage: [{ formula: "1d4+2", type: "piercing" }],
+  area: null,
+  attackCount: null,
+  usesLimit: null,
+  usesPer: null,
+  usesRecharge: null,
+  usesPool: null,
+  requiresEffectTag: null,
+  multiattack: null,
+  grants: false,
+  reaction: null,
   targeting: "single"
 };
 const ATTACKER = "11111111-1111-4111-8111-111111111111";
 const TARGET = "22222222-2222-4222-8222-222222222222";
-const BLOCK = { ok: false as const, blocked: { rule: "economy.action-used", message: "Lyra Emberwise has already used an action this turn.", overridable: true } };
+const BLOCK = {
+  ok: false as const,
+  blocked: {
+    rule: "economy.action-used",
+    message: "Lyra Emberwise has already used an action this turn.",
+    overridable: true
+  }
+};
 
 type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
 const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
@@ -47,7 +70,10 @@ function refuseTheAttack(): Record<string, unknown> {
 }
 
 describe("asking the GM about a refused move", () => {
-  beforeEach(() => { clearTargeting(); vi.clearAllMocks(); });
+  beforeEach(() => {
+    clearTargeting();
+    vi.clearAllMocks();
+  });
 
   it("still sends the attack itself as a preview, so the player keeps their confirm step", () => {
     expect(refuseTheAttack().commit).toBe(false);

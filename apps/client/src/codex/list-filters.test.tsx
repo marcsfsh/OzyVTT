@@ -39,22 +39,35 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      listConnections: (...a: unknown[]) => listConnections(...a), party: (...a: unknown[]) => party(...a),
-      getSettings: (...a: unknown[]) => getSettings(...a), search: (...a: unknown[]) => search(...a),
+      listPages: (...a: unknown[]) => listPages(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      listConnections: (...a: unknown[]) => listConnections(...a),
+      party: (...a: unknown[]) => party(...a),
+      getSettings: (...a: unknown[]) => getSettings(...a),
+      search: (...a: unknown[]) => search(...a),
       markersForPage: async () => []
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
-      listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
-      listMarkers: async () => [], chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listConnections: (...a: unknown[]) => playerConnections(...a), party: (...a: unknown[]) => playerParty(...a),
-      sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a),
-      standing: (...a: unknown[]) => playerStanding(...a), calendar: (...a: unknown[]) => playerCalendar(...a),
+      listPages: (...a: unknown[]) => playerListPages(...a),
+      listMaps: (...a: unknown[]) => playerListMaps(...a),
+      listMarkers: async () => [],
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
+      listConnections: (...a: unknown[]) => playerConnections(...a),
+      party: (...a: unknown[]) => playerParty(...a),
+      sessions: (...a: unknown[]) => playerSessions(...a),
+      quests: (...a: unknown[]) => playerQuests(...a),
+      standing: (...a: unknown[]) => playerStanding(...a),
+      calendar: (...a: unknown[]) => playerCalendar(...a),
       search: (...a: unknown[]) => playerSearch(...a)
     },
     journalApi: { ...actual.journalApi, chronicle: (...a: unknown[]) => chronicle(...a), forPage: async () => [] },
-    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: async () => [], listMarkers: async () => [] },
+    atlasApi: {
+      ...actual.atlasApi,
+      listMaps: (...a: unknown[]) => listMaps(...a),
+      listAssets: async () => [],
+      listMarkers: async () => []
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a) },
     questApi: { ...actual.questApi, list: (...a: unknown[]) => listQuests(...a) },
@@ -68,12 +81,32 @@ import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 
 const session = (id: string, number: number, status: "planned" | "played", recap = "") => ({
-  id, sessionNumber: number, realDate: null, attendees: [], prepBody: "", recapBody: recap, status,
-  tags: [], revealedToPlayers: true, rev: 1, createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+  id,
+  sessionNumber: number,
+  realDate: null,
+  attendees: [],
+  prepBody: "",
+  recapBody: recap,
+  status,
+  tags: [],
+  revealedToPlayers: true,
+  rev: 1,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 });
 const quest = (id: string, title: string, status: "active" | "completed" | "failed") => ({
-  id, title, status, playerBody: "", gmBody: "", objectives: [], entityIds: [], tags: [],
-  revealedToPlayers: true, rev: 1, createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+  id,
+  title,
+  status,
+  playerBody: "",
+  gmBody: "",
+  objectives: [],
+  entityIds: [],
+  tags: [],
+  revealedToPlayers: true,
+  rev: 1,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 });
 
 beforeEach(() => {
@@ -85,9 +118,21 @@ beforeEach(() => {
   search.mockResolvedValue({ hits: [], truncated: false });
   chronicle.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
-  getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [], currentInstant: 0, publishedInstant: 0 });
-  listSessions.mockResolvedValue({ sessions: [session("s1", 1, "played", "the crypt"), session("s2", 2, "planned")], activeSessionId: null });
-  listQuests.mockResolvedValue([quest("q1", "The Sunless Crown", "active"), quest("q2", "The Missing Cask", "completed")]);
+  getCalendar.mockResolvedValue({
+    yearName: "DR",
+    months: [{ name: "Hammer", days: 30 }],
+    weekdays: [],
+    currentInstant: 0,
+    publishedInstant: 0
+  });
+  listSessions.mockResolvedValue({
+    sessions: [session("s1", 1, "played", "the crypt"), session("s2", 2, "planned")],
+    activeSessionId: null
+  });
+  listQuests.mockResolvedValue([
+    quest("q1", "The Sunless Crown", "active"),
+    quest("q2", "The Missing Cask", "completed")
+  ]);
   listStanding.mockResolvedValue([]);
   playerListPages.mockResolvedValue([]);
   playerListMaps.mockResolvedValue([]);
@@ -101,7 +146,12 @@ beforeEach(() => {
   playerSearch.mockResolvedValue({ hits: [], truncated: false });
 });
 
-const renderGm = (at: string) => (goTo(at), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderGm = (at: string) =>
+  (goTo(at), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 const renderPlayer = (at: string) => (goTo(at), render)(<PlayerCodex token="player" />);
 const rail = async (name: string) => within(await screen.findByRole("navigation", { name }));
 
@@ -181,8 +231,34 @@ describe("D10 — the player's lists filter in place too", () => {
   it("Journal: the GM's three filters, over the player's own records", async () => {
     const user = userEvent.setup();
     playerChronicle.mockResolvedValue([
-      { id: "j1", kind: "entry", title: null, text: "We reached Vallaki", tags: ["travel"], realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, sessionId: null, sessionNumber: null, createdAt: "2026-07-31T00:00:00.000Z" },
-      { id: "j2", kind: "deadline", title: "The feast", text: "Before the feast", tags: [], realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, sessionId: null, sessionNumber: null, createdAt: "2026-07-31T00:00:00.000Z" }
+      {
+        id: "j1",
+        kind: "entry",
+        title: null,
+        text: "We reached Vallaki",
+        tags: ["travel"],
+        realDate: null,
+        inWorldLabel: null,
+        inWorldDate: null,
+        calendarInstant: null,
+        sessionId: null,
+        sessionNumber: null,
+        createdAt: "2026-07-31T00:00:00.000Z"
+      },
+      {
+        id: "j2",
+        kind: "deadline",
+        title: "The feast",
+        text: "Before the feast",
+        tags: [],
+        realDate: null,
+        inWorldLabel: null,
+        inWorldDate: null,
+        calendarInstant: null,
+        sessionId: null,
+        sessionNumber: null,
+        createdAt: "2026-07-31T00:00:00.000Z"
+      }
     ]);
     renderPlayer("/codex/journal");
     await waitFor(() => expect(screen.getByText("We reached Vallaki")).toBeInTheDocument());
@@ -197,8 +273,24 @@ describe("D10 — the player's lists filter in place too", () => {
   it("Pages: the kind filter is settable IN PLACE, not only by a dashboard card", async () => {
     const user = userEvent.setup();
     playerListPages.mockResolvedValue([
-      { id: "p1", title: "Strahd", entityType: "character", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-31T00:00:00.000Z" },
-      { id: "p2", title: "Vallaki", entityType: "location", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-31T00:00:00.000Z" }
+      {
+        id: "p1",
+        title: "Strahd",
+        entityType: "character",
+        folder: null,
+        tags: [],
+        bannerAssetId: null,
+        updatedAt: "2026-07-31T00:00:00.000Z"
+      },
+      {
+        id: "p2",
+        title: "Vallaki",
+        entityType: "location",
+        folder: null,
+        tags: [],
+        bannerAssetId: null,
+        updatedAt: "2026-07-31T00:00:00.000Z"
+      }
     ]);
     renderPlayer("/codex/pages");
     await waitFor(() => expect(screen.getByText("Strahd")).toBeInTheDocument());

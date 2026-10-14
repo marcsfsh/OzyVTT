@@ -24,8 +24,10 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      listConnections: (...a: unknown[]) => listConnections(...a), party: (...a: unknown[]) => party(...a),
+      listPages: (...a: unknown[]) => listPages(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      listConnections: (...a: unknown[]) => listConnections(...a),
+      party: (...a: unknown[]) => party(...a),
       getSettings: (...a: unknown[]) => getSettings(...a)
     },
     journalApi: { ...actual.journalApi, chronicle: (...a: unknown[]) => chronicle(...a) },
@@ -37,9 +39,14 @@ vi.mock("./api", async (importOriginal) => {
     playerCodexApi: {
       ...actual.playerCodexApi,
       listPages: (...a: unknown[]) => playerPages(...a),
-      listMaps: async () => [], chronicle: async () => [], listConnections: async () => [],
-      calendar: async () => null, sessions: async () => [], quests: async () => [],
-      standing: async () => [], party: async () => null
+      listMaps: async () => [],
+      chronicle: async () => [],
+      listConnections: async () => [],
+      calendar: async () => null,
+      sessions: async () => [],
+      quests: async () => [],
+      standing: async () => [],
+      party: async () => null
     }
   };
 });
@@ -62,18 +69,33 @@ function setViewport(width: number): void {
     const max = /max-width:\s*(\d+)px/.exec(query);
     const matches = (!min || width >= Number(min[1])) && (!max || width <= Number(max[1]));
     return {
-      matches, media: query, onchange: null,
+      matches,
+      media: query,
+      onchange: null,
       addEventListener: (_: string, fn: () => void) => listeners.add(fn),
       removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
-      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false
     } as unknown as MediaQueryList;
   }) as typeof window.matchMedia;
 }
 
 const PAGE = {
-  id: "p1", title: "Strahd", entityType: "character" as const, fields: {}, folder: null, tags: [],
-  revealedToPlayers: false, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id: "p1",
+  title: "Strahd",
+  entityType: "character" as const,
+  fields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 };
 
 beforeEach(() => {
@@ -85,14 +107,33 @@ beforeEach(() => {
   getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: true, intervalSeconds: 1 } });
   chronicle.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
-  getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [], currentInstant: 0, publishedInstant: 0 });
+  getCalendar.mockResolvedValue({
+    yearName: "DR",
+    months: [{ name: "Hammer", days: 30 }],
+    weekdays: [],
+    currentInstant: 0,
+    publishedInstant: 0
+  });
   listSessions.mockResolvedValue({ sessions: [], activeSessionId: null });
   listQuests.mockResolvedValue([]);
   listStanding.mockResolvedValue([]);
-  playerPages.mockResolvedValue([{ id: "p1", title: "Strahd", entityType: "character", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-28T00:00:00.000Z" }]);
+  playerPages.mockResolvedValue([
+    {
+      id: "p1",
+      title: "Strahd",
+      entityType: "character",
+      folder: null,
+      tags: [],
+      bannerAssetId: null,
+      updatedAt: "2026-07-28T00:00:00.000Z"
+    }
+  ]);
 });
 const realMatchMedia = window.matchMedia;
-afterEach(() => { window.matchMedia = realMatchMedia; localStorage.clear(); });
+afterEach(() => {
+  window.matchMedia = realMatchMedia;
+  localStorage.clear();
+});
 
 /** The aside's nav; the drawer's always-expanded copy has the same name. */
 const asideNav = () => screen.getAllByRole("navigation", { name: "Codex sections" })[0];
@@ -101,7 +142,11 @@ describe("The GM sidebar in the 761–849 band", () => {
   it("renders the rail even though the stored preference says open", async () => {
     setViewport(768);
     goTo("/codex");
-    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
     const nav = within(asideNav());
@@ -117,7 +162,11 @@ describe("The GM sidebar in the 761–849 band", () => {
   it("names the search entry, which is a bare glyph once the label is gone", async () => {
     setViewport(768);
     goTo("/codex");
-    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(within(asideNav()).getByRole("button", { name: "Search" })).toBeInTheDocument();
   });
@@ -125,7 +174,11 @@ describe("The GM sidebar in the 761–849 band", () => {
   it("is expanded again at 900px, where the track is 220px", async () => {
     setViewport(900);
     goTo("/codex");
-    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
     const nav = within(asideNav());
@@ -137,7 +190,11 @@ describe("The GM sidebar in the 761–849 band", () => {
   it("leaves the GM's stored preference alone — leaving the band restores what they chose", async () => {
     setViewport(768);
     goTo("/codex");
-    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(localStorage.getItem("codex-sidebar")).toBe("open");
   });
@@ -170,7 +227,11 @@ describe("The player sidebar in the 761–849 band", () => {
 describe("Collapsing the sidebar is reversible (both directions)", () => {
   const renderGm = async () => {
     goTo("/codex");
-    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listPages).toHaveBeenCalled());
   };
 

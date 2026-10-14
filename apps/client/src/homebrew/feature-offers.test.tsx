@@ -34,14 +34,23 @@ const WARD_FEAT: Draft = {
 
 /** The named budgets as printed, in `NAMED_PICK_BUDGET_KEYS` order, plus this record's own feature. */
 const OFFERED = [
-  "Class Skills", "Class Tools", "Background Skills", "Background Tools",
-  "Background Languages", "Species Languages", "Class Cantrips", "Class Spells",
+  "Class Skills",
+  "Class Tools",
+  "Background Skills",
+  "Background Tools",
+  "Background Languages",
+  "Species Languages",
+  "Class Cantrips",
+  "Class Spells",
   "Feature: Echoed Ward"
 ];
 
 function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);
-  const write = (next: Draft) => { setDraft(next); onBody(next); };
+  const write = (next: Draft) => {
+    setDraft(next);
+    onBody(next);
+  };
   return (
     <SchemaForm
       schema={SCHEMAS.feat}
@@ -50,7 +59,14 @@ function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => vo
       ctx={EMPTY_CONTEXT}
       custom={{
         features: ({ field }) => (
-          <FeatureEditor draft={draft} onDraft={write} ctx={EMPTY_CONTEXT} featuresKey={field.key} single idPrefix="hb-feat" />
+          <FeatureEditor
+            draft={draft}
+            onDraft={write}
+            ctx={EMPTY_CONTEXT}
+            featuresKey={field.key}
+            single
+            idPrefix="hb-feat"
+          />
         )
       }}
     />
@@ -59,7 +75,14 @@ function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => vo
 
 function mount(seed: Draft = WARD_FEAT) {
   let body: Draft = seed;
-  render(<RecordForm seed={seed} onBody={(next) => { body = next; }} />);
+  render(
+    <RecordForm
+      seed={seed}
+      onBody={(next) => {
+        body = next;
+      }}
+    />
+  );
   const user = userEvent.setup();
   return {
     user,
@@ -69,10 +92,12 @@ function mount(seed: Draft = WARD_FEAT) {
     clear: (label: string) => screen.getByRole("button", { name: `Clear ${label}` }),
     /** The open chooser's options, in order. A datalist has no listbox at all. */
     offered: (name: string) =>
-      within(screen.getByRole("listbox", { name })).getAllByRole("option").map((option) => option.textContent),
+      within(screen.getByRole("listbox", { name }))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
     /** The body `useAutosave` would send. */
     feature: () => (forStorage(body) as { feature?: Record<string, unknown> }).feature ?? {},
-    choice: () => ((forStorage(body) as { feature?: { choice?: Record<string, unknown> } }).feature?.choice ?? {})
+    choice: () => (forStorage(body) as { feature?: { choice?: Record<string, unknown> } }).feature?.choice ?? {}
   };
 }
 
@@ -89,8 +114,20 @@ describe("choice.kind — the reserved kinds are on screen, and a homebrew kind 
     const form = await emptied();
     await form.user.click(form.box("What kind of choice"));
     expect(form.offered("What kind of choice")).toEqual([
-      "Feat", "Fighting Style", "Asi Or Feat", "Subclass", "Lineage", "Spell", "Cantrip",
-      "Skill", "Tool", "Language", "Skill Or Tool", "Expertise", "Ability Score", "Weapon Mastery"
+      "Feat",
+      "Fighting Style",
+      "Asi Or Feat",
+      "Subclass",
+      "Lineage",
+      "Spell",
+      "Cantrip",
+      "Skill",
+      "Tool",
+      "Language",
+      "Skill Or Tool",
+      "Expertise",
+      "Ability Score",
+      "Weapon Mastery"
     ]);
   });
 
@@ -142,7 +179,9 @@ describe("the three offer boxes — one namespace, opened rather than spelled", 
     // would be `feature:-my-ward`, which `offerValidate` refuses.
     await form.user.type(form.box("Which pick"), "feature: my ward{Enter}");
     expect(form.feature().replaces).toEqual([{ offer: "feature:my-ward", when: "long-rest", amount: 1 }]);
-    expect(screen.queryByText("Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.")).toBeNull();
+    expect(
+      screen.queryByText("Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.")
+    ).toBeNull();
   });
 
   it("fromPicks: the fourth source names its budget from the same list", async () => {

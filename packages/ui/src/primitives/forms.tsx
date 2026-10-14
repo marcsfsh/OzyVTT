@@ -1,10 +1,4 @@
-import type {
-  InputHTMLAttributes,
-  ReactNode,
-  Ref,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes
-} from "react";
+import type { InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cx } from "./util";
 import { IconWarning } from "./icons";
 import "./forms.css";
@@ -17,7 +11,18 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   ref?: Ref<HTMLInputElement>;
 }
 export function Input({ invalid, variant = "default", className, ...rest }: InputProps) {
-  return <input className={cx("nh-input", variant !== "default" && `nh-input--${variant}`, invalid && "nh-input--invalid", className)} aria-invalid={invalid || undefined} {...rest} />;
+  return (
+    <input
+      className={cx(
+        "nh-input",
+        variant !== "default" && `nh-input--${variant}`,
+        invalid && "nh-input--invalid",
+        className
+      )}
+      aria-invalid={invalid || undefined}
+      {...rest}
+    />
+  );
 }
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -26,7 +31,11 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 export function Select({ invalid, className, children, ...rest }: SelectProps) {
   return (
-    <select className={cx("nh-input", "nh-select", invalid && "nh-input--invalid", className)} aria-invalid={invalid || undefined} {...rest}>
+    <select
+      className={cx("nh-input", "nh-select", invalid && "nh-input--invalid", className)}
+      aria-invalid={invalid || undefined}
+      {...rest}
+    >
       {children}
     </select>
   );
@@ -37,7 +46,13 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   ref?: Ref<HTMLTextAreaElement>;
 }
 export function Textarea({ invalid, className, ...rest }: TextareaProps) {
-  return <textarea className={cx("nh-input", "nh-textarea", invalid && "nh-input--invalid", className)} aria-invalid={invalid || undefined} {...rest} />;
+  return (
+    <textarea
+      className={cx("nh-input", "nh-textarea", invalid && "nh-input--invalid", className)}
+      aria-invalid={invalid || undefined}
+      {...rest}
+    />
+  );
 }
 
 export interface FieldProps {
@@ -59,13 +74,21 @@ export function Field({ label, htmlFor, help, error, required, className, childr
       {label != null && (
         <label className="nh-field-label" htmlFor={htmlFor}>
           {label}
-          {required && <span aria-hidden="true" className="nh-field-req"> *</span>}
+          {required && (
+            <span aria-hidden="true" className="nh-field-req">
+              {" "}
+              *
+            </span>
+          )}
         </label>
       )}
       {children}
       {error != null ? (
         <p className="nh-field-error" role="alert">
-          <span className="nh-field-error-icon" aria-hidden="true"><IconWarning /></span>{error}
+          <span className="nh-field-error-icon" aria-hidden="true">
+            <IconWarning />
+          </span>
+          {error}
         </p>
       ) : help != null ? (
         <p className="nh-field-help">{help}</p>

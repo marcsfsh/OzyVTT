@@ -46,18 +46,25 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A second launch with a different prefill must re-seed the fields; the dialog is mounted once.
-  useEffect(() => { setTitle(request.title ?? ""); setEntityType(request.entityType ?? "note"); setError(null); }, [request]);
+  useEffect(() => {
+    setTitle(request.title ?? "");
+    setEntityType(request.entityType ?? "note");
+    setError(null);
+  }, [request]);
 
   const create = async () => {
     const name = title.trim();
     if (!name || busy) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       const scaffold = SCAFFOLDS[entityType];
       const page = await codexApi.createPage(gmToken, {
-        title: name, entityType,
+        title: name,
+        entityType,
         ...(request.folder ? { folder: request.folder } : {}),
-        playerBody: scaffold.player, gmBody: scaffold.gm,
+        playerBody: scaffold.player,
+        gmBody: scaffold.gm,
         // Idempotency key: the button can be double-tapped, and a retry must not create two pages.
         commandId: newId()
       });
@@ -78,23 +85,55 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
       size="sm"
       title="New page"
       ariaLabel="New page"
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" disabled={!title.trim() || busy} onClick={() => void create()}>Create</Button>
-      </>}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!title.trim() || busy} onClick={() => void create()}>
+            Create
+          </Button>
+        </>
+      }
     >
       {request.note && <p className="codex-composer-hint">{request.note}</p>}
       <Field label="Name" htmlFor="codex-quickcreate-name">
-        <Input id="codex-quickcreate-name" value={title} autoFocus placeholder="Name the page"
+        <Input
+          id="codex-quickcreate-name"
+          value={title}
+          autoFocus
+          placeholder="Name the page"
           onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void create(); } }} />
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void create();
+            }
+          }}
+        />
       </Field>
-      <Field label="Kind" htmlFor="codex-quickcreate-kind" help="The kind determines which fields appear. You can change it later.">
-        <Select id="codex-quickcreate-kind" value={entityType} onChange={(event) => setEntityType(event.target.value as EntityType)}>
-          {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].label}</option>)}
+      <Field
+        label="Kind"
+        htmlFor="codex-quickcreate-kind"
+        help="The kind determines which fields appear. You can change it later."
+      >
+        <Select
+          id="codex-quickcreate-kind"
+          value={entityType}
+          onChange={(event) => setEntityType(event.target.value as EntityType)}
+        >
+          {ENTITY_TYPE_LIST.map((type) => (
+            <option key={type} value={type}>
+              {ENTITY_DEFS[type].label}
+            </option>
+          ))}
         </Select>
       </Field>
-      {request.folder && <p className="codex-composer-hint">Filed in <strong>{request.folder}</strong>.</p>}
+      {request.folder && (
+        <p className="codex-composer-hint">
+          Filed in <strong>{request.folder}</strong>.
+        </p>
+      )}
       {error && <Alert tone="danger">{error}</Alert>}
     </Modal>
   );

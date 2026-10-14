@@ -20,7 +20,16 @@ export interface PanelProps extends HTMLAttributes<HTMLElement> {
 
 /** Resting surface: surface-1, 1px line, radius-md, no glow. A panel glows only
     while it is the active target (add .is-active-turn / .is-selected then). */
-export function Panel({ accent = "none", frost = false, interactive = false, lift = false, entrance = false, className, children, ...rest }: PanelProps) {
+export function Panel({
+  accent = "none",
+  frost = false,
+  interactive = false,
+  lift = false,
+  entrance = false,
+  className,
+  children,
+  ...rest
+}: PanelProps) {
   return (
     <section
       className={cx(

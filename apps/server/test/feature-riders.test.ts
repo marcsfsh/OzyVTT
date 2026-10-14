@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, SpeciesReferenceSchema, SubclassReferenceSchema
+  BackgroundReferenceSchema,
+  ClassReferenceSchema,
+  SpeciesReferenceSchema,
+  SubclassReferenceSchema
 } from "@vtt/content-srd-5.2.1";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders } from "@vtt/rules-5e";
@@ -70,8 +73,12 @@ type Carrier = (typeof CARRIERS)[number];
 
 /** The `name` each carrier's record has, which is the `label` its `RiderCarrier` is found by. */
 const LABEL: Readonly<Record<Carrier, string>> = {
-  class: "Rift Attunement", subclass: "Rift Breaking", species: "Rift Sense",
-  lineage: "Deep Rift", background: "Rift Lore", option: "Rift Blade"
+  class: "Rift Attunement",
+  subclass: "Rift Breaking",
+  species: "Rift Sense",
+  lineage: "Deep Rift",
+  background: "Rift Lore",
+  option: "Rift Blade"
 };
 
 type Homebrew = Readonly<{
@@ -103,7 +110,16 @@ function classFor(brew: Homebrew) {
   const levelTable = Array.from({ length: 20 }, (_, index) => ({
     level: index + 1,
     proficiencyBonus: 2 + Math.floor(index / 4),
-    features: index === 0 ? ["rift-attunement", "rift-focus", "rift-surge", "rift-channel", ...(brew.boon === undefined ? [] : ["rift-apotheosis"])] : [],
+    features:
+      index === 0
+        ? [
+            "rift-attunement",
+            "rift-focus",
+            "rift-surge",
+            "rift-channel",
+            ...(brew.boon === undefined ? [] : ["rift-apotheosis"])
+          ]
+        : [],
     // The printed column, stepping 2/2/3/3/4..., read by `scaling: {type: "class-resource"}`.
     classResources: [
       { id: "rift-charge", name: "Rift Charges", amount: 2 + Math.floor(index / 2), display: true },
@@ -111,55 +127,103 @@ function classFor(brew: Homebrew) {
     ]
   }));
   return ClassReferenceSchema.parse({
-    id: "hb-riftwarden", name: "Riftwarden", source: "homebrew", summary: "A homebrew class.",
-    hitDie: "d10", statPriority: ["str", "con", "dex", "wis", "int", "cha"], primaryAbilities: ["str"],
-    savingThrows: ["str", "con"], skillChoices: { choose: 0, from: [] },
+    id: "hb-riftwarden",
+    name: "Riftwarden",
+    source: "homebrew",
+    summary: "A homebrew class.",
+    hitDie: "d10",
+    statPriority: ["str", "con", "dex", "wis", "int", "cha"],
+    primaryAbilities: ["str"],
+    savingThrows: ["str", "con"],
+    skillChoices: { choose: 0, from: [] },
     armorProficiencies: ["light", "medium", "heavy", "shields"],
     weaponProficiencies: ["simple", "martial"],
-    subclassLevel: 3, asiLevels: [4, 8, 12, 16, 19], levelTable,
-    startingEquipment: [{
-      id: "riftwarden-a", label: "A greatsword and a shortbow",
-      items: [{ id: "greatsword", name: "Greatsword" }, { id: "shortbow", name: "Shortbow" }, { id: "chain-mail", name: "Chain Mail" }]
-    }],
+    subclassLevel: 3,
+    asiLevels: [4, 8, 12, 16, 19],
+    levelTable,
+    startingEquipment: [
+      {
+        id: "riftwarden-a",
+        label: "A greatsword and a shortbow",
+        items: [
+          { id: "greatsword", name: "Greatsword" },
+          { id: "shortbow", name: "Shortbow" },
+          { id: "chain-mail", name: "Chain Mail" }
+        ]
+      }
+    ],
     features: [
       {
-        id: "rift-attunement", name: "Rift Attunement", level: 1,
-        description: "You are attuned to the rift.", ...ridersFor(brew, "class")
+        id: "rift-attunement",
+        name: "Rift Attunement",
+        level: 1,
+        description: "You are attuned to the rift.",
+        ...ridersFor(brew, "class")
       },
       {
-        id: "rift-focus", name: "Rift Focus", level: 1, description: "Choose how your rift manifests.",
+        id: "rift-focus",
+        name: "Rift Focus",
+        level: 1,
+        description: "Choose how your rift manifests.",
         choice: {
-          kind: "rift-form", choose: 1,
+          kind: "rift-form",
+          choose: 1,
           options: [
-            { id: "rift-blade", name: "Rift Blade", description: "The rift sharpens your steel.", ...ridersFor(brew, "option") },
+            {
+              id: "rift-blade",
+              name: "Rift Blade",
+              description: "The rift sharpens your steel.",
+              ...ridersFor(brew, "option")
+            },
             { id: "rift-veil", name: "Rift Veil", description: "The rift hides you." }
           ]
         }
       },
-      ...(brew.boon === undefined ? [] : [{
-        id: "rift-apotheosis", name: "Rift Apotheosis", level: 1,
-        description: "Increase one ability score by 1, to a maximum of 30.",
-        choice: {
-          kind: "ability-score", choose: 1, from: ["str", "dex", "con", "int", "wis", "cha"],
-          ...(typeof brew.boon === "number" ? { maximum: brew.boon } : {})
-        }
-      }]),
+      ...(brew.boon === undefined
+        ? []
+        : [
+            {
+              id: "rift-apotheosis",
+              name: "Rift Apotheosis",
+              level: 1,
+              description: "Increase one ability score by 1, to a maximum of 30.",
+              choice: {
+                kind: "ability-score",
+                choose: 1,
+                from: ["str", "dex", "con", "int", "wis", "cha"],
+                ...(typeof brew.boon === "number" ? { maximum: brew.boon } : {})
+              }
+            }
+          ]),
       {
-        id: "rift-surge", name: "Rift Surge", level: 1, description: "You surge with rift energy.",
-        actions: [{
-          id: "rift-surge", name: "Rift Surge", activation: "bonus-action",
-          description: "You surge with rift energy and regain your footing.",
-          uses: { limit: 3, per: "short-rest" }
-        }]
+        id: "rift-surge",
+        name: "Rift Surge",
+        level: 1,
+        description: "You surge with rift energy.",
+        actions: [
+          {
+            id: "rift-surge",
+            name: "Rift Surge",
+            activation: "bonus-action",
+            description: "You surge with rift energy and regain your footing.",
+            uses: { limit: 3, per: "short-rest" }
+          }
+        ]
       },
       {
-        id: "rift-channel", name: "Rift Channel", level: 1,
+        id: "rift-channel",
+        name: "Rift Channel",
+        level: 1,
         description: "You spend rift charges, as many as your class table prints.",
         uses: { scaling: { type: "class-resource", id: brew.chargeId ?? "rift-charge" }, per: "long-rest" },
-        actions: [{
-          id: "rift-channel", name: "Rift Channel", activation: "action",
-          description: "You channel the rift."
-        }]
+        actions: [
+          {
+            id: "rift-channel",
+            name: "Rift Channel",
+            activation: "action",
+            description: "You channel the rift."
+          }
+        ]
       }
     ]
   });
@@ -171,26 +235,71 @@ function libraryWith(brew: Homebrew = {}): ContentLibrary {
     publishedFor: () => ({
       ...EMPTY_HOMEBREW_SLICE,
       classes: [classFor(brew)],
-      subclasses: [SubclassReferenceSchema.parse({
-        id: "hb-riftbreaker", name: "Riftbreaker", source: "homebrew", classId: "hb-riftwarden",
-        features: [{ id: "rift-breaking", name: "Rift Breaking", level: 3, description: "You break the rift open.", ...ridersFor(brew, "subclass") }]
-      })],
-      species: [SpeciesReferenceSchema.parse({
-        id: "hb-riftborn", name: "Riftborn", source: "homebrew", speedFeet: 30,
-        traits: [
-          { id: "rift-sense", name: "Rift Sense", description: "You feel the rift.", ...ridersFor(brew, "species") },
-          { id: "rift-heritage", name: "Rift Heritage", description: "Choose a heritage.", choice: { kind: "lineage", choose: 1, from: ["hb-riftborn-deep"] } }
-        ],
-        lineages: [{
-          id: "hb-riftborn-deep", name: "Deep Riftborn", description: "Born of the deep rift.",
-          traits: [{ id: "deep-rift", name: "Deep Rift", description: "The deep rift marks you.", ...ridersFor(brew, "lineage") }]
-        }]
-      })],
-      backgrounds: [BackgroundReferenceSchema.parse({
-        id: "hb-riftwalker", name: "Riftwalker", source: "homebrew",
-        abilityOptions: { from: ["str", "con", "wis", "cha"] },
-        features: [{ id: "rift-lore", name: "Rift Lore", description: "You know the rift's lore.", ...ridersFor(brew, "background") }]
-      })]
+      subclasses: [
+        SubclassReferenceSchema.parse({
+          id: "hb-riftbreaker",
+          name: "Riftbreaker",
+          source: "homebrew",
+          classId: "hb-riftwarden",
+          features: [
+            {
+              id: "rift-breaking",
+              name: "Rift Breaking",
+              level: 3,
+              description: "You break the rift open.",
+              ...ridersFor(brew, "subclass")
+            }
+          ]
+        })
+      ],
+      species: [
+        SpeciesReferenceSchema.parse({
+          id: "hb-riftborn",
+          name: "Riftborn",
+          source: "homebrew",
+          speedFeet: 30,
+          traits: [
+            { id: "rift-sense", name: "Rift Sense", description: "You feel the rift.", ...ridersFor(brew, "species") },
+            {
+              id: "rift-heritage",
+              name: "Rift Heritage",
+              description: "Choose a heritage.",
+              choice: { kind: "lineage", choose: 1, from: ["hb-riftborn-deep"] }
+            }
+          ],
+          lineages: [
+            {
+              id: "hb-riftborn-deep",
+              name: "Deep Riftborn",
+              description: "Born of the deep rift.",
+              traits: [
+                {
+                  id: "deep-rift",
+                  name: "Deep Rift",
+                  description: "The deep rift marks you.",
+                  ...ridersFor(brew, "lineage")
+                }
+              ]
+            }
+          ]
+        })
+      ],
+      backgrounds: [
+        BackgroundReferenceSchema.parse({
+          id: "hb-riftwalker",
+          name: "Riftwalker",
+          source: "homebrew",
+          abilityOptions: { from: ["str", "con", "wis", "cha"] },
+          features: [
+            {
+              id: "rift-lore",
+              name: "Rift Lore",
+              description: "You know the rift's lore.",
+              ...ridersFor(brew, "background")
+            }
+          ]
+        })
+      ]
     }),
     monsterForInstance: () => undefined
   };
@@ -200,17 +309,34 @@ function libraryWith(brew: Homebrew = {}): ContentLibrary {
 // A level-5 Deep Riftborn Riftbreaker. Str 19 after the background spread (+4), proficiency 3, so a
 // martial-proficient greatsword swings at +7, the same baseline `feat-riders.test.ts` uses.
 const heroInput = (brew: Homebrew = {}): CharacterCreateRequestInput => ({
-  name: "Vess", speciesId: "hb-riftborn", backgroundId: "hb-riftwalker", classId: "hb-riftwarden", level: 5,
-  subclassId: "hb-riftbreaker", abilityMethod: (brew.method ?? "standard-array") as CharacterCreateRequestInput["abilityMethod"],
-  baseScores: (brew.scores ?? { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 }) as CharacterCreateRequestInput["baseScores"],
-  backgroundBonusAllocation: (brew.spread ?? [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }]) as CharacterCreateRequestInput["backgroundBonusAllocation"],
+  name: "Vess",
+  speciesId: "hb-riftborn",
+  backgroundId: "hb-riftwalker",
+  classId: "hb-riftwarden",
+  level: 5,
+  subclassId: "hb-riftbreaker",
+  abilityMethod: (brew.method ?? "standard-array") as CharacterCreateRequestInput["abilityMethod"],
+  baseScores: (brew.scores ?? {
+    str: 15,
+    dex: 13,
+    con: 14,
+    int: 8,
+    wis: 12,
+    cha: 10
+  }) as CharacterCreateRequestInput["baseScores"],
+  backgroundBonusAllocation: (brew.spread ?? [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ]) as CharacterCreateRequestInput["backgroundBonusAllocation"],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
     { level: 1, kind: "lineage", id: "hb-riftborn-deep" },
     { level: 1, kind: "rift-form", id: "rift-blade", payload: { featureId: "rift-focus" } },
     { level: 3, classId: "hb-riftwarden", kind: "subclass", id: "hb-riftbreaker" },
     { level: 1, kind: "equipment", id: "riftwarden-a" },
-    ...(brew.boon === undefined ? [] : [{ level: 1, kind: "ability-score", id: "str", payload: { featureId: "rift-apotheosis" } }])
+    ...(brew.boon === undefined
+      ? []
+      : [{ level: 1, kind: "ability-score", id: "str", payload: { featureId: "rift-apotheosis" } }])
   ] as CharacterCreateRequestInput["choices"]
 });
 
@@ -228,29 +354,57 @@ function build(brew: Homebrew = {}): Built {
   const catalog = equipmentCatalogOf(view);
   const state = GameStateSchema.parse({
     schemaVersion: 1,
-    actors: [{ id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: 12 }]
+    actors: [
+      {
+        id: IDS.foe,
+        name: "Foe",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        armorClass: 12
+      }
+    ]
   }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
   return { definition, catalog, state, hero: state.actors.find((actor) => actor.id === IDS.hero)! };
 }
 
 function fight(built: Built): Built {
-  startEncounter(built.state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    built.state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.hero, score: 20 },
+        { actorId: IDS.foe, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return built;
 }
 
 function deps(built: Built, faces: number[]): ResolveDependencies {
   let index = 0;
   return {
-    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
     newRollId: () => `40000000-0000-4000-8000-0000000000${String(index++).padStart(2, "0")}`,
-    gmSessionId: IDS.gmSession, now: () => "2026-07-28T00:00:00.000Z",
-    definition: built.definition, catalog: built.catalog
+    gmSessionId: IDS.gmSession,
+    now: () => "2026-07-28T00:00:00.000Z",
+    definition: built.definition,
+    catalog: built.catalog
   };
 }
 
-const actionOf = (built: Built, id: string) => effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id)!;
-const carrierOf = (built: Built, label: string) => deriveEquipment(built.hero, built.definition, built.catalog).carriers.find((carrier) => carrier.label === label);
+const actionOf = (built: Built, id: string) =>
+  effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === id)!;
+const carrierOf = (built: Built, label: string) =>
+  deriveEquipment(built.hero, built.definition, built.catalog).carriers.find((carrier) => carrier.label === label);
 
 describe("the builder records every granted feature by id and provenance", () => {
   it("writes character.features with the right kind and sourceId for all six carriers", () => {
@@ -286,7 +440,10 @@ describe("the builder records every granted feature by id and provenance", () =>
     for (const on of CARRIERS) {
       for (const modifier of ROLL_TIME_RIDERS) {
         const carrier = carrierOf(build({ on, modifiers: [modifier] }), LABEL[on]);
-        expect(carrier?.modifiers.map((entry) => entry.type), `${modifier.type} on a ${on} feature must reach the collector`).toEqual([modifier.type]);
+        expect(
+          carrier?.modifiers.map((entry) => entry.type),
+          `${modifier.type} on a ${on} feature must reach the collector`
+        ).toEqual([modifier.type]);
       }
       for (const modifier of BUILD_TIME_RIDERS) {
         const carrier = carrierOf(build({ on, modifiers: [modifier] }), LABEL[on]);
@@ -299,7 +456,9 @@ describe("the builder records every granted feature by id and provenance", () =>
     const built = build();
     for (const on of CARRIERS) expect(carrierOf(built, LABEL[on])).toBeUndefined();
     // The equipped gear is still carried, but nothing it holds carries a rider.
-    expect(deriveEquipment(built.hero, built.definition, built.catalog).carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]);
+    expect(
+      deriveEquipment(built.hero, built.definition, built.catalog).carriers.flatMap((carrier) => carrier.modifiers)
+    ).toEqual([]);
   });
 });
 
@@ -314,7 +473,12 @@ describe("a feature's attack-bonus reaches the rolled to-hit", () => {
     expect(action.attack!.bonus).toBe(8);
 
     // The roll, not just the number: d20 = 10 -> 18 total against AC 12.
-    const resolution = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" }, deps(built, [10, 4, 6]));
+    const resolution = resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" },
+      deps(built, [10, 4, 6])
+    );
     expect(resolution.attack).toMatchObject({ total: 18, naturalRoll: 10, targetAc: 12, outcome: "hit" });
   });
 
@@ -339,9 +503,18 @@ describe("a feature's save-bonus reaches the saving throw", () => {
     const bare = build();
     expect(saveRiderBonus(deriveEquipment(bare.hero, bare.definition, bare.catalog), "wis")).toBe(0);
 
-    const narrowed = build({ on: "species", modifiers: [{ type: "save-bonus", amount: 2, when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] }] });
+    const narrowed = build({
+      on: "species",
+      modifiers: [
+        {
+          type: "save-bonus",
+          amount: 2,
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+        }
+      ]
+    });
     const narrowedDerivation = deriveEquipment(narrowed.hero, narrowed.definition, narrowed.catalog);
-    expect(narrowedDerivation.saveBonus).toBe(0);              // a gated rider is not in the standing pass
+    expect(narrowedDerivation.saveBonus).toBe(0); // a gated rider is not in the standing pass
     expect(saveRiderBonus(narrowedDerivation, "dex")).toBe(2);
     expect(saveRiderBonus(narrowedDerivation, "wis")).toBe(0); // `ability-is` really narrows it
   });
@@ -349,9 +522,12 @@ describe("a feature's save-bonus reaches the saving throw", () => {
 
 describe("a feature's spell-save-dc raises the DC the target is held to", () => {
   const WAR_CRY = {
-    id: "rift-cry", name: "Rift Cry", activation: "action",
+    id: "rift-cry",
+    name: "Rift Cry",
+    activation: "action",
     description: "Wisdom Saving Throw: DC 13. Failure: 2d6 Thunder damage.",
-    save: { ability: "wis", dc: 13 }, damage: [{ formula: "2d6", type: "thunder" }]
+    save: { ability: "wis", dc: 13 },
+    damage: [{ formula: "2d6", type: "thunder" }]
   };
 
   it("folds into the action's DC and into the pending save the foe must beat", () => {
@@ -362,7 +538,12 @@ describe("a feature's spell-save-dc raises the DC the target is held to", () => 
     const action = actionOf(built, "rift-cry");
     expect(action.save!.dc).toBe(15);
 
-    const resolution = resolveDefinitionAction(built.state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000010" }, deps(built, [3, 4]));
+    const resolution = resolveDefinitionAction(
+      built.state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000010" },
+      deps(built, [3, 4])
+    );
     expect(resolution.save!.dc).toBe(15);
     expect(built.state.combat.pendingSaves[0].dc).toBe(15); // the DC actually enforced, not just shown
   });
@@ -371,13 +552,25 @@ describe("a feature's spell-save-dc raises the DC the target is held to", () => 
 describe("a feature's extra-damage is rolled as its own typed damage entry", () => {
   it("adds the die to the swing, and the rider-less build rolls only the weapon", () => {
     const bare = fight(build());
-    const plain = resolveDefinitionAction(bare.state, actionOf(bare, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000040" }, deps(bare, [15, 5, 6]));
+    const plain = resolveDefinitionAction(
+      bare.state,
+      actionOf(bare, "item-greatsword"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000040" },
+      deps(bare, [15, 5, 6])
+    );
     // 2d6 (5 + 6) + Str 3 = 14, and nothing else.
     expect(plain.damage).toEqual([{ formula: "2d6 + 3", type: "slashing", total: 14 }]);
     expect(plain.damageTotal).toBe(14);
 
-    const built = fight(build({ on: "subclass", modifiers: [{ type: "extra-damage", formula: "1d4", damageType: "fire" }] }));
-    const swung = resolveDefinitionAction(built.state, actionOf(built, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000041" }, deps(built, [15, 5, 6, 3]));
+    const built = fight(
+      build({ on: "subclass", modifiers: [{ type: "extra-damage", formula: "1d4", damageType: "fire" }] })
+    );
+    const swung = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-greatsword"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000041" },
+      deps(built, [15, 5, 6, 3])
+    );
     expect(swung.damage.map((entry) => entry.type)).toEqual(["slashing", "fire"]);
     expect(swung.damage.find((entry) => entry.type === "fire")).toEqual({ formula: "1d4", type: "fire", total: 3 });
     expect(swung.damageTotal).toBe(17); // 14 + a 3 actually rolled on the rider's d4
@@ -389,30 +582,49 @@ describe("a feature's resource-bonus raises a pool the engine actually spends fr
     const bare = build();
     expect(actionOf(bare, "rift-surge").uses!.limit).toBe(3);
 
-    const built = fight(build({ on: "background", modifiers: [{ type: "resource-bonus", poolId: "rift-surge", amount: 1 }] }));
+    const built = fight(
+      build({ on: "background", modifiers: [{ type: "resource-bonus", poolId: "rift-surge", amount: 1 }] })
+    );
     expect(actionOf(built, "rift-surge").uses!.limit).toBe(4);
 
     built.hero.actionUses = { "rift-surge": 3 };
-    resolveDefinitionAction(built.state, actionOf(built, "rift-surge"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" }, deps(built, []));
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "rift-surge"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" },
+      deps(built, [])
+    );
     expect(built.hero.actionUses["rift-surge"]).toBe(4);
   });
 
   it("refuses the spend when the pool is exhausted and no rider raised it", () => {
     const built = fight(build());
     built.hero.actionUses = { "rift-surge": 3 };
-    expect(() => resolveDefinitionAction(built.state, actionOf(built, "rift-surge"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000021" }, deps(built, []))).toThrow();
+    expect(() =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "rift-surge"),
+        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000021" },
+        deps(built, [])
+      )
+    ).toThrow();
     expect(built.hero.actionUses["rift-surge"]).toBe(3); // the refusal did not spend anything
   });
 
   it("leaves a pool the rider does not name alone", () => {
-    const built = build({ on: "lineage", modifiers: [{ type: "resource-bonus", poolId: "not-rift-surge", amount: 1 }] });
+    const built = build({
+      on: "lineage",
+      modifiers: [{ type: "resource-bonus", poolId: "not-rift-surge", amount: 1 }]
+    });
     expect(actionOf(built, "rift-surge").uses!.limit).toBe(3); // the wrong pool: untouched
   });
 });
 
 describe("a feature's moment-gated roll-mode fires only at its moment", () => {
   const RECKLESS = {
-    type: "roll-mode", roll: "attack", mode: "advantage",
+    type: "roll-mode",
+    roll: "attack",
+    mode: "advantage",
     when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["melee"] }]
   };
 
@@ -428,20 +640,42 @@ describe("a feature's moment-gated roll-mode fires only at its moment", () => {
   it("grants advantage on a MELEE attack and leaves a ranged one a single die", () => {
     const melee = fight(build({ on: "option", modifiers: [RECKLESS] }));
     // Two d20s (advantage keeps 18), then the 2d6 greatsword damage.
-    const swung = resolveDefinitionAction(melee.state, actionOf(melee, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" }, deps(melee, [4, 18, 3, 5]));
+    const swung = resolveDefinitionAction(
+      melee.state,
+      actionOf(melee, "item-greatsword"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" },
+      deps(melee, [4, 18, 3, 5])
+    );
     expect(swung.rollMode).toMatchObject({ mode: "advantage", advantage: ["Rift Blade"] });
     expect(swung.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
 
     const ranged = fight(build({ on: "option", modifiers: [RECKLESS] }));
-    const shot = resolveDefinitionAction(ranged.state, actionOf(ranged, "item-shortbow"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" }, deps(ranged, [4, 3]));
+    const shot = resolveDefinitionAction(
+      ranged.state,
+      actionOf(ranged, "item-shortbow"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" },
+      deps(ranged, [4, 3])
+    );
     expect(shot.rollMode).toBeUndefined();
     expect(shot.attack!.naturalRoll).toBe(4); // one die: `attack-kind-is` filtered
   });
 
   it("routes a save roll-mode to saves only, and to the named ability only", () => {
-    const built = build({ on: "lineage", modifiers: [{ type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["con"] }] }] });
+    const built = build({
+      on: "lineage",
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "save",
+          mode: "advantage",
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["con"] }]
+        }
+      ]
+    });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
-    expect(saveRollSources(built.hero, "con", derivation).advantage).toEqual([{ source: "item:Deep Rift", label: "Deep Rift" }]);
+    expect(saveRollSources(built.hero, "con", derivation).advantage).toEqual([
+      { source: "item:Deep Rift", label: "Deep Rift" }
+    ]);
     expect(saveRollSources(built.hero, "int", derivation).advantage).toEqual([]);
   });
 
@@ -451,7 +685,13 @@ describe("a feature's moment-gated roll-mode fires only at its moment", () => {
     expect(criticalThreshold(derivation, built.hero, actionOf(built, "item-greatsword"))).toBe(19);
 
     const bare = build();
-    expect(criticalThreshold(deriveEquipment(bare.hero, bare.definition, bare.catalog), bare.hero, actionOf(bare, "item-greatsword"))).toBe(20);
+    expect(
+      criticalThreshold(
+        deriveEquipment(bare.hero, bare.definition, bare.catalog),
+        bare.hero,
+        actionOf(bare, "item-greatsword")
+      )
+    ).toBe(20);
   });
 });
 
@@ -473,17 +713,24 @@ describe("a this-item-scoped rider on a feature does not become an 'always' ride
 
 describe("nothing the builder baked is counted a second time as a carrier", () => {
   it("bakes a feature's speed / initiative / AC exactly once", () => {
-    const built = build({ on: "species", modifiers: [{ type: "speed", amount: 10 }, { type: "initiative", amount: 2 }, { type: "armor-class", amount: 1 }] });
+    const built = build({
+      on: "species",
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "initiative", amount: 2 },
+        { type: "armor-class", amount: 1 }
+      ]
+    });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(derivation.speed).toBe(0);
     expect(derivation.initiative).toBe(0);
     expect(derivation.armorClass).toBe(0);
 
-    expect(built.definition.speedFeet).toBe(40);       // 30 + 10, once
+    expect(built.definition.speedFeet).toBe(40); // 30 + 10, once
     expect(built.hero.speedFeet).toBe(40);
-    expect(built.definition.initiativeBonus).toBe(3);  // Dex +1, rider +2, once
+    expect(built.definition.initiativeBonus).toBe(3); // Dex +1, rider +2, once
     expect(built.hero.initiative).toBe(3);
-    expect(built.definition.armorClass).toBe(17);      // chain mail 16 + rider 1
+    expect(built.definition.armorClass).toBe(17); // chain mail 16 + rider 1
     expect(built.hero.armorClass).toBe(17);
   });
 
@@ -504,7 +751,10 @@ describe("the feature carriers fail open", () => {
     const forgetful = equipmentCatalogOf(new ContentLibrary().forAudience("gm"));
     const derivation = deriveEquipment(built.hero, built.definition, forgetful);
     expect(derivation.carriers.some((carrier) => carrier.label === LABEL.class)).toBe(false);
-    expect(effectiveActions(built.definition, built.hero, forgetful).find((entry) => entry.id === "item-greatsword")!.attack!.bonus).toBe(6);
+    expect(
+      effectiveActions(built.definition, built.hero, forgetful).find((entry) => entry.id === "item-greatsword")!.attack!
+        .bonus
+    ).toBe(6);
   });
 
   it("derives a definition with NO features array at all, exactly as before - PDF imports and the example party", () => {
@@ -516,8 +766,10 @@ describe("the feature carriers fail open", () => {
 
     const derivation = deriveEquipment(built.hero, legacy, built.catalog);
     expect(derivation.carriers.map((carrier) => carrier.label)).toEqual(["Greatsword", "Shortbow", "Chain Mail"]); // gear only
-    expect(derivation.carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]);    // no array, no feature riders
-    expect(effectiveActions(legacy, built.hero, built.catalog).find((entry) => entry.id === "item-greatsword")!.attack!.bonus).toBe(6);
+    expect(derivation.carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]); // no array, no feature riders
+    expect(
+      effectiveActions(legacy, built.hero, built.catalog).find((entry) => entry.id === "item-greatsword")!.attack!.bonus
+    ).toBe(6);
 
     // The same sheet with the array intact is the +2 one, so the difference is the array itself.
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
@@ -541,16 +793,21 @@ describe("the recorded feature array stays inside the schema's bound", () => {
     const classCounts = view.classSummaries().map((summary) => {
       const record = view.classRecord(summary.id)!;
       const granted = new Set(record.levelTable.flatMap((row) => row.features));
-      const subclasses = view.subclassSummaries()
+      const subclasses = view
+        .subclassSummaries()
         .filter((entry) => view.subclassRecord(entry.id)?.classId === record.id)
         .map((entry) => view.subclassRecord(entry.id)!.features.length);
       return { id: record.id, total: granted.size + widest([0, ...subclasses]) };
     });
-    const speciesWidest = widest(view.speciesSummaries().map((summary) => {
-      const record = view.speciesRecord(summary.id)!;
-      return record.traits.length + widest([0, ...record.lineages.map((lineage) => lineage.traits.length)]);
-    }));
-    const backgroundWidest = widest(view.backgroundSummaries().map((summary) => view.backgroundRecord(summary.id)!.features.length));
+    const speciesWidest = widest(
+      view.speciesSummaries().map((summary) => {
+        const record = view.speciesRecord(summary.id)!;
+        return record.traits.length + widest([0, ...record.lineages.map((lineage) => lineage.traits.length)]);
+      })
+    );
+    const backgroundWidest = widest(
+      view.backgroundSummaries().map((summary) => view.backgroundRecord(summary.id)!.features.length)
+    );
 
     expect(classCounts.length).toBeGreaterThan(0);
     const worst = widest(classCounts.map((entry) => entry.total)) + speciesWidest + backgroundWidest;
@@ -568,12 +825,17 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
   /** A level-5 sheet with CHA 17 (+3), so the modifier that arrives is unmistakably the right one. */
   const CHA_HERO = {
     scores: { str: 13, dex: 12, con: 14, int: 8, wis: 10, cha: 15 },
-    spread: [{ ability: "cha", amount: 2 }, { ability: "str", amount: 1 }]
+    spread: [
+      { ability: "cha", amount: 2 },
+      { ability: "str", amount: 1 }
+    ]
   } as const;
 
   /** The cantrip, as a feature action that names its spell. */
   const ELDRITCH_BLAST = {
-    id: "eldritch-blast", name: "Eldritch Blast", activation: "action",
+    id: "eldritch-blast",
+    name: "Eldritch Blast",
+    activation: "action",
     description: "A beam of crackling energy streaks toward a creature.",
     attack: { ability: "cha", proficient: true },
     damage: [{ formula: "1d10", type: "force" }],
@@ -582,7 +844,9 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
 
   /** The invocation, as an option's rider: + CHA to the damage, only on that one spell. */
   const AGONIZING_BLAST = {
-    type: "extra-damage", abilityModifier: "cha", damageType: "force",
+    type: "extra-damage",
+    abilityModifier: "cha",
+    damageType: "force",
     when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
   };
 
@@ -593,13 +857,23 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
     const bare = warlock([]);
     // CHA 17 (+3) + proficiency 3 = 6 to hit; the cantrip's own damage is 1d10 force and nothing else.
     expect(actionOf(bare, "eldritch-blast").attack!.bonus).toBe(6);
-    const unaided = resolveDefinitionAction(bare.state, actionOf(bare, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000050" }, deps(bare, [10, 7]));
+    const unaided = resolveDefinitionAction(
+      bare.state,
+      actionOf(bare, "eldritch-blast"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000050" },
+      deps(bare, [10, 7])
+    );
     expect(unaided.attack).toMatchObject({ total: 16, naturalRoll: 10, targetAc: 12, outcome: "hit" });
     expect(unaided.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
     expect(unaided.damageTotal).toBe(7);
 
     const built = warlock([AGONIZING_BLAST]);
-    const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000051" }, deps(built, [10, 7]));
+    const blasted = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "eldritch-blast"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000051" },
+      deps(built, [10, 7])
+    );
     // The same two dice; the difference is +3, this character's Charisma modifier.
     expect(blasted.damage).toEqual([
       { formula: "1d10", type: "force", total: 7 },
@@ -612,12 +886,25 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
   it("tracks the CHARACTER's Charisma, not an authored constant", () => {
     // The same authored record on a different sheet gives a different number: CHA 12 (+1) here against
     // CHA 17 (+3) above.
-    const lesser = fight(build({
-      scores: { str: 13, dex: 14, con: 15, int: 8, wis: 10, cha: 12 },
-      spread: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-      on: "option", actionsOn: "class", actions: [ELDRITCH_BLAST], modifiers: [AGONIZING_BLAST]
-    }));
-    const blasted = resolveDefinitionAction(lesser.state, actionOf(lesser, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000052" }, deps(lesser, [10, 7]));
+    const lesser = fight(
+      build({
+        scores: { str: 13, dex: 14, con: 15, int: 8, wis: 10, cha: 12 },
+        spread: [
+          { ability: "str", amount: 2 },
+          { ability: "con", amount: 1 }
+        ],
+        on: "option",
+        actionsOn: "class",
+        actions: [ELDRITCH_BLAST],
+        modifiers: [AGONIZING_BLAST]
+      })
+    );
+    const blasted = resolveDefinitionAction(
+      lesser.state,
+      actionOf(lesser, "eldritch-blast"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000052" },
+      deps(lesser, [10, 7])
+    );
     expect(blasted.damage.at(-1)).toEqual({ formula: "1", type: "force", total: 1 });
     expect(blasted.damageTotal).toBe(8);
   });
@@ -626,15 +913,27 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
     // A school or level gate would also catch the Warlock's other cantrips; `spell-id-is` does not, and the
     // greatsword is not a spell at all.
     const built = warlock([AGONIZING_BLAST]);
-    const swung = resolveDefinitionAction(built.state, actionOf(built, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000053" }, deps(built, [15, 5, 6]));
+    const swung = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-greatsword"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000053" },
+      deps(built, [15, 5, 6])
+    );
     // 2d6 (5 + 6) + Str 2 = 13, with no Charisma anywhere near it.
     expect(swung.damage).toEqual([{ formula: "2d6 + 2", type: "slashing", total: 13 }]);
     expect(swung.damageTotal).toBe(13);
   });
 
   it("does NOT fire when the gate names a DIFFERENT spell", () => {
-    const built = warlock([{ ...AGONIZING_BLAST, when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["fire-bolt"] }] }]);
-    const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000054" }, deps(built, [10, 7]));
+    const built = warlock([
+      { ...AGONIZING_BLAST, when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["fire-bolt"] }] }
+    ]);
+    const blasted = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "eldritch-blast"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000054" },
+      deps(built, [10, 7])
+    );
     expect(blasted.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
     expect(blasted.damageTotal).toBe(7);
   });
@@ -642,7 +941,12 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
   it("does NOT fire on a MISS, because `on-hit` is still `on-hit`", () => {
     const built = warlock([AGONIZING_BLAST]);
     // d20 = 2 -> 8 against AC 12: a miss rolls no damage at all, rider included.
-    const missed = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000055" }, deps(built, [2]));
+    const missed = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "eldritch-blast"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000055" },
+      deps(built, [2])
+    );
     expect(missed.attack).toMatchObject({ total: 8, outcome: "miss" });
     expect(missed.damage).toEqual([]);
     expect(missed.damageTotal).toBe(0);
@@ -650,7 +954,12 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
 
   it("carries dice AND an ability modifier together when a record authors both", () => {
     const built = warlock([{ ...AGONIZING_BLAST, formula: "1d4" }]);
-    const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000056" }, deps(built, [10, 7, 2]));
+    const blasted = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "eldritch-blast"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000056" },
+      deps(built, [10, 7, 2])
+    );
     // The d4 rolled a 2 and CHA added 3: one entry of 5, because it is one rider.
     expect(blasted.damage.at(-1)).toEqual({ formula: "1d4", type: "force", total: 5 });
     expect(blasted.damageTotal).toBe(12);
@@ -666,7 +975,10 @@ describe("an ability-score choice raises past 20 when it says so", () => {
   const AT_TWENTY = {
     method: "roll",
     scores: { str: 18, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-    spread: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }]
+    spread: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ]
   } as const;
 
   it("takes STR from 20 to 21 when the choice names a maximum of 30", () => {
@@ -709,9 +1021,21 @@ describe("a feature scales its uses off the class table's printed column", () =>
     // This is the live `actionUses` counter, not a display number.
     const built = fight(build());
     built.hero.actionUses = { "rift-channel": 3 };
-    resolveDefinitionAction(built.state, actionOf(built, "rift-channel"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000060" }, deps(built, []));
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "rift-channel"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000060" },
+      deps(built, [])
+    );
     expect(built.hero.actionUses["rift-channel"]).toBe(4);
-    expect(() => resolveDefinitionAction(built.state, actionOf(built, "rift-channel"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000061" }, deps(built, []))).toThrow();
+    expect(() =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "rift-channel"),
+        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000061" },
+        deps(built, [])
+      )
+    ).toThrow();
     expect(built.hero.actionUses["rift-channel"]).toBe(4); // the refusal spent nothing
   });
 

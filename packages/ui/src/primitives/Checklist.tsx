@@ -57,14 +57,22 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
   return (
     <div className={cx("nh-checklist", className)}>
       {items.length > 0 && (
-        <ul className={cx("nh-checklist-items", !editable && "nh-checklist-items--static")} role="list" aria-label={ariaLabel}>
+        <ul
+          className={cx("nh-checklist-items", !editable && "nh-checklist-items--static")}
+          role="list"
+          aria-label={ariaLabel}
+        >
           {items.map((item, index) => (
             <li key={index} className={cx("nh-checklist-item", item.done && "is-done")}>
               {editable ? (
                 <>
                   {/* A checkbox can't take `::after`, so the 44px floor and the accessible name live on the wrapping <label>. */}
                   <label className="nh-checklist-tick">
-                    <input type="checkbox" checked={item.done} onChange={(event) => setAt(index, { done: event.target.checked })} />
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={(event) => setAt(index, { done: event.target.checked })}
+                    />
                     <span className="nh-sr-only">{nameOf(item, index)} done</span>
                   </label>
                   <Input
@@ -73,14 +81,21 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
                     aria-label={`Item ${index + 1}`}
                     onChange={(event) => setAt(index, { text: event.target.value })}
                   />
-                  <button type="button" className="nh-checklist-remove interactive" aria-label={`Remove ${nameOf(item, index)}`} onClick={() => remove(index)}>
+                  <button
+                    type="button"
+                    className="nh-checklist-remove interactive"
+                    aria-label={`Remove ${nameOf(item, index)}`}
+                    onClick={() => remove(index)}
+                  >
                     <IconTrash />
                   </button>
                 </>
               ) : (
                 <>
                   {/* State reads three ways, never by colour alone: a filled box, a check glyph, and the text. */}
-                  <span className="nh-checklist-mark" aria-hidden="true">{item.done && <IconCheck />}</span>
+                  <span className="nh-checklist-mark" aria-hidden="true">
+                    {item.done && <IconCheck />}
+                  </span>
                   <span className="nh-checklist-text">{item.text}</span>
                   <span className="nh-sr-only">{item.done ? "— done" : "— not done"}</span>
                 </>
@@ -101,14 +116,20 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
             aria-describedby={full ? reasonId : undefined}
             onClick={onAdd}
           >
-            <span className="nh-checklist-add-icon" aria-hidden="true"><IconPlus /></span>
+            <span className="nh-checklist-add-icon" aria-hidden="true">
+              <IconPlus />
+            </span>
             {addLabel ?? "Add item"}
           </Button>
           {full && <p className="nh-checklist-reason" id={reasonId}>{`That is the maximum of ${String(max)}.`}</p>}
         </div>
       )}
 
-      {editable && <span className="nh-sr-only" role="status">{announcement}</span>}
+      {editable && (
+        <span className="nh-sr-only" role="status">
+          {announcement}
+        </span>
+      )}
     </div>
   );
 }

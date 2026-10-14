@@ -1,7 +1,54 @@
-import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentLanguageSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
+import type {
+  CatalogChoiceCatalogs,
+  ContentActionSummary,
+  ContentBackgroundSummary,
+  ContentChoiceList,
+  ContentClassLevelRow,
+  ContentClassSummary,
+  ContentConditionSummary,
+  ContentEquipmentSummary,
+  ContentFeatSummary,
+  ContentFeatureSummary,
+  ContentLanguageSummary,
+  ContentMonsterSummary,
+  ContentNameBundle,
+  ContentSkillSummary,
+  ContentSpeciesSummary,
+  ContentSpellcastingSummary,
+  ContentSpellSummary,
+  ContentStartingEquipmentOption,
+  ContentSubclassSummary
+} from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
-import { applySpellListOverlay, featurePicks, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadLanguages, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import {
+  applySpellListOverlay,
+  featurePicks,
+  loadAttribution,
+  loadBackgrounds,
+  loadClasses,
+  loadConditions,
+  loadEquipment,
+  loadFeats,
+  loadLanguages,
+  loadMonsterDefinitions,
+  loadNames,
+  loadSkills,
+  loadSpecies,
+  loadSpells,
+  loadSubclasses,
+  type BackgroundReference,
+  type ClassLevelRow,
+  type ClassReference,
+  type ContentSpellcasting,
+  type EquipmentReference,
+  type FeatReference,
+  type FeatureRecord,
+  type SpeciesReference,
+  type SpellListReference,
+  type SpellReference,
+  type SubclassReference
+} from "@vtt/content-srd-5.2.1";
 import type { CharacterFeatureRef, FeatureRecordLike } from "./equipment-derivation.js";
 import { parseAreaProse } from "./area-targeting.js";
 
@@ -26,7 +73,15 @@ export type HomebrewCatalogSlice = Readonly<{
 
 /** The empty slice: an SRD-only catalog. */
 export const EMPTY_HOMEBREW_SLICE: HomebrewCatalogSlice = Object.freeze({
-  classes: [], subclasses: [], species: [], backgrounds: [], feats: [], spells: [], equipment: [], monsters: [], spellLists: []
+  classes: [],
+  subclasses: [],
+  species: [],
+  backgrounds: [],
+  feats: [],
+  spells: [],
+  equipment: [],
+  monsters: [],
+  spellLists: []
 });
 
 /** What `ContentLibrary` needs from the homebrew store; an interface so tests can supply a fake. */
@@ -146,7 +201,11 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
 
 /** "V, S, M (a pinch of soot)" from the structured components, or "None" for a spell with no components. */
 function spellComponentsText(components: SpellReference["components"]): string {
-  const parts = [components.verbal ? "V" : null, components.somatic ? "S" : null, components.material ? "M" : null].filter((part): part is string => part !== null);
+  const parts = [
+    components.verbal ? "V" : null,
+    components.somatic ? "S" : null,
+    components.material ? "M" : null
+  ].filter((part): part is string => part !== null);
   const base = parts.join(", ");
   const material = components.material && components.materialText ? ` (${components.materialText})` : "";
   return base ? `${base}${material}` : "None";
@@ -168,28 +227,42 @@ type WireChoice = NonNullable<ContentFeatureSummary["choice"]>;
 const extraPickSummaryOf = (grants: FeatureRecord["extraPicks"]): ContentFeatureSummary["extraPicks"] =>
   grants.map((grant) => ({ offer: grant.offer, amount: grant.amount ?? null, scaling: grant.scaling ?? null }));
 
-const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null => choice
-  ? {
-      kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null,
-      fromPicks: choice.fromPicks ? { offer: choice.fromPicks.offer, where: choice.fromPicks.where ?? null } : null,
-      options: (choice.options ?? []).map((option) => {
-        // One level of nesting only, matching the schema: a nested choice cannot carry options.
-        const nested = featurePicks(option).map((pick) => ({
-          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, minSpellLevel: pick.minSpellLevel ?? null,
-          fromPicks: pick.fromPicks ? { offer: pick.fromPicks.offer, where: pick.fromPicks.where ?? null } : null, options: []
-        }));
-        return {
-          id: option.id, name: option.name, description: option.description,
-          // The gate travels so the wizard filters options the way the server will (`FeatureOptionSchema.requires`).
-          requires: option.requires ? { offer: option.requires.offer, id: option.requires.id } : null,
-          choice: nested[0] ?? null,
-          choices: nested,
-          // The budget a chosen option raises, so the wizard lets the player make the extra pick.
-          extraPicks: extraPickSummaryOf(option.extraPicks)
-        };
-      })
-    }
-  : null;
+const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null =>
+  choice
+    ? {
+        kind: choice.kind,
+        choose: choice.choose,
+        from: choice.from ?? [],
+        fromCatalog: choice.fromCatalog ?? null,
+        maxSpellLevel: choice.maxSpellLevel ?? null,
+        minSpellLevel: choice.minSpellLevel ?? null,
+        fromPicks: choice.fromPicks ? { offer: choice.fromPicks.offer, where: choice.fromPicks.where ?? null } : null,
+        options: (choice.options ?? []).map((option) => {
+          // One level of nesting only, matching the schema: a nested choice cannot carry options.
+          const nested = featurePicks(option).map((pick) => ({
+            kind: pick.kind,
+            choose: pick.choose,
+            from: pick.from ?? [],
+            fromCatalog: pick.fromCatalog ?? null,
+            maxSpellLevel: pick.maxSpellLevel ?? null,
+            minSpellLevel: pick.minSpellLevel ?? null,
+            fromPicks: pick.fromPicks ? { offer: pick.fromPicks.offer, where: pick.fromPicks.where ?? null } : null,
+            options: []
+          }));
+          return {
+            id: option.id,
+            name: option.name,
+            description: option.description,
+            // The gate travels so the wizard filters options the way the server will (`FeatureOptionSchema.requires`).
+            requires: option.requires ? { offer: option.requires.offer, id: option.requires.id } : null,
+            choice: nested[0] ?? null,
+            choices: nested,
+            // The budget a chosen option raises, so the wizard lets the player make the extra pick.
+            extraPicks: extraPickSummaryOf(option.extraPicks)
+          };
+        })
+      }
+    : null;
 
 const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => {
   // Every pick a record owes; `choice` stays the first for callers that want one.
@@ -220,26 +293,51 @@ const grantLevelsOf = (levelTable: ClassReference["levelTable"]): ReadonlyMap<st
   return levels;
 };
 // The whole bundle (items and the "or take N gp" alternative), so the wizard can turn an option into inventory.
-const equipmentOptionsOf = (options: ReadonlyArray<{ id: string; label: string; items: ReadonlyArray<{ id: string; name: string; quantity: number }>; goldPieces: number }>): readonly ContentStartingEquipmentOption[] =>
-  options.map((option) => ({ id: option.id, label: option.label, items: option.items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity })), goldPieces: option.goldPieces }));
+const equipmentOptionsOf = (
+  options: ReadonlyArray<{
+    id: string;
+    label: string;
+    items: ReadonlyArray<{ id: string; name: string; quantity: number }>;
+    goldPieces: number;
+  }>
+): readonly ContentStartingEquipmentOption[] =>
+  options.map((option) => ({
+    id: option.id,
+    label: option.label,
+    items: option.items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity })),
+    goldPieces: option.goldPieces
+  }));
 // The printed 20-row table as display data. Missing columns are null, not 0, so "no cantrips" differs
 // from "zero cantrips at this level".
 const levelRowOf = (row: ClassLevelRow): ContentClassLevelRow => ({
-  level: row.level, proficiencyBonus: row.proficiencyBonus,
+  level: row.level,
+  proficiencyBonus: row.proficiencyBonus,
   spellSlots: row.spellSlots ? [...row.spellSlots] : null,
   pactSlots: row.pactSlots ? { level: row.pactSlots.level, slots: row.pactSlots.slots } : null,
-  cantripsKnown: row.cantripsKnown ?? null, spellsKnown: row.spellsKnown ?? null,
-  preparedFormula: row.preparedFormula ?? null, preparedCount: row.preparedCount ?? null,
-  classResources: row.classResources.map((resource) => ({ id: resource.id, name: resource.name, amount: resource.amount }))
+  cantripsKnown: row.cantripsKnown ?? null,
+  spellsKnown: row.spellsKnown ?? null,
+  preparedFormula: row.preparedFormula ?? null,
+  preparedCount: row.preparedCount ?? null,
+  classResources: row.classResources.map((resource) => ({
+    id: resource.id,
+    name: resource.name,
+    amount: resource.amount
+  }))
 });
 const byName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
 
 /** The extension key challenge rating and creature type actually live under. */
 export const STATBLOCK_EXTENSION = "open5e.srd-2024";
 /** A creature's bestiary facts from its extension bag; exported so the publish gate checks the same thing. */
-export function statblockFacts(definition: ActorDefinition): { challengeRating: number | null; creatureType: string | null } {
+export function statblockFacts(definition: ActorDefinition): {
+  challengeRating: number | null;
+  creatureType: string | null;
+} {
   const extension = (definition.extensions ?? {})[STATBLOCK_EXTENSION];
-  const bag = (extension && typeof extension === "object" ? extension : {}) as { challengeRating?: unknown; type?: unknown };
+  const bag = (extension && typeof extension === "object" ? extension : {}) as {
+    challengeRating?: unknown;
+    type?: unknown;
+  };
   // Narrowed, not cast: the bag is untyped. Null means "nothing to show", which the publish gate refuses.
   return {
     challengeRating: typeof bag.challengeRating === "number" ? bag.challengeRating : null,
@@ -248,28 +346,61 @@ export function statblockFacts(definition: ActorDefinition): { challengeRating: 
 }
 
 /** A bundle "choose N from" list as the wire shape (null when the record offers no such choice). */
-const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[]; fromCatalog?: string }> | undefined): ContentChoiceList | null =>
+const choiceListOf = (
+  list: Readonly<{ choose: number; from: readonly string[]; fromCatalog?: string }> | undefined
+): ContentChoiceList | null =>
   list ? { choose: list.choose, from: list.from, fromCatalog: list.fromCatalog ?? null } : null;
 /** A spellcasting header as the wire shape: display data plus the spell-list link. Riders stay server-side. */
 const spellcastingSummaryOf = (spellcasting: ContentSpellcasting | undefined): ContentSpellcastingSummary | null =>
   spellcasting
-    ? { ability: spellcasting.ability, prepares: spellcasting.prepares, ritual: spellcasting.ritual, focus: spellcasting.focus, progression: spellcasting.multiclassProgression, spellListId: spellcasting.spellListId ?? null }
+    ? {
+        ability: spellcasting.ability,
+        prepares: spellcasting.prepares,
+        ritual: spellcasting.ritual,
+        focus: spellcasting.focus,
+        progression: spellcasting.multiclassProgression,
+        spellListId: spellcasting.spellListId ?? null
+      }
     : null;
 
 const classSummaryOf = (entry: ClassReference): ContentClassSummary => ({
-  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
-  hitDie: entry.hitDie, statPriority: entry.statPriority, primaryAbilities: entry.primaryAbilities, savingThrows: entry.savingThrows,
-  skillChoiceCount: entry.skillChoices.choose, skillChoices: entry.skillChoices.from,
-  armorProficiencies: entry.armorProficiencies, weaponProficiencies: entry.weaponProficiencies, toolProficiencies: entry.toolProficiencies,
+  id: entry.id,
+  name: entry.name,
+  source: entry.source,
+  summary: entry.summary ?? null,
+  description: entry.description ?? null,
+  hitDie: entry.hitDie,
+  statPriority: entry.statPriority,
+  primaryAbilities: entry.primaryAbilities,
+  savingThrows: entry.savingThrows,
+  skillChoiceCount: entry.skillChoices.choose,
+  skillChoices: entry.skillChoices.from,
+  armorProficiencies: entry.armorProficiencies,
+  weaponProficiencies: entry.weaponProficiencies,
+  toolProficiencies: entry.toolProficiencies,
   toolChoices: choiceListOf(entry.toolChoices),
   multiclassProficiencies: entry.multiclassProficiencies
-    ? { armor: entry.multiclassProficiencies.armor, weapons: entry.multiclassProficiencies.weapons, tools: entry.multiclassProficiencies.tools, skillChoices: choiceListOf(entry.multiclassProficiencies.skills) }
+    ? {
+        armor: entry.multiclassProficiencies.armor,
+        weapons: entry.multiclassProficiencies.weapons,
+        tools: entry.multiclassProficiencies.tools,
+        skillChoices: choiceListOf(entry.multiclassProficiencies.skills)
+      }
     : null,
   multiclassPrerequisites: entry.multiclassPrerequisites
-    ? { mode: entry.multiclassPrerequisites.mode, minimums: entry.multiclassPrerequisites.minimums.map((minimum) => ({ ability: minimum.ability, minimum: minimum.minimum })) }
+    ? {
+        mode: entry.multiclassPrerequisites.mode,
+        minimums: entry.multiclassPrerequisites.minimums.map((minimum) => ({
+          ability: minimum.ability,
+          minimum: minimum.minimum
+        }))
+      }
     : null,
-  subclassLevel: entry.subclassLevel, subclassLabel: entry.subclassLabel ?? null, asiLevels: entry.asiLevels,
-  spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
+  subclassLevel: entry.subclassLevel,
+  subclassLabel: entry.subclassLabel ?? null,
+  asiLevels: entry.asiLevels,
+  spellcastingAbility: entry.spellcasting?.ability ?? null,
+  spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
   spellcasting: spellcastingSummaryOf(entry.spellcasting),
   levelTable: entry.levelTable.map(levelRowOf),
   startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
@@ -281,35 +412,68 @@ const classSummaryOf = (entry: ClassReference): ContentClassSummary => ({
 });
 
 const subclassSummaryOf = (entry: SubclassReference): ContentSubclassSummary => ({
-  id: entry.id, name: entry.name, source: entry.source, classId: entry.classId, summary: entry.summary ?? null, description: entry.description ?? null,
+  id: entry.id,
+  name: entry.name,
+  source: entry.source,
+  classId: entry.classId,
+  summary: entry.summary ?? null,
+  description: entry.description ?? null,
   subclassLevel: entry.subclassLevel ?? null,
-  spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
+  spellcastingAbility: entry.spellcasting?.ability ?? null,
+  spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
   spellcasting: spellcastingSummaryOf(entry.spellcasting),
   features: entry.features.map((feature) => featureSummaryOf(feature))
 });
 
 // Lineage traits are folded into `features` so a client renders one list.
 const speciesSummaryOf = (entry: SpeciesReference): ContentSpeciesSummary => ({
-  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
-  sizes: entry.sizes, speedFeet: entry.speedFeet, darkvisionFeet: entry.darkvisionFeet, creatureType: entry.creatureType,
+  id: entry.id,
+  name: entry.name,
+  source: entry.source,
+  summary: entry.summary ?? null,
+  description: entry.description ?? null,
+  sizes: entry.sizes,
+  speedFeet: entry.speedFeet,
+  darkvisionFeet: entry.darkvisionFeet,
+  creatureType: entry.creatureType,
   // Ability increases as data (empty for SRD 5.2.1 species; they live on the background), so
   // 2014-style and homebrew species still work.
   abilityBonuses: entry.abilityBonuses.map((bonus) => ({ ability: bonus.ability, amount: bonus.amount })),
   abilityBonusChoice: entry.abilityBonusChoice
-    ? { choose: entry.abilityBonusChoice.choose, amount: entry.abilityBonusChoice.amount, from: entry.abilityBonusChoice.from }
+    ? {
+        choose: entry.abilityBonusChoice.choose,
+        amount: entry.abilityBonusChoice.amount,
+        from: entry.abilityBonusChoice.from
+      }
     : null,
-  languages: entry.languages, languageChoices: choiceListOf(entry.languageChoices),
-  lineages: entry.lineages.map((lineage) => ({ id: lineage.id, name: lineage.name, description: lineage.description ?? null })),
-  features: [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map((feature) => featureSummaryOf(feature))
+  languages: entry.languages,
+  languageChoices: choiceListOf(entry.languageChoices),
+  lineages: entry.lineages.map((lineage) => ({
+    id: lineage.id,
+    name: lineage.name,
+    description: lineage.description ?? null
+  })),
+  features: [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map((feature) =>
+    featureSummaryOf(feature)
+  )
 });
 
 const backgroundSummaryOf = (entry: BackgroundReference): ContentBackgroundSummary => ({
-  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
-  abilityOptions: entry.abilityOptions ? { from: entry.abilityOptions.from, spreads: entry.abilityOptions.spreads } : null,
+  id: entry.id,
+  name: entry.name,
+  source: entry.source,
+  summary: entry.summary ?? null,
+  description: entry.description ?? null,
+  abilityOptions: entry.abilityOptions
+    ? { from: entry.abilityOptions.from, spreads: entry.abilityOptions.spreads }
+    : null,
   originFeatId: entry.originFeatId ?? null,
-  skillProficiencies: entry.skillProficiencies, skillChoices: choiceListOf(entry.skillChoices),
-  toolProficiencies: entry.toolProficiencies, toolChoices: choiceListOf(entry.toolChoices),
-  languages: entry.languages, languageChoices: choiceListOf(entry.languageChoices),
+  skillProficiencies: entry.skillProficiencies,
+  skillChoices: choiceListOf(entry.skillChoices),
+  toolProficiencies: entry.toolProficiencies,
+  toolChoices: choiceListOf(entry.toolChoices),
+  languages: entry.languages,
+  languageChoices: choiceListOf(entry.languageChoices),
   startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
   features: entry.features.map((feature) => featureSummaryOf(feature))
 });
@@ -317,8 +481,13 @@ const backgroundSummaryOf = (entry: BackgroundReference): ContentBackgroundSumma
 // A feat is a feature plus catalog metadata. Prerequisites travel as data and prose; the server
 // decides whether one is met.
 const featSummaryOf = (entry: FeatReference): ContentFeatSummary => ({
-  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
-  category: entry.category, repeatable: entry.repeatable,
+  id: entry.id,
+  name: entry.name,
+  source: entry.source,
+  summary: entry.summary ?? null,
+  description: entry.description ?? null,
+  category: entry.category,
+  repeatable: entry.repeatable,
   prerequisiteLevel: entry.prerequisite?.level ?? null,
   prerequisiteAbilities: entry.prerequisite?.abilityScores ?? [],
   prerequisiteRequires: entry.prerequisite?.requires ?? [],
@@ -327,18 +496,26 @@ const featSummaryOf = (entry: FeatReference): ContentFeatSummary => ({
 });
 
 const nameBundleOf = (entry: ReturnType<typeof loadNames>[number]): ContentNameBundle => ({
-  speciesId: entry.speciesId, source: entry.source,
+  speciesId: entry.speciesId,
+  source: entry.source,
   pools: entry.pools.map((pool) => ({ id: pool.id, label: pool.label, names: pool.names }))
 });
 
 /** SRD rows then this audience's homebrew. Never mutates a cached `loadX()` result. */
-const merged = <T>(srd: readonly T[], homebrew: readonly T[]): readonly T[] => homebrew.length === 0 ? srd : [...srd, ...homebrew];
+const merged = <T>(srd: readonly T[], homebrew: readonly T[]): readonly T[] =>
+  homebrew.length === 0 ? srd : [...srd, ...homebrew];
 
 const sliceIsEmpty = (slice: HomebrewCatalogSlice): boolean =>
-  slice.classes.length === 0 && slice.subclasses.length === 0 && slice.species.length === 0 && slice.backgrounds.length === 0
-  && slice.feats.length === 0 && slice.spells.length === 0 && slice.equipment.length === 0 && slice.monsters.length === 0
+  slice.classes.length === 0 &&
+  slice.subclasses.length === 0 &&
+  slice.species.length === 0 &&
+  slice.backgrounds.length === 0 &&
+  slice.feats.length === 0 &&
+  slice.spells.length === 0 &&
+  slice.equipment.length === 0 &&
+  slice.monsters.length === 0 &&
   // A spell-list overlay changes spells' `classes`, so a slice holding only lists is not empty.
-  && slice.spellLists.length === 0;
+  slice.spellLists.length === 0;
 
 /** All derived catalog structures for one audience. Homebrew must reach the summaries, record maps and
  *  progression table together, or a homebrew class silently gets SRD defaults. */
@@ -354,36 +531,63 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
   const spells = applySpellListOverlay(merged(loadSpells(), homebrew.spells), homebrew.spellLists);
   const equipment = merged(loadEquipment(), homebrew.equipment);
 
-  const conditionSummaries: readonly ContentConditionSummary[] = loadConditions().map(({ id, name, description }) => ({ id, name, description }));
+  const conditionSummaries: readonly ContentConditionSummary[] = loadConditions().map(({ id, name, description }) => ({
+    id,
+    name,
+    description
+  }));
 
   // Skill reference text + the ability each check uses (null only for an unmapped homebrew row).
   const skillSummaries: readonly ContentSkillSummary[] = loadSkills().map((skill) => ({
-    id: skill.id, name: skill.name, description: skill.description, ability: skill.ability ?? null
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    ability: skill.ability ?? null
   }));
 
   // The SRD languages, as data so a `languageChoices` budget has a list to offer.
   const languageSummaries: readonly ContentLanguageSummary[] = loadLanguages().map((language) => ({
-    id: language.id, name: language.name, description: language.description, table: language.table
+    id: language.id,
+    name: language.name,
+    description: language.description,
+    table: language.table
   }));
 
   const spellSummaries: readonly ContentSpellSummary[] = spells
     .map((spell) => ({
-      id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
-      rangeText: spell.range.text, componentsText: spellComponentsText(spell.components), duration: spell.duration,
+      id: spell.id,
+      name: spell.name,
+      level: spell.level,
+      school: spell.school,
+      castingTime: spell.castingTime,
+      rangeText: spell.range.text,
+      componentsText: spellComponentsText(spell.components),
+      duration: spell.duration,
       // Facts the `fromPicks` predicates read. Feet only when the printed range is a distance (not Self/Touch).
       attackRoll: spell.attackRoll,
       rangeFeet: spell.range.unit === "feet" || spell.range.unit === "foot" ? spell.range.distance : null,
-      concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel,
+      concentration: spell.concentration,
+      ritual: spell.ritual,
+      description: spell.description,
+      higherLevel: spell.higherLevel,
       // The spell-list link the builder's spell step filters by, paired with spellcasting.spellListId.
       classes: spell.classes,
-      damageRoll: spell.damage.roll, damageTypes: spell.damage.types, castingOptions: slotCastingOptions(spell.castingOptions)
+      damageRoll: spell.damage.roll,
+      damageTypes: spell.damage.types,
+      castingOptions: slotCastingOptions(spell.castingOptions)
     }))
     .sort(byName);
 
   // Mirrors EquipmentReference one-to-one, re-emitted as the transport-owned type.
   const equipmentSummaries: readonly ContentEquipmentSummary[] = equipment.map((item) => ({
-    id: item.id, name: item.name, category: item.category, costGp: item.costGp, weightLb: item.weightLb, description: item.description,
-    weapon: item.weapon ?? null, armor: item.armor ?? null,
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    costGp: item.costGp,
+    weightLb: item.weightLb,
+    description: item.description,
+    weapon: item.weapon ?? null,
+    armor: item.armor ?? null,
     // The template eligibility list, for the base chooser. Printed SRD text plus resolved ids; nothing GM-secret.
     appliesTo: item.appliesTo ?? null
   }));
@@ -439,8 +643,10 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
 /** Every feature and inline option keyed by `{kind, sourceId, id}` (ids repeat across classes). First
  *  write wins, so the index is deterministic. */
 function featureIndexOf(
-  classes: readonly ClassReference[], subclasses: readonly SubclassReference[],
-  species: readonly SpeciesReference[], backgrounds: readonly BackgroundReference[]
+  classes: readonly ClassReference[],
+  subclasses: readonly SubclassReference[],
+  species: readonly SpeciesReference[],
+  backgrounds: readonly BackgroundReference[]
 ): Map<string, FeatureRecordLike> {
   const index = new Map<string, FeatureRecordLike>();
   const put = (kind: CharacterFeatureRef["kind"], sourceId: string, feature: FeatureRecord) => {
@@ -489,7 +695,16 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     monsterSummaries: () => data.monsterSummaries,
     monster: (definitionId) => data.monstersById.get(definitionId),
     monsterActionSummaries: (definitionId) => data.monstersById.get(definitionId)?.actions.map(actionSummaryOf),
-    catalogChoiceCatalogs: () => ({ classes: data.classSummaries, subclasses: data.subclassSummaries, species: data.speciesSummaries, feats: data.featSummaries, spells: data.spellSummaries, equipment: data.equipmentSummaries, skills: data.skillSummaries, languages: data.languageSummaries }),
+    catalogChoiceCatalogs: () => ({
+      classes: data.classSummaries,
+      subclasses: data.subclassSummaries,
+      species: data.speciesSummaries,
+      feats: data.featSummaries,
+      spells: data.spellSummaries,
+      equipment: data.equipmentSummaries,
+      skills: data.skillSummaries,
+      languages: data.languageSummaries
+    }),
     classProgressionTable: () => data.progressionTable,
     classRecord: (id) => data.classRecords.get(id),
     subclassRecord: (id) => data.subclassRecords.get(id),

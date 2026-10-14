@@ -13,8 +13,11 @@ describe("generated app map", () => {
 
   it("covers every GameState field, command type, and HTTP path", () => {
     const rendered = renderAppMap();
-    for (const field of Object.keys(GameStateSchema.shape)) expect(rendered, `missing state field ${field}`).toContain(`\`${field}\``);
-    for (const type of Object.keys(GAME_COMMAND_SCOPES)) expect(rendered, `missing command ${type}`).toContain(`\`${type}\``);
-    for (const path of Object.keys(openApiDocument.paths)) expect(rendered, `missing path ${path}`).toContain(` ${path}\``);
+    for (const field of Object.keys(GameStateSchema.shape))
+      expect(rendered, `missing state field ${field}`).toContain(`\`${field}\``);
+    for (const type of Object.keys(GAME_COMMAND_SCOPES))
+      expect(rendered, `missing command ${type}`).toContain(`\`${type}\``);
+    for (const path of Object.keys(openApiDocument.paths))
+      expect(rendered, `missing path ${path}`).toContain(` ${path}\``);
   });
 });

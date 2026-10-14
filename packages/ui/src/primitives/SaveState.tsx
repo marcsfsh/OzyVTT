@@ -25,21 +25,34 @@ export function SaveState({ status, onReload, onRetry, className }: SaveStatePro
   const view = VIEWS[status];
   return (
     <div className={cx("nh-savestate", `nh-savestate--${view.tone}`, className)}>
-      <span className="nh-savestate-icon" aria-hidden="true">{view.icon}</span>
+      <span className="nh-savestate-icon" aria-hidden="true">
+        {view.icon}
+      </span>
       <span className="nh-savestate-label">{view.label}</span>
       {status === "conflict" && onReload && (
-        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onReload}>Reload</Button>
+        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onReload}>
+          Reload
+        </Button>
       )}
       {status === "error" && onRetry && (
-        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onRetry}>Retry</Button>
+        <Button variant="secondary" size="sm" className="nh-savestate-action" onClick={onRetry}>
+          Retry
+        </Button>
       )}
       {/* Settled states only; see the note above. */}
-      <span className="nh-sr-only" role="status">{view.settled ? view.label : ""}</span>
+      <span className="nh-sr-only" role="status">
+        {view.settled ? view.label : ""}
+      </span>
     </div>
   );
 }
 
-type View = Readonly<{ label: string; tone: "rest" | "work" | "caution" | "danger"; settled: boolean; icon: ReactNode }>;
+type View = Readonly<{
+  label: string;
+  tone: "rest" | "work" | "caution" | "danger";
+  settled: boolean;
+  icon: ReactNode;
+}>;
 
 /* One table, so a status can't ship with a word but no glyph. "saving" uses the shuffle glyph rather than a
    spinner, because looping motion isn't allowed. */

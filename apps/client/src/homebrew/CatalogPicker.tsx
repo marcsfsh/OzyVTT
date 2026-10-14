@@ -51,7 +51,9 @@ export function CatalogPicker({
       facet: entry.origin,
       badge:
         minority && entry.origin === minority ? (
-          <Badge tone={entry.origin === "srd" ? "info" : "primary"}>{entry.origin === "srd" ? "SRD" : "Homebrew"}</Badge>
+          <Badge tone={entry.origin === "srd" ? "info" : "primary"}>
+            {entry.origin === "srd" ? "SRD" : "Homebrew"}
+          </Badge>
         ) : undefined
     }));
 
@@ -102,7 +104,14 @@ export function CatalogPicker({
         </div>
         {chosen && (
           <div className="hb-catalog-foot">
-            <Button variant="ghost" size="sm" onClick={() => { onChange(null); setOpen(false); }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+            >
               Clear the choice
             </Button>
           </div>

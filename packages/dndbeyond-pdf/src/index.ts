@@ -26,7 +26,7 @@ export function validateDraft(draft: Record<string, unknown>, warnings: string[]
     draft,
     warnings,
     valid: false,
-    issues: parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`),
+    issues: parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
   };
 }
 
@@ -39,7 +39,11 @@ export interface ImportOptions {
 
 /** Extract a DDB PDF into a validated draft. Caller injects `getDocument` (browser build with a worker,
  * or the Node build) so this works in either environment. */
-export async function importCharacterPdf(getDocument: GetDocument, data: Uint8Array, options: ImportOptions = {}): Promise<ImportResult> {
+export async function importCharacterPdf(
+  getDocument: GetDocument,
+  data: Uint8Array,
+  options: ImportOptions = {}
+): Promise<ImportResult> {
   const widgets = await readWidgetsWith(getDocument, data, options.docOptions);
   const { draft, warnings } = buildDefinition(widgets, { knownSpellIds: options.knownSpellIds });
   return validateDraft(draft, warnings);

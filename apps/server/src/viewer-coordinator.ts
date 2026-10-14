@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { ViewerAccessDeniedError, type ViewerAccessMetadata, type ViewerAccessStore } from "./viewer-access.js";
-import type { ViewerCamera, ViewerCommand, ViewerEncounterScene, ViewerInitiative, ViewerPresentationProjection } from "./viewer-presentation.js";
+import type {
+  ViewerCamera,
+  ViewerCommand,
+  ViewerEncounterScene,
+  ViewerInitiative,
+  ViewerPresentationProjection
+} from "./viewer-presentation.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 type PresentationListener = (projection: ViewerPresentationProjection) => void;
@@ -86,13 +92,19 @@ export class ViewerCoordinator {
     for (const timer of this.pingTimers) clearTimeout(timer);
     this.pingTimers.clear();
     const now = this.now();
-    const soonest = this.presentation.snapshot.pings.map((ping) => ping.expiresAt).filter((expiry) => expiry > now).sort((a, b) => a - b)[0];
+    const soonest = this.presentation.snapshot.pings
+      .map((ping) => ping.expiresAt)
+      .filter((expiry) => expiry > now)
+      .sort((a, b) => a - b)[0];
     if (soonest === undefined) return;
-    const timer = setTimeout(() => {
-      this.pingTimers.delete(timer);
-      this.broadcast();
-      this.schedulePingExpiry();
-    }, Math.max(0, soonest - now));
+    const timer = setTimeout(
+      () => {
+        this.pingTimers.delete(timer);
+        this.broadcast();
+        this.schedulePingExpiry();
+      },
+      Math.max(0, soonest - now)
+    );
     timer.unref?.();
     this.pingTimers.add(timer);
   }
@@ -105,24 +117,36 @@ export class ViewerCoordinator {
   async synchronizeInitiative(sourceRevision: number, initiative: ViewerInitiative) {
     const current = this.presentation.snapshot;
     if (JSON.stringify(current.initiative) === JSON.stringify(initiative)) return false;
-    const result = await this.presentation.execute({
-      id: `encounter-initiative:${sourceRevision}:${current.revision}`,
-      role: "gm",
-      payload: { type: "viewer.initiative.set", initiative }
-    }, this.now());
+    const result = await this.presentation.execute(
+      {
+        id: `encounter-initiative:${sourceRevision}:${current.revision}`,
+        role: "gm",
+        payload: { type: "viewer.initiative.set", initiative }
+      },
+      this.now()
+    );
     if (!result.duplicate) this.broadcast();
     return !result.duplicate;
   }
 
-  async synchronizeEncounter(sourceRevision: number, projection: Readonly<{ initiative: ViewerInitiative; encounter: ViewerEncounterScene }>) {
+  async synchronizeEncounter(
+    sourceRevision: number,
+    projection: Readonly<{ initiative: ViewerInitiative; encounter: ViewerEncounterScene }>
+  ) {
     const current = this.presentation.snapshot;
-    if (JSON.stringify(current.initiative) === JSON.stringify(projection.initiative)
-      && JSON.stringify(current.encounter) === JSON.stringify(projection.encounter)) return false;
-    const result = await this.presentation.execute({
-      id: `encounter-scene:${sourceRevision}:${current.revision}`,
-      role: "gm",
-      payload: { type: "viewer.encounter.set", ...projection }
-    }, this.now());
+    if (
+      JSON.stringify(current.initiative) === JSON.stringify(projection.initiative) &&
+      JSON.stringify(current.encounter) === JSON.stringify(projection.encounter)
+    )
+      return false;
+    const result = await this.presentation.execute(
+      {
+        id: `encounter-scene:${sourceRevision}:${current.revision}`,
+        role: "gm",
+        payload: { type: "viewer.encounter.set", ...projection }
+      },
+      this.now()
+    );
     if (!result.duplicate) this.broadcast();
     return !result.duplicate;
   }
@@ -133,11 +157,14 @@ export class ViewerCoordinator {
   async presentMap(sourceRevision: number, map: Readonly<{ assetId: string; altText: string; camera: ViewerCamera }>) {
     const current = this.presentation.snapshot;
     if (current.enabled && current.activeMap?.assetId === map.assetId) return false;
-    const result = await this.presentation.execute({
-      id: `scene-present:${sourceRevision}:${current.revision}`,
-      role: "gm",
-      payload: { type: "viewer.presentation.begin", assetId: map.assetId, altText: map.altText, camera: map.camera }
-    }, this.now());
+    const result = await this.presentation.execute(
+      {
+        id: `scene-present:${sourceRevision}:${current.revision}`,
+        role: "gm",
+        payload: { type: "viewer.presentation.begin", assetId: map.assetId, altText: map.altText, camera: map.camera }
+      },
+      this.now()
+    );
     if (!result.duplicate) this.broadcast();
     return !result.duplicate;
   }
@@ -151,7 +178,12 @@ export class ViewerCoordinator {
   }
 
   activeViewers(): readonly ViewerConnectionMetadata[] {
-    return [...this.subscribers.values()].map(({ connectionId, viewer, connectedAt }) => ({ connectionId, viewerId: viewer.id, name: viewer.name, connectedAt }));
+    return [...this.subscribers.values()].map(({ connectionId, viewer, connectedAt }) => ({
+      connectionId,
+      viewerId: viewer.id,
+      name: viewer.name,
+      connectedAt
+    }));
   }
 
   broadcast() {
@@ -166,7 +198,11 @@ export class ViewerCoordinator {
       }
     }
     for (const [connectionId, subscriber] of this.gmSubscribers) {
-      if (!this.authorizeGm(subscriber.token)) { this.gmSubscribers.delete(connectionId); subscriber.close(); continue; }
+      if (!this.authorizeGm(subscriber.token)) {
+        this.gmSubscribers.delete(connectionId);
+        subscriber.close();
+        continue;
+      }
       subscriber.listener(projection);
     }
   }

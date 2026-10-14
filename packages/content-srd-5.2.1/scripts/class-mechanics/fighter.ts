@@ -8,7 +8,9 @@ export const fighter: ClassMechanicsModule = {
   features: {
     // Weapon Mastery grows with the printed column: 3 -> 4 at level 4 -> 5 at 10 -> 6 at 16.
     "weapon-mastery": {
-      extraPicks: [{ offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }]
+      extraPicks: [
+        { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
+      ]
     }
     // Not modeled: Tactical Mind (retroactive check bonus with a refund), Tactical Shift and Tactical
     // Master (movement, mastery swap) and Studied Attacks (needs memory of the missed target).
@@ -41,8 +43,14 @@ export const fighter: ClassMechanicsModule = {
         modifiers: [
           { type: "roll-mode", roll: "initiative", mode: "advantage" },
           {
-            type: "roll-mode", roll: "check", mode: "advantage",
-            when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }, { type: "skill-is", skills: ["athletics"] }]
+            type: "roll-mode",
+            roll: "check",
+            mode: "advantage",
+            when: [
+              { type: "on-ability-check" },
+              { type: "ability-is", abilities: ["str"] },
+              { type: "skill-is", skills: ["athletics"] }
+            ]
           }
         ]
       }

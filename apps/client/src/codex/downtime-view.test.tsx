@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-
 const createDowntime = vi.fn();
 const applyDowntime = vi.fn();
 const update = vi.fn();
@@ -26,32 +25,77 @@ import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "./
 
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
-  months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }],
+  months: [
+    { name: "Hammer", days: 30 },
+    { name: "Alturiak", days: 30 }
+  ],
   weekdays: ["Sul", "Mol"],
   currentDate: { year: 1491, month: 0, day: 10 },
   publishedDate: { year: 1491, month: 0, day: 10 }
 };
 
-const page = (id: string, title: string, entityType: CodexPageSummary["entityType"] = "character"): CodexPageSummary => ({
-  id, title, entityType, fields: {}, folder: null, tags: [], revealedToPlayers: true, bannerAssetId: null,
-  inWorldDate: null, inWorldLabel: null, calendarInstant: null,
-  rev: 1, createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+const page = (
+  id: string,
+  title: string,
+  entityType: CodexPageSummary["entityType"] = "character"
+): CodexPageSummary => ({
+  id,
+  title,
+  entityType,
+  fields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: true,
+  bannerAssetId: null,
+  inWorldDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  rev: 1,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 });
 
-const downtime = (id: string, payload: Readonly<{ who: string; activity: string; days: number; applied: boolean; characterPageId?: string | null }>): CodexChronicleRecord => ({
-  id, kind: "downtime", title: null, text: "", playerText: "", gmText: "", tags: [], revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldDate: null, inWorldLabel: "Hammer 3, 1491 DR",
-  calendarInstant: null, proposedDate: { year: 1491, month: 0, day: 17 }, attachPageId: null, attachMarkerId: null, archiveId: null,
-  payload: { characterPageId: null, ...payload },
-  createdAt: "2026-07-31T00:00:00.000Z"
-} as unknown as CodexChronicleRecord);
+const downtime = (
+  id: string,
+  payload: Readonly<{ who: string; activity: string; days: number; applied: boolean; characterPageId?: string | null }>
+): CodexChronicleRecord =>
+  ({
+    id,
+    kind: "downtime",
+    title: null,
+    text: "",
+    playerText: "",
+    gmText: "",
+    tags: [],
+    revealedToPlayers: false,
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldDate: null,
+    inWorldLabel: "Hammer 3, 1491 DR",
+    calendarInstant: null,
+    proposedDate: { year: 1491, month: 0, day: 17 },
+    attachPageId: null,
+    attachMarkerId: null,
+    archiveId: null,
+    payload: { characterPageId: null, ...payload },
+    createdAt: "2026-07-31T00:00:00.000Z"
+  }) as unknown as CodexChronicleRecord;
 
 const PAGES = [page("c1", "Vex"), page("c2", "Ireena"), page("l1", "Vallaki", "location")];
 
 const renderDowntime = (over: Partial<React.ComponentProps<typeof DowntimeView>> = {}) => {
   const props = {
-    gmToken: "gm", records: [] as readonly CodexChronicleRecord[], calendar: CALENDAR, pages: PAGES,
-    loading: false, error: null, onChanged: vi.fn(), onOpenEntry: vi.fn(), onOpenPage: vi.fn(), ...over
+    gmToken: "gm",
+    records: [] as readonly CodexChronicleRecord[],
+    calendar: CALENDAR,
+    pages: PAGES,
+    loading: false,
+    error: null,
+    onChanged: vi.fn(),
+    onOpenEntry: vi.fn(),
+    onOpenPage: vi.fn(),
+    ...over
   };
   return { props, ...render(<DowntimeView {...props} />) };
 };
@@ -177,10 +221,15 @@ describe("Pending confirmations", () => {
   it("warns when confirming would step past a deadline the party has not seen fall", () => {
     const deadline = {
       ...downtime("dl", { who: "", activity: "", days: 0, applied: false }),
-      id: "dl", kind: "deadline", payload: null,
-      inWorldDate: { year: 1491, month: 0, day: 14 }, calendarInstant: 44743
+      id: "dl",
+      kind: "deadline",
+      payload: null,
+      inWorldDate: { year: 1491, month: 0, day: 14 },
+      calendarInstant: 44743
     } as unknown as CodexChronicleRecord;
-    renderDowntime({ records: [downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }), deadline] });
+    renderDowntime({
+      records: [downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }), deadline]
+    });
 
     // Hammer 14 falls between the clock (10) and the proposal (17).
     expect(screen.getByRole("button", { name: /passes 1 deadline/ })).toBeInTheDocument();
@@ -189,7 +238,10 @@ describe("Pending confirmations", () => {
   it("confirms through the apply route and reports failure rather than swallowing it", async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();
-    renderDowntime({ onChanged, records: [downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }) ] });
+    renderDowntime({
+      onChanged,
+      records: [downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false })]
+    });
 
     await user.click(screen.getByRole("button", { name: /^Move your date to/ }));
     await waitFor(() => expect(applyDowntime).toHaveBeenCalledWith("gm", "d1"));
@@ -206,7 +258,12 @@ describe("Pending confirmations", () => {
     renderDowntime({
       // No current date: nothing to advance from.
       calendar: { ...CALENDAR, currentDate: null, publishedDate: null },
-      records: [{ ...downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }), proposedDate: null } as CodexChronicleRecord]
+      records: [
+        {
+          ...downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }),
+          proposedDate: null
+        } as CodexChronicleRecord
+      ]
     });
 
     // Found by heading, since the claim is that the reason sits beside the control.
@@ -255,7 +312,9 @@ describe("Adopting an old row (the Edit path)", () => {
 
     // Days are what the clock already moved by, so the row edit doesn't offer them.
     expect(history.queryByLabelText("Days")).toBeNull();
-    expect(history.getByText("Days cannot be changed after logging. Delete the entry and log it again to correct it.")).toBeInTheDocument();
+    expect(
+      history.getByText("Days cannot be changed after logging. Delete the entry and log it again to correct it.")
+    ).toBeInTheDocument();
 
     await user.click(history.getByRole("combobox", { name: "Link to a character page" }));
     await user.click(await screen.findByRole("option", { name: /Vex/ }));
@@ -308,7 +367,10 @@ describe("A party bigger than the Combobox's default page", () => {
 
   it("lets the edit row link an old entry to the ninth character", async () => {
     const user = userEvent.setup();
-    renderDowntime({ pages: NINE, records: [downtime("d1", { who: "ivy", activity: "Scouting", days: 4, applied: true })] });
+    renderDowntime({
+      pages: NINE,
+      records: [downtime("d1", { who: "ivy", activity: "Scouting", days: 4, applied: true })]
+    });
 
     const history = within(document.querySelector(".codex-downtime-history")!);
     await user.click(history.getByRole("button", { name: "Edit" }));
@@ -328,11 +390,31 @@ describe("A party bigger than the Combobox's default page", () => {
 
 describe("The player's Downtime (D12/D14)", () => {
   const PLAYER_ROWS = [
-    { id: "d1", kind: "downtime" as const, title: null, text: "", tags: [], realDate: null, inWorldLabel: "Hammer 3, 1491 DR", calendarInstant: 44732, sessionId: null, sessionNumber: null, createdAt: "2026-07-31T00:00:00.000Z", payload: { who: "Vex", activity: "Forging", days: 7, characterPageId: "c1" } }
+    {
+      id: "d1",
+      kind: "downtime" as const,
+      title: null,
+      text: "",
+      tags: [],
+      realDate: null,
+      inWorldLabel: "Hammer 3, 1491 DR",
+      calendarInstant: 44732,
+      sessionId: null,
+      sessionNumber: null,
+      createdAt: "2026-07-31T00:00:00.000Z",
+      payload: { who: "Vex", activity: "Forging", days: 7, characterPageId: "c1" }
+    }
   ];
 
   it("has no Pending section — by construction, not by a role check", () => {
-    render(<PlayerDowntimeView records={PLAYER_ROWS as never} pages={[{ id: "c1", title: "Vex" }]} onOpenEntry={vi.fn()} onOpenPage={vi.fn()} />);
+    render(
+      <PlayerDowntimeView
+        records={PLAYER_ROWS as never}
+        pages={[{ id: "c1", title: "Vex" }]}
+        onOpenEntry={vi.fn()}
+        onOpenPage={vi.fn()}
+      />
+    );
 
     // `applied` isn't on the player payload, so there is no Pending section or Confirm.
     expect(screen.queryByText("Pending confirmations")).toBeNull();

@@ -59,7 +59,8 @@ export function effectiveModeFor(combat: Pick<CombatState, "rulesMode" | "ruleEx
  *  to the legacy boolean's two prefixes for turns persisted by an older build. */
 export function overrideCovers(turn: CombatState["turn"], rule: string): boolean {
   const family = familyOf(rule);
-  if (turn.rulesOverriddenFamilies !== undefined) return family !== null && turn.rulesOverriddenFamilies.includes(family);
+  if (turn.rulesOverriddenFamilies !== undefined)
+    return family !== null && turn.rulesOverriddenFamilies.includes(family);
   return turn.rulesOverridden === true && (rule.startsWith("economy.") || rule.startsWith("range."));
 }
 

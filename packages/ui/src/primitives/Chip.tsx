@@ -27,7 +27,20 @@ export interface ChipProps {
 /** Condition/tag pill. Category reads from icon + label + border (never color
     alone); the label stays --text for contrast. Renders a <button> when it's
     pressable (onClick/pressed) and a <span> otherwise. */
-export function Chip({ tone = "neutral", icon, atRisk = false, className, children, title, pressed, disabled, onClick, onRemove, removeLabel, ...aria }: ChipProps) {
+export function Chip({
+  tone = "neutral",
+  icon,
+  atRisk = false,
+  className,
+  children,
+  title,
+  pressed,
+  disabled,
+  onClick,
+  onRemove,
+  removeLabel,
+  ...aria
+}: ChipProps) {
   const isButton = pressed !== undefined || onClick !== undefined;
   const cls = cx(
     "nh-chip",
@@ -38,13 +51,25 @@ export function Chip({ tone = "neutral", icon, atRisk = false, className, childr
   );
   const body = (
     <>
-      {icon != null && <span className="nh-chip-icon" aria-hidden="true">{icon}</span>}
+      {icon != null && (
+        <span className="nh-chip-icon" aria-hidden="true">
+          {icon}
+        </span>
+      )}
       <span className="nh-chip-label">{children}</span>
     </>
   );
   if (isButton) {
     return (
-      <button type="button" className={cls} aria-pressed={pressed} disabled={disabled} title={title} onClick={onClick} {...aria}>
+      <button
+        type="button"
+        className={cls}
+        aria-pressed={pressed}
+        disabled={disabled}
+        title={title}
+        onClick={onClick}
+        {...aria}
+      >
         {body}
       </button>
     );
@@ -53,7 +78,12 @@ export function Chip({ tone = "neutral", icon, atRisk = false, className, childr
     <span className={cls} title={title} {...aria}>
       {body}
       {onRemove && (
-        <button type="button" className="nh-chip-remove tap-target" aria-label={removeLabel ?? "Remove"} onClick={onRemove}>
+        <button
+          type="button"
+          className="nh-chip-remove tap-target"
+          aria-label={removeLabel ?? "Remove"}
+          onClick={onRemove}
+        >
           ✕
         </button>
       )}

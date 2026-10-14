@@ -2,7 +2,10 @@
    The material is painted as background layers on the element, not a `::before`, because the horizontal bar
    is a scroll container and a positioned pseudo would scroll away with the tabs. No corner cut, so no clipping.
    The scrollbar stays hidden: the edge-fade mask is the better "more tabs" signal on a phone. */
-.nh-tabs { display: flex; gap: var(--space-1); }
+.nh-tabs {
+  display: flex;
+  gap: var(--space-1);
+}
 .nh-tabs--horizontal {
   flex-direction: row;
   /* Translucent so the `.frame-tabbar` role wash and scanline beneath show through; an opaque fill would erase
@@ -13,7 +16,12 @@
      bezel, sheen. */
   background-image:
     linear-gradient(to top, var(--rim-color) 0 var(--rim-w), transparent var(--rim-w)),
-    linear-gradient(to top, transparent 0 calc(var(--bezel-inset) - 1px), var(--bezel-color) calc(var(--bezel-inset) - 1px) var(--bezel-inset), transparent var(--bezel-inset)),
+    linear-gradient(
+      to top,
+      transparent 0 calc(var(--bezel-inset) - 1px),
+      var(--bezel-color) calc(var(--bezel-inset) - 1px) var(--bezel-inset),
+      transparent var(--bezel-inset)
+    ),
     linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 60%);
   overflow-x: auto;
   scrollbar-width: none;
@@ -22,8 +30,13 @@
   /* `proximity`, not `mandatory`, so the bar stays where the finger left it. */
   scroll-snap-type: x proximity;
 }
-.nh-tabs--horizontal::-webkit-scrollbar { display: none; }
-.nh-tabs--vertical { flex-direction: column; align-items: stretch; }
+.nh-tabs--horizontal::-webkit-scrollbar {
+  display: none;
+}
+.nh-tabs--vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
 
 /* The fade is the only "more tabs" signal, so it appears only while the bar actually overflows. Rules are
    ordered so the later state wins at equal specificity (at the far end both scrolled classes are present). */
@@ -54,17 +67,27 @@
   color: var(--text-dim);
   font: 700 var(--fs-sm) / 1 var(--font-display);
   text-transform: uppercase;
-  letter-spacing: .05em;
+  letter-spacing: 0.05em;
   white-space: nowrap;
   cursor: pointer;
 }
 /* `:active` carries what `:hover` does. */
-.nh-tab:hover:not(:disabled), .nh-tab:active:not(:disabled) { color: var(--text); }
-.nh-tab:disabled { color: var(--text-muted); cursor: not-allowed; }
+.nh-tab:hover:not(:disabled),
+.nh-tab:active:not(:disabled) {
+  color: var(--text);
+}
+.nh-tab:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
 
 /* Horizontal: 2px magenta underline, no glow. No negative margin; the underline shares an edge with the rim. */
-.nh-tabs--horizontal .nh-tab { scroll-snap-align: start; }
-.nh-tabs--horizontal .nh-tab--active { color: var(--text); }
+.nh-tabs--horizontal .nh-tab {
+  scroll-snap-align: start;
+}
+.nh-tabs--horizontal .nh-tab--active {
+  color: var(--text);
+}
 .nh-tabs--horizontal .nh-tab--active::after {
   content: "";
   position: absolute;
@@ -77,8 +100,14 @@
 }
 
 /* Vertical rail — left 2px accent bar */
-.nh-tabs--vertical .nh-tab { text-align: left; border-radius: 0; }
-.nh-tabs--vertical .nh-tab--active { color: var(--text); background: var(--surface-2); }
+.nh-tabs--vertical .nh-tab {
+  text-align: left;
+  border-radius: 0;
+}
+.nh-tabs--vertical .nh-tab--active {
+  color: var(--text);
+  background: var(--surface-2);
+}
 .nh-tabs--vertical .nh-tab--active::before {
   content: "";
   position: absolute;

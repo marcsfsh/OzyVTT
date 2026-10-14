@@ -14,27 +14,65 @@ const ME = "30000000-0000-4000-8000-0000000000b1";
 const THEM = "30000000-0000-4000-8000-0000000000b2";
 
 /** A distinctive string per sheet, so "did this sheet cross the wire?" is a substring question. */
-const definitionOf = (name: string, className: string, level: number, secret: string): ActorDefinition => ActorDefinitionSchema.parse({
-  schemaId: "vtt.actor-character", schemaVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
-  source: { name: "test", version: "1" },
-  name, size: "medium", armorClass: 14, proficiencyBonus: 3, initiativeBonus: 0, speedFeet: 30,
-  abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 8 },
-  hitPoints: { maximum: 30 }, extensions: {}, token: { disposition: "friendly" },
-  // Two actions sharing one pool plus a solo one: the shared ceiling is the max over its members.
-  actions: [
-    { id: "divine-spark", name: "Channel Divinity: Divine Spark", activation: "action", description: "A surge of divine energy.", uses: { limit: 2, per: "short-rest", pool: "channel-divinity" } },
-    { id: "preserve-life", name: "Channel Divinity: Preserve Life", activation: "action", description: "You restore the wounded.", uses: { limit: 1, per: "short-rest", pool: "channel-divinity" } },
-    { id: "second-wind", name: "Second Wind", activation: "bonus-action", description: "You catch your breath.", uses: { limit: 3, per: "short-rest" } }
-  ],
-  character: { classes: [{ id: className.toLowerCase(), name: className, level }], feats: [], background: { id: "sage", name: secret } }
-});
+const definitionOf = (name: string, className: string, level: number, secret: string): ActorDefinition =>
+  ActorDefinitionSchema.parse({
+    schemaId: "vtt.actor-character",
+    schemaVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
+    source: { name: "test", version: "1" },
+    name,
+    size: "medium",
+    armorClass: 14,
+    proficiencyBonus: 3,
+    initiativeBonus: 0,
+    speedFeet: 30,
+    abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 8 },
+    hitPoints: { maximum: 30 },
+    extensions: {},
+    token: { disposition: "friendly" },
+    // Two actions sharing one pool plus a solo one: the shared ceiling is the max over its members.
+    actions: [
+      {
+        id: "divine-spark",
+        name: "Channel Divinity: Divine Spark",
+        activation: "action",
+        description: "A surge of divine energy.",
+        uses: { limit: 2, per: "short-rest", pool: "channel-divinity" }
+      },
+      {
+        id: "preserve-life",
+        name: "Channel Divinity: Preserve Life",
+        activation: "action",
+        description: "You restore the wounded.",
+        uses: { limit: 1, per: "short-rest", pool: "channel-divinity" }
+      },
+      {
+        id: "second-wind",
+        name: "Second Wind",
+        activation: "bonus-action",
+        description: "You catch your breath.",
+        uses: { limit: 3, per: "short-rest" }
+      }
+    ],
+    character: {
+      classes: [{ id: className.toLowerCase(), name: className, level }],
+      feats: [],
+      background: { id: "sage", name: secret }
+    }
+  });
 
 function tableAt(partyVisibility: PartyVisibility): GameState {
   const pc = (id: string, name: string, owner: string | null, definitionId: string) => ({
-    id, name, kind: "player-character", visibility: "public", hp: { current: 20, maximum: 30 },
-    ownerSessionId: owner, definitionId,
-    spellSlots: [{ level: 1, remaining: 2 }], preparedSpellIds: ["fireball"],
-    inventory: [{ id: "rod", name: "Rod of Tellings" }], currency: { gp: 12 },
+    id,
+    name,
+    kind: "player-character",
+    visibility: "public",
+    hp: { current: 20, maximum: 30 },
+    ownerSessionId: owner,
+    definitionId,
+    spellSlots: [{ level: 1, remaining: 2 }],
+    preparedSpellIds: ["fireball"],
+    inventory: [{ id: "rod", name: "Rod of Tellings" }],
+    currency: { gp: 12 },
     actionUses: { "second-wind": 1 },
     hitDice: { die: "d8", maximum: 5, remaining: 3, entries: [{ die: "d8", maximum: 5, remaining: 3 }] }
   });
@@ -59,7 +97,16 @@ function tableAt(partyVisibility: PartyVisibility): GameState {
 const viewAt = (tier: PartyVisibility) => projectPlayerView(tableAt(tier), ME, () => null);
 const actorIn = (tier: PartyVisibility, id: string) => viewAt(tier).actors.find((actor) => actor.id === id);
 
-const RESOURCES = ["actionUses", "pools", "hitDice", "spellSlots", "pactSlots", "preparedSpellIds", "inventory", "currency"] as const;
+const RESOURCES = [
+  "actionUses",
+  "pools",
+  "hitDice",
+  "spellSlots",
+  "pactSlots",
+  "preparedSpellIds",
+  "inventory",
+  "currency"
+] as const;
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
 describe("party visibility — the tier is enforced in projectPlayerView, never client-side", () => {
@@ -90,17 +137,41 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
   it("keeps the fight coherent at every tier - the turn order, the tokens and the actor list agree", () => {
     for (const tier of TIERS) {
       const state = tableAt(tier);
-      state.combat = { ...state.combat, active: true, turnActorId: MINE, mapAssetId: "50000000-0000-5000-8000-000000000001",
-        initiative: [{ actorId: MINE, score: 18, tieBreaker: 0 }, { actorId: THEIRS, score: 13, tieBreaker: 0 }, { actorId: GOBLIN, score: 9, tieBreaker: 0 }],
-        tokens: [MINE, THEIRS, GOBLIN].map((actorId) => ({ actorId, position: { x: 10, y: 10 }, sizePx: 40, sizeCells: 1, gridSizePx: 50, gridRotationRadians: 0 })) };
+      state.combat = {
+        ...state.combat,
+        active: true,
+        turnActorId: MINE,
+        mapAssetId: "50000000-0000-5000-8000-000000000001",
+        initiative: [
+          { actorId: MINE, score: 18, tieBreaker: 0 },
+          { actorId: THEIRS, score: 13, tieBreaker: 0 },
+          { actorId: GOBLIN, score: 9, tieBreaker: 0 }
+        ],
+        tokens: [MINE, THEIRS, GOBLIN].map((actorId) => ({
+          actorId,
+          position: { x: 10, y: 10 },
+          sizePx: 40,
+          sizeCells: 1,
+          gridSizePx: 50,
+          gridRotationRadians: 0
+        }))
+      };
       const view = projectPlayerView(GameStateSchema.parse(state), ME, () => null);
       const ids = new Set(view.actors.map((actor) => actor.id));
-      expect(view.combat.initiative.some((entry) => entry.actorId === THEIRS), `ally missing from the turn order at ${tier}`).toBe(true);
-      expect(view.combat.tokens.some((token) => token.actorId === THEIRS), `ally's token missing at ${tier}`).toBe(true);
+      expect(
+        view.combat.initiative.some((entry) => entry.actorId === THEIRS),
+        `ally missing from the turn order at ${tier}`
+      ).toBe(true);
+      expect(
+        view.combat.tokens.some((token) => token.actorId === THEIRS),
+        `ally's token missing at ${tier}`
+      ).toBe(true);
       // Every combatant the player is shown must resolve to an actor they were also given, or the map
       // renders an empty square where a teammate is standing.
-      for (const token of view.combat.tokens) expect(ids.has(token.actorId), `token ${token.actorId} has no actor at tier ${tier}`).toBe(true);
-      for (const entry of view.combat.initiative) expect(ids.has(entry.actorId), `initiative entry ${entry.actorId} has no actor at tier ${tier}`).toBe(true);
+      for (const token of view.combat.tokens)
+        expect(ids.has(token.actorId), `token ${token.actorId} has no actor at tier ${tier}`).toBe(true);
+      for (const entry of view.combat.initiative)
+        expect(ids.has(entry.actorId), `initiative entry ${entry.actorId} has no actor at tier ${tier}`).toBe(true);
     }
   });
 
@@ -135,7 +206,9 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
     const theirs = projectPlayerView(state, ME, () => null).actors.find((actor) => actor.id === THEIRS)!;
     expect(theirs.definition?.name).toBe("Their Hero");
     for (const field of RESOURCES) expect(field in theirs, `${field} withheld at sheet-and-resources`).toBe(true);
-    expect(theirs.inventory).toEqual([{ id: "rod", name: "Rod of Tellings", quantity: 1, equipped: false, attuned: false }]);
+    expect(theirs.inventory).toEqual([
+      { id: "rod", name: "Rod of Tellings", quantity: 1, equipped: false, attuned: false }
+    ]);
     const source = state.actors.find((actor) => actor.id === THEIRS)!;
     expect(theirs.inventory).not.toBe(source.inventory);
     expect(theirs.spellSlots).not.toBe(source.spellSlots);
@@ -160,7 +233,15 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
   it("never lets any tier widen what is GM-only for everyone", () => {
     for (const tier of TIERS) {
       for (const actor of viewAt(tier).actors) {
-        for (const field of ["notes", "ownerSessionId", "conditionImmunities", "legendary", "lastUsedAt", "archived", "sheetPreview"]) {
+        for (const field of [
+          "notes",
+          "ownerSessionId",
+          "conditionImmunities",
+          "legendary",
+          "lastUsedAt",
+          "archived",
+          "sheetPreview"
+        ]) {
           expect(field in actor, `${field} reached a player at tier ${tier}`).toBe(false);
         }
       }
@@ -194,7 +275,10 @@ describe("pools — the shape a resource tracker binds to", () => {
     // Pool ids and `actionUses` keys must share one namespace, or a ceiling would sit beside the wrong count.
     const mine = actorIn("sheet-and-resources", MINE)!;
     for (const key of Object.keys(mine.actionUses!)) {
-      expect(mine.pools!.some((pool) => pool.id === key), `actionUses key "${key}" has no pool entry`).toBe(true);
+      expect(
+        mine.pools!.some((pool) => pool.id === key),
+        `actionUses key "${key}" has no pool entry`
+      ).toBe(true);
     }
     expect(mine.actionUses).toEqual({ "second-wind": 1 });
   });

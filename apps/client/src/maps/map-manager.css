@@ -7,64 +7,225 @@
    Breakpoints: 560/561 (one column vs canvas | steps), 849/850 (rail or pane vs both), 1280. */
 
 /* `.scenes-maps-view` is the /scenes/maps ready selector in both audit scripts; keep it. */
-.scenes-maps-view { gap: var(--space-3); }
-.map-manager-head { display: flex; flex-direction: column; gap: var(--space-2); }
-.map-manager-back { align-self: flex-start; }
-.map-manager-title { display: flex; align-items: end; justify-content: space-between; gap: var(--space-4); }
-.map-manager-title h2 { margin: .2rem 0 0; font: 400 var(--fs-h1) var(--font-display); }
-.map-manager-title p { max-width: 26rem; margin: 0; color: var(--text-dim); font-size: var(--fs-sm); text-align: right; }
+.scenes-maps-view {
+  gap: var(--space-3);
+}
+.map-manager-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.map-manager-back {
+  align-self: flex-start;
+}
+.map-manager-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.map-manager-title h2 {
+  margin: 0.2rem 0 0;
+  font: 400 var(--fs-h1) var(--font-display);
+}
+.map-manager-title p {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-align: right;
+}
 
 /* Upload row: one "Add map…" button (the real file input is hidden) plus an inline reveal of
    name/type/folder, which waits for a file below 560px. */
-.map-upload { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); }
-.map-upload-details { display: contents; }
-.map-upload label { display: flex; flex-direction: column; flex: 1 1 9rem; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
-.map-upload-optional { color: var(--text-muted); }
-.map-upload-file { flex: 0 1 auto; max-width: 100%; gap: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+.map-upload-details {
+  display: contents;
+}
+.map-upload label {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 9rem;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.map-upload-optional {
+  color: var(--text-muted);
+}
+.map-upload-file {
+  flex: 0 1 auto;
+  max-width: 100%;
+  gap: var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The real input stays in the DOM (the button clicks it) but takes no layout or focus order. 1px
    width/height is not enough for `type="file"`: Chromium sizes it from its shadow "Choose File"
    button, so `min-*`, padding and border are zeroed too. */
-.map-upload-input { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; clip-path: inset(50%); }
+.map-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+}
 
 /* One row, one or two columns. Below 850px the rail and the pane share one column and one shows. */
-.map-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); min-width: 0; min-height: 0; }
+.map-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
 
-.map-rail { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
-.map-rail-filters { display: flex; flex-direction: column; gap: var(--space-2); }
-.map-folder-chips { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
-.map-folder-chips > * { flex: none; }
+.map-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+.map-rail-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.map-folder-chips {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.15rem;
+  scrollbar-width: thin;
+}
+.map-folder-chips > * {
+  flex: none;
+}
 /* The scroll region is the wrapper (`.scroll-y` in the markup), never the `<ul>`: a grid with a
    definite block size stops sizing its auto rows from its cards. The picker's 21rem cap is lifted
    so only one thing scrolls. */
-.map-rail-list { min-height: 0; padding-right: var(--space-1); }
-.map-rail .map-picker-grid { max-height: none; }
+.map-rail-list {
+  min-height: 0;
+  padding-right: var(--space-1);
+}
+.map-rail .map-picker-grid {
+  max-height: none;
+}
 /* Empty states get one designed frame (the material below), not a dashed placeholder. */
-.map-list-empty { margin: var(--space-2) 0 0; padding: var(--space-4); border: 1px solid transparent; text-align: center; color: var(--text-dim); font-size: var(--fs-sm); }
-.map-empty { margin: 0; padding: var(--space-8); border: 1px solid transparent; text-align: center; color: var(--text-dim); }
-.map-pane-empty { display: grid; place-items: center; }
+.map-list-empty {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-4);
+  border: 1px solid transparent;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.map-empty {
+  margin: 0;
+  padding: var(--space-8);
+  border: 1px solid transparent;
+  text-align: center;
+  color: var(--text-dim);
+}
+.map-pane-empty {
+  display: grid;
+  place-items: center;
+}
 
 /* Calibration pane: chrome rows around one flex-filling canvas and one bounded, scrolling step body. */
-.map-pane { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
-.map-pane > * { flex: none; }
-.map-pane-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
-.map-pane-back { flex: none; margin-inline-start: calc(var(--space-3) * -1); }
-.map-pane-title { display: flex; flex-direction: column; min-width: 0; margin-inline-end: auto; }
-.map-pane-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.map-pane-title span { color: var(--text-muted); font-size: var(--fs-xs); }
-.map-folder-move { display: flex; align-items: center; gap: var(--space-2); }
-.map-folder-move select { width: auto; }
+.map-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+.map-pane > * {
+  flex: none;
+}
+.map-pane-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.map-pane-back {
+  flex: none;
+  margin-inline-start: calc(var(--space-3) * -1);
+}
+.map-pane-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-inline-end: auto;
+}
+.map-pane-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-pane-title span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.map-folder-move {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.map-folder-move select {
+  width: auto;
+}
 
-.map-steps { flex: none; }
+.map-steps {
+  flex: none;
+}
 /* The per-step instruction line, and the surface's only live region. */
-.map-step-note { margin: 0; padding: .55rem var(--space-3); border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
+.map-step-note {
+  margin: 0;
+  padding: 0.55rem var(--space-3);
+  border-left: 3px solid var(--magenta);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
 
 /* The canvas column: `flex-basis: 0` takes the leftover height, and the min-height floor keeps it on
    screen even while the column shrinks. The floor must not be below the column's own content
    (7rem preview + gap + 44px tools row), or the tools row paints outside the column, over the step
    body, which then wins the hit test. */
-.map-canvas-col { display: flex; flex-direction: column; gap: var(--space-2); flex: 1 1 0; min-height: 11rem; }
-.map-canvas-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.map-zoom-level { color: var(--text-muted); font-size: var(--fs-xs); }
+.map-canvas-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  min-height: 11rem;
+}
+.map-canvas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.map-zoom-level {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
 
 /* The drag surface. `touch-action: none` is unconditional: it is a pointer-capture target, never a
    scroller. The explicit single grid track avoids a circular percentage max-height against a
@@ -85,102 +246,398 @@
   touch-action: none;
   transition: border-color var(--dur-hover);
 }
-.map-preview.movable { cursor: move; }
-.map-preview.resizing { cursor: nwse-resize; }
-.map-preview:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.map-preview:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
-.map-preview p { line-height: 1.5; }
+.map-preview.movable {
+  cursor: move;
+}
+.map-preview.resizing {
+  cursor: nwse-resize;
+}
+.map-preview:hover {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-preview:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
+}
+.map-preview p {
+  line-height: 1.5;
+}
 /* Sized from the svg's own attributes and bounded by the canvas, so the box is the image and every
    click lands on it. */
-.map-preview svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; user-select: none; }
+.map-preview svg {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  user-select: none;
+}
 /* Calibration grid preview lines: fixed colours, since SVG presentation attributes cannot use var(). */
-.map-preview line { stroke: rgb(45 226 255 / 0.6); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.map-preview line.major { stroke: rgb(255 46 154 / 0.85); stroke-width: 1.5; }
-.map-preview .grid-area-preview rect { fill: rgb(255 46 154 / 0.18); stroke: #7CEFFF; stroke-width: 2.5; stroke-dasharray: 8 5; vector-effect: non-scaling-stroke; }
-.map-preview .grid-area-preview line { stroke: #FF2E9A; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.map-preview circle { fill: #2DE2FF; stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.map-preview text { fill: #0a0805; font: 700 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
-.grid-crosshair { pointer-events: none; }
-.grid-crosshair line { stroke-width: 2.25; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 90%)); }
-.grid-area-handle { fill: #7CEFFF; stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.map-preview line {
+  stroke: rgb(45 226 255 / 0.6);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview line.major {
+  stroke: rgb(255 46 154 / 0.85);
+  stroke-width: 1.5;
+}
+.map-preview .grid-area-preview rect {
+  fill: rgb(255 46 154 / 0.18);
+  stroke: #7cefff;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview .grid-area-preview line {
+  stroke: #ff2e9a;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview circle {
+  fill: #2de2ff;
+  stroke: #0a0805;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview text {
+  fill: #0a0805;
+  font: 700 14px var(--font-mono);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.grid-crosshair {
+  pointer-events: none;
+}
+.grid-crosshair line {
+  stroke-width: 2.25;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 90%));
+}
+.grid-area-handle {
+  fill: #7cefff;
+  stroke: #0a0805;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
 
 /* The step body is bounded so it cannot push the canvas off screen. `.scroll-y` is in the markup.
    No floor: in the one-column pane it is the row that yields, and a floor would push the action
    row off the bottom instead. */
-.map-step-body { flex: 0 1 auto; min-height: 0; max-height: 40%; }
-.map-step-panel { display: flex; flex-direction: column; gap: var(--space-3); }
-.map-step-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
-.map-step-hint strong { color: var(--text); }
+.map-step-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 40%;
+}
+.map-step-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.map-step-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.map-step-hint strong {
+  color: var(--text);
+}
 /* The action row: one primary per step, pinned to the pane's bottom. */
-.map-step-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-1); }
-.map-step-actions .nh-btn { flex: 1 1 10rem; justify-content: center; }
+.map-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+.map-step-actions .nh-btn {
+  flex: 1 1 10rem;
+  justify-content: center;
+}
 
-.map-mode-choice { gap: var(--space-2); }
+.map-mode-choice {
+  gap: var(--space-2);
+}
 
 /* Fields step. Grids size from their own width (`auto-fit` with a real minimum), not the viewport:
    above 560px the step body is a column of varying width beside the canvas. */
-.grid-detected { margin: 0; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--cyan-hi); font-weight: 700; }
-.point-editor { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
-.point-editor fieldset { display: flex; flex: 1 1 11rem; gap: .45rem; min-width: 0; margin: 0; padding: var(--space-2); border: 1px solid transparent; }
-.point-editor legend { color: var(--text-muted); font-size: .7rem; font-weight: 800; }
-.point-editor label { display: flex; flex: 1 1 4rem; flex-direction: column; gap: var(--space-1); min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
-.point-editor input { width: 100%; min-width: 0; }
+.grid-detected {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--cyan-hi);
+  font-weight: 700;
+}
+.point-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: end;
+}
+.point-editor fieldset {
+  display: flex;
+  flex: 1 1 11rem;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid transparent;
+}
+.point-editor legend {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.point-editor label {
+  display: flex;
+  flex: 1 1 4rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.point-editor input {
+  width: 100%;
+  min-width: 0;
+}
 /* `.nh-btn` is `white-space: nowrap`; this one holds a sentence and must wrap. */
-.point-editor > .nh-btn { flex: 1 1 100%; white-space: normal; }
-.adjustment-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: .55rem; }
-.adjustment-groups fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; min-width: 0; margin: 0; padding: .55rem; border: 1px solid transparent; }
-.adjustment-groups legend { padding: 0 .3rem; color: var(--text-muted); font-size: .68rem; font-weight: 800; }
-.adjustment-groups .nh-btn { justify-content: center; padding-inline: var(--space-2); font-size: var(--fs-sm); }
-.wizard-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; }
-.wizard-fields label { display: flex; flex-direction: column; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
+.point-editor > .nh-btn {
+  flex: 1 1 100%;
+  white-space: normal;
+}
+.adjustment-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.55rem;
+}
+.adjustment-groups fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem;
+  border: 1px solid transparent;
+}
+.adjustment-groups legend {
+  padding: 0 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.adjustment-groups .nh-btn {
+  justify-content: center;
+  padding-inline: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.wizard-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.65rem;
+}
+.wizard-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
 
-.verification-card { display: flex; flex-direction: column; align-items: start; gap: .4rem; padding: .8rem; border: 1px solid transparent; }
-.verification-card strong { font: 400 .95rem var(--font-display); }
-.verification-card p { margin: 0 0 .3rem; color: var(--text-dim); font-size: var(--fs-sm); }
-.verification { margin: 0; padding: .55rem .7rem; border-left: 3px solid; font-size: var(--fs-sm); }
-.verification.accepted { border-color: var(--success); color: var(--cyan-hi); }
-.verification.rejected { border-color: var(--danger); color: var(--danger-hi); }
-.map-review { display: grid; gap: .3rem; margin: 0; }
-.map-review > div { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding: .35rem 0; border-top: 1px solid var(--line); }
-.map-review dt { color: var(--text-muted); font-size: var(--fs-xs); }
-.map-review dd { margin: 0; color: var(--text); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.verification-card {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.4rem;
+  padding: 0.8rem;
+  border: 1px solid transparent;
+}
+.verification-card strong {
+  font: 400 0.95rem var(--font-display);
+}
+.verification-card p {
+  margin: 0 0 0.3rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.verification {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid;
+  font-size: var(--fs-sm);
+}
+.verification.accepted {
+  border-color: var(--success);
+  color: var(--cyan-hi);
+}
+.verification.rejected {
+  border-color: var(--danger);
+  color: var(--danger-hi);
+}
+.map-review {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+.map-review > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--line);
+}
+.map-review dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.map-review dd {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
 
 /* The one recoverable failure: the server's 30-minute wizard TTL, with one way back to the canvas. */
-.map-expired { display: flex; flex-direction: column; gap: .35rem; padding: .8rem; border-left: 4px solid var(--caution); border-radius: var(--radius-sm); background: var(--surface-2); }
-.map-expired p { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
+.map-expired {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.8rem;
+  border-left: 4px solid var(--caution);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.map-expired p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
 
 /* Crosshair controls reach the 44px floor by paint: the swatches sit 4px apart, so an overhang would
    steal neighbours' taps, and the row sits under a drag surface. */
-.crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: .4rem .6rem; border: 1px solid transparent; color: var(--text-dim); font-size: var(--fs-xs); }
-.crosshair-label { color: var(--magenta-hi); font-weight: 700; }
-.crosshair-swatches { display: flex; gap: var(--space-1); }
-.crosshair-swatches button { display: grid; place-items: center; width: var(--tap-min); height: var(--tap-min); padding: 0; border: 0; background: none; cursor: pointer; }
-.crosshair-swatches button::before { content: ""; width: 1.5rem; height: 1.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--swatch); }
-.crosshair-swatches button:hover:not(:disabled)::before { border-color: var(--cyan-hi); }
-.crosshair-swatches button[aria-pressed="true"]::before { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
-.crosshair-color, .crosshair-opacity { display: flex; align-items: center; gap: .35rem; min-height: var(--tap-min); }
-.crosshair-color input { width: 3rem; height: var(--tap-min); margin: 0; padding: 0 .15rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: none; }
-.crosshair-opacity input { width: 7rem; height: var(--tap-min); margin: 0; }
-.map-point-summary { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
-.map-point-summary strong { color: var(--text); font-family: var(--font-mono); }
+.crosshair-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.crosshair-label {
+  color: var(--magenta-hi);
+  font-weight: 700;
+}
+.crosshair-swatches {
+  display: flex;
+  gap: var(--space-1);
+}
+.crosshair-swatches button {
+  display: grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.crosshair-swatches button::before {
+  content: "";
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--swatch);
+}
+.crosshair-swatches button:hover:not(:disabled)::before {
+  border-color: var(--cyan-hi);
+}
+.crosshair-swatches button[aria-pressed="true"]::before {
+  outline: 2px solid var(--cyan-hi);
+  outline-offset: 1px;
+}
+.crosshair-color,
+.crosshair-opacity {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: var(--tap-min);
+}
+.crosshair-color input {
+  width: 3rem;
+  height: var(--tap-min);
+  margin: 0;
+  padding: 0 0.15rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+}
+.crosshair-opacity input {
+  width: 7rem;
+  height: var(--tap-min);
+  margin: 0;
+}
+.map-point-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.map-point-summary strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
 
 /* Breakpoints: 560/561 is the pane's composition, 849/850 the rail's, 1280 where the rail stops
    flexing. Nothing inside the step body has its own breakpoint. */
 
 /* Phone density and the one-column pane: the upload reveal waits for a file and the heading stacks. */
 @media (max-width: 560px) {
-  .map-manager-title { display: block; }
-  .map-manager-title p { margin-top: var(--space-2); text-align: left; }
-  .map-upload:not(.has-file) .map-upload-details { display: none; }
-  .map-upload label { flex-basis: 100%; }
-  .map-upload-file { flex: 1 1 100%; }
-  .point-editor fieldset { flex: 1 1 100%; }
-  .map-folder-move { flex: 1 1 100%; }
-  .map-folder-move select { width: 100%; }
+  .map-manager-title {
+    display: block;
+  }
+  .map-manager-title p {
+    margin-top: var(--space-2);
+    text-align: left;
+  }
+  .map-upload:not(.has-file) .map-upload-details {
+    display: none;
+  }
+  .map-upload label {
+    flex-basis: 100%;
+  }
+  .map-upload-file {
+    flex: 1 1 100%;
+  }
+  .point-editor fieldset {
+    flex: 1 1 100%;
+  }
+  .map-folder-move {
+    flex: 1 1 100%;
+  }
+  .map-folder-move select {
+    width: 100%;
+  }
   /* The canvas floor stated as its own minimum content, so it stays right if either term changes. */
-  .map-canvas-col { min-height: calc(7rem + var(--space-2) + var(--tap-min)); }
-  .map-pane-title { flex: 1 1 8rem; }
-  .map-step-note { padding: .45rem .6rem; }
+  .map-canvas-col {
+    min-height: calc(7rem + var(--space-2) + var(--tap-min));
+  }
+  .map-pane-title {
+    flex: 1 1 8rem;
+  }
+  .map-step-note {
+    padding: 0.45rem 0.6rem;
+  }
 }
 
 /* From 561px the pane is two columns, canvas | steps: the step column scrolls itself, so the 40% cap
@@ -195,35 +652,60 @@
     column-gap: var(--space-3);
     align-items: stretch;
   }
-  .map-pane-head { grid-area: 1 / 1 / 2 / 3; }
+  .map-pane-head {
+    grid-area: 1 / 1 / 2 / 3;
+  }
   /* The step rail spans both columns: `Steps` never wraps and hides its scrollbar, so in the narrow
      step column the current step was cut off silently. */
-  .map-steps { grid-area: 2 / 1 / 3 / 3; }
-  .map-canvas-col { grid-area: 3 / 1 / 6 / 2; }
-  .map-step-note { grid-area: 3 / 2 / 4 / 3; }
-  .map-step-body { grid-area: 4 / 2 / 5 / 3; max-height: none; }
-  .map-step-actions { grid-area: 5 / 2 / 6 / 3; }
+  .map-steps {
+    grid-area: 2 / 1 / 3 / 3;
+  }
+  .map-canvas-col {
+    grid-area: 3 / 1 / 6 / 2;
+  }
+  .map-step-note {
+    grid-area: 3 / 2 / 4 / 3;
+  }
+  .map-step-body {
+    grid-area: 4 / 2 / 5 / 3;
+    max-height: none;
+  }
+  .map-step-actions {
+    grid-area: 5 / 2 / 6 / 3;
+  }
 }
 
 /* Below 850px the rail and the pane are the same column: tapping a map shows the pane, and its
    "All maps" row returns. 849 so it never double-fires with `min-width: 850px`. */
 @media (max-width: 849px) {
-  .map-body[data-view="pane"] > .map-rail { display: none; }
-  .map-body[data-view="rail"] > .map-pane { display: none; }
+  .map-body[data-view="pane"] > .map-rail {
+    display: none;
+  }
+  .map-body[data-view="rail"] > .map-pane {
+    display: none;
+  }
   /* The library's head rows (back to Scenes, title, "Add map…") hide while the pane has the column,
      giving the calibration room; "All maps" brings them back. Only inside this query: above it there
      is no "All maps" to restore them. */
-  .map-manager:has(.map-body[data-view="pane"]) > .map-manager-head { display: none; }
+  .map-manager:has(.map-body[data-view="pane"]) > .map-manager-head {
+    display: none;
+  }
 }
 
 @media (min-width: 850px) {
-  .map-body { grid-template-columns: minmax(12rem, var(--rail-w)) minmax(0, 1fr); }
-  .map-pane-back { display: none; }
+  .map-body {
+    grid-template-columns: minmax(12rem, var(--rail-w)) minmax(0, 1fr);
+  }
+  .map-pane-back {
+    display: none;
+  }
 }
 
 /* At 1280px the rail stops flexing, so extra width goes to the canvas. */
 @media (min-width: 1280px) {
-  .map-body { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+  .map-body {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  }
 }
 
 /* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing (the
@@ -260,8 +742,18 @@
   background-clip: border-box;
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
 /* Severity as a 2px leading rule on a neutral ground. */
-.map-step-note { border-left-width: 2px; border-radius: 0; background: var(--surface-2); }
-.map-expired { border-left-width: 2px; border-radius: 0; background: var(--surface-2); }
+.map-step-note {
+  border-left-width: 2px;
+  border-radius: 0;
+  background: var(--surface-2);
+}
+.map-expired {
+  border-left-width: 2px;
+  border-radius: 0;
+  background: var(--surface-2);
+}

@@ -2,7 +2,16 @@
 // GM-secret. One copy, because a key marked secret on the client but missing on the server is never sealed
 // and ships to players. Presentation (labels, icons, input kinds) stays in the client.
 
-export const CODEX_ENTITY_TYPES = ["note", "character", "location", "faction", "item", "species", "religion", "event"] as const;
+export const CODEX_ENTITY_TYPES = [
+  "note",
+  "character",
+  "location",
+  "faction",
+  "item",
+  "species",
+  "religion",
+  "event"
+] as const;
 export type CodexEntityType = (typeof CODEX_ENTITY_TYPES)[number];
 
 /** A field key belonging to an entity type. `secret` means the value rests in `gmFields`, never in player-facing `fields`. */
@@ -12,11 +21,22 @@ export type CodexFieldKeyDef = Readonly<{ key: string; secret?: boolean }>;
 export const CODEX_ENTITY_FIELD_KEYS: Readonly<Record<CodexEntityType, readonly CodexFieldKeyDef[]>> = {
   note: [],
   character: [
-    { key: "race" }, { key: "gender" }, { key: "age" },
-    { key: "role" }, { key: "status" }, { key: "location" }, { key: "goals", secret: true }
+    { key: "race" },
+    { key: "gender" },
+    { key: "age" },
+    { key: "role" },
+    { key: "status" },
+    { key: "location" },
+    { key: "goals", secret: true }
   ],
   location: [{ key: "kind" }, { key: "region" }, { key: "population" }, { key: "ruler" }, { key: "climate" }],
-  faction: [{ key: "kind" }, { key: "leader" }, { key: "headquarters" }, { key: "size" }, { key: "goals", secret: true }],
+  faction: [
+    { key: "kind" },
+    { key: "leader" },
+    { key: "headquarters" },
+    { key: "size" },
+    { key: "goals", secret: true }
+  ],
   item: [{ key: "kind" }, { key: "rarity" }, { key: "owner" }, { key: "attunement" }, { key: "properties" }],
   species: [{ key: "category" }, { key: "habitat" }, { key: "diet" }, { key: "size" }, { key: "traits" }],
   religion: [{ key: "deity" }, { key: "domains" }, { key: "alignment" }, { key: "followers" }],
@@ -34,11 +54,16 @@ export function codexFieldKeys(type: CodexEntityType | undefined): ReadonlySet<s
 
 /** Every key marked secret on any type, as one flat set: a key secret anywhere is never player-facing elsewhere. */
 export const CODEX_SECRET_FIELD_KEYS: ReadonlySet<string> = new Set(
-  Object.values(CODEX_ENTITY_FIELD_KEYS).flatMap((fields) => fields.filter((field) => field.secret).map((field) => field.key))
+  Object.values(CODEX_ENTITY_FIELD_KEYS).flatMap((fields) =>
+    fields.filter((field) => field.secret).map((field) => field.key)
+  )
 );
 
 /** Drop any key that does not belong to `type`. Used server-side so a type switch cannot strand unreachable values. */
-export function pruneCodexFields(type: CodexEntityType | undefined, values: Readonly<Record<string, string>>): Record<string, string> {
+export function pruneCodexFields(
+  type: CodexEntityType | undefined,
+  values: Readonly<Record<string, string>>
+): Record<string, string> {
   const allowed = codexFieldKeys(type);
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) if (allowed.has(key)) out[key] = value;

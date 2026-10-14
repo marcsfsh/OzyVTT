@@ -6,15 +6,38 @@ import { newId } from "../lib/ids";
 import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
 import { featureFields } from "./FeatureEditor";
 import { getAt } from "./paths";
-import { basicsSection, damagePartsField, diceValidate, humanise, inContainer, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
+import {
+  basicsSection,
+  damagePartsField,
+  diceValidate,
+  humanise,
+  inContainer,
+  opt,
+  type Draft,
+  type FieldDef,
+  type HomebrewSchema,
+  type SchemaContext,
+  type SectionDef
+} from "./schema";
 import type { HomebrewType } from "./types";
 
 const ABILITIES = [
-  opt("str", "Strength"), opt("dex", "Dexterity"), opt("con", "Constitution"),
-  opt("int", "Intelligence"), opt("wis", "Wisdom"), opt("cha", "Charisma")
+  opt("str", "Strength"),
+  opt("dex", "Dexterity"),
+  opt("con", "Constitution"),
+  opt("int", "Intelligence"),
+  opt("wis", "Wisdom"),
+  opt("cha", "Charisma")
 ];
 
-const SIZES = [opt("tiny", "Tiny"), opt("small", "Small"), opt("medium", "Medium"), opt("large", "Large"), opt("huge", "Huge"), opt("gargantuan", "Gargantuan")];
+const SIZES = [
+  opt("tiny", "Tiny"),
+  opt("small", "Small"),
+  opt("medium", "Medium"),
+  opt("large", "Large"),
+  opt("huge", "Huge"),
+  opt("gargantuan", "Gargantuan")
+];
 
 const LEVEL_CHIPS = Array.from({ length: 20 }, (_, index) => opt(String(index + 1), String(index + 1)));
 
@@ -66,12 +89,31 @@ const spellcastingGroup = (ownerWord: string): FieldDef => ({
         const current = (scope.spellcasting as Draft | undefined) ?? {};
         return {
           ...scope,
-          spellcasting: { ability: "int", prepares: "prepared", ritual: false, focus: null, ...current, multiclassProgression: next }
+          spellcasting: {
+            ability: "int",
+            prepares: "prepared",
+            ritual: false,
+            focus: null,
+            ...current,
+            multiclassProgression: next
+          }
         };
       }
     },
-    { key: "spellcasting.ability", label: "Spellcasting ability", kind: "select", options: ABILITIES, visibleWhen: isCaster },
-    { key: "spellcasting.prepares", label: "Spells are", kind: "select", options: [opt("known", "Known"), opt("prepared", "Prepared")], visibleWhen: isCaster },
+    {
+      key: "spellcasting.ability",
+      label: "Spellcasting ability",
+      kind: "select",
+      options: ABILITIES,
+      visibleWhen: isCaster
+    },
+    {
+      key: "spellcasting.prepares",
+      label: "Spells are",
+      kind: "select",
+      options: [opt("known", "Known"), opt("prepared", "Prepared")],
+      visibleWhen: isCaster
+    },
     { key: "spellcasting.ritual", label: "Can cast rituals", kind: "switch", visibleWhen: isCaster },
     { key: "spellcasting.focus", label: "Spellcasting focus", placeholder: "arcane-focus", visibleWhen: isCaster },
     {
@@ -89,7 +131,12 @@ const spellcastingGroup = (ownerWord: string): FieldDef => ({
 
 /* -------------------------------------------------------------- shared bits ----- */
 
-const choiceGroup = (key: string, label: string, options: (ctx: SchemaContext) => readonly { value: string; label: string }[], help?: string): FieldDef => ({
+const choiceGroup = (
+  key: string,
+  label: string,
+  options: (ctx: SchemaContext) => readonly { value: string; label: string }[],
+  help?: string
+): FieldDef => ({
   key,
   label,
   kind: "group",
@@ -134,9 +181,28 @@ const startingEquipment = (): FieldDef => ({
 /** Proficiency slugs are open sets, so these are free-tag inputs with well-known suggestions. Tools
     come from the equipment catalog's `tool` category, including the GM's own. */
 const proficiencyFields = (): readonly FieldDef[] => [
-  { key: "armorProficiencies", label: "Armour training", kind: "tags", suggestions: ["light-armor", "medium-armor", "heavy-armor", "shields"] },
-  { key: "weaponProficiencies", label: "Weapon training", kind: "tags", suggestions: (ctx) => ["simple-weapons", "martial-weapons", ...ctx.equipment.filter((entry) => entry.keywords === "weapon").map((entry) => entry.id)] },
-  { key: "toolProficiencies", label: "Tool proficiencies", kind: "tags", suggestions: (ctx) => ctx.equipment.filter((entry) => entry.keywords === "tool").map((entry) => entry.id) }
+  {
+    key: "armorProficiencies",
+    label: "Armour training",
+    kind: "tags",
+    suggestions: ["light-armor", "medium-armor", "heavy-armor", "shields"]
+  },
+  {
+    key: "weaponProficiencies",
+    label: "Weapon training",
+    kind: "tags",
+    suggestions: (ctx) => [
+      "simple-weapons",
+      "martial-weapons",
+      ...ctx.equipment.filter((entry) => entry.keywords === "weapon").map((entry) => entry.id)
+    ]
+  },
+  {
+    key: "toolProficiencies",
+    label: "Tool proficiencies",
+    kind: "tags",
+    suggestions: (ctx) => ctx.equipment.filter((entry) => entry.keywords === "tool").map((entry) => entry.id)
+  }
 ];
 
 /**
@@ -168,12 +234,36 @@ const CLASS_SCHEMA: HomebrewSchema = {
       id: "progression",
       title: "Progression",
       fields: [
-        { key: "hitDie", label: "Hit die", kind: "select", required: true, options: [opt("d4"), opt("d6"), opt("d8"), opt("d10"), opt("d12")] },
-        { key: "primaryAbilities", label: "Primary ability", kind: "multiselect", required: true, max: 2, options: ABILITIES },
-        { key: "savingThrows", label: "Saving throw proficiencies", kind: "multiselect", required: true, max: 6, options: ABILITIES },
+        {
+          key: "hitDie",
+          label: "Hit die",
+          kind: "select",
+          required: true,
+          options: [opt("d4"), opt("d6"), opt("d8"), opt("d10"), opt("d12")]
+        },
+        {
+          key: "primaryAbilities",
+          label: "Primary ability",
+          kind: "multiselect",
+          required: true,
+          max: 2,
+          options: ABILITIES
+        },
+        {
+          key: "savingThrows",
+          label: "Saving throw proficiencies",
+          kind: "multiselect",
+          required: true,
+          max: 6,
+          options: ABILITIES
+        },
         { key: "subclassLevel", label: "Subclass unlocks at", kind: "stepper", min: 1, max: 20 },
         { key: "subclassLabel", label: "Subclass called", placeholder: "Martial Archetype" },
-        numberChips("asiLevels", "Ability score improvements at", "Seeded with 4, 8, 12, 16 and 19 — every SRD class's ladder."),
+        numberChips(
+          "asiLevels",
+          "Ability score improvements at",
+          "Seeded with 4, 8, 12, 16 and 19 — every SRD class's ladder."
+        ),
         spellcastingGroup("class")
       ]
     },
@@ -182,7 +272,12 @@ const CLASS_SCHEMA: HomebrewSchema = {
       title: "Proficiencies",
       fields: [
         ...proficiencyFields(),
-        choiceGroup("skillChoices", "Skill choices", (ctx) => ctx.skills, "Which skills a new character of this class may choose from."),
+        choiceGroup(
+          "skillChoices",
+          "Skill choices",
+          (ctx) => ctx.skills,
+          "Which skills a new character of this class may choose from."
+        ),
         choiceGroup("toolChoices", "Tool choices", () => [])
       ]
     },
@@ -211,7 +306,16 @@ const CLASS_SCHEMA: HomebrewSchema = {
           newRow: () => "str",
           rowLabel: (row) => ABILITIES.find((entry) => entry.value === row)?.label ?? String(row),
           // Each row is the ability id itself, not an object.
-          rows: [{ key: "", label: "Ability", kind: "select", options: ABILITIES, read: (scope) => scope, write: (next) => next as Draft }]
+          rows: [
+            {
+              key: "",
+              label: "Ability",
+              kind: "select",
+              options: ABILITIES,
+              read: (scope) => scope,
+              write: (next) => next as Draft
+            }
+          ]
         },
         {
           key: "multiclassPrerequisites",
@@ -221,7 +325,8 @@ const CLASS_SCHEMA: HomebrewSchema = {
           emptyText: "No multiclass minimums.",
           rowKey: (row, index) => `${(row as { ability?: string }).ability ?? ""}-${index}`,
           newRow: () => ({ ability: "str", minimum: 13 }),
-          rowLabel: (row) => `${ABILITIES.find((entry) => entry.value === (row as { ability?: string }).ability)?.label ?? "Ability"} ${(row as { minimum?: number }).minimum ?? ""}`,
+          rowLabel: (row) =>
+            `${ABILITIES.find((entry) => entry.value === (row as { ability?: string }).ability)?.label ?? "Ability"} ${(row as { minimum?: number }).minimum ?? ""}`,
           rows: [
             { key: "ability", label: "Ability", kind: "select", options: ABILITIES },
             { key: "minimum", label: "At least", kind: "number", min: 1, max: 20 }
@@ -252,10 +357,18 @@ const SUBCLASS_SCHEMA: HomebrewSchema = {
       id: "belongs-to",
       title: "Belongs to",
       // The rules engine reads the class's level table, so a subclass has no slot field.
-      blurb: "A subclass can't grant its own spell slots — the rules engine reads the class's level table. It can still grant always-prepared spells through a feature.",
+      blurb:
+        "A subclass can't grant its own spell slots — the rules engine reads the class's level table. It can still grant always-prepared spells through a feature.",
       fields: [
         { key: "classId", label: "Class", kind: "select", required: true, options: (ctx) => ctx.classes },
-        { key: "subclassLevel", label: "Unlocks at level", kind: "stepper", min: 1, max: 20, help: "Leave at the class's own level unless this subclass unlocks earlier." },
+        {
+          key: "subclassLevel",
+          label: "Unlocks at level",
+          kind: "stepper",
+          min: 1,
+          max: 20,
+          help: "Leave at the class's own level unless this subclass unlocks earlier."
+        },
         spellcastingGroup("subclass")
       ]
     },
@@ -275,8 +388,21 @@ const SPECIES_SCHEMA: HomebrewSchema = {
       fields: [
         { key: "sizes", label: "Size", kind: "multiselect", required: true, options: SIZES },
         { key: "speedFeet", label: "Walking speed", kind: "number", required: true, min: 0, max: 120, unit: "ft" },
-        { key: "darkvisionFeet", label: "Darkvision", kind: "number", min: 0, max: 240, unit: "ft", note: "Display only — the rules engine doesn't grant darkvision yet." },
-        { key: "creatureType", label: "Creature type", placeholder: "humanoid", suggestions: (ctx) => ctx.creatureTypes }
+        {
+          key: "darkvisionFeet",
+          label: "Darkvision",
+          kind: "number",
+          min: 0,
+          max: 240,
+          unit: "ft",
+          note: "Display only — the rules engine doesn't grant darkvision yet."
+        },
+        {
+          key: "creatureType",
+          label: "Creature type",
+          placeholder: "humanoid",
+          suggestions: (ctx) => ctx.creatureTypes
+        }
       ]
     },
     {
@@ -307,13 +433,21 @@ const SPECIES_SCHEMA: HomebrewSchema = {
     {
       id: "languages",
       title: "Languages",
-      fields: [{ key: "languages", label: "Languages", kind: "tags", suggestions: ["common", "elvish", "dwarvish", "draconic"] }]
+      fields: [
+        {
+          key: "languages",
+          label: "Languages",
+          kind: "tags",
+          suggestions: ["common", "elvish", "dwarvish", "draconic"]
+        }
+      ]
     },
     { id: "traits", title: "Traits", fields: [featuresField("Species traits", "traits")] },
     {
       id: "lineages",
       title: "Lineages",
-      blurb: "A lineage trait can grant things, but it can't ask the player a question yet — put any choice on a species trait instead.",
+      blurb:
+        "A lineage trait can grant things, but it can't ask the player a question yet — put any choice on a species trait instead.",
       fields: [
         {
           key: "lineages",
@@ -388,10 +522,17 @@ const FEAT_SCHEMA: HomebrewSchema = {
     {
       id: "category",
       title: "Category",
-      blurb: "A feat is only offered where something asks for its category. Origin feats come from backgrounds; general feats from ability score improvements.",
+      blurb:
+        "A feat is only offered where something asks for its category. Origin feats come from backgrounds; general feats from ability score improvements.",
       fields: [
         // Open slug in `FeatReferenceSchema`, so new categories stay authorable.
-        { key: "category", label: "Category", required: true, placeholder: "general", suggestions: (ctx) => ctx.featCategories.map((option) => option.value) },
+        {
+          key: "category",
+          label: "Category",
+          required: true,
+          placeholder: "general",
+          suggestions: (ctx) => ctx.featCategories.map((option) => option.value)
+        },
         { key: "repeatable", label: "Can be chosen more than once", kind: "switch" },
         {
           key: "prerequisite",
@@ -426,7 +567,10 @@ const SPELL_SCHEMA: HomebrewSchema = {
         {
           key: "reactionCondition",
           label: "Reaction trigger",
-          visibleWhen: (draft) => String(draft.castingTime ?? "").toLowerCase().includes("reaction"),
+          visibleWhen: (draft) =>
+            String(draft.castingTime ?? "")
+              .toLowerCase()
+              .includes("reaction"),
           placeholder: "which you take when you are hit by an attack"
         },
         {
@@ -435,7 +579,13 @@ const SPELL_SCHEMA: HomebrewSchema = {
           kind: "group",
           rows: [
             { key: "range.distance", label: "Distance", kind: "number", min: 0, max: 5280, emptyValue: "null" },
-            { key: "range.unit", label: "Unit", kind: "select", emptyValue: "null", options: [opt("feet", "Feet"), opt("miles", "Miles"), opt("self", "Self"), opt("touch", "Touch")] },
+            {
+              key: "range.unit",
+              label: "Unit",
+              kind: "select",
+              emptyValue: "null",
+              options: [opt("feet", "Feet"), opt("miles", "Miles"), opt("self", "Self"), opt("touch", "Touch")]
+            },
             { key: "range.text", label: "Or say it in words", placeholder: "Self (30-foot cone)" }
           ]
         },
@@ -447,8 +597,17 @@ const SPELL_SCHEMA: HomebrewSchema = {
             { key: "components.verbal", label: "Verbal", kind: "switch" },
             { key: "components.somatic", label: "Somatic", kind: "switch" },
             { key: "components.material", label: "Material", kind: "switch" },
-            { key: "components.materialText", label: "Materials", visibleWhen: (draft) => (draft.components as Draft | undefined)?.material === true },
-            { key: "components.materialConsumed", label: "Consumed by the spell", kind: "switch", visibleWhen: (draft) => (draft.components as Draft | undefined)?.material === true }
+            {
+              key: "components.materialText",
+              label: "Materials",
+              visibleWhen: (draft) => (draft.components as Draft | undefined)?.material === true
+            },
+            {
+              key: "components.materialConsumed",
+              label: "Consumed by the spell",
+              kind: "switch",
+              visibleWhen: (draft) => (draft.components as Draft | undefined)?.material === true
+            }
           ]
         },
         { key: "duration", label: "Duration", required: true, placeholder: "Instantaneous" },
@@ -477,7 +636,19 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Target",
           kind: "group",
           rows: [
-            { key: "target.type", label: "Targets", kind: "select", emptyValue: "null", options: [opt("creature", "Creatures"), opt("object", "Objects"), opt("point", "A point"), opt("area", "An area"), opt("self", "Yourself")] },
+            {
+              key: "target.type",
+              label: "Targets",
+              kind: "select",
+              emptyValue: "null",
+              options: [
+                opt("creature", "Creatures"),
+                opt("object", "Objects"),
+                opt("point", "A point"),
+                opt("area", "An area"),
+                opt("self", "Yourself")
+              ]
+            },
             { key: "target.count", label: "How many", kind: "number", min: 1, max: 20, emptyValue: "null" }
           ]
         },
@@ -489,7 +660,18 @@ const SPELL_SCHEMA: HomebrewSchema = {
           // The key is `size` (not `sizeFeet`); `SpellReferenceSchema` isn't `.strict()`, so a wrong
           // key is silently stripped. The whole container is written on first touch.
           rows: inContainer("shape", SUB_OBJECT_DEFAULTS.spell!.shape, [
-            { key: "shape.type", label: "Shape", kind: "select", options: [opt("sphere", "Sphere"), opt("cube", "Cube"), opt("cone", "Cone"), opt("line", "Line"), opt("cylinder", "Cylinder")] },
+            {
+              key: "shape.type",
+              label: "Shape",
+              kind: "select",
+              options: [
+                opt("sphere", "Sphere"),
+                opt("cube", "Cube"),
+                opt("cone", "Cone"),
+                opt("line", "Line"),
+                opt("cylinder", "Cylinder")
+              ]
+            },
             { key: "shape.size", label: "Size", kind: "number", min: 0, max: 1000, unit: "ft", emptyValue: "null" },
             { key: "shape.unit", label: "Measured in", suggestions: ["feet", "miles"], emptyValue: "null" }
           ])
@@ -501,7 +683,9 @@ const SPELL_SCHEMA: HomebrewSchema = {
       id: "lists",
       title: "Spell lists",
       blurb: "Naming a list here puts this spell on it — you don't also have to edit the list.",
-      fields: [{ key: "classes", label: "On these lists", kind: "multiselect", wide: true, options: (ctx) => ctx.spellLists }]
+      fields: [
+        { key: "classes", label: "On these lists", kind: "multiselect", wide: true, options: (ctx) => ctx.spellLists }
+      ]
     }
   ]
 };
@@ -515,9 +699,16 @@ const SPELL_LIST_SCHEMA: HomebrewSchema = {
     {
       id: "contents",
       title: "Contents",
-      blurb: "Homebrew spells can just name this list in their own Spell lists field. Use this to pull in SRD spells too.",
+      blurb:
+        "Homebrew spells can just name this list in their own Spell lists field. Use this to pull in SRD spells too.",
       fields: [
-        { key: "basedOn", label: "Start from these lists", kind: "multiselect", wide: true, options: (ctx) => ctx.spellLists },
+        {
+          key: "basedOn",
+          label: "Start from these lists",
+          kind: "multiselect",
+          wide: true,
+          options: (ctx) => ctx.spellLists
+        },
         { key: "contents", label: "Spells", kind: "custom", custom: "spellListContents", wide: true }
       ]
     }
@@ -557,7 +748,21 @@ const SLOTS = [
 
 /** Turning magic off removes all of these; a leftover `isMagic: false` or orphan rider would fail
     `.strict()` invisibly. */
-const MAGIC_KEYS = ["isMagic", "rarity", "attunement", "cursed", "casts", "grantsFeatIds", "modifiers", "grants", "uses", "actions", "effects", "tags", "appliesTo"];
+const MAGIC_KEYS = [
+  "isMagic",
+  "rarity",
+  "attunement",
+  "cursed",
+  "casts",
+  "grantsFeatIds",
+  "modifiers",
+  "grants",
+  "uses",
+  "actions",
+  "effects",
+  "tags",
+  "appliesTo"
+];
 
 const EQUIPMENT_SCHEMA: HomebrewSchema = {
   type: "equipment",
@@ -581,8 +786,26 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           options: SLOTS,
           help: "This is what makes it derive armour class or an attack. Leave it unset and the category is used instead."
         },
-        { key: "costGp", label: "Cost", kind: "number", min: 0, max: 1000000, unit: "gp", allowDecimal: true, emptyValue: "null" },
-        { key: "weightLb", label: "Weight", kind: "number", min: 0, max: 1000, unit: "lb", allowDecimal: true, emptyValue: "null" }
+        {
+          key: "costGp",
+          label: "Cost",
+          kind: "number",
+          min: 0,
+          max: 1000000,
+          unit: "gp",
+          allowDecimal: true,
+          emptyValue: "null"
+        },
+        {
+          key: "weightLb",
+          label: "Weight",
+          kind: "number",
+          min: 0,
+          max: 1000,
+          unit: "lb",
+          allowDecimal: true,
+          emptyValue: "null"
+        }
       ]
     },
     {
@@ -603,7 +826,15 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
         },
         // Open slug ("unique" must stay writable), so a visible `pick` list rather than a closed
         // select. See `FieldDef.pick`.
-        { key: "rarity", label: "Rarity", pick: true, suggestions: RARITY_IDS, placeholder: "uncommon", emptyValue: "omit", visibleWhen: (draft) => draft.isMagic === true },
+        {
+          key: "rarity",
+          label: "Rarity",
+          pick: true,
+          suggestions: RARITY_IDS,
+          placeholder: "uncommon",
+          emptyValue: "omit",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
         {
           key: "attunement.required",
           label: "Requires attunement",
@@ -660,13 +891,42 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             const cast = row as Record<string, unknown>;
             const limit = getAt(cast, "uses.limit");
             const name = typeof cast.spellId === "string" && cast.spellId ? humanise(cast.spellId) : "No spell chosen";
-            return typeof limit === "number" ? `${name} — ${limit} a ${String(getAt(cast, "uses.per") ?? "long-rest").replace(/-/g, " ")}` : name;
+            return typeof limit === "number"
+              ? `${name} — ${limit} a ${String(getAt(cast, "uses.per") ?? "long-rest").replace(/-/g, " ")}`
+              : name;
           },
           rows: [
-            { key: "spellId", label: "Spell", kind: "select", searchable: true, catalog: "spells", placeholder: "Choose a spell" },
-            { key: "atLevel", label: "Cast at level", kind: "stepper", min: 0, max: 9, help: "Leave at the spell's own level for a scroll." },
-            { key: "ability", label: "Uses", kind: "select", options: ABILITIES, help: "Leave empty to use the wielder's own." },
-            { key: "saveDc", label: "Save DC", kind: "number", min: 1, max: 40, help: "The item's own DC, not the character's." },
+            {
+              key: "spellId",
+              label: "Spell",
+              kind: "select",
+              searchable: true,
+              catalog: "spells",
+              placeholder: "Choose a spell"
+            },
+            {
+              key: "atLevel",
+              label: "Cast at level",
+              kind: "stepper",
+              min: 0,
+              max: 9,
+              help: "Leave at the spell's own level for a scroll."
+            },
+            {
+              key: "ability",
+              label: "Uses",
+              kind: "select",
+              options: ABILITIES,
+              help: "Leave empty to use the wielder's own."
+            },
+            {
+              key: "saveDc",
+              label: "Save DC",
+              kind: "number",
+              min: 1,
+              max: 40,
+              help: "The item's own DC, not the character's."
+            },
             {
               key: "uses.limit",
               label: "Times",
@@ -682,8 +942,23 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
                 return { ...row, uses };
               }
             },
-            { key: "uses.per", label: "Comes back", kind: "select", options: [opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"), opt("long-rest", "On a long rest")], help: "A long rest is this table's day, so “once per day” is “on a long rest”." },
-            { key: "uses.pool", label: "Shared pool", placeholder: "wand-charges", help: "Spells sharing a pool share one set of charges." },
+            {
+              key: "uses.per",
+              label: "Comes back",
+              kind: "select",
+              options: [
+                opt("encounter", "Every encounter"),
+                opt("short-rest", "On a short rest"),
+                opt("long-rest", "On a long rest")
+              ],
+              help: "A long rest is this table's day, so “once per day” is “on a long rest”."
+            },
+            {
+              key: "uses.pool",
+              label: "Shared pool",
+              placeholder: "wand-charges",
+              help: "Spells sharing a pool share one set of charges."
+            },
             { key: "consumesSpellSlot", label: "Spends the caster's own slot", kind: "switch" }
           ]
         },
@@ -698,7 +973,14 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           help: "The feat's own modifiers come with it, and they come back off when the item does.",
           visibleWhen: (draft) => draft.isMagic === true
         },
-        { key: "riders", label: "What it does", kind: "custom", custom: "riders", wide: true, visibleWhen: (draft) => draft.isMagic === true }
+        {
+          key: "riders",
+          label: "What it does",
+          kind: "custom",
+          custom: "riders",
+          wide: true,
+          visibleWhen: (draft) => draft.isMagic === true
+        }
       ]
     },
     {
@@ -706,11 +988,39 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
       title: "Weapon",
       blurb: "Fill these in only for a weapon. The category has to be “weapon” too, or nothing here is read.",
       fields: inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
-        { key: "weapon.category", label: "Weapon kind", kind: "select", options: [opt("simple", "Simple"), opt("martial", "Martial")] },
+        {
+          key: "weapon.category",
+          label: "Weapon kind",
+          kind: "select",
+          options: [opt("simple", "Simple"), opt("martial", "Martial")]
+        },
         { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
-        { key: "weapon.damageType", label: "Damage type", pick: true, placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
-        { key: "weapon.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", emptyValue: "null", help: "Leave both empty for a melee weapon." },
-        { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft", emptyValue: "null" },
+        {
+          key: "weapon.damageType",
+          label: "Damage type",
+          pick: true,
+          placeholder: "slashing",
+          suggestions: (ctx) => ctx.damageTypes
+        },
+        {
+          key: "weapon.rangeFeet",
+          label: "Range",
+          kind: "number",
+          min: 1,
+          max: 1000,
+          unit: "ft",
+          emptyValue: "null",
+          help: "Leave both empty for a melee weapon."
+        },
+        {
+          key: "weapon.longRangeFeet",
+          label: "Long range",
+          kind: "number",
+          min: 1,
+          max: 5000,
+          unit: "ft",
+          emptyValue: "null"
+        },
         /**
          * Weapon properties are mechanics, not labels: `finesse` (better of Str/Dex), `reach`,
          * `thrown`, and `weapon-property-is` riders all read this column. Uses
@@ -738,7 +1048,14 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
         { key: "armor.acBase", label: "Base armour class", kind: "number", min: 2, max: 25 },
         { key: "armor.addDexModifier", label: "Adds Dexterity", kind: "switch" },
         { key: "armor.dexModifierCap", label: "Dexterity cap", kind: "number", min: 0, max: 10, emptyValue: "null" },
-        { key: "armor.strengthRequired", label: "Strength minimum", kind: "number", min: 0, max: 20, emptyValue: "null" },
+        {
+          key: "armor.strengthRequired",
+          label: "Strength minimum",
+          kind: "number",
+          min: 0,
+          max: 20,
+          emptyValue: "null"
+        },
         { key: "armor.stealthDisadvantage", label: "Disadvantage on Stealth", kind: "switch" }
       ])
     }
@@ -759,7 +1076,8 @@ const extensionField = (key: string, label: string, extra: Partial<FieldDef> = {
   key,
   label,
   ...extra,
-  read: (scope) => ((scope.extensions as Record<string, Record<string, unknown>> | undefined)?.[STATBLOCK_EXT] ?? {})[key],
+  read: (scope) =>
+    ((scope.extensions as Record<string, Record<string, unknown>> | undefined)?.[STATBLOCK_EXT] ?? {})[key],
   write: (next, scope) => {
     const extensions = { ...((scope.extensions as Record<string, unknown>) ?? {}) };
     extensions[STATBLOCK_EXT] = { ...((extensions[STATBLOCK_EXT] as Record<string, unknown>) ?? {}), [key]: next };
@@ -778,7 +1096,13 @@ const MONSTER_SCHEMA: HomebrewSchema = {
         ...basicsSection("creature", { summary: true }).fields,
         { key: "size", label: "Size", kind: "select", required: true, options: SIZES },
         extensionField("type", "Creature type", { placeholder: "humanoid", suggestions: (ctx) => ctx.creatureTypes }),
-        extensionField("challengeRating", "Challenge rating", { kind: "number", required: true, min: 0, max: 30, allowDecimal: true }),
+        extensionField("challengeRating", "Challenge rating", {
+          kind: "number",
+          required: true,
+          min: 0,
+          max: 30,
+          allowDecimal: true
+        }),
         { key: "speedFeet", label: "Speed", kind: "number", required: true, min: 0, max: 200, unit: "ft" }
       ]
     },
@@ -788,15 +1112,44 @@ const MONSTER_SCHEMA: HomebrewSchema = {
       fields: [
         { key: "armorClass", label: "Armour class", kind: "number", required: true, min: 1, max: 40 },
         { key: "hitPoints.maximum", label: "Hit points", kind: "number", required: true, min: 1, max: 1000 },
-        { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice." },
+        {
+          key: "hitPoints.formula",
+          label: "Hit dice",
+          placeholder: "19d12 + 133",
+          validate: diceValidate,
+          help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice."
+        },
         { key: "proficiencyBonus", label: "Proficiency bonus", kind: "number", min: 0, max: 12 },
         { key: "initiativeBonus", label: "Initiative bonus", kind: "number", min: -20, max: 30, allowNegative: true },
         // A mistyped damage type is never matched at play time, so these use the canonical list.
-        { key: "damageResistances", label: "Damage resistances", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
-        { key: "damageImmunities", label: "Damage immunities", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
-        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        {
+          key: "damageResistances",
+          label: "Damage resistances",
+          kind: "tags",
+          pick: true,
+          suggestions: (ctx) => ctx.damageTypes
+        },
+        {
+          key: "damageImmunities",
+          label: "Damage immunities",
+          kind: "tags",
+          pick: true,
+          suggestions: (ctx) => ctx.damageTypes
+        },
+        {
+          key: "damageVulnerabilities",
+          label: "Damage vulnerabilities",
+          kind: "tags",
+          pick: true,
+          suggestions: (ctx) => ctx.damageTypes
+        },
         // Not `pick` yet: condition immunities have no both-paths test for the chooser.
-        { key: "conditionImmunities", label: "Condition immunities", kind: "tags", suggestions: (ctx) => ctx.conditions }
+        {
+          key: "conditionImmunities",
+          label: "Condition immunities",
+          kind: "tags",
+          suggestions: (ctx) => ctx.conditions
+        }
       ]
     },
     {
@@ -824,7 +1177,12 @@ const MONSTER_SCHEMA: HomebrewSchema = {
       title: "On the table",
       advanced: true,
       fields: [
-        { key: "token.disposition", label: "Disposition", kind: "select", options: [opt("hostile", "Hostile"), opt("neutral", "Neutral"), opt("friendly", "Friendly")] },
+        {
+          key: "token.disposition",
+          label: "Disposition",
+          kind: "select",
+          options: [opt("hostile", "Hostile"), opt("neutral", "Neutral"), opt("friendly", "Friendly")]
+        },
         { key: "token.footprint.width", label: "Token width", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "token.footprint.height", label: "Token height", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "legendary.actionsPerRound", label: "Legendary actions per round", kind: "number", min: 1, max: 5 },
@@ -867,7 +1225,11 @@ export function fieldAt(
   for (const section of schema.sections) {
     const walk = (fields: readonly FieldDef[]) => {
       for (const field of fields) {
-        if (field.key && (dotted === field.key || dotted.startsWith(`${field.key}.`)) && field.key.length > bestLength) {
+        if (
+          field.key &&
+          (dotted === field.key || dotted.startsWith(`${field.key}.`)) &&
+          field.key.length > bestLength
+        ) {
           bestLength = field.key.length;
           best = { label: field.label.toLowerCase(), sectionId: section.id, sectionTitle: section.title };
         }

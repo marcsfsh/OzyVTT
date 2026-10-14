@@ -13,7 +13,10 @@ export function isIncapacitated(actor: Actor): boolean {
 export const AUTO_FAIL_PHYSICAL_SAVES = ["paralyzed", "petrified", "stunned", "unconscious"] as const;
 
 export function autoFailsPhysicalSaves(actor: Actor): string | null {
-  return actor.conditions.find((condition) => (AUTO_FAIL_PHYSICAL_SAVES as readonly string[]).includes(condition.id))?.id ?? null;
+  return (
+    actor.conditions.find((condition) => (AUTO_FAIL_PHYSICAL_SAVES as readonly string[]).includes(condition.id))?.id ??
+    null
+  );
 }
 
 export function exhaustionLevel(actor: Actor): number {
@@ -26,11 +29,21 @@ export function exhaustionPenalty(actor: Actor): number {
 }
 
 export function conditionLabel(conditionId: string): string {
-  return conditionId.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  return conditionId
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /** Conditions that set Speed to 0 (SRD conditions appendix). */
-export const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified", "stunned"] as const;
+export const SPEED_ZERO_CONDITIONS = [
+  "grappled",
+  "restrained",
+  "unconscious",
+  "paralyzed",
+  "petrified",
+  "stunned"
+] as const;
 
 /** True while a condition that sets Speed to 0 is active (SRD: "your Speed is 0 and can't increase"). */
 function speedZeroed(actor: Actor): boolean {
@@ -59,7 +72,10 @@ export function currentSpeedFeet(actor: Actor): number | null {
     if (effect.voidWhileIncapacitated && incapacitated) continue;
     for (const modifier of effect.modifiers) {
       if (modifier.type !== "speed") continue;
-      if (effect.stackKey === undefined) { speed += modifier.amount; continue; }
+      if (effect.stackKey === undefined) {
+        speed += modifier.amount;
+        continue;
+      }
       const held = grouped.get(effect.stackKey);
       grouped.set(effect.stackKey, held === undefined ? modifier.amount : morePotent(held, modifier.amount));
     }

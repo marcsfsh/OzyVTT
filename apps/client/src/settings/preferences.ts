@@ -8,12 +8,29 @@ import { useSyncExternalStore } from "react";
 
 const AUTO_ARRANGE_KEY = "vtt.auto-arrange";
 
-const read = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
-const write = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode - the choice stays in-session */ } };
+const read = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const write = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* private mode - the choice stays in-session */
+  }
+};
 
 let autoArrange: boolean = read(AUTO_ARRANGE_KEY) !== "off";
 const listeners = new Set<() => void>();
-const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
 
 export function setAutoArrange(next: boolean): void {
   if (next === autoArrange) return;
@@ -24,5 +41,9 @@ export function setAutoArrange(next: boolean): void {
 
 /** Reactive read, so the shell and the Settings switch always agree. */
 export function useAutoArrange(): boolean {
-  return useSyncExternalStore(subscribe, () => autoArrange, () => autoArrange);
+  return useSyncExternalStore(
+    subscribe,
+    () => autoArrange,
+    () => autoArrange
+  );
 }

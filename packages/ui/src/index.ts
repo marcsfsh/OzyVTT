@@ -46,7 +46,14 @@ export { Menu, MenuItem, type MenuProps, type MenuItemProps } from "./primitives
 export { Tooltip, type TooltipProps } from "./primitives/Tooltip";
 export { Modal, type ModalProps } from "./primitives/Modal";
 export { Drawer, type DrawerProps } from "./primitives/Drawer";
-export { ToastProvider, useToast, useToastMute, type ToastApi, type ToastOptions, type ToastTone } from "./primitives/Toast";
+export {
+  ToastProvider,
+  useToast,
+  useToastMute,
+  type ToastApi,
+  type ToastOptions,
+  type ToastTone
+} from "./primitives/Toast";
 export { Badge, type BadgeProps, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarProps, type AvatarSize, type AvatarPresence } from "./primitives/Avatar";
 export { Meter, type MeterProps, type MeterTone } from "./primitives/Meter";
@@ -70,15 +77,46 @@ export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/Sa
 
 /* Icons: the design system's own SVG glyphs. The app's richer set lives in apps/client/src/codex/icons.tsx. */
 export {
-  IconCheck, IconChevron, IconChevronLeft, IconChevronRight, IconSearch, IconShuffle, IconDie,
-  IconPencil, IconWarning, IconInfo, IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff,
-  IconX, IconPlay, IconArrow, IconDownload,
+  IconCheck,
+  IconChevron,
+  IconChevronLeft,
+  IconChevronRight,
+  IconSearch,
+  IconShuffle,
+  IconDie,
+  IconPencil,
+  IconWarning,
+  IconInfo,
+  IconPlus,
+  IconTrash,
+  IconDrag,
+  IconCopy,
+  IconEye,
+  IconEyeOff,
+  IconX,
+  IconPlay,
+  IconArrow,
+  IconDownload,
   // Map tools and content marks.
-  IconSelect, IconPing, IconMeasure, IconDraw, IconFog, IconColor, IconCleanup, IconScene, IconStar
+  IconSelect,
+  IconPing,
+  IconMeasure,
+  IconDraw,
+  IconFog,
+  IconColor,
+  IconCleanup,
+  IconScene,
+  IconStar
 } from "./primitives/icons";
 export { Combobox, type ComboboxProps, type ComboboxOption } from "./primitives/Combobox";
 // The editor's two pure rules, exported for direct testing.
-export { MarkdownEditor, applyMarkdownFormat, wikiLinkContext, type MarkdownEditorProps, type MarkdownSuggestion } from "./primitives/MarkdownEditor";
+export {
+  MarkdownEditor,
+  applyMarkdownFormat,
+  wikiLinkContext,
+  type MarkdownEditorProps,
+  type MarkdownSuggestion
+} from "./primitives/MarkdownEditor";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";
@@ -94,4 +132,9 @@ export {
 export { DiceInputRow, type DiceInputRowProps, type DiceEntryMode } from "./primitives/DiceInputRow";
 export { NameField, type NameFieldProps } from "./primitives/NameField";
 export { FeatureList, type FeatureListProps, type FeatureItem } from "./primitives/FeatureList";
-export { ReviewSummary, type ReviewSummaryProps, type ReviewSection, type ReviewItem } from "./primitives/ReviewSummary";
+export {
+  ReviewSummary,
+  type ReviewSummaryProps,
+  type ReviewSection,
+  type ReviewItem
+} from "./primitives/ReviewSummary";

@@ -24,9 +24,21 @@
 import type { z } from "zod";
 import { EquipmentReferenceSchema, type EquipmentReference } from "../../src/schemas.js";
 import {
-  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_PROPERTY_IDS
+  CONDITION_IDS,
+  CREATURE_TYPE_IDS,
+  DAMAGE_TYPE_IDS,
+  MAGIC_SCHOOL_IDS,
+  WEAPON_PROPERTY_IDS
 } from "../../src/enums.js";
-import { loadClasses, loadFeats, loadLanguages, loadSkills, loadSpecies, loadSpells, loadWeapons } from "../../src/index.js";
+import {
+  loadClasses,
+  loadFeats,
+  loadLanguages,
+  loadSkills,
+  loadSpecies,
+  loadSpells,
+  loadWeapons
+} from "../../src/index.js";
 
 /** Typed off the schema's input so `.default()`ed keys need not be restated; the merge re-parses each row. */
 type ItemInput = z.input<typeof EquipmentReferenceSchema>;
@@ -37,12 +49,19 @@ type ItemInput = z.input<typeof EquipmentReferenceSchema>;
  * text. A curse therefore needs an item the SRD already gates behind attunement.
  */
 export type ItemRiderKey =
-  | "tags" | "actions" | "effects" | "uses" | "grants" | "modifiers"
-  | "cursed" | "casts" | "grantsFeatIds";
+  "tags" | "actions" | "effects" | "uses" | "grants" | "modifiers" | "cursed" | "casts" | "grantsFeatIds";
 
 /** The same nine, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
-  "tags", "actions", "effects", "uses", "grants", "modifiers", "cursed", "casts", "grantsFeatIds"
+  "tags",
+  "actions",
+  "effects",
+  "uses",
+  "grants",
+  "modifiers",
+  "cursed",
+  "casts",
+  "grantsFeatIds"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
@@ -77,7 +96,9 @@ export interface ItemMechanicsLane {
  * `test/item-mechanics.test.ts` fails if the two drift. `"unread"` means no consumer applies the
  * rider yet.
  */
-export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing" | "at-its-moment" | "unread" | "display-only">> = Object.freeze({
+export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
+  Record<string, "standing" | "at-its-moment" | "unread" | "display-only">
+> = Object.freeze({
   "attack-bonus": "standing",
   "save-bonus": "standing",
   "spell-save-dc": "standing",
@@ -100,7 +121,9 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<Record<string, "standing
  * table, but `sense` riders on items do reach nothing; see `MEASURED_INERT_RIDER_TYPES`.
  */
 const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
-  Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR).filter(([, disposition]) => disposition === "unread").map(([type]) => type)
+  Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR)
+    .filter(([, disposition]) => disposition === "unread")
+    .map(([type]) => type)
 );
 
 /**
@@ -113,8 +136,17 @@ const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["speed", "darkv
 // ---- Cross-bundle vocabularies (check 5) --------------------------------------------------------
 
 type RefKind =
-  | "spell" | "feat" | "skill" | "language" | "class" | "species"
-  | "damage type" | "condition" | "school of magic" | "creature type" | "weapon property"
+  | "spell"
+  | "feat"
+  | "skill"
+  | "language"
+  | "class"
+  | "species"
+  | "damage type"
+  | "condition"
+  | "school of magic"
+  | "creature type"
+  | "weapon property"
   | "weapon proficiency";
 
 /** Where each kind's ids come from, loaded lazily so an empty overlay reads no bundle. */
@@ -136,14 +168,20 @@ const VOCABULARIES: Readonly<Record<RefKind, { readonly source: string; readonly
    */
   "weapon proficiency": {
     source: "bundles/weapons.v1.json (a weapon id, or one of its `category` groups)",
-    ids: () => { const weapons = loadWeapons(); return [...weapons.map((record) => record.id), ...new Set(weapons.map((record) => record.category))]; }
+    ids: () => {
+      const weapons = loadWeapons();
+      return [...weapons.map((record) => record.id), ...new Set(weapons.map((record) => record.category))];
+    }
   }
 };
 
 const resolved = new Map<RefKind, ReadonlySet<string>>();
 const vocabulary = (kind: RefKind): ReadonlySet<string> => {
   let ids = resolved.get(kind);
-  if (!ids) { ids = new Set(VOCABULARIES[kind].ids()); resolved.set(kind, ids); }
+  if (!ids) {
+    ids = new Set(VOCABULARIES[kind].ids());
+    resolved.set(kind, ids);
+  }
   return ids;
 };
 
@@ -152,21 +190,33 @@ const vocabulary = (kind: RefKind): ReadonlySet<string> => {
  * different things in different parents, so they are handled by `ELEMENT_REFERENCES` instead.
  */
 const SLUG_REFERENCES: Readonly<Record<string, RefKind>> = {
-  spellId: "spell", spellIds: "spell", grantsFeatIds: "feat",
-  damageType: "damage type", damageTypes: "damage type",
-  damageResistances: "damage type", damageImmunities: "damage type",
-  conditionId: "condition", conditionIds: "condition", conditionImmunities: "condition",
-  skills: "skill", expertise: "skill", languages: "language",
-  classId: "class", classIds: "class", speciesIds: "species",
-  schools: "school of magic", creatureTypes: "creature type", properties: "weapon property",
+  spellId: "spell",
+  spellIds: "spell",
+  grantsFeatIds: "feat",
+  damageType: "damage type",
+  damageTypes: "damage type",
+  damageResistances: "damage type",
+  damageImmunities: "damage type",
+  conditionId: "condition",
+  conditionIds: "condition",
+  conditionImmunities: "condition",
+  skills: "skill",
+  expertise: "skill",
+  languages: "language",
+  classId: "class",
+  classIds: "class",
+  speciesIds: "species",
+  schools: "school of magic",
+  creatureTypes: "creature type",
+  properties: "weapon property",
   weapons: "weapon proficiency"
 };
 
 /** A key holding objects, one of whose fields is a slug: `grants.spells[].id`, `damage[].type`. */
 const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
-  spells: { id: "spell" },          // grants.spells[]
-  conditions: { id: "condition" },  // actions[].onHit[].conditions[]
-  damage: { type: "damage type" },  // actions[].damage[]
+  spells: { id: "spell" }, // grants.spells[]
+  conditions: { id: "condition" }, // actions[].onHit[].conditions[]
+  damage: { type: "damage type" }, // actions[].damage[]
   damageByLevel: { type: "damage type" }
 };
 
@@ -182,7 +232,16 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  *   `grants.saves` - already a closed zod enum.
  */
 export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
-  "tags", "endsWithTag", "requiresEffectTag", "pool", "poolId", "tools", "armor", "sense", "saves", "actionId"
+  "tags",
+  "endsWithTag",
+  "requiresEffectTag",
+  "pool",
+  "poolId",
+  "tools",
+  "armor",
+  "sense",
+  "saves",
+  "actionId"
 ]);
 
 /** Levenshtein, only ever run against one vocabulary to turn a refusal into a fix. */
@@ -191,7 +250,9 @@ function distance(left: string, right: string): number {
   for (let index = 0; index < left.length; index++) {
     const current = [index + 1];
     for (let other = 0; other < right.length; other++) {
-      current.push(Math.min(previous[other] + (left[index] === right[other] ? 0 : 1), previous[other + 1] + 1, current[other] + 1));
+      current.push(
+        Math.min(previous[other] + (left[index] === right[other] ? 0 : 1), previous[other + 1] + 1, current[other] + 1)
+      );
     }
     previous = current;
   }
@@ -204,12 +265,19 @@ function closest(slug: string, ids: ReadonlySet<string>): string | null {
   let bestDistance = Math.min(4, Math.ceil(slug.length / 2));
   for (const id of ids) {
     const measured = distance(slug, id);
-    if (measured < bestDistance) { best = id; bestDistance = measured; }
+    if (measured < bestDistance) {
+      best = id;
+      bestDistance = measured;
+    }
   }
   return best;
 }
 
-interface Reference { readonly path: string; readonly kind: RefKind; readonly slug: string }
+interface Reference {
+  readonly path: string;
+  readonly kind: RefKind;
+  readonly slug: string;
+}
 
 /** Collect every cross-bundle slug in the parsed riders (so materialised defaults are included). */
 function collectReferences(node: unknown, path: string, into: Reference[]): void {
@@ -223,7 +291,9 @@ function collectReferences(node: unknown, path: string, into: Reference[]): void
   // `while-proficient-with` is the one trigger whose id list changes vocabulary with a sibling field.
   if (record.type === "while-proficient-with" && Array.isArray(record.ids)) {
     if (record.kind === "skill") {
-      record.ids.forEach((id, index) => { if (typeof id === "string") into.push({ path: `${path}.ids.${index}`, kind: "skill", slug: id }); });
+      record.ids.forEach((id, index) => {
+        if (typeof id === "string") into.push({ path: `${path}.ids.${index}`, kind: "skill", slug: id });
+      });
     }
     return;
   }
@@ -233,7 +303,10 @@ function collectReferences(node: unknown, path: string, into: Reference[]): void
     const kind = SLUG_REFERENCES[key];
     if (kind !== undefined) {
       if (typeof value === "string") into.push({ path: here, kind, slug: value });
-      else if (Array.isArray(value)) value.forEach((slug, index) => { if (typeof slug === "string") into.push({ path: `${here}.${index}`, kind, slug }); });
+      else if (Array.isArray(value))
+        value.forEach((slug, index) => {
+          if (typeof slug === "string") into.push({ path: `${here}.${index}`, kind, slug });
+        });
       continue;
     }
     const fields = ELEMENT_REFERENCES[key];
@@ -296,16 +369,22 @@ export function applyItemMechanics(
     const entries = Object.entries(lane.entries);
     entryCount += entries.length;
     if (entries.length === 0) {
-      refused.push(`lane "${lane.lane}" composes no entries at all, so listing it authors nothing; land it with the items it authors, or leave it out of ITEM_MECHANICS_LANES until it has some`);
+      refused.push(
+        `lane "${lane.lane}" composes no entries at all, so listing it authors nothing; land it with the items it authors, or leave it out of ITEM_MECHANICS_LANES until it has some`
+      );
       continue;
     }
     if (lane.categories.length === 0) {
-      refused.push(`lane "${lane.lane}" declares no categories, so nothing can check that its entries are its own; declare the bundle categories it owns`);
+      refused.push(
+        `lane "${lane.lane}" declares no categories, so nothing can check that its entries are its own; declare the bundle categories it owns`
+      );
       continue;
     }
     // Present-but-empty `slots` would admit no row.
     if (lane.slots !== undefined && lane.slots.length === 0) {
-      refused.push(`lane "${lane.lane}" declares an empty "slots" list, which matches no row at all; name the slots it owns, or omit the field to be checked by category alone`);
+      refused.push(
+        `lane "${lane.lane}" declares an empty "slots" list, which matches no row at all; name the slots it owns, or omit the field to be checked by category alone`
+      );
       continue;
     }
 
@@ -314,25 +393,33 @@ export function applyItemMechanics(
 
       const already = claimedBy.get(itemId);
       if (already !== undefined) {
-        refused.push(`${at} - already authored by lane "${already}". Two lanes on one item silently collapse to one when composed, so the seam refuses instead; one item belongs to one lane`);
+        refused.push(
+          `${at} - already authored by lane "${already}". Two lanes on one item silently collapse to one when composed, so the seam refuses instead; one item belongs to one lane`
+        );
         continue;
       }
       claimedBy.set(itemId, lane.lane);
 
       const row = byId.get(itemId);
       if (!row) {
-        refused.push(`${at} - no row in magic-items.v1.json carries this id, so the riders keyed to it would author nothing at all`);
+        refused.push(
+          `${at} - no row in magic-items.v1.json carries this id, so the riders keyed to it would author nothing at all`
+        );
         continue;
       }
 
       if (!lane.categories.includes(row.category)) {
-        refused.push(`${at} - is a "${row.category}" and lane "${lane.lane}" owns ${lane.categories.map((category) => `"${category}"`).join(", ")}. The lane split is by category (plan §3); author this item in the lane that owns it`);
+        refused.push(
+          `${at} - is a "${row.category}" and lane "${lane.lane}" owns ${lane.categories.map((category) => `"${category}"`).join(", ")}. The lane split is by category (plan §3); author this item in the lane that owns it`
+        );
         continue;
       }
 
       // A row with no `slot` fails a declared list: a missing column is not evidence the item belongs here.
       if (lane.slots !== undefined && !lane.slots.includes(row.slot ?? "")) {
-        refused.push(`${at} - has slot ${row.slot === undefined ? "(none)" : `"${row.slot}"`} and lane "${lane.lane}" owns ${lane.slots.map((slot) => `"${slot}"`).join(", ")}. Two lanes share the "${row.category}" category, so the slot is what divides them (plan §3); author this item in the lane that owns it`);
+        refused.push(
+          `${at} - has slot ${row.slot === undefined ? "(none)" : `"${row.slot}"`} and lane "${lane.lane}" owns ${lane.slots.map((slot) => `"${slot}"`).join(", ")}. Two lanes share the "${row.category}" category, so the slot is what divides them (plan §3); author this item in the lane that owns it`
+        );
         continue;
       }
 
@@ -340,30 +427,40 @@ export function applyItemMechanics(
        * The merged row is built by picking known rider keys (so a lane cannot set parsed columns like
        * `slot`), which means a misspelled key would never reach `.strict()`. Refuse unknown keys explicitly.
        */
-      const unknown = Object.keys(mechanics)
-        .filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
+      const unknown = Object.keys(mechanics).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
       if (unknown.length > 0) {
-        refused.push(`${at} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The nine are: ${ITEM_RIDER_KEYS.join(", ")}`);
+        refused.push(
+          `${at} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The nine are: ${ITEM_RIDER_KEYS.join(", ")}`
+        );
         continue;
       }
 
-      const empty = ITEM_RIDER_KEYS
-        .map((key) => ({ key, reason: authorsNothing(mechanics[key]) }))
-        .filter((named): named is { key: ItemRiderKey; reason: string } => named.reason !== null);
+      const empty = ITEM_RIDER_KEYS.map((key) => ({ key, reason: authorsNothing(mechanics[key]) })).filter(
+        (named): named is { key: ItemRiderKey; reason: string } => named.reason !== null
+      );
       if (empty.length > 0) {
-        refused.push(`${at} - ${empty.map((named) => `"${named.key}" is ${named.reason}`).join(" and ")}, which authors nothing. Drop the key, or author the rider you meant`);
+        refused.push(
+          `${at} - ${empty.map((named) => `"${named.key}" is ${named.reason}`).join(" and ")}, which authors nothing. Drop the key, or author the rider you meant`
+        );
         continue;
       }
 
       const riders = ITEM_RIDER_KEYS.filter((key) => mechanics[key] !== undefined);
       if (riders.length === 0) {
-        refused.push(`${at} - the entry names no rider; record a named absence as a comment beside it, not as an empty entry`);
+        refused.push(
+          `${at} - the entry names no rider; record a named absence as a comment beside it, not as an empty entry`
+        );
         continue;
       }
 
-      const parsed = EquipmentReferenceSchema.safeParse({ ...row, ...Object.fromEntries(riders.map((key) => [key, mechanics[key]])) });
+      const parsed = EquipmentReferenceSchema.safeParse({
+        ...row,
+        ...Object.fromEntries(riders.map((key) => [key, mechanics[key]]))
+      });
       if (!parsed.success) {
-        refused.push(`${at} - the schema refuses the merged row. ${parsed.error.issues.map((issue) => `${where(issue.path)}${issue.message}`).join(" | ")}`);
+        refused.push(
+          `${at} - the schema refuses the merged row. ${parsed.error.issues.map((issue) => `${where(issue.path)}${issue.message}`).join(" | ")}`
+        );
         continue;
       }
 
@@ -372,7 +469,9 @@ export function applyItemMechanics(
         .map((modifier, index) => ({ index, type: modifier.type }))
         .filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
       if (unread.length > 0) {
-        refused.push(`${at} - ${unread.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Record it as a named absence in a comment, with the unit that unblocks it`);
+        refused.push(
+          `${at} - ${unread.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Record it as a named absence in a comment, with the unit that unblocks it`
+        );
         continue;
       }
 
@@ -380,7 +479,9 @@ export function applyItemMechanics(
         .map((modifier, index) => ({ index, type: modifier.type }))
         .filter((modifier) => MEASURED_INERT_RIDER_TYPES.has(modifier.type));
       if (inert.length > 0) {
-        refused.push(`${at} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which C7c measured (limit W2) as reaching NOTHING from an item: derivation.speed is written and never read, and EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Record it as a named absence in a comment, with the unit that unblocks it`);
+        refused.push(
+          `${at} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which C7c measured (limit W2) as reaching NOTHING from an item: derivation.speed is written and never read, and EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Record it as a named absence in a comment, with the unit that unblocks it`
+        );
         continue;
       }
 
@@ -388,10 +489,14 @@ export function applyItemMechanics(
       collectReferences(Object.fromEntries(riders.map((key) => [key, parsed.data[key]])), "", references);
       const unresolved = references.filter((reference) => !vocabulary(reference.kind).has(reference.slug));
       if (unresolved.length > 0) {
-        refused.push(`${at} - a rider pointing at an id nothing resolves parses, ships, and is silent at the table: ${unresolved.map((reference) => {
-          const suggestion = closest(reference.slug, vocabulary(reference.kind));
-          return `${reference.path} names "${reference.slug}", which is no ${reference.kind} this content ships (${VOCABULARIES[reference.kind].source})${suggestion ? `; did you mean "${suggestion}"?` : ""}`;
-        }).join(" | ")}`);
+        refused.push(
+          `${at} - a rider pointing at an id nothing resolves parses, ships, and is silent at the table: ${unresolved
+            .map((reference) => {
+              const suggestion = closest(reference.slug, vocabulary(reference.kind));
+              return `${reference.path} names "${reference.slug}", which is no ${reference.kind} this content ships (${VOCABULARIES[reference.kind].source})${suggestion ? `; did you mean "${suggestion}"?` : ""}`;
+            })
+            .join(" | ")}`
+        );
         continue;
       }
 
@@ -402,8 +507,8 @@ export function applyItemMechanics(
   if (refused.length > 0) {
     throw new Error(
       `item-mechanics: ${refused.length} ${refused.length === 1 ? "refusal" : "refusals"} across ${lanes.length} lane(s) and ${entryCount} entr${entryCount === 1 ? "y" : "ies"}; the bundle is NOT written.\n` +
-      `${refused.map((line) => `  ${line}\n`).join("")}` +
-      `Fix it in scripts/item-mechanics/ - a rider that cannot land is a rider that silently authors nothing, which is the failure this overlay exists to make loud.`
+        `${refused.map((line) => `  ${line}\n`).join("")}` +
+        `Fix it in scripts/item-mechanics/ - a rider that cannot land is a rider that silently authors nothing, which is the failure this overlay exists to make loud.`
     );
   }
 

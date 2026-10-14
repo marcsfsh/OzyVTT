@@ -16,7 +16,12 @@ describe("Drawer", () => {
   it("renders titled, closeable, non-modal, and inert while closed", async () => {
     const onClose = vi.fn();
     const { rerender, container } = render(
-      <><button type="button">Outside</button><Drawer open={false} onClose={onClose} title="Session 14"><button type="button">Inside</button></Drawer></>
+      <>
+        <button type="button">Outside</button>
+        <Drawer open={false} onClose={onClose} title="Session 14">
+          <button type="button">Inside</button>
+        </Drawer>
+      </>
     );
     const panel = container.querySelector("aside")!;
     expect(panel.tagName).toBe("ASIDE");
@@ -31,7 +36,14 @@ describe("Drawer", () => {
     // Named by its visible title. Queried through the DOM because the closed panel is absent from the a11y tree.
     expect(panel.getAttribute("aria-labelledby")).toBe(panel.querySelector("h2")!.id);
 
-    rerender(<><button type="button">Outside</button><Drawer open onClose={onClose} title="Session 14"><button type="button">Inside</button></Drawer></>);
+    rerender(
+      <>
+        <button type="button">Outside</button>
+        <Drawer open onClose={onClose} title="Session 14">
+          <button type="button">Inside</button>
+        </Drawer>
+      </>
+    );
     expect(panel.className).toContain("is-open");
     expect(panel.hasAttribute("inert")).toBe(false);
     expect(panel.hasAttribute("aria-hidden")).toBe(false);
@@ -51,7 +63,9 @@ describe("Drawer", () => {
 
   it("takes an explicit label and a side", () => {
     const { container } = render(
-      <Drawer open onClose={() => {}} side="left" ariaLabel="Session console" title={<span>Session 14</span>}>body</Drawer>
+      <Drawer open onClose={() => {}} side="left" ariaLabel="Session console" title={<span>Session 14</span>}>
+        body
+      </Drawer>
     );
     const panel = container.querySelector("aside")!;
     expect(panel.className).toContain("nh-drawer--left");
@@ -83,8 +97,16 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   function Host({ initial = "", onValue }: Readonly<{ initial?: string; onValue?: (next: string) => void }>) {
     const [value, setValue] = useState(initial);
     return (
-      <MarkdownEditor value={value} onChange={(next) => { setValue(next); onValue?.(next); }}
-        ariaLabel="Prep for this session" suggest={suggest} placeholder="Beats, encounters…" />
+      <MarkdownEditor
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          onValue?.(next);
+        }}
+        ariaLabel="Prep for this session"
+        suggest={suggest}
+        placeholder="Beats, encounters…"
+      />
     );
   }
 
@@ -102,7 +124,9 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
     expect(within(list).getAllByRole("option")).toHaveLength(3);
 
     await user.type(box, "val");
-    await waitFor(() => expect(within(screen.getByRole("listbox", { name: "Link to page" })).getAllByRole("option")).toHaveLength(1));
+    await waitFor(() =>
+      expect(within(screen.getByRole("listbox", { name: "Link to page" })).getAllByRole("option")).toHaveLength(1)
+    );
     expect(screen.getByRole("option", { name: "Vallaki" })).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{Enter}");
@@ -188,7 +212,10 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
     render(<Host />);
     const box = screen.getByLabelText("Body") as HTMLTextAreaElement;
     /** The editor restores the caret in `requestAnimationFrame`, so each step waits a frame before the next selection. */
-    const settle = () => act(async () => { await new Promise((resolve) => requestAnimationFrame(() => resolve(null))); });
+    const settle = () =>
+      act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      });
 
     box.setSelectionRange(0, 5);
     await user.click(screen.getByRole("button", { name: "Bold" }));
@@ -238,7 +265,9 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
     expect(screen.queryByRole("button", { name: "Insert image" })).toBeNull();
     view.unmount();
 
-    render(<MarkdownEditor value="" onChange={() => {}} ariaLabel="Body" onUploadImage={async () => "![x](codex-asset:1)"} />);
+    render(
+      <MarkdownEditor value="" onChange={() => {}} ariaLabel="Body" onUploadImage={async () => "![x](codex-asset:1)"} />
+    );
     expect(screen.getByRole("button", { name: "Insert image" })).toBeInTheDocument();
   });
 });
@@ -330,13 +359,23 @@ describe("Combobox", () => {
   it("allowFreeText: text that matches no option comes back as itself, and renders as a chip", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const view = render(<Combobox options={OPTIONS} value={null} onChange={onChange} allowFreeText ariaLabel="Who spent the time" />);
+    const view = render(
+      <Combobox options={OPTIONS} value={null} onChange={onChange} allowFreeText ariaLabel="Who spent the time" />
+    );
 
     await user.type(screen.getByRole("combobox", { name: "Who spent the time" }), "Vex the Bold{Enter}");
     // A name the GM typed: the raw text is what the caller stores.
     expect(onChange).toHaveBeenCalledWith("Vex the Bold");
 
-    view.rerender(<Combobox options={OPTIONS} value="Vex the Bold" onChange={onChange} allowFreeText ariaLabel="Who spent the time" />);
+    view.rerender(
+      <Combobox
+        options={OPTIONS}
+        value="Vex the Bold"
+        onChange={onChange}
+        allowFreeText
+        ariaLabel="Who spent the time"
+      />
+    );
     expect(screen.getByText("Vex the Bold")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear Vex the Bold" })).toBeInTheDocument();
   });
@@ -436,7 +475,9 @@ describe("TagInput", () => {
   it("without `pick` it is the datalist it always was — no listbox, no menu", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const { container } = render(<TagInput values={[]} onChange={onChange} suggestions={TYPES} ariaLabel="Damage resistances" />);
+    const { container } = render(
+      <TagInput values={[]} onChange={onChange} suggestions={TYPES} ariaLabel="Damage resistances" />
+    );
 
     // Codex tag fields use this default: their suggestions are a hint, not a set to choose from.
     expect(screen.queryByRole("listbox")).toBeNull();
@@ -448,12 +489,22 @@ describe("TagInput", () => {
   it("with `pick` the whole list is on screen, by its printed name, before anything is typed", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <TagInput values={[]} onChange={vi.fn()} suggestions={TYPES} pick optionLabel={(value) => value.toUpperCase()} ariaLabel="Damage resistances" />
+      <TagInput
+        values={[]}
+        onChange={vi.fn()}
+        suggestions={TYPES}
+        pick
+        optionLabel={(value) => value.toUpperCase()}
+        ariaLabel="Damage resistances"
+      />
     );
 
     await user.click(screen.getByRole("combobox", { name: "Damage resistances" }));
-    expect(within(screen.getByRole("listbox", { name: "Damage resistances" })).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["ACID", "COLD", "FIRE", "LIGHTNING"]);
+    expect(
+      within(screen.getByRole("listbox", { name: "Damage resistances" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(["ACID", "COLD", "FIRE", "LIGHTNING"]);
     // The datalist is gone, not supplemented.
     expect(container.querySelector("datalist")).toBeNull();
   });
@@ -474,7 +525,9 @@ describe("TagInput", () => {
     render(<TagInput values={["fire"]} onChange={onChange} suggestions={TYPES} pick ariaLabel="Damage resistances" />);
 
     await user.click(screen.getByRole("combobox", { name: "Damage resistances" }));
-    const shown = within(screen.getByRole("listbox", { name: "Damage resistances" })).getAllByRole("option").map((option) => option.textContent);
+    const shown = within(screen.getByRole("listbox", { name: "Damage resistances" }))
+      .getAllByRole("option")
+      .map((option) => option.textContent);
     expect(shown).toEqual(["acid", "cold", "lightning"]);
 
     // Removal is the chip's ✕ in both modes; `pick` gives up Backspace-on-empty.

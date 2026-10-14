@@ -21,18 +21,37 @@ export interface SwitchProps {
 
 /** On/off toggle for settings and feature flags (role="switch"). Prefer over a
     checkbox when the change takes effect immediately. */
-export function Switch({ checked, onChange, label, labelAlternate, banded = false, disabled = false, className, ...aria }: SwitchProps) {
+export function Switch({
+  checked,
+  onChange,
+  label,
+  labelAlternate,
+  banded = false,
+  disabled = false,
+  className,
+  ...aria
+}: SwitchProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       disabled={disabled}
-      className={cx("nh-switch", checked && "nh-switch--on", label != null && "nh-switch--labeled", banded && "nh-switch--banded", "tap-target", "interactive", className)}
+      className={cx(
+        "nh-switch",
+        checked && "nh-switch--on",
+        label != null && "nh-switch--labeled",
+        banded && "nh-switch--banded",
+        "tap-target",
+        "interactive",
+        className
+      )}
       onClick={() => onChange(!checked)}
       {...aria}
     >
-      <span className="nh-switch-track" aria-hidden="true"><span className="nh-switch-thumb" /></span>
+      <span className="nh-switch-track" aria-hidden="true">
+        <span className="nh-switch-thumb" />
+      </span>
       {/* The label stays inside the button: it is part of the tap target. The band is margin on the button, not a
           wrapper. */}
       {label != null && (

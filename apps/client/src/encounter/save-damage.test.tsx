@@ -17,11 +17,17 @@ import { SavePrompt } from "./EncounterPanel";
 const SAVE: PendingSave = {
   id: "60000000-0000-4000-8000-000000000001",
   targetActorId: "10000000-0000-4000-8000-000000000002",
-  ability: "dex", dc: 15,
+  ability: "dex",
+  dc: 15,
   sourceActorId: "10000000-0000-4000-8000-000000000001",
-  sourceName: "Dragon", actionName: "Fire Breath",
-  proposedDamage: 17, proposedDamageParts: [{ amount: 17, type: "fire" }],
-  halfOnSuccess: true, conditionId: null, saveBonus: 0, createdAt: 0
+  sourceName: "Dragon",
+  actionName: "Fire Breath",
+  proposedDamage: 17,
+  proposedDamageParts: [{ amount: 17, type: "fire" }],
+  halfOnSuccess: true,
+  conditionId: null,
+  saveBonus: 0,
+  createdAt: 0
 };
 
 /**
@@ -29,11 +35,20 @@ const SAVE: PendingSave = {
  * amended 12 lands as 3 + 2 = 5 rather than `floor(12 / 2)` = 6, which proves the prompt prints the
  * server's number. The mirror test runs this save through the real `answerSave`.
  */
-const TWO_TYPE: PendingSave = { ...SAVE, proposedDamageParts: [{ amount: 9, type: "fire" }, { amount: 8, type: "cold" }] };
+const TWO_TYPE: PendingSave = {
+  ...SAVE,
+  proposedDamageParts: [
+    { amount: 9, type: "fire" },
+    { amount: 8, type: "cold" }
+  ]
+};
 
 type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
 const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
-const lastAnswer = () => emitted().filter(([event]) => event === "save:answer").at(-1)![1];
+const lastAnswer = () =>
+  emitted()
+    .filter(([event]) => event === "save:answer")
+    .at(-1)![1];
 
 /** What the prompt handed its parent: how a refusal reaches the answerer. */
 const feedback: string[] = [];
@@ -44,14 +59,28 @@ const feedback: string[] = [];
  * cleared, swallowing every recheck ack.
  */
 const mount = (save: PendingSave, rollMode: "auto" | "manual" = "manual") =>
-  render(<StrictMode><SavePrompt save={save} targetName="Borin" canDismiss={false} onFeedback={(text) => { feedback.push(text); }} rollMode={rollMode} /></StrictMode>);
+  render(
+    <StrictMode>
+      <SavePrompt
+        save={save}
+        targetName="Borin"
+        canDismiss={false}
+        onFeedback={(text) => {
+          feedback.push(text);
+        }}
+        rollMode={rollMode}
+      />
+    </StrictMode>
+  );
 
 /** Comfortably longer than the prompt's `RECHECK_AMEND_MS` debounce. */
 const RECHECK_WAIT_MS = 600;
 
 const answers = () => emitted().filter(([event]) => event === "save:answer");
 /** Answers the newest `save:answer` as the server would: an uncommitted projection. */
-const ack = (outcome: Readonly<{ total: number; success: boolean; appliedDamage: number; conditionApplied?: boolean }>) => {
+const ack = (
+  outcome: Readonly<{ total: number; success: boolean; appliedDamage: number; conditionApplied?: boolean }>
+) => {
   const [, , acknowledge] = answers().at(-1)!;
   acknowledge({ ok: true, outcome: { dc: 15, conditionApplied: false, committed: false, ...outcome } });
 };
@@ -65,7 +94,10 @@ const nextAnswer = async (before: number) => {
 };
 
 describe("the save prompt's damage field", () => {
-  beforeEach(() => { vi.clearAllMocks(); feedback.length = 0; });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    feedback.length = 0;
+  });
 
   it("asks for the damage in manual mode, offering the rolled number as the fallback", () => {
     mount(SAVE);
@@ -94,7 +126,13 @@ describe("the save prompt's damage field", () => {
     await user.type(screen.getByLabelText(/Damage on a failure/), "12");
     await user.type(screen.getByLabelText("Rolled save total"), "18");
     await user.click(screen.getByRole("button", { name: "Apply" }));
-    expect(lastAnswer()).toMatchObject({ saveId: SAVE.id, method: "manual", total: 18, commit: true, damageOverride: 12 });
+    expect(lastAnswer()).toMatchObject({
+      saveId: SAVE.id,
+      method: "manual",
+      total: 18,
+      commit: true,
+      damageOverride: 12
+    });
   });
 
   it("sends no damage field when the answerer leaves the number alone", async () => {
@@ -120,7 +158,13 @@ describe("the save prompt's damage field", () => {
     expect(screen.getByText("Amended to 12 - checking")).toBeTruthy();
 
     // The recheck is Confirm's payload with `commit: false`: nothing is rolled or applied.
-    expect(await nextAnswer(1)).toMatchObject({ saveId: SAVE.id, method: "manual", total: 18, commit: false, damageOverride: 12 });
+    expect(await nextAnswer(1)).toMatchObject({
+      saveId: SAVE.id,
+      method: "manual",
+      total: 18,
+      commit: false,
+      damageOverride: 12
+    });
 
     // 5 is the server's answer for this save (see the mirror test). Neither 12 nor any halving of it
     // is 5, so the line must be showing the server's number.

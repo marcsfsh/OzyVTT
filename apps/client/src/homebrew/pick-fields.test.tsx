@@ -30,7 +30,10 @@ function RecordForm({ type, seed, onBody }: { type: HomebrewType; seed: Draft; o
     <SchemaForm
       schema={SCHEMAS[type]}
       draft={draft}
-      onDraft={(next) => { setDraft(next); onBody(next); }}
+      onDraft={(next) => {
+        setDraft(next);
+        onBody(next);
+      }}
       ctx={EMPTY_CONTEXT}
     />
   );
@@ -39,13 +42,24 @@ function RecordForm({ type, seed, onBody }: { type: HomebrewType; seed: Draft; o
 /** Mounts the form; `body()` is the last write after the save path's shaping. */
 function mount(type: HomebrewType = "equipment", seed: Draft = { name: "Mace of Storms", isMagic: true }) {
   let body: Draft = {};
-  render(<RecordForm type={type} seed={seed} onBody={(next) => { body = next; }} />);
+  render(
+    <RecordForm
+      type={type}
+      seed={seed}
+      onBody={(next) => {
+        body = next;
+      }}
+    />
+  );
   const chooser = (name: string) => screen.getByRole("combobox", { name });
   return {
     chooser,
     rarity: () => chooser("Rarity"),
     /** Scoped to the chooser's own listbox: these forms also contain real `<select>`s. */
-    options: (name: string) => within(screen.getByRole("listbox", { name })).getAllByRole("option").map((option) => option.textContent),
+    options: (name: string) =>
+      within(screen.getByRole("listbox", { name }))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
     rungs: () => within(screen.getByRole("listbox", { name: "Rarity" })).getAllByRole("option"),
     // `forStorage` is what `useAutosave` sends and where `emptyValue: "omit"` drops the key.
     body: () => forStorage(body)
@@ -211,7 +225,10 @@ describe("3d — every damage-type control is a visible chooser that still takes
       return (
         <RiderEditor
           value={held}
-          onChange={(next) => { setHeld(next); value = next; }}
+          onChange={(next) => {
+            setHeld(next);
+            value = next;
+          }}
           enabled={["modifiers"]}
           scope="item"
           ctx={EMPTY_CONTEXT}
@@ -229,17 +246,26 @@ describe("3d — every damage-type control is a visible chooser that still takes
 
     // The `extra-damage` rider, one row deep.
     await user.click(screen.getByRole("combobox", { name: "Damage type" }));
-    expect(within(screen.getByRole("listbox", { name: "Damage type" })).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(NAMES);
+    expect(
+      within(screen.getByRole("listbox", { name: "Damage type" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(NAMES);
     await user.click(screen.getByRole("option", { name: "Lightning" }));
-    expect((value.modifiers as Array<Record<string, unknown>>)[0]).toMatchObject({ type: "extra-damage", damageType: "lightning" });
+    expect((value.modifiers as Array<Record<string, unknown>>)[0]).toMatchObject({
+      type: "extra-damage",
+      damageType: "lightning"
+    });
 
     // The `damage-type-is` gate, two rows deep; a mistyped slug here means the rider never fires.
     await user.click(screen.getByRole("button", { name: "Add a condition" }));
     await user.selectOptions(screen.getByLabelText("Condition"), "damage-type-is");
     await user.click(screen.getByRole("combobox", { name: "Damage types" }));
-    expect(within(screen.getByRole("listbox", { name: "Damage types" })).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(NAMES);
+    expect(
+      within(screen.getByRole("listbox", { name: "Damage types" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(NAMES);
 
     await user.click(screen.getByRole("option", { name: "Cold" }));
     const when = ((value.modifiers as Array<Record<string, unknown>>)[0].when as Array<Record<string, unknown>>)[0];
@@ -254,7 +280,10 @@ describe("3d — every damage-type control is a visible chooser that still takes
       return (
         <RiderEditor
           value={held}
-          onChange={(next) => { setHeld(next); value = next; }}
+          onChange={(next) => {
+            setHeld(next);
+            value = next;
+          }}
           enabled={["grants"]}
           scope="item"
           ctx={EMPTY_CONTEXT}
@@ -270,8 +299,11 @@ describe("3d — every damage-type control is a visible chooser that still takes
     await user.selectOptions(what, "damageResistances");
 
     await user.click(screen.getByRole("combobox", { name: "Which damage resistances" }));
-    expect(within(screen.getByRole("listbox", { name: "Which damage resistances" })).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(NAMES);
+    expect(
+      within(screen.getByRole("listbox", { name: "Which damage resistances" }))
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(NAMES);
 
     await user.click(screen.getByRole("option", { name: "Cold" }));
     await user.type(screen.getByRole("combobox", { name: "Which damage resistances" }), "void{Enter}");
@@ -287,7 +319,10 @@ describe("3d — every damage-type control is a visible chooser that still takes
       return (
         <RiderEditor
           value={held}
-          onChange={(next) => { setHeld(next); value = next; }}
+          onChange={(next) => {
+            setHeld(next);
+            value = next;
+          }}
           enabled={["grants"]}
           scope="item"
           ctx={EMPTY_CONTEXT}
@@ -328,7 +363,10 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
       return (
         <RiderEditor
           value={held}
-          onChange={(next) => { setHeld(next); value = next; }}
+          onChange={(next) => {
+            setHeld(next);
+            value = next;
+          }}
           enabled={["grants"]}
           scope="feature"
           ctx={SPELL_CTX}
@@ -357,7 +395,10 @@ describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id c
       return (
         <RiderEditor
           value={held}
-          onChange={(next) => { setHeld(next); value = next; }}
+          onChange={(next) => {
+            setHeld(next);
+            value = next;
+          }}
           enabled={["grants"]}
           scope="item"
           ctx={SPELL_CTX}
@@ -437,7 +478,10 @@ describe("a gate the editor cannot show is a gate the editor must not drop", () 
       return (
         <RiderEditor
           value={held}
-          onChange={(next) => { setHeld(next); value = next; }}
+          onChange={(next) => {
+            setHeld(next);
+            value = next;
+          }}
           enabled={["grants"]}
           scope="feature"
           ctx={EMPTY_CONTEXT}
@@ -458,8 +502,9 @@ describe("a gate the editor cannot show is a gate the editor must not drop", () 
     await user.click(screen.getByRole("option", { name: "Paralyzed" }));
 
     expect(grants().conditionImmunities).toEqual(["charmed", "frightened", "paralyzed"]);
-    expect(grants().when, "one tap on a grant row must not silently make the immunity permanent")
-      .toEqual([{ type: "while-effect-tag", tags: ["raging"] }]);
+    expect(grants().when, "one tap on a grant row must not silently make the immunity permanent").toEqual([
+      { type: "while-effect-tag", tags: ["raging"] }
+    ]);
   });
 });
 
@@ -480,10 +525,11 @@ describe("C3 — a homebrew weapon's Properties row is a visible chooser over th
 
     expect(form.options("Properties")).toEqual(PROPERTY_NAMES);
     expect(form.options("Properties")).toContain("Two Handed");
-      // Checked per slug so a failure names the leaked mastery.
+    // Checked per slug so a failure names the leaked mastery.
     for (const mastery of WEAPON_MASTERY_IDS) {
-      expect(form.options("Properties"), `${mastery} is a mastery, not a property`)
-        .not.toContain(suggestionLabel(mastery));
+      expect(form.options("Properties"), `${mastery} is a mastery, not a property`).not.toContain(
+        suggestionLabel(mastery)
+      );
     }
   });
 

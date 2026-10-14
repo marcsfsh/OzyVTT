@@ -7,16 +7,18 @@ export type ApplyDamagePayload = Parameters<ClientToServerEvents["actor:apply-da
  * The `actor:apply-damage` manual-entry payload for all three hand-entry doors. A plain `.ts` so
  * `damage-type.mirror.test.ts` can assert on the bytes the app sends.
  */
-export function manualDamagePayload(input: Readonly<{
-  commandId: string;
-  actorId: string;
-  amount: number;
-  /** The canonical slug from `manualDamageType`, or `undefined` for the untyped fast path. */
-  damageType?: string;
-  /** SRD knock-out: a drop to 0 leaves the target Unconscious and stable instead of dying. */
-  nonlethal?: boolean;
-  expectedRevision?: number;
-}>): ApplyDamagePayload {
+export function manualDamagePayload(
+  input: Readonly<{
+    commandId: string;
+    actorId: string;
+    amount: number;
+    /** The canonical slug from `manualDamageType`, or `undefined` for the untyped fast path. */
+    damageType?: string;
+    /** SRD knock-out: a drop to 0 leaves the target Unconscious and stable instead of dying. */
+    nonlethal?: boolean;
+    expectedRevision?: number;
+  }>
+): ApplyDamagePayload {
   return {
     commandId: input.commandId,
     actorId: input.actorId,

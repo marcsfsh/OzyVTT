@@ -23,16 +23,27 @@ const IDS = {
 } as const;
 
 /** Only the fields the damage maths reads. */
-const sheet = (damageResistances: readonly string[]) => ({
-  abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
-  damageResistances: [...damageResistances],
-  extensions: {}
-}) as unknown as ActorDefinition;
+const sheet = (damageResistances: readonly string[]) =>
+  ({
+    abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
+    damageResistances: [...damageResistances],
+    extensions: {}
+  }) as unknown as ActorDefinition;
 
 function tableWith(resistances: readonly string[]) {
-  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.hero, name: "Aria", kind: "player-character", visibility: "public", hp: { current: 40, maximum: 40 }, definitionId: "aria-def" }
-  ] });
+  const state = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.hero,
+        name: "Aria",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        definitionId: "aria-def"
+      }
+    ]
+  });
   const hp = () => state.actors[0].hp.current;
   return { state, hp, definition: sheet(resistances) };
 }
@@ -43,11 +54,21 @@ function tableWith(resistances: readonly string[]) {
  * an SRD slug when picked, raw words when typed.
  */
 function applyFromTheDoor(table: ReturnType<typeof tableWith>, amount: number, chosen: string | null) {
-  const payload = manualDamagePayload({ commandId: IDS.command, actorId: IDS.hero, amount, damageType: manualDamageType(chosen) });
+  const payload = manualDamagePayload({
+    commandId: IDS.command,
+    actorId: IDS.hero,
+    amount,
+    damageType: manualDamageType(chosen)
+  });
   const request = ApplyDamageSchema.parse(payload);
   const before = table.hp();
-  const outcome = applyDamageDetailed(table.state, request.actorId, request, { role: "gm" },
-    { resolveDefinition: (id) => (id === "aria-def" ? table.definition : undefined) });
+  const outcome = applyDamageDetailed(
+    table.state,
+    request.actorId,
+    request,
+    { role: "gm" },
+    { resolveDefinition: (id) => (id === "aria-def" ? table.definition : undefined) }
+  );
   return { payload, hpLost: before - table.hp(), detail: damageAdjustmentDetail(outcome.application), outcome };
 }
 
@@ -72,13 +93,15 @@ describe("the manual damage entry's type chooser", () => {
     for (const chosen of [null, "", "   ", "untyped", "  Untyped "]) {
       const table = tableWith(["fire"]);
       const result = applyFromTheDoor(table, 10, chosen);
-      expect("damageType" in result.payload, `an untouched chooser sent a type for ${JSON.stringify(chosen)}`).toBe(false);
+      expect("damageType" in result.payload, `an untouched chooser sent a type for ${JSON.stringify(chosen)}`).toBe(
+        false
+      );
       expect(result.hpLost, `the exact manual number did not land for ${JSON.stringify(chosen)}`).toBe(10);
       expect(result.detail, `an unadjusted hit was explained for ${JSON.stringify(chosen)}`).toBe("");
     }
   });
 
-  it("slugs what the GM typed by hand, so \"  Fire \" is the fire the engine matches", () => {
+  it('slugs what the GM typed by hand, so "  Fire " is the fire the engine matches', () => {
     const table = tableWith(["fire"]);
     const result = applyFromTheDoor(table, 10, "  Fire ");
     expect(result.payload.damageType).toBe("fire");

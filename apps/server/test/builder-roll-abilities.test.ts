@@ -11,7 +11,9 @@ import { createServer } from "../src/server.js";
 // what is closed is client-generated randomness.
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
 const post = (base: string, path: string, token: string, body: unknown = {}) =>
@@ -35,7 +37,10 @@ async function boot() {
   await new Promise<void>((resolve) => server.httpServer.listen(0, "127.0.0.1", resolve));
   const address = server.httpServer.address();
   if (!address || typeof address === "string") throw new Error("Server did not bind.");
-  cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken, playerToken: server.auth.issuePlayerSession() };
 }
 
@@ -49,7 +54,10 @@ describe("builder.roll-abilities", () => {
     const body = await response.json();
     expect(body.data.scores).toHaveLength(6);
     // 4d6kh3: never below 3, never above 18, and the kept dice ride along for the wizard to show.
-    for (const score of body.data.scores) { expect(score).toBeGreaterThanOrEqual(3); expect(score).toBeLessThanOrEqual(18); }
+    for (const score of body.data.scores) {
+      expect(score).toBeGreaterThanOrEqual(3);
+      expect(score).toBeLessThanOrEqual(18);
+    }
     expect(body.data.dice).toHaveLength(6);
     expect(body.data.dice[0]).toHaveLength(4);
 
@@ -70,12 +78,18 @@ describe("builder.roll-abilities", () => {
     await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["custom"], customFormula: "3d6" });
     const custom = await post(base, GAME_PATHS.builderRollAbilities, gmToken, { method: "custom" });
     expect(custom.status).toBe(200);
-    for (const score of (await custom.json()).data.scores) { expect(score).toBeGreaterThanOrEqual(3); expect(score).toBeLessThanOrEqual(18); }
+    for (const score of (await custom.json()).data.scores) {
+      expect(score).toBeGreaterThanOrEqual(3);
+      expect(score).toBeLessThanOrEqual(18);
+    }
   });
 
   it("follows the same player-builder gate the wizard itself does", async () => {
     const { base, gmToken, playerToken } = await boot();
-    await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ALL_METHODS, playerBuilder: "gm-only" });
+    await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      allowedAbilityMethods: ALL_METHODS,
+      playerBuilder: "gm-only"
+    });
     expect((await post(base, GAME_PATHS.builderRollAbilities, playerToken, { method: "roll" })).status).toBe(403);
 
     await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ALL_METHODS, playerBuilder: "open" });

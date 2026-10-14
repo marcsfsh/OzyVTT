@@ -38,15 +38,25 @@ export class AuthService {
     this.data = {
       passwordHash: legacy.passwordHash,
       tokenSecret: legacy.tokenSecret,
-      gmSessionsRevokedBefore: typeof legacy.gmSessionsRevokedBefore === "number" ? legacy.gmSessionsRevokedBefore : undefined,
-      revokedGmSessionIds: legacy.revokedGmSessionIds && typeof legacy.revokedGmSessionIds === "object" ? { ...legacy.revokedGmSessionIds } : {}
+      gmSessionsRevokedBefore:
+        typeof legacy.gmSessionsRevokedBefore === "number" ? legacy.gmSessionsRevokedBefore : undefined,
+      revokedGmSessionIds:
+        legacy.revokedGmSessionIds && typeof legacy.revokedGmSessionIds === "object"
+          ? { ...legacy.revokedGmSessionIds }
+          : {}
     };
     this.pruneRevokedSessions();
   }
-  get isBootstrapped() { return this.data !== null; }
+  get isBootstrapped() {
+    return this.data !== null;
+  }
   async bootstrap(password: string) {
     if (this.data) throw new Error("GM password is already configured.");
-    this.data = { passwordHash: await bcrypt.hash(password, PASSWORD_HASH_COST), tokenSecret: randomUUID(), revokedGmSessionIds: {} };
+    this.data = {
+      passwordHash: await bcrypt.hash(password, PASSWORD_HASH_COST),
+      tokenSecret: randomUUID(),
+      revokedGmSessionIds: {}
+    };
     await this.persist();
   }
   async login(password: string) {
@@ -57,7 +67,12 @@ export class AuthService {
   issuePlayerSession() {
     if (!this.data) throw new Error("The host must complete GM setup before players join.");
     const now = Date.now();
-    return this.sign({ role: "player", sessionId: randomUUID(), issuedAt: now, expiresAt: now + 30 * 24 * 60 * 60 * 1000 });
+    return this.sign({
+      role: "player",
+      sessionId: randomUUID(),
+      issuedAt: now,
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000
+    });
   }
   /** A short-lived player principal for the GM's preview of the player Codex. A real player token, so
    *  every read goes through `authorizePlayer` and the player projection and the preview can't show more
@@ -79,7 +94,10 @@ export class AuthService {
   async logout(token: string | undefined): Promise<boolean> {
     const session = this.verify(token);
     if (!session || !this.data) return false;
-    this.data.revokedGmSessionIds = { ...(this.data.revokedGmSessionIds ?? {}), [session.sessionId]: session.expiresAt };
+    this.data.revokedGmSessionIds = {
+      ...(this.data.revokedGmSessionIds ?? {}),
+      [session.sessionId]: session.expiresAt
+    };
     this.pruneRevokedSessions();
     await this.persist();
     return true;
@@ -96,7 +114,8 @@ export class AuthService {
     const [encoded, signature] = token.split(".");
     if (!encoded || !signature) return null;
     const expected = createHmac("sha256", this.data.tokenSecret).update(encoded).digest("base64url");
-    if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return null;
+    if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature)))
+      return null;
     try {
       const session = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Session;
       if (session.role !== "gm" && session.role !== "player") return null;
@@ -106,7 +125,9 @@ export class AuthService {
         if (this.data.revokedGmSessionIds?.[session.sessionId] !== undefined) return null;
       }
       return session;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   private pruneRevokedSessions() {
     if (!this.data?.revokedGmSessionIds) return;

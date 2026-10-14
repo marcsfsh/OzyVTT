@@ -36,14 +36,49 @@ const state = GameStateSchema.parse({
   schemaVersion: 1,
   actors: [
     { ...filled, id: "11111111-1111-4111-8111-111111111111", name: "Monster", kind: "monster", ownerSessionId: null },
-    { ...filled, id: "22222222-2222-4222-8222-222222222222", name: "Theirs", kind: "player-character", ownerSessionId: other },
-    { ...filled, id: "33333333-3333-4333-8333-333333333333", name: "Mine", kind: "player-character", ownerSessionId: me }
+    {
+      ...filled,
+      id: "22222222-2222-4222-8222-222222222222",
+      name: "Theirs",
+      kind: "player-character",
+      ownerSessionId: other
+    },
+    {
+      ...filled,
+      id: "33333333-3333-4333-8333-333333333333",
+      name: "Mine",
+      kind: "player-character",
+      ownerSessionId: me
+    }
   ]
 });
 
-const COMMON = ["id", "name", "kind", "visibility", "size", "sizeCells", "tokenAssetId", "conditions", "deathSaves", "hp", "effects", "claimStatus", "presence"];
+const COMMON = [
+  "id",
+  "name",
+  "kind",
+  "visibility",
+  "size",
+  "sizeCells",
+  "tokenAssetId",
+  "conditions",
+  "deathSaves",
+  "hp",
+  "effects",
+  "claimStatus",
+  "presence"
+];
 const PARTY = ["armorClass", "initiative", "speedFeet", "definitionId"];
-const OWNER = ["actionUses", "choiceOverrides", "hitDice", "spellSlots", "pactSlots", "preparedSpellIds", "inventory", "currency"];
+const OWNER = [
+  "actionUses",
+  "choiceOverrides",
+  "hitDice",
+  "spellSlots",
+  "pactSlots",
+  "preparedSpellIds",
+  "inventory",
+  "currency"
+];
 
 function keysOf(name: string, partyVisibility = "name-and-class") {
   const view = projectPlayerView({ ...state, partyVisibility } as typeof state, me, noPresence);
@@ -67,7 +102,8 @@ describe("player view actor fields", () => {
 
   it("never sends GM-only values", () => {
     const serialized = JSON.stringify(projectPlayerView(state, me, noPresence));
-    for (const secret of ["GM notes", "charmed", "resistancesPerDay", "lastUsedAt", other]) expect(serialized).not.toContain(secret);
+    for (const secret of ["GM notes", "charmed", "resistancesPerDay", "lastUsedAt", other])
+      expect(serialized).not.toContain(secret);
   });
 });
 
@@ -78,36 +114,97 @@ describe("player view pending prompts", () => {
     ...state,
     actors: [
       ...state.actors,
-      { id: hidden, name: "Vashkar", kind: "monster", visibility: "gm-only", hp: { current: 9, maximum: 9, temporary: 0 } }
+      {
+        id: hidden,
+        name: "Vashkar",
+        kind: "monster",
+        visibility: "gm-only",
+        hp: { current: 9, maximum: 9, temporary: 0 }
+      }
     ],
     combat: {
       ...state.combat,
-      pendingSaves: [{
-        id: "55555555-5555-4555-8555-555555555555", targetActorId: mine, ability: "con", dc: 14,
-        sourceActorId: hidden, sourceName: "Vashkar", actionName: "Grab", createdAt: 1,
-        endsEffects: [{ actorId: hidden, effectId: "concentration" }],
-        onFailEffect: { name: "Grappled by Vashkar", sourceActorId: hidden, sourceName: "Vashkar", linkedConditionIds: ["grappled"] }
-      }],
-      pendingReactions: [{
-        id: "66666666-6666-4666-8666-666666666666", actorId: mine, actionId: "shield", actionName: "Shield",
-        sourceActorId: hidden, sourceName: "Vashkar", triggerCommandId: "77777777-7777-4777-8777-777777777777", createdAt: 1
-      }],
-      pendingRuleAsks: [{
-        id: "88888888-8888-4888-8888-888888888888", actorId: mine, rule: "economy.not-your-turn", message: "Not your turn.",
-        command: { type: "action.resolve", payload: { targetIds: [hidden] } }, createdAt: "2026-01-01T00:00:00.000Z"
-      }]
+      pendingSaves: [
+        {
+          id: "55555555-5555-4555-8555-555555555555",
+          targetActorId: mine,
+          ability: "con",
+          dc: 14,
+          sourceActorId: hidden,
+          sourceName: "Vashkar",
+          actionName: "Grab",
+          createdAt: 1,
+          endsEffects: [{ actorId: hidden, effectId: "concentration" }],
+          onFailEffect: {
+            name: "Grappled by Vashkar",
+            sourceActorId: hidden,
+            sourceName: "Vashkar",
+            linkedConditionIds: ["grappled"]
+          }
+        }
+      ],
+      pendingReactions: [
+        {
+          id: "66666666-6666-4666-8666-666666666666",
+          actorId: mine,
+          actionId: "shield",
+          actionName: "Shield",
+          sourceActorId: hidden,
+          sourceName: "Vashkar",
+          triggerCommandId: "77777777-7777-4777-8777-777777777777",
+          createdAt: 1
+        }
+      ],
+      pendingRuleAsks: [
+        {
+          id: "88888888-8888-4888-8888-888888888888",
+          actorId: mine,
+          rule: "economy.not-your-turn",
+          message: "Not your turn.",
+          command: { type: "action.resolve", payload: { targetIds: [hidden] } },
+          createdAt: "2026-01-01T00:00:00.000Z"
+        }
+      ]
     }
   });
   const combat = projectPlayerView(prompts, me, noPresence).combat;
 
   it("sends only allow-listed fields", () => {
     expect(Object.keys(combat.pendingSaves[0]).sort()).toEqual(
-      ["id", "targetActorId", "ability", "dc", "actionName", "proposedDamage", "halfOnSuccess", "conditionId", "saveBonus", "createdAt", "sourceName", "onFailEffect"].sort()
+      [
+        "id",
+        "targetActorId",
+        "ability",
+        "dc",
+        "actionName",
+        "proposedDamage",
+        "halfOnSuccess",
+        "conditionId",
+        "saveBonus",
+        "createdAt",
+        "sourceName",
+        "onFailEffect"
+      ].sort()
     );
     expect(Object.keys(combat.pendingReactions[0]).sort()).toEqual(
-      ["id", "kind", "actorId", "actionId", "actionName", "targetActorId", "triggerCommandId", "proposedDamage", "proposedDamageParts", "critical", "createdAt", "sourceName"].sort()
+      [
+        "id",
+        "kind",
+        "actorId",
+        "actionId",
+        "actionName",
+        "targetActorId",
+        "triggerCommandId",
+        "proposedDamage",
+        "proposedDamageParts",
+        "critical",
+        "createdAt",
+        "sourceName"
+      ].sort()
     );
-    expect(Object.keys(combat.pendingRuleAsks[0]).sort()).toEqual(["id", "actorId", "rule", "family", "message", "createdAt"].sort());
+    expect(Object.keys(combat.pendingRuleAsks[0]).sort()).toEqual(
+      ["id", "actorId", "rule", "family", "message", "createdAt"].sort()
+    );
   });
 
   it("never names or identifies a hidden source", () => {

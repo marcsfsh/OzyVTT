@@ -19,7 +19,11 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     revealAuditApi: { get: (...a: unknown[]) => getAudit(...a) },
     codexApi: { ...actual.codexApi, revealPage: (...a: unknown[]) => revealPage(...a) },
-    atlasApi: { ...actual.atlasApi, revealMap: (...a: unknown[]) => revealMap(...a), revealMarker: (...a: unknown[]) => revealMarker(...a) },
+    atlasApi: {
+      ...actual.atlasApi,
+      revealMap: (...a: unknown[]) => revealMap(...a),
+      revealMarker: (...a: unknown[]) => revealMarker(...a)
+    },
     journalApi: { ...actual.journalApi, reveal: (...a: unknown[]) => revealEntry(...a) },
     sessionApi: { ...actual.sessionApi, reveal: (...a: unknown[]) => revealSession(...a) },
     questApi: { ...actual.questApi, reveal: (...a: unknown[]) => revealQuest(...a) },
@@ -30,12 +34,19 @@ vi.mock("./api", async (importOriginal) => {
 import { RevealAudit } from "./RevealAudit";
 import type { CodexJournalKind, CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "./api";
 
-
 const KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journal", "session", "quest", "standing"];
 
 /** `journalKind` is present-and-null on non-journal rows. */
-const section = (kind: CodexRevealAuditKind, rows: Array<{ id: string; title: string; journalKind?: CodexJournalKind }>, total = rows.length): CodexRevealAuditSection =>
-  ({ kind, revealed: rows.length, total, rows: rows.map((row) => ({ kind, journalKind: null, ...row })) });
+const section = (
+  kind: CodexRevealAuditKind,
+  rows: Array<{ id: string; title: string; journalKind?: CodexJournalKind }>,
+  total = rows.length
+): CodexRevealAuditSection => ({
+  kind,
+  revealed: rows.length,
+  total,
+  rows: rows.map((row) => ({ kind, journalKind: null, ...row }))
+});
 
 /** Derives the codex-wide totals the way the server does. */
 const answer = (sections: readonly CodexRevealAuditSection[]): CodexRevealAudit => ({
@@ -48,19 +59,26 @@ const answer = (sections: readonly CodexRevealAuditSection[]): CodexRevealAudit 
 const EMPTY: CodexRevealAudit = answer(KINDS.map((kind) => section(kind, [])));
 
 const AUDIT: CodexRevealAudit = answer([
-    section("page", [{ id: "p1", title: "Strahd" }], 12),
-    section("map", [{ id: "m1", title: "Barovia" }], 3),
-    section("marker", [{ id: "k1", title: "Vallaki" }], 8),
-    section("journal", [{ id: "j1", title: "The party crossed the mists." }], 40),
-    section("session", [{ id: "e1", title: "Session 4" }], 4),
-    section("quest", [{ id: "q1", title: "Find the Sunsword" }], 5),
-    // Addressed by the faction page id, which the standing reveal route takes.
-    section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
+  section("page", [{ id: "p1", title: "Strahd" }], 12),
+  section("map", [{ id: "m1", title: "Barovia" }], 3),
+  section("marker", [{ id: "k1", title: "Vallaki" }], 8),
+  section("journal", [{ id: "j1", title: "The party crossed the mists." }], 40),
+  section("session", [{ id: "e1", title: "Session 4" }], 4),
+  section("quest", [{ id: "q1", title: "Find the Sunsword" }], 5),
+  // Addressed by the faction page id, which the standing reveal route takes.
+  section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
 ]);
 
 /** A standing row shares its faction page's id, so the coupling guard is actually reachable. */
 const COUPLED: CodexRevealAudit = answer([
-  section("page", [{ id: "f1", title: "The Zhentarim" }, { id: "p1", title: "Strahd" }], 12),
+  section(
+    "page",
+    [
+      { id: "f1", title: "The Zhentarim" },
+      { id: "p1", title: "Strahd" }
+    ],
+    12
+  ),
   section("map", [], 3),
   section("marker", [], 8),
   section("journal", [], 40),
@@ -75,7 +93,8 @@ const renderAudit = async (audit: unknown = AUDIT) => {
   await waitFor(() => expect(getAudit).toHaveBeenCalled());
 };
 
-const sectionOf = (heading: string) => screen.getByRole("heading", { name: new RegExp(`^${heading}`) }).closest("section")!;
+const sectionOf = (heading: string) =>
+  screen.getByRole("heading", { name: new RegExp(`^${heading}`) }).closest("section")!;
 
 describe("The audit lists every Codex record type (CT-9)", () => {
   it("names all seven kinds and one record from each", async () => {
@@ -116,7 +135,11 @@ describe("Hiding a faction page takes the standing with it (D23)", () => {
     await user.click(pages.getByRole("switch", { name: "Show the page The Zhentarim to players" }));
 
     expect(await screen.findByRole("dialog", { name: "Hide this faction page" })).toBeInTheDocument();
-    expect(screen.getByText("Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Your standing with them stops being shown to players as well. A standing is only shown while its faction page is."
+      )
+    ).toBeInTheDocument();
     // The warning comes before the act.
     expect(revealPage).not.toHaveBeenCalled();
   });
@@ -125,13 +148,19 @@ describe("Hiding a faction page takes the standing with it (D23)", () => {
     const user = userEvent.setup();
     await renderAudit(COUPLED);
 
-    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+    await user.click(
+      within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" })
+    );
     await screen.findByRole("dialog", { name: "Hide this faction page" });
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument()
+    );
     expect(revealPage).not.toHaveBeenCalled();
-    expect(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" })).toBeChecked();
+    expect(
+      within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" })
+    ).toBeChecked();
   });
 
   it("Hide page proceeds through the page's own reveal route", async () => {
@@ -139,7 +168,9 @@ describe("Hiding a faction page takes the standing with it (D23)", () => {
     revealPage.mockResolvedValue(undefined);
     await renderAudit(COUPLED);
 
-    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+    await user.click(
+      within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" })
+    );
     await screen.findByRole("dialog", { name: "Hide this faction page" });
     await user.click(screen.getByRole("button", { name: "Hide page" }));
 
@@ -160,13 +191,19 @@ describe("Hiding a faction page takes the standing with it (D23)", () => {
 
 describe("A chronicle row says which kind of record it is", () => {
   it("badges the kind, in the chronicle's own words, beside the record's own prose", async () => {
-    await renderAudit(answer([
-      ...KINDS.filter((kind) => kind !== "journal").map((kind) => section(kind, [])),
-      section("journal", [
-        { id: "j1", title: "The duke's ultimatum expires.", journalKind: "deadline" },
-        { id: "j2", title: "The party crossed the mists.", journalKind: "note" }
-      ], 40)
-    ]));
+    await renderAudit(
+      answer([
+        ...KINDS.filter((kind) => kind !== "journal").map((kind) => section(kind, [])),
+        section(
+          "journal",
+          [
+            { id: "j1", title: "The duke's ultimatum expires.", journalKind: "deadline" },
+            { id: "j2", title: "The party crossed the mists.", journalKind: "note" }
+          ],
+          40
+        )
+      ])
+    );
 
     const chronicle = within(sectionOf("Journal entries"));
     // The timeline's own labels; `note` must cross to "Entry".
@@ -190,7 +227,12 @@ describe("A chronicle row says which kind of record it is", () => {
 describe("It aggregates; it does not decide (CT-9's stated risk)", () => {
   it("renders exactly what the server sent, with no predicate of its own", async () => {
     // Report the server's answer as given: `total` 8 with one row is legitimate (a pin on a hidden map).
-    await renderAudit(answer([...EMPTY.sections.filter((s) => s.kind !== "marker"), section("marker", [{ id: "k1", title: "Vallaki" }], 8)]));
+    await renderAudit(
+      answer([
+        ...EMPTY.sections.filter((s) => s.kind !== "marker"),
+        section("marker", [{ id: "k1", title: "Vallaki" }], 8)
+      ])
+    );
 
     expect(within(sectionOf("Map pins")).getByText("Vallaki")).toBeInTheDocument();
     expect(within(sectionOf("Map pins")).getByText("1 of 8 shared")).toBeInTheDocument();
@@ -210,7 +252,12 @@ describe("Un-revealing goes back out through each record's own route", () => {
     ["Pages", "Show the page Strahd to players", () => revealPage, ["gm", "p1", false]],
     ["Maps", "Show the map Barovia to players", () => revealMap, ["gm", "m1", false]],
     ["Map pins", "Show the pin Vallaki to players", () => revealMarker, ["gm", "k1", false]],
-    ["Journal entries", "Show the entry The party crossed the mists. to players", () => revealEntry, ["gm", "j1", false]],
+    [
+      "Journal entries",
+      "Show the entry The party crossed the mists. to players",
+      () => revealEntry,
+      ["gm", "j1", false]
+    ],
     ["Session recaps", "Show the recap for Session 4 to players", () => revealSession, ["gm", "e1", false]],
     ["Quests", "Show the quest Find the Sunsword to players", () => revealQuest, ["gm", "q1", false]],
     ["Faction standing", "Show standing with The Zhentarim to players", () => revealStanding, ["gm", "f1", false]]
@@ -232,7 +279,9 @@ describe("Nothing revealed and not loaded never look the same (CF-2)", () => {
   it("says what an EMPTY kind means, in that kind's own words", async () => {
     await renderAudit(EMPTY);
     expect(within(sectionOf("Pages")).getByText("No pages are shown to players.")).toBeInTheDocument();
-    expect(within(sectionOf("Faction standing")).getByText("No faction standing is shown to players.")).toBeInTheDocument();
+    expect(
+      within(sectionOf("Faction standing")).getByText("No faction standing is shown to players.")
+    ).toBeInTheDocument();
     expect(screen.getByText("0 records are shown to players across the Codex.")).toBeInTheDocument();
     expect(screen.queryByText(/This audit is incomplete/)).toBeNull();
   });
@@ -251,7 +300,11 @@ describe("Nothing revealed and not loaded never look the same (CF-2)", () => {
   it("does not claim anything at all while the first read is in flight", async () => {
     // Before the read settles, "nothing is revealed" is not a claim the screen may make.
     let release: (value: CodexRevealAudit) => void = () => {};
-    getAudit.mockReturnValue(new Promise<CodexRevealAudit>((resolve) => { release = resolve; }));
+    getAudit.mockReturnValue(
+      new Promise<CodexRevealAudit>((resolve) => {
+        release = resolve;
+      })
+    );
     render(<RevealAudit gmToken="gm" />);
 
     expect(screen.queryByText(/are shown to players across the Codex/)).toBeNull();

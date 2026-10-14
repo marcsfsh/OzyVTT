@@ -6,7 +6,10 @@ vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn()
 const forPage = vi.fn();
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
-  return { ...actual, journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), create: vi.fn() } };
+  return {
+    ...actual,
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), create: vi.fn() }
+  };
 });
 
 import { PageTimeline } from "./PageTimeline";
@@ -17,10 +20,26 @@ import type { CodexJournalEntry } from "./api";
  * players" ("GM only" is the content pill's wording).
  */
 const entry = (over: Partial<CodexJournalEntry>): CodexJournalEntry => ({
-  id: "j1", playerText: "", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null, payload: null,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "j1",
+  playerText: "",
+  gmText: null,
+  revealedToPlayers: false,
+  kind: "note",
+  attachMarkerId: null,
+  attachPageId: "p1",
+  sourceEncounterId: null,
+  payload: null,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const renderTimeline = async (entries: CodexJournalEntry[]) => {

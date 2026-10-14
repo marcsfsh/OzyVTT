@@ -19,27 +19,49 @@ import { ApplyDamageSchema } from "../../../server/src/game-commands";
 
 const ACTOR = {
   id: "10000000-0000-4000-8000-000000000001",
-  name: "Aria", kind: "player-character", visibility: "public",
+  name: "Aria",
+  kind: "player-character",
+  visibility: "public",
   hp: { current: 40, maximum: 40, temporary: 0 },
-  conditions: [], effects: []
+  conditions: [],
+  effects: []
 } as unknown as GmActor;
 
 type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
 const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
-const lastHpCall = () => emitted().filter(([event]) => event.startsWith("actor:apply-damage") || event === "actor:heal").at(-1)!;
+const lastHpCall = () =>
+  emitted()
+    .filter(([event]) => event.startsWith("actor:apply-damage") || event === "actor:heal")
+    .at(-1)!;
 
-const mount = () => render(<TokenContextMenu
-  actor={ACTOR} role="gm" gmToken="gm-token" x={20} y={20} reactionUsed={false} placed
-  onOpenSheet={() => {}} onReturnToTray={() => {}} onClose={() => {}} />);
+const mount = () =>
+  render(
+    <TokenContextMenu
+      actor={ACTOR}
+      role="gm"
+      gmToken="gm-token"
+      x={20}
+      y={20}
+      reactionUsed={false}
+      placed
+      onOpenSheet={() => {}}
+      onReturnToTray={() => {}}
+      onClose={() => {}}
+    />
+  );
 
 /** Pick a row out of the chooser's listbox by its visible label. */
 async function chooseType(user: ReturnType<typeof userEvent.setup>, label: string) {
   await user.click(screen.getByRole("combobox", { name: "Damage type" }));
-  await user.click(within(await screen.findByRole("listbox", { name: "Damage type" })).getByRole("option", { name: label }));
+  await user.click(
+    within(await screen.findByRole("listbox", { name: "Damage type" })).getByRole("option", { name: label })
+  );
 }
 
 describe("the manual damage entry's type chooser", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it("offers all thirteen SRD types and reads as Untyped until one is picked", async () => {
     const user = userEvent.setup();
@@ -103,7 +125,9 @@ describe("the manual damage entry's type chooser", () => {
  * than through `CharacterSheet`, which needs a definition fetch and a skill catalog.
  */
 describe("the sheet's HP box carries the type too", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   /** `said` collects the confirmation line. */
   const said: string[] = [];
@@ -163,22 +187,38 @@ describe("the sheet's HP box carries the type too", () => {
 const SECOND_ID = "10000000-0000-4000-8000-000000000002";
 const GM_STATE = ((): GmView => {
   // Parsed through the real schema so unrelated fields get their defaults and cannot drift.
-  const actor = (id: string, name: string) => ({ id, name, kind: "player-character", visibility: "public", hp: { current: 40, maximum: 40 } });
+  const actor = (id: string, name: string) => ({
+    id,
+    name,
+    kind: "player-character",
+    visibility: "public",
+    hp: { current: 40, maximum: 40 }
+  });
   const state = GameStateSchema.parse({
     schemaVersion: 1,
     revision: 12,
     actors: [actor(ACTOR.id, ACTOR.name), actor(SECOND_ID, "Borin")],
     combat: {
-      active: true, round: 1, turnActorId: ACTOR.id,
-      initiative: [{ actorId: ACTOR.id, score: 17 }, { actorId: SECOND_ID, score: 11 }],
-      tokens: [{ actorId: ACTOR.id, position: { x: 0, y: 0 }, sizePx: 50 }, { actorId: SECOND_ID, position: { x: 60, y: 0 }, sizePx: 50 }]
+      active: true,
+      round: 1,
+      turnActorId: ACTOR.id,
+      initiative: [
+        { actorId: ACTOR.id, score: 17 },
+        { actorId: SECOND_ID, score: 11 }
+      ],
+      tokens: [
+        { actorId: ACTOR.id, position: { x: 0, y: 0 }, sizePx: 50 },
+        { actorId: SECOND_ID, position: { x: 60, y: 0 }, sizePx: 50 }
+      ]
     }
   });
   return state as unknown as GmView;
 })();
 
 describe("the turn-order row's tools popover carries the type too", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   /** Opens a combatant's tools card, where the HP editor and its chooser live. */
   const openRowTools = async (user: ReturnType<typeof userEvent.setup>, name = "Aria") => {

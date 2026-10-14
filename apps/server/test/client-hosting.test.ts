@@ -3,7 +3,9 @@ import { developmentClientUrl } from "../src/client-hosting.js";
 
 describe("development client redirects", () => {
   it("preserves a LAN IPv4 host and requested path", () => {
-    expect(developmentClientUrl("192.168.1.42", "/encounter?view=player", 5173)).toBe("http://192.168.1.42:5173/encounter?view=player");
+    expect(developmentClientUrl("192.168.1.42", "/encounter?view=player", 5173)).toBe(
+      "http://192.168.1.42:5173/encounter?view=player"
+    );
   });
 
   it("formats an IPv6 host for a URL", () => {

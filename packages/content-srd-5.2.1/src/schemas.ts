@@ -9,9 +9,18 @@
 import { z } from "zod";
 import { AbilitySchema, ActorDefinitionSchema, ItemSlotSchema } from "@vtt/schemas";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, ContentIdSchema, ContentSourceSchema,
-  FeatReferenceSchema, FeatureUsesSchema, ITEM_REFUSED_MODIFIER_MESSAGE, ITEM_REFUSED_MODIFIER_TYPES,
-  SpeciesReferenceSchema, SpellListReferenceSchema, SubclassReferenceSchema, featureRiders
+  BackgroundReferenceSchema,
+  ClassReferenceSchema,
+  ContentIdSchema,
+  ContentSourceSchema,
+  FeatReferenceSchema,
+  FeatureUsesSchema,
+  ITEM_REFUSED_MODIFIER_MESSAGE,
+  ITEM_REFUSED_MODIFIER_TYPES,
+  SpeciesReferenceSchema,
+  SpellListReferenceSchema,
+  SubclassReferenceSchema,
+  featureRiders
 } from "./character-content.js";
 
 export * from "./character-content.js";
@@ -44,7 +53,13 @@ export const SpellReferenceSchema = z.object({
   castingTime: z.string().min(1).max(80),
   reactionCondition: z.string().max(400).nullable(),
   range: z.object({ distance: z.number().nullable(), unit: z.string().nullable(), text: z.string().nullable() }),
-  components: z.object({ verbal: z.boolean(), somatic: z.boolean(), material: z.boolean(), materialText: z.string().nullable(), materialConsumed: z.boolean() }),
+  components: z.object({
+    verbal: z.boolean(),
+    somatic: z.boolean(),
+    material: z.boolean(),
+    materialText: z.string().nullable(),
+    materialConsumed: z.boolean()
+  }),
   duration: z.string().min(1).max(120),
   concentration: z.boolean(),
   ritual: z.boolean(),
@@ -56,7 +71,14 @@ export const SpellReferenceSchema = z.object({
   classes: z.array(z.string()),
   description: z.string().min(1).max(20000),
   higherLevel: z.string().max(4000).nullable(),
-  castingOptions: z.array(z.object({ type: z.string(), damageRoll: z.string().nullable(), targetCount: z.number().int().nullable(), description: z.string().nullable() }))
+  castingOptions: z.array(
+    z.object({
+      type: z.string(),
+      damageRoll: z.string().nullable(),
+      targetCount: z.number().int().nullable(),
+      description: z.string().nullable()
+    })
+  )
 });
 export type SpellReference = z.infer<typeof SpellReferenceSchema>;
 
@@ -74,7 +96,15 @@ export const WeaponReferenceSchema = z.object({
   /** Closed: each mastery is an engine behaviour, so an unknown one would be inert. Optional for homebrew. */
   mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
   /** Open slugs, unlike `mastery`; matches `ItemWeaponSchema.properties`. Absent = not recorded, `[]` = none. */
-  properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
+  properties: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(40)
+    )
+    .max(12)
+    .optional()
 });
 export type WeaponReference = z.infer<typeof WeaponReferenceSchema>;
 export const WEAPON_MASTERY_IDS = z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).options;
@@ -108,26 +138,30 @@ export type ArmorReference = z.infer<typeof ArmorReferenceSchema>;
  * A spell an item can cast; becomes a synthesised action in `actionUses`, re-armed by rests.
  * "Once per day" is `uses: {limit: 1, per: "long-rest"}`.
  */
-export const ItemSpellCastSchema = z.object({
-  spellId: ContentIdSchema,
-  /** Cast at this slot level; absent = the spell's own level. */
-  atLevel: z.number().int().min(0).max(9).optional(),
-  /** Which ability powers it; absent = the wielder's own spellcasting ability. */
-  ability: AbilitySchema.optional(),
-  /** A flat printed DC ("save DC 15"), overriding any derivation. */
-  saveDc: z.number().int().min(1).max(40).optional(),
-  /** Charges. Share one pool across several casts with `uses.pool`. */
-  uses: FeatureUsesSchema.optional(),
-  /** Whether casting it also spends one of the bearer's own spell slots. */
-  consumesSpellSlot: z.boolean().default(false)
-}).strict();
+export const ItemSpellCastSchema = z
+  .object({
+    spellId: ContentIdSchema,
+    /** Cast at this slot level; absent = the spell's own level. */
+    atLevel: z.number().int().min(0).max(9).optional(),
+    /** Which ability powers it; absent = the wielder's own spellcasting ability. */
+    ability: AbilitySchema.optional(),
+    /** A flat printed DC ("save DC 15"), overriding any derivation. */
+    saveDc: z.number().int().min(1).max(40).optional(),
+    /** Charges. Share one pool across several casts with `uses.pool`. */
+    uses: FeatureUsesSchema.optional(),
+    /** Whether casting it also spends one of the bearer's own spell slots. */
+    consumesSpellSlot: z.boolean().default(false)
+  })
+  .strict();
 export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
 /** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
-export const ItemAttunementSchema = z.object({
-  required: z.boolean().default(false),
-  restrictedTo: z.array(ContentIdSchema).max(8).default([])
-}).strict();
+export const ItemAttunementSchema = z
+  .object({
+    required: z.boolean().default(false),
+    restrictedTo: z.array(ContentIdSchema).max(8).default([])
+  })
+  .strict();
 export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
 
 /**
@@ -144,7 +178,15 @@ const EquipmentWeaponStatsSchema = z.object({
   /** Optional here: gear and homebrew rows map through this shape and have no mastery. */
   mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
   /** Copied onto the inventory row, where `weaponPropertiesOf` reads it. */
-  properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
+  properties: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(40)
+    )
+    .max(12)
+    .optional()
 });
 
 /**
@@ -152,10 +194,20 @@ const EquipmentWeaponStatsSchema = z.object({
  * its resolved ids, computed at build or authoring time so the server's bind check is a membership
  * test.
  */
-export const ItemAppliesToSchema = z.object({
-  label: z.string().min(1).max(120),
-  baseIds: z.array(z.string().regex(/^[a-z0-9-]+$/).max(60)).min(1).max(40)
-}).strict();
+export const ItemAppliesToSchema = z
+  .object({
+    label: z.string().min(1).max(120),
+    baseIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .min(1)
+      .max(40)
+  })
+  .strict();
 export type ItemAppliesTo = z.infer<typeof ItemAppliesToSchema>;
 
 /**
@@ -166,52 +218,73 @@ export type ItemAppliesTo = z.infer<typeof ItemAppliesToSchema>;
  * Riders live here, never on the carried `InventoryItem` row: the owner receives their inventory
  * verbatim in their projection, so a rider there would reveal a cursed item's mechanics.
  */
-export const EquipmentReferenceSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
-  name: z.string().min(1).max(80),
-  source: ContentSourceSchema,
-  /** Open slug. The engine reads only "weapon", "armor" and "shield"; other categories need `slot` to derive AC or attacks. */
-  category: z.string().regex(/^[a-z0-9-]+$/).max(40),
-  costGp: z.number().nonnegative().max(1_000_000).nullable(),
-  weightLb: z.number().nonnegative().max(1000).nullable(),
-  /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. */
-  description: z.string().max(4000).nullable(),
-  weapon: EquipmentWeaponStatsSchema.nullable().optional(),
-  armor: z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).nullable().optional(),
+export const EquipmentReferenceSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    name: z.string().min(1).max(80),
+    source: ContentSourceSchema,
+    /** Open slug. The engine reads only "weapon", "armor" and "shield"; other categories need `slot` to derive AC or attacks. */
+    category: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40),
+    costGp: z.number().nonnegative().max(1_000_000).nullable(),
+    weightLb: z.number().nonnegative().max(1000).nullable(),
+    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. */
+    description: z.string().max(4000).nullable(),
+    weapon: EquipmentWeaponStatsSchema.nullable().optional(),
+    armor: z
+      .object({
+        acBase: z.number().int().min(2).max(25),
+        addDexModifier: z.boolean(),
+        dexModifierCap: z.number().int().nullable(),
+        stealthDisadvantage: z.boolean(),
+        strengthRequired: z.number().int().nullable()
+      })
+      .nullable()
+      .optional(),
 
-  // ---- the magic-item vocabulary ---------------------------------------------------------------
+    // ---- the magic-item vocabulary ---------------------------------------------------------------
 
-  /** Where it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
-  slot: ItemSlotSchema.optional(),
-  /** With no `weapon`/`armor` block this row is a template, deriving nothing until the player binds it to a base. */
-  appliesTo: ItemAppliesToSchema.nullable().optional(),
-  /** Display and filtering only ("uncommon", "legendary"). An open slug. */
-  rarity: ContentIdSchema.optional(),
-  isMagic: z.boolean().default(false),
-  attunement: ItemAttunementSchema.optional(),
-  /** Cannot be voluntarily removed once attuned; its magic is hidden from the player until attunement, and only until then. */
-  cursed: z.boolean().default(false),
-  casts: z.array(ItemSpellCastSchema).max(8).default([]),
-  /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
-  grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
+    /** Where it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
+    slot: ItemSlotSchema.optional(),
+    /** With no `weapon`/`armor` block this row is a template, deriving nothing until the player binds it to a base. */
+    appliesTo: ItemAppliesToSchema.nullable().optional(),
+    /** Display and filtering only ("uncommon", "legendary"). An open slug. */
+    rarity: ContentIdSchema.optional(),
+    isMagic: z.boolean().default(false),
+    attunement: ItemAttunementSchema.optional(),
+    /** Cannot be voluntarily removed once attuned; its magic is hidden from the player until attunement, and only until then. */
+    cursed: z.boolean().default(false),
+    casts: z.array(ItemSpellCastSchema).max(8).default([]),
+    /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
+    grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
-  /** The same rider block a feature, feat and chosen option carry, spread rather than restated. */
-  ...featureRiders
-}).strict().superRefine((item, context) => {
-  // Requiring attunement gives the hiding rule one boundary: hidden until attuned, visible after.
-  if (item.cursed && item.attunement?.required !== true) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom, path: ["cursed"],
-      message: "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
-    });
-  }
-  // Enforced on the item carrier only: the identical rider on a feat is valid.
-  item.modifiers.forEach((modifier, index) => {
-    if (ITEM_REFUSED_MODIFIER_TYPES.includes(modifier.type)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["modifiers", index, "type"], message: ITEM_REFUSED_MODIFIER_MESSAGE });
+    /** The same rider block a feature, feat and chosen option carry, spread rather than restated. */
+    ...featureRiders
+  })
+  .strict()
+  .superRefine((item, context) => {
+    // Requiring attunement gives the hiding rule one boundary: hidden until attuned, visible after.
+    if (item.cursed && item.attunement?.required !== true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cursed"],
+        message:
+          "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
+      });
     }
+    // Enforced on the item carrier only: the identical rider on a feat is valid.
+    item.modifiers.forEach((modifier, index) => {
+      if (ITEM_REFUSED_MODIFIER_TYPES.includes(modifier.type)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["modifiers", index, "type"],
+          message: ITEM_REFUSED_MODIFIER_MESSAGE
+        });
+      }
+    });
   });
-});
 export type EquipmentReference = z.infer<typeof EquipmentReferenceSchema>;
 
 export const RuleReferenceSchema = z.object({
@@ -228,14 +301,25 @@ export const ContentAttributionSchema = z.object({
   license: z.literal("CC-BY-4.0"),
   attribution: z.string().min(1),
   source: z.object({
-    name: z.string(), author: z.string(), publisher: z.string(), permalink: z.string(),
-    vendoredFrom: z.string(), retrieved: z.string()
+    name: z.string(),
+    author: z.string(),
+    publisher: z.string(),
+    permalink: z.string(),
+    vendoredFrom: z.string(),
+    retrieved: z.string()
   }),
   /** Further CC BY 4.0 transcriptions the bundles draw on, for provenance; `attribution` is what is owed. */
-  additionalSources: z.array(z.object({
-    name: z.string(), vendoredFrom: z.string(), commit: z.string(),
-    retrieved: z.string(), covers: z.string()
-  })).default([])
+  additionalSources: z
+    .array(
+      z.object({
+        name: z.string(),
+        vendoredFrom: z.string(),
+        commit: z.string(),
+        retrieved: z.string(),
+        covers: z.string()
+      })
+    )
+    .default([])
 });
 export type ContentAttribution = z.infer<typeof ContentAttributionSchema>;
 
@@ -245,23 +329,39 @@ export type SkillReference = z.infer<typeof SkillReferenceSchema>;
 
 /** A language. `table` is the SRD's standard/rare split, which choices narrow on. */
 export const LanguageReferenceSchema = ConditionReferenceSchema.extend({
-  table: z.string().regex(/^[a-z0-9-]+$/).max(40).default("standard")
+  table: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(40)
+    .default("standard")
 });
 export type LanguageReference = z.infer<typeof LanguageReferenceSchema>;
 
 /** The printed SRD 5.2.1 skill->ability table, used only when a bundle row omits its own `ability`. */
 export const SRD_SKILL_ABILITY: Readonly<Record<string, z.infer<typeof AbilityShortSchema>>> = Object.freeze({
   athletics: "str",
-  acrobatics: "dex", "sleight-of-hand": "dex", stealth: "dex",
-  arcana: "int", history: "int", investigation: "int", nature: "int", religion: "int",
-  "animal-handling": "wis", insight: "wis", medicine: "wis", perception: "wis", survival: "wis",
-  deception: "cha", intimidation: "cha", performance: "cha", persuasion: "cha"
+  acrobatics: "dex",
+  "sleight-of-hand": "dex",
+  stealth: "dex",
+  arcana: "int",
+  history: "int",
+  investigation: "int",
+  nature: "int",
+  religion: "int",
+  "animal-handling": "wis",
+  insight: "wis",
+  medicine: "wis",
+  perception: "wis",
+  survival: "wis",
+  deception: "cha",
+  intimidation: "cha",
+  performance: "cha",
+  persuasion: "cha"
 });
 
 /** The nine authorable homebrew types. The server's `HomebrewContentType` is checked against this with `satisfies`. */
 export type HomebrewBodyType =
-  | "class" | "subclass" | "species" | "background" | "feat"
-  | "spell" | "equipment" | "monster" | "spell-list";
+  "class" | "subclass" | "species" | "background" | "feat" | "spell" | "equipment" | "monster" | "spell-list";
 
 /**
  * Type -> body schema, shared by the publish validator (`apps/server/src/homebrew-validate.ts`),

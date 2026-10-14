@@ -31,30 +31,72 @@ const command = "50000000-0000-4000-8000-000000000001";
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 /** Borin's sheet, fire-resistant when the case needs it. Only the fields the damage maths reads. */
-const sheet = (damageResistances: readonly string[]) => ({
-  abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
-  damageResistances: [...damageResistances],
-  extensions: {}
-}) as unknown as ActorDefinition;
+const sheet = (damageResistances: readonly string[]) =>
+  ({
+    abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
+    damageResistances: [...damageResistances],
+    extensions: {}
+  }) as unknown as ActorDefinition;
 
 /**
  * A live fight with a 17-damage breath owed by Borin, as `action.resolve` would park it. `parts`
  * defaults to one fire component; with two, per-part halving stops matching `floor(total / 2)`.
  */
-function tableWith(options: Readonly<{ resistant: boolean; halfOnSuccess: boolean; parts?: ReadonlyArray<{ amount: number; type: string }> }>) {
-  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.dragon, name: "Dragon", kind: "monster", visibility: "public", hp: { current: 100, maximum: 100 } },
-    { id: IDS.borin, name: "Borin", kind: "player-character", visibility: "public", hp: { current: 40, maximum: 40 }, ownerSessionId: IDS.borinSession, definitionId: "borin-def" }
-  ] });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.dragon, score: 20 }, { actorId: IDS.borin, score: 12 }] }, () => 1, GEOMETRY);
+function tableWith(
+  options: Readonly<{
+    resistant: boolean;
+    halfOnSuccess: boolean;
+    parts?: ReadonlyArray<{ amount: number; type: string }>;
+  }>
+) {
+  const state = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: IDS.dragon, name: "Dragon", kind: "monster", visibility: "public", hp: { current: 100, maximum: 100 } },
+      {
+        id: IDS.borin,
+        name: "Borin",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        ownerSessionId: IDS.borinSession,
+        definitionId: "borin-def"
+      }
+    ]
+  });
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.dragon, score: 20 },
+        { actorId: IDS.borin, score: 12 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   createPendingSaves(state, {
-    sourceActorId: IDS.dragon, sourceName: "Dragon", actionName: "Fire Breath", ability: "dex", dc: 15,
-    targetIds: [IDS.borin], proposedDamage: 17, proposedDamageParts: [...(options.parts ?? [{ amount: 17, type: "fire" }])],
-    halfOnSuccess: options.halfOnSuccess, conditionId: null, newSaveId: () => IDS.save, createdAt: 0
+    sourceActorId: IDS.dragon,
+    sourceName: "Dragon",
+    actionName: "Fire Breath",
+    ability: "dex",
+    dc: 15,
+    targetIds: [IDS.borin],
+    proposedDamage: 17,
+    proposedDamageParts: [...(options.parts ?? [{ amount: 17, type: "fire" }])],
+    halfOnSuccess: options.halfOnSuccess,
+    conditionId: null,
+    newSaveId: () => IDS.save,
+    createdAt: 0
   });
   const definition = sheet(options.resistant ? ["fire"] : []);
   const deps = (role: "gm" | "player", sessionId: string): SaveAnswerDependencies => ({
-    random: () => 1, newRollId: () => IDS.roll, sessionId, role, now: () => "2026-08-10T00:00:00.000Z",
+    random: () => 1,
+    newRollId: () => IDS.roll,
+    sessionId,
+    role,
+    now: () => "2026-08-10T00:00:00.000Z",
     resolveDefinition: (id) => (id === "borin-def" ? definition : undefined)
   });
   const hp = () => state.actors.find((actor) => actor.id === IDS.borin)!.hp.current;
@@ -73,15 +115,30 @@ function answerFromThePrompt(
   commit = true
 ) {
   const payload = saveAnswerPayload({
-    commandId: command, saveId: IDS.save, method: "manual", commit, total: rolledTotal,
+    commandId: command,
+    saveId: IDS.save,
+    method: "manual",
+    commit,
+    total: rolledTotal,
     ...(saveDamageAmend(17, typedDamage) !== undefined ? { damageOverride: saveDamageAmend(17, typedDamage) } : {})
   });
   const request = SaveAnswerSchema.parse(payload);
   const scope = who.role === "gm" ? { role: "gm" as const } : { role: "player" as const, sessionId: who.sessionId };
   return {
     payload,
-    ...answerSave(table.state, request.commandId, request.saveId, request.method, request.total, request.commit, scope,
-      table.deps(who.role, who.sessionId), request.legendaryResistance, request.rollMode, request.damageOverride)
+    ...answerSave(
+      table.state,
+      request.commandId,
+      request.saveId,
+      request.method,
+      request.total,
+      request.commit,
+      scope,
+      table.deps(who.role, who.sessionId),
+      request.legendaryResistance,
+      request.rollMode,
+      request.damageOverride
+    )
   };
 }
 
@@ -102,7 +159,9 @@ describe("the save prompt's damage field", () => {
     const before = table.hp();
     const { outcome } = answerFromThePrompt(table, "12", 5);
     expect(before - table.hp()).toBe(6);
-    expect(outcome.parts).toEqual([{ amount: 12, type: "fire", adjusted: 6, adjustment: "resistance", adjustmentSource: null }]);
+    expect(outcome.parts).toEqual([
+      { amount: 12, type: "fire", adjusted: 6, adjustment: "resistance", adjustmentSource: null }
+    ]);
   });
 
   it("halves the amend ONCE on a successful half-on-success save - 12 typed lands as 6, not 3", () => {
@@ -155,7 +214,14 @@ describe("the save prompt's damage field", () => {
   it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {
     // 9 fire + 8 cold: `rescaleDamageParts` re-weights 12 as 7 + 5 and the success halving floors each
     // part (3 + 2 = 5), while `floor(12 / 2)` is 6. `save-damage.test.tsx` renders this fixture.
-    const table = tableWith({ resistant: false, halfOnSuccess: true, parts: [{ amount: 9, type: "fire" }, { amount: 8, type: "cold" }] });
+    const table = tableWith({
+      resistant: false,
+      halfOnSuccess: true,
+      parts: [
+        { amount: 9, type: "fire" },
+        { amount: 8, type: "cold" }
+      ]
+    });
     const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
     expect(outcome.appliedDamage).toBe(5);
     expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's halving").not.toBe(5);
@@ -217,15 +283,32 @@ describe("the save prompt's damage field", () => {
     // Assert the message, not the path: `save.answer` surfaces `issues[0].message` verbatim
     // (`preferIssueMessage`, game-operations.ts).
     for (const typed of ["9999", "1001"]) {
-      const refusal = SaveAnswerSchema.safeParse(saveAnswerPayload({
-        commandId: command, saveId: IDS.save, method: "manual", commit: true, total: 5,
-        damageOverride: saveDamageAmend(17, typed)
-      }));
+      const refusal = SaveAnswerSchema.safeParse(
+        saveAnswerPayload({
+          commandId: command,
+          saveId: IDS.save,
+          method: "manual",
+          commit: true,
+          total: 5,
+          damageOverride: saveDamageAmend(17, typed)
+        })
+      );
       expect(refusal.success, `${typed} was accepted`).toBe(false);
       expect(refusal.error!.issues[0].message).toBe("Enter the damage as a whole number from 0 to 1000.");
     }
     // 1000 is inside the bound, so the sentence is a refusal and not a wall.
-    expect(SaveAnswerSchema.safeParse(saveAnswerPayload({ commandId: command, saveId: IDS.save, method: "manual", commit: true, total: 5, damageOverride: 1000 })).success).toBe(true);
+    expect(
+      SaveAnswerSchema.safeParse(
+        saveAnswerPayload({
+          commandId: command,
+          saveId: IDS.save,
+          method: "manual",
+          commit: true,
+          total: 5,
+          damageOverride: 1000
+        })
+      ).success
+    ).toBe(true);
 
     expect(() => answerFromThePrompt(table, "9999", 5)).toThrow();
     expect(table.hp()).toBe(40);

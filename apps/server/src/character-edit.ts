@@ -9,7 +9,8 @@ function editableDefinition(state: GameState, actorId: string): { definitionId: 
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (actor.kind !== "player-character") throw new CommandRejectedError("Only player characters can be edited here.");
   const definitionId = actor.definitionId;
-  if (!definitionId || !definitionId.startsWith("import-")) throw new CommandRejectedError("This character has no editable sheet - import one first.");
+  if (!definitionId || !definitionId.startsWith("import-"))
+    throw new CommandRejectedError("This character has no editable sheet - import one first.");
   const entry = state.definitions.find((candidate) => candidate.id === definitionId);
   if (!entry) throw new CommandRejectedError("This character's sheet is missing.");
   return { definitionId, definition: entry.definition };
@@ -18,7 +19,9 @@ function editableDefinition(state: GameState, actorId: string): { definitionId: 
 /** Persists an edited definition, re-validated through the schema so the stored sheet stays canonical. */
 function replaceDefinition(state: GameState, definitionId: string, next: ActorDefinition): void {
   const parsed = ActorDefinitionSchema.parse(next);
-  state.definitions = state.definitions.map((entry) => entry.id === definitionId ? { id: entry.id, definition: parsed } : entry);
+  state.definitions = state.definitions.map((entry) =>
+    entry.id === definitionId ? { id: entry.id, definition: parsed } : entry
+  );
 }
 
 /**
@@ -59,16 +62,25 @@ export function setCharacterIdentity(state: GameState, actorId: string, characte
   const { definitionId, definition } = editableDefinition(state, actorId);
   // The table's level cap applies here too, or the free-text identity editor bypasses it. Summed across classes.
   const requested = (character?.classes ?? []).reduce((total, row) => total + row.level, 0);
-  if (requested > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
+  if (requested > state.builderPolicy.maxLevel)
+    throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
   const stored = definition.character;
   const merged = carryForwardOmitted(stored, character);
-  const next = merged !== undefined && stored !== undefined
-    ? { ...merged, classes: mergeClassRows(stored.classes, merged.classes) }
-    : merged;
+  const next =
+    merged !== undefined && stored !== undefined
+      ? { ...merged, classes: mergeClassRows(stored.classes, merged.classes) }
+      : merged;
   replaceDefinition(state, definitionId, { ...definition, character: next });
 }
 
-export function setCharacterProficiencies(state: GameState, actorId: string, proficiencies: ActorDefinition["proficiencies"]): void {
+export function setCharacterProficiencies(
+  state: GameState,
+  actorId: string,
+  proficiencies: ActorDefinition["proficiencies"]
+): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
-  replaceDefinition(state, definitionId, { ...definition, proficiencies: carryForwardOmitted(definition.proficiencies, proficiencies) });
+  replaceDefinition(state, definitionId, {
+    ...definition,
+    proficiencies: carryForwardOmitted(definition.proficiencies, proficiencies)
+  });
 }

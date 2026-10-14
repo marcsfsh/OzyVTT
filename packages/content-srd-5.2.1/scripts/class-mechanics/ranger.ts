@@ -34,25 +34,31 @@ export const ranger: ClassMechanicsModule = {
     // Uses equal the Wisdom modifier (minimum 1). The temporary HP and the Exhaustion decrease stay prose.
     tireless: {
       uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
-      actions: [{
-        id: "tireless",
-        name: "Tireless",
-        activation: "action",
-        description: "As a Magic action, you give yourself Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1.",
-        damage: []
-      }]
+      actions: [
+        {
+          id: "tireless",
+          name: "Tireless",
+          activation: "action",
+          description:
+            "As a Magic action, you give yourself Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1.",
+          damage: []
+        }
+      ]
     },
 
     // The activation and counter only; effects cannot apply the Invisible condition.
     "natures-veil": {
       uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
-      actions: [{
-        id: "natures-veil",
-        name: "Nature's Veil",
-        activation: "bonus-action",
-        description: "You invoke spirits of nature to magically hide yourself, giving yourself the Invisible condition until the end of your next turn.",
-        damage: []
-      }]
+      actions: [
+        {
+          id: "natures-veil",
+          name: "Nature's Veil",
+          activation: "bonus-action",
+          description:
+            "You invoke spirits of nature to magically hide yourself, giving yourself the Invisible condition until the end of your next turn.",
+          damage: []
+        }
+      ]
     },
 
     // Display-only: senses are not modeled on `ActorDefinition` yet.
@@ -70,13 +76,18 @@ export const ranger: ClassMechanicsModule = {
      */
     "fighting-style": {
       choice: {
-        kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats",
-        options: [{
-          id: "druidic-warrior",
-          name: "Druidic Warrior",
-          description: "You learn two Druid cantrips of your choice. Wisdom is your spellcasting ability for them. Whenever you gain a Ranger level, you can replace one of these cantrips with another Druid cantrip.",
-          choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 }
-        }]
+        kind: "fighting-style",
+        choose: 1,
+        fromCatalog: "fighting-style-feats",
+        options: [
+          {
+            id: "druidic-warrior",
+            name: "Druidic Warrior",
+            description:
+              "You learn two Druid cantrips of your choice. Wisdom is your spellcasting ability for them. Whenever you gain a Ranger level, you can replace one of these cantrips with another Druid cantrip.",
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 }
+          }
+        ]
       }
     }
   },
@@ -89,17 +100,20 @@ export const ranger: ClassMechanicsModule = {
        */
       "hunters-prey": {
         choice: {
-          kind: "hunters-prey", choose: 1,
+          kind: "hunters-prey",
+          choose: 1,
           options: [
             {
               id: "colossus-slayer",
               name: "Colossus Slayer",
-              description: "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
+              description:
+                "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
             },
             {
               id: "horde-breaker",
               name: "Horde Breaker",
-              description: "Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn."
+              description:
+                "Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn."
             }
           ]
         }
@@ -109,7 +123,8 @@ export const ranger: ClassMechanicsModule = {
       // are never announced by the resolver.
       "defensive-tactics": {
         choice: {
-          kind: "defensive-tactics", choose: 1,
+          kind: "defensive-tactics",
+          choose: 1,
           options: [
             {
               id: "escape-the-horde",
@@ -119,7 +134,8 @@ export const ranger: ClassMechanicsModule = {
             {
               id: "multiattack-defense",
               name: "Multiattack Defense",
-              description: "When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn."
+              description:
+                "When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn."
             }
           ]
         }

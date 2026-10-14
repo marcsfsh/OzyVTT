@@ -2,16 +2,51 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Drawer, IconButton, Kbd, Modal, useToast } from "@vtt/ui";
 import { socket } from "../socket";
 import {
-  atlasApi, calendarApi, codexApi, journalApi, questApi, sessionApi, standingApi,
+  atlasApi,
+  calendarApi,
+  codexApi,
+  journalApi,
+  questApi,
+  sessionApi,
+  standingApi,
   AUTOSAVE_DEFAULT,
-  type CodexChronicleRecord, type CodexConnection, type CodexMap, type CodexMarker, type CodexPage,
-  type CodexPageSummary, type CodexQuest, type CodexSession, type CodexSettings, type CodexStanding,
+  type CodexChronicleRecord,
+  type CodexConnection,
+  type CodexMap,
+  type CodexMarker,
+  type CodexPage,
+  type CodexPageSummary,
+  type CodexQuest,
+  type CodexSession,
+  type CodexSettings,
+  type CodexStanding,
   type GmCodexCalendar
 } from "./api";
-import { navigate, replaceQuery, pushTransient, popTransient, discardTransient, releaseStrandedEntry, useRoute } from "../router";
 import {
-  CODEX_ROOT, GM_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath,
-  pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath, graphPath, type CodexSection
+  navigate,
+  replaceQuery,
+  pushTransient,
+  popTransient,
+  discardTransient,
+  releaseStrandedEntry,
+  useRoute
+} from "../router";
+import {
+  CODEX_ROOT,
+  GM_SIDEBAR,
+  SECTION_TITLE,
+  atlasPath,
+  codexSectionOf,
+  journalEntryPath,
+  pagePath,
+  pathForHit,
+  pathForSection,
+  questPath,
+  recordIdOf,
+  sessionPath,
+  tagPath,
+  graphPath,
+  type CodexSection
 } from "./routes";
 import { SidebarCollapseToggle, SidebarNav } from "./SidebarNav";
 import { useSidebarRailBand } from "./useSidebarRail";
@@ -53,7 +88,14 @@ type WorkspaceScene = Readonly<{ id: string; name: string }>;
 /** `archived` and `kind` are optional; the character pickers read them (see `characters.ts`). */
 type WorkspaceActor = Readonly<{ id: string; name: string; archived?: boolean; kind?: string }>;
 
-export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {}, onOpenReplay }: Readonly<{
+export function CodexShell({
+  gmToken,
+  scenes = [],
+  actors = [],
+  activeSceneId = null,
+  onActivateScene = () => {},
+  onOpenReplay
+}: Readonly<{
   gmToken: string;
   scenes?: readonly WorkspaceScene[];
   actors?: readonly WorkspaceActor[];
@@ -76,9 +118,19 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
 
   // ----- Sidebar state: expanded / rail / drawer -----
   const [sidebarMode, setSidebarMode] = useState<"open" | "rail">(() => {
-    try { return localStorage.getItem(SIDEBAR_KEY) === "rail" ? "rail" : "open"; } catch { return "open"; }
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "rail" ? "rail" : "open";
+    } catch {
+      return "open";
+    }
   });
-  useEffect(() => { try { localStorage.setItem(SIDEBAR_KEY, sidebarMode); } catch { /* private mode - fine */ } }, [sidebarMode]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, sidebarMode);
+    } catch {
+      /* private mode - fine */
+    }
+  }, [sidebarMode]);
   /** 761-849px forces the rail (a 56px track). The stored preference is untouched and returns outside the band. */
   const railBand = useSidebarRailBand();
   const collapsed = railBand || sidebarMode === "rail";
@@ -88,12 +140,25 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     // The Android back gesture closes the drawer instead of leaving the section.
     pushTransient(DRAWER_TRANSIENT, () => setDrawerOpen(false));
   }, []);
-  const closeDrawer = useCallback(() => { setDrawerOpen(false); popTransient(DRAWER_TRANSIENT); }, []);
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    popTransient(DRAWER_TRANSIENT);
+  }, []);
 
   const [consoleOpen, setConsoleOpen] = useState(() => {
-    try { return localStorage.getItem(CONSOLE_KEY) === "open"; } catch { return false; }
+    try {
+      return localStorage.getItem(CONSOLE_KEY) === "open";
+    } catch {
+      return false;
+    }
   });
-  useEffect(() => { try { localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed"); } catch { /* private mode - fine */ } }, [consoleOpen]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed");
+    } catch {
+      /* private mode - fine */
+    }
+  }, [consoleOpen]);
 
   // ----- Feeds, one owner each -----
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -110,11 +175,19 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
         codexApi.listFolders(gmToken).catch(() => []),
         codexApi.listConnections(gmToken)
       ]);
-      setPages(nextPages); setFolders(nextFolders); setConnections(nextConnections); setError(null);
-    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
-    finally { setLoading(false); }
+      setPages(nextPages);
+      setFolders(nextFolders);
+      setConnections(nextConnections);
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load the codex.");
+    } finally {
+      setLoading(false);
+    }
   }, [gmToken]);
-  useEffect(() => { void refreshList(); }, [refreshList]);
+  useEffect(() => {
+    void refreshList();
+  }, [refreshList]);
 
   const [sessions, setSessions] = useState<readonly CodexSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -123,80 +196,146 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   const loadSessions = useCallback(async () => {
     try {
       const data = await sessionApi.list(gmToken);
-      setSessions(data.sessions); setActiveSessionId(data.activeSessionId); setSessionsError(null);
-    } catch (loadError) { setSessionsError(loadError instanceof Error ? loadError.message : "Could not load the sessions."); }
-    finally { setSessionsLoading(false); }
+      setSessions(data.sessions);
+      setActiveSessionId(data.activeSessionId);
+      setSessionsError(null);
+    } catch (loadError) {
+      setSessionsError(loadError instanceof Error ? loadError.message : "Could not load the sessions.");
+    } finally {
+      setSessionsLoading(false);
+    }
   }, [gmToken]);
-  useEffect(() => { void loadSessions(); }, [loadSessions]);
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
 
   const [quests, setQuests] = useState<readonly CodexQuest[]>([]);
   const [questsLoading, setQuestsLoading] = useState(true);
   const [questsError, setQuestsError] = useState<string | null>(null);
   const loadQuests = useCallback(async () => {
-    try { setQuests(await questApi.list(gmToken)); setQuestsError(null); }
-    catch (loadError) { setQuestsError(loadError instanceof Error ? loadError.message : "Could not load the quests."); }
-    finally { setQuestsLoading(false); }
+    try {
+      setQuests(await questApi.list(gmToken));
+      setQuestsError(null);
+    } catch (loadError) {
+      setQuestsError(loadError instanceof Error ? loadError.message : "Could not load the quests.");
+    } finally {
+      setQuestsLoading(false);
+    }
   }, [gmToken]);
-  useEffect(() => { void loadQuests(); }, [loadQuests]);
+  useEffect(() => {
+    void loadQuests();
+  }, [loadQuests]);
 
   /** The autosave preference, read once here and handed to every editor so they share one cadence. */
   const [settings, setSettings] = useState<CodexSettings | null>(null);
   const loadSettings = useCallback(async () => {
-    try { setSettings(await codexApi.getSettings(gmToken)); } catch { /* the editors fall back to the default cadence */ }
+    try {
+      setSettings(await codexApi.getSettings(gmToken));
+    } catch {
+      /* the editors fall back to the default cadence */
+    }
   }, [gmToken]);
-  useEffect(() => { void loadSettings(); }, [loadSettings]);
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
   const autosave = settings?.autosave ?? AUTOSAVE_DEFAULT;
 
   /**
    * The campaign feed (chronicle, maps, calendar, standing, party pin). Loaded lazily, only for the
    * sections that read it.
    */
-  const [campaign, setCampaign] = useState<{ records: readonly CodexChronicleRecord[]; maps: readonly CodexMap[]; calendar: GmCodexCalendar | null; party: { marker: CodexMarker; mapName: string } | null }>({ records: [], maps: [], calendar: null, party: null });
+  const [campaign, setCampaign] = useState<{
+    records: readonly CodexChronicleRecord[];
+    maps: readonly CodexMap[];
+    calendar: GmCodexCalendar | null;
+    party: { marker: CodexMarker; mapName: string } | null;
+  }>({ records: [], maps: [], calendar: null, party: null });
   const [standing, setStanding] = useState<readonly CodexStanding[]>([]);
   const [campaignLoading, setCampaignLoading] = useState(true);
   const [campaignError, setCampaignError] = useState<string | null>(null);
   const loadCampaign = useCallback(async () => {
     try {
       const [records, maps, calendar, nextStanding, party] = await Promise.all([
-        journalApi.chronicle(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken), standingApi.list(gmToken),
+        journalApi.chronicle(gmToken),
+        atlasApi.listMaps(gmToken),
+        calendarApi.get(gmToken),
+        standingApi.list(gmToken),
         // Not caught separately: a silently missing card is worse than the shared error Alert.
         codexApi.party(gmToken)
       ]);
-      setCampaign({ records, maps, calendar, party }); setStanding(nextStanding); setCampaignError(null);
-    } catch (loadError) { setCampaignError(loadError instanceof Error ? loadError.message : "Could not load the campaign dashboard."); }
-    finally { setCampaignLoading(false); }
+      setCampaign({ records, maps, calendar, party });
+      setStanding(nextStanding);
+      setCampaignError(null);
+    } catch (loadError) {
+      setCampaignError(loadError instanceof Error ? loadError.message : "Could not load the campaign dashboard.");
+    } finally {
+      setCampaignLoading(false);
+    }
   }, [gmToken]);
   const needsCampaign = section === "home" || section === "calendar" || section === "downtime" || section === "tags";
   useEffect(() => {
     if (!needsCampaign) return;
     void loadCampaign();
-    const onChanged = () => { void loadCampaign(); };
+    const onChanged = () => {
+      void loadCampaign();
+    };
     socket.on("codex:changed", onChanged);
-    return () => { socket.off("codex:changed", onChanged); };
+    return () => {
+      socket.off("codex:changed", onChanged);
+    };
   }, [needsCampaign, loadCampaign]);
 
   // Any codex write pings every client.
   useEffect(() => {
-    const onChanged = () => { void refreshList(); void loadSessions(); void loadQuests(); };
+    const onChanged = () => {
+      void refreshList();
+      void loadSessions();
+      void loadQuests();
+    };
     socket.on("codex:changed", onChanged);
-    return () => { socket.off("codex:changed", onChanged); };
+    return () => {
+      socket.off("codex:changed", onChanged);
+    };
   }, [refreshList, loadSessions, loadQuests]);
 
   // Cmd/Ctrl-K opens the palette. Codex-scoped by design, so the shortcut leaves with the section.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); } };
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const onPageChanged = useCallback((page: CodexPage) => {
-    setPages((prev) => prev.map((row) => (row.id === page.id ? { ...row, title: page.title, folder: page.folder, tags: page.tags, entityType: page.entityType, revealedToPlayers: page.revealedToPlayers, rev: page.rev, updatedAt: page.updatedAt } : row)));
+    setPages((prev) =>
+      prev.map((row) =>
+        row.id === page.id
+          ? {
+              ...row,
+              title: page.title,
+              folder: page.folder,
+              tags: page.tags,
+              entityType: page.entityType,
+              revealedToPlayers: page.revealedToPlayers,
+              rev: page.rev,
+              updatedAt: page.updatedAt
+            }
+          : row
+      )
+    );
   }, []);
 
   const openPlayerPreview = useCallback(async () => {
     setPreviewError(null);
-    try { setPreviewToken(await codexApi.createPreviewSession(gmToken)); }
-    catch (previewFailure) { setPreviewError(previewFailure instanceof Error ? previewFailure.message : "Couldn't open the player preview."); }
+    try {
+      setPreviewToken(await codexApi.createPreviewSession(gmToken));
+    } catch (previewFailure) {
+      setPreviewError(previewFailure instanceof Error ? previewFailure.message : "Couldn't open the player preview.");
+    }
   }, [gmToken]);
 
   /**
@@ -215,7 +354,10 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   /** A list's filters are part of its address, so a filtered list is linkable and survives a refresh. */
   const setListFilter = useCallback((next: Readonly<Record<string, string | null>>) => {
     replaceQuery((query) => {
-      for (const [key, value] of Object.entries(next)) { if (value) query.set(key, value); else query.delete(key); }
+      for (const [key, value] of Object.entries(next)) {
+        if (value) query.set(key, value);
+        else query.delete(key);
+      }
     });
   }, []);
 
@@ -228,21 +370,30 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
       const session = await createSession(gmToken, sessions);
       await loadSessions();
       void navigate(sessionPath(session.id));
-    } catch (createError) { setError(createError instanceof Error ? createError.message : "Couldn't create the session."); }
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Couldn't create the session.");
+    }
   }, [gmToken, sessions, loadSessions]);
   const newQuest = useCallback(async () => {
     try {
       const quest = await createQuest(gmToken);
       await loadQuests();
       void navigate(questPath(quest.id));
-    } catch (createError) { setError(createError instanceof Error ? createError.message : "Couldn't create the quest."); }
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Couldn't create the quest.");
+    }
   }, [gmToken, loadQuests]);
 
   const standingRows = useMemo(() => {
     const byFaction = new Map(standing.map((row) => [row.factionPageId, row.value]));
     return pages
       .filter((page) => page.entityType === "faction" || byFaction.has(page.id))
-      .map((page) => ({ factionPageId: page.id, name: page.title, value: byFaction.get(page.id) ?? 0, revealed: page.revealedToPlayers }));
+      .map((page) => ({
+        factionPageId: page.id,
+        name: page.title,
+        value: byFaction.get(page.id) ?? 0,
+        revealed: page.revealedToPlayers
+      }));
   }, [pages, standing]);
   const adjustingFaction = useMemo(() => {
     if (!adjustingFactionId) return null;
@@ -257,11 +408,25 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   );
 
   const sidebarHeader = (
-    <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K"
+    <button
+      type="button"
+      className="codex-sidebar-search"
+      onClick={() => {
+        closeDrawer();
+        setPaletteOpen(true);
+      }}
+      aria-keyshortcuts="Meta+K Control+K"
       /* Collapsed, the glyph is the whole button, so it needs an accessible name. */
-      title={collapsed ? "Search" : undefined} aria-label={collapsed ? "Search" : undefined}>
+      title={collapsed ? "Search" : undefined}
+      aria-label={collapsed ? "Search" : undefined}
+    >
       <CodexIcon iconId="search" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
-      {!collapsed && <><span className="codex-navitem-label">Search</span><Kbd>⌘K</Kbd></>}
+      {!collapsed && (
+        <>
+          <span className="codex-navitem-label">Search</span>
+          <Kbd>⌘K</Kbd>
+        </>
+      )}
     </button>
   );
 
@@ -271,13 +436,23 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
       activePath={route.path}
       collapsed={asRail}
       onNavigate={goto}
-      onAction={() => { closeDrawer(); void openPlayerPreview(); }}
+      onAction={() => {
+        closeDrawer();
+        void openPlayerPreview();
+      }}
       header={sidebarHeader}
       /**
        * Gate on `railBand`, never `collapsed`: otherwise collapsing hides the only control that expands.
        * In the forced band there is nothing to expand into. The phone drawer is always expanded.
        */
-      footer={railBand || drawerOpen ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />}
+      footer={
+        railBand || drawerOpen ? undefined : (
+          <SidebarCollapseToggle
+            collapsed={sidebarMode === "rail"}
+            onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))}
+          />
+        )
+      }
     />
   );
 
@@ -302,11 +477,22 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
               <CodexIcon iconId="search" className="codex-navitem-icon" />
             </IconButton>
             {/* The session prep drawer, reachable from every section. */}
-            <Button variant="ghost" size="sm" aria-expanded={consoleOpen} onClick={() => setConsoleOpen((open) => !open)}>Session prep</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={consoleOpen}
+              onClick={() => setConsoleOpen((open) => !open)}
+            >
+              Session prep
+            </Button>
           </div>
         </div>
 
-        {error && <Alert tone="danger" title="Couldn't load the Codex">{error}</Alert>}
+        {error && (
+          <Alert tone="danger" title="Couldn't load the Codex">
+            {error}
+          </Alert>
+        )}
         {previewError && <Alert tone="danger">{previewError}</Alert>}
 
         {/* The one scroll region. */}
@@ -315,18 +501,38 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
 
           {section === "home" && (
             <CampaignHome
-              pages={pages} entries={dash.entries} maps={campaign.maps} today={dash.today}
-              loading={loading || campaignLoading} error={campaignError}
+              pages={pages}
+              entries={dash.entries}
+              maps={campaign.maps}
+              today={dash.today}
+              loading={loading || campaignLoading}
+              error={campaignError}
               session={dash.nextSession(sessions, activeSessionId)}
               onOpenSession={(sessionId) => navigate(sessionPath(sessionId))}
-              quests={quests.map((quest) => ({ id: quest.id, title: quest.title, status: quest.status, objectives: quest.objectives, revealed: quest.revealedToPlayers }))}
+              quests={quests.map((quest) => ({
+                id: quest.id,
+                title: quest.title,
+                status: quest.status,
+                objectives: quest.objectives,
+                revealed: quest.revealedToPlayers
+              }))}
               onOpenQuest={(questId) => navigate(questPath(questId))}
               deadlines={dash.deadlines}
               downtimePending={dash.downtimePending}
               onOpenDowntime={() => navigate(pathForSection("downtime"))}
               /* The pin's own reveal flag, not a computed visibility: the map gates it too, and the Atlas
                  is where that switch lives. */
-              party={campaign.party ? { label: campaign.party.marker.label, mapId: campaign.party.marker.mapId, mapName: campaign.party.mapName, markerId: campaign.party.marker.id, revealed: campaign.party.marker.revealedToPlayers } : null}
+              party={
+                campaign.party
+                  ? {
+                      label: campaign.party.marker.label,
+                      mapId: campaign.party.marker.mapId,
+                      mapName: campaign.party.mapName,
+                      markerId: campaign.party.marker.id,
+                      revealed: campaign.party.marker.revealedToPlayers
+                    }
+                  : null
+              }
               onOpenParty={(mapId, markerId) => navigate(atlasPath(mapId, markerId))}
               standing={standingRows}
               onAdjustStanding={setAdjustingFactionId}
@@ -342,132 +548,247 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
 
           {section === "pages" && (
             <PagesView
-              gmToken={gmToken} pages={pages} folders={folders} loading={loading} autosave={autosave}
-              selectedId={recordId} query={route.query}
-              onRefresh={refreshList} onPageChanged={onPageChanged}
-              onQuickCreate={setQuickCreate} onError={setError}
+              gmToken={gmToken}
+              pages={pages}
+              folders={folders}
+              loading={loading}
+              autosave={autosave}
+              selectedId={recordId}
+              query={route.query}
+              onRefresh={refreshList}
+              onPageChanged={onPageChanged}
+              onQuickCreate={setQuickCreate}
+              onError={setError}
               onOpenReplay={onOpenReplay}
             />
           )}
 
           {section === "atlas" && (
-            <AtlasView gmToken={gmToken} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
-              onActivateScene={onActivateScene} onOpenReplay={onOpenReplay}
-              mapId={recordId} pinId={route.query.get("pin")} filter={route.query.get("q") ?? ""} tagFilter={route.query.get("tag")}
+            <AtlasView
+              gmToken={gmToken}
+              scenes={scenes}
+              actors={actors}
+              activeSceneId={activeSceneId}
+              onActivateScene={onActivateScene}
+              onOpenReplay={onOpenReplay}
+              mapId={recordId}
+              pinId={route.query.get("pin")}
+              filter={route.query.get("q") ?? ""}
+              tagFilter={route.query.get("tag")}
               autosave={autosave}
               onQuickCreate={setQuickCreate}
-              onNavigate={navigate} onReplaceQuery={replaceQuery} />
+              onNavigate={navigate}
+              onReplaceQuery={replaceQuery}
+            />
           )}
 
           {section === "graph" && (
-            <ConnectionGraph loading={loading}
+            <ConnectionGraph
+              loading={loading}
               nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))}
               connections={connections}
               onOpen={(pageId) => navigate(pagePath(pageId))}
               focusPageId={route.query.get("focus")}
-              onFocused={() => replaceQuery((query) => query.delete("focus"))} />
+              onFocused={() => replaceQuery((query) => query.delete("focus"))}
+            />
           )}
 
           {section === "sessions" && (
-            <SessionsView gmToken={gmToken} sessions={sessions} activeSessionId={activeSessionId}
-              loading={sessionsLoading} error={sessionsError} onChanged={loadSessions}
-              autosave={autosave} pages={pages} actors={actors}
-              openSessionId={recordId} onOpenSession={(id) => navigate(id ? sessionPath(id) : pathForSection("sessions"))}
-              filter={route.query.get("q") ?? ""} statusFilter={route.query.get("status")}
+            <SessionsView
+              gmToken={gmToken}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              loading={sessionsLoading}
+              error={sessionsError}
+              onChanged={loadSessions}
+              autosave={autosave}
+              pages={pages}
+              actors={actors}
+              openSessionId={recordId}
+              onOpenSession={(id) => navigate(id ? sessionPath(id) : pathForSection("sessions"))}
+              filter={route.query.get("q") ?? ""}
+              statusFilter={route.query.get("status")}
               onFilterChange={setListFilter}
-              onPickTag={(tag) => navigate(tagPath(tag))} />
+              onPickTag={(tag) => navigate(tagPath(tag))}
+            />
           )}
 
           {section === "quests" && (
-            <QuestsView gmToken={gmToken} quests={quests} pages={pages}
-              loading={questsLoading} error={questsError} onChanged={loadQuests}
+            <QuestsView
+              gmToken={gmToken}
+              quests={quests}
+              pages={pages}
+              loading={questsLoading}
+              error={questsError}
+              onChanged={loadQuests}
               autosave={autosave}
-              openQuestId={recordId} onOpenQuest={(id) => navigate(id ? questPath(id) : pathForSection("quests"))}
+              openQuestId={recordId}
+              onOpenQuest={(id) => navigate(id ? questPath(id) : pathForSection("quests"))}
               onOpenPage={(pageId) => navigate(pagePath(pageId))}
-              filter={route.query.get("q") ?? ""} statusFilter={route.query.get("status")}
+              filter={route.query.get("q") ?? ""}
+              statusFilter={route.query.get("status")}
               onFilterChange={setListFilter}
-              onPickTag={(tag) => navigate(tagPath(tag))} />
+              onPickTag={(tag) => navigate(tagPath(tag))}
+            />
           )}
 
           {section === "journal" && (
-            <JournalView gmToken={gmToken} autosave={autosave} pages={pages}
+            <JournalView
+              gmToken={gmToken}
+              autosave={autosave}
+              pages={pages}
               onOpenPage={(pageId) => navigate(pagePath(pageId))}
               onOpenMarker={(markerId) => navigate(atlasPath(null, markerId))}
               onOpenReplay={onOpenReplay}
-              openEntryId={route.query.get("entry")} onOpenedEntry={() => replaceQuery((query) => query.delete("entry"))}
-              kindFilter={route.query.get("kind")} tagFilter={route.query.get("tag")} textFilter={route.query.get("q") ?? ""}
+              openEntryId={route.query.get("entry")}
+              onOpenedEntry={() => replaceQuery((query) => query.delete("entry"))}
+              kindFilter={route.query.get("kind")}
+              tagFilter={route.query.get("tag")}
+              textFilter={route.query.get("q") ?? ""}
               onFilterChange={setListFilter}
-              sessions={sessions} activeSessionId={activeSessionId}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
               onOpenSession={(sessionId) => navigate(sessionPath(sessionId))}
-              onOpenCalendar={() => navigate(pathForSection("calendar"))} />
+              onOpenCalendar={() => navigate(pathForSection("calendar"))}
+            />
           )}
 
           {section === "calendar" && (
-            <CalendarView gmToken={gmToken} calendar={campaign.calendar} records={campaign.records}
-              loading={campaignLoading} error={campaignError} onChanged={loadCampaign}
-              year={route.query.get("y")} month={route.query.get("m")}
-              onMonthChange={(year, month) => replaceQuery((query) => { query.set("y", String(year)); query.set("m", String(month)); })}
+            <CalendarView
+              gmToken={gmToken}
+              calendar={campaign.calendar}
+              records={campaign.records}
+              loading={campaignLoading}
+              error={campaignError}
+              onChanged={loadCampaign}
+              year={route.query.get("y")}
+              month={route.query.get("m")}
+              onMonthChange={(year, month) =>
+                replaceQuery((query) => {
+                  query.set("y", String(year));
+                  query.set("m", String(month));
+                })
+              }
               onOpenEntry={(entryId) => navigate(journalEntryPath(entryId))}
-              onOpenPage={(pageId) => navigate(pagePath(pageId))} />
+              onOpenPage={(pageId) => navigate(pagePath(pageId))}
+            />
           )}
 
           {section === "downtime" && (
-            <DowntimeView gmToken={gmToken} records={campaign.records} calendar={campaign.calendar} pages={pages} actors={actors}
-              loading={campaignLoading} error={campaignError} onChanged={loadCampaign}
+            <DowntimeView
+              gmToken={gmToken}
+              records={campaign.records}
+              calendar={campaign.calendar}
+              pages={pages}
+              actors={actors}
+              loading={campaignLoading}
+              error={campaignError}
+              onChanged={loadCampaign}
               onOpenEntry={(entryId) => navigate(journalEntryPath(entryId))}
-              onOpenPage={(pageId) => navigate(pagePath(pageId))} />
+              onOpenPage={(pageId) => navigate(pagePath(pageId))}
+            />
           )}
 
           {section === "tags" && (
-            <TagView gmToken={gmToken} tag={decodeURIComponent(route.segments[2] ?? "")}
-              pages={pages} maps={campaign.maps} records={campaign.records} sessions={sessions} quests={quests}
-              onNavigate={navigate} />
+            <TagView
+              gmToken={gmToken}
+              tag={decodeURIComponent(route.segments[2] ?? "")}
+              pages={pages}
+              maps={campaign.maps}
+              records={campaign.records}
+              sessions={sessions}
+              quests={quests}
+              onNavigate={navigate}
+            />
           )}
 
           {section === "audit" && <RevealAudit gmToken={gmToken} />}
-          {section === "backup" && <BackupView gmToken={gmToken} onChanged={() => { void refreshList(); void loadSessions(); void loadQuests(); void loadCampaign(); }} />}
+          {section === "backup" && (
+            <BackupView
+              gmToken={gmToken}
+              onChanged={() => {
+                void refreshList();
+                void loadSessions();
+                void loadQuests();
+                void loadCampaign();
+              }}
+            />
+          )}
           {section === "settings" && <CodexSettingsView gmToken={gmToken} onSettingsChanged={setSettings} />}
         </div>
       </div>
 
       {/* Always mounted so the non-modal Drawer's slide plays both ways. Reads the same session feed Sessions edits. */}
-      <SessionConsole open={consoleOpen} onClose={() => setConsoleOpen(false)} gmToken={gmToken}
+      <SessionConsole
+        open={consoleOpen}
+        onClose={() => setConsoleOpen(false)}
+        gmToken={gmToken}
         session={sessions.find((session) => session.id === activeSessionId) ?? null}
-        loading={sessionsLoading} error={sessionsError}
-        onOpenSession={(sessionId) => { setConsoleOpen(false); navigate(sessionPath(sessionId)); }}
-        onOpenSessions={() => { setConsoleOpen(false); navigate(pathForSection("sessions")); }} />
+        loading={sessionsLoading}
+        error={sessionsError}
+        onOpenSession={(sessionId) => {
+          setConsoleOpen(false);
+          navigate(sessionPath(sessionId));
+        }}
+        onOpenSessions={() => {
+          setConsoleOpen(false);
+          navigate(pathForSection("sessions"));
+        }}
+      />
 
       {paletteOpen && (
-        <CommandPalette gmToken={gmToken}
+        <CommandPalette
+          gmToken={gmToken}
           onOpenHit={(hit) => navigate(pathForHit(hit))}
           onCreatePage={(title) => setQuickCreate({ title })}
           /* Palette create verbs share `creates.ts` with the rails and land on the new record. */
           onCreateSession={() => void newSession()}
           onCreateQuest={() => void newQuest()}
           onNavigate={navigate}
-          onClose={() => setPaletteOpen(false)} />
+          onClose={() => setPaletteOpen(false)}
+        />
       )}
 
       {quickCreate && (
-        <QuickCreate gmToken={gmToken} request={quickCreate}
+        <QuickCreate
+          gmToken={gmToken}
+          request={quickCreate}
           onClose={() => setQuickCreate(null)}
           onOpen={(pageId) => navigate(pagePath(pageId))}
-          onChanged={refreshList} />
+          onChanged={refreshList}
+        />
       )}
 
       {/* `codex-preview-modal` gives the embedded shell a real height, so the atlas map has something to fill. */}
-      <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="full" title="What players see" ariaLabel="Player Codex preview" className="codex-preview-modal">
-        <p className="codex-inspector-hint">This is the real player Codex, read through a player session. Anything hidden from players is absent here, not dimmed.</p>
+      <Modal
+        open={!!previewToken}
+        onClose={() => setPreviewToken(null)}
+        size="full"
+        title="What players see"
+        ariaLabel="Player Codex preview"
+        className="codex-preview-modal"
+      >
+        <p className="codex-inspector-hint">
+          This is the real player Codex, read through a player session. Anything hidden from players is absent here, not
+          dimmed.
+        </p>
         {previewToken && <PlayerCodex token={previewToken} embedded />}
       </Modal>
 
       {/* The GM's standing write control lives here, never in `CampaignHome`, which the player Codex also renders. */}
       {adjustingFaction && (
-        <StandingAdjuster key={adjustingFaction.page.id} gmToken={gmToken}
-          factionPageId={adjustingFaction.page.id} factionName={adjustingFaction.page.title}
+        <StandingAdjuster
+          key={adjustingFaction.page.id}
+          gmToken={gmToken}
+          factionPageId={adjustingFaction.page.id}
+          factionName={adjustingFaction.page.title}
           standing={adjustingFaction.standing}
-          onSaved={() => { void loadCampaign(); toast("Standing updated.", { tone: "success" }); }}
-          onClose={() => setAdjustingFactionId(null)} />
+          onSaved={() => {
+            void loadCampaign();
+            toast("Standing updated.", { tone: "success" });
+          }}
+          onClose={() => setAdjustingFactionId(null)}
+        />
       )}
     </div>
   );

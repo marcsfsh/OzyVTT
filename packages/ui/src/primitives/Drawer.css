@@ -13,10 +13,16 @@
   /* Panel material with the brighter rim. Edge-anchored, so no corner cut. */
   background-color: var(--surface-2);
   background-image:
-    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--scanline-gap) - 1px),
+      var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
+    ),
     linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 35%);
   background-repeat: repeat, no-repeat;
-  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-size:
+    100% var(--scanline-gap),
+    100% 100%;
   box-shadow: var(--shadow-2);
   color: var(--text);
   visibility: hidden;
@@ -26,9 +32,20 @@
     translate var(--dur-base) var(--ease-drawer),
     visibility var(--dur-base) var(--ease-drawer);
 }
-.nh-drawer--right { right: 0; translate: 100% 0; border-left: var(--rim-w) solid var(--rim-color-hi); }
-.nh-drawer--left { left: 0; translate: -100% 0; border-right: var(--rim-w) solid var(--rim-color-hi); }
-.nh-drawer.is-open { translate: 0 0; visibility: visible; }
+.nh-drawer--right {
+  right: 0;
+  translate: 100% 0;
+  border-left: var(--rim-w) solid var(--rim-color-hi);
+}
+.nh-drawer--left {
+  left: 0;
+  translate: -100% 0;
+  border-right: var(--rim-w) solid var(--rim-color-hi);
+}
+.nh-drawer.is-open {
+  translate: 0 0;
+  visibility: visible;
+}
 
 .nh-drawer-head {
   /* The client's bare `header { max-width: 40rem }` would clamp this header. */
@@ -78,27 +95,50 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: polygon(0 .3rem, .3rem 0, 100% 0, 100% calc(100% - .3rem), calc(100% - .3rem) 100%, 0 100%);
+  clip-path: polygon(0 0.3rem, 0.3rem 0, 100% 0, 100% calc(100% - 0.3rem), calc(100% - 0.3rem) 100%, 0 100%);
   border: 1px solid var(--nh-rim);
   background: var(--surface-3);
   transition: border-color var(--dur-hover);
 }
-.nh-drawer-close:hover, .nh-drawer-close:active { color: var(--text); --nh-rim: var(--rim-color-hi); }
+.nh-drawer-close:hover,
+.nh-drawer-close:active {
+  color: var(--text);
+  --nh-rim: var(--rim-color-hi);
+}
 
 /* overscroll-behavior: contain, as on `.nh-modal-body`. */
-.nh-drawer-body { flex: 1; min-height: 0; padding: var(--space-5); overflow-y: auto; overscroll-behavior: contain; }
+.nh-drawer-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 
 /* Full-width sheet at the phone/tablet split, so a tablet doesn't get a narrow panel beside a dead strip; no
    side border on an edge-to-edge sheet. */
 @media (max-width: 760px) {
-  .nh-drawer { width: 100vw; }
-  .nh-drawer--right { border-left: 0; }
-  .nh-drawer--left { border-right: 0; }
-  .nh-drawer-head { padding: var(--space-4); }
-  .nh-drawer-body { padding: var(--space-4); padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
+  .nh-drawer {
+    width: 100vw;
+  }
+  .nh-drawer--right {
+    border-left: 0;
+  }
+  .nh-drawer--left {
+    border-right: 0;
+  }
+  .nh-drawer-head {
+    padding: var(--space-4);
+  }
+  .nh-drawer-body {
+    padding: var(--space-4);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
 }
 
 /* State the cut here so a later transition edit can't reintroduce a slide under reduced motion. */
 @media (prefers-reduced-motion: reduce) {
-  .nh-drawer { transition: none; }
+  .nh-drawer {
+    transition: none;
+  }
 }

@@ -59,33 +59,89 @@ import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1", playerText: "The party reached Barovia.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: ["dark-gift"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "j1",
+  playerText: "The party reached Barovia.",
+  gmText: null,
+  revealedToPlayers: false,
+  kind: "note",
+  attachMarkerId: null,
+  attachPageId: null,
+  sourceEncounterId: null,
+  payload: null,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  sortKey: 0,
+  tags: ["dark-gift"],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 /** The Journal reads the chronicle record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "The party reached Barovia.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: ["dark-gift"], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "The party reached Barovia.",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: ["dark-gift"],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const MAP = (over: Partial<CodexMap> = {}): CodexMap => ({
-  id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null, revealedToPlayers: false,
-  sortKey: 0, tags: ["faerun"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia",
+  kind: "regional",
+  parentMapId: null,
+  revealedToPlayers: false,
+  sortKey: 0,
+  tags: ["faerun"],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
-  id: "k1", mapId: "m1", x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road",
-  revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: ["dungeon"],
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "k1",
+  mapId: "m1",
+  x: 0.5,
+  y: 0.5,
+  iconId: "pin",
+  iconColor: "#FF2E9A",
+  label: "Old Svalich Road",
+  revealedToPlayers: false,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: ["dungeon"],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 // ----- Journal entries -----
-
 
 /** Filing fields live in the Details panel, whose open state persists across mounts. */
 const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -98,7 +154,9 @@ describe("Journal entry tags (CI-2)", () => {
     chronicle.mockResolvedValue(records);
     listPages.mockResolvedValue([]);
     getCalendar.mockResolvedValue(CALENDAR);
-    render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
+    render(
+      <JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />
+    );
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
   };
 
@@ -150,9 +208,22 @@ describe("Marker tags (CI-2)", () => {
     forMarker.mockResolvedValue([]);
     return render(
       <MarkerInspector
-        gmToken="gm" marker={marker} maps={[MAP()]} pages={[]} scenes={[]} actors={[]}
-        activeSceneId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
-        onCreatePage={vi.fn()} onRevealPage={vi.fn()} onActivateScene={vi.fn()} onClose={vi.fn()}
+        gmToken="gm"
+        marker={marker}
+        maps={[MAP()]}
+        pages={[]}
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        autosave={{ enabled: true, intervalSeconds: 1 }}
+        onUpdated={vi.fn()}
+        onDeleted={vi.fn()}
+        onOpenMap={vi.fn()}
+        onOpenPage={vi.fn()}
+        onCreatePage={vi.fn()}
+        onRevealPage={vi.fn()}
+        onActivateScene={vi.fn()}
+        onClose={vi.fn()}
       />
     );
   };
@@ -182,10 +253,22 @@ describe("Marker tags (CI-2)", () => {
       forMarker.mockResolvedValue([]);
       return render(
         <MarkerInspector
-          gmToken="gm" marker={marker} maps={[MAP()]} pages={[]} scenes={[]} actors={[]}
-          activeSceneId={null} autosave={{ enabled: false, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()}
-          onOpenMap={vi.fn()} onOpenPage={vi.fn()} onCreatePage={vi.fn()} onRevealPage={vi.fn()}
-          onActivateScene={vi.fn()} onClose={vi.fn()}
+          gmToken="gm"
+          marker={marker}
+          maps={[MAP()]}
+          pages={[]}
+          scenes={[]}
+          actors={[]}
+          activeSceneId={null}
+          autosave={{ enabled: false, intervalSeconds: 1 }}
+          onUpdated={vi.fn()}
+          onDeleted={vi.fn()}
+          onOpenMap={vi.fn()}
+          onOpenPage={vi.fn()}
+          onCreatePage={vi.fn()}
+          onRevealPage={vi.fn()}
+          onActivateScene={vi.fn()}
+          onClose={vi.fn()}
         />
       );
     };
@@ -229,7 +312,23 @@ describe("Map tags (CI-2)", () => {
     listAssets.mockResolvedValue([]);
     listMarkers.mockResolvedValue([]);
     listPages.mockResolvedValue([]);
-    render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <AtlasView
+          gmToken="gm"
+          scenes={[]}
+          actors={[]}
+          activeSceneId={null}
+          onActivateScene={vi.fn()}
+          mapId={null}
+          pinId={null}
+          autosave={{ enabled: true, intervalSeconds: 1 }}
+          onQuickCreate={vi.fn()}
+          onNavigate={vi.fn()}
+          onReplaceQuery={vi.fn()}
+        />
+      </ToastProvider>
+    );
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Map settings" }));
     return user;

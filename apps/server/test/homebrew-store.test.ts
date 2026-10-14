@@ -6,12 +6,34 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HomebrewContentTypeSchema } from "@vtt/api-contract";
 import { CharacterIdentitySchema } from "@vtt/schemas";
 import {
-  loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions,
-  loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses
+  loadBackgrounds,
+  loadClasses,
+  loadConditions,
+  loadEquipment,
+  loadFeats,
+  loadMonsterDefinitions,
+  loadNames,
+  loadSkills,
+  loadSpecies,
+  loadSpells,
+  loadSubclasses
 } from "@vtt/content-srd-5.2.1";
 import { ContentLibrary } from "../src/content-library.js";
-import { HOMEBREW_ID_MAX_LENGTH, assertMintable, isMintedHomebrewId, mintHomebrewId, slugify } from "../src/homebrew-ids.js";
-import { HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, HomebrewStore, MIGRATIONS, type HomebrewRevalidator } from "../src/homebrew-store.js";
+import {
+  HOMEBREW_ID_MAX_LENGTH,
+  assertMintable,
+  isMintedHomebrewId,
+  mintHomebrewId,
+  slugify
+} from "../src/homebrew-ids.js";
+import {
+  HomebrewNotFoundError,
+  HomebrewRevisionConflictError,
+  HomebrewStateError,
+  HomebrewStore,
+  MIGRATIONS,
+  type HomebrewRevalidator
+} from "../src/homebrew-store.js";
 
 // Store and id-minting tests. Critical: the id length budget (an over-long id passes creation, then
 // fails `GameStateSchema.parse` on the next boot) and the `expectedRev` conflict path autosave uses.
@@ -40,12 +62,15 @@ describe("homebrew id minting", () => {
       expect(id.length, `${type} id "${id}"`).toBeLessThanOrEqual(HOMEBREW_ID_MAX_LENGTH);
       // Anchored to the schema, not our constant: `CharacterIdentitySchema` caps persisted ids at 60
       // where `ContentIdSchema` allows 80, so raising HOMEBREW_ID_MAX_LENGTH must fail here.
-      expect(CharacterIdentitySchema.safeParse({
-        classes: [{ id, name: "X", level: 1, subclass: { id, name: "X" } }],
-        race: { id, name: "X", subrace: { id, name: "X" } },
-        background: { id, name: "X" },
-        feats: [{ id, name: "X" }]
-      }).success, `${type} id "${id}" (${id.length} chars) does not fit a persisted ActorDefinition`).toBe(true);
+      expect(
+        CharacterIdentitySchema.safeParse({
+          classes: [{ id, name: "X", level: 1, subclass: { id, name: "X" } }],
+          race: { id, name: "X", subrace: { id, name: "X" } },
+          background: { id, name: "X" },
+          feats: [{ id, name: "X" }]
+        }).success,
+        `${type} id "${id}" (${id.length} chars) does not fit a persisted ActorDefinition`
+      ).toBe(true);
       expect(id).toMatch(/^[a-z0-9-]+$/);
       expect(id.startsWith("hb-")).toBe(true);
       // The reserved catalog-choice families `resolveCatalogChoice` dispatches on are unreachable because
@@ -90,11 +115,16 @@ describe("homebrew id minting", () => {
     // This property is why no SRD-collision check exists; a future SRD printing that broke it would let
     // homebrew shadow bundled content.
     const srdIds = [
-      ...loadClasses().map((record) => record.id), ...loadSubclasses().map((record) => record.id),
-      ...loadSpecies().map((record) => record.id), ...loadBackgrounds().map((record) => record.id),
-      ...loadFeats().map((record) => record.id), ...loadSpells().map((record) => record.id),
-      ...loadEquipment().map((record) => record.id), ...loadSkills().map((record) => record.id),
-      ...loadConditions().map((record) => record.id), ...loadNames().map((record) => record.speciesId),
+      ...loadClasses().map((record) => record.id),
+      ...loadSubclasses().map((record) => record.id),
+      ...loadSpecies().map((record) => record.id),
+      ...loadBackgrounds().map((record) => record.id),
+      ...loadFeats().map((record) => record.id),
+      ...loadSpells().map((record) => record.id),
+      ...loadEquipment().map((record) => record.id),
+      ...loadSkills().map((record) => record.id),
+      ...loadConditions().map((record) => record.id),
+      ...loadNames().map((record) => record.speciesId),
       ...loadMonsterDefinitions().map((definition) => definition.source.externalId ?? "")
     ];
     expect(srdIds.length).toBeGreaterThan(500);
@@ -107,12 +137,21 @@ describe("HomebrewStore", () => {
     // Migration SQL is frozen, so the CHECK list cannot be derived from the schema; this catches a
     // contract change that would otherwise drift on fresh databases only.
     const declared = MIGRATIONS[0].sql.match(/type TEXT NOT NULL CHECK \(type IN \(([^)]+)\)\)/)?.[1] ?? "";
-    expect(declared.split(",").map((value) => value.trim().replace(/'/g, ""))).toEqual([...HomebrewContentTypeSchema.options]);
+    expect(declared.split(",").map((value) => value.trim().replace(/'/g, ""))).toEqual([
+      ...HomebrewContentTypeSchema.options
+    ]);
   });
 
   it("creates as an invisible draft, mints a legal id, and denormalises the name", () => {
     const row = store.create({ type: "class", body: bodyFor("Blood Hunter") });
-    expect(row).toMatchObject({ type: "class", name: "Blood Hunter", state: "draft", visibleToPlayers: false, deletedAt: null, rev: 1 });
+    expect(row).toMatchObject({
+      type: "class",
+      name: "Blood Hunter",
+      state: "draft",
+      visibleToPlayers: false,
+      deletedAt: null,
+      rev: 1
+    });
     expect(row.id).toMatch(/^hb-blood-hunter-[0-9a-f]{6}$/);
     // The body carries the row's id and never the routing discriminator: `EquipmentReferenceSchema` is
     // `.strict()` and would reject its own record at publish time if `type` rode along.
@@ -140,7 +179,11 @@ describe("HomebrewStore", () => {
     // The stale write is refused with the row's real revision, so the editor's autosave can resync
     // instead of clobbering.
     let conflict: unknown;
-    try { store.update(row.id, bodyFor("Stale"), row.rev, "gm"); } catch (error) { conflict = error; }
+    try {
+      store.update(row.id, bodyFor("Stale"), row.rev, "gm");
+    } catch (error) {
+      conflict = error;
+    }
     expect(conflict).toBeInstanceOf(HomebrewRevisionConflictError);
     expect((conflict as HomebrewRevisionConflictError).currentRev).toBe(2);
     expect(store.get(row.id)!.name).toBe("Blood Maledict II");
@@ -168,7 +211,7 @@ describe("HomebrewStore", () => {
     store.setVisibility(row.id, true, undefined);
     const deleted = store.softDelete(row.id)!;
     expect(deleted.deletedAt).toBeTruthy();
-    expect(store.softDelete(row.id)!.deletedAt).toBe(deleted.deletedAt);  // idempotent: the stamp does not move
+    expect(store.softDelete(row.id)!.deletedAt).toBe(deleted.deletedAt); // idempotent: the stamp does not move
     expect(store.list().rows.map((r) => r.id)).not.toContain(row.id);
     expect(store.list({ includeDeleted: true }).rows.map((r) => r.id)).toContain(row.id);
     // Data is retained; restore is the explicit inverse and keeps state/visibility.
@@ -186,7 +229,8 @@ describe("HomebrewStore", () => {
   });
 
   it("pages by keyset in a stable name order that publishing cannot disturb", () => {
-    for (const name of ["Delta", "alpha", "Charlie", "bravo", "echo"]) store.create({ type: "feat", body: bodyFor(name) });
+    for (const name of ["Delta", "alpha", "Charlie", "bravo", "echo"])
+      store.create({ type: "feat", body: bodyFor(name) });
     const first = store.list({ limit: 2 });
     expect(first.rows.map((row) => row.name)).toEqual(["alpha", "bravo"]);
     expect(first.total).toBe(5);
@@ -205,7 +249,8 @@ describe("HomebrewStore", () => {
   it("keeps the cursor inside the contract's 200-character cap even at the longest legal name", () => {
     // The token carries the row id only; encoding the sort key too would run to ~250 chars for a
     // 120-character name and break `HomebrewContentList.nextCursor`.
-    for (let index = 0; index < 3; index += 1) store.create({ type: "class", body: bodyFor(`${"N".repeat(118)}-${index}`) });
+    for (let index = 0; index < 3; index += 1)
+      store.create({ type: "class", body: bodyFor(`${"N".repeat(118)}-${index}`) });
     const page = store.list({ limit: 1 });
     expect(page.nextCursor!.length).toBeLessThanOrEqual(200);
     expect(page.rows).toHaveLength(1);
@@ -241,7 +286,10 @@ describe("HomebrewStore", () => {
     const row = store.create({ type: "spell", body: bodyFor("Cinder Bolt") });
     store.update(row.id, bodyFor("Cinder Bolt II"), row.rev, "gm");
     const revisions = store.listRevisions(row.id);
-    expect(revisions.map((revision) => [revision.rev, revision.name])).toEqual([[2, "Cinder Bolt II"], [1, "Cinder Bolt"]]);
+    expect(revisions.map((revision) => [revision.rev, revision.name])).toEqual([
+      [2, "Cinder Bolt II"],
+      [1, "Cinder Bolt"]
+    ]);
     expect(revisions[0].authorTag).toBe("gm");
   });
 });
@@ -280,13 +328,20 @@ describe("HomebrewStore revision counter", () => {
 
     // Own migration table, distinct from `codex_schema_migrations` and the game store's `schema_migrations`.
     const database = new DatabaseSync(path);
-    const tables = (database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name);
+    const tables = (
+      database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+    ).map((r) => r.name);
     expect(tables).toContain("homebrew_schema_migrations");
     expect(tables).toContain("homebrew_records");
     expect(tables).toContain("homebrew_record_revisions");
     // STRICT tables: a wrong-typed write is refused rather than coerced.
-    expect(() => database.prepare("INSERT INTO homebrew_records (id, type, name, state, visible_to_players, body_json, rev, created_at, updated_at) VALUES ('hb-x-000000', 'nonsense', 'X', 'draft', 0, '{}', 1, '', '')").run())
-      .toThrow(/CHECK constraint/i);
+    expect(() =>
+      database
+        .prepare(
+          "INSERT INTO homebrew_records (id, type, name, state, visible_to_players, body_json, rev, created_at, updated_at) VALUES ('hb-x-000000', 'nonsense', 'X', 'draft', 0, '{}', 1, '', '')"
+        )
+        .run()
+    ).toThrow(/CHECK constraint/i);
     database.close();
   });
 });
@@ -322,7 +377,10 @@ describe("HomebrewStore as a ContentLibrary source", () => {
 
     // A draft that does not parse still counts as naming its class; requiring a parse would bring back
     // the deadlock.
-    const halfTyped = store.create({ type: "subclass", body: { name: "Half Typed", classId: klass.id, features: "not an array" } });
+    const halfTyped = store.create({
+      type: "subclass",
+      body: { name: "Half Typed", classId: klass.id, features: "not an array" }
+    });
     expect([...store.authoredIndex().subclassIdsFor(klass.id)].sort()).toEqual([subclass.id, halfTyped.id].sort());
 
     // A soft-deleted subclass must stop propping up its class.

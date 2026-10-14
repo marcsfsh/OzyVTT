@@ -22,15 +22,24 @@ const IDS = {
 } as const;
 
 type Row = CharacterCreateRequestInput["choices"][number];
-type MutableInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & { choices: Row[] };
+type MutableInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
+  choices: Row[];
+};
 
 // A Halfling Berserker at Dex 14 / Con 16. Halfling adds no number of its own, so any AC drift belongs
 // to the class. Bare-handed: 10 + 2 (Dex) + 3 (Con) = 15.
 const barbarianInput = (level = 1): MutableInput => ({
-  name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level,
+  name: "Ozar",
+  speciesId: "halfling",
+  backgroundId: "soldier",
+  classId: "barbarian",
+  level,
   abilityMethod: "standard-array",
   baseScores: { str: 13, dex: 14, con: 15, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -48,10 +57,17 @@ const barbarianInput = (level = 1): MutableInput => ({
 // A Halfling Monk at Dex 15 / Wis 16. The Acolyte background carries Wisdom to 16, and its Magic
 // Initiate rows are required for the build. Bare-handed: 10 + 2 (Dex) + 3 (Wis) = 15, same as the Barbarian.
 const monkInput = (level = 1): MutableInput => ({
-  name: "Shan", speciesId: "halfling", backgroundId: "acolyte", classId: "monk", level,
+  name: "Shan",
+  speciesId: "halfling",
+  backgroundId: "acolyte",
+  classId: "monk",
+  level,
   abilityMethod: "standard-array",
   baseScores: { str: 12, dex: 15, con: 13, int: 10, wis: 14, cha: 8 },
-  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "int", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "wis", amount: 2 },
+    { ability: "int", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -69,10 +85,18 @@ const monkInput = (level = 1): MutableInput => ({
 // A Halfling Draconic Sorcerer at level 3, the SRD's third author of this rider, which prints no Shield
 // sentence at all. Dex 14 / Cha 17: bare-handed 10 + 2 + 3 = 15. Draconic Resilience arrives at level 3.
 const sorcererInput = (): MutableInput => ({
-  name: "Vaeryn", speciesId: "halfling", backgroundId: "acolyte", classId: "sorcerer", subclassId: "draconic-sorcery", level: 3,
+  name: "Vaeryn",
+  speciesId: "halfling",
+  backgroundId: "acolyte",
+  classId: "sorcerer",
+  subclassId: "draconic-sorcery",
+  level: 3,
   abilityMethod: "standard-array",
   baseScores: { str: 8, dex: 14, con: 13, int: 12, wis: 10, cha: 15 },
-  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "int", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "cha", amount: 2 },
+    { ability: "int", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -92,10 +116,17 @@ const sorcererInput = (): MutableInput => ({
 
 /** A Halfling Fighter: the negative control, with no Unarmored Defense to read. */
 const fighterInput = (): MutableInput => ({
-  name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level: 1,
+  name: "Borin",
+  speciesId: "halfling",
+  backgroundId: "soldier",
+  classId: "fighter",
+  level: 1,
   abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -120,10 +151,18 @@ function equippedFromCatalog(id: string): InventoryItem {
   const record = view.equipmentRecord(id);
   if (!record?.armor) throw new Error(`the SRD catalog has no armor record for "${id}"`);
   return {
-    id: record.id, name: record.name, quantity: 1, equipped: true, attuned: false, category: record.category,
+    id: record.id,
+    name: record.name,
+    quantity: 1,
+    equipped: true,
+    attuned: false,
+    category: record.category,
     armor: {
-      acBase: record.armor.acBase, addDexModifier: record.armor.addDexModifier, dexModifierCap: record.armor.dexModifierCap,
-      stealthDisadvantage: record.armor.stealthDisadvantage, strengthRequired: record.armor.strengthRequired
+      acBase: record.armor.acBase,
+      addDexModifier: record.armor.addDexModifier,
+      dexModifierCap: record.armor.dexModifierCap,
+      stealthDisadvantage: record.armor.stealthDisadvantage,
+      strengthRequired: record.armor.strengthRequired
     }
   } as InventoryItem;
 }
@@ -141,8 +180,13 @@ function onTheTable(input: MutableInput): Table {
 // The player's equip gesture: the same write the sheet sends, through the same reconciliation. The
 // return type is left as `number | undefined` so a missing armor class fails the assertion by name.
 function equip(table: Table, itemId: string): Actor["armorClass"] {
-  setInventoryItem(table.state, IDS.hero, equippedFromCatalog(itemId),
-    (id) => table.state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+  setInventoryItem(
+    table.state,
+    IDS.hero,
+    equippedFromCatalog(itemId),
+    (id) => table.state.definitions.find((entry) => entry.id === id)?.definition,
+    { catalog, role: "player" }
+  );
   return table.hero.armorClass;
 }
 
@@ -164,7 +208,8 @@ describe("Unarmored Defense and a shield (U28)", () => {
   /** The authored flags the four numbers rest on; a flipped flag would still pass the test above in one direction. */
   it("reads the flag the three SRD records actually print", () => {
     const flagIn = (features: readonly { id: string; modifiers: readonly { type: string }[] }[] | undefined) => {
-      const modifier = features?.find((entry) => entry.id === "unarmored-defense" || entry.id === "draconic-resilience")
+      const modifier = features
+        ?.find((entry) => entry.id === "unarmored-defense" || entry.id === "draconic-resilience")
         ?.modifiers.find((entry) => entry.type === "unarmored-defense");
       return modifier?.type === "unarmored-defense" ? (modifier as { allowShield?: boolean }).allowShield : undefined;
     };
@@ -187,21 +232,39 @@ describe("Unarmored Defense and a shield (U28)", () => {
   // `allowShield: false` still gains the shield. The definition is JSON round-tripped as `GameStore` reloads it.
   it("prefers the corrected content over a pre-fix snapshot stored on the sheet", () => {
     const built = buildCharacterDefinition(sorcererInput() as CharacterCreateRequestInput, view, POLICY);
-    const bag = (built.extensions as Record<string, { unarmoredDefense?: { ability: string; allowShield: boolean } }>)["open5e.srd-2024"];
-    expect(bag?.unarmoredDefense, "the builder still writes the fast-path key").toMatchObject({ ability: "cha", allowShield: true });
+    const bag = (built.extensions as Record<string, { unarmoredDefense?: { ability: string; allowShield: boolean } }>)[
+      "open5e.srd-2024"
+    ];
+    expect(bag?.unarmoredDefense, "the builder still writes the fast-path key").toMatchObject({
+      ability: "cha",
+      allowShield: true
+    });
 
-    const stale = JSON.parse(JSON.stringify({
-      ...built,
-      extensions: { ...built.extensions, "open5e.srd-2024": { ...bag, unarmoredDefense: { ability: "cha", allowShield: false } } }
-    })) as ActorDefinition;
-    expect(stale.character?.features?.some((held) => held.id === "draconic-resilience"), "the stale sheet still names the feature").toBe(true);
+    const stale = JSON.parse(
+      JSON.stringify({
+        ...built,
+        extensions: {
+          ...built.extensions,
+          "open5e.srd-2024": { ...bag, unarmoredDefense: { ability: "cha", allowShield: false } }
+        }
+      })
+    ) as ActorDefinition;
+    expect(
+      stale.character?.features?.some((held) => held.id === "draconic-resilience"),
+      "the stale sheet still names the feature"
+    ).toBe(true);
 
     const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
     importActorDefinition(state, stale, IDS.hero, "public", catalog);
     const hero = state.actors.find((actor) => actor.id === IDS.hero)!;
     expect(hero.armorClass).toBe(15);
-    setInventoryItem(state, IDS.hero, equippedFromCatalog("shield"),
-      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    setInventoryItem(
+      state,
+      IDS.hero,
+      equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition,
+      { catalog, role: "player" }
+    );
     // 17, not 14: the live rider wins over the stale flag.
     expect(hero.armorClass, "a sheet saved before the content fix must still gain the shield").toBe(17);
   });
@@ -242,8 +305,13 @@ describe("Unarmored Defense and a shield (U28)", () => {
     importActorDefinition(state, anonymous, IDS.other, "public", catalog);
     const actor = state.actors.find((entry) => entry.id === IDS.other)!;
     expect(actor.armorClass).toBe(15); // the stored total still stands while nothing is equipped
-    setInventoryItem(state, IDS.other, equippedFromCatalog("shield"),
-      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    setInventoryItem(
+      state,
+      IDS.other,
+      equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition,
+      { catalog, role: "player" }
+    );
     expect(actor.armorClass).toBe(14); // 10 + 2 + 2 - no feature is claimed, so none is granted
   });
 
@@ -253,7 +321,9 @@ describe("Unarmored Defense and a shield (U28)", () => {
     const { definition } = onTheTable(barbarianInput());
     const bag = { ...(definition.extensions!["open5e.srd-2024"] as Record<string, unknown>) };
     delete bag.unarmoredDefense;
-    const legacy = JSON.parse(JSON.stringify({ ...definition, extensions: { "open5e.srd-2024": bag } })) as ActorDefinition;
+    const legacy = JSON.parse(
+      JSON.stringify({ ...definition, extensions: { "open5e.srd-2024": bag } })
+    ) as ActorDefinition;
     expect(Object.keys(legacy.extensions!["open5e.srd-2024"] as object)).toEqual(["traits"]);
     expect(legacy.character!.features!.some((entry) => entry.id === "unarmored-defense")).toBe(true);
 
@@ -261,8 +331,13 @@ describe("Unarmored Defense and a shield (U28)", () => {
     importActorDefinition(state, legacy, IDS.other, "public", catalog);
     const actor = state.actors.find((entry) => entry.id === IDS.other)!;
     expect(actor.armorClass).toBe(15); // bare-handed, unchanged
-    setInventoryItem(state, IDS.other, equippedFromCatalog("shield"),
-      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    setInventoryItem(
+      state,
+      IDS.other,
+      equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition,
+      { catalog, role: "player" }
+    );
     expect(actor.armorClass).toBe(17); // +2 on top of Constitution, read from the stored sheet's own feature
   });
 
@@ -272,13 +347,20 @@ describe("Unarmored Defense and a shield (U28)", () => {
     const { definition } = onTheTable(monkInput());
     const bag = { ...(definition.extensions!["open5e.srd-2024"] as Record<string, unknown>) };
     delete bag.unarmoredDefense;
-    const legacy = JSON.parse(JSON.stringify({ ...definition, extensions: { "open5e.srd-2024": bag } })) as ActorDefinition;
+    const legacy = JSON.parse(
+      JSON.stringify({ ...definition, extensions: { "open5e.srd-2024": bag } })
+    ) as ActorDefinition;
     const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
     importActorDefinition(state, legacy, IDS.other, "public", catalog);
     const actor = state.actors.find((entry) => entry.id === IDS.other)!;
     expect(actor.armorClass).toBe(15);
-    setInventoryItem(state, IDS.other, equippedFromCatalog("shield"),
-      (id) => state.definitions.find((entry) => entry.id === id)?.definition, { catalog, role: "player" });
+    setInventoryItem(
+      state,
+      IDS.other,
+      equippedFromCatalog("shield"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition,
+      { catalog, role: "player" }
+    );
     expect(actor.armorClass).toBe(14); // 10 + 2 + 2: the Monk's printing refuses the Shield
   });
 });

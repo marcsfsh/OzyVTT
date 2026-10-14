@@ -14,7 +14,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ItemSlotSchema } from "@vtt/schemas";
-import { ArmorReferenceSchema, EquipmentReferenceSchema, WeaponReferenceSchema, type EquipmentReference, type ItemAppliesTo } from "../src/schemas.js";
+import {
+  ArmorReferenceSchema,
+  EquipmentReferenceSchema,
+  WeaponReferenceSchema,
+  type EquipmentReference,
+  type ItemAppliesTo
+} from "../src/schemas.js";
 import { RARITY_IDS } from "../src/enums.js";
 import { slug, withTables } from "./markdown.js";
 import { ITEM_MECHANICS_LANES } from "./item-mechanics/index.js";
@@ -34,14 +40,21 @@ const source = readFileSync(join(root, "sources/dnd-5e-srd-markdown/magic-items.
  * `test/item-mechanics.test.ts` uses them to prove the script actually applies the overlay.
  */
 const flag = (name: string): string | undefined =>
-  process.argv.slice(2).find((argument) => argument.startsWith(`--${name}=`))?.slice(name.length + 3);
+  process.argv
+    .slice(2)
+    .find((argument) => argument.startsWith(`--${name}=`))
+    ?.slice(name.length + 3);
 const outPath = flag("out") ?? join(bundles, "magic-items.v1.json");
 const overlayPath = flag("overlay");
 const lanes: readonly ItemMechanicsLane[] = overlayPath
-  ? ((await import(pathToFileURL(resolve(overlayPath)).href)) as { ITEM_MECHANICS_LANES: readonly ItemMechanicsLane[] }).ITEM_MECHANICS_LANES
+  ? ((await import(pathToFileURL(resolve(overlayPath)).href)) as { ITEM_MECHANICS_LANES: readonly ItemMechanicsLane[] })
+      .ITEM_MECHANICS_LANES
   : ITEM_MECHANICS_LANES;
 
-const die = (message: string): never => { console.error(`\n${message}\n`); process.exit(1); };
+const die = (message: string): never => {
+  console.error(`\n${message}\n`);
+  process.exit(1);
+};
 
 // ---- 1. The section, and what counts as an item inside it ---------------------------------------
 
@@ -50,7 +63,12 @@ const lines = source.split("\n");
 const azIndex = lines.findIndex((line) => line.startsWith("## Magic Items A"));
 if (azIndex < 0) die("The `## Magic Items A-Z` heading is gone from the vendored source. The parse cannot be scoped.");
 
-interface Entry { readonly name: string; readonly typeLine: string; readonly body: string; readonly line: number }
+interface Entry {
+  readonly name: string;
+  readonly typeLine: string;
+  readonly body: string;
+  readonly line: number;
+}
 
 const entries: Entry[] = [];
 for (let index = azIndex; index < lines.length; index++) {
@@ -59,7 +77,11 @@ for (let index = azIndex; index < lines.length; index++) {
   while (cursor < lines.length && lines[cursor].trim() === "") cursor++;
   const typeLine = (lines[cursor] ?? "").trim();
   const body: string[] = [];
-  for (let scan = cursor + 1; scan < lines.length && !lines[scan].startsWith("#### ") && !lines[scan].startsWith("## "); scan++) {
+  for (
+    let scan = cursor + 1;
+    scan < lines.length && !lines[scan].startsWith("#### ") && !lines[scan].startsWith("## ");
+    scan++
+  ) {
     body.push(lines[scan]);
   }
   entries.push({ name: lines[index].slice(5).trim(), typeLine, body: body.join("\n").trim(), line: index + 1 });
@@ -70,7 +92,15 @@ for (let index = azIndex; index < lines.length; index++) {
  * italics: every entry in the run has an italic second line.
  */
 const CATEGORY_WORDS = [
-  "Wondrous Item", "Weapon", "Potion", "Ring", "Armor", "Wand", "Staff", "Rod", "Scroll"
+  "Wondrous Item",
+  "Weapon",
+  "Potion",
+  "Ring",
+  "Armor",
+  "Wand",
+  "Staff",
+  "Rod",
+  "Scroll"
 ] as const;
 type CategoryWord = (typeof CATEGORY_WORDS)[number];
 
@@ -84,9 +114,14 @@ const categoryOf = (typeLine: string): CategoryWord | undefined =>
 const items = entries.filter((entry) => categoryOf(entry.typeLine));
 const skipped = entries.filter((entry) => !categoryOf(entry.typeLine));
 
-if (entries.length !== 260) die(`Expected 260 entries under the A-Z heading, parsed ${entries.length}. The source moved; re-read the pin in test/magic-item-source.test.ts.`);
+if (entries.length !== 260)
+  die(
+    `Expected 260 entries under the A-Z heading, parsed ${entries.length}. The source moved; re-read the pin in test/magic-item-source.test.ts.`
+  );
 if (skipped.map((entry) => entry.name).join("|") !== NOT_ITEMS.join("|")) {
-  die(`The non-item entries are meant to be exactly ${NOT_ITEMS.join(" and ")}; parsed [${skipped.map((entry) => entry.name).join(", ")}].`);
+  die(
+    `The non-item entries are meant to be exactly ${NOT_ITEMS.join(" and ")}; parsed [${skipped.map((entry) => entry.name).join(", ")}].`
+  );
 }
 if (items.length !== 258) die(`Expected 258 items, parsed ${items.length}.`);
 
@@ -130,7 +165,9 @@ function parseTypeLine(entry: Entry): TypeLine {
   const rarity = rest.replace(/\s*\(Requires Attunement[^)]*\)\s*$/i, "").trim();
   if (rarity === "") die(`${entry.name} (line ${entry.line}): no rarity segment in "${text}".`);
   return {
-    category, qualifier, rarity,
+    category,
+    qualifier,
+    rarity,
     attunementClause: attunementMatch ? attunementMatch[1] : null,
     attunement: {
       required: attunementMatch !== null,
@@ -201,12 +238,21 @@ function wondrousSlot(entry: Entry): string {
  */
 function slotOf(entry: Entry, type: TypeLine): string {
   switch (type.category) {
-    case "Wondrous Item": return wondrousSlot(entry);
-    case "Weapon": return /^any ammunition$/i.test(type.qualifier ?? "") ? "ammunition" : "weapon";
-    case "Armor": return /^shield$/i.test(type.qualifier ?? "") ? "shield" : "armor";
-    case "Ring": return "ring";
-    case "Wand": case "Staff": case "Rod": return "held";
-    case "Potion": case "Scroll": return "consumable";
+    case "Wondrous Item":
+      return wondrousSlot(entry);
+    case "Weapon":
+      return /^any ammunition$/i.test(type.qualifier ?? "") ? "ammunition" : "weapon";
+    case "Armor":
+      return /^shield$/i.test(type.qualifier ?? "") ? "shield" : "armor";
+    case "Ring":
+      return "ring";
+    case "Wand":
+    case "Staff":
+    case "Rod":
+      return "held";
+    case "Potion":
+    case "Scroll":
+      return "consumable";
   }
 }
 
@@ -217,14 +263,23 @@ function slotOf(entry: Entry, type: TypeLine): string {
 function categoryOfRow(type: TypeLine, slotId: string): string {
   if (slotId === "shield" || slotId === "ammunition") return slotId;
   switch (type.category) {
-    case "Wondrous Item": return "wondrous-item";
-    case "Weapon": return "weapon";
-    case "Armor": return "armor";
-    case "Ring": return "ring";
-    case "Wand": return "wand";
-    case "Staff": return "staff";
-    case "Rod": return "rod";
-    case "Potion": case "Scroll": return "consumable";
+    case "Wondrous Item":
+      return "wondrous-item";
+    case "Weapon":
+      return "weapon";
+    case "Armor":
+      return "armor";
+    case "Ring":
+      return "ring";
+    case "Wand":
+      return "wand";
+    case "Staff":
+      return "staff";
+    case "Rod":
+      return "rod";
+    case "Potion":
+    case "Scroll":
+      return "consumable";
   }
 }
 
@@ -252,9 +307,12 @@ function renderDescription(entry: Entry, printedTypeLine: string): { text: strin
   const prose = withTables(entry.body)
     .replace(/\*\*/g, "")
     .replace(/(?<!\w)_(?=\S)|(?<=\S)_(?!\w)/g, "")
-    .split("\n").map((line) => line.replace(/^\s*[-*]\s+/, "• ").trim()).filter((line) => line !== "")
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*]\s+/, "• ").trim())
+    .filter((line) => line !== "")
     .join(" ")
-    .replace(/\s+/g, " ").trim();
+    .replace(/\s+/g, " ")
+    .trim();
   /**
    * Lead with the printed type line: the wire summary carries no `rarity`, so this is what shows a
    * reader the rarity and attunement requirement.
@@ -264,7 +322,10 @@ function renderDescription(entry: Entry, printedTypeLine: string): { text: strin
   const room = DESCRIPTION_LIMIT - TRUNCATION_MARK.length;
   const head = full.slice(0, room);
   const lastStop = Math.max(head.lastIndexOf(". "), head.lastIndexOf("; "));
-  return { text: `${(lastStop > room / 2 ? head.slice(0, lastStop + 1) : head.trimEnd())}${TRUNCATION_MARK}`, truncated: true };
+  return {
+    text: `${lastStop > room / 2 ? head.slice(0, lastStop + 1) : head.trimEnd()}${TRUNCATION_MARK}`,
+    truncated: true
+  };
 }
 
 // ---- 5b. The eligibility column: the printed base qualifier, resolved and fail-closed -----------
@@ -275,19 +336,35 @@ function renderDescription(entry: Entry, printedTypeLine: string): { text: strin
  * against `weapons.v1.json` and `armor.v1.json` into `appliesTo`, so play time never evaluates a
  * predicate, and an unresolvable qualifier fails the build by name.
  */
-const BASE_WEAPONS = z.array(WeaponReferenceSchema).parse(JSON.parse(readFileSync(join(bundles, "weapons.v1.json"), "utf8"))).filter((weapon) => !weapon.improvised);
-const BASE_ARMOR = z.array(ArmorReferenceSchema).parse(JSON.parse(readFileSync(join(bundles, "armor.v1.json"), "utf8")));
+const BASE_WEAPONS = z
+  .array(WeaponReferenceSchema)
+  .parse(JSON.parse(readFileSync(join(bundles, "weapons.v1.json"), "utf8")))
+  .filter((weapon) => !weapon.improvised);
+const BASE_ARMOR = z
+  .array(ArmorReferenceSchema)
+  .parse(JSON.parse(readFileSync(join(bundles, "armor.v1.json"), "utf8")));
 
 /** Split "A, B, or C" / "A or B" into its printed parts, in printed order. */
 const namedParts = (qualifier: string): string[] =>
-  qualifier.split(/,\s*(?:or\s+)?|\s+or\s+/i).map((part) => part.trim()).filter((part) => part !== "");
+  qualifier
+    .split(/,\s*(?:or\s+)?|\s+or\s+/i)
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
 
-function namedBaseIds(entry: Entry, qualifier: string, byName: ReadonlyMap<string, string>, kind: string): readonly string[] {
+function namedBaseIds(
+  entry: Entry,
+  qualifier: string,
+  byName: ReadonlyMap<string, string>,
+  kind: string
+): readonly string[] {
   const parts = namedParts(qualifier);
   if (parts.length === 0) return die(`${entry.name} (line ${entry.line}): empty ${kind} qualifier "${qualifier}".`);
   return parts.map((part) => {
     const id = byName.get(slug(part));
-    if (!id) return die(`${entry.name} (line ${entry.line}): "${part}" in "(${qualifier})" matches no ${kind} in the ${kind} bundle - fail closed by name, never guess.`);
+    if (!id)
+      return die(
+        `${entry.name} (line ${entry.line}): "${part}" in "(${qualifier})" matches no ${kind} in the ${kind} bundle - fail closed by name, never guess.`
+      );
     return id;
   });
 }
@@ -296,11 +373,20 @@ function weaponBaseIds(entry: Entry, qualifier: string): readonly string[] {
   if (/^any simple or martial$/i.test(qualifier)) return BASE_WEAPONS.map((weapon) => weapon.id);
   if (/^any melee weapon$/i.test(qualifier)) {
     const melee = BASE_WEAPONS.filter((weapon) => weapon.melee === true).map((weapon) => weapon.id);
-    if (melee.length === 0) return die(`${entry.name} (line ${entry.line}): "(${qualifier})" resolved to zero weapons - the melee band column is missing from weapons.v1.json.`);
+    if (melee.length === 0)
+      return die(
+        `${entry.name} (line ${entry.line}): "(${qualifier})" resolved to zero weapons - the melee band column is missing from weapons.v1.json.`
+      );
     return melee;
   }
-  if (/^any\b/i.test(qualifier)) return die(`${entry.name} (line ${entry.line}): unrecognised weapon predicate "(${qualifier})".`);
-  return namedBaseIds(entry, qualifier, new Map(BASE_WEAPONS.map((weapon) => [slug(weapon.name), weapon.id])), "weapon");
+  if (/^any\b/i.test(qualifier))
+    return die(`${entry.name} (line ${entry.line}): unrecognised weapon predicate "(${qualifier})".`);
+  return namedBaseIds(
+    entry,
+    qualifier,
+    new Map(BASE_WEAPONS.map((weapon) => [slug(weapon.name), weapon.id])),
+    "weapon"
+  );
 }
 
 function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
@@ -309,15 +395,24 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
   if (predicate) {
     const categories = namedParts(predicate[1]).map((part) => part.toLowerCase());
     for (const category of categories) {
-      if (!["light", "medium", "heavy"].includes(category)) return die(`${entry.name} (line ${entry.line}): unrecognised armor category "${category}" in "(${qualifier})".`);
+      if (!["light", "medium", "heavy"].includes(category))
+        return die(
+          `${entry.name} (line ${entry.line}): unrecognised armor category "${category}" in "(${qualifier})".`
+        );
     }
     let ids = bodyArmor.filter((piece) => categories.includes(piece.category ?? "")).map((piece) => piece.id);
     if (predicate[2]) {
       const excluded = slug(predicate[2]);
-      if (!ids.includes(excluded)) return die(`${entry.name} (line ${entry.line}): "(${qualifier})" excepts "${excluded}", which the named categories do not contain.`);
+      if (!ids.includes(excluded))
+        return die(
+          `${entry.name} (line ${entry.line}): "(${qualifier})" excepts "${excluded}", which the named categories do not contain.`
+        );
       ids = ids.filter((id) => id !== excluded);
     }
-    if (ids.length === 0) return die(`${entry.name} (line ${entry.line}): "(${qualifier})" resolved to zero armors - the category band column is missing from armor.v1.json.`);
+    if (ids.length === 0)
+      return die(
+        `${entry.name} (line ${entry.line}): "(${qualifier})" resolved to zero armors - the category band column is missing from armor.v1.json.`
+      );
     return ids;
   }
   return namedBaseIds(entry, qualifier, new Map(bodyArmor.map((piece) => [slug(piece.name), piece.id])), "armor");
@@ -337,11 +432,13 @@ const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
 function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesTo | null {
   if (RESERVED_UNBINDABLE.has(slug(entry.name))) return null;
   if (type.category === "Weapon" && slotId === "weapon") {
-    if (!type.qualifier) return die(`${entry.name} (line ${entry.line}): a weapon row whose type line names no base weapon.`);
+    if (!type.qualifier)
+      return die(`${entry.name} (line ${entry.line}): a weapon row whose type line names no base weapon.`);
     return { label: type.qualifier, baseIds: [...weaponBaseIds(entry, type.qualifier)] };
   }
   if (type.category === "Armor" && slotId === "armor") {
-    if (!type.qualifier) return die(`${entry.name} (line ${entry.line}): an armor row whose type line names no base armor.`);
+    if (!type.qualifier)
+      return die(`${entry.name} (line ${entry.line}): an armor row whose type line names no base armor.`);
     return { label: type.qualifier, baseIds: [...armorBaseIds(entry, type.qualifier)] };
   }
   return null;
@@ -362,35 +459,50 @@ for (const entry of items) {
 
   const ladder = LADDER_SUFFIX.test(entry.name) ? entry.name.replace(LADDER_SUFFIX, "") : null;
   const rungs = ladder ? type.rarity.match(LADDER_RARITIES) : null;
-  if (ladder && !rungs) die(`${entry.name} (line ${entry.line}): a "+1, +2, or +3" name whose rarity segment is not a three-rung ladder ("${type.rarity}").`);
+  if (ladder && !rungs)
+    die(
+      `${entry.name} (line ${entry.line}): a "+1, +2, or +3" name whose rarity segment is not a three-rung ladder ("${type.rarity}").`
+    );
 
   // `Horn of Valhalla` prints a rarity ladder but is not a "+1, +2, or +3" item; its metal is a d100
   // roll, so it gets `varies`. Any other multi-rung rarity lands here too.
   const tiers = rungs
-    ? [1, 2, 3].map((bonus) => ({ name: `${ladder}, +${bonus}`, printedRarity: rungs[bonus].trim(), rarity: rarityId(rungs[bonus].trim()) }))
-    // The printed segment stays verbatim in the description even when the slug collapses to `varies`.
-    : [{ name: entry.name, printedRarity: type.rarity, rarity: /,| or /.test(type.rarity) ? "varies" : rarityId(type.rarity) }];
+    ? [1, 2, 3].map((bonus) => ({
+        name: `${ladder}, +${bonus}`,
+        printedRarity: rungs[bonus].trim(),
+        rarity: rarityId(rungs[bonus].trim())
+      }))
+    : // The printed segment stays verbatim in the description even when the slug collapses to `varies`.
+      [
+        {
+          name: entry.name,
+          printedRarity: type.rarity,
+          rarity: /,| or /.test(type.rarity) ? "varies" : rarityId(type.rarity)
+        }
+      ];
 
   for (const tier of tiers) {
     const rarity = tier.rarity;
     const printedTypeLine = `${printedCategory}, ${tier.printedRarity}${attunementSuffix}`;
     const description = renderDescription(entry, printedTypeLine);
-    rows.push(EquipmentReferenceSchema.parse({
-      id: slug(tier.name),
-      name: tier.name,
-      category,
-      slot: slotId,
-      // The SRD prints value bands by rarity, never per-item prices or weights.
-      costGp: null,
-      weightLb: null,
-      description: description.text,
-      weapon: null,
-      armor: null,
-      appliesTo,
-      isMagic: true,
-      rarity,
-      attunement: { required: type.attunement.required, restrictedTo: [...type.attunement.restrictedTo] }
-    }));
+    rows.push(
+      EquipmentReferenceSchema.parse({
+        id: slug(tier.name),
+        name: tier.name,
+        category,
+        slot: slotId,
+        // The SRD prints value bands by rarity, never per-item prices or weights.
+        costGp: null,
+        weightLb: null,
+        description: description.text,
+        weapon: null,
+        armor: null,
+        appliesTo,
+        isMagic: true,
+        rarity,
+        attunement: { required: type.attunement.required, restrictedTo: [...type.attunement.restrictedTo] }
+      })
+    );
     provenance.push({ id: slug(tier.name), from: `${entry.name} (line ${entry.line})` });
   }
 }
@@ -400,18 +512,35 @@ for (const entry of items) {
 if (rows.length !== 268) die(`Expected 268 rows (258 entries - 5 ladders + 15 tiers), emitted ${rows.length}.`);
 
 const badSlots = rows.filter((row) => !ItemSlotSchema.safeParse(row.slot).success);
-if (badSlots.length > 0) die(`${badSlots.length} row(s) carry a slot that is not a member of ItemSlotSchema: ${badSlots.map((row) => `${row.name} -> ${row.slot}`).join(", ")}`);
+if (badSlots.length > 0)
+  die(
+    `${badSlots.length} row(s) carry a slot that is not a member of ItemSlotSchema: ${badSlots.map((row) => `${row.name} -> ${row.slot}`).join(", ")}`
+  );
 
 const badRarities = rows.filter((row) => !RARITY_IDS.includes(row.rarity ?? ""));
-if (badRarities.length > 0) die(`${badRarities.length} row(s) carry a rarity outside RARITY_IDS: ${badRarities.map((row) => `${row.name} -> ${row.rarity}`).join(", ")}`);
+if (badRarities.length > 0)
+  die(
+    `${badRarities.length} row(s) carry a rarity outside RARITY_IDS: ${badRarities.map((row) => `${row.name} -> ${row.rarity}`).join(", ")}`
+  );
 
 // The eligibility column is total on weapons and body armor and absent everywhere else.
-const missingAppliesTo = rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id));
-if (missingAppliesTo.length > 0) die(`${missingAppliesTo.length} weapon/armor row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`);
+const missingAppliesTo = rows.filter(
+  (row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id)
+);
+if (missingAppliesTo.length > 0)
+  die(
+    `${missingAppliesTo.length} weapon/armor row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`
+  );
 const boundReserved = rows.filter((row) => RESERVED_UNBINDABLE.has(row.id) && row.appliesTo);
-if (boundReserved.length > 0) die(`${boundReserved.length} U20-reserved row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`);
+if (boundReserved.length > 0)
+  die(
+    `${boundReserved.length} U20-reserved row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`
+  );
 const strayAppliesTo = rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo);
-if (strayAppliesTo.length > 0) die(`${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`);
+if (strayAppliesTo.length > 0)
+  die(
+    `${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`
+  );
 
 // Expanding `Potions of Healing` would have minted `potion-of-healing`, which `equipment.v1.json`
 // already ships; this guard turns any such collision into a build failure.
@@ -424,13 +553,24 @@ for (const file of OTHER_BUNDLES) {
 }
 const collisions = rows
   .filter((row) => elsewhere.has(row.id))
-  .map((row) => `${row.id} (minted from ${provenance.find((entry) => entry.id === row.id)!.from}) already ships in ${elsewhere.get(row.id)}`);
+  .map(
+    (row) =>
+      `${row.id} (minted from ${provenance.find((entry) => entry.id === row.id)!.from}) already ships in ${elsewhere.get(row.id)}`
+  );
 const duplicates = rows.map((row) => row.id).filter((id, index, all) => all.indexOf(id) !== index);
 if (collisions.length > 0 || duplicates.length > 0) {
-  die([
-    collisions.length > 0 ? `${collisions.length} minted id(s) already exist in another bundle:\n  ${collisions.join("\n  ")}` : "",
-    duplicates.length > 0 ? `${duplicates.length} duplicate id(s) inside this bundle: ${[...new Set(duplicates)].join(", ")}` : ""
-  ].filter(Boolean).join("\n"));
+  die(
+    [
+      collisions.length > 0
+        ? `${collisions.length} minted id(s) already exist in another bundle:\n  ${collisions.join("\n  ")}`
+        : "",
+      duplicates.length > 0
+        ? `${duplicates.length} duplicate id(s) inside this bundle: ${[...new Set(duplicates)].join(", ")}`
+        : ""
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
 }
 
 // ---- 7. The mechanics overlay -------------------------------------------------------------------
@@ -440,8 +580,11 @@ if (collisions.length > 0 || duplicates.length > 0) {
  * the validate and write. The bundle is output only, so the overlay may set any rider field.
  */
 const merged: EquipmentReference[] = ((): EquipmentReference[] => {
-  try { return applyItemMechanics(rows, lanes); }
-  catch (error) { return die(error instanceof Error ? error.message : String(error)); }
+  try {
+    return applyItemMechanics(rows, lanes);
+  } catch (error) {
+    return die(error instanceof Error ? error.message : String(error));
+  }
 })();
 
 // Rows whose serialized bytes changed, keyed by id so the sort below cannot disturb it.
@@ -453,13 +596,22 @@ merged.sort((left, right) => left.name.localeCompare(right.name));
 z.array(EquipmentReferenceSchema).parse(merged);
 writeFileSync(outPath, `${JSON.stringify(merged, null, 1)}\n`);
 
-const histogram = (values: readonly string[]) => [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map<string, number>())]
-  .sort((left, right) => right[1] - left[1]).map(([key, count]) => `${key} ${count}`).join(" · ");
-console.log(`wrote ${merged.length} magic items (${items.length} entries, ${NOT_ITEMS.length} creature stat blocks skipped by name).`);
+const histogram = (values: readonly string[]) =>
+  [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map<string, number>())]
+    .sort((left, right) => right[1] - left[1])
+    .map(([key, count]) => `${key} ${count}`)
+    .join(" · ");
+console.log(
+  `wrote ${merged.length} magic items (${items.length} entries, ${NOT_ITEMS.length} creature stat blocks skipped by name).`
+);
 console.log(`  slot:     ${histogram(merged.map((row) => row.slot!))}`);
 console.log(`  category: ${histogram(merged.map((row) => row.category))}`);
 console.log(`  rarity:   ${histogram(merged.map((row) => row.rarity!))}`);
 console.log(`  attunement required: ${merged.filter((row) => row.attunement?.required).length}`);
-console.log(`  descriptions cut at the ${DESCRIPTION_LIMIT}-char schema cap: ${merged.filter((row) => row.description!.endsWith(TRUNCATION_MARK)).length}`);
+console.log(
+  `  descriptions cut at the ${DESCRIPTION_LIMIT}-char schema cap: ${merged.filter((row) => row.description!.endsWith(TRUNCATION_MARK)).length}`
+);
 // Counts rows whose bytes moved, so it cannot report work the merge did not do.
-console.log(`  rows changed by the overlay: ${changed} (${lanes.length} lane(s): ${lanes.map((lane) => lane.lane).join(", ") || "none"})`);
+console.log(
+  `  rows changed by the overlay: ${changed} (${lanes.length} lane(s): ${lanes.map((lane) => lane.lane).join(", ") || "none"})`
+);

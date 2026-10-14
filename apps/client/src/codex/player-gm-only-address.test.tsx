@@ -13,9 +13,14 @@ vi.mock("./api", async (importOriginal) => {
     playerCodexApi: {
       ...actual.playerCodexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listMaps: async () => [], chronicle: async () => [], listConnections: async () => [],
-      calendar: async () => null, sessions: async () => [], quests: async () => [],
-      standing: async () => [], party: async () => null
+      listMaps: async () => [],
+      chronicle: async () => [],
+      listConnections: async () => [],
+      calendar: async () => null,
+      sessions: async () => [],
+      quests: async () => [],
+      standing: async () => [],
+      party: async () => null
     }
   };
 });
@@ -29,7 +34,10 @@ import { rememberLocation, resumeTarget } from "../router";
  * heading must not name the GM section.
  */
 
-beforeEach(() => { listPages.mockResolvedValue([]); localStorage.clear(); });
+beforeEach(() => {
+  listPages.mockResolvedValue([]);
+  localStorage.clear();
+});
 
 /** Render the player Codex at an address and return all rendered text. */
 async function textAt(path: string): Promise<string> {

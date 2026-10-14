@@ -39,8 +39,20 @@ type Feature = Readonly<{
 
 /** Reserved choice kinds, offered as suggestions: `FeatureChoiceSchema.kind` is an open slug. */
 const CHOICE_KINDS = [
-  "feat", "fighting-style", "asi-or-feat", "subclass", "lineage", "spell", "cantrip",
-  "skill", "tool", "language", "skill-or-tool", "expertise", "ability-score", "weapon-mastery"
+  "feat",
+  "fighting-style",
+  "asi-or-feat",
+  "subclass",
+  "lineage",
+  "spell",
+  "cantrip",
+  "skill",
+  "tool",
+  "language",
+  "skill-or-tool",
+  "expertise",
+  "ability-score",
+  "weapon-mastery"
 ];
 
 /** How a choice states its list. Held in React state, not the draft; see `featureFields`. */
@@ -133,9 +145,10 @@ const offerValidate = (value: unknown): string | null => {
  * so every write here deletes them, and their writes clear `fromPicks` in return.
  */
 const writeFromPicks = (block: Draft, leaf: "offer" | "where", next: unknown): Draft => {
-  const held = block.fromPicks && typeof block.fromPicks === "object" && !Array.isArray(block.fromPicks)
-    ? (block.fromPicks as Record<string, unknown>)
-    : {};
+  const held =
+    block.fromPicks && typeof block.fromPicks === "object" && !Array.isArray(block.fromPicks)
+      ? (block.fromPicks as Record<string, unknown>)
+      : {};
   const text = typeof next === "string" ? next.trim() : "";
   const merged: Record<string, unknown> = { ...held };
   if (text) merged[leaf] = text;
@@ -160,12 +173,16 @@ const withoutPicks = (block: Draft, changes: Readonly<Record<string, unknown>>):
 const featuresOf = (draft: Draft): readonly Draft[] => [
   ...(Array.isArray(draft.features) ? (draft.features as Draft[]) : []),
   ...(Array.isArray(draft.traits) ? (draft.traits as Draft[]) : []),
-  ...(draft.feature && typeof draft.feature === "object" && !Array.isArray(draft.feature) ? [draft.feature as Draft] : [])
+  ...(draft.feature && typeof draft.feature === "object" && !Array.isArray(draft.feature)
+    ? [draft.feature as Draft]
+    : [])
 ];
 
 /** Every feature id this record declares — the targets a `feature:<id>` offer may name. */
 const featureIdsOf = (draft: Draft): readonly string[] =>
-  featuresOf(draft).map((feature) => String((feature as { id?: unknown })?.id ?? "")).filter(Boolean);
+  featuresOf(draft)
+    .map((feature) => String((feature as { id?: unknown })?.id ?? ""))
+    .filter(Boolean);
 
 /** Every answer any pick on this record could hold: the id half of a `requires` clause. SRD gates
     name a sibling feature's option, so the record already declares the ids. */
@@ -192,20 +209,23 @@ const optionIdsOf = (draft: Draft): readonly string[] => {
  * namespace, and `id` may name an option not authored yet.
  */
 function requiresField(): FieldDef {
-  const write = (leaf: "offer" | "id") => (next: unknown, option: Draft): Draft => {
-    const held = option.requires && typeof option.requires === "object" && !Array.isArray(option.requires)
-      ? (option.requires as Record<string, unknown>)
-      : {};
-    const text = typeof next === "string" ? next.trim() : "";
-    const merged: Record<string, unknown> = { ...held };
-    if (text) merged[leaf] = text;
-    else delete merged[leaf];
-    const out: Record<string, unknown> = { ...option };
-    // An emptied pair removes the clause; a leftover `{}` would fail publish.
-    if (Object.keys(merged).length === 0) delete out.requires;
-    else out.requires = merged;
-    return out;
-  };
+  const write =
+    (leaf: "offer" | "id") =>
+    (next: unknown, option: Draft): Draft => {
+      const held =
+        option.requires && typeof option.requires === "object" && !Array.isArray(option.requires)
+          ? (option.requires as Record<string, unknown>)
+          : {};
+      const text = typeof next === "string" ? next.trim() : "";
+      const merged: Record<string, unknown> = { ...held };
+      if (text) merged[leaf] = text;
+      else delete merged[leaf];
+      const out: Record<string, unknown> = { ...option };
+      // An emptied pair removes the clause; a leftover `{}` would fail publish.
+      if (Object.keys(merged).length === 0) delete out.requires;
+      else out.requires = merged;
+      return out;
+    };
   return {
     key: "requires",
     label: "Only when an earlier pick chose",
@@ -265,7 +285,9 @@ function extraPicksField(): FieldDef {
     rowLabel: (row) => {
       const grant = row as { offer?: unknown; amount?: unknown; scaling?: { id?: unknown } };
       const offer = String(grant.offer || "no pick named");
-      return grant.scaling ? `${offer} — grows with ${String(grant.scaling.id || "a column")}` : `${offer} +${Number(grant.amount ?? 1)}`;
+      return grant.scaling
+        ? `${offer} — grows with ${String(grant.scaling.id || "a column")}`
+        : `${offer} +${Number(grant.amount ?? 1)}`;
     },
     rows: [
       {
@@ -388,13 +410,16 @@ const replacesFeatureIdField = (): FieldDef => ({
     ...featureIdsOf(draft).map((id) => ({ value: id, label: featureLabelOf(draft, id) }))
   ],
   // `options` receives the record, not the row, so self-reference is caught here instead.
-  validate: (value, feature) => (value && value === feature.id ? "A feature cannot supersede itself — pick the earlier one it replaces." : null)
+  validate: (value, feature) =>
+    value && value === feature.id ? "A feature cannot supersede itself — pick the earlier one it replaces." : null
 });
 
 /** The spell window applies to these kinds, or to any block already holding a bound (kind is open). */
 const showsSpellWindow = (block: Draft): boolean =>
-  block.kind === "spell" || block.kind === "cantrip"
-  || block.maxSpellLevel !== undefined || block.minSpellLevel !== undefined;
+  block.kind === "spell" ||
+  block.kind === "cantrip" ||
+  block.maxSpellLevel !== undefined ||
+  block.minSpellLevel !== undefined;
 
 /** The controls of one choice block, keys relative to the block. */
 function choiceBlockFields(): readonly FieldDef[] {
@@ -452,12 +477,13 @@ function choiceBlockFields(): readonly FieldDef[] {
         const from = block.from;
         return (Array.isArray(from) ? from : []).map(String).join(", ");
       },
-      write: (next, block) => withoutPicks(block, {
-        from: String(next ?? "")
-          .split(",")
-          .map((entry) => asChoiceSlug(entry.trim()))
-          .filter(Boolean)
-      })
+      write: (next, block) =>
+        withoutPicks(block, {
+          from: String(next ?? "")
+            .split(",")
+            .map((entry) => asChoiceSlug(entry.trim()))
+            .filter(Boolean)
+        })
     },
     {
       /** `fromPicks` as one group, since budget and predicate form one clause. See `writeFromPicks`. */
@@ -474,7 +500,10 @@ function choiceBlockFields(): readonly FieldDef[] {
           placeholder: "class-cantrips",
           // Same open namespace as `extraPicks` and `replaces`.
           help: "A named budget, or feature:<id> for one of this record's own features.",
-          suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+          suggestions: (_ctx, draft) => [
+            ...NAMED_PICK_BUDGET_KEYS,
+            ...featureIdsOf(draft).map((id) => `feature:${id}`)
+          ],
           validate: offerValidate,
           write: (next, block) => writeFromPicks(block, "offer", next)
         },
@@ -667,8 +696,7 @@ export function FeatureEditor({
     return levels;
   };
 
-  const writeFeatures = (next: readonly Feature[]) =>
-    onDraft(setAt(draft, featuresKey, single ? next[0] : next));
+  const writeFeatures = (next: readonly Feature[]) => onDraft(setAt(draft, featuresKey, single ? next[0] : next));
 
   /** Writes both halves in one edit: one draft identity, one autosave. */
   const setGrantedLevels = (index: number, levels: readonly number[]) => {
@@ -745,7 +773,7 @@ export function FeatureEditor({
     const choicesField = fieldFor("choices");
     const blockCap = choicesField.maxRows ?? 4;
 
-  /** Replace one feature wholesale; every choice write funnels through this. */
+    /** Replace one feature wholesale; every choice write funnels through this. */
     const putFeature = (next: Draft) =>
       writeFeatures(features.map((entry, i) => (i === index ? (next as Feature) : entry)));
 
@@ -799,7 +827,13 @@ export function FeatureEditor({
           field={blockFieldFor(key)}
           value={block}
           onValue={(next) =>
-            putFeature(writeChoiceBlocks(feature, blocks.map((held, i) => (i === blockIndex ? (next as Record<string, unknown>) : held))))}
+            putFeature(
+              writeChoiceBlocks(
+                feature,
+                blocks.map((held, i) => (i === blockIndex ? (next as Record<string, unknown>) : held))
+              )
+            )
+          }
           draft={draft}
           onDraft={onDraft}
           ctx={ctx}
@@ -812,7 +846,17 @@ export function FeatureEditor({
           {blocks.length > 1 && (
             <div className="hb-choice-head">
               <span className="nh-field-label">Choice {blockIndex + 1}</span>
-              <Button size="sm" onClick={() => putFeature(writeChoiceBlocks(feature, blocks.filter((_, i) => i !== blockIndex)))}>
+              <Button
+                size="sm"
+                onClick={() =>
+                  putFeature(
+                    writeChoiceBlocks(
+                      feature,
+                      blocks.filter((_, i) => i !== blockIndex)
+                    )
+                  )
+                }
+              >
                 Remove choice {blockIndex + 1}
               </Button>
             </div>
@@ -826,7 +870,9 @@ export function FeatureEditor({
           <div className="hb-field">
             <span className="nh-field-label">Where the options come from</span>
             <SegmentedControl
-              ariaLabel={blocks.length > 1 ? `Where choice ${blockIndex + 1}'s options come from` : "Where the options come from"}
+              ariaLabel={
+                blocks.length > 1 ? `Where choice ${blockIndex + 1}'s options come from` : "Where the options come from"
+              }
               size="sm"
               value={source}
               options={[
@@ -839,9 +885,12 @@ export function FeatureEditor({
                  all but one. The offer is seeded empty so it cannot point at the wrong budget. */
               onChange={(next) => {
                 setSourceMode((prev) => ({ ...prev, [stateKey]: next as SourceMode }));
-                if (next === "catalog") setChoice({ options: undefined, from: undefined, fromPicks: undefined, fromCatalog: "skills" });
-                else if (next === "list") setChoice({ options: undefined, fromCatalog: undefined, fromPicks: undefined, from: [] });
-                else if (next === "picks") setChoice({ options: undefined, from: undefined, fromCatalog: undefined, fromPicks: { offer: "" } });
+                if (next === "catalog")
+                  setChoice({ options: undefined, from: undefined, fromPicks: undefined, fromCatalog: "skills" });
+                else if (next === "list")
+                  setChoice({ options: undefined, fromCatalog: undefined, fromPicks: undefined, from: [] });
+                else if (next === "picks")
+                  setChoice({ options: undefined, from: undefined, fromCatalog: undefined, fromPicks: { offer: "" } });
                 else setChoice({ fromCatalog: undefined, from: undefined, fromPicks: undefined, options: [] });
               }}
             />
@@ -892,7 +941,13 @@ export function FeatureEditor({
               {/* Resolved through the same function the server validates with. A slug naming this
                   record cannot resolve against the merged catalog, so it gets a neutral explanation
                   instead of an error. */}
-              <p className={(!catalogSlug || (catalogResult && "error" in catalogResult)) && !selfCatalog ? "hb-blocked" : "nh-field-help"}>
+              <p
+                className={
+                  (!catalogSlug || (catalogResult && "error" in catalogResult)) && !selfCatalog
+                    ? "hb-blocked"
+                    : "nh-field-help"
+                }
+              >
                 {selfCatalog
                   ? "Players pick from the records that name this one. They only have to exist in your library — they don't have to be published."
                   : !catalogSlug
@@ -968,13 +1023,15 @@ export function FeatureEditor({
 
           {/* Live `choose × grants` readout. */}
           <p className="hb-picks">
-            {levelAware && grants > 1
-              ? `Granted at ${grants} levels × choose ${choose} = `
-              : `Choose ${choose} = `}
+            {levelAware && grants > 1 ? `Granted at ${grants} levels × choose ${choose} = ` : `Choose ${choose} = `}
             <strong>
               {grants * choose} {grants * choose === 1 ? "pick" : "picks"}
             </strong>
-            {repeatable ? ". The same option may be taken again." : grants * choose > 1 ? ", each a different option." : "."}
+            {repeatable
+              ? ". The same option may be taken again."
+              : grants * choose > 1
+                ? ", each a different option."
+                : "."}
           </p>
         </div>
       );
@@ -1049,12 +1106,16 @@ export function FeatureEditor({
                 size="sm"
                 disabled={blocks.length >= blockCap}
                 aria-describedby={blocks.length >= blockCap ? `${autoId}-choicecap-${feature.id}` : undefined}
-                onClick={() => putFeature(writeChoiceBlocks(feature, [...blocks, choicesField.newRow!() as ChoiceBlock]))}
+                onClick={() =>
+                  putFeature(writeChoiceBlocks(feature, [...blocks, choicesField.newRow!() as ChoiceBlock]))
+                }
               >
                 {choicesField.addLabel}
               </Button>
               {blocks.length >= blockCap && (
-                <p className="nh-field-help" id={`${autoId}-choicecap-${feature.id}`}>{choicesField.maxRowsReason}</p>
+                <p className="nh-field-help" id={`${autoId}-choicecap-${feature.id}`}>
+                  {choicesField.maxRowsReason}
+                </p>
               )}
             </div>
           </>

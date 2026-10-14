@@ -22,7 +22,14 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
   const characters = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
 
   const claim = async (actorId: string, name: string) => {
-    if (!(await confirm({ title: `Claim ${name}?`, body: "You'll play them at this table until you release them.", confirmLabel: "Claim" }))) return;
+    if (
+      !(await confirm({
+        title: `Claim ${name}?`,
+        body: "You'll play them at this table until you release them.",
+        confirmLabel: "Claim"
+      }))
+    )
+      return;
     setClaiming(actorId);
     socket.emit("character:claim", { commandId: newId(), actorId, expectedRevision: state.revision }, (result) => {
       setClaiming(null);
@@ -32,43 +39,55 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
   };
 
   /* A scroll region at every width, so the picker never pushes the map down its column. */
-  return <section className="claim-view scroll-y" aria-labelledby="claim-heading">
-    <div className="claim-heading">
-      <h2 id="claim-heading">Choose your character</h2>
-      <p>Pick who you'll play at the table.</p>
-    </div>
-    {characters.length === 0
-      ? <div className="nh-empty">
+  return (
+    <section className="claim-view scroll-y" aria-labelledby="claim-heading">
+      <div className="claim-heading">
+        <h2 id="claim-heading">Choose your character</h2>
+        <p>Pick who you'll play at the table.</p>
+      </div>
+      {characters.length === 0 ? (
+        <div className="nh-empty">
           <span className="nh-empty-title">Nothing to claim yet</span>
-          <span className="nh-empty-text">Your GM is setting up the party. You can send them a character sheet in the meantime.</span>
+          <span className="nh-empty-text">
+            Your GM is setting up the party. You can send them a character sheet in the meantime.
+          </span>
         </div>
-      : <ul className="claim-grid">
-        {characters.map((actor) => {
-          const claimState = claimStateOf(actor);
-          const taken = claimState === "claimed";
-          return <li key={actor.id} className="claim-card">
-            <Avatar name={actor.name} size="lg" />
-            <h3 className="claim-card-name">{actor.name}</h3>
-            <Badge tone={taken ? "info" : "neutral"}>{CLAIM_WORD[claimState]}</Badge>
-            <Button
-              variant="primary"
-              block
-              className="claim-card-action"
-              disabled={taken || claiming !== null}
-              onClick={() => claim(actor.id, actor.name)}
-            >{claiming === actor.id ? "Claiming…" : taken ? "Claimed" : "Claim"}</Button>
-          </li>;
-        })}
-      </ul>}
-    <div className="claim-actions">
-      <Button variant="ghost" onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
-    </div>
-    <PdfImportModal
-      open={pdfImportOpen}
-      role="player"
-      onClose={() => setPdfImportOpen(false)}
-      onImported={() => toast("Sent to your GM for approval.", { tone: "success" })}
-    />
-    {dialog}
-  </section>;
+      ) : (
+        <ul className="claim-grid">
+          {characters.map((actor) => {
+            const claimState = claimStateOf(actor);
+            const taken = claimState === "claimed";
+            return (
+              <li key={actor.id} className="claim-card">
+                <Avatar name={actor.name} size="lg" />
+                <h3 className="claim-card-name">{actor.name}</h3>
+                <Badge tone={taken ? "info" : "neutral"}>{CLAIM_WORD[claimState]}</Badge>
+                <Button
+                  variant="primary"
+                  block
+                  className="claim-card-action"
+                  disabled={taken || claiming !== null}
+                  onClick={() => claim(actor.id, actor.name)}
+                >
+                  {claiming === actor.id ? "Claiming…" : taken ? "Claimed" : "Claim"}
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="claim-actions">
+        <Button variant="ghost" onClick={() => setPdfImportOpen(true)}>
+          Import from D&amp;D Beyond (PDF)
+        </Button>
+      </div>
+      <PdfImportModal
+        open={pdfImportOpen}
+        role="player"
+        onClose={() => setPdfImportOpen(false)}
+        onImported={() => toast("Sent to your GM for approval.", { tone: "success" })}
+      />
+      {dialog}
+    </section>
+  );
 }

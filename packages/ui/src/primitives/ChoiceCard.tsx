@@ -38,8 +38,22 @@ export interface ChoiceCardProps {
     pick-one from pick-N. One chosen treatment everywhere, a cyan edge with the selection glow plus a check
     mark; don't add a second cue. */
 export function ChoiceCard({
-  selected, onSelect, title, description, icon, badge, meta,
-  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, action, className, ref,
+  selected,
+  onSelect,
+  title,
+  description,
+  icon,
+  badge,
+  meta,
+  disabled = false,
+  disabledReason,
+  tabIndex,
+  onKeyDown,
+  selectionRole = "radio",
+  id,
+  action,
+  className,
+  ref,
   "aria-describedby": describedBy
 }: ChoiceCardProps) {
   const card = (
@@ -57,19 +71,37 @@ export function ChoiceCard({
       className={cx("nh-choice", selected && "is-selected", "interactive", className)}
     >
       <span className="nh-choice-head">
-        {icon != null && <span className="nh-choice-icon" aria-hidden="true">{icon}</span>}
+        {icon != null && (
+          <span className="nh-choice-icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
         <span className="nh-choice-title">{title}</span>
         {badge != null && <span className="nh-choice-badge">{badge}</span>}
       </span>
       {description != null && <span className="nh-choice-desc">{description}</span>}
       {meta != null && <span className="nh-choice-meta tabular">{meta}</span>}
       {disabled && disabledReason != null && (
-        <span className="nh-choice-locked"><span className="nh-choice-locked-icon" aria-hidden="true"><IconWarning /></span>{disabledReason}</span>
+        <span className="nh-choice-locked">
+          <span className="nh-choice-locked-icon" aria-hidden="true">
+            <IconWarning />
+          </span>
+          {disabledReason}
+        </span>
       )}
       {/* The check is the chosen mark; aria-checked carries it for assistive tech. */}
-      <span className="nh-choice-check" aria-hidden="true"><IconCheck /></span>
+      <span className="nh-choice-check" aria-hidden="true">
+        <IconCheck />
+      </span>
     </button>
   );
   /* No wrapper without an action, so a large grid doesn't grow an extra element per card. */
-  return action == null ? card : <div className="nh-choice-wrap">{card}{action}</div>;
+  return action == null ? (
+    card
+  ) : (
+    <div className="nh-choice-wrap">
+      {card}
+      {action}
+    </div>
+  );
 }

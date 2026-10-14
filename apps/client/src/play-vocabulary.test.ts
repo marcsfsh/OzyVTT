@@ -19,29 +19,54 @@ assertRoots();
  */
 const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string; where?: RegExp }>> = [
   // The playable entity
-  { pattern: /\bactors?\b/i, use: "“character” / “monster” / “NPC” — the specific kind, or “character or monster” for the generic slot" },
+  {
+    pattern: /\bactors?\b/i,
+    use: "“character” / “monster” / “NPC” — the specific kind, or “character or monster” for the generic slot"
+  },
   { pattern: /\bcombatants?\b/i, use: "“character” / “monster”; the list they are in is “Turn order”" },
-  { pattern: /\bcreatures?\b/i, use: "the specific kind, or “it”/“its” — “on its own turn”, not “on this creature's turn”" },
+  {
+    pattern: /\bcreatures?\b/i,
+    use: "the specific kind, or “it”/“its” — “on its own turn”, not “on this creature's turn”"
+  },
   // Visibility: one decision, one pair of words (the RevealSwitch family's)
-  { pattern: /\b(gm|shared) layer\b/i, use: "“Shown to players” / “Hidden from players” — a layer is an implementation detail, not a thing a GM decides about" },
+  {
+    pattern: /\b(gm|shared) layer\b/i,
+    use: "“Shown to players” / “Hidden from players” — a layer is an implementation detail, not a thing a GM decides about"
+  },
   { pattern: /\bGM-only\b/, use: "“GM only”, unhyphenated — the spelling `GmOnlyTag` renders" },
   { pattern: /\bpublicly\b|\bpublic\b/i, use: "“Shown to players”" },
   // The dice phrasings. `^Everyone$`, not `\bEveryone\b`: a one-word string is a label and must use
   // the reveal words, while a sentence containing "Everyone" is just English.
-  { pattern: /^Everyone$/, use: "“Shown to players” — the roll audience uses the same words as every other reveal (dice/DicePanel.tsx's ROLL_VISIBILITY_WORD)" },
-  { pattern: /\bJust me\b|\bJust the GM\b/i, use: "“GM only” / “Hidden from players” — see ROLL_VISIBILITY_WORD in dice/DicePanel.tsx" },
+  {
+    pattern: /^Everyone$/,
+    use: "“Shown to players” — the roll audience uses the same words as every other reveal (dice/DicePanel.tsx's ROLL_VISIBILITY_WORD)"
+  },
+  {
+    pattern: /\bJust me\b|\bJust the GM\b/i,
+    use: "“GM only” / “Hidden from players” — see ROLL_VISIBILITY_WORD in dice/DicePanel.tsx"
+  },
   // Claim states
   { pattern: /\bunclaimed\b/i, use: "“Available” (actors/actor-display.ts's CLAIM_WORD)" },
   { pattern: /\btaken\b/i, use: "“Claimed” (actors/actor-display.ts's CLAIM_WORD)" },
   // The rules assistant
-  { pattern: /\b(strict|assisted|freeform)\b/i, use: "“Enforce” / “Advise” / “Off” — the wire values keep their names, the dial does not" },
+  {
+    pattern: /\b(strict|assisted|freeform)\b/i,
+    use: "“Enforce” / “Advise” / “Off” — the wire values keep their names, the dial does not"
+  },
   // The fight, and the place it happens
-  { pattern: /\bencounters?\b/i, use: "“fight” for the event (“Start the fight”, “Add to this fight”) and “Table” for the place — D28 demotes “encounter” to a wire name" },
+  {
+    pattern: /\bencounters?\b/i,
+    use: "“fight” for the event (“Start the fight”, “Add to this fight”) and “Table” for the place — D28 demotes “encounter” to a wire name"
+  },
   { pattern: /\bbattlemaps?\b/i, use: "“battle map”, two words — the Codex's spelling wins" },
   { pattern: /\bscene prep\b/i, use: "“Staging” — one name for the GM-private setup state, not three" },
   // A finished fight's record
   { pattern: /\brecordings?\b/i, use: "“replay”" },
-  { pattern: /\barchives?\b/i, where: /\/replay\//, use: "“replay” — “Archive” stays the reversible verb elsewhere, but a finished fight's record is a Replay" },
+  {
+    pattern: /\barchives?\b/i,
+    where: /\/replay\//,
+    use: "“replay” — “Archive” stays the reversible verb elsewhere, but a finished fight's record is a Replay"
+  },
   // The verb triad
   { pattern: /remove from pickers/i, use: "“Archive” — the act is reversible, so it is the Archive verb" },
   { pattern: /^Removed$/, use: "“Archived” — the state a reversible Archive leaves behind" }
@@ -69,7 +94,11 @@ const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]>
 const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
   ["apps/client/src/scene/MapToolbar.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs D28 keeps"],
   ["apps/client/src/scene/MapToolbar.tsx", "Hide the whole map again", "fog: the Hide half"],
-  ["apps/client/src/encounter/EncounterPanel.tsx", "Initiative d20", "Initiative the SCORE keeps its D&D name; only the LIST is “Turn order”"],
+  [
+    "apps/client/src/encounter/EncounterPanel.tsx",
+    "Initiative d20",
+    "Initiative the SCORE keeps its D&D name; only the LIST is “Turn order”"
+  ],
   ["apps/client/src/encounter/EncounterPanel.tsx", "Saving throw for $", "Save the THROW, not the persist verb"],
   ["apps/client/src/actors/ClaimCharacter.tsx", "Claim", "the table's claim verb"],
   ["apps/client/src/actors/MyCharacter.tsx", "Release", "the table's release verb — never “Leave”"]
@@ -92,7 +121,20 @@ describe("The play glossary (D28)", () => {
   it("covers every play directory, not a list someone remembered to update", () => {
     // Named directories, so a scan that stops walking one fails by name rather than by a count.
     const dirs = new Set(playCopySources().map((source) => source.file.replace("apps/client/src/", "").split("/")[0]));
-    for (const dir of ["actors", "builder", "dice", "encounter", "homebrew", "maps", "replay", "scene", "scenes", "settings", "tokens", "viewer"]) {
+    for (const dir of [
+      "actors",
+      "builder",
+      "dice",
+      "encounter",
+      "homebrew",
+      "maps",
+      "replay",
+      "scene",
+      "scenes",
+      "settings",
+      "tokens",
+      "viewer"
+    ]) {
       expect(dirs.has(dir), `apps/client/src/${dir}/ is not in the scan`).toBe(true);
     }
     expect(dirs.has("codex"), "codex/ has its own lock and must stay out of this one").toBe(false);
@@ -102,9 +144,14 @@ describe("The play glossary (D28)", () => {
   it("sees the copy shapes a naive scanner is blind to", () => {
     // Named strings, so a narrowed scanner fails by name: an object-literal confirm title, an
     // object-literal confirm body, and a template literal.
-    expect(at("apps/client/src/replay/ReplayPanel.tsx", "Delete this replay?"), "object-literal confirm title").toBe(true);
+    expect(at("apps/client/src/replay/ReplayPanel.tsx", "Delete this replay?"), "object-literal confirm title").toBe(
+      true
+    );
     expect(
-      at("apps/client/src/encounter/EncounterPanel.tsx", "Turn order stays saved for reference, but the shared screen will hide it."),
+      at(
+        "apps/client/src/encounter/EncounterPanel.tsx",
+        "Turn order stays saved for reference, but the shared screen will hide it."
+      ),
       "object-literal confirm body"
     ).toBe(true);
     expect(at("apps/client/src/actors/ClaimCharacter.tsx", "Claim $?"), "template-literal confirm title").toBe(true);
@@ -128,12 +175,20 @@ describe("The play glossary (D28)", () => {
     // only shrink.
     for (const [file, text, why] of ALLOWED) {
       const rescued = strings.filter(
-        (entry) => entry.file === file && visible(entry) === text && RETIRED.some(({ pattern, where }) => (!where || where.test(file)) && pattern.test(text))
+        (entry) =>
+          entry.file === file &&
+          visible(entry) === text &&
+          RETIRED.some(({ pattern, where }) => (!where || where.test(file)) && pattern.test(text))
       );
-      expect(rescued.length, `exemption ${JSON.stringify(`${file} :: ${text}`)} rescues nothing — delete it`).toBeGreaterThan(0);
+      expect(
+        rescued.length,
+        `exemption ${JSON.stringify(`${file} :: ${text}`)} rescues nothing — delete it`
+      ).toBeGreaterThan(0);
       expect(why.length, `exemption ${JSON.stringify(text)} has no reason attached`).toBeGreaterThan(40);
     }
-    expect(ALLOWED.length, "the exemption list is shrink-only — see design-conventions-shape.ts").toBe(CONVENTION_SHAPE.playExemptions);
+    expect(ALLOWED.length, "the exemption list is shrink-only — see design-conventions-shape.ts").toBe(
+      CONVENTION_SHAPE.playExemptions
+    );
   });
 
   it("keeps the domain words D28 deliberately kept", () => {
@@ -171,7 +226,9 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
       ).toBe(true);
     }
     for (const dead of ["Just me (GM)", "Just me and the GM", "Just the GM"]) {
-      expect(source.includes(`"${dead}"`), `dice/DicePanel.tsx has re-grown the phrasing ${JSON.stringify(dead)}`).toBe(false);
+      expect(source.includes(`"${dead}"`), `dice/DicePanel.tsx has re-grown the phrasing ${JSON.stringify(dead)}`).toBe(
+        false
+      );
     }
   });
 
@@ -199,7 +256,10 @@ describe("The verb triad, pinned per dialog (D28)", () => {
   /** Delete is permanent and says so; Archive is reversible; Remove takes something out of a list. */
   it("says “cannot be undone” on every Delete, and only on a Delete", () => {
     const undoable = strings.filter((entry) => /this cannot be undone/i.test(visible(entry)));
-    expect(undoable.length, "no confirm says “This cannot be undone.” — the Delete dialogs have lost their warning").toBeGreaterThan(2);
+    expect(
+      undoable.length,
+      "no confirm says “This cannot be undone.” — the Delete dialogs have lost their warning"
+    ).toBeGreaterThan(2);
     for (const entry of undoable) {
       expect(
         /\barchiv/i.test(visible(entry)),
@@ -211,7 +271,9 @@ describe("The verb triad, pinned per dialog (D28)", () => {
   it("keeps Archive reversible in copy — it offers a way back", () => {
     expect(at("apps/client/src/homebrew/RecordDetail.tsx", "Archive this?"), "the homebrew archive confirm").toBe(true);
     const body = strings.find(
-      (entry) => entry.file === "apps/client/src/homebrew/RecordDetail.tsx" && /stops appearing in the character builder/.test(visible(entry))
+      (entry) =>
+        entry.file === "apps/client/src/homebrew/RecordDetail.tsx" &&
+        /stops appearing in the character builder/.test(visible(entry))
     );
     expect(body, "the homebrew archive confirm has lost its body").toBeDefined();
     expect(/restore it later/i.test(visible(body!)), "an Archive confirm must say the thing comes back").toBe(true);

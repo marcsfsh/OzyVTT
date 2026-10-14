@@ -1,31 +1,124 @@
 /* The embedded map picker. No @media rules: the grid is auto-fill, so a phone gets one column and a
    laptop four. */
-.map-picker { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: .55rem; border: 1px solid transparent; }
+.map-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid transparent;
+}
 /* One scrolling chip row, never a wrapping block that pushes the grid off-screen on a phone. */
-.map-picker-folders { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
-.map-picker-folders > * { flex: none; }
-.map-picker-search { width: 100%; }
+.map-picker-folders {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.15rem;
+  scrollbar-width: thin;
+}
+.map-picker-folders > * {
+  flex: none;
+}
+.map-picker-search {
+  width: 100%;
+}
 /* Embedded in a panel nothing hands it a height, so the picker caps itself at 21rem. `.scroll-y` is
    on the `<ul>` itself here: a `max-height` is not a definite block size, so the auto rows still size
    from the tiles. The maps rail lifts the cap and scrolls a wrapper instead. */
-.map-picker-grid { display: grid; min-width: 0; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: var(--space-2); margin: 0; padding: 0; list-style: none; max-height: 21rem; overscroll-behavior: contain; }
-.map-tile { display: flex; flex-direction: column; gap: .2rem; width: 100%; min-height: var(--tap-min); padding: .35rem; border: 1px solid transparent; color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
-.map-tile:hover { border-color: var(--line-hover); }
-.map-tile.is-selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.map-picker-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 21rem;
+  overscroll-behavior: contain;
+}
+.map-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0.35rem;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.map-tile:hover {
+  border-color: var(--line-hover);
+}
+.map-tile.is-selected {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
 /* Cap the art, or a one-column grid in a 390px modal makes each tile ~280px tall. */
-.map-tile-art { display: grid; place-items: center; aspect-ratio: 4 / 3; max-height: 5.5rem; overflow: hidden; border-radius: var(--radius-sm); background: var(--void); }
-.map-tile-art img { width: 100%; height: 100%; object-fit: cover; }
-.map-tile-art-empty { width: 100%; height: 100%; background: var(--grad-horizon); opacity: .25; }
-.map-tile-name { font-size: .78rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.map-tile-meta { color: var(--text-muted); font-size: .68rem; }
-.map-tile--upload { border-style: dashed; }
-.map-tile--upload .map-tile-art { color: var(--cyan); background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); }
+.map-tile-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  max-height: 5.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--void);
+}
+.map-tile-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.map-tile-art-empty {
+  width: 100%;
+  height: 100%;
+  background: var(--grad-horizon);
+  opacity: 0.25;
+}
+.map-tile-name {
+  font-size: 0.78rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-tile-meta {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+.map-tile--upload {
+  border-style: dashed;
+}
+.map-tile--upload .map-tile-art {
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan));
+}
 /* The real input stays in the DOM (the tile clicks it) but takes no layout or focus order. Same as
    `.map-upload-input`: Chromium sizes a file input from its shadow button, so `min-*`, padding and
    border are zeroed too. */
-.map-picker-file { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
-.map-picker-empty, .map-picker-note { margin: 0; color: var(--text-dim); font-size: .74rem; }
-.map-picker-note strong { color: var(--text); }
+.map-picker-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.map-picker-empty,
+.map-picker-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+.map-picker-note strong {
+  color: var(--text);
+}
 
 /* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
    The picker is outermost and takes the scanline; tiles are nested and get rim + bezel over a flat
@@ -52,14 +145,26 @@
   background-clip: border-box;
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.map-picker { --material-fill: var(--material-scanline), var(--material-plate); }
-.map-tile { --material-fill: var(--material-plate); }
+.map-picker {
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.map-tile {
+  --material-fill: var(--material-plate);
+}
 .map-tile:hover:not(:disabled)::before,
 .map-tile:focus-visible::before,
 .map-tile:active:not(:disabled)::before {
   border-color: var(--rim-color-hi);
-  background: var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h), var(--material-fill);
+  background:
+    var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h),
+    var(--material-fill);
 }
-.map-tile { --cue-w: .3rem; --cue-h: .6rem; --cue-inset: .28rem; }
+.map-tile {
+  --cue-w: 0.3rem;
+  --cue-h: 0.6rem;
+  --cue-inset: 0.28rem;
+}

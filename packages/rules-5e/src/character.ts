@@ -18,7 +18,12 @@ export function abilityModifier(score: number): number {
  * uses Dex and melee Str, and a thrown weapon (Javelin) stays Str despite having a range. The server's attack
  * and the sheet's preview both call this so they cannot disagree.
  */
-export function weaponAbilityModifierFrom(properties: readonly string[], rangeFeet: number | null | undefined, str: number, dex: number): number {
+export function weaponAbilityModifierFrom(
+  properties: readonly string[],
+  rangeFeet: number | null | undefined,
+  str: number,
+  dex: number
+): number {
   const ranged = rangeFeet !== null && rangeFeet !== undefined && !properties.includes("thrown");
   return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
 }
@@ -59,7 +64,12 @@ export function spellAttackBonus(spellcastingAbilityScore: number, proficiencyBo
 /** The armor/shield fields an item carries (from the SRD catalog) that drive Armor Class. */
 export type ItemArmorStats = Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null }>;
 /** Structural item shape so callers can pass their own item type. */
-export type EquippedItem = Readonly<{ equipped?: boolean; category?: string; slot?: string; armor?: ItemArmorStats | undefined }>;
+export type EquippedItem = Readonly<{
+  equipped?: boolean;
+  category?: string;
+  slot?: string;
+  armor?: ItemArmorStats | undefined;
+}>;
 
 /** Unarmored Defense as the arithmetic needs it: the modifier added to 10 + Dex (already resolved by the caller),
  * and whether a shield keeps it (Barbarian: yes; Monk: no). */
@@ -71,12 +81,20 @@ export type UnarmoredDefense = Readonly<{ bonus: number; allowShield: boolean }>
  * 10 + Dex, plus `unarmored.bonus` if that feature allows a shield. Only the best equipped shield counts.
  * Slots come from `effectiveSlot`, so a homebrew category with an explicit slot derives AC too.
  */
-export function armorClassFromEquipment(dexModifier: number, items: readonly EquippedItem[], unarmored?: UnarmoredDefense | null): number | null {
+export function armorClassFromEquipment(
+  dexModifier: number,
+  items: readonly EquippedItem[],
+  unarmored?: UnarmoredDefense | null
+): number | null {
   const worn = items.filter((item) => item.equipped && item.armor);
   const equippedArmor = worn.find((item) => effectiveSlot(item) === "armor");
-  const shieldBonus = worn.reduce((best, item) => effectiveSlot(item) === "shield" ? Math.max(best, item.armor!.acBase) : best, 0);
+  const shieldBonus = worn.reduce(
+    (best, item) => (effectiveSlot(item) === "shield" ? Math.max(best, item.armor!.acBase) : best),
+    0
+  );
   if (!equippedArmor && shieldBonus === 0) return null;
-  const dexAllowed = (armor: ItemArmorStats) => (armor.addDexModifier ? Math.min(dexModifier, armor.dexModifierCap ?? Number.POSITIVE_INFINITY) : 0);
+  const dexAllowed = (armor: ItemArmorStats) =>
+    armor.addDexModifier ? Math.min(dexModifier, armor.dexModifierCap ?? Number.POSITIVE_INFINITY) : 0;
   // Unarmored Defense requires no armor, so it applies only in the shield-only branch.
   const base = equippedArmor
     ? equippedArmor.armor!.acBase + dexAllowed(equippedArmor.armor!)

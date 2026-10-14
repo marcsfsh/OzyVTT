@@ -41,9 +41,16 @@ const GATE = [{ type: "while-effect-tag", tags: ["raging"] }] as const;
     automatically. Uses `FeatureGrantsFieldsSchema`, which lacks the cross-field refusal of `spells`
     beside `when`, so every key can be held at once. */
 const EVERY_KEY = FeatureGrantsFieldsSchema.parse({
-  skills: ["athletics"], expertise: ["athletics"], tools: ["thieves-tools"], languages: ["giant"],
-  armor: ["heavy-armor"], weapons: ["martial-weapons"], saves: ["str"],
-  damageResistances: ["fire"], damageImmunities: ["poison"], conditionImmunities: ["charmed"],
+  skills: ["athletics"],
+  expertise: ["athletics"],
+  tools: ["thieves-tools"],
+  languages: ["giant"],
+  armor: ["heavy-armor"],
+  weapons: ["martial-weapons"],
+  saves: ["str"],
+  damageResistances: ["fire"],
+  damageImmunities: ["poison"],
+  conditionImmunities: ["charmed"],
   spells: [{ id: "bless" }],
   when: GATE
 }) as Record<string, unknown>;
@@ -56,8 +63,17 @@ describe("the partition: every key is either a row the GM edits or a key the edi
 
   it("accounts for every key of the grants vocabulary exactly once", () => {
     expect(editable).toEqual([
-      "skills", "expertise", "tools", "languages", "armor", "weapons", "saves",
-      "damageResistances", "damageImmunities", "conditionImmunities", "spells"
+      "skills",
+      "expertise",
+      "tools",
+      "languages",
+      "armor",
+      "weapons",
+      "saves",
+      "damageResistances",
+      "damageImmunities",
+      "conditionImmunities",
+      "spells"
     ]);
     // A new schema key fails here until it gets a row or is carried.
     expect(carried, "a key the editor neither edits nor carries is silently deleted by every edit").toEqual(["when"]);
@@ -81,7 +97,9 @@ const MINDLESS_RAGE_GRANTS = { conditionImmunities: ["charmed", "frightened"], w
 describe("the editor's own read/write pair carries the gate across an edit", () => {
   it("reads the block as one row and hands the gate back untouched", () => {
     const rows = grantRowsOf(MINDLESS_RAGE_GRANTS);
-    expect(rows).toEqual([{ rowId: "conditionImmunities", kind: "conditionImmunities", values: ["charmed", "frightened"] }]);
+    expect(rows).toEqual([
+      { rowId: "conditionImmunities", kind: "conditionImmunities", values: ["charmed", "frightened"] }
+    ]);
 
     // One row edited, as `GrantsEditor`'s `replace` does it.
     const edited: GrantRow[] = rows.map((row) => ({ ...row, values: [...row.values, "paralyzed"] }));
@@ -105,7 +123,9 @@ describe("the editor's own read/write pair carries the gate across an edit", () 
 const srdView = new ContentLibrary().forAudience("gm");
 
 const directories: string[] = [];
-afterAll(async () => { for (const directory of directories) await rm(directory, { recursive: true, force: true }); });
+afterAll(async () => {
+  for (const directory of directories) await rm(directory, { recursive: true, force: true });
+});
 
 async function emptyStore() {
   const directory = await mkdtemp(join(tmpdir(), "vtt-grant-gate-"));
@@ -123,7 +143,10 @@ function duplicateBerserker() {
   const source = findCatalogRecord(srdView, SOURCE_ID)!;
   const copied = copyName(String((source.body as Body).name));
   const mintedId = mintHomebrewId(source.type, copied, () => false);
-  return { id: mintedId, body: rewriteForNewId(source.type, { ...source.body, name: copied }, SOURCE_ID, mintedId) as unknown as Body };
+  return {
+    id: mintedId,
+    body: rewriteForNewId(source.type, { ...source.body, name: copied }, SOURCE_ID, mintedId) as unknown as Body
+  };
 }
 
 /** Adds one condition to `mindless-rage`'s condition-immunities row through the component's write.
@@ -132,8 +155,9 @@ function touchOneGrantRow(body: Body, preserve = true): Body {
   const features = (body.features as Feature[]).map((feature) => {
     if (feature.id !== "mindless-rage") return feature;
     const grants = feature.grants as Body;
-    const edited = grantRowsOf(grants)
-      .map((row) => (row.kind === "conditionImmunities" ? { ...row, values: [...row.values, "paralyzed"] } : row));
+    const edited = grantRowsOf(grants).map((row) =>
+      row.kind === "conditionImmunities" ? { ...row, values: [...row.values, "paralyzed"] } : row
+    );
     return { ...feature, grants: grantsFromRows(edited, preserve ? grants : {}) };
   });
   return { ...body, features };
@@ -154,30 +178,39 @@ async function publish(body: Body, id: string) {
 }
 
 /** A Halfling Berserker 6 on the duplicated subclass; Halfling adds no bonus, modifier or choice. */
-const berserker = (subclassId: string): CharacterCreateRequestInput => ({
-  name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level: 6,
-  subclassId, abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
-    { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
-    { level: 3, classId: "barbarian", kind: "skill", id: "nature" },
-    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "greataxe" },
-    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "handaxe" },
-    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "javelin" },
-    { level: 3, classId: "barbarian", kind: "subclass", id: subclassId },
-    { level: 4, classId: "barbarian", kind: "asi-or-feat", id: "ability-score-improvement" },
-    { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-    { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "barbarian-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as unknown as CharacterCreateRequestInput);
+const berserker = (subclassId: string): CharacterCreateRequestInput =>
+  ({
+    name: "Ozar",
+    speciesId: "halfling",
+    backgroundId: "soldier",
+    classId: "barbarian",
+    level: 6,
+    subclassId,
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
+      { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
+      { level: 3, classId: "barbarian", kind: "skill", id: "nature" },
+      { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "greataxe" },
+      { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "handaxe" },
+      { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "javelin" },
+      { level: 3, classId: "barbarian", kind: "subclass", id: subclassId },
+      { level: 4, classId: "barbarian", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+      { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "barbarian-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as unknown as CharacterCreateRequestInput;
 
 /** The sheet seated by the roster's own importer, which copies baked `conditionImmunities` onto the actor. */
 function tableWith(definition: ActorDefinition, catalog: ReturnType<typeof equipmentCatalogOf>): GameState {
@@ -187,12 +220,28 @@ function tableWith(definition: ActorDefinition, catalog: ReturnType<typeof equip
 }
 
 /** Enters Rage as the shipped `rage` action does: one effect with the tag the gate reads. */
-const rage = (state: GameState) => addEffect(state, HERO, EffectInstanceSchema.parse({
-  id: "rage-1", name: "Rage", tags: ["raging"], duration: { type: "encounter" }
-}));
+const rage = (state: GameState) =>
+  addEffect(
+    state,
+    HERO,
+    EffectInstanceSchema.parse({
+      id: "rage-1",
+      name: "Rage",
+      tags: ["raging"],
+      duration: { type: "encounter" }
+    })
+  );
 
 const frighten = (state: GameState, definition: ActorDefinition, catalog: ReturnType<typeof equipmentCatalogOf>) =>
-  setCondition(state, HERO, "frightened", true, undefined, { role: "gm" }, { resolveDefinition: () => definition, catalog });
+  setCondition(
+    state,
+    HERO,
+    "frightened",
+    true,
+    undefined,
+    { role: "gm" },
+    { resolveDefinition: () => definition, catalog }
+  );
 
 describe("FAR END: the Berserker a GM duplicated, edited and published is still Frightenable", () => {
   it("carries the gate out of the SRD bundle and through `/duplicate` - the first two links", () => {
@@ -206,7 +255,10 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     const { id, body } = duplicateBerserker();
     const edited = touchOneGrantRow(body);
     const { validity, view } = await publish(edited, id);
-    expect(validity, "a body the editor produced must publish - the gate is not what makes it invalid").toEqual({ valid: true, issues: [] });
+    expect(validity, "a body the editor produced must publish - the gate is not what makes it invalid").toEqual({
+      valid: true,
+      issues: []
+    });
 
     // Read back through the merged catalog the builder consults.
     const published = view.featureRecord({ kind: "subclass", sourceId: id, id: "mindless-rage" })!;
@@ -218,7 +270,9 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     // The gate is `while-effect-tag: raging`, and this Barbarian is not raging.
     const definition = buildCharacterDefinition(berserker(id), view, BuilderPolicySchema.parse({}));
     const catalog = equipmentCatalogOf(view);
-    expect(definition.conditionImmunities ?? [], "a gated grant must never be baked into the sheet").not.toContain("frightened");
+    expect(definition.conditionImmunities ?? [], "a gated grant must never be baked into the sheet").not.toContain(
+      "frightened"
+    );
 
     const calm = tableWith(definition, catalog);
     expect(frighten(calm, definition, catalog), "no refusal: the gate fails, so the condition lands").toEqual([]);
@@ -230,16 +284,30 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     expect(frighten(raging, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened - not applied.");
     expect(raging.actors[0].conditions).toEqual([]);
     // The condition added in the edit is gated by the same `when`.
-    expect(setCondition(raging, HERO, "paralyzed", true, undefined, { role: "gm" }, { resolveDefinition: () => definition, catalog })[0]!.text)
-      .toBe("Ozar is immune to Paralyzed - not applied.");
+    expect(
+      setCondition(
+        raging,
+        HERO,
+        "paralyzed",
+        true,
+        undefined,
+        { role: "gm" },
+        { resolveDefinition: () => definition, catalog }
+      )[0]!.text
+    ).toBe("Ozar is immune to Paralyzed - not applied.");
   });
 
   it("CONTROL: the same road with the gate dropped makes that Barbarian permanently immune", async () => {
     // Reproduces the bug by giving the write an empty bag.
     const { id, body } = duplicateBerserker();
     const { validity, view } = await publish(touchOneGrantRow(body, false), id);
-    expect(validity.valid, "nothing downstream refuses the over-grant - that is why the editor must not create it").toBe(true);
-    expect((view.featureRecord({ kind: "subclass", sourceId: id, id: "mindless-rage" })!.grants as Body).when).toBeUndefined();
+    expect(
+      validity.valid,
+      "nothing downstream refuses the over-grant - that is why the editor must not create it"
+    ).toBe(true);
+    expect(
+      (view.featureRecord({ kind: "subclass", sourceId: id, id: "mindless-rage" })!.grants as Body).when
+    ).toBeUndefined();
 
     const definition = buildCharacterDefinition(berserker(id), view, BuilderPolicySchema.parse({}));
     // Ungated, so the builder bakes the immunity into the sheet.
@@ -247,6 +315,9 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     const catalog = equipmentCatalogOf(view);
     const calm = tableWith(definition, catalog);
     expect(frighten(calm, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened - not applied.");
-    expect(calm.actors[0].conditions, "a level-6 Barbarian who is not raging, and cannot be Frightened ever again").toEqual([]);
+    expect(
+      calm.actors[0].conditions,
+      "a level-6 Barbarian who is not raging, and cannot be Frightened ever again"
+    ).toEqual([]);
   });
 });

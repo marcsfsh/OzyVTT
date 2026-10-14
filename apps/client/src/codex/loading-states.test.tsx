@@ -30,7 +30,11 @@ vi.mock("./api", async (importOriginal) => {
       search: (...a: unknown[]) => search(...a)
     },
     // The dashboard's other feeds resolve empty, so `pages` decides the empty state under test.
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      timeline: (...a: unknown[]) => timeline(...a)
+    },
     atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) }
   };
@@ -43,11 +47,18 @@ import { CodexShell } from "./CodexShell";
 /** An empty state must not show before its fetch settles. Each test holds the fetch open on purpose. */
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => { resolve = r; });
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 };
 
-const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () =>
+  (goTo("/codex/pages"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 
 describe("Codex loading states (CF-2)", () => {
   beforeEach(() => {
@@ -73,11 +84,21 @@ describe("Codex loading states (CF-2)", () => {
     // Fetch still open: no first-page invitation yet.
     expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument();
 
-    pages.resolve([{
-      id: "p1", title: "Strahd", entityType: "character", fields: {}, folder: null, tags: [],
-      revealedToPlayers: false, bannerAssetId: null, rev: 1,
-      createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
-    }]);
+    pages.resolve([
+      {
+        id: "p1",
+        title: "Strahd",
+        entityType: "character",
+        fields: {},
+        folder: null,
+        tags: [],
+        revealedToPlayers: false,
+        bannerAssetId: null,
+        rev: 1,
+        createdAt: "2026-07-28T00:00:00.000Z",
+        updatedAt: "2026-07-28T00:00:00.000Z"
+      }
+    ]);
     await waitFor(() => expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument());
     expect(await screen.findByText("Strahd")).toBeInTheDocument();
   });

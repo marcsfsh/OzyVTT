@@ -27,9 +27,12 @@ export interface TwoLayerBodyTabsProps {
 export function TwoLayerBodyTabs({ value, onChange, children }: TwoLayerBodyTabsProps) {
   return (
     <div className="codex-body-bar">
-      <SegmentedControl ariaLabel="Which layer to write" value={value}
+      <SegmentedControl
+        ariaLabel="Which layer to write"
+        value={value}
         onChange={(next) => onChange(next as BodyLayer)}
-        options={[BODY_LAYER.player, BODY_LAYER.gm]} />
+        options={[BODY_LAYER.player, BODY_LAYER.gm]}
+      />
       {children}
     </div>
   );

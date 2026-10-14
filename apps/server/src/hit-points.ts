@@ -1,11 +1,33 @@
 import type { Actor, DamageApplication, GameState, HealthBand } from "@vtt/domain";
-import { adjustDamageParts, collectRiders, damageWhileDying, droppedToZero, normalizeDamageType, reduceDamageTotal, rescaleDamageParts, sumRiders, type DamagePart } from "@vtt/rules-5e";
+import {
+  adjustDamageParts,
+  collectRiders,
+  damageWhileDying,
+  droppedToZero,
+  normalizeDamageType,
+  reduceDamageTotal,
+  rescaleDamageParts,
+  sumRiders,
+  type DamagePart
+} from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { applyConditionDirect, endConcentrationSustainedBy, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
+import {
+  applyConditionDirect,
+  endConcentrationSustainedBy,
+  endEffectsSustainedBy,
+  effectDamageDefenses,
+  removeConditionDirect,
+  type EffectNarration
+} from "./effects.js";
 import { choiceOverrideDefenses } from "./choice-overrides.js";
-import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import {
+  deriveEquipment,
+  EMPTY_DERIVATION,
+  type EquipmentCatalog,
+  type EquipmentDerivation
+} from "./equipment-derivation.js";
 
 /** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
 export type ActorScope = { role: "gm" } | { role: "player"; sessionId: string };
@@ -19,7 +41,8 @@ export function healthBandOf(hp: Actor["hp"]): HealthBand {
 export function adjustableActor(state: GameState, actorId: string, scope: ActorScope): Actor {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (scope.role === "player" && actor.ownerSessionId !== scope.sessionId) throw new CommandRejectedError("You can only track your own character.");
+  if (scope.role === "player" && actor.ownerSessionId !== scope.sessionId)
+    throw new CommandRejectedError("You can only track your own character.");
   return actor;
 }
 
@@ -68,10 +91,15 @@ export function damagePartsOf(input: DamageInput): readonly DamagePart[] | null 
 }
 
 /** The damage-adjustment line ("17 bludgeoning → 8, resistance: Rage"); "" when nothing adjusted the hit. */
-export function damageAdjustmentDetail(application: Readonly<{ parts: DamageApplication["parts"]; flatReduction?: number }>): string {
+export function damageAdjustmentDetail(
+  application: Readonly<{ parts: DamageApplication["parts"]; flatReduction?: number }>
+): string {
   const clauses = application.parts
     .filter((part) => part.adjustment !== null)
-    .map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`);
+    .map(
+      (part) =>
+        `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`
+    );
   // The flat step is not per-type: it comes once, after the halving.
   if ((application.flatReduction ?? 0) > 0) clauses.push(`then -${application.flatReduction}, reduction`);
   return clauses.length > 0 ? ` (${clauses.join("; ")})` : "";
@@ -81,14 +109,18 @@ export function damageAdjustmentDetail(application: Readonly<{ parts: DamageAppl
  *  `damage-type-is` matches the incoming types. */
 function damageReductionFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): number {
   const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
-  const onTakingDamage = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-taking-damage", damageTypes });
+  const onTakingDamage = collectRiders(derivation.carriers, {
+    ...derivation.context,
+    moment: "on-taking-damage",
+    damageTypes
+  });
   return sumRiders(standing, "damage-reduction") + sumRiders(onTakingDamage, "damage-reduction");
 }
 
 /** The stat block's defences minus any a rest-time re-choice superseded (chosen options are baked in). */
 function definitionDefenses(definition: ActorDefinition | undefined, superseded: ReadonlySet<string> = new Set()) {
   const keep = (list: readonly string[] | undefined) =>
-    superseded.size === 0 ? list ?? [] : (list ?? []).filter((id) => !superseded.has(normalizeDamageType(id)));
+    superseded.size === 0 ? (list ?? []) : (list ?? []).filter((id) => !superseded.has(normalizeDamageType(id)));
   return {
     resistances: keep(definition?.damageResistances),
     immunities: keep(definition?.damageImmunities),
@@ -99,7 +131,13 @@ function definitionDefenses(definition: ActorDefinition | undefined, superseded:
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
-export function applyDamageDetailed(state: GameState, actorId: string, input: DamageInput, scope: ActorScope, deps?: DamageDeps): DamageOutcome {
+export function applyDamageDetailed(
+  state: GameState,
+  actorId: string,
+  input: DamageInput,
+  scope: ActorScope,
+  deps?: DamageDeps
+): DamageOutcome {
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
 
@@ -120,9 +158,10 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const itemImmunities = fromItems.damageImmunities.map((entry) => entry.id);
     const itemVulnerabilities = fromItems.damageVulnerabilities.map((entry) => entry.id);
     const itemSourceOf = (type: string): string | null => {
-      const source = fromItems.damageImmunities.find((entry) => entry.id.toLowerCase() === type)
-        ?? fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type)
-        ?? fromItems.damageVulnerabilities.find((entry) => entry.id.toLowerCase() === type);
+      const source =
+        fromItems.damageImmunities.find((entry) => entry.id.toLowerCase() === type) ??
+        fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type) ??
+        fromItems.damageVulnerabilities.find((entry) => entry.id.toLowerCase() === type);
       if (!source) return null;
       return fromItems.sources.find((row) => row.itemId === source.sourceItemId)?.itemName ?? source.sourceItemId;
     };
@@ -131,36 +170,80 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
     const adjusted = adjustDamageParts(typed, {
-      resistances: [...innate.resistances, ...fromChoices.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
-      immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...fromChoices.immunities, ...itemImmunities],
+      resistances: [
+        ...innate.resistances,
+        ...fromChoices.resistances,
+        ...fromEffects.resistances,
+        ...itemResistances,
+        ...(underwater ? ["fire"] : [])
+      ],
+      immunities: [
+        ...(petrified ? [...innate.immunities, "poison"] : innate.immunities),
+        ...fromChoices.immunities,
+        ...itemImmunities
+      ],
       // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
       vulnerabilities: [...innate.vulnerabilities, ...fromEffects.vulnerabilities, ...itemVulnerabilities],
       resistAll: petrified
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
-      const effectSource = part.adjustment === "resistance" || part.adjustment === "vulnerability" ? fromEffects.sources.get(type) ?? null : null;
+      const effectSource =
+        part.adjustment === "resistance" || part.adjustment === "vulnerability"
+          ? (fromEffects.sources.get(type) ?? null)
+          : null;
       // Name the chosen feature on the line, as an effect or item names itself.
-      const choiceSource = part.adjustment !== null && effectSource === null ? fromChoices.sources.get(type) ?? null : null;
+      const choiceSource =
+        part.adjustment !== null && effectSource === null ? (fromChoices.sources.get(type) ?? null) : null;
       const innateHas = (list: readonly string[]) => list.map((entry) => entry.toLowerCase()).includes(type);
-      const petrifiedSource = petrified && choiceSource === null
-        && ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null)
-          || (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
-        ? "Petrified" : null;
-      const underwaterSource = underwater && part.adjustment === "resistance" && type === "fire"
-        && !innateHas(innate.resistances) && effectSource === null && petrifiedSource === null && choiceSource === null
-        ? "Underwater" : null;
+      const petrifiedSource =
+        petrified &&
+        choiceSource === null &&
+        ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null) ||
+          (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
+          ? "Petrified"
+          : null;
+      const underwaterSource =
+        underwater &&
+        part.adjustment === "resistance" &&
+        type === "fire" &&
+        !innateHas(innate.resistances) &&
+        effectSource === null &&
+        petrifiedSource === null &&
+        choiceSource === null
+          ? "Underwater"
+          : null;
       // The item's name on the damage line, so a halved hit explains itself.
-      const innateList = part.adjustment === "immunity" ? innate.immunities : part.adjustment === "vulnerability" ? innate.vulnerabilities : innate.resistances;
-      const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null && choiceSource === null
-        && !innateHas(innateList)
-        ? itemSourceOf(type) : null;
-      return { ...part, adjustmentSource: effectSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
+      const innateList =
+        part.adjustment === "immunity"
+          ? innate.immunities
+          : part.adjustment === "vulnerability"
+            ? innate.vulnerabilities
+            : innate.resistances;
+      const itemSource =
+        part.adjustment !== null &&
+        effectSource === null &&
+        petrifiedSource === null &&
+        underwaterSource === null &&
+        choiceSource === null &&
+        !innateHas(innateList)
+          ? itemSourceOf(type)
+          : null;
+      return {
+        ...part,
+        adjustmentSource: effectSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? itemSource
+      };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
     const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
     // Last, on the total: flat reduction subtracts from what the per-type math produced.
-    flatReduction = Math.max(0, damageReductionFor(fromItems, adjusted.map((part) => normalizeDamageType(part.type))));
+    flatReduction = Math.max(
+      0,
+      damageReductionFor(
+        fromItems,
+        adjusted.map((part) => normalizeDamageType(part.type))
+      )
+    );
     totalAdjusted = reduceDamageTotal(afterDefenses, flatReduction);
     flatReduction = afterDefenses - totalAdjusted;
   } else {
@@ -196,7 +279,11 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
       if (isPlayerCharacter) actor.deathSaves = { successes: 0, failures: 0, stable: true };
       applyConditionDirect(actor, "unconscious");
       applyConditionDirect(actor, "prone");
-      events.push({ kind: "condition", text: `${actor.name} was knocked out - Unconscious and stable at 0 HP.`, actorId });
+      events.push({
+        kind: "condition",
+        text: `${actor.name} was knocked out - Unconscious and stable at 0 HP.`,
+        actorId
+      });
     } else if (isPlayerCharacter) {
       const overflow = damageToHp - hpBefore;
       const outcome = droppedToZero(overflow, actor.hp.maximum);
@@ -204,7 +291,11 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
       instantDeath = outcome.instantDeath;
       applyConditionDirect(actor, "unconscious");
       applyConditionDirect(actor, "prone");
-      events.push({ kind: "condition", text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`, actorId });
+      events.push({
+        kind: "condition",
+        text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
+        actorId
+      });
     } else {
       defeated = true;
     }
@@ -220,27 +311,38 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const sustained: Array<{ actorId: string; effectId: string }> = [];
     for (const bearer of state.actors) {
       for (const effect of bearer.effects) {
-        if (effect.concentration && effect.sourceActorId === actor.id) sustained.push({ actorId: bearer.id, effectId: effect.id });
+        if (effect.concentration && effect.sourceActorId === actor.id)
+          sustained.push({ actorId: bearer.id, effectId: effect.id });
       }
     }
     if (sustained.length > 0 && state.combat.pendingSaves.length < 100) {
       const dc = Math.min(30, Math.max(10, Math.floor(totalAdjusted / 2)));
-      state.combat = { ...state.combat, pendingSaves: [...state.combat.pendingSaves, {
-        id: deps.newId(),
-        targetActorId: actor.id,
-        ability: "con" as const,
-        dc,
-        sourceActorId: null,
-        sourceName: input.sourceName ?? "Damage",
-        actionName: "Concentration check",
-        proposedDamage: 0,
-        halfOnSuccess: false,
-        conditionId: null,
-        saveBonus: 0,
-        endsEffects: sustained,
-        createdAt: deps.now ? Date.parse(deps.now()) : Date.now()
-      }] };
-      events.push({ kind: "condition", text: `${actor.name} must make a DC ${dc} Constitution save to keep concentrating.`, actorId: actor.id });
+      state.combat = {
+        ...state.combat,
+        pendingSaves: [
+          ...state.combat.pendingSaves,
+          {
+            id: deps.newId(),
+            targetActorId: actor.id,
+            ability: "con" as const,
+            dc,
+            sourceActorId: null,
+            sourceName: input.sourceName ?? "Damage",
+            actionName: "Concentration check",
+            proposedDamage: 0,
+            halfOnSuccess: false,
+            conditionId: null,
+            saveBonus: 0,
+            endsEffects: sustained,
+            createdAt: deps.now ? Date.parse(deps.now()) : Date.now()
+          }
+        ]
+      };
+      events.push({
+        kind: "condition",
+        text: `${actor.name} must make a DC ${dc} Constitution save to keep concentrating.`,
+        actorId: actor.id
+      });
     }
   }
 

@@ -1,35 +1,129 @@
 /* The staging tray. The list scrolls inside its own cap (~5 rows), so the Add buttons and primary
    action below never scroll out of the panel. */
-.staging-tray { display: flex; flex-direction: column; gap: .4rem; padding: var(--space-2); border: 1px solid transparent; }
-.staging-tray-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; }
-.staging-tray-title strong { display: block; font-size: .84rem; }
-.staging-tray-title span { display: block; color: var(--text-muted); font-size: .7rem; }
-.staging-tray-reveal { display: flex; align-items: center; gap: .45rem; }
-.staging-tray-reveal > span { color: var(--text-dim); font-size: .72rem; font-weight: 700; }
+.staging-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: var(--space-2);
+  border: 1px solid transparent;
+}
+.staging-tray-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.staging-tray-title strong {
+  display: block;
+  font-size: 0.84rem;
+}
+.staging-tray-title span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.staging-tray-reveal {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.staging-tray-reveal > span {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
 /* The cap is here; the scroll is `.scroll-y` in the markup. */
-.staging-tray-list { display: flex; flex-direction: column; gap: var(--space-1); max-height: 15rem; overscroll-behavior: contain; margin: 0; padding: 0; list-style: none; }
+.staging-tray-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 15rem;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 /* Rows are hairline rules, no fill. A placed row gets the leading tick and a cyan rule. */
-.staging-row { position: relative; display: flex; align-items: center; gap: .4rem; min-height: var(--tap-min); padding: var(--space-1) .35rem .35rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
-.staging-row.is-placed { border-bottom-color: color-mix(in srgb, var(--cyan) 45%, var(--line)); padding-inline-start: .85rem; }
+.staging-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0.35rem 0.35rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+.staging-row.is-placed {
+  border-bottom-color: color-mix(in srgb, var(--cyan) 45%, var(--line));
+  padding-inline-start: 0.85rem;
+}
 /* The tick sits .2rem in from the edge: a 7.2px box exactly on the scroll container's clip edge is
    dropped from paint. It still clears the row's .85rem text gutter. */
-.staging-row.is-placed::before { content: ""; position: absolute; inset-inline-start: .2rem; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--cyan); background: var(--cue-mark); pointer-events: none; }
-.staging-tray-list > .staging-row:last-child { border-bottom: 0; }
-.staging-row-name { flex: 1; min-width: 0; }
-.staging-row-name strong { display: block; font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staging-row.is-placed::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.2rem;
+  top: 50%;
+  width: var(--cue-w);
+  height: var(--cue-h);
+  transform: translateY(-50%);
+  color: var(--cyan);
+  background: var(--cue-mark);
+  pointer-events: none;
+}
+.staging-tray-list > .staging-row:last-child {
+  border-bottom: 0;
+}
+.staging-row-name {
+  flex: 1;
+  min-width: 0;
+}
+.staging-row-name strong {
+  display: block;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Kind and placement on one muted line. `display: block` so the ellipsis has a block to clip in. */
-.staging-row-name small { display: block; overflow: hidden; color: var(--text-muted); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.staging-row-name small {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* The two row controls are glyphs in transparent 44px boxes (no rim or plate). Real paint rather
    than a `.tap-target` overhang, which would steal the neighbour's taps at this 6.4px gap. Scoped to
    `.staging-row` so these overrides beat Button.css's single-class rules regardless of order. */
 .staging-row .staging-row-reveal .nh-reveal-toggle,
-.staging-row .staging-row-remove { width: var(--tap-min); height: var(--tap-min); }
+.staging-row .staging-row-remove {
+  width: var(--tap-min);
+  height: var(--tap-min);
+}
 /* The reveal's colours come from Reveal.css. The remove keeps the shared IconButton and drops its
    chrome via `--nh-fill` / `--nh-rim`, the supported hooks. */
-.staging-row .staging-row-remove { color: var(--text-muted); --nh-fill: transparent; --nh-rim: transparent; }
-.staging-row .staging-row-remove:hover:not(:disabled), .staging-row .staging-row-remove:active:not(:disabled) { color: var(--text); --nh-rim: transparent; }
-.staging-tray-empty, .staging-tray-hint { margin: 0; color: var(--text-dim); font-size: .74rem; }
+.staging-row .staging-row-remove {
+  color: var(--text-muted);
+  --nh-fill: transparent;
+  --nh-rim: transparent;
+}
+.staging-row .staging-row-remove:hover:not(:disabled),
+.staging-row .staging-row-remove:active:not(:disabled) {
+  color: var(--text);
+  --nh-rim: transparent;
+}
+.staging-tray-empty,
+.staging-tray-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
 
 /* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing. The
    tray keeps the panel rim but no scanline: both of its hosts already paint one, and nested
@@ -54,6 +148,10 @@
   background-clip: border-box;
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.staging-tray { --material-fill: var(--material-plate); }
+.staging-tray {
+  --material-fill: var(--material-plate);
+}

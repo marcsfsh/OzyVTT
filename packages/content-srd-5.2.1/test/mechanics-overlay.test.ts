@@ -5,14 +5,21 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { CLASS_MECHANICS, HAND_AUTHORED, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "../scripts/class-mechanics/index.js";
+import {
+  CLASS_MECHANICS,
+  HAND_AUTHORED,
+  LIVE_CLASS_RESOURCES,
+  SUBCLASS_MECHANICS,
+  applyMechanics
+} from "../scripts/class-mechanics/index.js";
 import type { FeatureMechanics, MechanicsOverlay } from "../scripts/class-mechanics/index.js";
 import { ClassReferenceSchema, featurePicks } from "../src/character-content.js";
 import { loadClasses, loadSubclasses } from "../src/index.js";
 
 // `applyMechanics` is tested directly because the ETL is a top-level script, and its failure cases must fail the build.
 describe("the mechanics overlay", () => {
-  const feature = () => [{ id: "rage", name: "Rage", description: "x" }] as Array<{ id: string } & Record<string, unknown>>;
+  const feature = () =>
+    [{ id: "rage", name: "Rage", description: "x" }] as Array<{ id: string } & Record<string, unknown>>;
 
   it("merges a rider into a feature", () => {
     const features = feature();
@@ -23,7 +30,9 @@ describe("the mechanics overlay", () => {
 
   it("reports a feature id that matches nothing, instead of dropping the rider", () => {
     const features = feature();
-    expect(applyMechanics("barbarian", features, { barbarian: { raeg: { tags: ["typo"] } } })).toEqual(["barbarian.raeg"]);
+    expect(applyMechanics("barbarian", features, { barbarian: { raeg: { tags: ["typo"] } } })).toEqual([
+      "barbarian.raeg"
+    ]);
   });
 
   it("merges `choices` - SEVERAL picks on one record - from a class module", () => {
@@ -46,10 +55,14 @@ describe("the mechanics overlay", () => {
   });
 
   it("merges into an inline OPTION, and reports an option id that matches nothing", () => {
-    const features = [{
-      id: "divine-order", name: "Divine Order", description: "x",
-      choice: { kind: "divine-order", choose: 1, options: [{ id: "thaumaturge", name: "T", description: "y" }] }
-    }] as Array<{ id: string } & Record<string, unknown>>;
+    const features = [
+      {
+        id: "divine-order",
+        name: "Divine Order",
+        description: "x",
+        choice: { kind: "divine-order", choose: 1, options: [{ id: "thaumaturge", name: "T", description: "y" }] }
+      }
+    ] as Array<{ id: string } & Record<string, unknown>>;
     const overlay = {
       cleric: {
         "divine-order": {
@@ -69,17 +82,25 @@ describe("the mechanics overlay", () => {
   it("REFUSES to overwrite a value the record already carries", () => {
     // `classes.v1.json` is both the ETL's input and output for hand-authored classes, so an overwrite
     // would silently rewrite committed data.
-    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<
+      { id: string } & Record<string, unknown>
+    >;
     const misses = applyMechanics("barbarian", features, { barbarian: { rage: { tags: ["raging"] } } });
-    expect(misses).toEqual(["barbarian.rage.tags (already authored on the record - remove it from one of the two homes)"]);
+    expect(misses).toEqual([
+      "barbarian.rage.tags (already authored on the record - remove it from one of the two homes)"
+    ]);
     expect(features[0].tags).toEqual(["already-here"]);
   });
 
   it("`clears` supersedes a value the record already carries, and clearing an absent key is a no-op", () => {
     // A `clears` that has already done its work (key absent) must stay legal, so the second build passes.
-    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<
+      { id: string } & Record<string, unknown>
+    >;
     const misses = applyMechanics("barbarian", features, {
-      barbarian: { rage: { clears: ["tags", "modifiers"], tags: ["raging"], modifiers: [{ type: "speed", amount: 10 }] } }
+      barbarian: {
+        rage: { clears: ["tags", "modifiers"], tags: ["raging"], modifiers: [{ type: "speed", amount: 10 }] }
+      }
     });
     expect(misses).toEqual([]);
     expect(features[0].tags).toEqual(["raging"]);
@@ -89,34 +110,53 @@ describe("the mechanics overlay", () => {
   it("REFUSES a `clears` with no rider beside it, and deletes nothing", () => {
     // `clears` may never delete without a replacement: on a hand-authored record the delete is irreversible.
     // An invalid entry contributes nothing.
-    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<
+      { id: string } & Record<string, unknown>
+    >;
     const misses = applyMechanics("barbarian", features, { barbarian: { rage: { clears: ["tags"] } } });
-    expect(misses).toEqual(["barbarian.rage.clears [tags] (deletes without replacing - author the superseding rider in the same entry)"]);
+    expect(misses).toEqual([
+      "barbarian.rage.clears [tags] (deletes without replacing - author the superseding rider in the same entry)"
+    ]);
     expect(features[0].tags).toEqual(["already-here"]);
   });
 
   it("REFUSES a `clears` whose key is unreplaced even when the entry authors a DIFFERENT rider", () => {
     // The replacement check is per key: an unrelated rider in the same entry does not satisfy it.
-    const features = [{ id: "rage", name: "Rage", description: "x", choice: { id: "c", options: [{ id: "o", name: "O" }] }, tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const features = [
+      {
+        id: "rage",
+        name: "Rage",
+        description: "x",
+        choice: { id: "c", options: [{ id: "o", name: "O" }] },
+        tags: ["already-here"]
+      }
+    ] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, {
       barbarian: { rage: { clears: ["choice", "tags"], tags: ["raging"] } }
     });
-    expect(misses).toEqual(["barbarian.rage.clears [choice] (deletes without replacing - author the superseding rider in the same entry)"]);
+    expect(misses).toEqual([
+      "barbarian.rage.clears [choice] (deletes without replacing - author the superseding rider in the same entry)"
+    ]);
     expect(features[0].choice).toEqual({ id: "c", options: [{ id: "o", name: "O" }] });
     expect(features[0].tags).toEqual(["already-here"]);
   });
 
   it("treats an empty rider list as absent, so a bundle's `[]` is not a collision", () => {
-    const features = [{ id: "rage", name: "Rage", description: "x", modifiers: [] }] as Array<{ id: string } & Record<string, unknown>>;
-    expect(applyMechanics("barbarian", features, { barbarian: { rage: { modifiers: [{ type: "speed", amount: 10 }] } } })).toEqual([]);
+    const features = [{ id: "rage", name: "Rage", description: "x", modifiers: [] }] as Array<
+      { id: string } & Record<string, unknown>
+    >;
+    expect(
+      applyMechanics("barbarian", features, { barbarian: { rage: { modifiers: [{ type: "speed", amount: 10 }] } } })
+    ).toEqual([]);
     expect(features[0].modifiers).toEqual([{ type: "speed", amount: 10 }]);
   });
 
   it("reaches a HAND_AUTHORED class - the three the overlay used to skip entirely", () => {
     expect(Object.keys(CLASS_MECHANICS)).toContain("cleric");
     const cleric = loadClasses().find((record) => record.id === "cleric")!;
-    const thaumaturge = cleric.features.find((entry) => entry.id === "divine-order")!.choice!.options!
-      .find((option) => option.id === "thaumaturge")!;
+    const thaumaturge = cleric.features
+      .find((entry) => entry.id === "divine-order")!
+      .choice!.options!.find((option) => option.id === "thaumaturge")!;
     expect(thaumaturge.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
   });
 
@@ -124,17 +164,24 @@ describe("the mechanics overlay", () => {
     expect(Object.keys(SUBCLASS_MECHANICS)).toContain("draconic-sorcery");
     const draconic = loadSubclasses().find((record) => record.id === "draconic-sorcery")!;
     // `allowShield: true` is authored: the printed feature restricts only "wearing armor", not a Shield.
-    expect(draconic.features.find((entry) => entry.id === "draconic-resilience")!.modifiers)
-      .toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
+    expect(draconic.features.find((entry) => entry.id === "draconic-resilience")!.modifiers).toEqual([
+      { type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }
+    ]);
   });
 
   it("composes the same three exports the ETL consumed before the per-class split", () => {
-    expect(CLASS_MECHANICS.barbarian?.rage?.uses).toEqual({ scaling: { type: "class-resource", id: "rage" }, per: "long-rest" });
+    expect(CLASS_MECHANICS.barbarian?.rage?.uses).toEqual({
+      scaling: { type: "class-resource", id: "rage" },
+      per: "long-rest"
+    });
     // Every live column must be printed on its class's own table.
     expect(LIVE_CLASS_RESOURCES.barbarian).toEqual(["rage"]);
     for (const [classId, resources] of Object.entries(LIVE_CLASS_RESOURCES)) {
-      const printed = new Set(loadClasses().find((entry) => entry.id === classId)!.levelTable
-        .flatMap((row) => row.classResources.map((resource) => resource.id)));
+      const printed = new Set(
+        loadClasses()
+          .find((entry) => entry.id === classId)!
+          .levelTable.flatMap((row) => row.classResources.map((resource) => resource.id))
+      );
       expect(resources.length).toBeGreaterThan(0);
       expect(resources.filter((id) => !printed.has(id))).toEqual([]);
     }
@@ -190,7 +237,10 @@ describe("`clears` through the class-bundle build", () => {
     expect(featurePicks(before)).toHaveLength(1);
 
     // `choice` and `choices` cannot coexist on a record (`oneChoiceForm`).
-    const replacement: ChoiceInput[] = [{ ...before.choice!, choose: 1 }, { ...before.choice!, choose: 1 }];
+    const replacement: ChoiceInput[] = [
+      { ...before.choice!, choose: 1 },
+      { ...before.choice!, choose: 1 }
+    ];
     const overlay: MechanicsOverlay = { [recordId]: { [before.id]: { clears: ["choice"], choices: replacement } } };
 
     const directory = await mkdtemp(join(tmpdir(), "vtt-overlay-clears-"));
@@ -214,7 +264,8 @@ describe("`clears` through the class-bundle build", () => {
 
       // The superseded key is gone from the file itself, not just from a parse.
       const raw = (JSON.parse(afterFirst) as RecordShape[])
-        .find((record) => record.id === recordId)!.features.find((entry) => entry.id === before.id)!;
+        .find((record) => record.id === recordId)!
+        .features.find((entry) => entry.id === before.id)!;
       expect(Object.keys(raw)).not.toContain("choice");
       expect(Object.keys(raw)).toContain("choices");
     } finally {

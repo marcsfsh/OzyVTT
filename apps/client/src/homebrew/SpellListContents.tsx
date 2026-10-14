@@ -86,7 +86,9 @@ export function SpellListContents({
       <span className="nh-field-label">Spells</span>
       <p className="nh-field-help">
         <strong className="tabular">{resolved.on.size}</strong> {resolved.on.size === 1 ? "spell" : "spells"} —{" "}
-        {inheritedCount} from {basedOn.length === 0 ? "no other list" : basedOn.length === 1 ? "one list" : `${basedOn.length} lists`}, {add.length} added, {remove.length} removed.
+        {inheritedCount} from{" "}
+        {basedOn.length === 0 ? "no other list" : basedOn.length === 1 ? "one list" : `${basedOn.length} lists`},{" "}
+        {add.length} added, {remove.length} removed.
       </p>
       <ChoiceGrid
         options={options}

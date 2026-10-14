@@ -9,9 +9,18 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 /** Every SRD damage type Fiendish Resilience may name: the printed twelve, less Force. */
 const RESILIENCE_TYPES: ReadonlyArray<readonly [id: string, name: string]> = [
-  ["acid", "Acid"], ["bludgeoning", "Bludgeoning"], ["cold", "Cold"], ["fire", "Fire"],
-  ["lightning", "Lightning"], ["necrotic", "Necrotic"], ["piercing", "Piercing"], ["poison", "Poison"],
-  ["psychic", "Psychic"], ["radiant", "Radiant"], ["slashing", "Slashing"], ["thunder", "Thunder"]
+  ["acid", "Acid"],
+  ["bludgeoning", "Bludgeoning"],
+  ["cold", "Cold"],
+  ["fire", "Fire"],
+  ["lightning", "Lightning"],
+  ["necrotic", "Necrotic"],
+  ["piercing", "Piercing"],
+  ["poison", "Poison"],
+  ["psychic", "Psychic"],
+  ["radiant", "Radiant"],
+  ["slashing", "Slashing"],
+  ["thunder", "Thunder"]
 ];
 
 export const warlock: ClassMechanicsModule = {
@@ -21,7 +30,12 @@ export const warlock: ClassMechanicsModule = {
      * level-1 feature reads the column's growth instead of repeating grants.
      */
     "eldritch-invocations": {
-      extraPicks: [{ offer: "feature:eldritch-invocations", scaling: { type: "class-resource-growth", id: "eldritch-invocations" } }],
+      extraPicks: [
+        {
+          offer: "feature:eldritch-invocations",
+          scaling: { type: "class-resource-growth", id: "eldritch-invocations" }
+        }
+      ],
       /**
        * Riders on the ETL-parsed invocation options. "Cast X without expending a spell slot" options are a
        * `grants.spells` line each (granted spells are always prepared, need not be on the Warlock list,
@@ -35,10 +49,14 @@ export const warlock: ClassMechanicsModule = {
          */
         "agonizing-blast": {
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } },
-          modifiers: [{
-            type: "extra-damage", abilityModifier: "cha", damageType: "force",
-            when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
-          }]
+          modifiers: [
+            {
+              type: "extra-damage",
+              abilityModifier: "cha",
+              damageType: "force",
+              when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
+            }
+          ]
         },
         "eldritch-spear": {
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "ranged" } }
@@ -125,8 +143,10 @@ export const warlock: ClassMechanicsModule = {
       "fiend-spells": {
         grants: {
           spells: [
-            { id: "burning-hands", level: 1 }, { id: "command", level: 1 },
-            { id: "scorching-ray", level: 2 }, { id: "suggestion", level: 2 }
+            { id: "burning-hands", level: 1 },
+            { id: "command", level: 1 },
+            { id: "scorching-ray", level: 2 },
+            { id: "suggestion", level: 2 }
           ]
         }
       },
@@ -157,14 +177,17 @@ export const warlock: ClassMechanicsModule = {
        */
       "hurl-through-hell": {
         uses: { limit: 1, per: "long-rest" },
-        actions: [{
-          id: "hurl-through-hell",
-          name: "Hurl Through Hell",
-          activation: "other",
-          description: "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
-          save: { ability: "cha", dc: "spellcasting" },
-          damage: [{ formula: "8d10", type: "psychic" }]
-        }]
+        actions: [
+          {
+            id: "hurl-through-hell",
+            name: "Hurl Through Hell",
+            activation: "other",
+            description:
+              "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
+            save: { ability: "cha", dc: "spellcasting" },
+            damage: [{ formula: "8d10", type: "psychic" }]
+          }
+        ]
       }
     }
   }

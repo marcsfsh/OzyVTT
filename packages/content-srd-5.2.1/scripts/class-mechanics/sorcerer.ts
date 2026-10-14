@@ -8,12 +8,20 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 // One debit off the shared pool, which reads the printed Sorcery Points column.
 const ONE_SORCERY_POINT = {
-  uses: { scaling: { type: "class-resource" as const, id: "sorcery-points" }, per: "long-rest" as const, pool: "sorcery-points" }
+  uses: {
+    scaling: { type: "class-resource" as const, id: "sorcery-points" },
+    per: "long-rest" as const,
+    pool: "sorcery-points"
+  }
 };
 
 /** The five damage types Elemental Affinity prints, with the prose each option carries on the sheet. */
 const AFFINITY_TYPES: ReadonlyArray<readonly [id: string, name: string]> = [
-  ["acid", "Acid"], ["cold", "Cold"], ["fire", "Fire"], ["lightning", "Lightning"], ["poison", "Poison"]
+  ["acid", "Acid"],
+  ["cold", "Cold"],
+  ["fire", "Fire"],
+  ["lightning", "Lightning"],
+  ["poison", "Poison"]
 ];
 
 export const sorcerer: ClassMechanicsModule = {
@@ -28,18 +36,21 @@ export const sorcerer: ClassMechanicsModule = {
      */
     "innate-sorcery": {
       uses: { limit: 2, per: "long-rest" },
-      actions: [{
-        id: "innate-sorcery",
-        name: "Innate Sorcery",
-        activation: "bonus-action",
-        description: "You unleash your innate magic for 1 minute. For the duration, the spell save DC of your Sorcerer spells increases by 1 and you have Advantage on the attack rolls of Sorcerer spells you cast.",
-        damage: [],
-        grants: {
+      actions: [
+        {
+          id: "innate-sorcery",
           name: "Innate Sorcery",
-          tags: ["innate-sorcery"],
-          duration: { type: "rounds", rounds: 10 }
+          activation: "bonus-action",
+          description:
+            "You unleash your innate magic for 1 minute. For the duration, the spell save DC of your Sorcerer spells increases by 1 and you have Advantage on the attack rolls of Sorcerer spells you cast.",
+          damage: [],
+          grants: {
+            name: "Innate Sorcery",
+            tags: ["innate-sorcery"],
+            duration: { type: "rounds", rounds: 10 }
+          }
         }
-      }]
+      ]
     },
     /**
      * The Sorcery Points pool, read off the printed column. Converting slots to points and points to
@@ -89,8 +100,10 @@ export const sorcerer: ClassMechanicsModule = {
       "draconic-spells": {
         grants: {
           spells: [
-            { id: "alter-self", level: 2 }, { id: "chromatic-orb", level: 1 },
-            { id: "command", level: 1 }, { id: "dragons-breath", level: 2 }
+            { id: "alter-self", level: 2 },
+            { id: "chromatic-orb", level: 1 },
+            { id: "command", level: 1 },
+            { id: "dragons-breath", level: 2 }
           ]
         }
       },
@@ -109,12 +122,14 @@ export const sorcerer: ClassMechanicsModule = {
             name,
             description: `You have Resistance to ${name} damage, and when you cast a spell that deals ${name} damage you can add your Charisma modifier to one damage roll of that spell.`,
             grants: { damageResistances: [id] },
-            modifiers: [{
-              type: "extra-damage" as const,
-              abilityModifier: "cha" as const,
-              damageType: id,
-              when: [{ type: "on-damage-roll" as const }, { type: "damage-type-is" as const, damageTypes: [id] }]
-            }]
+            modifiers: [
+              {
+                type: "extra-damage" as const,
+                abilityModifier: "cha" as const,
+                damageType: id,
+                when: [{ type: "on-damage-roll" as const }, { type: "damage-type-is" as const, damageTypes: [id] }]
+              }
+            ]
           }))
         }
       },
@@ -122,13 +137,16 @@ export const sorcerer: ClassMechanicsModule = {
       // Sorcery Points stay prose.
       "dragon-wings": {
         uses: { limit: 1, per: "long-rest" },
-        actions: [{
-          id: "dragon-wings",
-          name: "Dragon Wings",
-          activation: "bonus-action",
-          description: "Draconic wings appear on your back for 1 hour or until you dismiss them (no action required). For the duration you have a Fly Speed of 60 feet. You regain the use on a Long Rest, or by spending 3 Sorcery Points.",
-          damage: []
-        }]
+        actions: [
+          {
+            id: "dragon-wings",
+            name: "Dragon Wings",
+            activation: "bonus-action",
+            description:
+              "Draconic wings appear on your back for 1 hour or until you dismiss them (no action required). For the duration you have a Fly Speed of 60 feet. You regain the use on a Long Rest, or by spending 3 Sorcery Points.",
+            damage: []
+          }
+        ]
       },
       // The only route to Summon Dragon, with one free casting per Long Rest. The no-Material,
       // no-Concentration modifications stay prose.

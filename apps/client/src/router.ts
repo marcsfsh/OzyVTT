@@ -45,7 +45,9 @@ const guards = new Set<Guard>();
  */
 export function registerNavigationGuard(guard: Guard): () => void {
   guards.add(guard);
-  return () => { guards.delete(guard); };
+  return () => {
+    guards.delete(guard);
+  };
 }
 
 async function mayLeave(): Promise<boolean> {
@@ -111,10 +113,16 @@ window.addEventListener("popstate", (event) => {
    * Back is a navigation too, so guards apply; the browser has already moved, so a veto pushes the
    * previous address back. With no guards, or a pop that keeps the address, it just publishes.
    */
-  if (guards.size === 0 || currentHref() === currentEntry) { publish(); return; }
+  if (guards.size === 0 || currentHref() === currentEntry) {
+    publish();
+    return;
+  }
   const from = currentEntry;
   void mayLeave().then((allowed) => {
-    if (allowed) { publish(); return; }
+    if (allowed) {
+      publish();
+      return;
+    }
     window.history.pushState(null, "", from);
   });
 });
@@ -161,7 +169,12 @@ export function withQuery(path: string, params: Readonly<Record<string, string |
 
 export function useRoute(): Route {
   return useSyncExternalStore(
-    (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     () => snapshot,
     () => snapshot
   );
@@ -183,7 +196,9 @@ const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
   settings: "/settings"
 };
 
-export function pathForGmTab(tab: GmTab): string { return GM_TAB_PATHS[tab]; }
+export function pathForGmTab(tab: GmTab): string {
+  return GM_TAB_PATHS[tab];
+}
 
 /** Retired addresses, redirected so old bookmarks land. */
 const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
@@ -246,7 +261,8 @@ export function isKnownPath(path: string): boolean {
   // `/settings/api` is the only two-segment settings address.
   if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
-  if (segments[0] === "replays") return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
+  if (segments[0] === "replays")
+    return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
   return gmTabForPath(path) !== null && segments.length === 1;
 }
 
@@ -290,11 +306,17 @@ export function rememberLocation(role: "gm" | "player", href: string): void {
     // Also remembered per tab, so returning to a tab reopens the record that was open there.
     const head = headOf(href.split("?")[0] ?? "");
     if (head) localStorage.setItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`, href);
-  } catch { /* private mode - fine */ }
+  } catch {
+    /* private mode - fine */
+  }
 }
 
 export function lastLocation(role: "gm" | "player"): string | null {
-  try { return localStorage.getItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY); } catch { return null; }
+  try {
+    return localStorage.getItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -303,7 +325,11 @@ export function lastLocation(role: "gm" | "player"): string | null {
  */
 export function lastLocationForTab(role: "gm" | "player", head: string): string | null {
   let stored: string | null = null;
-  try { stored = localStorage.getItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`); } catch { return null; }
+  try {
+    stored = localStorage.getItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`);
+  } catch {
+    return null;
+  }
   if (!stored) return null;
   const path = stored.split("?")[0] ?? "";
   if (headOf(path) !== head) return null;

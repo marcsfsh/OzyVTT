@@ -29,52 +29,72 @@ export function PartyStrip(props: Props) {
   const actors = rosterActors(props.state.actors as ReadonlyArray<GmActor | PlayerActor>).filter(
     (actor) => actor.kind === "player-character" && !("archived" in actor && actor.archived)
   );
-  const openActor = openId ? actors.find((actor) => actor.id === openId) ?? null : null;
+  const openActor = openId ? (actors.find((actor) => actor.id === openId) ?? null) : null;
 
   // Second guard on `off` (main.tsx also skips the mount), so a new call site cannot leak the party.
   if (tier === "off") return null;
 
   if (actors.length === 0) {
     // A player who has claimed nobody never gets here, so an empty party is always the GM's.
-    return <section className="party-strip party-strip-empty" aria-label="The party">
-      <p>No characters yet — create or import them on the Roster tab.</p>
-      {props.onOpenRoster && <Button variant="ghost" size="sm" onClick={props.onOpenRoster}>Open Roster</Button>}
-    </section>;
+    return (
+      <section className="party-strip party-strip-empty" aria-label="The party">
+        <p>No characters yet — create or import them on the Roster tab.</p>
+        {props.onOpenRoster && (
+          <Button variant="ghost" size="sm" onClick={props.onOpenRoster}>
+            Open Roster
+          </Button>
+        )}
+      </section>
+    );
   }
 
-  return <section className="party-strip" aria-label="The party">
-    <ul className="party-strip-row">
-      {actors.map((actor) => {
-        const claim = claimStateOf(actor);
-        // Your own HP and the GM's view are always exact; other characters' exact HP needs a sheet tier.
-        const showsHp = tier === null || claim === "mine" || tier === "full-sheet" || tier === "sheet-and-resources";
-        // Below `full-sheet` a player sees a class line instead: the server-derived `classLine` for other
-        // characters, the stored sheet for your own. GM rows always show HP.
-        const line = "claimStatus" in actor ? actor.classLine ?? classLine(actor.definition) : null;
-        const detail = showsHp ? hpLabel(actor.hp) : line;
-        const openable = props.role === "gm" || claim === "mine";
-        const label = [actor.name, detail, CLAIM_WORD[claim], actor.presence ? presenceLabel(actor.presence) : null]
-          .filter((part): part is string => Boolean(part))
-          .join(" — ");
-        const body = <>
-          <Avatar name={actor.name} size="sm" presence={actor.presence ? presenceDot(actor.presence) : undefined} />
-          <span className="party-strip-name">{actor.name}</span>
-          {detail && <span className={showsHp ? "party-strip-hp" : "party-strip-line"}>{detail}</span>}
-          <span className={`party-strip-claim party-strip-claim--${claim}`} />
-        </>;
-        return <li key={actor.id} className={`party-strip-item${claim === "mine" ? " is-mine" : ""}`}>
-          {openable
-            ? <button type="button" className="party-strip-entry" aria-label={`${label}. Open sheet.`} onClick={() => setOpenId(actor.id)}>{body}</button>
-            /* A plain readout rather than a disabled button: a player cannot open someone else's sheet. */
-            : <span className="party-strip-entry is-static" role="group" aria-label={label}>{body}</span>}
-        </li>;
-      })}
-    </ul>
-    {openActor && <CharacterSheet
-      actor={openActor}
-      role={props.role}
-      state={props.state}
-      onClose={() => setOpenId(null)}
-    />}
-  </section>;
+  return (
+    <section className="party-strip" aria-label="The party">
+      <ul className="party-strip-row">
+        {actors.map((actor) => {
+          const claim = claimStateOf(actor);
+          // Your own HP and the GM's view are always exact; other characters' exact HP needs a sheet tier.
+          const showsHp = tier === null || claim === "mine" || tier === "full-sheet" || tier === "sheet-and-resources";
+          // Below `full-sheet` a player sees a class line instead: the server-derived `classLine` for other
+          // characters, the stored sheet for your own. GM rows always show HP.
+          const line = "claimStatus" in actor ? (actor.classLine ?? classLine(actor.definition)) : null;
+          const detail = showsHp ? hpLabel(actor.hp) : line;
+          const openable = props.role === "gm" || claim === "mine";
+          const label = [actor.name, detail, CLAIM_WORD[claim], actor.presence ? presenceLabel(actor.presence) : null]
+            .filter((part): part is string => Boolean(part))
+            .join(" — ");
+          const body = (
+            <>
+              <Avatar name={actor.name} size="sm" presence={actor.presence ? presenceDot(actor.presence) : undefined} />
+              <span className="party-strip-name">{actor.name}</span>
+              {detail && <span className={showsHp ? "party-strip-hp" : "party-strip-line"}>{detail}</span>}
+              <span className={`party-strip-claim party-strip-claim--${claim}`} />
+            </>
+          );
+          return (
+            <li key={actor.id} className={`party-strip-item${claim === "mine" ? " is-mine" : ""}`}>
+              {openable ? (
+                <button
+                  type="button"
+                  className="party-strip-entry"
+                  aria-label={`${label}. Open sheet.`}
+                  onClick={() => setOpenId(actor.id)}
+                >
+                  {body}
+                </button>
+              ) : (
+                /* A plain readout rather than a disabled button: a player cannot open someone else's sheet. */
+                <span className="party-strip-entry is-static" role="group" aria-label={label}>
+                  {body}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {openActor && (
+        <CharacterSheet actor={openActor} role={props.role} state={props.state} onClose={() => setOpenId(null)} />
+      )}
+    </section>
+  );
 }

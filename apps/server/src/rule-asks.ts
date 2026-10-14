@@ -14,7 +14,8 @@ const MAX_ASKS = 10;
 /** Parks one ask. A second ask for the same character replaces the first (same question, one row). */
 export function parkRuleAsk(state: GameState, ask: PendingRuleAsk): PendingRuleAsk {
   const others = state.combat.pendingRuleAsks.filter((entry) => entry.actorId !== ask.actorId);
-  if (others.length >= MAX_ASKS) throw new CommandRejectedError("The GM already has ten questions waiting - give them a moment.");
+  if (others.length >= MAX_ASKS)
+    throw new CommandRejectedError("The GM already has ten questions waiting - give them a moment.");
   state.combat = { ...state.combat, pendingRuleAsks: [...others, ask] };
   return ask;
 }
@@ -29,7 +30,10 @@ export function findRuleAsk(state: GameState, askId: string): PendingRuleAsk | n
 export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
   const ask = findRuleAsk(state, askId);
   if (!ask) throw new CommandRejectedError("That question is no longer waiting - the fight moved on.");
-  state.combat = { ...state.combat, pendingRuleAsks: state.combat.pendingRuleAsks.filter((entry) => entry.id !== askId) };
+  state.combat = {
+    ...state.combat,
+    pendingRuleAsks: state.combat.pendingRuleAsks.filter((entry) => entry.id !== askId)
+  };
   return ask;
 }
 
@@ -41,7 +45,11 @@ export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
  *   outcome instead of firing the action twice.
  */
 export function rerunPayload(ask: PendingRuleAsk, reason: string | undefined): Record<string, unknown> {
-  return { ...withoutStaleRevision(ask.command.payload), commandId: ask.id, override: { ...(reason === undefined ? {} : { reason }) } };
+  return {
+    ...withoutStaleRevision(ask.command.payload),
+    commandId: ask.id,
+    override: { ...(reason === undefined ? {} : { reason }) }
+  };
 }
 
 /** The payload to re-run when the ask arrives. `expectedRevision` is stripped for the same reason: the

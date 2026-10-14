@@ -24,22 +24,30 @@ const WRITE_CREDENTIAL = { authorization: "Bearer int-codex:write", "content-typ
 const ANONYMOUS = { "content-type": "application/json" };
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { while (cleanups.length > 0) await cleanups.pop()?.(); });
+afterEach(async () => {
+  while (cleanups.length > 0) await cleanups.pop()?.();
+});
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "vtt-codex-conventions-"));
   const store = new CodexStore(join(directory, "vtt.sqlite"), () => Date.parse("2026-07-31T03:00:00.000Z"));
   const assets = new MapAssetStore(join(directory, "codex-assets"));
-  await store.initialize(); await assets.initialize();
-  const app = express(); app.use(express.json()); app.use(createCodexRouter({
-    store, assets,
-    authorizeGm: (token) => token === "gm-token",
-    authorizePlayer: (token) => token === "player-token",
-    // One credential per scope, so a verifier that ignored `scope` would fail the scope assertions below.
-    verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
-    notifyChanged: () => {},
-    issuePreviewSession: () => "preview-player-token"
-  }));
+  await store.initialize();
+  await assets.initialize();
+  const app = express();
+  app.use(express.json());
+  app.use(
+    createCodexRouter({
+      store,
+      assets,
+      authorizeGm: (token) => token === "gm-token",
+      authorizePlayer: (token) => token === "player-token",
+      // One credential per scope, so a verifier that ignored `scope` would fail the scope assertions below.
+      verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
+      notifyChanged: () => {},
+      issuePreviewSession: () => "preview-player-token"
+    })
+  );
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as { port: number }).port;
@@ -54,8 +62,10 @@ async function fixture() {
 const send = (base: string, method: string, path: string, headers: Record<string, string>, payload?: unknown) =>
   fetch(`${base}${path}`, { method, headers, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
 const get = (base: string, path: string, headers: Record<string, string>) => send(base, "GET", path, headers);
-const post = (base: string, path: string, headers: Record<string, string>, payload: unknown) => send(base, "POST", path, headers, payload);
-const patch = (base: string, path: string, headers: Record<string, string>, payload: unknown) => send(base, "PATCH", path, headers, payload);
+const post = (base: string, path: string, headers: Record<string, string>, payload: unknown) =>
+  send(base, "POST", path, headers, payload);
+const patch = (base: string, path: string, headers: Record<string, string>, payload: unknown) =>
+  send(base, "PATCH", path, headers, payload);
 const body = async (response: Response) => (await response.json()) as Json;
 
 describe("codex request correlation (X-Request-Id)", () => {
@@ -92,7 +102,11 @@ describe("codex request correlation (X-Request-Id)", () => {
 describe("codex 401 vs 403", () => {
   it("answers 401 only for a missing or unparseable Authorization header", async () => {
     const { base } = await fixture();
-    for (const headers of [ANONYMOUS, { ...ANONYMOUS, authorization: "Basic abc123" }, { ...ANONYMOUS, authorization: "gm-token" }]) {
+    for (const headers of [
+      ANONYMOUS,
+      { ...ANONYMOUS, authorization: "Basic abc123" },
+      { ...ANONYMOUS, authorization: "gm-token" }
+    ]) {
       const response = await get(base, "/api/v1/codex/pages", headers);
       expect(response.status, JSON.stringify(headers)).toBe(401);
       expect((await body(response)).error.code).toBe("unauthenticated");
@@ -107,7 +121,13 @@ describe("codex 401 vs 403", () => {
       ["player on a write", PLAYER, "POST", "/api/v1/codex/pages", { title: "Nope" }],
       ["player on a GM-grade read", PLAYER, "GET", "/api/v1/codex/settings", undefined],
       ["player on the reveal audit", PLAYER, "GET", "/api/v1/codex/reveal-audit", undefined],
-      ["junk bearer on a role read", { ...ANONYMOUS, authorization: "Bearer nonsense" }, "GET", "/api/v1/codex/pages", undefined],
+      [
+        "junk bearer on a role read",
+        { ...ANONYMOUS, authorization: "Bearer nonsense" },
+        "GET",
+        "/api/v1/codex/pages",
+        undefined
+      ],
       ["codex:read on a write", READ_CREDENTIAL, "PATCH", `/api/v1/codex/pages/${pageId}`, { title: "Mine" }],
       ["codex:write on a read", WRITE_CREDENTIAL, "GET", "/api/v1/codex/pages", undefined]
     ] as const) {
@@ -121,7 +141,9 @@ describe("codex 401 vs 403", () => {
 
   it("keeps 404-not-403 for a record a player may not see - a different axis, and it does not move", async () => {
     const { base } = await fixture();
-    const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." }));
+    const secret = await body(
+      await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." })
+    );
     const response = await get(base, `/api/v1/codex/pages/${secret.data.page.id}`, PLAYER);
     expect(response.status).toBe(404);
     expect((await body(response)).error.code).toBe("not_found");
@@ -131,7 +153,11 @@ describe("codex 401 vs 403", () => {
 describe("codex integration credentials", () => {
   it("gives a codex:read credential the GM projection, not the player one", async () => {
     const { base } = await fixture();
-    await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", playerBody: "A rumour.", gmBody: "Meets under the inn." });
+    await post(base, "/api/v1/codex/pages", GM, {
+      title: "The Cult",
+      playerBody: "A rumour.",
+      gmBody: "Meets under the inn."
+    });
 
     const asCredential = await body(await get(base, "/api/v1/codex/pages", READ_CREDENTIAL));
     const asGm = await body(await get(base, "/api/v1/codex/pages", GM));
@@ -197,8 +223,17 @@ describe("codex error envelopes", () => {
 
     // A refusal that is not a lost race carries none, so a client is not invited to retry something
     // that will never succeed.
-    await send(base, "PUT", "/api/v1/codex/calendar", GM, { yearName: "AE", months: [{ name: "Rise", days: 30 }], weekdays: ["Sol"], currentDate: { year: 1492, month: 0, day: 1 } });
-    const downtime = await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8 } }));
+    await send(base, "PUT", "/api/v1/codex/calendar", GM, {
+      yearName: "AE",
+      months: [{ name: "Rise", days: 30 }],
+      weekdays: ["Sol"],
+      currentDate: { year: 1492, month: 0, day: 1 }
+    });
+    const downtime = await body(
+      await post(base, "/api/v1/codex/journal/downtime", GM, {
+        downtime: { who: "Brannor", activity: "Forging", days: 8 }
+      })
+    );
     const entryId = downtime.data.entry.id as string;
     expect((await post(base, `/api/v1/codex/journal/${entryId}/apply-downtime`, GM, {})).status).toBe(200);
     const twice = await post(base, `/api/v1/codex/journal/${entryId}/apply-downtime`, GM, {});
@@ -210,7 +245,9 @@ describe("codex error envelopes", () => {
     const { base, store } = await fixture();
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     const secret = "SQLITE_CORRUPT: database disk image is malformed: /srv/vtt/data/vtt.sqlite";
-    (store as unknown as { listFolders: () => never }).listFolders = () => { throw new Error(secret); };
+    (store as unknown as { listFolders: () => never }).listFolders = () => {
+      throw new Error(secret);
+    };
 
     const response = await get(base, "/api/v1/codex/folders", GM);
     expect(response.status).toBe(500);
@@ -285,10 +322,19 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     // The query is part of the resource.
     const filtered = (await get(base, "/api/v1/codex/pages?folder=Places", GM)).headers.get("etag") as string;
     expect(filtered).not.toBe(pagesTag);
-    expect((await get(base, "/api/v1/codex/pages?folder=Places", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
+    expect((await get(base, "/api/v1/codex/pages?folder=Places", { ...GM, "if-none-match": pagesTag })).status).toBe(
+      200
+    );
     // ...but parameter order is not.
     const bothWays = await get(base, "/api/v1/codex/pages?tag=ruin&folder=Places", GM);
-    expect((await get(base, "/api/v1/codex/pages?folder=Places&tag=ruin", { ...GM, "if-none-match": bothWays.headers.get("etag") as string })).status).toBe(304);
+    expect(
+      (
+        await get(base, "/api/v1/codex/pages?folder=Places&tag=ruin", {
+          ...GM,
+          "if-none-match": bothWays.headers.get("etag") as string
+        })
+      ).status
+    ).toBe(304);
   });
 
   // Conditional requests are evaluated at serialization, after authorization and existence checks, so a
@@ -299,9 +345,15 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     const secretId = secret.data.page.id as string;
     const gmTag = (await get(base, `/api/v1/codex/pages/${secretId}`, GM)).headers.get("etag");
 
-    expect((await get(base, `/api/v1/codex/pages/${secretId}`, { ...PLAYER, "if-none-match": gmTag as string })).status).toBe(404);
-    expect((await get(base, "/api/v1/codex/settings", { ...PLAYER, "if-none-match": gmTag as string })).status).toBe(403);
-    expect((await get(base, "/api/v1/codex/pages", { ...ANONYMOUS, "if-none-match": gmTag as string })).status).toBe(401);
+    expect(
+      (await get(base, `/api/v1/codex/pages/${secretId}`, { ...PLAYER, "if-none-match": gmTag as string })).status
+    ).toBe(404);
+    expect((await get(base, "/api/v1/codex/settings", { ...PLAYER, "if-none-match": gmTag as string })).status).toBe(
+      403
+    );
+    expect((await get(base, "/api/v1/codex/pages", { ...ANONYMOUS, "if-none-match": gmTag as string })).status).toBe(
+      401
+    );
   });
 });
 
@@ -315,14 +367,22 @@ describe("codex responses validate against the schemas the document publishes", 
   const validatorFor = (component: string) => ajv.compile({ $ref: `openapi#/components/schemas/${component}` });
   /** The 200 response component the document declares for this GET, read from the document. */
   const documentedResponse = (contractPath: string) => {
-    const operation = (openApiDocument.paths as unknown as Record<string, Record<string, { responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }> }>>)[contractPath].get;
+    const operation = (
+      openApiDocument.paths as unknown as Record<
+        string,
+        Record<string, { responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }> }>
+      >
+    )[contractPath].get;
     const ref = operation.responses["200"].content?.["application/json"]?.schema?.$ref;
     if (!ref) throw new Error(`no documented 200 JSON schema for GET ${contractPath}`);
     return ref.replace("#/components/schemas/", "");
   };
   const check = (component: string, payload: unknown, label: string) => {
     const validate = validatorFor(component);
-    expect(validate(payload), `${label} must match ${component}: ${ajv.errorsText(validate.errors, { separator: "; " })}`).toBe(true);
+    expect(
+      validate(payload),
+      `${label} must match ${component}: ${ajv.errorsText(validate.errors, { separator: "; " })}`
+    ).toBe(true);
   };
 
   /** A codex with one of everything, revealed, so a player read is non-empty and actually gets validated. */
@@ -333,7 +393,10 @@ describe("codex responses validate against the schemas the document publishes", 
     await post(base, "/api/v1/codex/calendar", GM, {}).catch(() => undefined);
     await send(base, "PUT", "/api/v1/codex/calendar", GM, {
       yearName: "AE",
-      months: [{ name: "Rise", days: 30 }, { name: "Fall", days: 30 }],
+      months: [
+        { name: "Rise", days: 30 },
+        { name: "Fall", days: 30 }
+      ],
       weekdays: ["Sol", "Lun"],
       currentDate: { year: 1492, month: 0, day: 10 }
     });
@@ -341,45 +404,119 @@ describe("codex responses validate against the schemas the document publishes", 
 
     // The Harpers first: a `[[wiki link]]` to a title no page carries yields no edge, which would leave
     // the link feeds empty and their validation vacuous.
-    const faction = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Harpers", entityType: "faction", playerBody: "Meddlers." }));
+    const faction = await body(
+      await post(base, "/api/v1/codex/pages", GM, {
+        title: "The Harpers",
+        entityType: "faction",
+        playerBody: "Meddlers."
+      })
+    );
     const factionId = faction.data.page.id as string;
     await reveal(`/api/v1/codex/pages/${factionId}/reveal`);
-    const shown = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Barovia", entityType: "location", playerBody: "A misty valley. See [[The Harpers]].", gmBody: "The mists are alive.", tags: ["valley"], fields: { ruler: "Strahd" }, gmFields: { secret: "yes" }, inWorldDate: { year: 1492, month: 0, day: 3 } }));
+    const shown = await body(
+      await post(base, "/api/v1/codex/pages", GM, {
+        title: "Barovia",
+        entityType: "location",
+        playerBody: "A misty valley. See [[The Harpers]].",
+        gmBody: "The mists are alive.",
+        tags: ["valley"],
+        fields: { ruler: "Strahd" },
+        gmFields: { secret: "yes" },
+        inWorldDate: { year: 1492, month: 0, day: 3 }
+      })
+    );
     const shownId = shown.data.page.id as string;
     await reveal(`/api/v1/codex/pages/${shownId}/reveal`);
     await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." });
     await post(base, `/api/v1/codex/pages/${shownId}/connections`, GM, { toPageId: factionId, label: "ally of" });
     await post(base, "/api/v1/codex/folders", GM, { path: "Places" });
 
-    const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["realm"] }));
+    const map = await body(
+      await post(base, "/api/v1/codex/maps", GM, {
+        assetId: crypto.randomUUID(),
+        name: "Barovia",
+        kind: "regional",
+        tags: ["realm"]
+      })
+    );
     const mapId = map.data.map.id as string;
     await reveal(`/api/v1/codex/maps/${mapId}/reveal`);
-    const marker = await body(await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Village", pageIds: [shownId], tags: ["stop"] }));
+    const marker = await body(
+      await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, {
+        x: 0.5,
+        y: 0.5,
+        iconId: "pin",
+        iconColor: "#ff2e9a",
+        label: "Village",
+        pageIds: [shownId],
+        tags: ["stop"]
+      })
+    );
     const markerId = marker.data.marker.id as string;
     await reveal(`/api/v1/codex/markers/${markerId}/reveal`);
     await send(base, "PUT", `/api/v1/codex/markers/${markerId}/party`, GM, { isParty: true });
 
-    const session = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 4, realDate: "2026-07-30", recapBody: "They reached the gates.", prepBody: "Strahd watches.", attendees: ["Ana"], status: "played" }));
+    const session = await body(
+      await post(base, "/api/v1/codex/sessions", GM, {
+        sessionNumber: 4,
+        realDate: "2026-07-30",
+        recapBody: "They reached the gates.",
+        prepBody: "Strahd watches.",
+        attendees: ["Ana"],
+        status: "played"
+      })
+    );
     const sessionId = session.data.session.id as string;
     await reveal(`/api/v1/codex/sessions/${sessionId}/reveal`);
 
-    const quest = await body(await post(base, "/api/v1/codex/quests", GM, { title: "Find the amulet", playerBody: "Search the crypt.", gmBody: "It is a fake.", objectives: [{ text: "Enter the crypt", done: false }], entityIds: [shownId] }));
+    const quest = await body(
+      await post(base, "/api/v1/codex/quests", GM, {
+        title: "Find the amulet",
+        playerBody: "Search the crypt.",
+        gmBody: "It is a fake.",
+        objectives: [{ text: "Enter the crypt", done: false }],
+        entityIds: [shownId]
+      })
+    );
     const questId = quest.data.quest.id as string;
     await reveal(`/api/v1/codex/quests/${questId}/reveal`);
 
-    const note = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "The gates opened.", gmText: "Strahd allowed it.", tags: ["arrival"], attachPageId: shownId, inWorldDate: { year: 1492, month: 0, day: 4 } }));
+    const note = await body(
+      await post(base, "/api/v1/codex/journal", GM, {
+        playerText: "The gates opened.",
+        gmText: "Strahd allowed it.",
+        tags: ["arrival"],
+        attachPageId: shownId,
+        inWorldDate: { year: 1492, month: 0, day: 4 }
+      })
+    );
     await reveal(`/api/v1/codex/journal/${note.data.entry.id}/reveal`);
-    const downtime = await body(await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "A week of work.", downtime: { who: "Brannor", activity: "Forging", days: 7 } }));
+    const downtime = await body(
+      await post(base, "/api/v1/codex/journal/downtime", GM, {
+        playerText: "A week of work.",
+        downtime: { who: "Brannor", activity: "Forging", days: 7 }
+      })
+    );
     await reveal(`/api/v1/codex/journal/${downtime.data.entry.id}/reveal`);
-    const milestone = await body(await post(base, "/api/v1/codex/journal/milestone", GM, { playerText: "Level up.", milestone: { level: 5, reason: "cleared the crypt" } }));
+    const milestone = await body(
+      await post(base, "/api/v1/codex/journal/milestone", GM, {
+        playerText: "Level up.",
+        milestone: { level: 5, reason: "cleared the crypt" }
+      })
+    );
     await reveal(`/api/v1/codex/journal/${milestone.data.entry.id}/reveal`);
-    await post(base, "/api/v1/codex/journal/deadline", GM, { playerText: "The moon turns.", revealedToPlayers: true, inWorldDate: { year: 1492, month: 1, day: 1 } });
+    await post(base, "/api/v1/codex/journal/deadline", GM, {
+      playerText: "The moon turns.",
+      revealedToPlayers: true,
+      inWorldDate: { year: 1492, month: 1, day: 1 }
+    });
 
     await send(base, "PUT", `/api/v1/codex/standing/${factionId}`, GM, { value: -40, reason: "Killed their envoy" });
     await reveal(`/api/v1/codex/standing/${factionId}/reveal`);
     // The `standing` chronicle record is written hidden; reveal it so the player branch is exercised.
     const entries = (await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[];
-    for (const entry of entries.filter((row) => row.kind === "standing")) await reveal(`/api/v1/codex/journal/${entry.id}/reveal`);
+    for (const entry of entries.filter((row) => row.kind === "standing"))
+      await reveal(`/api/v1/codex/journal/${entry.id}/reveal`);
 
     return { base, store, shownId, mapId, markerId, sessionId, questId };
   }
@@ -411,12 +548,19 @@ describe("codex responses validate against the schemas the document publishes", 
     ];
     for (const [contractPath, url, nonEmpty] of reads) {
       const component = documentedResponse(contractPath);
-      for (const [role, headers] of [["gm", GM], ["player", PLAYER]] as const) {
+      for (const [role, headers] of [
+        ["gm", GM],
+        ["player", PLAYER]
+      ] as const) {
         const response = await get(base, url, headers);
         expect(response.status, `${role} GET ${url}`).toBe(200);
         const payload = await body(response);
         check(component, payload, `${role} GET ${url}`);
-        if (nonEmpty) expect((payload.data[nonEmpty] as unknown[]).length, `${role} GET ${url} -> data.${nonEmpty} must not be empty`).toBeGreaterThan(0);
+        if (nonEmpty)
+          expect(
+            (payload.data[nonEmpty] as unknown[]).length,
+            `${role} GET ${url} -> data.${nonEmpty} must not be empty`
+          ).toBeGreaterThan(0);
       }
     }
   });

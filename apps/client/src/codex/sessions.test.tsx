@@ -40,26 +40,45 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      getPage: (...a: unknown[]) => getPage(...a), search: (...a: unknown[]) => search(...a),
+      listPages: (...a: unknown[]) => listPages(...a),
+      listRelationships: (...a: unknown[]) => listRelationships(...a),
+      listLinks: (...a: unknown[]) => listLinks(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      getPage: (...a: unknown[]) => getPage(...a),
+      search: (...a: unknown[]) => search(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a)
     },
-    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forPage: (...a: unknown[]) => forPage(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      timeline: (...a: unknown[]) => timeline(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forPage: (...a: unknown[]) => forPage(...a)
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
-    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: (...a: unknown[]) => listAssets(...a), listMarkers: (...a: unknown[]) => listMarkers(...a) },
+    atlasApi: {
+      ...actual.atlasApi,
+      listMaps: (...a: unknown[]) => listMaps(...a),
+      listAssets: (...a: unknown[]) => listAssets(...a),
+      listMarkers: (...a: unknown[]) => listMarkers(...a)
+    },
     sessionApi: {
-      list: (...a: unknown[]) => listSessions(...a), create: (...a: unknown[]) => createSession(...a),
-      update: (...a: unknown[]) => updateSession(...a), reveal: (...a: unknown[]) => revealSession(...a),
-      activate: (...a: unknown[]) => activateSession(...a), remove: (...a: unknown[]) => removeSession(...a),
+      list: (...a: unknown[]) => listSessions(...a),
+      create: (...a: unknown[]) => createSession(...a),
+      update: (...a: unknown[]) => updateSession(...a),
+      reveal: (...a: unknown[]) => revealSession(...a),
+      activate: (...a: unknown[]) => activateSession(...a),
+      remove: (...a: unknown[]) => removeSession(...a),
       get: vi.fn()
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
       calendar: (...a: unknown[]) => getCalendar(...a),
-      listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
-      listMarkers: (...a: unknown[]) => playerListMarkers(...a), chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listConnections: (...a: unknown[]) => playerListRelationships(...a), party: (...a: unknown[]) => playerListLinks(...a),
+      listPages: (...a: unknown[]) => playerListPages(...a),
+      listMaps: (...a: unknown[]) => playerListMaps(...a),
+      listMarkers: (...a: unknown[]) => playerListMarkers(...a),
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
+      listConnections: (...a: unknown[]) => playerListRelationships(...a),
+      party: (...a: unknown[]) => playerListLinks(...a),
       sessions: (...a: unknown[]) => playerSessions(...a)
     }
   };
@@ -81,19 +100,52 @@ import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSess
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const SESSION = (over: Partial<CodexSession> = {}): CodexSession => ({
-  id: "s1", sessionNumber: 3, tags: [], realDate: "2026-07-12", attendees: ["Ozy"],
-  prepBody: "Strahd ambushes them at the bridge.", recapBody: "The party crossed the mists.",
-  revealedToPlayers: false, status: "planned", rev: 1,
-  createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z", ...over
+  id: "s1",
+  sessionNumber: 3,
+  tags: [],
+  realDate: "2026-07-12",
+  attendees: ["Ozy"],
+  prepBody: "Strahd ambushes them at the bridge.",
+  recapBody: "The party crossed the mists.",
+  revealedToPlayers: false,
+  status: "planned",
+  rev: 1,
+  createdAt: "2026-07-01T00:00:00.000Z",
+  updatedAt: "2026-07-01T00:00:00.000Z",
+  ...over
 });
 const S3 = SESSION({ id: "s3" });
-const S8 = SESSION({ id: "s8", sessionNumber: 8, realDate: "2026-07-26", prepBody: "The heart of the castle.", recapBody: "They reached the spire.", rev: 2 });
+const S8 = SESSION({
+  id: "s8",
+  sessionNumber: 8,
+  realDate: "2026-07-26",
+  prepBody: "The heart of the castle.",
+  recapBody: "They reached the spire.",
+  rev: 2
+});
 
 const record = (id: string, sessionNumber: number | null): CodexChronicleRecord => ({
-  kind: "entry", id, title: null, text: `Entry ${id}`, gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  kind: "entry",
+  id,
+  title: null,
+  text: `Entry ${id}`,
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
 const gmDefaults = (sessions: CodexSession[] = [S3, S8], activeSessionId: string | null = "s8") => {
@@ -114,12 +166,19 @@ const gmDefaults = (sessions: CodexSession[] = [S3, S8], activeSessionId: string
   listSessions.mockResolvedValue({ sessions, activeSessionId });
 };
 const renderWorkspace = async () => {
-  (goTo("/codex/sessions"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+  (goTo("/codex/sessions"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
   await waitFor(() => expect(listSessions).toHaveBeenCalled());
 };
 
 // Mocks are restored between tests but storage is not (console state, the badge's seen ids, the lens).
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 describe("Which session is 'now' (the rule, below the components)", () => {
   it("prefers the GM's explicit pointer, and falls back to the highest number for a player who has none", () => {
@@ -176,13 +235,21 @@ describe("The session console is a VIEW (M9)", () => {
     // Both the write and the read back on a fresh mount.
     gmDefaults();
     const user = userEvent.setup();
-    const first = (goTo("/codex/sessions"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    const first = (goTo("/codex/sessions"), render)(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listSessions).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Session prep" }));
     expect(localStorage.getItem("codex-session-console")).toBe("open");
     first.unmount();
 
-    (goTo("/codex/sessions"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    (goTo("/codex/sessions"), render)(
+      <ToastProvider>
+        <CodexShell gmToken="gm" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(listSessions).toHaveBeenCalledTimes(2));
     expect(screen.getByRole("complementary", { name: "Session prep" })).not.toHaveAttribute("inert");
   });
@@ -204,7 +271,9 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     await waitFor(() => expect(log.getByRole("button", { name: /Session 3/ })).toHaveAttribute("aria-current", "true"));
     expect(log.getByRole("button", { name: /Session 8/ })).not.toHaveAttribute("aria-current");
     // The record is open and its prep editable, not just highlighted.
-    expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue("Strahd ambushes them at the bridge.");
+    expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue(
+      "Strahd ambushes them at the bridge."
+    );
   });
 
   it("from a by-session journal heading — but ONLY where a session record exists", async () => {
@@ -219,20 +288,30 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     await user.click(screen.getByRole("button", { name: "By session" }));
 
     // Session 4's group heading must stay plain. Query the headings, since entry rows also say "Session 4".
-    const heading = (label: string) => [...document.querySelectorAll(".codex-timeline-year")].find((node) => node.textContent?.startsWith(label))!;
+    const heading = (label: string) =>
+      [...document.querySelectorAll(".codex-timeline-year")].find((node) => node.textContent?.startsWith(label))!;
     expect(heading("Session 4").tagName).toBe("DIV");
     expect(heading("Session 3").tagName).toBe("BUTTON");
 
     await user.click(screen.getByRole("button", { name: /^Session 3/ }));
     const log = within(await screen.findByRole("navigation", { name: "Sessions" }));
     await waitFor(() => expect(log.getByRole("button", { name: /Session 3/ })).toHaveAttribute("aria-current", "true"));
-    expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue("Strahd ambushes them at the bridge.");
+    expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue(
+      "Strahd ambushes them at the bridge."
+    );
   });
 
   it("does not turn a calendar YEAR into a session number under the date lens", async () => {
     // Under the date lens the key is a year, never a session number.
     gmDefaults([SESSION({ id: "s1492", sessionNumber: 1492 })], null);
-    chronicle.mockResolvedValue([{ ...record("j1", null), calendarInstant: 1492 * 30, inWorldDate: { year: 1492, month: 0, day: 1 }, inWorldLabel: "Hammer 1, 1492 DR" }]);
+    chronicle.mockResolvedValue([
+      {
+        ...record("j1", null),
+        calendarInstant: 1492 * 30,
+        inWorldDate: { year: 1492, month: 0, day: 1 },
+        inWorldLabel: "Hammer 1, 1492 DR"
+      }
+    ]);
     const user = userEvent.setup();
     await renderWorkspace();
 
@@ -245,7 +324,13 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
 });
 
 describe("The player's session card (M9, viewer safety)", () => {
-  const PLAYER_SESSION: PlayerCodexSession = { id: "s8", sessionNumber: 8, realDate: "2026-07-26", recap: "They reached the spire.", tags: [] };
+  const PLAYER_SESSION: PlayerCodexSession = {
+    id: "s8",
+    sessionNumber: 8,
+    realDate: "2026-07-26",
+    recap: "They reached the spire.",
+    tags: []
+  };
   beforeEach(() => {
     playerListPages.mockResolvedValue([]);
     playerListMaps.mockResolvedValue([]);
@@ -279,11 +364,16 @@ describe("The player's session card (M9, viewer safety)", () => {
    * the absence assertions are meaningful.
    */
   it("renders nothing from extra keys if the server ever regresses and sends a GM row", async () => {
-    playerSessions.mockResolvedValue([{
-      ...PLAYER_SESSION,
-      prepBody: "The heart of the castle.", attendees: ["Ana", "Bo"], status: "planned", rev: 7,
-      recapBody: "a GM-shaped duplicate of the recap"
-    } as never]);
+    playerSessions.mockResolvedValue([
+      {
+        ...PLAYER_SESSION,
+        prepBody: "The heart of the castle.",
+        attendees: ["Ana", "Bo"],
+        status: "planned",
+        rev: 7,
+        recapBody: "a GM-shaped duplicate of the recap"
+      } as never
+    ]);
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Latest recap" }));
@@ -298,11 +388,21 @@ describe("The player's session card (M9, viewer safety)", () => {
 /** Uses the hook exactly as main.tsx does. */
 function BadgeProbe({ token }: Readonly<{ token: string | null }>) {
   const badge = useRecapBadge(token);
-  return <button type="button" onClick={badge.markSeen}>Open Codex{badge.unread > 0 ? ` ${badge.unread} new` : ""}</button>;
+  return (
+    <button type="button" onClick={badge.markSeen}>
+      Open Codex{badge.unread > 0 ? ` ${badge.unread} new` : ""}
+    </button>
+  );
 }
 
 describe("The recap badge keys on session ID (CT-3, correction C2)", () => {
-  const sessionRow = (id: string, sessionNumber: number): PlayerCodexSession => ({ id, sessionNumber, realDate: null, recap: "…", tags: [] });
+  const sessionRow = (id: string, sessionNumber: number): PlayerCodexSession => ({
+    id,
+    sessionNumber,
+    realDate: null,
+    recap: "…",
+    tags: []
+  });
 
   it("counts revealed sessions the reader has not opened, and forgets them once they have", async () => {
     playerSessions.mockResolvedValue([sessionRow("s1", 1), sessionRow("s2", 2)]);
@@ -326,7 +426,9 @@ describe("The recap badge keys on session ID (CT-3, correction C2)", () => {
     await screen.findByRole("button", { name: "Open Codex" });
 
     // The GM edits prep and re-reveals; clients refetch the same ids.
-    const refetch = (socket.on as unknown as { mock: { calls: [string, () => void][] } }).mock.calls.find(([event]) => event === "codex:changed")![1];
+    const refetch = (socket.on as unknown as { mock: { calls: [string, () => void][] } }).mock.calls.find(
+      ([event]) => event === "codex:changed"
+    )![1];
     playerSessions.mockResolvedValue([sessionRow("s1", 1)]);
     refetch();
     await waitFor(() => expect(playerSessions).toHaveBeenCalledTimes(2));

@@ -11,14 +11,19 @@ const formatChallenge = (rating: number) => {
   if (rating === 0.5) return "1/2";
   return String(rating);
 };
-const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
+const titleCase = (value: string) => (value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 
 /**
  * The bestiary browser. It adds monsters; visibility comes from the staging tray (`visibility`),
  * so every add path obeys one control. With `joinEncounter`, the roster add and joining the fight
  * are one command.
  */
-export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEncounter = false }: Readonly<{
+export function MonsterBrowser({
+  onClose,
+  onAdded,
+  visibility = "public",
+  joinEncounter = false
+}: Readonly<{
   onClose: () => void;
   onAdded?: (actorId: string) => void;
   /** The staging tray's current "New tokens" state. */
@@ -45,7 +50,10 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
 
   useEffect(() => {
     socket.emit("content:monsters", {}, (result) => {
-      if (!result.ok || !result.monsters) { setError(result.message ?? "The bundled bestiary could not be loaded."); return; }
+      if (!result.ok || !result.monsters) {
+        setError(result.message ?? "The bundled bestiary could not be loaded.");
+        return;
+      }
       setMonsters(result.monsters);
       setAttribution(result.attribution ?? "");
     });
@@ -55,35 +63,94 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
     if (!monsters) return [];
     const query = search.trim().toLowerCase();
     if (!query) return monsters;
-    return monsters.filter((monster) => monster.name.toLowerCase().includes(query) || monster.type.toLowerCase().includes(query));
+    return monsters.filter(
+      (monster) => monster.name.toLowerCase().includes(query) || monster.type.toLowerCase().includes(query)
+    );
   }, [monsters, search]);
 
   const add = (monster: ContentMonsterSummary) => {
     setBusyIds((current) => new Set(current).add(monster.id));
-    socket.emit("actor:add-from-definition", { commandId: newId(), definitionId: monster.id, visibility, ...(joinEncounter ? { joinEncounter: true } : {}) }, (result) => {
-      setBusyIds((current) => { const next = new Set(current); next.delete(monster.id); return next; });
-      if (result.ok && result.actorId) { setAddedIds((current) => new Set(current).add(monster.id)); onAdded?.(result.actorId); }
-      setFeedback(result.ok
-        ? `${monster.name} is in the staging tray${visibility === "gm-only" ? ", GM only" : ""}.`
-        : result.message ?? "The monster could not be added.");
-    });
+    socket.emit(
+      "actor:add-from-definition",
+      { commandId: newId(), definitionId: monster.id, visibility, ...(joinEncounter ? { joinEncounter: true } : {}) },
+      (result) => {
+        setBusyIds((current) => {
+          const next = new Set(current);
+          next.delete(monster.id);
+          return next;
+        });
+        if (result.ok && result.actorId) {
+          setAddedIds((current) => new Set(current).add(monster.id));
+          onAdded?.(result.actorId);
+        }
+        setFeedback(
+          result.ok
+            ? `${monster.name} is in the staging tray${visibility === "gm-only" ? ", GM only" : ""}.`
+            : (result.message ?? "The monster could not be added.")
+        );
+      }
+    );
   };
 
-  return <Modal open onClose={onClose} size="lg" className="monster-browser" title="Add monsters" ariaLabel="Add monsters from the SRD bestiary">
-    <div className="monster-browser-controls">
-      <Input type="search" placeholder="Search by name or type…" aria-label="Search monsters" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
-      <p className="monster-browser-target">Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong></p>
-    </div>
-    {error && <p className="monster-browser-status" role="alert">{error}</p>}
-    {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
-    {monsters && <ol className="monster-browser-list scroll-y">
-      {shown.map((monster) => <li key={monster.id}>
-        <div className="monster-browser-name"><strong>{monster.name}{addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}</strong><small>CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}</small></div>
-        <button type="button" className="monster-browser-add" disabled={busyIds.has(monster.id)} onClick={() => add(monster)}>{busyIds.has(monster.id) ? "Adding…" : "Add"}</button>
-      </li>)}
-      {shown.length === 0 && <li className="monster-browser-none">No monsters match "{search}".</li>}
-    </ol>}
-    <p className="monster-browser-feedback" role="status">{feedback}</p>
-    {attribution && <p className="monster-browser-attribution">{attribution}</p>}
-  </Modal>;
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      className="monster-browser"
+      title="Add monsters"
+      ariaLabel="Add monsters from the SRD bestiary"
+    >
+      <div className="monster-browser-controls">
+        <Input
+          type="search"
+          placeholder="Search by name or type…"
+          aria-label="Search monsters"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          autoFocus
+        />
+        <p className="monster-browser-target">
+          Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong>
+        </p>
+      </div>
+      {error && (
+        <p className="monster-browser-status" role="alert">
+          {error}
+        </p>
+      )}
+      {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
+      {monsters && (
+        <ol className="monster-browser-list scroll-y">
+          {shown.map((monster) => (
+            <li key={monster.id}>
+              <div className="monster-browser-name">
+                <strong>
+                  {monster.name}
+                  {addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}
+                </strong>
+                <small>
+                  CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC{" "}
+                  {monster.armorClass} · HP {monster.hitPoints}
+                </small>
+              </div>
+              <button
+                type="button"
+                className="monster-browser-add"
+                disabled={busyIds.has(monster.id)}
+                onClick={() => add(monster)}
+              >
+                {busyIds.has(monster.id) ? "Adding…" : "Add"}
+              </button>
+            </li>
+          ))}
+          {shown.length === 0 && <li className="monster-browser-none">No monsters match "{search}".</li>}
+        </ol>
+      )}
+      <p className="monster-browser-feedback" role="status">
+        {feedback}
+      </p>
+      {attribution && <p className="monster-browser-attribution">{attribution}</p>}
+    </Modal>
+  );
 }

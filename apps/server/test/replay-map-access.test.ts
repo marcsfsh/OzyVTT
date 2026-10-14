@@ -11,18 +11,34 @@ import { createServer } from "../src/server.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8); buffer.write("IHDR", 12, "ascii"); buffer.writeUInt32BE(width, 16); buffer.writeUInt32BE(height, 20);
+  buffer.writeUInt32BE(13, 8);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
   return buffer;
 }
 
-const initialState = () => GameStateSchema.parse({ schemaVersion: 1, actors: [
-  { id: HERO_ID, name: "Public Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, initiative: 3 }
-] });
+const initialState = () =>
+  GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: HERO_ID,
+        name: "Public Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        initiative: 3
+      }
+    ]
+  });
 
 async function boot() {
   const directory = await mkdtemp(join(tmpdir(), "vtt-replay-map-"));
@@ -43,7 +59,10 @@ async function boot() {
   await new Promise<void>((resolve) => server.httpServer.listen(0, "127.0.0.1", resolve));
   const address = server.httpServer.address();
   if (!address || typeof address === "string") throw new Error("Server did not bind.");
-  cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken, playerToken };
 }
 
@@ -52,7 +71,8 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     const { base, server, gmToken, playerToken } = await boot();
     const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
     const image = async (assetId: string, token: string) =>
-      (await fetch(`${base}/api/v1/map-assets/${assetId}/content`, { headers: { authorization: `Bearer ${token}` } })).status;
+      (await fetch(`${base}/api/v1/map-assets/${assetId}/content`, { headers: { authorization: `Bearer ${token}` } }))
+        .status;
 
     // Two battlemaps, two recorded fights - one per map, so "shared" can be told from "archived".
     const shared = await server.mapAssets.import(png(900, 600), "shared.png");
@@ -61,15 +81,40 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     server.mapCatalog.register(secret.metadata.id, "Next week's ambush", "battlemap");
 
     const record = async (mapAssetId: string) => {
-      expect((await fetch(`${base}/api/v1/game/encounter/start`, { method: "POST", headers: bearer(gmToken), body: JSON.stringify({ mapAssetId, entries: [{ actorId: HERO_ID, score: 12 }] }) })).status).toBe(200);
+      expect(
+        (
+          await fetch(`${base}/api/v1/game/encounter/start`, {
+            method: "POST",
+            headers: bearer(gmToken),
+            body: JSON.stringify({ mapAssetId, entries: [{ actorId: HERO_ID, score: 12 }] })
+          })
+        ).status
+      ).toBe(200);
       // One turn boundary, so the archive has a turn a player's replay can render a map on.
-      expect((await fetch(`${base}/api/v1/game/initiative/next`, { method: "POST", headers: bearer(gmToken), body: JSON.stringify({}) })).status).toBe(200);
-      expect((await fetch(`${base}/api/v1/game/encounter/end`, { method: "POST", headers: bearer(gmToken), body: JSON.stringify({}) })).status).toBe(200);
+      expect(
+        (
+          await fetch(`${base}/api/v1/game/initiative/next`, {
+            method: "POST",
+            headers: bearer(gmToken),
+            body: JSON.stringify({})
+          })
+        ).status
+      ).toBe(200);
+      expect(
+        (
+          await fetch(`${base}/api/v1/game/encounter/end`, {
+            method: "POST",
+            headers: bearer(gmToken),
+            body: JSON.stringify({})
+          })
+        ).status
+      ).toBe(200);
     };
     await record(shared.metadata.id);
     await record(secret.metadata.id);
 
-    const archives = (await (await fetch(`${base}/api/v1/encounters`, { headers: bearer(gmToken) })).json()).data.encounters as ReadonlyArray<{ id: number }>;
+    const archives = (await (await fetch(`${base}/api/v1/encounters`, { headers: bearer(gmToken) })).json()).data
+      .encounters as ReadonlyArray<{ id: number }>;
     expect(archives).toHaveLength(2);
     // Newest first, so the last fight recorded (the secret map) is index 0.
     const sharedArchiveId = archives[1].id;
@@ -80,7 +125,13 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     expect(await image(secret.metadata.id, playerToken)).toBe(403);
 
     const setShared = async (id: number, playerVisible: boolean) =>
-      (await fetch(`${base}/api/v1/encounters/${id}/visibility`, { method: "POST", headers: bearer(gmToken), body: JSON.stringify({ playerVisible }) })).status;
+      (
+        await fetch(`${base}/api/v1/encounters/${id}/visibility`, {
+          method: "POST",
+          headers: bearer(gmToken),
+          body: JSON.stringify({ playerVisible })
+        })
+      ).status;
     expect(await setShared(sharedArchiveId, true)).toBe(200);
 
     // The shared fight's battlefield opens; the unshared one does not.

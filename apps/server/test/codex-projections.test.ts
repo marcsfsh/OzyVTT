@@ -1,13 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { projectGmChronicleRecord, projectGmCalendar, projectGmMarker, projectGmStanding, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerMarker, projectPlayerPageMarker, projectPlayerStanding, projectRevealAudit } from "../src/codex-projections.js";
-import type { CodexCalendar, CodexDowntimePayload, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMarkerRow, CodexStandingRow } from "../src/codex-store.js";
+import {
+  projectGmChronicleRecord,
+  projectGmCalendar,
+  projectGmMarker,
+  projectGmStanding,
+  projectPlayerCalendar,
+  projectPlayerChronicleRecord,
+  projectPlayerMarker,
+  projectPlayerPageMarker,
+  projectPlayerStanding,
+  projectRevealAudit
+} from "../src/codex-projections.js";
+import type {
+  CodexCalendar,
+  CodexDowntimePayload,
+  CodexInWorldDate,
+  CodexJournalKind,
+  CodexJournalRow,
+  CodexMarkerRow,
+  CodexStandingRow
+} from "../src/codex-store.js";
 
 // Codex projection gates on literal rows, so a bug cannot hide behind a store that never returned a
 // dangerous row. SQL and HTTP layers are covered in `codex-store.test.ts` and `codex-http.test.ts`.
 
 const CALENDAR: CodexCalendar = {
   yearName: "DR",
-  months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }],
+  months: [
+    { name: "Hammer", days: 30 },
+    { name: "Alturiak", days: 30 }
+  ],
   weekdays: ["First", "Second"],
   currentDate: { year: 1492, month: 1, day: 20 }
 };
@@ -16,15 +38,37 @@ const CALENDAR: CodexCalendar = {
 function entryRow(overrides: Partial<CodexJournalRow> & { kind: CodexJournalKind }): CodexJournalRow {
   return {
     id: "11111111-1111-4111-8111-111111111111",
-    playerText: "The tax is due.", gmText: "The duke will send the guard.", revealedToPlayers: false,
-    attachMarkerId: null, attachPageId: null, sourceEncounterId: null, sessionId: null, sessionNumber: null, realDate: null,
-    inWorldLabel: "Hammer 10, 1492 DR", calendarInstant: 9, inWorldDate: { year: 1492, month: 0, day: 10 },
-    sortKey: 0, tags: [], payload: null, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z",
+    playerText: "The tax is due.",
+    gmText: "The duke will send the guard.",
+    revealedToPlayers: false,
+    attachMarkerId: null,
+    attachPageId: null,
+    sourceEncounterId: null,
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldLabel: "Hammer 10, 1492 DR",
+    calendarInstant: 9,
+    inWorldDate: { year: 1492, month: 0, day: 10 },
+    sortKey: 0,
+    tags: [],
+    payload: null,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
     ...overrides
   };
 }
-const DOWNTIME: CodexDowntimePayload = { who: "Brannor", activity: "Forging a blade", days: 8, applied: true, characterPageId: null };
-const playerContext = (publishedInstant: number | null = null) => ({ unrevealedSessionIds: new Set<string>(), publishedInstant });
+const DOWNTIME: CodexDowntimePayload = {
+  who: "Brannor",
+  activity: "Forging a blade",
+  days: 8,
+  applied: true,
+  characterPageId: null
+};
+const playerContext = (publishedInstant: number | null = null) => ({
+  unrevealedSessionIds: new Set<string>(),
+  publishedInstant
+});
 
 describe("M11 calendar projection - the GM's prep clock never reaches a player (O-1 / D11-G)", () => {
   /** The two clocks differ, so a projection that returned the GM's clock cannot pass. */
@@ -36,7 +80,15 @@ describe("M11 calendar projection - the GM's prep clock never reaches a player (
     expect(player.currentDate).toEqual({ year: 1492, month: 0, day: 10 });
     expect(player.currentDate).not.toEqual(CALENDAR.currentDate);
     // ...and the GM's clock (`month: 1`, `day: 20`) is nowhere in the serialized payload.
-    expect(JSON.stringify(player)).toBe(JSON.stringify({ yearName: "DR", eras: [], months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: published }));
+    expect(JSON.stringify(player)).toBe(
+      JSON.stringify({
+        yearName: "DR",
+        eras: [],
+        months: CALENDAR.months,
+        weekdays: CALENDAR.weekdays,
+        currentDate: published
+      })
+    );
     expect(Object.keys(player).sort()).toEqual(["currentDate", "eras", "months", "weekdays", "yearName"]);
     // The world's own months/weekdays/eras are not secrets and still travel unchanged.
     expect(player.months).toEqual(CALENDAR.months);
@@ -46,7 +98,10 @@ describe("M11 calendar projection - the GM's prep clock never reaches a player (
   // `eras` is added key by key to both projections, as `months` is: a player-side spread would carry
   // the next GM-only field out with it. Eras carry no dates; `currentDate` is still the only clock.
   it("gives BOTH audiences the world's eras, and gives the player no extra key with them", () => {
-    const eras = [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }];
+    const eras = [
+      { name: "Age of Ruin", startYear: 1000 },
+      { name: "Third Age", startYear: 1400 }
+    ];
     const withEras = { ...CALENDAR, eras };
     const published: CodexInWorldDate = { year: 1492, month: 0, day: 10 };
 
@@ -82,14 +137,25 @@ describe("M11 chronicle projection - deadlines and downtime are gated by reveal 
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: deadline }, playerContext())).toBeNull();
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: downtime }, playerContext())).toBeNull();
 
-    const shownDeadline = projectPlayerChronicleRecord({ kind: "entry", entry: { ...deadline, revealedToPlayers: true } }, playerContext());
-    const shownDowntime = projectPlayerChronicleRecord({ kind: "entry", entry: { ...downtime, revealedToPlayers: true } }, playerContext());
+    const shownDeadline = projectPlayerChronicleRecord(
+      { kind: "entry", entry: { ...deadline, revealedToPlayers: true } },
+      playerContext()
+    );
+    const shownDowntime = projectPlayerChronicleRecord(
+      { kind: "entry", entry: { ...downtime, revealedToPlayers: true } },
+      playerContext()
+    );
     expect(shownDeadline).not.toBeNull();
     expect(shownDowntime).not.toBeNull();
     // A revealed deadline keeps its kind.
     expect(shownDeadline!.kind).toBe("deadline");
     expect(shownDowntime!.kind).toBe("downtime");
-    expect(projectPlayerChronicleRecord({ kind: "entry", entry: entryRow({ kind: "note", revealedToPlayers: true }) }, playerContext())).not.toBeNull();
+    expect(
+      projectPlayerChronicleRecord(
+        { kind: "entry", entry: entryRow({ kind: "note", revealedToPlayers: true }) },
+        playerContext()
+      )
+    ).not.toBeNull();
   });
 
   it("carries a revealed downtime's who/activity/days to a player but never `applied`", () => {
@@ -106,7 +172,10 @@ describe("M11 chronicle projection - deadlines and downtime are gated by reveal 
 
   it("gives a non-downtime record a null payload rather than an absent key, so no reader branches on presence", () => {
     for (const kind of ["note", "combat", "deadline"] as const) {
-      const player = projectPlayerChronicleRecord({ kind: "entry", entry: entryRow({ kind, revealedToPlayers: true }) }, playerContext())!;
+      const player = projectPlayerChronicleRecord(
+        { kind: "entry", entry: entryRow({ kind, revealedToPlayers: true }) },
+        playerContext()
+      )!;
       expect(player, `${kind} payload`).toHaveProperty("payload", null);
     }
   });
@@ -124,7 +193,9 @@ describe("M11 chronicle projection - deadlines and downtime are gated by reveal 
   it("keeps a downtime's proposed date off the player row entirely", () => {
     const row = entryRow({ kind: "downtime", revealedToPlayers: true, payload: { ...DOWNTIME, applied: false } });
     const proposedDate: CodexInWorldDate = { year: 1492, month: 1, day: 28 };
-    expect(projectGmChronicleRecord({ kind: "entry", entry: row }, { proposedDate }).proposedDate).toEqual(proposedDate);
+    expect(projectGmChronicleRecord({ kind: "entry", entry: row }, { proposedDate }).proposedDate).toEqual(
+      proposedDate
+    );
     const player = projectPlayerChronicleRecord({ kind: "entry", entry: row }, playerContext())!;
     expect(player).not.toHaveProperty("proposedDate");
     expect(JSON.stringify(player)).not.toContain("28");
@@ -137,18 +208,34 @@ const SECRET_FACTION_ID = "33333333-3333-4333-8333-333333333333";
 /** A standing row as the store returns one. Every field explicit so the test inherits no defaults. */
 function standingRow(overrides: Partial<CodexStandingRow> = {}): CodexStandingRow {
   return {
-    id: "44444444-4444-4444-8444-444444444444", factionPageId: FACTION_ID, value: -40, revealedToPlayers: false,
-    createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z",
+    id: "44444444-4444-4444-8444-444444444444",
+    factionPageId: FACTION_ID,
+    value: -40,
+    revealedToPlayers: false,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
     ...overrides
   };
 }
 /** A marker row as the store returns one, GM-only links included so a leak has something to leak. */
 function markerRow(overrides: Partial<CodexMarkerRow> = {}): CodexMarkerRow {
   return {
-    id: "55555555-5555-4555-8555-555555555555", mapId: "66666666-6666-4666-8666-666666666666",
-    x: 0.5, y: 0.25, iconId: "pin", iconColor: "#aabbcc", label: "Camp", revealedToPlayers: false, tags: ["travel"],
-    pageIds: [], subMapId: null, sceneIds: ["77777777-7777-4777-8777-777777777777"], actorId: "88888888-8888-4888-8888-888888888888",
-    isParty: false, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z",
+    id: "55555555-5555-4555-8555-555555555555",
+    mapId: "66666666-6666-4666-8666-666666666666",
+    x: 0.5,
+    y: 0.25,
+    iconId: "pin",
+    iconColor: "#aabbcc",
+    label: "Camp",
+    revealedToPlayers: false,
+    tags: ["travel"],
+    pageIds: [],
+    subMapId: null,
+    sceneIds: ["77777777-7777-4777-8777-777777777777"],
+    actorId: "88888888-8888-4888-8888-888888888888",
+    isParty: false,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
     ...overrides
   };
 }
@@ -174,7 +261,10 @@ describe("M12 standing projection - CT-6, two gates and a signed value", () => {
     const row = standingRow({ factionPageId: SECRET_FACTION_ID, revealedToPlayers: true, value: 75 });
     expect(projectPlayerStanding(row, { factionRevealed: false })).toBeNull();
     // The same row with its faction revealed travels, so this is the faction gate.
-    expect(projectPlayerStanding(row, { factionRevealed: true })).toEqual({ factionPageId: SECRET_FACTION_ID, value: 75 });
+    expect(projectPlayerStanding(row, { factionRevealed: true })).toEqual({
+      factionPageId: SECRET_FACTION_ID,
+      value: 75
+    });
   });
 });
 
@@ -188,15 +278,27 @@ describe("M12 party marker projection - CT-7, a flag and nothing else", () => {
     expect(party).not.toBeNull();
 
     // The whole key set, so any new field in the player marker projection fails here.
-    expect(Object.keys(party!).sort()).toEqual(["iconColor", "iconId", "id", "isParty", "label", "mapId", "pageIds", "subMapId", "tags", "x", "y"]);
+    expect(Object.keys(party!).sort()).toEqual([
+      "iconColor",
+      "iconId",
+      "id",
+      "isParty",
+      "label",
+      "mapId",
+      "pageIds",
+      "subMapId",
+      "tags",
+      "x",
+      "y"
+    ]);
     expect(Object.keys(party!).sort()).toEqual(Object.keys(ordinary!).sort());
     expect(party!.isParty).toBe(true);
     expect(ordinary!.isParty).toBe(false);
 
     // The GM-only links the row carries are nowhere in the serialized party pin.
     const payload = JSON.stringify(party);
-    expect(payload).not.toContain("77777777-7777-4777-8777-777777777777");   // sceneIds
-    expect(payload).not.toContain("88888888-8888-4888-8888-888888888888");   // actorId
+    expect(payload).not.toContain("77777777-7777-4777-8777-777777777777"); // sceneIds
+    expect(payload).not.toContain("88888888-8888-4888-8888-888888888888"); // actorId
     expect(payload).not.toContain("revealedToPlayers");
     expect(payload).not.toContain("createdAt");
     expect(projectGmMarker(markerRow({ isParty: true })).sceneIds).toHaveLength(1);
@@ -216,14 +318,23 @@ describe("M12 party marker projection - CT-7, a flag and nothing else", () => {
 // record's delta and reason, since its `playerText` is empty.
 describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => {
   const milestone = entryRow({ kind: "milestone", payload: { level: 5, reason: "Cleared the crypt" } });
-  const standing = entryRow({ kind: "standing", payload: { factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" } });
+  const standing = entryRow({
+    kind: "standing",
+    payload: { factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" }
+  });
 
   it("carries a revealed milestone's level and reason to a player, and hides an unrevealed one", () => {
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: milestone }, playerContext())).toBeNull();
-    const shown = projectPlayerChronicleRecord({ kind: "entry", entry: { ...milestone, revealedToPlayers: true } }, playerContext())!;
+    const shown = projectPlayerChronicleRecord(
+      { kind: "entry", entry: { ...milestone, revealedToPlayers: true } },
+      playerContext()
+    )!;
     expect(shown.kind).toBe("milestone");
     expect(shown.payload).toEqual({ level: 5, reason: "Cleared the crypt" });
-    expect(projectGmChronicleRecord({ kind: "entry", entry: milestone }).payload).toEqual({ level: 5, reason: "Cleared the crypt" });
+    expect(projectGmChronicleRecord({ kind: "entry", entry: milestone }).payload).toEqual({
+      level: 5,
+      reason: "Cleared the crypt"
+    });
   });
 
   it("carries a revealed standing record's DELTA and reason, and HIDES it whole when the faction is secret", () => {
@@ -235,14 +346,25 @@ describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => 
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, playerContext())).toBeNull();
 
     // Faction page revealed: the id travels too, so the client can name the faction.
-    const withFaction = projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, { ...playerContext(), revealedPageIds: new Set([FACTION_ID]) })!;
+    const withFaction = projectPlayerChronicleRecord(
+      { kind: "entry", entry: revealed },
+      { ...playerContext(), revealedPageIds: new Set([FACTION_ID]) }
+    )!;
     expect(withFaction.payload).toEqual({ factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" });
-    expect(projectGmChronicleRecord({ kind: "entry", entry: standing }).payload).toEqual({ factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" });
+    expect(projectGmChronicleRecord({ kind: "entry", entry: standing }).payload).toEqual({
+      factionPageId: FACTION_ID,
+      delta: -15,
+      reason: "Killed their envoy"
+    });
   });
 
   it("never lets one kind's payload ride out on another kind's row", () => {
     // A row whose stored blob does not match its kind projects `null`: dispatch is on the entry's kind.
-    const mislabelled = entryRow({ kind: "milestone", revealedToPlayers: true, payload: { who: "Brannor", activity: "Forging", days: 8, applied: true, characterPageId: null } });
+    const mislabelled = entryRow({
+      kind: "milestone",
+      revealedToPlayers: true,
+      payload: { who: "Brannor", activity: "Forging", days: 8, applied: true, characterPageId: null }
+    });
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: mislabelled }, playerContext())!.payload).toBeNull();
     expect(projectGmChronicleRecord({ kind: "entry", entry: mislabelled }).payload).toBeNull();
   });
@@ -253,11 +375,20 @@ describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => 
 describe("M12 reveal audit projection - CT-9, an aggregation and not a second opinion", () => {
   it("counts a revealed pin on a HIDDEN map as not visible, and reports every section even when empty", () => {
     const onShownMap = markerRow({ id: "99999999-9999-4999-8999-999999999999", revealedToPlayers: true });
-    const onSecretMap = markerRow({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", revealedToPlayers: true, isParty: true });
+    const onSecretMap = markerRow({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      revealedToPlayers: true,
+      isParty: true
+    });
     const audit = projectRevealAudit([
       { kind: "marker", marker: onShownMap, mapRevealed: true, ...markerContext },
       { kind: "marker", marker: onSecretMap, mapRevealed: false, ...markerContext },
-      { kind: "standing", standing: standingRow({ revealedToPlayers: true }), factionRevealed: true, factionTitle: "The Harpers" }
+      {
+        kind: "standing",
+        standing: standingRow({ revealedToPlayers: true }),
+        factionRevealed: true,
+        factionTitle: "The Harpers"
+      }
     ]);
 
     const section = (kind: string) => audit.sections.find((entry) => entry.kind === kind)!;
@@ -265,10 +396,20 @@ describe("M12 reveal audit projection - CT-9, an aggregation and not a second op
     expect(section("marker").total).toBe(2);
     expect(section("marker").revealed).toBe(1);
     expect(section("marker").rows.map((row) => row.id)).toEqual([onShownMap.id]);
-    expect(section("standing").rows).toEqual([{ kind: "standing", id: FACTION_ID, title: "The Harpers", journalKind: null }]);
+    expect(section("standing").rows).toEqual([
+      { kind: "standing", id: FACTION_ID, title: "The Harpers", journalKind: null }
+    ]);
 
     // Every surface is reported, empty ones included, so "nothing revealed" and "did not load" differ.
-    expect(audit.sections.map((entry) => entry.kind)).toEqual(["page", "map", "marker", "journal", "session", "quest", "standing"]);
+    expect(audit.sections.map((entry) => entry.kind)).toEqual([
+      "page",
+      "map",
+      "marker",
+      "journal",
+      "session",
+      "quest",
+      "standing"
+    ]);
     expect(section("page")).toEqual({ kind: "page", revealed: 0, total: 0, rows: [] });
     expect(audit.revealed).toBe(2);
     expect(audit.total).toBe(3);
@@ -277,8 +418,18 @@ describe("M12 reveal audit projection - CT-9, an aggregation and not a second op
   // A journal row carries its kind as `journalKind`, its own field, so a deadline with prose is not
   // indistinguishable from a note with prose and the client can badge it.
   it("names a journal row's KIND in its own field, so a deadline with prose is not a note with prose", () => {
-    const deadline = entryRow({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", kind: "deadline", revealedToPlayers: true, playerText: "The tax is due." });
-    const note = entryRow({ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", kind: "note", revealedToPlayers: true, playerText: "The tax is due." });
+    const deadline = entryRow({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      kind: "deadline",
+      revealedToPlayers: true,
+      playerText: "The tax is due."
+    });
+    const note = entryRow({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      kind: "note",
+      revealedToPlayers: true,
+      playerText: "The tax is due."
+    });
     const sessionContext = { unrevealedSessionIds: new Set<string>() };
     const rows = projectRevealAudit([
       { kind: "journal", entry: deadline, sessionContext },
@@ -291,9 +442,21 @@ describe("M12 reveal audit projection - CT-9, an aggregation and not a second op
 
     // The fallback still names a silent record (`setStanding` writes an empty player text). A revealed
     // standing record also needs its faction page revealed to reach a player.
-    const silentStanding = entryRow({ kind: "standing", revealedToPlayers: true, playerText: "", payload: { factionPageId: FACTION_ID, delta: 40, reason: "Saved the caravan." } });
-    const silent = projectRevealAudit([{ kind: "journal", entry: silentStanding, sessionContext: { ...sessionContext, revealedPageIds: new Set([FACTION_ID]) } }])
-      .sections.find((entry) => entry.kind === "journal")!.rows;
-    expect(silent).toEqual([{ kind: "journal", id: silentStanding.id, title: "Faction standing changed", journalKind: "standing" }]);
+    const silentStanding = entryRow({
+      kind: "standing",
+      revealedToPlayers: true,
+      playerText: "",
+      payload: { factionPageId: FACTION_ID, delta: 40, reason: "Saved the caravan." }
+    });
+    const silent = projectRevealAudit([
+      {
+        kind: "journal",
+        entry: silentStanding,
+        sessionContext: { ...sessionContext, revealedPageIds: new Set([FACTION_ID]) }
+      }
+    ]).sections.find((entry) => entry.kind === "journal")!.rows;
+    expect(silent).toEqual([
+      { kind: "journal", id: silentStanding.id, title: "Faction standing changed", journalKind: "standing" }
+    ]);
   });
 });

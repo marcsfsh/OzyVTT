@@ -26,10 +26,25 @@ import { DowntimeView } from "./DowntimeView";
 import { SessionsView } from "./SessionsView";
 import type { CodexPageSummary, CodexSession, GmCodexCalendar } from "./api";
 
-const page = (id: string, title: string, entityType: CodexPageSummary["entityType"] = "character"): CodexPageSummary => ({
-  id, title, entityType, fields: {}, folder: null, tags: [], revealedToPlayers: true, bannerAssetId: null,
-  inWorldDate: null, inWorldLabel: null, calendarInstant: null,
-  rev: 1, createdAt: "2026-08-08T00:00:00.000Z", updatedAt: "2026-08-08T00:00:00.000Z"
+const page = (
+  id: string,
+  title: string,
+  entityType: CodexPageSummary["entityType"] = "character"
+): CodexPageSummary => ({
+  id,
+  title,
+  entityType,
+  fields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: true,
+  bannerAssetId: null,
+  inWorldDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  rev: 1,
+  createdAt: "2026-08-08T00:00:00.000Z",
+  updatedAt: "2026-08-08T00:00:00.000Z"
 });
 
 // Vallaki is a location and is never offered; Ireena is archived at the table, Ozy is not.
@@ -41,29 +56,70 @@ const ACTORS = [
 ];
 
 const CALENDAR: GmCodexCalendar = {
-  yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["Sul"],
-  currentDate: { year: 1491, month: 0, day: 10 }, publishedDate: null
+  yearName: "DR",
+  months: [{ name: "Hammer", days: 30 }],
+  weekdays: ["Sul"],
+  currentDate: { year: 1491, month: 0, day: 10 },
+  publishedDate: null
 };
 
 const SESSION: CodexSession = {
-  id: "s1", sessionNumber: 3, tags: [], realDate: "2026-07-12", attendees: [],
-  prepBody: "", recapBody: "", revealedToPlayers: false, status: "planned", rev: 1,
-  createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z"
+  id: "s1",
+  sessionNumber: 3,
+  tags: [],
+  realDate: "2026-07-12",
+  attendees: [],
+  prepBody: "",
+  recapBody: "",
+  revealedToPlayers: false,
+  status: "planned",
+  rev: 1,
+  createdAt: "2026-07-01T00:00:00.000Z",
+  updatedAt: "2026-07-01T00:00:00.000Z"
 };
 
 const renderSessions = (over: Partial<React.ComponentProps<typeof SessionsView>> = {}) =>
-  render(<SessionsView gmToken="gm" sessions={[SESSION]} activeSessionId={null} loading={false} error={null}
-    openSessionId="s1" onOpenSession={vi.fn()} onChanged={vi.fn()}
-    autosave={{ enabled: false, intervalSeconds: 1 }} pages={PAGES} actors={ACTORS} {...over} />);
+  render(
+    <SessionsView
+      gmToken="gm"
+      sessions={[SESSION]}
+      activeSessionId={null}
+      loading={false}
+      error={null}
+      openSessionId="s1"
+      onOpenSession={vi.fn()}
+      onChanged={vi.fn()}
+      autosave={{ enabled: false, intervalSeconds: 1 }}
+      pages={PAGES}
+      actors={ACTORS}
+      {...over}
+    />
+  );
 
 const renderDowntime = (over: Partial<React.ComponentProps<typeof DowntimeView>> = {}) =>
-  render(<DowntimeView gmToken="gm" records={[]} calendar={CALENDAR} pages={PAGES} actors={ACTORS}
-    loading={false} error={null} onChanged={vi.fn()} onOpenEntry={vi.fn()} onOpenPage={vi.fn()} {...over} />);
+  render(
+    <DowntimeView
+      gmToken="gm"
+      records={[]}
+      calendar={CALENDAR}
+      pages={PAGES}
+      actors={ACTORS}
+      loading={false}
+      error={null}
+      onChanged={vi.fn()}
+      onOpenEntry={vi.fn()}
+      onOpenPage={vi.fn()}
+      {...over}
+    />
+  );
 
 describe("the rule underneath both fields (characters.ts)", () => {
   it("puts archived characters last and leaves the active order alone", () => {
-    expect(charactersFor(PAGES, ACTORS).map((option) => `${option.title}${option.archived ? "*" : ""}`))
-      .toEqual(["Ozy", "Ismark", "Ireena*"]);
+    expect(charactersFor(PAGES, ACTORS).map((option) => `${option.title}${option.archived ? "*" : ""}`)).toEqual([
+      "Ozy",
+      "Ismark",
+      "Ireena*"
+    ]);
   });
 
   it("treats a campaign with no table state as all-active, in page order", () => {
@@ -91,8 +147,11 @@ describe("`5a` — Who played", () => {
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     // Scoped to the chooser's listbox: the `<select>` options share the role.
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    expect(list.getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["Ozy", "Ismark", "Ireena — Archived"]);
+    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Ozy",
+      "Ismark",
+      "Ireena — Archived"
+    ]);
   });
 
   it("stores the NAME, not the page id and not the marked-up label", async () => {
@@ -126,8 +185,7 @@ describe("`5a` — Who played", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    expect(list.getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["Ismark", "Ireena — Archived"]);
+    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena — Archived"]);
   });
 });
 
@@ -158,19 +216,39 @@ describe("`5e.3` — downtime's Who", () => {
   it("marks the archived option on the edit row's link picker too", async () => {
     const user = userEvent.setup();
     renderDowntime({
-      records: [{
-        id: "d1", kind: "downtime", title: null, text: "", playerText: "", gmText: "", tags: [],
-        revealedToPlayers: false, sessionId: null, sessionNumber: null, realDate: null, inWorldDate: null,
-        inWorldLabel: "Hammer 3, 1491 DR", calendarInstant: null, proposedDate: null, attachPageId: null,
-        attachMarkerId: null, archiveId: null, createdAt: "2026-08-08T00:00:00.000Z",
-        payload: { who: "ireena", activity: "Resting", days: 3, applied: true, characterPageId: null }
-      }] as never
+      records: [
+        {
+          id: "d1",
+          kind: "downtime",
+          title: null,
+          text: "",
+          playerText: "",
+          gmText: "",
+          tags: [],
+          revealedToPlayers: false,
+          sessionId: null,
+          sessionNumber: null,
+          realDate: null,
+          inWorldDate: null,
+          inWorldLabel: "Hammer 3, 1491 DR",
+          calendarInstant: null,
+          proposedDate: null,
+          attachPageId: null,
+          attachMarkerId: null,
+          archiveId: null,
+          createdAt: "2026-08-08T00:00:00.000Z",
+          payload: { who: "ireena", activity: "Resting", days: 3, applied: true, characterPageId: null }
+        }
+      ] as never
     });
 
     const history = within(document.querySelector(".codex-downtime-history")!);
     await user.click(history.getByRole("button", { name: "Edit" }));
     await user.click(history.getByRole("combobox", { name: "Link to a character page" }));
-    expect((await screen.findAllByRole("option")).map((option) => option.textContent))
-      .toEqual(["Ozy", "Ismark", "IreenaArchived"]);
+    expect((await screen.findAllByRole("option")).map((option) => option.textContent)).toEqual([
+      "Ozy",
+      "Ismark",
+      "IreenaArchived"
+    ]);
   });
 });

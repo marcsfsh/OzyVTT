@@ -19,15 +19,15 @@ export interface MeterProps {
     bands as token health; use fixed tones for slots, XP, and other resources. */
 export function Meter({ value, max, label, tone = "cyan", className }: MeterProps) {
   const fraction = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
-  const band = tone === "health"
-    ? (fraction > 0.5 ? "healthy" : fraction > 0.25 ? "bloodied" : "down")
-    : tone;
+  const band = tone === "health" ? (fraction > 0.5 ? "healthy" : fraction > 0.25 ? "bloodied" : "down") : tone;
   return (
     <div className={cx("nh-meter", className)}>
       {label != null && (
         <div className="nh-meter-head">
           <span className="nh-meter-label">{label}</span>
-          <span className="nh-meter-value tabular">{value}/{max}</span>
+          <span className="nh-meter-value tabular">
+            {value}/{max}
+          </span>
         </div>
       )}
       <div className="nh-meter-track" role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>

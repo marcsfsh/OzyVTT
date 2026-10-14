@@ -5,6 +5,7 @@
  * expression are not scanned.
  */
 import { readFileSync } from "node:fs";
+import ts from "typescript";
 
 /** A file to scan: the name a failure message should print, and how to read it. */
 export interface CopySource {
@@ -24,46 +25,91 @@ export interface CopyString {
  * corpus floors in `design-conventions-shape.ts`.
  */
 export const COPY_PROPS = [
-  "aria-label", "ariaLabel", "label", "placeholder", "title", "empty", "emptyLabel", "heading",
-  "help", "hint", "body", "summary", "confirmLabel", "cancelLabel", "removeLabel", "maxReachedReason"
+  "aria-label",
+  "ariaLabel",
+  "label",
+  "placeholder",
+  "title",
+  "empty",
+  "emptyLabel",
+  "heading",
+  "help",
+  "hint",
+  "body",
+  "summary",
+  "confirmLabel",
+  "cancelLabel",
+  "removeLabel",
+  "maxReachedReason"
 ].join("|");
 
 /** The calls that put a sentence on screen with no prop to hang it on. */
 export const COPY_CALLS = "setError|setNotice|toast";
 
-/** The strings a person reads; `source` is passed in so a caller can strip comments first. */
+const COPY_PROP_NAMES = new Set(COPY_PROPS.split("|"));
+const COPY_CALL_NAMES = new Set(COPY_CALLS.split("|"));
+
+/** The literal text of a string or template literal (holes kept as `${…}`), or null for anything else. */
+function literalText(node: ts.Node | undefined, file: ts.SourceFile): string | null {
+  if (!node) return null;
+  if (ts.isJsxExpression(node)) return literalText(node.expression, file);
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isTemplateExpression(node)) return node.getText(file).slice(1, -1);
+  return null;
+}
+
+function nameOf(node: ts.PropertyName | ts.JsxAttributeName): string {
+  return ts.isIdentifier(node) || ts.isStringLiteral(node)
+    ? node.text
+    : ts.isJsxNamespacedName(node)
+      ? `${node.namespace.text}:${node.name.text}`
+      : "";
+}
+
+/**
+ * The strings a person reads: JSX text, copy props (as attributes or object keys), the first argument
+ * of a copy call, a `?? "…"` fallback rendered in JSX, and a success message passed after a callback
+ * (`run(async () => {…}, "Encounter started")`). Parsed as TSX, so layout does not matter.
+ */
 export function userFacingStrings(file: string, source: string): CopyString[] {
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const found: CopyString[] = [];
-  source.split("\n").forEach((line, index) => {
-    // `[:=]` covers object-literal keys; the backtick branch covers template literals. The branches are
-    // separate so a template literal may contain a double quote (`Delete map "${name}"?`).
-    const quoted = `(?:"([^"\\n]+)"|\`([^\`\\n]+)\`)`;
-    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_PROPS})\\s*[:=]\\s*\\{?${quoted}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
+  const push = (node: ts.Node, text: string | null) => {
+    if (text === null || text.length === 0) return;
+    found.push({ file, line: parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line + 1, text });
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxText(node)) {
+      const text = node.text.replace(/\s+/g, " ").trim();
+      if (text.length > 1 && /[A-Za-z]/.test(text)) push(node, text);
+    } else if (ts.isJsxAttribute(node) && COPY_PROP_NAMES.has(nameOf(node.name))) {
+      push(node, literalText(node.initializer, parsed));
+    } else if (ts.isPropertyAssignment(node) && COPY_PROP_NAMES.has(nameOf(node.name))) {
+      push(node, literalText(node.initializer, parsed));
+    } else if (ts.isCallExpression(node)) {
+      if (ts.isIdentifier(node.expression) && COPY_CALL_NAMES.has(node.expression.text))
+        push(node, literalText(node.arguments[0], parsed));
+      node.arguments.forEach((argument, index) => {
+        const previous = node.arguments[index - 1];
+        if (
+          previous &&
+          (ts.isArrowFunction(previous) || ts.isFunctionExpression(previous)) &&
+          ts.isBlock(previous.body)
+        )
+          push(argument, literalText(argument, parsed));
+      });
+    } else if (
+      node.parent !== undefined &&
+      ts.isJsxExpression(node.parent) &&
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+    ) {
+      push(node.right, literalText(node.right, parsed));
     }
-    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_CALLS})\\(\\s*${quoted}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    // A display fallback rendered in JSX (`{actor?.name ?? "combatant"}`) is copy. The trailing `}`
-    // keeps code defaults out, since those close on `)` or `;`. Not caught: a fallback assigned to a
-    // variable first, or passed to `setError(x ?? "…")`.
-    for (const match of line.matchAll(new RegExp(`\\?\\?\\s*${quoted}\\s*\\}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    // A success message as a callback's second argument (`run(async () => {…}, "Encounter started…")`);
-    // `}, "…")` is its tell.
-    for (const match of line.matchAll(new RegExp(`\\},\\s*${quoted}\\s*\\)`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    // A JSX text node runs from the `>` that closed a tag to the next `<` or `{`, so a sentence
-    // interrupted by an interpolation is still caught. `(?<!=)` keeps arrow functions' `=>` out.
-    for (const match of line.matchAll(/(?<!=)>([^<>{}\n]*[A-Za-z][^<>{}\n]*)(?=[<{])/g)) {
-      const text = match[1].trim();
-      // A backtick means the `>` closed a generic type argument (`request<{ … }>(token, \`/…\`)`), not a tag.
-      if (text.length > 1 && !text.includes("`")) found.push({ file, line: index + 1, text });
-    }
-  });
-  return found;
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  return found.sort((a, b) => a.line - b.line);
 }
 
 /** Every user-facing string in a set of sources, in source order. */
@@ -72,8 +118,7 @@ export function scanCopy(sources: readonly CopySource[]): CopyString[] {
 }
 
 /** The one-line citation every vocabulary failure prints, so a failure is a jump target. */
-export const citeCopy = (entry: CopyString): string =>
-  `${entry.file}:${entry.line}  ${JSON.stringify(entry.text)}`;
+export const citeCopy = (entry: CopyString): string => `${entry.file}:${entry.line}  ${JSON.stringify(entry.text)}`;
 
 /**
  * A template literal's `${…}` holes replaced by `$`, applied when matching rules (failures print the

@@ -38,25 +38,47 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      listConnections: (...a: unknown[]) => listConnections(...a), party: (...a: unknown[]) => party(...a),
-      getPage: (...a: unknown[]) => getPage(...a), getSettings: (...a: unknown[]) => getSettings(...a),
-      search: (...a: unknown[]) => search(...a), markersForPage: (...a: unknown[]) => markersForPage(...a)
+      listPages: (...a: unknown[]) => listPages(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      listConnections: (...a: unknown[]) => listConnections(...a),
+      party: (...a: unknown[]) => party(...a),
+      getPage: (...a: unknown[]) => getPage(...a),
+      getSettings: (...a: unknown[]) => getSettings(...a),
+      search: (...a: unknown[]) => search(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a)
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
       search: (...a: unknown[]) => playerSearch(...a),
-      listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
-      listMarkers: async () => [], chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listConnections: (...a: unknown[]) => playerConnections(...a), party: (...a: unknown[]) => playerParty(...a),
-      sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a),
-      standing: (...a: unknown[]) => playerStanding(...a), calendar: (...a: unknown[]) => playerCalendar(...a)
+      listPages: (...a: unknown[]) => playerListPages(...a),
+      listMaps: (...a: unknown[]) => playerListMaps(...a),
+      listMarkers: async () => [],
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
+      listConnections: (...a: unknown[]) => playerConnections(...a),
+      party: (...a: unknown[]) => playerParty(...a),
+      sessions: (...a: unknown[]) => playerSessions(...a),
+      quests: (...a: unknown[]) => playerQuests(...a),
+      standing: (...a: unknown[]) => playerStanding(...a),
+      calendar: (...a: unknown[]) => playerCalendar(...a)
     },
     journalApi: { ...actual.journalApi, chronicle: (...a: unknown[]) => chronicle(...a), forPage: async () => [] },
-    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: async () => [], listMarkers: async () => [] },
+    atlasApi: {
+      ...actual.atlasApi,
+      listMaps: (...a: unknown[]) => listMaps(...a),
+      listAssets: async () => [],
+      listMarkers: async () => []
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
-    sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a), create: (...a: unknown[]) => createSessionCall(...a) },
-    questApi: { ...actual.questApi, list: (...a: unknown[]) => listQuests(...a), create: (...a: unknown[]) => createQuestCall(...a) },
+    sessionApi: {
+      ...actual.sessionApi,
+      list: (...a: unknown[]) => listSessions(...a),
+      create: (...a: unknown[]) => createSessionCall(...a)
+    },
+    questApi: {
+      ...actual.questApi,
+      list: (...a: unknown[]) => listQuests(...a),
+      create: (...a: unknown[]) => createQuestCall(...a)
+    },
     standingApi: { ...actual.standingApi, list: (...a: unknown[]) => listStanding(...a) }
   };
 });
@@ -73,14 +95,37 @@ import type { CodexSearchHit } from "./api";
  */
 
 const PAGE = {
-  id: "p1", title: "Strahd von Zarovich", entityType: "character" as const, fields: {}, folder: null, tags: [],
-  revealedToPlayers: true, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id: "p1",
+  title: "Strahd von Zarovich",
+  entityType: "character" as const,
+  fields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: true,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 };
-const HIT: CodexSearchHit = { kind: "page", id: "p1", title: "Strahd von Zarovich", tags: [], entityType: "character", mapId: null };
+const HIT: CodexSearchHit = {
+  kind: "page",
+  id: "p1",
+  title: "Strahd von Zarovich",
+  tags: [],
+  entityType: "character",
+  mapId: null
+};
 
 const palette = () => screen.findByRole("dialog", { name: "Codex command palette" });
-const renderGm = (at = "/codex") => (goTo(at), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderGm = (at = "/codex") =>
+  (goTo(at), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 
 beforeEach(() => {
   listPages.mockResolvedValue([PAGE]);
@@ -95,7 +140,13 @@ beforeEach(() => {
   chronicle.mockResolvedValue([]);
   playerChronicle.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
-  getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [], currentInstant: 0, publishedInstant: 0 });
+  getCalendar.mockResolvedValue({
+    yearName: "DR",
+    months: [{ name: "Hammer", days: 30 }],
+    weekdays: [],
+    currentInstant: 0,
+    publishedInstant: 0
+  });
   playerCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
   listSessions.mockResolvedValue({ sessions: [], activeSessionId: null });
   listQuests.mockResolvedValue([]);
@@ -121,7 +172,9 @@ describe("Opening and closing", () => {
     expect(await palette()).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument()
+    );
   });
 
   it("opens from the sidebar's Search row, which announces the shortcut it duplicates", async () => {
@@ -129,7 +182,9 @@ describe("Opening and closing", () => {
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    const row = within(screen.getByRole("navigation", { name: "Codex sections" })).getByRole("button", { name: /Search/ });
+    const row = within(screen.getByRole("navigation", { name: "Codex sections" })).getByRole("button", {
+      name: /Search/
+    });
     expect(row).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
     await user.click(row);
     expect(await palette()).toBeInTheDocument();
@@ -141,7 +196,11 @@ describe("The scope decision (D20) — Codex-only, deliberately", () => {
   it("⌘K does nothing when the Codex is not on screen", async () => {
     /** A bare tree is the discriminating case: a global listener would fire regardless of what's rendered. */
     const user = userEvent.setup();
-    render(<ToastProvider><div>Some other tab</div></ToastProvider>);
+    render(
+      <ToastProvider>
+        <div>Some other tab</div>
+      </ToastProvider>
+    );
     await user.keyboard("{Control>}k{/Control}");
     expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
   });
@@ -182,7 +241,20 @@ describe("What it can do", () => {
     const box = within(await palette());
 
     // Built from GM_SIDEBAR, so new sections appear automatically.
-    for (const label of ["Home", "Pages", "Atlas", "Graph", "Sessions", "Quests", "Journal", "Calendar", "Downtime", "Reveal audit", "Backup", "Settings"]) {
+    for (const label of [
+      "Home",
+      "Pages",
+      "Atlas",
+      "Graph",
+      "Sessions",
+      "Quests",
+      "Journal",
+      "Calendar",
+      "Downtime",
+      "Reveal audit",
+      "Backup",
+      "Settings"
+    ]) {
       expect(box.getByText(`Go to ${label}`)).toBeInTheDocument();
     }
     // An action, not an address.
@@ -316,7 +388,12 @@ describe("The player's palette (invariant §1)", () => {
     const user = userEvent.setup();
     renderPlayer();
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    const box = within(await palette().catch(async () => { await user.keyboard("{Control>}k{/Control}"); return palette(); }));
+    const box = within(
+      await palette().catch(async () => {
+        await user.keyboard("{Control>}k{/Control}");
+        return palette();
+      })
+    );
 
     // Built from PLAYER_SIDEBAR, so the palette can't reach a route the nav hides.
     for (const label of ["Reveal audit", "Backup", "Settings", "Preview as player"]) {

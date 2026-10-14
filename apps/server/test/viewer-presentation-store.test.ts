@@ -19,10 +19,22 @@ describe("ViewerPresentationStore", () => {
       store = new ViewerPresentationStore(databasePath);
       await store.initialize();
       await store.execute(command("enable", { type: "viewer.enabled.set", enabled: true }), 1_000);
-      await store.execute(command("map", { type: "viewer.map.set", assetId: "map-1", altText: "Dungeon", camera: { center: { x: 100, y: 50 }, zoom: 2 } }), 1_100);
-      await store.execute(command("ping", { type: "viewer.ping", id: "ping-1", point: { x: 20, y: 30 }, durationMs: 250 }), 1_200);
+      await store.execute(
+        command("map", {
+          type: "viewer.map.set",
+          assetId: "map-1",
+          altText: "Dungeon",
+          camera: { center: { x: 100, y: 50 }, zoom: 2 }
+        }),
+        1_100
+      );
+      await store.execute(
+        command("ping", { type: "viewer.ping", id: "ping-1", point: { x: 20, y: 30 }, durationMs: 250 }),
+        1_200
+      );
       expect(store.snapshot.revision).toBe(3);
-      store.close(); store = undefined;
+      store.close();
+      store = undefined;
 
       store = new ViewerPresentationStore(databasePath);
       await store.initialize();
@@ -49,7 +61,9 @@ describe("ViewerPresentationStore", () => {
       expect(second.state.revision).toBe(2);
       const retry = await store.execute(command("first", { type: "viewer.enabled.set", enabled: true }, 0));
       expect(retry).toMatchObject({ duplicate: true, state: { revision: 2 } });
-      await expect(store.execute(command("stale", { type: "viewer.enabled.set", enabled: true }, 1))).rejects.toBeInstanceOf(ViewerRevisionConflictError);
+      await expect(
+        store.execute(command("stale", { type: "viewer.enabled.set", enabled: true }, 1))
+      ).rejects.toBeInstanceOf(ViewerRevisionConflictError);
     } finally {
       store.close();
       await rm(directory, { recursive: true, force: true });
@@ -60,7 +74,9 @@ describe("ViewerPresentationStore", () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-viewer-shared-db-"));
     const databasePath = join(directory, "vtt.sqlite");
     const database = new DatabaseSync(databasePath);
-    database.exec("CREATE TABLE unrelated_state (id INTEGER PRIMARY KEY, value TEXT NOT NULL) STRICT; INSERT INTO unrelated_state VALUES (1, 'preserved');");
+    database.exec(
+      "CREATE TABLE unrelated_state (id INTEGER PRIMARY KEY, value TEXT NOT NULL) STRICT; INSERT INTO unrelated_state VALUES (1, 'preserved');"
+    );
     database.close();
 
     const store = new ViewerPresentationStore(databasePath);
@@ -72,8 +88,13 @@ describe("ViewerPresentationStore", () => {
       store.close();
 
       const reopened = new DatabaseSync(databasePath, { readOnly: true });
-      expect((reopened.prepare("SELECT value FROM unrelated_state WHERE id = 1").get() as { value: string }).value).toBe("preserved");
-      expect((reopened.prepare("SELECT revision FROM viewer_presentation_state WHERE id = 1").get() as { revision: number }).revision).toBe(1);
+      expect(
+        (reopened.prepare("SELECT value FROM unrelated_state WHERE id = 1").get() as { value: string }).value
+      ).toBe("preserved");
+      expect(
+        (reopened.prepare("SELECT revision FROM viewer_presentation_state WHERE id = 1").get() as { revision: number })
+          .revision
+      ).toBe(1);
       reopened.close();
     } finally {
       store.close();

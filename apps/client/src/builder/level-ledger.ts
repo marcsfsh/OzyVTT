@@ -1,7 +1,14 @@
 import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { ABILITIES, type Ability } from "@vtt/rules-5e";
 import type { BuilderAbilityMethod, BuilderPolicy } from "@vtt/domain";
-import { ASI_SHORTHAND, abilityBonusesOf, computeOffers, emptyDraft, type BuilderDraft, type BuilderOffer } from "./build-payload";
+import {
+  ASI_SHORTHAND,
+  abilityBonusesOf,
+  computeOffers,
+  emptyDraft,
+  type BuilderDraft,
+  type BuilderOffer
+} from "./build-payload";
 import type { BuilderCatalogs } from "../content/catalogs";
 
 /**
@@ -72,7 +79,9 @@ export function draftFromLedger(
     name: definition.name,
     abilityMethod: methodFor(policy),
     // Recorded rolls are re-sent verbatim so a level-down/level-up round trip restores the same max HP.
-    ...(hpRolls(choices, targetLevel) ? { hpMode: "entries" as const, hpEntries: hpRolls(choices, targetLevel)! } : { hpMode: "average" as const, hpEntries: [] })
+    ...(hpRolls(choices, targetLevel)
+      ? { hpMode: "entries" as const, hpEntries: hpRolls(choices, targetLevel)! }
+      : { hpMode: "average" as const, hpEntries: [] })
   };
 
   for (let pass = 0; pass < 4; pass += 1) {
@@ -88,7 +97,10 @@ export function draftFromLedger(
       if (increases) asiIncreases[offer.key] = increases;
     }
     const next: BuilderDraft = { ...draft, picks, asiIncreases };
-    if (JSON.stringify(next.picks) === JSON.stringify(draft.picks) && pass > 0) { draft = next; break; }
+    if (JSON.stringify(next.picks) === JSON.stringify(draft.picks) && pass > 0) {
+      draft = next;
+      break;
+    }
     draft = next;
   }
 
@@ -131,7 +143,10 @@ export function hpRolls(choices: readonly CharacterChoice[], level: number): num
 }
 
 /** The levels missing an hp roll; reported only for a partial set (none means the average was taken). */
-export function hpRollGap(choices: readonly CharacterChoice[], targetLevel: number): Readonly<{ from: number; to: number }> | null {
+export function hpRollGap(
+  choices: readonly CharacterChoice[],
+  targetLevel: number
+): Readonly<{ from: number; to: number }> | null {
   const recorded = choices.filter((row) => row.kind === "hp-roll");
   if (recorded.length === 0) return null;
   if (hpRolls(choices, targetLevel)) return null;

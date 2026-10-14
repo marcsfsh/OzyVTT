@@ -29,7 +29,10 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-1);
-  transition: border-color var(--dur-hover), background var(--dur-hover), box-shadow var(--dur-base);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover),
+    box-shadow var(--dur-base);
 }
 
 .nh-roweditor-head {
@@ -54,7 +57,9 @@
   cursor: grab;
   touch-action: none;
 }
-.nh-roweditor-grip:hover { color: var(--text-dim); }
+.nh-roweditor-grip:hover {
+  color: var(--text-dim);
+}
 
 .nh-roweditor-toggle {
   flex: 1 1 auto;
@@ -73,8 +78,13 @@
   text-align: left;
   cursor: pointer;
 }
-.nh-roweditor-head .nh-roweditor-toggle:hover { color: var(--text); background: transparent; }
-.nh-roweditor-head .nh-roweditor-toggle:hover .nh-roweditor-caret { color: var(--text); }
+.nh-roweditor-head .nh-roweditor-toggle:hover {
+  color: var(--text);
+  background: transparent;
+}
+.nh-roweditor-head .nh-roweditor-toggle:hover .nh-roweditor-caret {
+  color: var(--text);
+}
 
 .nh-roweditor-caret {
   flex: none;
@@ -84,9 +94,16 @@
   font-size: 1rem;
   transition: transform var(--dur-hover) var(--ease-settle);
 }
-.nh-roweditor-caret.is-open { transform: rotate(180deg); }
+.nh-roweditor-caret.is-open {
+  transform: rotate(180deg);
+}
 
-.nh-roweditor-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nh-roweditor-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .nh-roweditor-label--static {
   flex: 1 1 auto;
   display: flex;
@@ -95,22 +112,54 @@
   color: var(--text);
   font: 700 var(--fs-sm) / 1.35 var(--font-body);
 }
-.nh-roweditor-menu { flex: none; }
+.nh-roweditor-menu {
+  flex: none;
+}
 
-.nh-roweditor-body { min-width: 0; padding: 0 var(--space-3) var(--space-3); }
+.nh-roweditor-body {
+  min-width: 0;
+  padding: 0 var(--space-3) var(--space-3);
+}
 /* `display` is set above, so keep the `hidden` attribute working. */
-.nh-roweditor-body[hidden] { display: none; }
+.nh-roweditor-body[hidden] {
+  display: none;
+}
 
 /* Reorder feedback. Never group `opacity`: a dimmed subtree can't be opted back out of. */
-.nh-roweditor.is-reordering { user-select: none; -webkit-user-select: none; }
-.nh-roweditor.is-reordering .nh-roweditor-grip { cursor: grabbing; }
-.nh-roweditor-row.is-dragging { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.nh-roweditor-row.is-drop-target { border-color: var(--line-strong); background: var(--surface-2); }
+.nh-roweditor.is-reordering {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.nh-roweditor.is-reordering .nh-roweditor-grip {
+  cursor: grabbing;
+}
+.nh-roweditor-row.is-dragging {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.nh-roweditor-row.is-drop-target {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
 
-.nh-roweditor-foot { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--space-3); }
-.nh-roweditor-add-icon { display: grid; place-items: center; font-size: 1.05em; }
+.nh-roweditor-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+}
+.nh-roweditor-add-icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
 /* Full strength beside a disabled Add: the reason must stay readable. */
-.nh-roweditor-reason { margin: 0; font-size: var(--fs-sm); color: var(--caution-hi); }
+.nh-roweditor-reason {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--caution-hi);
+}
 
 /* `.nh-empty` without its 12rem min-height, which would outweigh the fields around it. */
 .nh-roweditor-empty {

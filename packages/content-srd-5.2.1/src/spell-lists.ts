@@ -54,7 +54,10 @@ function cyclicIds(listsById: ReadonlyMap<string, SpellListReference>): Set<stri
       return;
     }
     const list = listsById.get(id);
-    if (!list) { settled.add(id); return; }
+    if (!list) {
+      settled.add(id);
+      return;
+    }
     path.add(id);
     for (const base of list.basedOn) walk(base, path);
     path.delete(id);
@@ -69,7 +72,9 @@ function cyclicIds(listsById: ReadonlyMap<string, SpellListReference>): Set<stri
  * `"<listId>-spells"`. Works for a declared overlay list and for a bare tag ("wizard").
  */
 export function spellListMemberIds(
-  listId: string, lists: readonly SpellListReference[], spells: readonly SpellListSpell[]
+  listId: string,
+  lists: readonly SpellListReference[],
+  spells: readonly SpellListSpell[]
 ): ReadonlySet<string> {
   const listsById = new Map(lists.map((list) => [list.id, list]));
   return membersOf(listId, listsById, spells, cyclicIds(listsById), new Map());
@@ -89,7 +94,8 @@ function membersOf(
   const list = listsById.get(listId);
   if (list) {
     if (!cyclic.has(listId)) {
-      for (const base of list.basedOn) for (const id of membersOf(base, listsById, spells, cyclic, memo)) members.add(id);
+      for (const base of list.basedOn)
+        for (const id of membersOf(base, listsById, spells, cyclic, memo)) members.add(id);
     }
     const known = new Set(spells.map((spell) => spell.id));
     for (const id of list.add) if (known.has(id)) members.add(id);
@@ -100,7 +106,8 @@ function membersOf(
 
 /** Resolve every declared list at once and report what a GM needs to know before publishing. */
 export function resolveSpellLists(
-  lists: readonly SpellListReference[], spells: readonly SpellListSpell[]
+  lists: readonly SpellListReference[],
+  spells: readonly SpellListSpell[]
 ): SpellListResolution {
   const listsById = new Map(lists.map((list) => [list.id, list]));
   const cyclic = cyclicIds(listsById);
@@ -134,13 +141,17 @@ export function resolveSpellLists(
  * leaks the list's existence through the public spell catalog.
  */
 export function applySpellListOverlay<T extends SpellListSpell>(
-  spells: readonly T[], lists: readonly SpellListReference[]
+  spells: readonly T[],
+  lists: readonly SpellListReference[]
 ): readonly T[] {
   if (lists.length === 0) return spells;
   const { memberIds } = resolveSpellLists(lists, spells);
   return spells.map((spell) => {
     // Sorted so the projected `classes` order is deterministic regardless of authoring order.
-    const extra = [...memberIds].filter(([id, ids]) => ids.has(spell.id) && !spell.classes.includes(id)).map(([id]) => id).sort();
+    const extra = [...memberIds]
+      .filter(([id, ids]) => ids.has(spell.id) && !spell.classes.includes(id))
+      .map(([id]) => id)
+      .sort();
     return extra.length === 0 ? spell : { ...spell, classes: [...spell.classes, ...extra] };
   });
 }

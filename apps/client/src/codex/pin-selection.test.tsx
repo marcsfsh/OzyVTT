@@ -11,10 +11,16 @@ import userEvent from "@testing-library/user-event";
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 /** A stand-in surface that reports the selected pin and offers a button per marker. */
 vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { selectedMarkerId: string | null; markers: ReadonlyArray<{ id: string; label: string | null }>; onMarkerClick: (id: string) => void }) => (
+  MapSurface: (props: {
+    selectedMarkerId: string | null;
+    markers: ReadonlyArray<{ id: string; label: string | null }>;
+    onMarkerClick: (id: string) => void;
+  }) => (
     <div data-testid="map-surface" data-selected={props.selectedMarkerId ?? ""}>
       {props.markers.map((marker) => (
-        <button key={marker.id} type="button" onClick={() => props.onMarkerClick(marker.id)}>Pin {marker.label ?? marker.id}</button>
+        <button key={marker.id} type="button" onClick={() => props.onMarkerClick(marker.id)}>
+          Pin {marker.label ?? marker.id}
+        </button>
       ))}
     </div>
   )
@@ -50,13 +56,34 @@ import { navigate, replaceQuery, currentHref } from "../router";
 import { goTo } from "../../test/route";
 
 const MAP: CodexMap = {
-  id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null, revealedToPlayers: true, sortKey: 0, tags: [],
-  createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia",
+  kind: "regional",
+  parentMapId: null,
+  revealedToPlayers: true,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 };
 const marker = (id: string, label: string): CodexMarker => ({
-  id, mapId: "m1", x: 10, y: 10, label, iconId: "pin", iconColor: "#fff", tags: [],
-  pageIds: [], sceneIds: [], subMapId: null, actorId: null, isParty: false, revealedToPlayers: false,
-  createdAt: "2026-07-31T00:00:00.000Z", updatedAt: "2026-07-31T00:00:00.000Z"
+  id,
+  mapId: "m1",
+  x: 10,
+  y: 10,
+  label,
+  iconId: "pin",
+  iconColor: "#fff",
+  tags: [],
+  pageIds: [],
+  sceneIds: [],
+  subMapId: null,
+  actorId: null,
+  isParty: false,
+  revealedToPlayers: false,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z"
 });
 const MARKERS = [marker("k1", "Village"), marker("k2", "Castle")];
 
@@ -66,10 +93,21 @@ const AUTOSAVE_OFF = { enabled: false, intervalSeconds: 1 } as const;
 function renderAtlas(query: URLSearchParams) {
   return render(
     <ToastProvider>
-      <AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()}
-        mapId="m1" pinId={query.get("pin")} filter={query.get("q") ?? ""} tagFilter={query.get("tag")}
-        autosave={AUTOSAVE_OFF} onQuickCreate={vi.fn()}
-        onNavigate={navigate} onReplaceQuery={replaceQuery} />
+      <AtlasView
+        gmToken="gm"
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        onActivateScene={vi.fn()}
+        mapId="m1"
+        pinId={query.get("pin")}
+        filter={query.get("q") ?? ""}
+        tagFilter={query.get("tag")}
+        autosave={AUTOSAVE_OFF}
+        onQuickCreate={vi.fn()}
+        onNavigate={navigate}
+        onReplaceQuery={replaceQuery}
+      />
     </ToastProvider>
   );
 }
@@ -79,10 +117,21 @@ function atlasAt(view: ReturnType<typeof renderAtlas>) {
   const query = new URLSearchParams(window.location.search);
   view.rerender(
     <ToastProvider>
-      <AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()}
-        mapId="m1" pinId={query.get("pin")} filter={query.get("q") ?? ""} tagFilter={query.get("tag")}
-        autosave={AUTOSAVE_OFF} onQuickCreate={vi.fn()}
-        onNavigate={navigate} onReplaceQuery={replaceQuery} />
+      <AtlasView
+        gmToken="gm"
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        onActivateScene={vi.fn()}
+        mapId="m1"
+        pinId={query.get("pin")}
+        filter={query.get("q") ?? ""}
+        tagFilter={query.get("tag")}
+        autosave={AUTOSAVE_OFF}
+        onQuickCreate={vi.fn()}
+        onNavigate={navigate}
+        onReplaceQuery={replaceQuery}
+      />
     </ToastProvider>
   );
 }
@@ -94,10 +143,14 @@ describe("Selecting another pin passes the autosave-off leave guard", () => {
     listMarkers.mockResolvedValue(MARKERS);
     listPages.mockResolvedValue([]);
     forMarker.mockResolvedValue([]);
-    updateMarker.mockImplementation((_token: string, id: string) => Promise.resolve({ ...marker(id, "Village"), label: "Village keep" }));
+    updateMarker.mockImplementation((_token: string, id: string) =>
+      Promise.resolve({ ...marker(id, "Village"), label: "Village keep" })
+    );
     goTo("/codex/atlas/m1?pin=k1");
   });
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("prompts, and refusing keeps the pin AND the typed label", async () => {
     const user = userEvent.setup();

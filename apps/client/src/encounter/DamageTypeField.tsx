@@ -10,24 +10,30 @@ import { DAMAGE_TYPE_OPTIONS } from "./manual-damage";
  * On its own row (`flex-basis: 100%`): the hosts are dense rows that break at 375px with another
  * inline control, and `.nh-combobox-list` is `inset-inline: 0`, so the list gets the host's width.
  */
-export function DamageTypeField({ value, disabled, onChange }: Readonly<{
+export function DamageTypeField({
+  value,
+  disabled,
+  onChange
+}: Readonly<{
   value: string | null;
   disabled?: boolean;
   onChange: (next: string | null) => void;
 }>) {
-  return <Combobox
-    className="damage-type-field"
-    ariaLabel="Damage type"
-    /* "Untyped" is the placeholder, not an option: it is the absent value. `manualDamageType` still
+  return (
+    <Combobox
+      className="damage-type-field"
+      ariaLabel="Damage type"
+      /* "Untyped" is the placeholder, not an option: it is the absent value. `manualDamageType` still
        treats a hand-typed "untyped" as no type. */
-    placeholder="Untyped"
-    options={DAMAGE_TYPE_OPTIONS}
-    value={value}
-    disabled={disabled}
-    /* The whole list rather than `Combobox`'s default page of 8: thirteen types is a complete,
+      placeholder="Untyped"
+      options={DAMAGE_TYPE_OPTIONS}
+      value={value}
+      disabled={disabled}
+      /* The whole list rather than `Combobox`'s default page of 8: thirteen types is a complete,
        bounded vocabulary. */
-    limit={DAMAGE_TYPE_OPTIONS.length}
-    allowFreeText
-    onChange={onChange}
-  />;
+      limit={DAMAGE_TYPE_OPTIONS.length}
+      allowFreeText
+      onChange={onChange}
+    />
+  );
 }

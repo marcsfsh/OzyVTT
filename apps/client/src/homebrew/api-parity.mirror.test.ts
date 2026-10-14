@@ -11,8 +11,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HOMEBREW_PATHS } from "@vtt/api-contract";
 import type { HomebrewBodyType } from "@vtt/content-srd-5.2.1/schemas";
 import {
-  assertCanonicaliserSound, bootHomebrewApi, censusVerdict, comparableBody, EXEMPTIONS,
-  firstDifference, isSystemForced, probeAddress, walkBodySchemas, type ApiFixture
+  assertCanonicaliserSound,
+  bootHomebrewApi,
+  censusVerdict,
+  comparableBody,
+  EXEMPTIONS,
+  firstDifference,
+  isSystemForced,
+  probeAddress,
+  walkBodySchemas,
+  type ApiFixture
 } from "./api-parity-harness";
 import { applyField, authored, authoredRow, publishVerdict, storedBody } from "./authoring-harness";
 import type { Draft } from "./schema";
@@ -57,55 +65,77 @@ const GM = { authorization: "Bearer gm-token", "content-type": "application/json
     with no control). Covered fields only; uncovered keys are T1's concern. */
 const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
   monster: () => {
-    const damage = authoredRow("monster", ["actions", "damage"], [["formula", "3d6"], ["type", "psychic"]]);
-    const action = authoredRow("monster", ["actions"], [
-      ["name", "Consume Memories"],
-      ["activation", "action"],
-      ["description", "Intelligence Saving Throw: DC 16, one creature within 30 feet."],
-      ["damage", [damage]],
-      ["save.ability", "int"],
-      ["save.dc", 16]
-    ]);
+    const damage = authoredRow(
+      "monster",
+      ["actions", "damage"],
+      [
+        ["formula", "3d6"],
+        ["type", "psychic"]
+      ]
+    );
+    const action = authoredRow(
+      "monster",
+      ["actions"],
+      [
+        ["name", "Consume Memories"],
+        ["activation", "action"],
+        ["description", "Intelligence Saving Throw: DC 16, one creature within 30 feet."],
+        ["damage", [damage]],
+        ["save.ability", "int"],
+        ["save.dc", 16]
+      ]
+    );
     return authored("monster", "Memory Eater", [
       ["size", "large"],
       // The two stat-block extension keys the publish gate requires.
       ["type", "aberration"],
       ["challengeRating", 10],
       ["speedFeet", 30],
-      ["abilityScores.str", 21], ["abilityScores.dex", 9], ["abilityScores.con", 15],
-      ["abilityScores.int", 18], ["abilityScores.wis", 15], ["abilityScores.cha", 18],
+      ["abilityScores.str", 21],
+      ["abilityScores.dex", 9],
+      ["abilityScores.con", 15],
+      ["abilityScores.int", 18],
+      ["abilityScores.wis", 15],
+      ["abilityScores.cha", 18],
       ["armorClass", 17],
       ["hitPoints.maximum", 150],
       ["proficiencyBonus", 4],
       ["actions", [action]]
     ]);
   },
-  equipment: () => authored("equipment", "Iron Lantern of Vigil", [
-    ["description", "A sturdy iron lantern that never gutters."],
-    ["category", "weapon"],
-    ["weapon.damageDice", "1d6"],
-    ["weapon.damageType", "bludgeoning"]
-  ]),
-  class: () => authored("class", "Warden", [
-    ["summary", "A warden of the deep wood."],
-    ["description", "Wardens stand between the wood and what comes for it."],
-    ["hitDie", "d10"],
-    ["primaryAbilities", ["str"]],
-    ["savingThrows", ["str", "con"]],
-    ["subclassLevel", 20],
-    ["skillChoices.choose", 2],
-    ["skillChoices.from", ["athletics", "survival", "perception"]]
-  ]),
-  subclass: () => authored("subclass", "Circle of Embers", [
-    ["classId", "druid"],
-    ["summary", "Druids of the cinder."],
-    ["description", "They keep the first fire."]
-  ]),
+  equipment: () =>
+    authored("equipment", "Iron Lantern of Vigil", [
+      ["description", "A sturdy iron lantern that never gutters."],
+      ["category", "weapon"],
+      ["weapon.damageDice", "1d6"],
+      ["weapon.damageType", "bludgeoning"]
+    ]),
+  class: () =>
+    authored("class", "Warden", [
+      ["summary", "A warden of the deep wood."],
+      ["description", "Wardens stand between the wood and what comes for it."],
+      ["hitDie", "d10"],
+      ["primaryAbilities", ["str"]],
+      ["savingThrows", ["str", "con"]],
+      ["subclassLevel", 20],
+      ["skillChoices.choose", 2],
+      ["skillChoices.from", ["athletics", "survival", "perception"]]
+    ]),
+  subclass: () =>
+    authored("subclass", "Circle of Embers", [
+      ["classId", "druid"],
+      ["summary", "Druids of the cinder."],
+      ["description", "They keep the first fire."]
+    ]),
   species: () => {
-    const trait = authoredRow("species", ["traits"], [
-      ["name", "Cinder Ward"],
-      ["description", "You are warded against one element at a time."]
-    ]);
+    const trait = authoredRow(
+      "species",
+      ["traits"],
+      [
+        ["name", "Cinder Ward"],
+        ["description", "You are warded against one element at a time."]
+      ]
+    );
     return authored("species", "Emberkin", [
       ["summary", "Kin of the cinder."],
       ["description", "Emberkin carry a ward they re-tune whenever they rest."],
@@ -125,15 +155,14 @@ const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
     feature = applyField("feat", feature, "description", "You always have the road's favor.", ["feature"]);
     return { ...shell, feature };
   },
-  spell: () => authored("spell", "Ember Coil", [
-    ["level", 1],
-    ["school", "evocation"],
-    ["description", "A coil of embers lashes out."]
-  ]),
+  spell: () =>
+    authored("spell", "Ember Coil", [
+      ["level", 1],
+      ["school", "evocation"],
+      ["description", "A coil of embers lashes out."]
+    ]),
   "spell-list": () => {
-    const draft = authored("spell-list", "Warden Spells", [
-      ["description", "The warden list."]
-    ]);
+    const draft = authored("spell-list", "Warden Spells", [["description", "The warden list."]]);
     // The write `SpellListContents` performs on a tap; the component is bespoke.
     return { ...draft, add: ["fire-bolt"] };
   }
@@ -141,8 +170,12 @@ const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
 
 describe("T2 — the HTTP round trip: the editor reproduces the record the API stored, field for field", () => {
   let api: ApiFixture;
-  beforeAll(async () => { api = await bootHomebrewApi(); });
-  afterAll(async () => { await api.close(); });
+  beforeAll(async () => {
+    api = await bootHomebrewApi();
+  });
+  afterAll(async () => {
+    await api.close();
+  });
 
   for (const type of Object.keys(FIXTURES) as ReadonlyArray<keyof typeof FIXTURES>) {
     it(`${type}: POST → publish (the real four-tier gate) → GET → editor rebuild → deep-equal`, async () => {
@@ -153,24 +186,31 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
 
       const posted = storedBody(type as HomebrewType, draft, "hb-a1-probe");
       const created = await fetch(`${api.base}${HOMEBREW_PATHS.content}`, {
-        method: "POST", headers: GM, body: JSON.stringify({ record: { type, ...posted } })
+        method: "POST",
+        headers: GM,
+        body: JSON.stringify({ record: { type, ...posted } })
       });
       expect(created.status, `${type} create`).toBe(201);
       const record = (await created.json()).data.record as { id: string };
 
       // Stronger than a Zod parse: the identity and referential tiers run too.
       const published = await fetch(`${api.base}${HOMEBREW_PATHS.contentById.replace("{id}", record.id)}/publish`, {
-        method: "POST", headers: GM
+        method: "POST",
+        headers: GM
       });
       expect(published.status, `${type} publish`).toBe(200);
 
-      const fetched = await fetch(`${api.base}${HOMEBREW_PATHS.contentById.replace("{id}", record.id)}`, { headers: GM });
+      const fetched = await fetch(`${api.base}${HOMEBREW_PATHS.contentById.replace("{id}", record.id)}`, {
+        headers: GM
+      });
       const stored = (await fetched.json()).data.record.record as Record<string, unknown>;
       const editor = storedBody(type as HomebrewType, draft, record.id) as Record<string, unknown>;
       const difference = firstDifference(comparableBody(type, stored), comparableBody(type, editor));
       expect(
         difference === null,
-        difference ? `${type} differs at \`${difference.path}\`: api=${JSON.stringify(difference.api)} editor=${JSON.stringify(difference.editor)}` : ""
+        difference
+          ? `${type} differs at \`${difference.path}\`: api=${JSON.stringify(difference.api)} editor=${JSON.stringify(difference.editor)}`
+          : ""
       ).toBe(true);
     });
   }
@@ -194,8 +234,9 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
     const tapped = applyField("background", bare, "abilityOptions.spreads", [spread]);
     const verdict = publishVerdict("background", tapped, "hb-a1-probe");
     expect(verdict.publishable).toBe(false);
-    expect(verdict.why, "the tapped refusal is the minted SHAPE's, not the empty array's")
-      .toContain("Fix spreads — expected array, received object");
+    expect(verdict.why, "the tapped refusal is the minted SHAPE's, not the empty array's").toContain(
+      "Fix spreads — expected array, received object"
+    );
   });
 });
 
@@ -224,7 +265,10 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
     const difference = firstDifference(comparableBody("monster", mangled), comparableBody("monster", editor));
     expect(difference).toEqual({ path: "armorClass", api: 18, editor: 17 });
     // A key present on one side only is named too.
-    const extra = firstDifference(comparableBody("monster", { ...editor, sneaky: true }), comparableBody("monster", editor));
+    const extra = firstDifference(
+      comparableBody("monster", { ...editor, sneaky: true }),
+      comparableBody("monster", editor)
+    );
     expect(extra).toEqual({ path: "sneaky", api: true, editor: undefined });
   });
 });

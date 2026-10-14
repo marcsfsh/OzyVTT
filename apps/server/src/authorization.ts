@@ -11,11 +11,17 @@ export type InitiateVerdict = { ok: true } | { ok: false; message: string };
 /** The single decision for "may this principal initiate this kind of action on this actor?". The GM
  *  (and integrations) may act on anyone; a player only on their claimed player-character. A future
  *  per-table policy would be read here and nowhere else. */
-export function canInitiateForActor(initiator: ActorInitiator, state: GameState, actorId: string, _kind: InitiateKind): InitiateVerdict {
+export function canInitiateForActor(
+  initiator: ActorInitiator,
+  state: GameState,
+  actorId: string,
+  _kind: InitiateKind
+): InitiateVerdict {
   if (initiator.role === "gm") return { ok: true };
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return { ok: false, message: "That combatant no longer exists." };
-  if (actor.kind !== "player-character" || actor.ownerSessionId !== initiator.sessionId) return { ok: false, message: "You can only act on your own character." };
+  if (actor.kind !== "player-character" || actor.ownerSessionId !== initiator.sessionId)
+    return { ok: false, message: "You can only act on your own character." };
   return { ok: true };
 }
 

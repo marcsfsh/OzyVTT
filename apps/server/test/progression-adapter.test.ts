@@ -27,7 +27,9 @@ describe("progressionFromClass reconciliation", () => {
       expect(adapted.casterProgression).toBe(srd.casterProgression);
       expect(adapted.spellcastingAbility).toBe(srd.spellcastingAbility);
       expect(adapted.multiclassPrerequisite.mode).toBe(srd.multiclassPrerequisite.mode);
-      expect([...adapted.multiclassPrerequisite.minimums].sort()).toEqual([...srd.multiclassPrerequisite.minimums].sort());
+      expect([...adapted.multiclassPrerequisite.minimums].sort()).toEqual(
+        [...srd.multiclassPrerequisite.minimums].sort()
+      );
     });
   }
 

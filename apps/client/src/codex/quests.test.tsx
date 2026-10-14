@@ -42,27 +42,47 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      getPage: (...a: unknown[]) => getPage(...a), search: (...a: unknown[]) => search(...a),
+      listPages: (...a: unknown[]) => listPages(...a),
+      listRelationships: (...a: unknown[]) => listRelationships(...a),
+      listLinks: (...a: unknown[]) => listLinks(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      getPage: (...a: unknown[]) => getPage(...a),
+      search: (...a: unknown[]) => search(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a)
     },
-    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forPage: (...a: unknown[]) => forPage(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      timeline: (...a: unknown[]) => timeline(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forPage: (...a: unknown[]) => forPage(...a)
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
-    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: (...a: unknown[]) => listAssets(...a), listMarkers: (...a: unknown[]) => listMarkers(...a) },
+    atlasApi: {
+      ...actual.atlasApi,
+      listMaps: (...a: unknown[]) => listMaps(...a),
+      listAssets: (...a: unknown[]) => listAssets(...a),
+      listMarkers: (...a: unknown[]) => listMarkers(...a)
+    },
     sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a) },
     questApi: {
-      list: (...a: unknown[]) => listQuests(...a), create: (...a: unknown[]) => createQuest(...a),
-      update: (...a: unknown[]) => updateQuest(...a), reveal: (...a: unknown[]) => revealQuest(...a),
-      remove: (...a: unknown[]) => removeQuest(...a), get: vi.fn()
+      list: (...a: unknown[]) => listQuests(...a),
+      create: (...a: unknown[]) => createQuest(...a),
+      update: (...a: unknown[]) => updateQuest(...a),
+      reveal: (...a: unknown[]) => revealQuest(...a),
+      remove: (...a: unknown[]) => removeQuest(...a),
+      get: vi.fn()
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
       calendar: (...a: unknown[]) => getCalendar(...a),
-      listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
-      listMarkers: (...a: unknown[]) => playerListMarkers(...a), chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listConnections: (...a: unknown[]) => playerListRelationships(...a), party: (...a: unknown[]) => playerListLinks(...a),
-      sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a),
+      listPages: (...a: unknown[]) => playerListPages(...a),
+      listMaps: (...a: unknown[]) => playerListMaps(...a),
+      listMarkers: (...a: unknown[]) => playerListMarkers(...a),
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
+      listConnections: (...a: unknown[]) => playerListRelationships(...a),
+      party: (...a: unknown[]) => playerListLinks(...a),
+      sessions: (...a: unknown[]) => playerSessions(...a),
+      quests: (...a: unknown[]) => playerQuests(...a),
       search: (...a: unknown[]) => playerSearch(...a)
     }
   };
@@ -78,21 +98,45 @@ import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const QUEST = (over: Partial<CodexQuest> = {}): CodexQuest => ({
-  id: "q1", title: "The Sunless Crown", status: "active",
+  id: "q1",
+  title: "The Sunless Crown",
+  status: "active",
   playerBody: "The burgomaster wants the crown returned.",
   gmBody: "The crown is a phylactery and the burgomaster knows it.",
-  objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-  entityIds: [], revealedToPlayers: false, tags: [], rev: 3,
-  createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-02T00:00:00.000Z", ...over
+  objectives: [
+    { text: "Find the crypt", done: true },
+    { text: "Open the sarcophagus", done: false }
+  ],
+  entityIds: [],
+  revealedToPlayers: false,
+  tags: [],
+  rev: 3,
+  createdAt: "2026-07-01T00:00:00.000Z",
+  updatedAt: "2026-07-02T00:00:00.000Z",
+  ...over
 });
 const OPEN = QUEST();
-const DONE = QUEST({ id: "q2", title: "The Bell of Vallaki", status: "completed", gmBody: "Already spent.", objectives: [] });
+const DONE = QUEST({
+  id: "q2",
+  title: "The Bell of Vallaki",
+  status: "completed",
+  gmBody: "Already spent.",
+  objectives: []
+});
 const LOST = QUEST({ id: "q3", title: "The Missing Caravan", status: "failed", gmBody: "Eaten.", objectives: [] });
 const FRESH = QUEST({ id: "q0", title: "A rumour in Vallaki", status: "not-started", gmBody: "Bait.", objectives: [] });
-const DROPPED = QUEST({ id: "q4", title: "The Amber Bargain", status: "canceled", gmBody: "They walked away.", objectives: [] });
+const DROPPED = QUEST({
+  id: "q4",
+  title: "The Amber Bargain",
+  status: "canceled",
+  gmBody: "They walked away.",
+  objectives: []
+});
 /** A second open quest. Jumps target this one because the log's fallback would select the first. */
 const OTHER = QUEST({
-  id: "q4", title: "The Amber Temple", gmBody: "The vestiges are still bargaining.",
+  id: "q4",
+  title: "The Amber Temple",
+  gmBody: "The vestiges are still bargaining.",
   objectives: [{ text: "Cross the pass", done: false }]
 });
 
@@ -115,12 +159,19 @@ const gmDefaults = (quests: CodexQuest[] = [OPEN, OTHER, DONE, LOST]) => {
   listQuests.mockResolvedValue(quests);
 };
 const renderWorkspace = async () => {
-  (goTo("/codex/quests"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+  (goTo("/codex/quests"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
   await waitFor(() => expect(listQuests).toHaveBeenCalled());
 };
 
 // Mocks are restored between tests but storage is not, and the console persists its state under a `codex-` key.
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 describe("What counts as OPEN (the rule, below the components)", () => {
   it("is NOT FINISHED — `not-started` and `active`, never one of the three terminal states", () => {
@@ -135,8 +186,13 @@ describe("What counts as OPEN (the rule, below the components)", () => {
 
   it("names all five statuses, offers them in lifecycle order, and never colours a cancellation as a loss", () => {
     expect(QUEST_STATUS_ORDER).toEqual(["not-started", "active", "completed", "failed", "canceled"]);
-    expect(QUEST_STATUS_ORDER.map((status) => QUEST_STATUS_LABEL[status]))
-      .toEqual(["Not started", "Active", "Completed", "Failed", "Canceled"]);
+    expect(QUEST_STATUS_ORDER.map((status) => QUEST_STATUS_LABEL[status])).toEqual([
+      "Not started",
+      "Active",
+      "Completed",
+      "Failed",
+      "Canceled"
+    ]);
     expect(Object.keys(QUEST_STATUS_LABEL).sort()).toEqual([...QUEST_STATUS_ORDER].sort());
     expect(QUEST_STATUS_ORDER.map(questStatusTone)).toEqual(["neutral", "info", "success", "danger", "neutral"]);
   });
@@ -165,7 +221,9 @@ describe("The dashboard's open-quests card (M10)", () => {
     await user.click(card.getByText("The Amber Temple"));
 
     const log = within(await screen.findByRole("navigation", { name: "Quests" }));
-    await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
+    await waitFor(() =>
+      expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true")
+    );
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
     await user.click(screen.getByRole("button", { name: "GM-only notes" }));
     expect(screen.getByRole("textbox", { name: /GM-only notes/ })).toHaveValue("The vestiges are still bargaining.");
@@ -181,7 +239,19 @@ describe("The dashboard's open-quests card (M10)", () => {
      * the handled-ref and let this pass without the clear.
      */
     gmDefaults();
-    search.mockResolvedValue({ hits: [{ kind: "quest", id: "q4", title: "The Amber Temple", tags: [], entityType: null, mapId: null } as CodexSearchHit], truncated: false });
+    search.mockResolvedValue({
+      hits: [
+        {
+          kind: "quest",
+          id: "q4",
+          title: "The Amber Temple",
+          tags: [],
+          entityType: null,
+          mapId: null
+        } as CodexSearchHit
+      ],
+      truncated: false
+    });
     const user = userEvent.setup();
     await renderWorkspace();
 
@@ -194,13 +264,19 @@ describe("The dashboard's open-quests card (M10)", () => {
 
     await jumpViaPalette();
     const log = within(await screen.findByRole("navigation", { name: "Quests" }));
-    await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
+    await waitFor(() =>
+      expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true")
+    );
 
     await user.click(screen.getByRole("button", { name: "All quests" }));
-    await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).not.toHaveAttribute("aria-current"));
+    await waitFor(() =>
+      expect(log.getByRole("button", { name: /The Amber Temple/ })).not.toHaveAttribute("aria-current")
+    );
 
     await jumpViaPalette();
-    await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
+    await waitFor(() =>
+      expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true")
+    );
   });
 });
 
@@ -214,14 +290,20 @@ describe("The GM can actually pick the new statuses (5d)", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
     const filter = await screen.findByLabelText("Filter by status");
-    expect(within(filter).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["All quests", "Not started", "Active", "Completed", "Failed", "Canceled"]);
+    expect(
+      within(filter)
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(["All quests", "Not started", "Active", "Completed", "Failed", "Canceled"]);
 
     await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
     await user.click(await screen.findByRole("button", { name: "Details" }));
     const status = await screen.findByLabelText(/Status/);
-    expect(within(status).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["Not started", "Active", "Completed", "Failed", "Canceled"]);
+    expect(
+      within(status)
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(["Not started", "Active", "Completed", "Failed", "Canceled"]);
 
     await user.selectOptions(status, "Canceled");
     await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
@@ -249,7 +331,11 @@ describe("The GM's objective checklist (M10)", () => {
 
     // Saved by autosave (1s debounce by default), with the blank row kept in position.
     await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
-    const [, , input] = updateQuest.mock.calls[0] as [string, string, { objectives: readonly { text: string; done: boolean }[]; expectedRev: number }];
+    const [, , input] = updateQuest.mock.calls[0] as [
+      string,
+      string,
+      { objectives: readonly { text: string; done: boolean }[]; expectedRev: number }
+    ];
     expect(input.objectives).toEqual([
       { text: "Find the crypt", done: true },
       { text: "Open the sarcophagus", done: false },
@@ -272,7 +358,11 @@ describe("The GM's objective checklist (M10)", () => {
     await user.click(screen.getByRole("checkbox", { name: "Open the sarcophagus done" }));
 
     await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
-    const [, , input] = updateQuest.mock.calls[0] as [string, string, { objectives: readonly { text: string; done: boolean }[] }];
+    const [, , input] = updateQuest.mock.calls[0] as [
+      string,
+      string,
+      { objectives: readonly { text: string; done: boolean }[] }
+    ];
     // Order is content: a done item is not moved.
     expect(input.objectives).toEqual([
       { text: "Find the crypt", done: true },
@@ -283,19 +373,54 @@ describe("The GM's objective checklist (M10)", () => {
 
 /** Shared by the card and reader tests, which are two views of the same feed. */
 const PLAYER_QUEST: PlayerCodexQuest = {
-  id: "q1", title: "The Sunless Crown", status: "active",
+  id: "q1",
+  title: "The Sunless Crown",
+  status: "active",
   body: "The burgomaster wants the crown returned.",
-  objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-  entityIds: [], tags: []
+  objectives: [
+    { text: "Find the crypt", done: true },
+    { text: "Open the sarcophagus", done: false }
+  ],
+  entityIds: [],
+  tags: []
 };
 /** Finished, so the open-quests card never lists it. */
 const PLAYER_DONE: PlayerCodexQuest = {
-  id: "q2", title: "The Bell of Vallaki", status: "completed",
-  body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: [], tags: []
+  id: "q2",
+  title: "The Bell of Vallaki",
+  status: "completed",
+  body: "The bell was hauled back up the hill.",
+  objectives: [{ text: "Raise the bell", done: true }],
+  entityIds: [],
+  tags: []
 };
-const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [], tags: [] };
-const PLAYER_FRESH: PlayerCodexQuest = { id: "q0", title: "A rumour in Vallaki", status: "not-started", body: "Someone is buying coffins.", objectives: [], entityIds: [], tags: [] };
-const PLAYER_DROPPED: PlayerCodexQuest = { id: "q4", title: "The Amber Bargain", status: "canceled", body: "The party walked away.", objectives: [], entityIds: [], tags: [] };
+const PLAYER_LOST: PlayerCodexQuest = {
+  id: "q3",
+  title: "The Missing Caravan",
+  status: "failed",
+  body: "",
+  objectives: [],
+  entityIds: [],
+  tags: []
+};
+const PLAYER_FRESH: PlayerCodexQuest = {
+  id: "q0",
+  title: "A rumour in Vallaki",
+  status: "not-started",
+  body: "Someone is buying coffins.",
+  objectives: [],
+  entityIds: [],
+  tags: []
+};
+const PLAYER_DROPPED: PlayerCodexQuest = {
+  id: "q4",
+  title: "The Amber Bargain",
+  status: "canceled",
+  body: "The party walked away.",
+  objectives: [],
+  entityIds: [],
+  tags: []
+};
 
 const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
   playerListPages.mockResolvedValue([]);
@@ -311,7 +436,9 @@ const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
 };
 
 describe("The player's copy of the card (M10, viewer safety)", () => {
-  beforeEach(() => { playerDefaults(); });
+  beforeEach(() => {
+    playerDefaults();
+  });
 
   it("shows progress and never a tickable box — no checkbox, no field, nothing focusable", async () => {
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
@@ -334,12 +461,15 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
    * absence assertions are meaningful.
    */
   it("renders nothing from extra keys if the server ever regresses and sends a GM row", async () => {
-    playerDefaults([{
-      ...PLAYER_QUEST,
-      gmBody: "The crown is a phylactery and the burgomaster knows it.",
-      playerBody: "a GM-shaped duplicate of the hook",
-      revealedToPlayers: true, rev: 3
-    }]);
+    playerDefaults([
+      {
+        ...PLAYER_QUEST,
+        gmBody: "The crown is a phylactery and the burgomaster knows it.",
+        playerBody: "a GM-shaped duplicate of the hook",
+        revealedToPlayers: true,
+        rev: 3
+      }
+    ]);
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
@@ -374,7 +504,9 @@ describe("The player's quest reader", () => {
     await user.click(card.getByRole("button", { name: /The Sunless Crown/ }));
 
     const rail = await railOf();
-    await waitFor(() => expect(rail.getByRole("button", { name: /The Sunless Crown/ })).toHaveAttribute("aria-current", "true"));
+    await waitFor(() =>
+      expect(rail.getByRole("button", { name: /The Sunless Crown/ })).toHaveAttribute("aria-current", "true")
+    );
 
     const reader = await readerOf();
     expect(reader.getByRole("heading", { name: /The Sunless Crown/ })).toBeInTheDocument();
@@ -416,7 +548,19 @@ describe("The player's quest reader", () => {
   it("lands a search hit ON a completed quest — the jump that used to go nowhere", async () => {
     /** Only finished quests, so the dashboard card doesn't render and the hit must land in the reader. */
     playerDefaults([PLAYER_DONE]);
-    playerSearch.mockResolvedValue({ hits: [{ kind: "quest", id: "q2", title: "The Bell of Vallaki", tags: [], entityType: null, mapId: null } as CodexSearchHit], truncated: false });
+    playerSearch.mockResolvedValue({
+      hits: [
+        {
+          kind: "quest",
+          id: "q2",
+          title: "The Bell of Vallaki",
+          tags: [],
+          entityType: null,
+          mapId: null
+        } as CodexSearchHit
+      ],
+      truncated: false
+    });
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
@@ -441,12 +585,15 @@ describe("The player's quest reader", () => {
 
   /** The reader renders the player's state directly, so a GM-shaped row is the real leak risk here. */
   it("survives a GM-shaped row from a regressed server, and never asks the GM feed for one", async () => {
-    playerDefaults([{
-      ...PLAYER_QUEST,
-      gmBody: "The crown is a phylactery and the burgomaster knows it.",
-      playerBody: "a GM-shaped duplicate of the hook",
-      revealedToPlayers: true, rev: 3
-    }]);
+    playerDefaults([
+      {
+        ...PLAYER_QUEST,
+        gmBody: "The crown is a phylactery and the burgomaster knows it.",
+        playerBody: "a GM-shaped duplicate of the hook",
+        revealedToPlayers: true,
+        rev: 3
+      }
+    ]);
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
@@ -468,9 +615,19 @@ describe("The player's quest reader", () => {
 /** Rendered rather than string-asserted: the sentence combines the verb table, the player's quest feed and the row. */
 describe("A quest-history row a player reads (5d)", () => {
   const questRecord = (id: string, questId: string, status: string) => ({
-    id, kind: "quest" as const, title: null, text: "", tags: [], realDate: null, inWorldLabel: null,
-    inWorldDate: null, calendarInstant: null, sessionId: null, sessionNumber: null,
-    createdAt: "2026-07-31T00:00:00.000Z", payload: { questId, status }
+    id,
+    kind: "quest" as const,
+    title: null,
+    text: "",
+    tags: [],
+    realDate: null,
+    inWorldLabel: null,
+    inWorldDate: null,
+    calendarInstant: null,
+    sessionId: null,
+    sessionNumber: null,
+    createdAt: "2026-07-31T00:00:00.000Z",
+    payload: { questId, status }
   });
 
   it("says a quest HAS NOT STARTED and WAS CANCELED, naming the quest from the player's own feed", async () => {
@@ -494,7 +651,14 @@ describe("A quest-history row a player reads (5d)", () => {
 
 describe("A quest in suite-wide search (M10)", () => {
   // q4, not q1: the log's fallback would land on q1 anyway, so a hit for it couldn't fail.
-  const HIT: CodexSearchHit = { kind: "quest", id: "q4", title: "The Amber Temple", tags: [], entityType: null, mapId: null };
+  const HIT: CodexSearchHit = {
+    kind: "quest",
+    id: "q4",
+    title: "The Amber Temple",
+    tags: [],
+    entityType: null,
+    mapId: null
+  };
 
   it("names its kind in TEXT and opens the quest log ON that quest", async () => {
     gmDefaults();
@@ -511,7 +675,9 @@ describe("A quest in suite-wide search (M10)", () => {
 
     await user.click(results.getByText("The Amber Temple"));
     const log = within(await screen.findByRole("navigation", { name: "Quests" }));
-    await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
+    await waitFor(() =>
+      expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true")
+    );
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
   });
 });

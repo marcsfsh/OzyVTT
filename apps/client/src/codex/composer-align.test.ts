@@ -28,7 +28,9 @@ describe("the fix: the three composer containers, and only those", () => {
   it("scopes `align-content: start` to each container's own `.nh-field` children", () => {
     const css = withoutComments(CODEX_CSS);
     for (const container of CONTAINERS) {
-      const selector = new RegExp(`\\${container} > \\.nh-field[^{]*\\{[^}]*align-content:\\s*start|\\${container} > \\.nh-field\\s*,`);
+      const selector = new RegExp(
+        `\\${container} > \\.nh-field[^{]*\\{[^}]*align-content:\\s*start|\\${container} > \\.nh-field\\s*,`
+      );
       expect(css, `${container} no longer keeps its fields' rows from stretching`).toMatch(selector);
     }
     // One `align-content: start` block for all three rows.

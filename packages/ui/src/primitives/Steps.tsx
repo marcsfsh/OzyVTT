@@ -41,7 +41,9 @@ export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel =
     <div className={cx("nh-steps-wrap", className)}>
       <div className="nh-steps-compact">
         <div className="nh-steps-compact-head">
-          <span className="nh-steps-count tabular">Step {index + 1} of {total}</span>
+          <span className="nh-steps-count tabular">
+            Step {index + 1} of {total}
+          </span>
           <span className="nh-steps-compact-label">{activeName}</span>
         </div>
         <div
@@ -60,9 +62,9 @@ export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel =
       <ol className="nh-steps" aria-label={ariaLabel}>
         {steps.map((step, i) => {
           // Precedence: the current step, then the flow's declared state, then position.
-          const state = i === index ? "current" : step.state ?? (i < index ? "done" : "upcoming");
-          const jumpable = onStepSelect != null && i !== index
-            && (maxSelectable != null ? i <= maxSelectable : state === "done");
+          const state = i === index ? "current" : (step.state ?? (i < index ? "done" : "upcoming"));
+          const jumpable =
+            onStepSelect != null && i !== index && (maxSelectable != null ? i <= maxSelectable : state === "done");
           const inner = (
             <>
               {/* Three marks, never three colours: a check for done, the caution mark for unfinished (the same glyph as the
@@ -80,10 +82,18 @@ export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel =
             </>
           );
           return (
-            <li key={i} className={cx("nh-step", `nh-step--${state}`)} aria-current={state === "current" ? "step" : undefined}>
-              {jumpable
-                ? <button type="button" className="nh-step-jump interactive" onClick={() => onStepSelect?.(i)}>{inner}</button>
-                : inner}
+            <li
+              key={i}
+              className={cx("nh-step", `nh-step--${state}`)}
+              aria-current={state === "current" ? "step" : undefined}
+            >
+              {jumpable ? (
+                <button type="button" className="nh-step-jump interactive" onClick={() => onStepSelect?.(i)}>
+                  {inner}
+                </button>
+              ) : (
+                inner
+              )}
             </li>
           );
         })}

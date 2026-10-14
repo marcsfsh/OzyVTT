@@ -12,9 +12,20 @@ import type { CodexPageSummary } from "./api";
  */
 
 const PAGE = (id: string, title: string, folder: string | null): CodexPageSummary => ({
-  id, title, folder, entityType: "note", fields: {}, tags: [], revealedToPlayers: false, bannerAssetId: null,
-  inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 1,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id,
+  title,
+  folder,
+  entityType: "note",
+  fields: {},
+  tags: [],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
 const handlers = () => ({
@@ -50,7 +61,9 @@ describe("Notebook folder row — one action control, not four (§4)", () => {
     expect(onRow).toHaveLength(2);
 
     await user.click(folderMenu());
-    const items = within(row).getAllByRole("menuitem").map((item) => item.textContent);
+    const items = within(row)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
     // "Move to top level" is the touch-friendly way to move a folder; still one control on the row.
     expect(items).toEqual(["New subfolder", "New page here", "Rename folder", "Move to top level", "Delete folder"]);
   });

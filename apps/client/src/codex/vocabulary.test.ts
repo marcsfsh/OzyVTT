@@ -38,8 +38,14 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
    * appear legitimately in prose and "GM only" is the content-axis pill.
    */
   { pattern: /^Player-facing\b/, use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" },
-  { pattern: /^What (will happen|the party knows|the party was told)$/, use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" },
-  { pattern: /^(GM notes|GM-only side|GM secret body)$/, use: "“GM-only notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" }
+  {
+    pattern: /^What (will happen|the party knows|the party was told)$/,
+    use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx"
+  },
+  {
+    pattern: /^(GM notes|GM-only side|GM secret body)$/,
+    use: "“GM-only notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx"
+  }
 ];
 
 /** Exemptions, matched as whole strings so a new violation can't hide behind one. */
@@ -58,9 +64,7 @@ function codexSources(): readonly string[] {
 }
 
 describe("The canonical glossary (D5)", () => {
-  const strings = scanCopy(
-    codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) }))
-  );
+  const strings = scanCopy(codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) })));
 
   it("reads enough of the Codex to be worth trusting", () => {
     // Guard against a scan that silently matches nothing. The floor keeps headroom on purpose.
@@ -74,7 +78,11 @@ describe("The canonical glossary (D5)", () => {
     expect(at("MarkerInspector.tsx", "Delete pin")).toBe(true);
     expect(at("MarkerInspector.tsx", "Delete this pin? This cannot be undone.")).toBe(true);
     expect(at("AtlasView.tsx", 'Delete map "${currentMap.name}"? Its pins are removed.')).toBe(true);
-    expect(strings.some((entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional. Players never see"))).toBe(true);
+    expect(
+      strings.some(
+        (entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional. Players never see")
+      )
+    ).toBe(true);
   });
 
   for (const { pattern, use } of RETIRED) {
@@ -87,7 +95,9 @@ describe("The canonical glossary (D5)", () => {
   it("has no exemption that rescues nothing — a dead exemption is a comment pretending to be a rule", () => {
     // Every exemption must still be needed.
     for (const allowed of ALLOWED) {
-      const rescued = strings.filter((entry) => entry.text === allowed && RETIRED.some(({ pattern }) => pattern.test(entry.text)));
+      const rescued = strings.filter(
+        (entry) => entry.text === allowed && RETIRED.some(({ pattern }) => pattern.test(entry.text))
+      );
       expect(rescued.length, `exemption ${JSON.stringify(allowed)} rescues nothing`).toBeGreaterThan(0);
     }
   });
@@ -121,8 +131,19 @@ describe("The words the navigation itself uses (D1/D5)", () => {
   it("names every sidebar destination in the glossary's words, in both roles", () => {
     const labels = (groups: typeof GM_SIDEBAR) => groups.flatMap((group) => group.items.map((item) => item.label));
     expect(labels(GM_SIDEBAR)).toEqual([
-      "Home", "Pages", "Atlas", "Graph", "Sessions", "Quests", "Journal", "Calendar", "Downtime",
-      "Reveal audit", "Preview as player", "Backup", "Settings"
+      "Home",
+      "Pages",
+      "Atlas",
+      "Graph",
+      "Sessions",
+      "Quests",
+      "Journal",
+      "Calendar",
+      "Downtime",
+      "Reveal audit",
+      "Preview as player",
+      "Backup",
+      "Settings"
     ]);
     // The player's Codex is the GM's navigation minus the tools.
     expect(labels(PLAYER_SIDEBAR)).toEqual(labels(GM_SIDEBAR).slice(0, 9));

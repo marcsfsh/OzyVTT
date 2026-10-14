@@ -21,11 +21,18 @@ beforeEach(async () => {
   store = new CodexStore(join(directory, "vtt.sqlite"));
   await store.initialize();
 });
-afterEach(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+afterEach(async () => {
+  store.close();
+  await rm(directory, { recursive: true, force: true });
+});
 
 describe("session scene attachments", () => {
   it("round-trips, dedupes, and merges like every other session field", () => {
-    const session = store.createSession({ sessionNumber: 4, prepBody: "Ambush at the bridge.", sceneIds: [SCENE_A, SCENE_B, SCENE_A] });
+    const session = store.createSession({
+      sessionNumber: 4,
+      prepBody: "Ambush at the bridge.",
+      sceneIds: [SCENE_A, SCENE_B, SCENE_A]
+    });
     expect(session.sceneIds).toEqual([SCENE_A, SCENE_B]);
     expect(store.getSession(session.id)!.sceneIds).toEqual([SCENE_A, SCENE_B]);
 
@@ -39,12 +46,19 @@ describe("session scene attachments", () => {
   });
 
   it("caps at the table's own scene cap", () => {
-    const many = Array.from({ length: 30 }, (_, index) => `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`);
+    const many = Array.from(
+      { length: 30 },
+      (_, index) => `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`
+    );
     expect(store.createSession({ sceneIds: many }).sceneIds).toHaveLength(20);
   });
 
   it("is GM-only in projections ALWAYS - even for a revealed session (R2)", () => {
-    const session = store.createSession({ sessionNumber: 5, recapBody: "They crossed the bridge.", sceneIds: [SCENE_A] });
+    const session = store.createSession({
+      sessionNumber: 5,
+      recapBody: "They crossed the bridge.",
+      sceneIds: [SCENE_A]
+    });
     expect(projectGmSession(session).sceneIds).toEqual([SCENE_A]);
 
     const revealed = store.setSessionRevealed(session.id, true);
@@ -57,7 +71,12 @@ describe("session scene attachments", () => {
   });
 
   it("keeps scene ids out of both search indexes - they are ids, not text", () => {
-    const session = store.createSession({ sessionNumber: 6, prepBody: "Prep", recapBody: "Recap", sceneIds: [SCENE_A] });
+    const session = store.createSession({
+      sessionNumber: 6,
+      prepBody: "Prep",
+      recapBody: "Recap",
+      sceneIds: [SCENE_A]
+    });
     store.setSessionRevealed(session.id, true);
     expect(store.searchAll("gm", SCENE_A).hits).toHaveLength(0);
     expect(store.searchAll("player", SCENE_A).hits).toHaveLength(0);

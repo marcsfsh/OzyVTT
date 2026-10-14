@@ -20,27 +20,56 @@ const CORRIDOR = "40000000-0000-4000-8000-0000000000a1";
 const IMPLICIT = "40000000-0000-4000-8000-0000000000a2";
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8); buffer.write("IHDR", 12, "ascii"); buffer.writeUInt32BE(width, 16); buffer.writeUInt32BE(height, 20);
+  buffer.writeUInt32BE(13, 8);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
   return buffer;
 }
 
 // A live fight mid-turn: Hero is up, prone, with a 30 ft Speed already spent. Standing costs half
 // Speed, so `actor.set-condition` blocks with `movement.stand-up-cost`.
 function initialState() {
-  return GameStateSchema.parse({ schemaVersion: 1,
+  return GameStateSchema.parse({
+    schemaVersion: 1,
     actors: [
-      { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, speedFeet: 30, conditions: [{ id: "prone" }] },
-      { id: OTHER, name: "Second Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, speedFeet: 30, conditions: [{ id: "prone" }] },
+      {
+        id: HERO,
+        name: "Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        speedFeet: 30,
+        conditions: [{ id: "prone" }]
+      },
+      {
+        id: OTHER,
+        name: "Second Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        speedFeet: 30,
+        conditions: [{ id: "prone" }]
+      },
       { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
     ],
     combat: {
-      active: true, round: 1, turnActorId: HERO, rulesMode: "strict",
-      initiative: [{ actorId: HERO, score: 20 }, { actorId: OTHER, score: 10 }, { actorId: GOBLIN, score: 1 }],
+      active: true,
+      round: 1,
+      turnActorId: HERO,
+      rulesMode: "strict",
+      initiative: [
+        { actorId: HERO, score: 20 },
+        { actorId: OTHER, score: 10 },
+        { actorId: GOBLIN, score: 1 }
+      ],
       turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 30 }
     }
   });
@@ -66,7 +95,10 @@ async function boot() {
   if (!address || typeof address === "string") throw new Error("Server did not bind.");
   const imported = await server.mapAssets.import(png(900, 600), "arena.png");
   server.mapCatalog.register(imported.metadata.id, "Ask Arena", "battlemap");
-  cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken, mapAssetId: imported.metadata.id };
 }
 
@@ -90,7 +122,13 @@ async function fightWithExhaustedMovement() {
 
 const STAND_UP = GAME_PATHS.actorConditions.replace("{actorId}", HERO);
 /** Hero tries to stand up with no movement left - the blocked command, carrying the revision it was sent at. */
-const standUpBody = (revision: number) => ({ commandId: randomUUID(), actorId: HERO, conditionId: "prone", active: false, expectedRevision: revision });
+const standUpBody = (revision: number) => ({
+  commandId: randomUUID(),
+  actorId: HERO,
+  conditionId: "prone",
+  active: false,
+  expectedRevision: revision
+});
 
 describe("ask the GM", () => {
   it("turns a blocked player move into a parked question instead of a silent dead end", async () => {
@@ -102,7 +140,11 @@ describe("ask the GM", () => {
     expect(blocked.status).toBe(409);
     expect((await blocked.json()).error.details.blocked.rule).toBe("movement.stand-up-cost");
 
-    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: body });
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: body
+    });
     expect(asked.status).toBe(200);
     const askBody = await asked.json();
     expect(askBody.data.ran).toBe(false);
@@ -120,7 +162,11 @@ describe("ask the GM", () => {
 
   it("shows a player only their OWN ask, and never the parked payload", async () => {
     const { base, server, heroSession, otherSession, gmToken } = await fightWithExhaustedMovement();
-    await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(server.store.snapshot.revision) });
+    await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: standUpBody(server.store.snapshot.revision)
+    });
 
     const mine = await playerView(base, heroSession);
     const theirs = await playerView(base, otherSession);
@@ -141,14 +187,28 @@ describe("ask the GM", () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     // Ask at revision N...
     const staleRevision = server.store.snapshot.revision;
-    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(staleRevision) });
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: standUpBody(staleRevision)
+    });
     const askId = (await asked.json()).data.askId as string;
 
     // ...and let the table move on, so the parked expectedRevision is stale.
-    await post(base, GAME_PATHS.rolls, gmToken, { commandId: randomUUID(), formula: "1d20", purpose: "manual", visibility: "public" });
+    await post(base, GAME_PATHS.rolls, gmToken, {
+      commandId: randomUUID(),
+      formula: "1d20",
+      purpose: "manual",
+      visibility: "public"
+    });
     expect(server.store.snapshot.revision).toBeGreaterThan(staleRevision);
 
-    const allowed = await post(base, GAME_PATHS.rulesAnswer, gmToken, { commandId: randomUUID(), askId, allow: true, reason: "You were running downhill." });
+    const allowed = await post(base, GAME_PATHS.rulesAnswer, gmToken, {
+      commandId: randomUUID(),
+      askId,
+      allow: true,
+      reason: "You were running downhill."
+    });
     expect(allowed.status).toBe(200);
     expect((await allowed.json()).data.allowed).toBe(true);
 
@@ -162,7 +222,11 @@ describe("ask the GM", () => {
   it("declines without running anything, and tells the player", async () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     const before = server.store.snapshot.actors.find((actor) => actor.id === HERO)?.conditions.length;
-    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(server.store.snapshot.revision) });
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: standUpBody(server.store.snapshot.revision)
+    });
     const askId = (await asked.json()).data.askId as string;
 
     const denied = await post(base, GAME_PATHS.rulesAnswer, gmToken, { commandId: randomUUID(), askId, allow: false });
@@ -180,9 +244,21 @@ describe("ask the GM", () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     const body = standUpBody(server.store.snapshot.revision);
     // The GM relaxes movement policing before the player taps Ask.
-    expect((await post(base, GAME_PATHS.rulesMode, gmToken, { commandId: randomUUID(), mode: "strict", exceptions: { movement: "freeform" } })).status).toBe(200);
+    expect(
+      (
+        await post(base, GAME_PATHS.rulesMode, gmToken, {
+          commandId: randomUUID(),
+          mode: "strict",
+          exceptions: { movement: "freeform" }
+        })
+      ).status
+    ).toBe(200);
 
-    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: body });
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: body
+    });
     expect(asked.status).toBe(200);
     expect((await asked.json()).data.ran).toBe(true);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
@@ -195,23 +271,41 @@ describe("ask the GM", () => {
 
     // Another player wrapping Hero's blocked move in an ask gets the same refusal the raw command gives:
     // the ask is not a way around role boundaries.
-    const impostor = await post(base, GAME_PATHS.rulesAsk, otherSession, { commandId: randomUUID(), type: "actor.set-condition", payload: body });
+    const impostor = await post(base, GAME_PATHS.rulesAsk, otherSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: body
+    });
     expect(impostor.status).toBe(409);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
 
     // A payload that is not a valid token.move at all is that command's own validation failure.
-    const tampered = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: { commandId: randomUUID(), actorId: HERO, conditionId: 42, active: false } });
+    const tampered = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: { commandId: randomUUID(), actorId: HERO, conditionId: 42, active: false }
+    });
     expect(tampered.status).toBe(400);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
   });
 
   it("keeps one question per character and clears the queue when the fight ends", async () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
-    await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(server.store.snapshot.revision) });
-    await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: { ...standUpBody(server.store.snapshot.revision), conditionId: "prone" } });
+    await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: standUpBody(server.store.snapshot.revision)
+    });
+    await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: { ...standUpBody(server.store.snapshot.revision), conditionId: "prone" }
+    });
     // A double tap is one question; two rows would make the GM answer it twice.
     expect(server.store.snapshot.combat.pendingRuleAsks.length).toBe(1);
-    expect((server.store.snapshot.combat.pendingRuleAsks[0].command.payload as { conditionId: string }).conditionId).toBe("prone");
+    expect(
+      (server.store.snapshot.combat.pendingRuleAsks[0].command.payload as { conditionId: string }).conditionId
+    ).toBe("prone");
 
     expect((await post(base, GAME_PATHS.encounterEnd, gmToken, { commandId: randomUUID() })).status).toBe(200);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
@@ -219,7 +313,11 @@ describe("ask the GM", () => {
 
   it("tells the answering GM plainly when the question has expired", async () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
-    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(server.store.snapshot.revision) });
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: standUpBody(server.store.snapshot.revision)
+    });
     const askId = (await asked.json()).data.askId as string;
     await post(base, GAME_PATHS.encounterEnd, gmToken, { commandId: randomUUID() });
 
@@ -230,9 +328,17 @@ describe("ask the GM", () => {
 
   it("refuses a player answering their own question", async () => {
     const { base, server, heroSession } = await fightWithExhaustedMovement();
-    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, { commandId: randomUUID(), type: "actor.set-condition", payload: standUpBody(server.store.snapshot.revision) });
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "actor.set-condition",
+      payload: standUpBody(server.store.snapshot.revision)
+    });
     const askId = (await asked.json()).data.askId as string;
-    const answered = await post(base, GAME_PATHS.rulesAnswer, heroSession, { commandId: randomUUID(), askId, allow: true });
+    const answered = await post(base, GAME_PATHS.rulesAnswer, heroSession, {
+      commandId: randomUUID(),
+      askId,
+      allow: true
+    });
     expect(answered.status).toBe(403);
     expect(server.store.snapshot.combat.pendingRuleAsks.length).toBe(1);
   });
@@ -241,15 +347,27 @@ describe("ask the GM", () => {
     // `pendingRuleAsks` must be in both the snapshot list and the empty-scene literal, or a parked scene
     // resumes with an answered question or loses an unanswered one.
     const ask = {
-      id: "90000000-0000-4000-8000-000000000001", actorId: HERO, rule: "movement.stand-up-cost", family: "movement" as const,
+      id: "90000000-0000-4000-8000-000000000001",
+      actorId: HERO,
+      rule: "movement.stand-up-cost",
+      family: "movement" as const,
       message: "Standing up costs 15 ft of movement - Hero has 0 ft left.",
-      command: { type: "actor.set-condition" as const, payload: { actorId: HERO, conditionId: "prone", active: false } },
+      command: {
+        type: "actor.set-condition" as const,
+        payload: { actorId: HERO, conditionId: "prone", active: false }
+      },
       createdAt: new Date().toISOString()
     };
-    const game = GameStateSchema.parse({ schemaVersion: 1,
-      actors: [{ id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } }],
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } }
+      ],
       combat: {
-        active: true, round: 1, turnActorId: HERO, mapAssetId: MAP,
+        active: true,
+        round: 1,
+        turnActorId: HERO,
+        mapAssetId: MAP,
         initiative: [{ actorId: HERO, score: 20 }],
         pendingRuleAsks: [ask],
         scenes: [{ id: CORRIDOR, name: "The corridor", mapAssetId: MAP, combat: {} }],

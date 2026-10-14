@@ -19,14 +19,26 @@ const goLive = (state: ReturnType<typeof GameStateSchema.parse>, sceneId: string
   activateNewScene(state, { sceneId, name: "Replay", mapAssetId: MAP, combat: EMPTY_COMBAT }, SCENE(99));
 
 const refusalFrom = (run: () => unknown): string => {
-  try { run(); } catch (cause) { return (cause as Error).message; }
+  try {
+    run();
+  } catch (cause) {
+    return (cause as Error).message;
+  }
   throw new Error("Expected the go-live to be refused, and it was not.");
 };
 
 describe("launch refusal - the client's routes match the server's refusals", () => {
   it("routes a full scene list to the scene gallery", () => {
     const state = GameStateSchema.parse({ schemaVersion: 1 });
-    state.combat = { ...state.combat, scenes: Array.from({ length: 20 }, (_, index) => ({ id: SCENE(index), name: `Scene ${index}`, mapAssetId: MAP, combat: EMPTY_COMBAT })) };
+    state.combat = {
+      ...state.combat,
+      scenes: Array.from({ length: 20 }, (_, index) => ({
+        id: SCENE(index),
+        name: `Scene ${index}`,
+        mapAssetId: MAP,
+        combat: EMPTY_COMBAT
+      }))
+    };
     const message = refusalFrom(() => goLive(state, SCENE(50)));
     expect(message).toBe(SCENE_ROOM_REFUSAL);
     expect(launchRefusalOf(message)).toBe("scene-room");
@@ -43,6 +55,8 @@ describe("launch refusal - the client's routes match the server's refusals", () 
   it("leaves every other failure on the transient toast it always had", () => {
     expect(launchRefusalOf(undefined)).toBe("other");
     expect(launchRefusalOf("That recording could not be read.")).toBe("other");
-    expect(launchRefusalOf("The table's sheet library is full - delete some imported stat blocks before launching a replay.")).toBe("other");
+    expect(
+      launchRefusalOf("The table's sheet library is full - delete some imported stat blocks before launching a replay.")
+    ).toBe("other");
   });
 });

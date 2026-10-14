@@ -72,7 +72,11 @@ export function CreateRecordModal({
       ...(source.meta ? { meta: source.meta } : {}),
       ...(source.keywords ? { keywords: source.keywords } : {}),
       ...(source.origin === minority
-        ? { badge: <Badge tone={minority === "srd" ? "info" : "primary"}>{minority === "srd" ? "SRD" : "Homebrew"}</Badge> }
+        ? {
+            badge: (
+              <Badge tone={minority === "srd" ? "info" : "primary"}>{minority === "srd" ? "SRD" : "Homebrew"}</Badge>
+            )
+          }
         : {})
     }));
     return {
@@ -107,7 +111,14 @@ export function CreateRecordModal({
       return;
     }
     if (!chosen) return;
-    onCreate({ mode: "duplicate", type, sourceId: chosen.id, sourceName: chosen.name, origin: chosen.origin, companions });
+    onCreate({
+      mode: "duplicate",
+      type,
+      sourceId: chosen.id,
+      sourceName: chosen.name,
+      origin: chosen.origin,
+      companions
+    });
   };
 
   return (
@@ -120,8 +131,15 @@ export function CreateRecordModal({
       className="hb-create"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={submit} disabled={!!blockedReason || busy} aria-describedby={blockedReason ? reasonId : undefined}>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={submit}
+            disabled={!!blockedReason || busy}
+            aria-describedby={blockedReason ? reasonId : undefined}
+          >
             {busy ? "Creating…" : "Create"}
           </Button>
         </>
@@ -137,7 +155,9 @@ export function CreateRecordModal({
             }}
           >
             {HOMEBREW_TYPES.map((option) => (
-              <option key={option} value={option}>{typePlural(option)}</option>
+              <option key={option} value={option}>
+                {typePlural(option)}
+              </option>
             ))}
           </Select>
         </Field>
@@ -171,7 +191,9 @@ export function CreateRecordModal({
               onChange={setSourceId}
               searchable
               searchPlaceholder={`Search ${typePlural(type).toLowerCase()}…`}
-              {...(facets ? { facets, facetValue: facet, onFacetChange: setFacet, facetLabel: "Source", facetAllValue: "all" } : {})}
+              {...(facets
+                ? { facets, facetValue: facet, onFacetChange: setFacet, facetLabel: "Source", facetAllValue: "all" }
+                : {})}
               emptyTitle="Nothing to duplicate"
               emptyText={
                 type === "spell-list"
@@ -184,12 +206,16 @@ export function CreateRecordModal({
 
         {companions.length > 0 && (
           <p className="hb-create-note">
-            {chosen!.name}&rsquo;s {companions.length} {companions.length === 1 ? "subclass is" : "subclasses are"} copied too, so the
-            copy has something to offer at its subclass level and can be published straight away.
+            {chosen!.name}&rsquo;s {companions.length} {companions.length === 1 ? "subclass is" : "subclasses are"}{" "}
+            copied too, so the copy has something to offer at its subclass level and can be published straight away.
           </p>
         )}
 
-        {blockedReason && <p className="hb-blocked" id={reasonId}>{blockedReason}</p>}
+        {blockedReason && (
+          <p className="hb-blocked" id={reasonId}>
+            {blockedReason}
+          </p>
+        )}
       </div>
     </Modal>
   );

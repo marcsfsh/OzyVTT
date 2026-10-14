@@ -25,7 +25,10 @@ export function renderAppMap(): string {
   const httpPaths = Object.entries(openApiDocument.paths)
     .map(([path, item]) => ({
       path,
-      methods: Object.keys(item as Record<string, unknown>).filter((key) => HTTP_METHODS.has(key)).map((method) => method.toUpperCase()).sort()
+      methods: Object.keys(item as Record<string, unknown>)
+        .filter((key) => HTTP_METHODS.has(key))
+        .map((method) => method.toUpperCase())
+        .sort()
     }))
     .sort((a, b) => a.path.localeCompare(b.path));
 
@@ -76,7 +79,9 @@ export function renderAppMap(): string {
   lines.push("");
   lines.push("Curated pointers (verify line numbers before relying on them - code moves):");
   lines.push("");
-  lines.push("- **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`.");
+  lines.push(
+    "- **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`."
+  );
   lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.");
   lines.push("- **Command Zod schemas:** `apps/server/src/game-commands.ts`.");
   lines.push("- **Command handlers + registry:** `apps/server/src/game-operations.ts`.");
@@ -84,7 +89,9 @@ export function renderAppMap(): string {
   lines.push("- **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.");
   lines.push("- **Public viewer projection:** `apps/server/src/viewer-encounter.ts`, `viewer-presentation.ts`.");
   lines.push("- **Persistence (SQLite):** `apps/server/src/game-store.ts`.");
-  lines.push("- **Rules engine:** `apps/server/src/{action-resolution,saving-throws,hit-points,rests,condition-rules}.ts`.");
+  lines.push(
+    "- **Rules engine:** `apps/server/src/{action-resolution,saving-throws,hit-points,rests,condition-rules}.ts`."
+  );
   lines.push("- **Shared 5e math:** `packages/rules-5e/src/{dice,combat,character}.ts`.");
   lines.push("- **SRD content bundles:** `packages/content-srd-5.2.1`.");
   lines.push("- **Client entry points:** `apps/client/src/{main,viewer-main,styleguide-main}.tsx`.");

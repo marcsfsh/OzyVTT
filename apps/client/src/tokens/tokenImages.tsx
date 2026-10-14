@@ -12,13 +12,14 @@ const resolved = new Map<string, string>();
 function loadTokenBlob(assetId: string, token: string): Promise<string> {
   const existing = pendingCache.get(assetId);
   if (existing) return existing;
-  const pending = fetch(`/api/v1/token-assets/${encodeURIComponent(assetId)}/content`, { headers: { authorization: `Bearer ${token}` } })
-    .then(async (response) => {
-      if (!response.ok) throw new Error("The token image could not be loaded.");
-      const url = URL.createObjectURL(await response.blob());
-      resolved.set(assetId, url);
-      return url;
-    });
+  const pending = fetch(`/api/v1/token-assets/${encodeURIComponent(assetId)}/content`, {
+    headers: { authorization: `Bearer ${token}` }
+  }).then(async (response) => {
+    if (!response.ok) throw new Error("The token image could not be loaded.");
+    const url = URL.createObjectURL(await response.blob());
+    resolved.set(assetId, url);
+    return url;
+  });
   pending.catch(() => pendingCache.delete(assetId));
   pendingCache.set(assetId, pending);
   return pending;
@@ -29,21 +30,37 @@ function loadTokenBlob(assetId: string, token: string): Promise<string> {
  * fall back to initials. The shared-screen viewer uses the cookie-authorized `/content` URL instead.
  */
 export function useTokenImageUrl(assetId: string | null | undefined, token: string | null | undefined): string | null {
-  const [url, setUrl] = useState<string | null>(() => (assetId ? resolved.get(assetId) ?? null : null));
+  const [url, setUrl] = useState<string | null>(() => (assetId ? (resolved.get(assetId) ?? null) : null));
   useEffect(() => {
-    if (!assetId || !token) { setUrl(null); return; }
+    if (!assetId || !token) {
+      setUrl(null);
+      return;
+    }
     const cached = resolved.get(assetId);
     setUrl(cached ?? null);
     if (cached) return;
     let active = true;
-    loadTokenBlob(assetId, token).then((next) => { if (active) setUrl(next); }).catch(() => { if (active) setUrl(null); });
-    return () => { active = false; };
+    loadTokenBlob(assetId, token)
+      .then((next) => {
+        if (active) setUrl(next);
+      })
+      .catch(() => {
+        if (active) setUrl(null);
+      });
+    return () => {
+      active = false;
+    };
   }, [assetId, token]);
   return url;
 }
 
 /** A `TokenGlyph` with an authorized image, one per token since the hook cannot run in a loop. */
-export function AuthorizedTokenGlyph({ assetId, token, ...glyph }: Omit<TokenGlyphProps, "imageUrl"> & Readonly<{ assetId: string | null | undefined; token: string | null | undefined }>) {
+export function AuthorizedTokenGlyph({
+  assetId,
+  token,
+  ...glyph
+}: Omit<TokenGlyphProps, "imageUrl"> &
+  Readonly<{ assetId: string | null | undefined; token: string | null | undefined }>) {
   const imageUrl = useTokenImageUrl(assetId, token);
   return <TokenGlyph {...glyph} imageUrl={imageUrl} />;
 }

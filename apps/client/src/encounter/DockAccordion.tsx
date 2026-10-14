@@ -31,7 +31,9 @@ function defaultFor(role: "gm" | "player", inCombat: boolean): DockKey {
 
 /** One query string shared by the JS and CSS halves, as in `scene/MapToolbar.tsx`. */
 function useSheet(): boolean {
-  const [sheet, setSheet] = useState(() => typeof window !== "undefined" && (window.matchMedia?.(SHEET_QUERY).matches ?? false));
+  const [sheet, setSheet] = useState(
+    () => typeof window !== "undefined" && (window.matchMedia?.(SHEET_QUERY).matches ?? false)
+  );
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const query = window.matchMedia(SHEET_QUERY);
@@ -60,21 +62,37 @@ socket.on("state:updated", (next: GmView | PlayerView) => setWaiting(next.combat
 socket.on("disconnect", () => setWaiting(0));
 function subscribeWaiting(listener: () => void) {
   waitingListeners.add(listener);
-  return () => { waitingListeners.delete(listener); };
+  return () => {
+    waitingListeners.delete(listener);
+  };
 }
 function useWaitingAsks(): number {
-  return useSyncExternalStore(subscribeWaiting, () => waiting, () => waiting);
+  return useSyncExternalStore(
+    subscribeWaiting,
+    () => waiting,
+    () => waiting
+  );
 }
 
 /** The count rides the section/tab label, with a word so a screen reader hears what it counts. */
 function WaitingBadge({ count }: Readonly<{ count: number }>) {
   if (count <= 0) return null;
-  return <span className="dock-waiting-count">
-    {count}<span className="nh-sr-only"> {count === 1 ? "question waiting on the GM" : "questions waiting on the GM"}</span>
-  </span>;
+  return (
+    <span className="dock-waiting-count">
+      {count}
+      <span className="nh-sr-only"> {count === 1 ? "question waiting on the GM" : "questions waiting on the GM"}</span>
+    </span>
+  );
 }
 
-export function DockAccordion({ role, inCombat, turnLabel, turn, dice, onOpenLog }: Readonly<{
+export function DockAccordion({
+  role,
+  inCombat,
+  turnLabel,
+  turn,
+  dice,
+  onOpenLog
+}: Readonly<{
   role: "gm" | "player";
   inCombat: boolean;
   /** Named per combat state: the fight in combat, staging one out of it. */
@@ -94,68 +112,101 @@ export function DockAccordion({ role, inCombat, turnLabel, turn, dice, onOpenLog
    * Otherwise the last choice stands, across reloads too. Stored in localStorage only: a dock
    * preference belongs to this device.
    */
-  useEffect(() => { setOpen(defaultFor(role, inCombat)); }, [role, inCombat]);
+  useEffect(() => {
+    setOpen(defaultFor(role, inCombat));
+  }, [role, inCombat]);
 
   const sheet = useSheet();
   const waitingAsks = useWaitingAsks();
 
   const choose = (key: DockKey) => {
     setOpen(key);
-    try { localStorage.setItem(MEMORY_KEY, key); } catch { /* private mode: the session still works, it just will not remember */ }
+    try {
+      localStorage.setItem(MEMORY_KEY, key);
+    } catch {
+      /* private mode: the session still works, it just will not remember */
+    }
   };
 
   const sections: ReadonlyArray<{ key: DockKey; label: string; body: ReactNode }> = [
     { key: "turn", label: turnLabel, body: turn },
-    { key: "dice", label: "Dice", body: dice },
+    { key: "dice", label: "Dice", body: dice }
   ];
 
   if (sheet) {
     const active = sections.find((section) => section.key === open) ?? sections[0];
-    return <div className="dock-tabs">
-      <div className="dock-tabs-head">
-      {/* `Tabs`, not `SegmentedControl`: these switch whole panels, and `Tabs` meets the 44px floor
+    return (
+      <div className="dock-tabs">
+        <div className="dock-tabs-head">
+          {/* `Tabs`, not `SegmentedControl`: these switch whole panels, and `Tabs` meets the 44px floor
           with real paint. A segmented control reaches it through `.tap-target`'s `::after`, which would
           extend ~4px up into the map band's `touch-action: none` drag surface and eat map drags. */}
-      <Tabs
-        className="dock-tabs-bar"
-        ariaLabel="The table"
-        activeId={active.key}
-        onChange={(id) => choose(id as DockKey)}
-        tabs={sections.map((section) => ({
-          id: section.key,
-          label: <>{section.label}{section.key === "turn" && <WaitingBadge count={waitingAsks} />}</>
-        }))}
-      />
-      {/* The log's door sits beside the tabs, not as a third tab: it opens a drawer rather than
+          <Tabs
+            className="dock-tabs-bar"
+            ariaLabel="The table"
+            activeId={active.key}
+            onChange={(id) => choose(id as DockKey)}
+            tabs={sections.map((section) => ({
+              id: section.key,
+              label: (
+                <>
+                  {section.label}
+                  {section.key === "turn" && <WaitingBadge count={waitingAsks} />}
+                </>
+              )
+            }))}
+          />
+          {/* The log's door sits beside the tabs, not as a third tab: it opens a drawer rather than
           switching the body. */}
-      <button type="button" className="dock-log-door tap-target interactive" onClick={onOpenLog}>Log</button>
+          <button type="button" className="dock-log-door tap-target interactive" onClick={onOpenLog}>
+            Log
+          </button>
+        </div>
+        {/* One body, mounted for the active tab only. The scroll is declared in the markup (`.scroll-y`). */}
+        <div key={active.key} role="tabpanel" aria-label={active.label} className="dock-tabs-body scroll-y">
+          {active.body}
+        </div>
       </div>
-      {/* One body, mounted for the active tab only. The scroll is declared in the markup (`.scroll-y`). */}
-      <div key={active.key} role="tabpanel" aria-label={active.label} className="dock-tabs-body scroll-y">{active.body}</div>
-    </div>;
+    );
   }
 
-  return <div className="dock-accordion">
-    {sections.map((section) => {
-      const isOpen = open === section.key;
-      return <section key={section.key} className={`dock-section${isOpen ? " is-open" : ""}`}>
-        {/* The whole header is a button, so the full row is the hit area and it carries `aria-expanded`. */}
+  return (
+    <div className="dock-accordion">
+      {sections.map((section) => {
+        const isOpen = open === section.key;
+        return (
+          <section key={section.key} className={`dock-section${isOpen ? " is-open" : ""}`}>
+            {/* The whole header is a button, so the full row is the hit area and it carries `aria-expanded`. */}
+            <h2 className="dock-section-head">
+              <button
+                type="button"
+                className="dock-section-toggle tap-target"
+                aria-expanded={isOpen}
+                aria-controls={`dock-body-${section.key}`}
+                onClick={() => choose(section.key)}
+              >
+                <span className="dock-section-label">
+                  {section.label}
+                  {section.key === "turn" && <WaitingBadge count={waitingAsks} />}
+                </span>
+              </button>
+            </h2>
+            {isOpen && (
+              <div id={`dock-body-${section.key}`} className="dock-section-body scroll-y">
+                {section.body}
+              </div>
+            )}
+          </section>
+        );
+      })}
+      {/* The log's door, styled like a section header; no `aria-expanded`, since nothing expands. */}
+      <section className="dock-section dock-section--door">
         <h2 className="dock-section-head">
-          <button type="button" className="dock-section-toggle tap-target" aria-expanded={isOpen}
-            aria-controls={`dock-body-${section.key}`} onClick={() => choose(section.key)}>
-            <span className="dock-section-label">{section.label}{section.key === "turn" && <WaitingBadge count={waitingAsks} />}</span>
+          <button type="button" className="dock-section-toggle tap-target" onClick={onOpenLog}>
+            <span className="dock-section-label">Combat log</span>
           </button>
         </h2>
-        {isOpen && <div id={`dock-body-${section.key}`} className="dock-section-body scroll-y">{section.body}</div>}
-      </section>;
-    })}
-    {/* The log's door, styled like a section header; no `aria-expanded`, since nothing expands. */}
-    <section className="dock-section dock-section--door">
-      <h2 className="dock-section-head">
-        <button type="button" className="dock-section-toggle tap-target" onClick={onOpenLog}>
-          <span className="dock-section-label">Combat log</span>
-        </button>
-      </h2>
-    </section>
-  </div>;
+      </section>
+    </div>
+  );
 }

@@ -60,18 +60,42 @@ export interface WizardShellProps {
     whose disabled Next always has an announced reason, sticky header and footer, and an optional detail pane
     that becomes master-detail on narrow screens. The flow owns all step state. */
 export function WizardShell({
-  title, eyebrow, steps, current, onStepSelect, maxSelectable, children,
-  onBack, footerSecondary, onNext, backLabel = "Back", nextLabel = "Next", blockedReason, busy = false,
-  onSaveAndClose, saveLabel = "Save & close", resume,
-  detail, detailTitle, detailOpen = false,
-  onOpenDetail, detailOpenLabel = "Show details", onCloseDetail, detailBackLabel = "Back to the list",
-  footnote, ariaLabel, className
+  title,
+  eyebrow,
+  steps,
+  current,
+  onStepSelect,
+  maxSelectable,
+  children,
+  onBack,
+  footerSecondary,
+  onNext,
+  backLabel = "Back",
+  nextLabel = "Next",
+  blockedReason,
+  busy = false,
+  onSaveAndClose,
+  saveLabel = "Save & close",
+  resume,
+  detail,
+  detailTitle,
+  detailOpen = false,
+  onOpenDetail,
+  detailOpenLabel = "Show details",
+  onCloseDetail,
+  detailBackLabel = "Back to the list",
+  footnote,
+  ariaLabel,
+  className
 }: WizardShellProps) {
   const reasonId = useId();
   const blocked = blockedReason != null;
 
   return (
-    <section className={cx("nh-wizard", className)} aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}>
+    <section
+      className={cx("nh-wizard", className)}
+      aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
+    >
       <header className="nh-wizard-head">
         <div className="nh-wizard-titles">
           {eyebrow != null && <span className="nh-eyebrow">{eyebrow}</span>}
@@ -79,21 +103,38 @@ export function WizardShell({
         </div>
         {onSaveAndClose && (
           <div className="nh-wizard-headops">
-            <Button variant="secondary" size="sm" onClick={onSaveAndClose} disabled={busy}>{saveLabel}</Button>
+            <Button variant="secondary" size="sm" onClick={onSaveAndClose} disabled={busy}>
+              {saveLabel}
+            </Button>
           </div>
         )}
         <div className="nh-wizard-progress">
-          <Steps steps={steps} current={current} onStepSelect={onStepSelect} maxSelectable={maxSelectable} ariaLabel={`${typeof title === "string" ? title : "Wizard"} progress`} />
+          <Steps
+            steps={steps}
+            current={current}
+            onStepSelect={onStepSelect}
+            maxSelectable={maxSelectable}
+            ariaLabel={`${typeof title === "string" ? title : "Wizard"} progress`}
+          />
         </div>
       </header>
 
       {resume != null && <div className="nh-wizard-resume">{resume}</div>}
 
       {/* The step body is the wizard's one scrolling region; head and foot stay put. */}
-      <div className={cx("nh-wizard-body", "scroll-y", detail != null && "nh-wizard-body--split", detailOpen && "has-detail")}>
+      <div
+        className={cx(
+          "nh-wizard-body",
+          "scroll-y",
+          detail != null && "nh-wizard-body--split",
+          detailOpen && "has-detail"
+        )}
+      >
         <div className="nh-wizard-main">
           {detail != null && onOpenDetail && (
-            <Button variant="ghost" size="sm" className="nh-wizard-detail-open" onClick={onOpenDetail}>{detailOpenLabel}</Button>
+            <Button variant="ghost" size="sm" className="nh-wizard-detail-open" onClick={onOpenDetail}>
+              {detailOpenLabel}
+            </Button>
           )}
           {children}
           {/* The footnote scrolls with the step so licence text doesn't permanently take phone height. */}
@@ -104,7 +145,9 @@ export function WizardShell({
             {onCloseDetail && (
               <Button variant="ghost" size="sm" className="nh-wizard-detail-back" onClick={onCloseDetail}>
                 {/* The disclosure caret, turned a quarter, rather than a "‹" glyph that renders too small. */}
-                <span className="nh-wizard-detail-back-icon" aria-hidden="true"><IconChevron /></span>
+                <span className="nh-wizard-detail-back-icon" aria-hidden="true">
+                  <IconChevron />
+                </span>
                 {detailBackLabel}
               </Button>
             )}
@@ -116,15 +159,32 @@ export function WizardShell({
 
       <footer className="nh-wizard-foot">
         <div className="nh-wizard-foot-back">
-          {onBack && <Button variant="secondary" onClick={onBack} disabled={busy}>{backLabel}</Button>}
+          {onBack && (
+            <Button variant="secondary" onClick={onBack} disabled={busy}>
+              {backLabel}
+            </Button>
+          )}
           {footerSecondary}
         </div>
         <p className={cx("nh-wizard-blocked", !blocked && "is-clear")} id={reasonId} role="status">
-          {blocked && <><span className="nh-wizard-blocked-icon" aria-hidden="true"><IconWarning /></span>{blockedReason}</>}
+          {blocked && (
+            <>
+              <span className="nh-wizard-blocked-icon" aria-hidden="true">
+                <IconWarning />
+              </span>
+              {blockedReason}
+            </>
+          )}
         </p>
         <div className="nh-wizard-foot-next">
           {onNext && (
-            <Button variant="primary" arrow onClick={onNext} disabled={blocked || busy} aria-describedby={blocked ? reasonId : undefined}>
+            <Button
+              variant="primary"
+              arrow
+              onClick={onNext}
+              disabled={blocked || busy}
+              aria-describedby={blocked ? reasonId : undefined}
+            >
               {nextLabel}
             </Button>
           )}

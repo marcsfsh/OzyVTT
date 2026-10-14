@@ -4,8 +4,22 @@ import type { CodexChronicleRecord } from "./api";
 
 /** The dashboard's pure selection rules. The session card's heading must reflect the record, never a constant. */
 
-const SESSION = (over: Partial<{ id: string; sessionNumber: number | null; realDate: string | null; recapBody: string; status: "planned" | "played"; revealedToPlayers: boolean }> = {}) => ({
-  id: "s1", sessionNumber: 1, realDate: null, recapBody: "", status: "planned" as const, ...over
+const SESSION = (
+  over: Partial<{
+    id: string;
+    sessionNumber: number | null;
+    realDate: string | null;
+    recapBody: string;
+    status: "planned" | "played";
+    revealedToPlayers: boolean;
+  }> = {}
+) => ({
+  id: "s1",
+  sessionNumber: 1,
+  realDate: null,
+  recapBody: "",
+  status: "planned" as const,
+  ...over
 });
 
 describe("Which session the dashboard names, and what it calls it (D18)", () => {
@@ -27,12 +41,18 @@ describe("Which session the dashboard names, and what it calls it (D18)", () => 
   });
 
   it("prefers the active session outright, whatever else is planned", () => {
-    const card = nextSessionCard([SESSION({ id: "s3", sessionNumber: 3, status: "played" }), SESSION({ id: "s4", sessionNumber: 4 })], "s3");
+    const card = nextSessionCard(
+      [SESSION({ id: "s3", sessionNumber: 3, status: "played" }), SESSION({ id: "s4", sessionNumber: 4 })],
+      "s3"
+    );
     expect(card?.id).toBe("s3");
   });
 
   it("picks the LOWEST-numbered planned session when nothing is active", () => {
-    const card = nextSessionCard([SESSION({ id: "s9", sessionNumber: 9 }), SESSION({ id: "s5", sessionNumber: 5 })], null);
+    const card = nextSessionCard(
+      [SESSION({ id: "s9", sessionNumber: 9 }), SESSION({ id: "s5", sessionNumber: 5 })],
+      null
+    );
     expect(card?.id).toBe("s5");
     expect(card?.heading).toBe("Next session");
   });
@@ -50,15 +70,35 @@ describe("Which session the dashboard names, and what it calls it (D18)", () => 
 
 // ----- Downtime -----
 
-const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "e1", title: null, text: "An entry.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null,
-  inWorldDate: null, tags: [], payload: null, fired: false, createdAt: "2026-07-01T00:00:00.000Z",
-  ...over
-} as CodexChronicleRecord);
+const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord =>
+  ({
+    kind: "entry",
+    id: "e1",
+    title: null,
+    text: "An entry.",
+    gmText: null,
+    revealedToPlayers: false,
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldLabel: null,
+    calendarInstant: null,
+    inWorldDate: null,
+    tags: [],
+    payload: null,
+    fired: false,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    ...over
+  }) as CodexChronicleRecord;
 
 const DOWNTIME = (id: string, applied: boolean, who = "Ana", revealed = false) =>
-  RECORD({ kind: "downtime", id, text: `${who} took time.`, revealedToPlayers: revealed, payload: { who, activity: "Forging", days: 7, characterPageId: null, applied } } as Partial<CodexChronicleRecord>);
+  RECORD({
+    kind: "downtime",
+    id,
+    text: `${who} took time.`,
+    revealedToPlayers: revealed,
+    payload: { who, activity: "Forging", days: 7, characterPageId: null, applied }
+  } as Partial<CodexChronicleRecord>);
 
 describe("Downtime waiting on the GM (D18 #5)", () => {
   it("lists only the unconfirmed rows", () => {
@@ -73,7 +113,10 @@ describe("Downtime waiting on the GM (D18 #5)", () => {
 
   it("does not also leave a pending row in the feed — one record, one place on the dashboard", () => {
     // Pending downtime has its own card with Confirm, so it leaves the feed.
-    const feed = campaignFeedProps({ records: [DOWNTIME("w1", false), DOWNTIME("w2", true), RECORD({ id: "e9" })], calendar: null });
+    const feed = campaignFeedProps({
+      records: [DOWNTIME("w1", false), DOWNTIME("w2", true), RECORD({ id: "e9" })],
+      calendar: null
+    });
     expect(feed.downtimePending.map((row) => row.id)).toEqual(["w1"]);
     expect(feed.entries.map((entry) => entry.id)).toEqual(["w2", "e9"]);
   });
@@ -86,7 +129,11 @@ describe("Downtime waiting on the GM (D18 #5)", () => {
 
 describe("Records on one in-world day (the Calendar's day panel)", () => {
   it("matches the server's instant exactly, and never re-derives a date", () => {
-    const rows = [RECORD({ id: "a", calendarInstant: 100 }), RECORD({ id: "b", calendarInstant: 101 }), RECORD({ id: "c", calendarInstant: null })];
+    const rows = [
+      RECORD({ id: "a", calendarInstant: 100 }),
+      RECORD({ id: "b", calendarInstant: 101 }),
+      RECORD({ id: "c", calendarInstant: null })
+    ];
     expect(recordsOnInstant(rows, 100).map((row) => row.id)).toEqual(["a"]);
     expect(recordsOnInstant(rows, 999)).toEqual([]);
   });

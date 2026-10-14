@@ -68,16 +68,28 @@ export interface AbilityScoreAllocatorProps {
   className?: string;
 }
 
-const signed = (value: number | null) => value == null ? "—" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
-const plain = (value: number | null) => value == null ? "—" : String(value);
+const signed = (value: number | null) =>
+  value == null ? "—" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+const plain = (value: number | null) => (value == null ? "—" : String(value));
 
 /** The ability-score step for all four generation methods. Assignment is a per-ability `<Select>` rather than
     drag-and-drop, which fails on a phone. Numbers use `.tabular` so columns line up as they change. Pure
     presentation: scores, costs and modifiers come from `@vtt/rules-5e` as props. */
 export function AbilityScoreAllocator({
-  mode, rows, methods, method, onMethodChange, methodHint,
-  pool, onAssign, onScoreChange, budget, toolbar,
-  disabled = false, ariaLabel = "Ability scores", className
+  mode,
+  rows,
+  methods,
+  method,
+  onMethodChange,
+  methodHint,
+  pool,
+  onAssign,
+  onScoreChange,
+  budget,
+  toolbar,
+  disabled = false,
+  ariaLabel = "Ability scores",
+  className
 }: AbilityScoreAllocatorProps) {
   const tableId = useId();
   const unassigned = (pool ?? []).filter((entry) => !entry.assignedTo);
@@ -88,7 +100,12 @@ export function AbilityScoreAllocator({
       {(methods && method != null && onMethodChange) || methodHint != null ? (
         <div className="nh-abil-method">
           {methods && method != null && onMethodChange && (
-            <SegmentedControl ariaLabel="Ability score method" options={[...methods]} value={method} onChange={onMethodChange} />
+            <SegmentedControl
+              ariaLabel="Ability score method"
+              options={[...methods]}
+              value={method}
+              onChange={onMethodChange}
+            />
           )}
           {methodHint != null && <p className="nh-abil-hint">{methodHint}</p>}
         </div>
@@ -100,9 +117,15 @@ export function AbilityScoreAllocator({
         <div className="nh-abil-pool">
           <span className="nh-abil-pool-label">Still to assign</span>
           <div className="nh-abil-pool-values">
-            {unassigned.length === 0
-              ? <span className="nh-abil-pool-done">All assigned</span>
-              : unassigned.map((entry) => <Badge key={entry.id} tone="info"><span className="tabular">{entry.value}</span></Badge>)}
+            {unassigned.length === 0 ? (
+              <span className="nh-abil-pool-done">All assigned</span>
+            ) : (
+              unassigned.map((entry) => (
+                <Badge key={entry.id} tone="info">
+                  <span className="tabular">{entry.value}</span>
+                </Badge>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -117,7 +140,11 @@ export function AbilityScoreAllocator({
             label={budget.label ?? "Points remaining"}
           />
           {/* Caution, not danger: over budget is unfinished, not destructive. The flow's footer owns the fix. */}
-          {overspent && <Alert tone="warning" title="Over budget">You have spent {budget.spent} of {budget.total} points.</Alert>}
+          {overspent && (
+            <Alert tone="warning" title="Over budget">
+              You have spent {budget.spent} of {budget.total} points.
+            </Alert>
+          )}
         </div>
       )}
 
@@ -142,7 +169,9 @@ export function AbilityScoreAllocator({
               </span>
 
               <span className="nh-abil-cell nh-abil-cell--control">
-                <span className="nh-abil-cell-label" aria-hidden="true">{mode === "assign" ? "Assigned" : "Score"}</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  {mode === "assign" ? "Assigned" : "Score"}
+                </span>
                 {mode === "assign" ? (
                   <Select
                     className="nh-abil-select tabular"
@@ -154,7 +183,11 @@ export function AbilityScoreAllocator({
                   >
                     <option value="">—</option>
                     {assigned && <option value={assigned.id}>{assigned.value}</option>}
-                    {unassigned.map((entry) => <option key={entry.id} value={entry.id}>{entry.value}</option>)}
+                    {unassigned.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.value}
+                      </option>
+                    ))}
                   </Select>
                 ) : (
                   <Stepper
@@ -170,17 +203,23 @@ export function AbilityScoreAllocator({
               </span>
 
               <span className="nh-abil-cell">
-                <span className="nh-abil-cell-label" aria-hidden="true">Bonus</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  Bonus
+                </span>
                 <span className="nh-abil-num tabular">{row.bonus ? signed(row.bonus) : "—"}</span>
               </span>
 
               <span className="nh-abil-cell">
-                <span className="nh-abil-cell-label" aria-hidden="true">Total</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  Total
+                </span>
                 <span className="nh-abil-num nh-abil-num--total tabular">{plain(row.total)}</span>
               </span>
 
               <span className="nh-abil-cell">
-                <span className="nh-abil-cell-label" aria-hidden="true">Mod</span>
+                <span className="nh-abil-cell-label" aria-hidden="true">
+                  Mod
+                </span>
                 <span className="nh-abil-num nh-abil-num--mod tabular">{signed(row.modifier)}</span>
               </span>
 

@@ -17,12 +17,16 @@ export function sessionByNumber<T extends SessionRef>(sessions: readonly T[], se
  * session; players never receive it, so fall back to the highest-numbered session. Unnumbered sessions
  * are a last resort; among them the last (most recently created, given server order) wins.
  */
-export function pickNextSession<T extends SessionRef>(sessions: readonly T[], activeSessionId: string | null = null): T | null {
+export function pickNextSession<T extends SessionRef>(
+  sessions: readonly T[],
+  activeSessionId: string | null = null
+): T | null {
   if (activeSessionId) {
     const active = sessions.find((session) => session.id === activeSessionId);
     if (active) return active;
   }
   const numbered = sessions.filter((session) => session.sessionNumber !== null);
-  if (numbered.length > 0) return numbered.reduce((best, session) => (session.sessionNumber! > best.sessionNumber! ? session : best));
+  if (numbered.length > 0)
+    return numbered.reduce((best, session) => (session.sessionNumber! > best.sessionNumber! ? session : best));
   return sessions.at(-1) ?? null;
 }

@@ -1,7 +1,20 @@
-import type { AbilityId, Actor, ActorDerivedSheet, ContentSkillSummary, DerivedAbilityRow, DerivedSkillRow } from "@vtt/domain";
+import type {
+  AbilityId,
+  Actor,
+  ActorDerivedSheet,
+  ContentSkillSummary,
+  DerivedAbilityRow,
+  DerivedSkillRow
+} from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
-import { checkRiderBonus, effectiveSkillTier, EMPTY_DERIVATION, skillTierSources, type EquipmentDerivation } from "./equipment-derivation.js";
+import {
+  checkRiderBonus,
+  effectiveSkillTier,
+  EMPTY_DERIVATION,
+  skillTierSources,
+  type EquipmentDerivation
+} from "./equipment-derivation.js";
 import { saveTotalFor } from "./saving-throws.js";
 
 /**
@@ -58,7 +71,10 @@ export function deriveActorSheet(
       bonus = override + (ability ? checkRiderBonus(derivation, { ability, skill: skill.id }) : 0);
     } else if (ability && scores) {
       const multiplier = tier === "expertise" ? 2 : tier === "proficient" ? 1 : 0;
-      bonus = abilityModifier(scores[ability]) + proficiencyBonus * multiplier + checkRiderBonus(derivation, { ability, skill: skill.id });
+      bonus =
+        abilityModifier(scores[ability]) +
+        proficiencyBonus * multiplier +
+        checkRiderBonus(derivation, { ability, skill: skill.id });
     }
     return { id: skill.id, name: skill.name, ability, tier, bonus, sources: skillTierSources(derivation, skill.id) };
   });
@@ -74,4 +90,3 @@ export function deriveActorSheet(
     skills: derivedSkills
   };
 }
-

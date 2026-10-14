@@ -24,7 +24,16 @@ export type StagingEntry = Readonly<{
 /** Specific kinds, never "actor" or "combatant". */
 const KIND_WORD: Record<StagingKind, string> = { "player-character": "Character", npc: "NPC", monster: "Monster" };
 
-export function StagingTray({ entries, revealNew, onRevealNewChange, onRevealEntryChange, onRemove, busy = false, emptyNote, placementHint = true }: Readonly<{
+export function StagingTray({
+  entries,
+  revealNew,
+  onRevealNewChange,
+  onRevealEntryChange,
+  onRemove,
+  busy = false,
+  emptyNote,
+  placementHint = true
+}: Readonly<{
   entries: readonly StagingEntry[];
   /** Tray-level decision: do tokens added from here start shown to players? */
   revealNew: boolean;
@@ -38,35 +47,64 @@ export function StagingTray({ entries, revealNew, onRevealNewChange, onRevealEnt
   placementHint?: boolean;
 }>) {
   const placed = entries.filter((entry) => entry.placed).length;
-  return <section className="staging-tray" aria-label="Staging tray">
-    <header className="staging-tray-head">
-      <div className="staging-tray-title">
-        <strong>Staging tray</strong>
-        <span>{entries.length === 0 ? "Nothing staged yet" : `${entries.length} staged · ${placed} on the map`}</span>
-      </div>
-      <label className="staging-tray-reveal">
-        <span>New tokens</span>
-        <RevealSwitch revealed={revealNew} onChange={onRevealNewChange} disabled={busy} ariaLabel="Show new tokens to players" />
-      </label>
-    </header>
-    {entries.length === 0
-      ? <p className="staging-tray-empty">{emptyNote}</p>
-      : <ul className="staging-tray-list scroll-y">
-          {entries.map((entry) => <li key={entry.actorId} className={`staging-row${entry.placed ? " is-placed" : ""}`}>
-            {/* A name and a muted second line (kind, and "Placed"); the leading tick drawn by
+  return (
+    <section className="staging-tray" aria-label="Staging tray">
+      <header className="staging-tray-head">
+        <div className="staging-tray-title">
+          <strong>Staging tray</strong>
+          <span>{entries.length === 0 ? "Nothing staged yet" : `${entries.length} staged · ${placed} on the map`}</span>
+        </div>
+        <label className="staging-tray-reveal">
+          <span>New tokens</span>
+          <RevealSwitch
+            revealed={revealNew}
+            onChange={onRevealNewChange}
+            disabled={busy}
+            ariaLabel="Show new tokens to players"
+          />
+        </label>
+      </header>
+      {entries.length === 0 ? (
+        <p className="staging-tray-empty">{emptyNote}</p>
+      ) : (
+        <ul className="staging-tray-list scroll-y">
+          {entries.map((entry) => (
+            <li key={entry.actorId} className={`staging-row${entry.placed ? " is-placed" : ""}`}>
+              {/* A name and a muted second line (kind, and "Placed"); the leading tick drawn by
                 `.staging-row.is-placed::before` also marks placement. */}
-            <span className="staging-row-name">
-              <strong>{entry.name}</strong>
-              <small>{KIND_WORD[entry.kind]} · {entry.placed ? "Placed" : "In the tray"}</small>
-            </span>
-            {/* `RevealSwitch`, the one reveal control, so the state cannot be misread; it supplies the
+              <span className="staging-row-name">
+                <strong>{entry.name}</strong>
+                <small>
+                  {KIND_WORD[entry.kind]} · {entry.placed ? "Placed" : "In the tray"}
+                </small>
+              </span>
+              {/* `RevealSwitch`, the one reveal control, so the state cannot be misread; it supplies the
                 accessible name and tooltip. */}
-            <RevealSwitch revealed={entry.revealed} disabled={busy} className="staging-row-reveal"
-              ariaLabel={`Show ${entry.name} to players`}
-              onChange={(revealed) => onRevealEntryChange(entry.actorId, revealed)} />
-            <IconButton size="sm" className="staging-row-remove" label={`Remove ${entry.name} from this list`} disabled={busy} onClick={() => onRemove(entry)}><IconX /></IconButton>
-          </li>)}
-        </ul>}
-    {placementHint && entries.length > 0 && placed < entries.length && <p className="staging-tray-hint">Drag them from the tray above the map to place them — or tap a tray token to drop it at the centre.</p>}
-  </section>;
+              <RevealSwitch
+                revealed={entry.revealed}
+                disabled={busy}
+                className="staging-row-reveal"
+                ariaLabel={`Show ${entry.name} to players`}
+                onChange={(revealed) => onRevealEntryChange(entry.actorId, revealed)}
+              />
+              <IconButton
+                size="sm"
+                className="staging-row-remove"
+                label={`Remove ${entry.name} from this list`}
+                disabled={busy}
+                onClick={() => onRemove(entry)}
+              >
+                <IconX />
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+      {placementHint && entries.length > 0 && placed < entries.length && (
+        <p className="staging-tray-hint">
+          Drag them from the tray above the map to place them — or tap a tray token to drop it at the centre.
+        </p>
+      )}
+    </section>
+  );
 }

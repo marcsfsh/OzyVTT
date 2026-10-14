@@ -19,46 +19,135 @@ const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 /** One boundary state: the ambusher is hidden until `revealed`. */
 function turnState(revealed: boolean, current: "hero" | "ambusher"): GameState {
-  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.hero, name: "Borin", kind: "player-character", visibility: "public", hp: { current: 21, maximum: 30 }, ownerSessionId: IDS.heroSession, notes: "GM notes about Borin" },
-    { id: IDS.ambusher, name: "Shadow Stalker", kind: "monster", visibility: revealed ? "public" : "gm-only", hp: { current: 18, maximum: 40 }, notes: "Lairs in the rafters" }
-  ] });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 18 }, { actorId: IDS.ambusher, score: 12 }] }, () => 1, GEOMETRY);
+  const state = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.hero,
+        name: "Borin",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 21, maximum: 30 },
+        ownerSessionId: IDS.heroSession,
+        notes: "GM notes about Borin"
+      },
+      {
+        id: IDS.ambusher,
+        name: "Shadow Stalker",
+        kind: "monster",
+        visibility: revealed ? "public" : "gm-only",
+        hp: { current: 18, maximum: 40 },
+        notes: "Lairs in the rafters"
+      }
+    ]
+  });
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.hero, score: 18 },
+        { actorId: IDS.ambusher, score: 12 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   state.combat = { ...state.combat, turnActorId: current === "hero" ? IDS.hero : IDS.ambusher };
   return state;
 }
 
 const roll = (id: string, visibility: RollRecord["visibility"], sessionId: string): RollRecord => ({
-  id, commandId: `c-${id}`, initiatorSessionId: sessionId, initiatorRole: "player", initiatorLabel: "Borin",
-  label: "Attack", actorId: IDS.hero, purpose: "attack", visibility,
-  formula: "1d20+5", normalizedFormula: "1d20+5", dice: [], modifiers: [], total: 17, createdAt: "2026-07-01T20:00:00.000Z"
+  id,
+  commandId: `c-${id}`,
+  initiatorSessionId: sessionId,
+  initiatorRole: "player",
+  initiatorLabel: "Borin",
+  label: "Attack",
+  actorId: IDS.hero,
+  purpose: "attack",
+  visibility,
+  formula: "1d20+5",
+  normalizedFormula: "1d20+5",
+  dice: [],
+  modifiers: [],
+  total: 17,
+  createdAt: "2026-07-01T20:00:00.000Z"
 });
 
 const logRow = (id: number, revision: number, over: Partial<CombatLogEntry> = {}): CombatLogEntry => ({
-  id, at: "2026-07-01T20:00:00.000Z", kind: "action", text: "Something happened.", gmOnly: false, revision, ...over
+  id,
+  at: "2026-07-01T20:00:00.000Z",
+  kind: "action",
+  text: "Something happened.",
+  gmOnly: false,
+  revision,
+  ...over
 });
 
 function document(): EncounterArchiveDocument {
   const hidden = turnState(false, "ambusher");
   const revealed = turnState(true, "ambusher");
   return {
-    archiveSchemaVersion: 3, startedAt: "2026-07-01T20:00:00.000Z", endedAt: "2026-07-01T21:00:00.000Z",
+    archiveSchemaVersion: 3,
+    startedAt: "2026-07-01T20:00:00.000Z",
+    endedAt: "2026-07-01T21:00:00.000Z",
     turnCount: 2,
     turns: [
-      { index: 0, kind: "turn", label: "Shadow Stalker's turn", revision: 10, at: "2026-07-01T20:00:00.000Z", state: hidden },
-      { index: 1, kind: "turn", label: "Shadow Stalker's turn", revision: 20, at: "2026-07-01T20:05:00.000Z", state: revealed }
+      {
+        index: 0,
+        kind: "turn",
+        label: "Shadow Stalker's turn",
+        revision: 10,
+        at: "2026-07-01T20:00:00.000Z",
+        state: hidden
+      },
+      {
+        index: 1,
+        kind: "turn",
+        label: "Shadow Stalker's turn",
+        revision: 20,
+        at: "2026-07-01T20:05:00.000Z",
+        state: revealed
+      }
     ],
     log: [
       logRow(1, 10, { text: "The rafters creak.", gmOnly: false }),
       logRow(2, 11, { text: "Shadow Stalker readies an ambush.", gmOnly: true }),
       // A self-only roll is stored gm_only = 0 (visible to its roller). The replay reader is any player, so
       // a gmOnly-only filter is not enough.
-      logRow(3, 12, { kind: "roll", text: "Borin rolls in secret.", gmOnly: false, roll: { ...roll("r-self", "self-only", IDS.otherSession), initiatorSessionId: undefined } as never }),
-      logRow(4, 21, { kind: "roll", text: "Borin attacks.", gmOnly: false, roll: { ...roll("r-public", "public", IDS.heroSession), initiatorSessionId: undefined } as never })
+      logRow(3, 12, {
+        kind: "roll",
+        text: "Borin rolls in secret.",
+        gmOnly: false,
+        roll: { ...roll("r-self", "self-only", IDS.otherSession), initiatorSessionId: undefined } as never
+      }),
+      logRow(4, 21, {
+        kind: "roll",
+        text: "Borin attacks.",
+        gmOnly: false,
+        roll: { ...roll("r-public", "public", IDS.heroSession), initiatorSessionId: undefined } as never
+      })
     ],
-    journal: [{ seq: 1, commandId: "c-1", type: "actor.set-visibility", actorId: IDS.ambusher, principal: `gm:${IDS.otherSession}`, payload: { secret: "the ambusher's plan" }, revision: 15, at: "2026-07-01T20:03:00.000Z" }],
-    finalState: revealed, postEncounterState: revealed,
-    rolls: [roll("r-self", "self-only", IDS.otherSession), roll("r-public", "public", IDS.heroSession), roll("r-gm", "gm-only", IDS.otherSession)],
+    journal: [
+      {
+        seq: 1,
+        commandId: "c-1",
+        type: "actor.set-visibility",
+        actorId: IDS.ambusher,
+        principal: `gm:${IDS.otherSession}`,
+        payload: { secret: "the ambusher's plan" },
+        revision: 15,
+        at: "2026-07-01T20:03:00.000Z"
+      }
+    ],
+    finalState: revealed,
+    postEncounterState: revealed,
+    rolls: [
+      roll("r-self", "self-only", IDS.otherSession),
+      roll("r-public", "public", IDS.heroSession),
+      roll("r-gm", "gm-only", IDS.otherSession)
+    ],
     definitions: [],
     attribution: null
   } as unknown as EncounterArchiveDocument;
@@ -83,7 +172,11 @@ describe("the player's replay is a projection, not a filtered archive", () => {
   it("bands a monster's hit points and keeps a party member's exact, exactly as live play does", () => {
     const replay = projectPlayerReplay(3, document());
     const revealed = replay.turns[1];
-    expect(revealed.actors.find((actor) => actor.name === "Borin")!.hp).toMatchObject({ kind: "exact", current: 21, maximum: 30 });
+    expect(revealed.actors.find((actor) => actor.name === "Borin")!.hp).toMatchObject({
+      kind: "exact",
+      current: 21,
+      maximum: 30
+    });
     expect(revealed.actors.find((actor) => actor.name === "Shadow Stalker")!.hp).toMatchObject({ kind: "band" });
   });
 
@@ -119,7 +212,12 @@ describe("the player's replay is a projection, not a filtered archive", () => {
   });
 
   it("reads an old or empty recording defensively rather than throwing", () => {
-    const bare = { archiveSchemaVersion: 1, endedAt: "2026-07-01T21:00:00.000Z", turns: [], log: [] } as unknown as EncounterArchiveDocument;
+    const bare = {
+      archiveSchemaVersion: 1,
+      endedAt: "2026-07-01T21:00:00.000Z",
+      turns: [],
+      log: []
+    } as unknown as EncounterArchiveDocument;
     const replay = projectPlayerReplay(1, bare);
     expect(replay).toMatchObject({ id: 1, turnCount: 0, turns: [], rolls: [], startedAt: null, attribution: null });
   });
@@ -131,8 +229,21 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     const prepared = "20000000-0000-5000-8000-0000000000ff";
     const source = document();
     const staged = structuredClone(source.turns[0].state);
-    staged.combat = { ...staged.combat, scenes: [{ id: "40000000-0000-4000-8000-0000000000f1", name: "Next week", mapAssetId: prepared, combat: staged.combat.scenes[0]?.combat ?? GameStateSchema.parse({ schemaVersion: 1 }).combat }] as never };
-    const withPrepared = { ...source, turns: [{ ...source.turns[0], state: staged }, source.turns[1]] } as unknown as EncounterArchiveDocument;
+    staged.combat = {
+      ...staged.combat,
+      scenes: [
+        {
+          id: "40000000-0000-4000-8000-0000000000f1",
+          name: "Next week",
+          mapAssetId: prepared,
+          combat: staged.combat.scenes[0]?.combat ?? GameStateSchema.parse({ schemaVersion: 1 }).combat
+        }
+      ] as never
+    };
+    const withPrepared = {
+      ...source,
+      turns: [{ ...source.turns[0], state: staged }, source.turns[1]]
+    } as unknown as EncounterArchiveDocument;
 
     const maps = playerReplayMapAssetIds(3, withPrepared);
     expect([...maps]).toEqual([IDS.map]);

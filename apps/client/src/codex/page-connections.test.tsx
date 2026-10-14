@@ -5,8 +5,9 @@ import userEvent from "@testing-library/user-event";
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
 vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) =>
+  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
     <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+  )
 }));
 
 const listPages = vi.fn();
@@ -44,7 +45,12 @@ vi.mock("./api", async (importOriginal) => {
       search: (...a: unknown[]) => search(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forMarker: (...a: unknown[]) => forMarker(...a)
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -69,7 +75,16 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker, CodexPage, CodexPageSummary, PlayerCodexPageSummary } from "./api";
+import type {
+  CodexCalendar,
+  CodexChronicleRecord,
+  CodexJournalEntry,
+  CodexMap,
+  CodexMarker,
+  CodexPage,
+  CodexPageSummary,
+  PlayerCodexPageSummary
+} from "./api";
 
 /**
  * A page's return edges (journal entries, atlas pins, graph node) and the graph's framing. Each jump is
@@ -77,10 +92,25 @@ import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, 
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
-const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"] = "location"): CodexPageSummary => ({
-  id, title, entityType, fields: {}, folder: null, tags: [], revealedToPlayers: false,
-  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+const summary = (
+  id: string,
+  title: string,
+  entityType: CodexPageSummary["entityType"] = "location"
+): CodexPageSummary => ({
+  id,
+  title,
+  entityType,
+  fields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const full = (row: CodexPageSummary): CodexPage => ({ ...row, playerBody: "", gmBody: "", gmFields: {} });
 
@@ -88,26 +118,93 @@ const PAGE = summary("p1", "Barovia");
 const OTHER = summary("p2", "Strahd", "character");
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1", playerText: "The mists closed behind them.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null, payload: null,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "j1",
+  playerText: "The mists closed behind them.",
+  gmText: null,
+  revealedToPlayers: false,
+  kind: "note",
+  attachMarkerId: null,
+  attachPageId: "p1",
+  sourceEncounterId: null,
+  payload: null,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 /** The Journal reads the chronicle record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "The mists closed behind them.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: "p1", attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "The mists closed behind them.",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: "p1",
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 /** The atlas defaults to `maps[0]`, so the pin's map is second and a dropped map half fails. */
-const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MAP_OTHER: CodexMap = {
+  id: "m0",
+  assetId: "a0",
+  name: "Castle Ravenloft",
+  kind: "battlemap",
+  parentMapId: null,
+  revealedToPlayers: false,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia valley", kind: "regional" };
-const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: ["p1"], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MARKER: CodexMarker = {
+  id: "k1",
+  mapId: "m1",
+  x: 0.4,
+  y: 0.6,
+  iconId: "pin",
+  iconColor: "#FF2E9A",
+  label: "Old Svalich Road",
+  revealedToPlayers: false,
+  pageIds: ["p1"],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
 
-const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () =>
+  (goTo("/codex/pages"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 
 const gmDefaults = () => {
   listPages.mockResolvedValue([PAGE, OTHER]);
@@ -157,7 +254,10 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
   it("CI-3: a journal row lands on the Journal WITH that entry focused", async () => {
     // The page's entry is second, so focusing the first entry fails.
     forPage.mockResolvedValue([ENTRY({ id: "j9", playerText: "The mists closed behind them." })]);
-    chronicle.mockResolvedValue([RECORD({ id: "j0", text: "They left Daggerford.", attachPageId: null }), RECORD({ id: "j9" })]);
+    chronicle.mockResolvedValue([
+      RECORD({ id: "j0", text: "They left Daggerford.", attachPageId: null }),
+      RECORD({ id: "j9" })
+    ]);
     const user = userEvent.setup();
     renderWorkspace();
     const connections = await openPage(user);
@@ -188,7 +288,18 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
   });
 
   it("CI-5: Show in graph lands on the Graph WITH this entity's node focused", async () => {
-    listRelationships.mockResolvedValue([{ id: null, fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention", layer: "player", createdAt: null }]);
+    listRelationships.mockResolvedValue([
+      {
+        id: null,
+        fromKind: "page",
+        fromId: "p1",
+        toPageId: "p2",
+        label: null,
+        origin: "mention",
+        layer: "player",
+        createdAt: null
+      }
+    ]);
     const user = userEvent.setup();
     renderWorkspace();
     const connections = await openPage(user);
@@ -216,8 +327,10 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
 function nodePoint(node: Element): { x: number; y: number } {
   const transform = node.getAttribute("transform") ?? "";
   const match = /translate\(\s*(\S+)\s+(\S+?)\s*\)/.exec(transform);
-  const x = Number(match?.[1]), y = Number(match?.[2]);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`node has no usable translate transform: "${transform}"`);
+  const x = Number(match?.[1]),
+    y = Number(match?.[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y))
+    throw new Error(`node has no usable translate transform: "${transform}"`);
   return { x, y };
 }
 /** `RelationshipGraph`'s viewBox, which every node must be inside. */
@@ -233,8 +346,26 @@ describe("The Graph tells the truth (CI-8)", () => {
 
   it("draws every connection, whatever its origin — one feed, one count", async () => {
     listRelationships.mockResolvedValue([
-      { id: "c1", fromKind: "page", fromId: "p1", toPageId: "p2", label: "ally of", origin: "declared", layer: "player", createdAt: "2026-07-28T00:00:00.000Z" },
-      { id: null, fromKind: "page", fromId: "p2", toPageId: "p1", label: null, origin: "mention", layer: "player", createdAt: null }
+      {
+        id: "c1",
+        fromKind: "page",
+        fromId: "p1",
+        toPageId: "p2",
+        label: "ally of",
+        origin: "declared",
+        layer: "player",
+        createdAt: "2026-07-28T00:00:00.000Z"
+      },
+      {
+        id: null,
+        fromKind: "page",
+        fromId: "p2",
+        toPageId: "p1",
+        label: null,
+        origin: "mention",
+        layer: "player",
+        createdAt: null
+      }
     ]);
     const user = userEvent.setup();
     renderWorkspace();
@@ -247,8 +378,26 @@ describe("The Graph tells the truth (CI-8)", () => {
 
   it("D8: ONE edge style — origin is an attribute on the label, never a second render", async () => {
     listRelationships.mockResolvedValue([
-      { id: "c1", fromKind: "page", fromId: "p1", toPageId: "p2", label: "ally of", origin: "declared", layer: "player", createdAt: "2026-07-28T00:00:00.000Z" },
-      { id: null, fromKind: "page", fromId: "p2", toPageId: "p1", label: null, origin: "mention", layer: "player", createdAt: null }
+      {
+        id: "c1",
+        fromKind: "page",
+        fromId: "p1",
+        toPageId: "p2",
+        label: "ally of",
+        origin: "declared",
+        layer: "player",
+        createdAt: "2026-07-28T00:00:00.000Z"
+      },
+      {
+        id: null,
+        fromKind: "page",
+        fromId: "p2",
+        toPageId: "p1",
+        label: null,
+        origin: "mention",
+        layer: "player",
+        createdAt: null
+      }
     ]);
     const user = userEvent.setup();
     renderWorkspace();
@@ -270,7 +419,9 @@ describe("The Graph tells the truth (CI-8)", () => {
   it("frames every node it draws — an orphan is inside the fitted view, not off in the margins", async () => {
     // `p3` is unconnected; it must still be inside the frame.
     listPages.mockResolvedValue([PAGE, OTHER, summary("p3", "Vallaki")]);
-    listRelationships.mockResolvedValue([{ id: "r1", fromPageId: "p1", toPageId: "p2", type: "ally", createdAt: "2026-07-28T00:00:00.000Z" }]);
+    listRelationships.mockResolvedValue([
+      { id: "r1", fromPageId: "p1", toPageId: "p2", type: "ally", createdAt: "2026-07-28T00:00:00.000Z" }
+    ]);
     const user = userEvent.setup();
     renderWorkspace();
     await openGraph(user);
@@ -289,8 +440,24 @@ describe("The Graph tells the truth (CI-8)", () => {
 
 describe("The player Graph reads the PLAYER links feed (CI-8, viewer safety)", () => {
   const PLAYER_PAGES: PlayerCodexPageSummary[] = [
-    { id: "p1", title: "Barovia", entityType: "location", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-28T00:00:00.000Z" },
-    { id: "p2", title: "Strahd", entityType: "character", folder: null, tags: [], bannerAssetId: null, updatedAt: "2026-07-28T00:00:00.000Z" }
+    {
+      id: "p1",
+      title: "Barovia",
+      entityType: "location",
+      folder: null,
+      tags: [],
+      bannerAssetId: null,
+      updatedAt: "2026-07-28T00:00:00.000Z"
+    },
+    {
+      id: "p2",
+      title: "Strahd",
+      entityType: "character",
+      folder: null,
+      tags: [],
+      bannerAssetId: null,
+      updatedAt: "2026-07-28T00:00:00.000Z"
+    }
   ];
 
   beforeEach(() => {
@@ -301,16 +468,40 @@ describe("The player Graph reads the PLAYER links feed (CI-8, viewer safety)", (
     playerChronicle.mockResolvedValue([]);
     playerListLinks.mockResolvedValue(null);
     // The player feed has one edge; the larger GM feed would add one if the player surface read it.
-    playerListRelationships.mockResolvedValue([{ fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention" }]);
+    playerListRelationships.mockResolvedValue([
+      { fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention" }
+    ]);
     listRelationships.mockResolvedValue([
-      { id: null, fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention", layer: "player", createdAt: null },
-      { id: null, fromKind: "page", fromId: "p2", toPageId: "p1", label: null, origin: "mention", layer: "player", createdAt: null }
+      {
+        id: null,
+        fromKind: "page",
+        fromId: "p1",
+        toPageId: "p2",
+        label: null,
+        origin: "mention",
+        layer: "player",
+        createdAt: null
+      },
+      {
+        id: null,
+        fromKind: "page",
+        fromId: "p2",
+        toPageId: "p1",
+        label: null,
+        origin: "mention",
+        layer: "player",
+        createdAt: null
+      }
     ]);
   });
 
   it("draws the player's links, and never asks the GM feed", async () => {
     const user = userEvent.setup();
-    (goTo("/codex"), render)(<ToastProvider><PlayerCodex token="player" /></ToastProvider>);
+    (goTo("/codex"), render)(
+      <ToastProvider>
+        <PlayerCodex token="player" />
+      </ToastProvider>
+    );
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Graph" }));
 

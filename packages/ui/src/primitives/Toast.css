@@ -39,14 +39,52 @@
   /* A lift as a drop-shadow filter, since box-shadow can't follow the cut. */
   filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--void) 55%, transparent));
 }
-.nh-toast--success { --nh-rule: var(--success); }
-.nh-toast--error { --nh-rule: var(--danger); }
-.nh-toast--info { --nh-rule: var(--info); }
-.nh-toast-icon { flex: none; display: grid; place-items: center; font-size: 1.05rem; line-height: 1; }
-.nh-toast--success .nh-toast-icon { color: var(--success); }
-.nh-toast--error .nh-toast-icon { color: var(--danger-hi); }
-.nh-toast--info .nh-toast-icon { color: var(--info); }
-.nh-toast-message { flex: 1; font-size: var(--fs-sm); line-height: 1.3; }
+.nh-toast--success {
+  --nh-rule: var(--success);
+}
+.nh-toast--error {
+  --nh-rule: var(--danger);
+}
+.nh-toast--info {
+  --nh-rule: var(--info);
+}
+.nh-toast-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.nh-toast--success .nh-toast-icon {
+  color: var(--success);
+}
+.nh-toast--error .nh-toast-icon {
+  color: var(--danger-hi);
+}
+.nh-toast--info .nh-toast-icon {
+  color: var(--info);
+}
+.nh-toast-message {
+  flex: 1;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
 /* A quiet ✕; `.tap-target` lifts the hit area to 44px without growing the toast. */
-.nh-toast-close { flex: none; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; background: transparent; color: var(--text-muted); line-height: 1; cursor: pointer; transition: color var(--dur-hover); }
-.nh-toast-close:hover, .nh-toast-close:active { color: var(--text); }
+.nh-toast-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--dur-hover);
+}
+.nh-toast-close:hover,
+.nh-toast-close:active {
+  color: var(--text);
+}

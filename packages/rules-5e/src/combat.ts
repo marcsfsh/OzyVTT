@@ -30,11 +30,19 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
   const vulnerabilities = new Set(defenses.vulnerabilities.map(normalizeType));
   return parts.map((part) => {
     const type = normalizeType(part.type);
-    if (immunities.has(type)) return { type: part.type, amount: part.amount, adjusted: 0, adjustment: "immunity" as const };
+    if (immunities.has(type))
+      return { type: part.type, amount: part.amount, adjusted: 0, adjustment: "immunity" as const };
     const resistant = resistances.has(type) || defenses.resistAll === true;
     const vulnerable = vulnerabilities.has(type);
-    if (resistant && !vulnerable) return { type: part.type, amount: part.amount, adjusted: Math.floor(part.amount / 2), adjustment: "resistance" as const };
-    if (vulnerable && !resistant) return { type: part.type, amount: part.amount, adjusted: part.amount * 2, adjustment: "vulnerability" as const };
+    if (resistant && !vulnerable)
+      return {
+        type: part.type,
+        amount: part.amount,
+        adjusted: Math.floor(part.amount / 2),
+        adjustment: "resistance" as const
+      };
+    if (vulnerable && !resistant)
+      return { type: part.type, amount: part.amount, adjusted: part.amount * 2, adjustment: "vulnerability" as const };
     return { type: part.type, amount: part.amount, adjusted: part.amount, adjustment: null };
   });
 }
@@ -55,7 +63,8 @@ export function rescaleDamageParts(parts: readonly DamagePart[], total: number):
   const scaled = parts.map((part) => ({ type: part.type, amount: Math.floor((part.amount * target) / rolled) }));
   const remainder = target - scaled.reduce((sum, part) => sum + part.amount, 0);
   let largest = 0;
-  for (let index = 1; index < parts.length; index += 1) if (parts[index].amount > parts[largest].amount) largest = index;
+  for (let index = 1; index < parts.length; index += 1)
+    if (parts[index].amount > parts[largest].amount) largest = index;
   scaled[largest] = { type: scaled[largest].type, amount: scaled[largest].amount + remainder };
   return scaled;
 }
@@ -68,9 +77,23 @@ export type AggregatedRollMode = Readonly<{
 }>;
 
 /** 5e aggregation: any advantage + any disadvantage cancel to normal, regardless of how many sources each side has. */
-export function aggregateRollMode(advantage: readonly RollModeSource[], disadvantage: readonly RollModeSource[]): AggregatedRollMode {
-  const mode = advantage.length > 0 && disadvantage.length > 0 ? "normal" : advantage.length > 0 ? "advantage" : disadvantage.length > 0 ? "disadvantage" : "normal";
-  return { mode, advantage: advantage.map((entry) => entry.label), disadvantage: disadvantage.map((entry) => entry.label) };
+export function aggregateRollMode(
+  advantage: readonly RollModeSource[],
+  disadvantage: readonly RollModeSource[]
+): AggregatedRollMode {
+  const mode =
+    advantage.length > 0 && disadvantage.length > 0
+      ? "normal"
+      : advantage.length > 0
+        ? "advantage"
+        : disadvantage.length > 0
+          ? "disadvantage"
+          : "normal";
+  return {
+    mode,
+    advantage: advantage.map((entry) => entry.label),
+    disadvantage: disadvantage.map((entry) => entry.label)
+  };
 }
 
 export type DeathSaveState = Readonly<{ successes: number; failures: number; stable: boolean }>;
@@ -85,16 +108,32 @@ export type DeathSaveRoll = Readonly<{
 /** One death saving throw (SRD 5.2.1): 20 → regain 1 HP; 1 → two failures; 10+ → success (3 → stable); else failure (3 → dead). */
 export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): DeathSaveRoll {
   if (naturalRoll === 20) {
-    return { state: { successes: 0, failures: 0, stable: false }, outcome: "critical-success", regainsOneHitPoint: true, dead: false };
+    return {
+      state: { successes: 0, failures: 0, stable: false },
+      outcome: "critical-success",
+      regainsOneHitPoint: true,
+      dead: false
+    };
   }
   if (naturalRoll === 1) {
     const failures = Math.min(3, current.failures + 2);
-    return { state: { ...current, failures }, outcome: "critical-failure", regainsOneHitPoint: false, dead: failures >= 3 };
+    return {
+      state: { ...current, failures },
+      outcome: "critical-failure",
+      regainsOneHitPoint: false,
+      dead: failures >= 3
+    };
   }
   if (naturalRoll >= 10) {
     const successes = Math.min(3, current.successes + 1);
     // Becoming stable resets both counters (SRD 5.2.1).
-    if (successes >= 3) return { state: { successes: 0, failures: 0, stable: true }, outcome: "success", regainsOneHitPoint: false, dead: false };
+    if (successes >= 3)
+      return {
+        state: { successes: 0, failures: 0, stable: true },
+        outcome: "success",
+        regainsOneHitPoint: false,
+        dead: false
+      };
     return { state: { ...current, successes }, outcome: "success", regainsOneHitPoint: false, dead: false };
   }
   const failures = Math.min(3, current.failures + 1);
@@ -105,18 +144,34 @@ export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): 
  * Damage taken while already at 0 HP: one automatic failure, two on a critical hit; instant death
  * when the damage equals or exceeds the hit point maximum. Losing stability resumes dying.
  */
-export function damageWhileDying(current: DeathSaveState, damage: number, critical: boolean, hpMaximum: number): Readonly<{ state: DeathSaveState; failuresAdded: number; dead: boolean }> {
+export function damageWhileDying(
+  current: DeathSaveState,
+  damage: number,
+  critical: boolean,
+  hpMaximum: number
+): Readonly<{ state: DeathSaveState; failuresAdded: number; dead: boolean }> {
   // A stable character's counters were reset; damage breaks stability and dying resumes from zero.
   const base = current.stable ? { successes: 0, failures: 0 } : current;
   if (damage <= 0) return { state: current, failuresAdded: 0, dead: current.failures >= 3 };
-  if (damage >= hpMaximum) return { state: { successes: base.successes, stable: false, failures: 3 }, failuresAdded: 3 - base.failures, dead: true };
+  if (damage >= hpMaximum)
+    return {
+      state: { successes: base.successes, stable: false, failures: 3 },
+      failuresAdded: 3 - base.failures,
+      dead: true
+    };
   const failuresAdded = critical ? 2 : 1;
   const failures = Math.min(3, base.failures + failuresAdded);
   return { state: { successes: base.successes, failures, stable: false }, failuresAdded, dead: failures >= 3 };
 }
 
 /** Damage that drops a creature to 0: instant death when the damage beyond 0 equals or exceeds the HP maximum. */
-export function droppedToZero(overflowDamage: number, hpMaximum: number): Readonly<{ instantDeath: boolean; state: DeathSaveState }> {
+export function droppedToZero(
+  overflowDamage: number,
+  hpMaximum: number
+): Readonly<{ instantDeath: boolean; state: DeathSaveState }> {
   const instantDeath = overflowDamage >= hpMaximum;
-  return { instantDeath, state: instantDeath ? { successes: 0, failures: 3, stable: false } : { successes: 0, failures: 0, stable: false } };
+  return {
+    instantDeath,
+    state: instantDeath ? { successes: 0, failures: 3, stable: false } : { successes: 0, failures: 0, stable: false }
+  };
 }

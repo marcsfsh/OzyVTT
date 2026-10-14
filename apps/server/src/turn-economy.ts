@@ -20,7 +20,8 @@ function requireActiveCombat(state: GameState) {
  *  "attack 2 of 2". */
 export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", used: boolean, scope: ActorScope) {
   requireActiveCombat(state);
-  if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId)) throw new CommandRejectedError("It isn't your character's turn.");
+  if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId))
+    throw new CommandRejectedError("It isn't your character's turn.");
   const clearInstance = slot === "action" && !used;
   state.combat = {
     ...state.combat,
@@ -35,8 +36,10 @@ export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", u
 /** Reactions are off-turn resources: any combatant, any time; a player only their own character. */
 export function setReactionUsed(state: GameState, actorId: string, used: boolean, scope: ActorScope) {
   requireActiveCombat(state);
-  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
-  if (scope.role === "player" && actorId !== claimedActorId(state, scope.sessionId)) throw new CommandRejectedError("You can only track your own character.");
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId))
+    throw new CommandRejectedError("That combatant is not in this encounter.");
+  if (scope.role === "player" && actorId !== claimedActorId(state, scope.sessionId))
+    throw new CommandRejectedError("You can only track your own character.");
   const remaining = state.combat.reactionsUsed.filter((id) => id !== actorId);
   state.combat = { ...state.combat, reactionsUsed: used ? [...remaining, actorId] : remaining };
 }
@@ -45,7 +48,8 @@ export function setReactionUsed(state: GameState, actorId: string, used: boolean
 export function setLegendaryUsed(state: GameState, actorId: string, spent: number, scope: ActorScope) {
   requireActiveCombat(state);
   if (scope.role === "player") throw new CommandRejectedError("Only the GM tracks legendary actions.");
-  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId))
+    throw new CommandRejectedError("That combatant is not in this encounter.");
   const { [actorId]: _cleared, ...rest } = state.combat.legendaryUsed;
   state.combat = { ...state.combat, legendaryUsed: spent === 0 ? rest : { ...rest, [actorId]: spent } };
 }
@@ -53,6 +57,7 @@ export function setLegendaryUsed(state: GameState, actorId: string, spent: numbe
 /** Player-facing End Turn: same advance as the GM's Next, gated to the claimed character's own turn. */
 export function endTurn(state: GameState, scope: ActorScope, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   requireActiveCombat(state);
-  if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId)) throw new CommandRejectedError("It isn't your character's turn.");
+  if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId))
+    throw new CommandRejectedError("It isn't your character's turn.");
   nextInitiativeTurn(state, events, deps);
 }

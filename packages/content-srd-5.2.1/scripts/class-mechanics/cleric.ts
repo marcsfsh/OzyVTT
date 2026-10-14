@@ -23,13 +23,16 @@ export const cleric: ClassMechanicsModule = {
      * Intervention's 2d4 Long Rest recharge is prose.
      */
     "divine-intervention": {
-      actions: [{
-        id: "divine-intervention",
-        name: "Divine Intervention",
-        activation: "action",
-        description: "As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. At level 20 you can choose Wish instead, and if you do you can't use Divine Intervention again until you finish 2d4 Long Rests.",
-        damage: []
-      }]
+      actions: [
+        {
+          id: "divine-intervention",
+          name: "Divine Intervention",
+          activation: "action",
+          description:
+            "As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. At level 20 you can choose Wish instead, and if you do you can't use Divine Intervention again until you finish 2d4 Long Rests.",
+          damage: []
+        }
+      ]
     },
 
     /**
@@ -51,7 +54,8 @@ export const cleric: ClassMechanicsModule = {
           {
             id: "improved-potent-spellcasting",
             name: "Improved Potent Spellcasting",
-            description: "When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier.",
+            description:
+              "When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier.",
             requires: { offer: "feature:blessed-strikes", id: "potent-spellcasting" }
           }
         ]

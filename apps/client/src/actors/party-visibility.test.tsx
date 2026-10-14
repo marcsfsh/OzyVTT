@@ -16,31 +16,33 @@ import { PartyStrip } from "./PartyStrip";
 /** Exact HP strings, chosen to be unmistakable in a substring sweep — no other number renders "83". */
 const HP = { mine: "41/44", ally: "37/83", other: "12/95", unclaimed: "26/26" } as const;
 
-const playerActor = (over: Partial<PlayerActor> & Pick<PlayerActor, "id" | "name">): PlayerActor => ({
-  kind: "player-character",
-  visibility: "public",
-  hp: { kind: "exact", current: 37, maximum: 83, temporary: 0 },
-  effects: [],
-  conditions: [],
-  claimStatus: "claimed",
-  presence: "online",
-  size: "medium",
-  sizeCells: 1,
-  ...over
-} as unknown as PlayerActor);
+const playerActor = (over: Partial<PlayerActor> & Pick<PlayerActor, "id" | "name">): PlayerActor =>
+  ({
+    kind: "player-character",
+    visibility: "public",
+    hp: { kind: "exact", current: 37, maximum: 83, temporary: 0 },
+    effects: [],
+    conditions: [],
+    claimStatus: "claimed",
+    presence: "online",
+    size: "medium",
+    sizeCells: 1,
+    ...over
+  }) as unknown as PlayerActor;
 
-const gmActor = (over: Partial<GmActor> & Pick<GmActor, "id" | "name">): GmActor => ({
-  kind: "player-character",
-  visibility: "public",
-  hp: { current: 37, maximum: 83, temporary: 0 },
-  effects: [],
-  conditions: [],
-  presence: "online",
-  size: "medium",
-  sizeCells: 1,
-  ownerSessionId: "session-1",
-  ...over
-} as unknown as GmActor);
+const gmActor = (over: Partial<GmActor> & Pick<GmActor, "id" | "name">): GmActor =>
+  ({
+    kind: "player-character",
+    visibility: "public",
+    hp: { current: 37, maximum: 83, temporary: 0 },
+    effects: [],
+    conditions: [],
+    presence: "online",
+    size: "medium",
+    sizeCells: 1,
+    ownerSessionId: "session-1",
+    ...over
+  }) as unknown as GmActor;
 
 /** A table of four: the player's own character, two other people's, and one nobody has claimed. */
 function playerView(partyVisibility: PartyVisibility): PlayerView {
@@ -48,12 +50,28 @@ function playerView(partyVisibility: PartyVisibility): PlayerView {
     revision: 7,
     partyVisibility,
     actors: [
-      playerActor({ id: "mine", name: "Mira Thorne", claimStatus: "mine", hp: { kind: "exact", current: 41, maximum: 44, temporary: 0 } }),
+      playerActor({
+        id: "mine",
+        name: "Mira Thorne",
+        claimStatus: "mine",
+        hp: { kind: "exact", current: 41, maximum: 44, temporary: 0 }
+      }),
       // `classLine` is the field the `name-and-class` tier carries.
       playerActor({ id: "ally", name: "Borin Stoneguard", classLine: "Fighter 7" }),
-      playerActor({ id: "other", name: "Lyra Emberwise", classLine: "Wizard 5", hp: { kind: "exact", current: 12, maximum: 95, temporary: 0 } }),
+      playerActor({
+        id: "other",
+        name: "Lyra Emberwise",
+        classLine: "Wizard 5",
+        hp: { kind: "exact", current: 12, maximum: 95, temporary: 0 }
+      }),
       // Unclaimed characters still appear on the party surface, so `off` hides them too.
-      playerActor({ id: "free", name: "Sable Vex", claimStatus: "available", presence: null, hp: { kind: "exact", current: 26, maximum: 26, temporary: 0 } })
+      playerActor({
+        id: "free",
+        name: "Sable Vex",
+        claimStatus: "available",
+        presence: null,
+        hp: { kind: "exact", current: 26, maximum: 26, temporary: 0 }
+      })
     ]
   } as unknown as PlayerView;
 }
@@ -85,7 +103,10 @@ const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet"
 describe("party visibility — the player's party strip", () => {
   it("renders NO party surface at `off`", () => {
     const { container } = render(<PartyStrip role="player" state={playerView("off")} />);
-    expect(container.querySelector(".party-strip"), "`off` is: no identity card, no sheet to open, no party list").toBeNull();
+    expect(
+      container.querySelector(".party-strip"),
+      "`off` is: no identity card, no sheet to open, no party list"
+    ).toBeNull();
     expect(container.textContent).toBe("");
   });
 
@@ -105,14 +126,16 @@ describe("party visibility — the player's party strip", () => {
     const swept = surfaceText(container);
 
     // Who: every character on the table, including the unclaimed one.
-    for (const name of ["Mira Thorne", "Borin Stoneguard", "Lyra Emberwise", "Sable Vex"]) expect(swept).toContain(name);
+    for (const name of ["Mira Thorne", "Borin Stoneguard", "Lyra Emberwise", "Sable Vex"])
+      expect(swept).toContain(name);
     // What they play: the tier's own field, rendered rather than inferred.
     expect(swept).toContain("Fighter 7");
     expect(swept).toContain("Wizard 5");
 
     // Only your own exact HP may show at this tier.
     expect(swept).toContain(HP.mine);
-    for (const hp of [HP.ally, HP.other, HP.unclaimed]) expect(swept, `${hp} is another character's exact HP`).not.toContain(hp);
+    for (const hp of [HP.ally, HP.other, HP.unclaimed])
+      expect(swept, `${hp} is another character's exact HP`).not.toContain(hp);
     expect(container.querySelectorAll(".party-strip-hp")).toHaveLength(1);
   });
 
@@ -130,7 +153,9 @@ describe("party visibility — the player's party strip", () => {
     for (const tier of TIERS) {
       const { container, unmount } = render(<PartyStrip role="player" state={playerView(tier)} />);
       const buttons = [...container.querySelectorAll("button.party-strip-entry")];
-      expect(buttons.map((b) => b.getAttribute("aria-label")).join(), `tier ${tier}`).toMatch(tier === "off" ? /^$/ : /Mira Thorne/);
+      expect(buttons.map((b) => b.getAttribute("aria-label")).join(), `tier ${tier}`).toMatch(
+        tier === "off" ? /^$/ : /Mira Thorne/
+      );
       expect(buttons, `tier ${tier}: only the player's own entry is a button`).toHaveLength(tier === "off" ? 0 : 1);
       unmount();
     }
@@ -150,7 +175,9 @@ describe("party visibility — the GM's own strip is never gated", () => {
 
   it("still offers the empty state's way out", () => {
     const onOpenRoster = vi.fn();
-    const { container } = render(<PartyStrip role="gm" state={{ revision: 1, actors: [] } as unknown as GmView} onOpenRoster={onOpenRoster} />);
+    const { container } = render(
+      <PartyStrip role="gm" state={{ revision: 1, actors: [] } as unknown as GmView} onOpenRoster={onOpenRoster} />
+    );
     expect(container.querySelector(".party-strip-empty")).not.toBeNull();
   });
 });

@@ -17,14 +17,22 @@
 }
 /* The client's styles.css styles bare `button span` (display, colour, size, margin-top) at (0,0,2), which adds
    stray height to every row of this button; restated at (0,1,1) to win. */
-.nh-choice span { margin-top: 0; }
+.nh-choice span {
+  margin-top: 0;
+}
 /* Hover owns the surface, not the edge of a chosen card: `:not()` takes its argument's specificity, so a hover
    border rule would out-specify `.is-selected` and turn its cyan edge grey. Excluded rather than out-specified. */
-.nh-choice:hover:not(:disabled) { background: var(--surface-2); }
-.nh-choice:hover:not(:disabled):not(.is-selected) { border-color: var(--line-strong); }
+.nh-choice:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.nh-choice:hover:not(:disabled):not(.is-selected) {
+  border-color: var(--line-strong);
+}
 /* The client's bare `button:hover:not(:disabled)` border rule at (0,2,1) beats `.is-selected` (0,2,0); restate the
    chosen edge at (0,3,0). */
-.nh-choice.is-selected:hover { border-color: var(--cyan); }
+.nh-choice.is-selected:hover {
+  border-color: var(--cyan);
+}
 
 /* ---- The reference control beside a card (ChoiceCard's `action`) ----
    A flex sibling, never on top of the card, whose whole box is its tap area. 44px square, stated directly
@@ -51,13 +59,23 @@
   padding-block: var(--space-1);
   row-gap: 0;
 }
-.nh-choice-wrap > .nh-choice-info { border: 0; height: auto; }
+.nh-choice-wrap > .nh-choice-info {
+  border: 0;
+  height: auto;
+}
 /* Pair states live on the frame. `:not(.is-selected)` because `:has()` takes its argument's specificity and the
    hover rule would otherwise beat the chosen edge. */
-.nh-choice-wrap:has(> .nh-choice:hover:not(.is-selected):not(:disabled)) { border-color: var(--line-strong); }
-.nh-choice-wrap:has(> .nh-choice.is-selected) { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.nh-choice-wrap:has(> .nh-choice:hover:not(.is-selected):not(:disabled)) {
+  border-color: var(--line-strong);
+}
+.nh-choice-wrap:has(> .nh-choice.is-selected) {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
 /* The wrapper owns the chosen edge and glow; `:not(:focus-visible)` keeps the card's keyboard ring. */
-.nh-choice-wrap > .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
+.nh-choice-wrap > .nh-choice.is-selected:not(:focus-visible) {
+  box-shadow: none;
+}
 .nh-choice-info {
   flex: none;
   display: grid;
@@ -78,10 +96,25 @@
   line-height: 1;
   cursor: pointer;
 }
-.nh-choice-info:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--text); }
+.nh-choice-info:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
 
-.nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
+.nh-choice-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.nh-choice-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  color: var(--text-dim);
+}
 /* Wraps to at most three lines (same as `.nh-choice-desc`), because a starting-kit title ends with its price
    and an ellipsis would hide it on a phone. */
 .nh-choice-title {
@@ -95,7 +128,9 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.nh-choice-badge { flex: none; }
+.nh-choice-badge {
+  flex: none;
+}
 
 .nh-choice-desc {
   color: var(--text-dim);
@@ -108,11 +143,25 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.nh-choice-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+.nh-choice-meta {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
 /* Locked is caution, not danger (rose-red means damage). Full strength: the reason is the most important thing
    on a disabled card. */
-.nh-choice-locked { display: flex; align-items: center; gap: var(--space-2); color: var(--caution-hi); font-size: var(--fs-sm); }
-.nh-choice-locked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+.nh-choice-locked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
+.nh-choice-locked-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
 
 /* ---- The one chosen treatment: cyan edge + selection glow + a check ---- */
 .nh-choice-check {
@@ -129,23 +178,36 @@
   font-size: 0.85rem;
   opacity: 0;
   transform: scale(0.8);
-  transition: opacity var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle);
+  transition:
+    opacity var(--dur-hover) var(--ease-settle),
+    transform var(--dur-hover) var(--ease-settle);
 }
 /* Edge, glow and check, but no fill: hover already owns --surface-2, so a fill would make "pointer here" and
    "my answer" the same colour. */
 .nh-choice.is-selected {
   border-color: var(--cyan);
   box-shadow: var(--glow-cyan);
-  transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover);
+  transition:
+    box-shadow var(--dur-hover) var(--ease-settle),
+    border-color var(--dur-hover);
 }
-.nh-choice.is-selected .nh-choice-check { opacity: 1; transform: none; }
-.nh-choice.is-selected .nh-choice-title { color: var(--text); }
+.nh-choice.is-selected .nh-choice-check {
+  opacity: 1;
+  transform: none;
+}
+.nh-choice.is-selected .nh-choice-title {
+  color: var(--text);
+}
 
 /* Choose-N grids keep the chosen edge and check but drop the glow (one glowing element per region).
    `:not(:focus-visible)` keeps the keyboard ring, which this selector would otherwise out-specify. */
-.nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
+.nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) {
+  box-shadow: none;
+}
 /* The same glow budget for framed pairs, where the glow lives on the wrapper. */
-.nh-choicegrid-items[role="group"] .nh-choice-wrap:has(> .nh-choice.is-selected) { box-shadow: none; }
+.nh-choicegrid-items[role="group"] .nh-choice-wrap:has(> .nh-choice.is-selected) {
+  box-shadow: none;
+}
 
 /* Disabled dims per property, never with group `opacity` (a child can't opt out of it, and the locked reason
    would fail contrast). Dim the frame, title and icon; keep the reason at full strength. */
@@ -154,17 +216,32 @@
   border-color: color-mix(in srgb, var(--line) 60%, transparent);
   background: color-mix(in srgb, var(--surface-1) 70%, var(--bg));
 }
-.nh-choice:disabled .nh-choice-title { color: var(--text-dim); }
+.nh-choice:disabled .nh-choice-title {
+  color: var(--text-dim);
+}
 /* desc/meta keep their resting colours: dimming them would drop below AA. */
-.nh-choice:disabled .nh-choice-icon { color: var(--text-muted); }
-.nh-choice:disabled .nh-choice-badge { opacity: 0.75; }
+.nh-choice:disabled .nh-choice-icon {
+  color: var(--text-muted);
+}
+.nh-choice:disabled .nh-choice-badge {
+  opacity: 0.75;
+}
 /* The dimmed frame for a pair. Declared after the chosen rule so "locked" wins the (0,3,0) tie. The reference
    control stays live. */
-.nh-choice-wrap:has(> .nh-choice:disabled) { border-color: color-mix(in srgb, var(--line) 60%, transparent); }
+.nh-choice-wrap:has(> .nh-choice:disabled) {
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+}
 
 /* The selection glow would out-specify the global :focus-visible ring; restate the ring so focus always shows. */
-.nh-choice:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
+.nh-choice:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .nh-choice-check { transition: none; transform: none; }
+  .nh-choice-check {
+    transition: none;
+    transform: none;
+  }
 }

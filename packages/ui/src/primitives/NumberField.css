@@ -20,4 +20,6 @@
 }
 
 /* Room for the suffix ("lb", "gp", "ft") so a long value never slides under it. */
-.nh-numberfield--unit .nh-numberfield-input { padding-right: 3.25rem; }
+.nh-numberfield--unit .nh-numberfield-input {
+  padding-right: 3.25rem;
+}

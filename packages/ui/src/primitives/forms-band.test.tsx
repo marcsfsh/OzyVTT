@@ -14,7 +14,9 @@ import { Switch } from "./Switch";
 const css = (file: string): string => readFileSync(`${process.cwd()}/src/primitives/${file}`, "utf8");
 /** The declaration block for one selector, with comments and newlines flattened. */
 function ruleFor(source: string, selector: string): string {
-  const match = source.replace(/\/\*[\s\S]*?\*\//g, "").match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`));
+  const match = source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`));
   expect(match, `no rule for ${selector}`).not.toBeNull();
   return match![1].replace(/\s+/g, " ").trim();
 }
@@ -48,7 +50,9 @@ describe("the label band is one named token, derived from the field metrics it h
     // padding back. The two rules must change together.
     const padding = ruleFor(switchCss, ".nh-switch--labeled").match(/padding:\s*var\((--[\w-]+)\)/);
     expect(padding, ".nh-switch--labeled no longer states its padding as a single token").not.toBeNull();
-    expect(ruleFor(switchCss, ".nh-switch--banded.nh-switch--labeled")).toBe(`margin-top: calc(var(--nh-label-band) - var(${padding![1]}));`);
+    expect(ruleFor(switchCss, ".nh-switch--banded.nh-switch--labeled")).toBe(
+      `margin-top: calc(var(--nh-label-band) - var(${padding![1]}));`
+    );
   });
 
   it("is matched — not spent — by the labeled stepper, which stacks its own real label into the band", () => {
@@ -57,7 +61,9 @@ describe("the label band is one named token, derived from the field metrics it h
     expect(ruleFor(stepper, ".nh-stepper--labeled")).toContain("display: grid");
     expect(ruleFor(stepper, ".nh-stepper--labeled")).toContain("gap: var(--space-2)");
     // Same font shorthand as `.nh-field-label`.
-    expect(ruleFor(stepper, ".nh-stepper-label")).toContain(ruleFor(css("forms.css"), ".nh-field-label").match(/font:[^;]+;/)![0]);
+    expect(ruleFor(stepper, ".nh-stepper-label")).toContain(
+      ruleFor(css("forms.css"), ".nh-field-label").match(/font:[^;]+;/)![0]
+    );
   });
 });
 
@@ -96,7 +102,9 @@ describe("Stepper (D23a)", () => {
   });
 
   it("renders the value through `format`, and stays quiet unless asked to announce", () => {
-    const view = render(<Stepper value={0} onChange={() => {}} label="Modifier" format={(v) => (v === 0 ? "±0" : `+${v}`)} />);
+    const view = render(
+      <Stepper value={0} onChange={() => {}} label="Modifier" format={(v) => (v === 0 ? "±0" : `+${v}`)} />
+    );
     const value = view.container.querySelector(".nh-stepper-value")!;
     expect(value.textContent).toBe("±0");
     // Opt-in, so several steppers on one screen don't compete as live regions.
@@ -135,7 +143,9 @@ describe("Switch (D23b)", () => {
   it("names itself from its label, and takes an explicit aria-label when the label is the state", () => {
     const view = render(<Switch checked onChange={() => {}} label="Auto-stage" />);
     expect(screen.getByRole("switch")).toHaveAccessibleName("Auto-stage");
-    view.rerender(<Switch checked onChange={() => {}} label="Shown to players" aria-label="Show this page to players" />);
+    view.rerender(
+      <Switch checked onChange={() => {}} label="Shown to players" aria-label="Show this page to players" />
+    );
     // A constant accessible name, not one that changes with the state label.
     expect(screen.getByRole("switch")).toHaveAccessibleName("Show this page to players");
   });

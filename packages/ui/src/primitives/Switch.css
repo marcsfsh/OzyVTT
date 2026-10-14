@@ -9,14 +9,23 @@
   font: 600 var(--fs-sm) / 1.3 var(--font-body);
   cursor: pointer;
 }
-.nh-switch--labeled { padding: var(--space-1) 0; }
+.nh-switch--labeled {
+  padding: var(--space-1) 0;
+}
 /* In a form grid the switch reserves the label band its Field neighbours use, so the track lines up with their
    input wells. Margin, not padding, so the 44px hit area moves with the track. */
-.nh-switch--banded { margin-top: var(--nh-label-band); }
+.nh-switch--banded {
+  margin-top: var(--nh-label-band);
+}
 /* The labeled form already pads `--space-1` above the track, so give that back. */
-.nh-switch--banded.nh-switch--labeled { margin-top: calc(var(--nh-label-band) - var(--space-1)); }
+.nh-switch--banded.nh-switch--labeled {
+  margin-top: calc(var(--nh-label-band) - var(--space-1));
+}
 /* Guard the internal spans from an app's global `button span` rules, which would push the thumb off centre. */
-.nh-switch span { margin: 0; font: inherit; }
+.nh-switch span {
+  margin: 0;
+  font: inherit;
+}
 /* Sibling to SegmentedControl, not the same control: in dark both use the same magenta, so they differ by shape
    (Switch = pill track and round thumb; SegmentedControl = cut rectangle and tick). The track keeps
    `--radius-pill`; don't unify the shapes. */
@@ -28,26 +37,50 @@
   border-radius: var(--radius-pill);
   background: var(--surface-3);
   border: 1px solid var(--line-strong);
-  transition: background var(--dur-base) var(--ease-settle), border-color var(--dur-base);
+  transition:
+    background var(--dur-base) var(--ease-settle),
+    border-color var(--dur-base);
 }
 /* `:active` says what `:hover` says, so touch users get feedback too. */
 .nh-switch:hover:not(:disabled) .nh-switch-track,
-.nh-switch:active:not(:disabled) .nh-switch-track { border-color: var(--line-hover); }
-.nh-switch:active:not(:disabled) .nh-switch-thumb { background: var(--text); }
-.nh-switch--on:active:not(:disabled) .nh-switch-thumb { background: var(--text-on-neon); }
+.nh-switch:active:not(:disabled) .nh-switch-track {
+  border-color: var(--line-hover);
+}
+.nh-switch:active:not(:disabled) .nh-switch-thumb {
+  background: var(--text);
+}
+.nh-switch--on:active:not(:disabled) .nh-switch-thumb {
+  background: var(--text-on-neon);
+}
 .nh-switch-thumb {
   position: absolute;
   top: 50%;
   left: 2px;
-  width: .95rem;
-  height: .95rem;
+  width: 0.95rem;
+  height: 0.95rem;
   border-radius: 50%;
   background: var(--text-dim);
   transform: translate(0, -50%);
-  transition: transform var(--dur-base) var(--ease-settle), background var(--dur-base);
+  transition:
+    transform var(--dur-base) var(--ease-settle),
+    background var(--dur-base);
 }
-.nh-switch--on .nh-switch-track { background: var(--primary); border-color: transparent; box-shadow: var(--glow-magenta); }
-.nh-switch--on .nh-switch-thumb { transform: translate(.95rem, -50%); background: var(--text-on-neon); }
-.nh-switch:disabled { cursor: not-allowed; opacity: .55; }
-.nh-switch-label { color: var(--text-dim); }
-.nh-switch--on .nh-switch-label { color: var(--text); }
+.nh-switch--on .nh-switch-track {
+  background: var(--primary);
+  border-color: transparent;
+  box-shadow: var(--glow-magenta);
+}
+.nh-switch--on .nh-switch-thumb {
+  transform: translate(0.95rem, -50%);
+  background: var(--text-on-neon);
+}
+.nh-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.nh-switch-label {
+  color: var(--text-dim);
+}
+.nh-switch--on .nh-switch-label {
+  color: var(--text);
+}

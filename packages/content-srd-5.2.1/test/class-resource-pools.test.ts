@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CLASS_MECHANICS } from "../scripts/class-mechanics/index.js";
-import { loadClasses, loadSubclasses, type ClassReference, type FeatureRecord, type SubclassReference } from "../src/index.js";
+import {
+  loadClasses,
+  loadSubclasses,
+  type ClassReference,
+  type FeatureRecord,
+  type SubclassReference
+} from "../src/index.js";
 
 /**
  * A `classResources` id is a printed table column. It is bound to a live pool
@@ -13,8 +19,14 @@ const classes = loadClasses();
 const subclasses = loadSubclasses();
 
 /** A feature and every inline option under it - both carry the identical `uses` vocabulary. */
-function riderNodes(feature: FeatureRecord): Array<{ id: string; uses?: FeatureRecord["uses"]; actions: FeatureRecord["actions"] }> {
-  const options = (feature.choice?.options ?? []).map((option) => ({ id: option.id, uses: option.uses, actions: option.actions }));
+function riderNodes(
+  feature: FeatureRecord
+): Array<{ id: string; uses?: FeatureRecord["uses"]; actions: FeatureRecord["actions"] }> {
+  const options = (feature.choice?.options ?? []).map((option) => ({
+    id: option.id,
+    uses: option.uses,
+    actions: option.actions
+  }));
   return [{ id: feature.id, uses: feature.uses, actions: feature.actions }, ...options];
 }
 
@@ -42,7 +54,10 @@ describe("every printed class resource is either a real pool or marked display-o
   it("binds each classResources id to a live actionUses key, or says it is ink", () => {
     const unbound: string[] = [];
     for (const entry of classes) {
-      const keys = poolKeysOf(entry, subclasses.filter((subclass) => subclass.classId === entry.id));
+      const keys = poolKeysOf(
+        entry,
+        subclasses.filter((subclass) => subclass.classId === entry.id)
+      );
       for (const row of entry.levelTable) {
         for (const resource of row.classResources) {
           if (resource.display === true || keys.has(resource.id)) continue;
@@ -55,21 +70,35 @@ describe("every printed class resource is either a real pool or marked display-o
 
   it("counts the classes that HAVE a live pool, so the check cannot pass by there being none", () => {
     // Guards against the check above passing vacuously.
-    const keysFor = (id: string) => [...poolKeysOf(classes.find((entry) => entry.id === id)!, subclasses.filter((s) => s.classId === id))].sort();
+    const keysFor = (id: string) =>
+      [
+        ...poolKeysOf(
+          classes.find((entry) => entry.id === id)!,
+          subclasses.filter((s) => s.classId === id)
+        )
+      ].sort();
     expect(keysFor("fighter")).toEqual(["action-surge", "indomitable", "second-wind"]);
     expect(keysFor("cleric")).toEqual(["blessed-strikes", "channel-divinity", "divine-intervention"]);
     expect(keysFor("wizard")).toEqual(["arcane-recovery", "overchannel", "signature-spells"]);
-    const clericColumns = new Set(classes.find((entry) => entry.id === "cleric")!.levelTable.flatMap((row) => row.classResources.map((resource) => resource.id)));
+    const clericColumns = new Set(
+      classes
+        .find((entry) => entry.id === "cleric")!
+        .levelTable.flatMap((row) => row.classResources.map((resource) => resource.id))
+    );
     expect(clericColumns.has("channel-divinity")).toBe(true);
   });
 
   it("marks a display-only column as display-only rather than leaving it to be inferred", () => {
     // Fighter has real pools and also prints a display-only Weapon Mastery count.
     const fighter = classes.find((entry) => entry.id === "fighter")!;
-    const mastery = fighter.levelTable.flatMap((row) => row.classResources).filter((resource) => resource.id === "weapon-mastery");
+    const mastery = fighter.levelTable
+      .flatMap((row) => row.classResources)
+      .filter((resource) => resource.id === "weapon-mastery");
     expect(mastery.length).toBeGreaterThan(0);
     expect(mastery.every((resource) => resource.display === true)).toBe(true);
-    const secondWind = fighter.levelTable.flatMap((row) => row.classResources).filter((resource) => resource.id === "second-wind");
+    const secondWind = fighter.levelTable
+      .flatMap((row) => row.classResources)
+      .filter((resource) => resource.id === "second-wind");
     expect(secondWind.length).toBeGreaterThan(0);
     expect(secondWind.some((resource) => resource.display === true)).toBe(false);
   });
@@ -87,17 +116,23 @@ describe("the mechanics overlay merges over generated prose", () => {
     expect(rage.uses).toEqual({ scaling: { type: "class-resource", id: "rage" }, per: "long-rest" });
     expect(rage.actions.map((action) => action.id)).toEqual(["rage"]);
     expect(rage.actions[0].grants?.tags).toEqual(["raging"]);
-    expect(rage.actions[0].grants?.modifiers.map((modifier) => modifier.type))
-      .toEqual(["damage-resistance", "roll-mode", "roll-mode"]);
+    expect(rage.actions[0].grants?.modifiers.map((modifier) => modifier.type)).toEqual([
+      "damage-resistance",
+      "roll-mode",
+      "roll-mode"
+    ]);
   });
 
   it("scales its uses off the printed Rages column, which stopped being display-only", () => {
-    const rages = (level: number) => barbarian.levelTable[level - 1].classResources.find((resource) => resource.id === "rage")!;
+    const rages = (level: number) =>
+      barbarian.levelTable[level - 1].classResources.find((resource) => resource.id === "rage")!;
     expect(rages(1).amount).toBe(2);
     expect(rages(3).amount).toBe(3);
     expect(rages(1).display).toBeUndefined();
     // Rage Damage stays display-only: the effect vocabulary cannot express it yet.
-    expect(barbarian.levelTable[0].classResources.find((resource) => resource.id === "rage-damage")!.display).toBe(true);
+    expect(barbarian.levelTable[0].classResources.find((resource) => resource.id === "rage-damage")!.display).toBe(
+      true
+    );
   });
 
   it("leaves every class NOBODY authored untouched, so the overlay is opt-in per feature", () => {

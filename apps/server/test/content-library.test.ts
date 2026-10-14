@@ -23,25 +23,53 @@ describe("bundled reference content exposed to the client", () => {
     // Base damage + SRD upcast scaling drive the sheet's "cast at" auto-roll (Fireball: 8d6, +1d6/level).
     expect(fireball?.damageRoll).toBe("8d6");
     expect(fireball?.damageTypes).toEqual(["fire"]);
-    expect(fireball?.castingOptions.find((option) => option.level === 4)).toEqual({ level: 4, damageRoll: "9d6", targetCount: null });
+    expect(fireball?.castingOptions.find((option) => option.level === 4)).toEqual({
+      level: 4,
+      damageRoll: "9d6",
+      targetCount: null
+    });
     expect(fireball?.castingOptions.find((option) => option.level === 9)).toMatchObject({ damageRoll: "14d6" });
     // Only slot-level upcasts are surfaced (cantrip character-level scaling is filtered out).
     expect(fireball?.castingOptions.every((option) => option.level >= 4 && option.level <= 9)).toBe(true);
     // A target-scaling spell carries the count, not a new damage roll (Scorching Ray: +1 ray/level).
     const scorchingRay = spells.find((spell) => spell.id === "scorching-ray");
-    expect(scorchingRay?.castingOptions.find((option) => option.level === 3)).toEqual({ level: 3, damageRoll: null, targetCount: 4 });
+    expect(scorchingRay?.castingOptions.find((option) => option.level === 3)).toEqual({
+      level: 3,
+      damageRoll: null,
+      targetCount: 4
+    });
   });
 
   it("exposes the folded equipment catalog the sheet's browse-and-add picker reads", () => {
     const equipment = library.equipmentSummaries();
     expect(equipment.length).toBeGreaterThan(150);
     const categories = new Set(equipment.map((item) => item.category));
-    for (const category of ["weapon", "armor", "shield", "ammunition", "adventuring-gear", "tool", "equipment-pack", "focus", "consumable"]) {
+    for (const category of [
+      "weapon",
+      "armor",
+      "shield",
+      "ammunition",
+      "adventuring-gear",
+      "tool",
+      "equipment-pack",
+      "focus",
+      "consumable"
+    ]) {
       expect(categories, category).toContain(category);
     }
     // A weapon carries its structured block; a gear entry carries cost/weight and neither sub-object.
-    expect(equipment.find((item) => item.id === "longsword")).toMatchObject({ category: "weapon", weapon: { damageDice: "1d8", damageType: "slashing" }, armor: null });
-    expect(equipment.find((item) => item.id === "thieves-tools")).toMatchObject({ category: "tool", costGp: 25, weightLb: 1, weapon: null, armor: null });
+    expect(equipment.find((item) => item.id === "longsword")).toMatchObject({
+      category: "weapon",
+      weapon: { damageDice: "1d8", damageType: "slashing" },
+      armor: null
+    });
+    expect(equipment.find((item) => item.id === "thieves-tools")).toMatchObject({
+      category: "tool",
+      costGp: 25,
+      weightLb: 1,
+      weapon: null,
+      armor: null
+    });
     // The attribution line is available for any surface that renders the catalog (CC-BY requirement).
     expect(library.attribution).toContain("System Reference Document 5.2.1");
   });
@@ -59,9 +87,12 @@ describe("bundled reference content exposed to the client", () => {
     expect(fighter.levelTable[0].pactSlots).toBeNull();
     expect(fighter.levelTable[0].cantripsKnown).toBeNull();
     // Named per-level resources travel as data - this is what grows Second Wind 2 -> 3 -> 4.
-    const secondWind = fighter.levelTable.find((row) => row.classResources.some((resource) => resource.id === "second-wind"));
+    const secondWind = fighter.levelTable.find((row) =>
+      row.classResources.some((resource) => resource.id === "second-wind")
+    );
     expect(secondWind, "fighter level table declares Second Wind uses").toBeDefined();
-    const usesAtLevel = (level: number) => fighter.levelTable[level - 1].classResources.find((resource) => resource.id === "second-wind")?.amount;
+    const usesAtLevel = (level: number) =>
+      fighter.levelTable[level - 1].classResources.find((resource) => resource.id === "second-wind")?.amount;
     expect(usesAtLevel(10)).not.toBe(usesAtLevel(1));
     const wizard = library.classSummaries().find((entry) => entry.id === "wizard")!;
     expect(wizard.levelTable[0].spellSlots).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -69,8 +100,13 @@ describe("bundled reference content exposed to the client", () => {
     expect(fighter.startingEquipmentOptions.length).toBeGreaterThan(0);
     const option = fighter.startingEquipmentOptions[0];
     expect(option).toMatchObject({ id: expect.any(String), label: expect.any(String), goldPieces: expect.any(Number) });
-    expect(fighter.startingEquipmentOptions.some((entry) => entry.items.length > 0), "at least one bundle names real items").toBe(true);
-    expect(library.backgroundSummaries()[0].startingEquipmentOptions.every((entry) => Array.isArray(entry.items))).toBe(true);
+    expect(
+      fighter.startingEquipmentOptions.some((entry) => entry.items.length > 0),
+      "at least one bundle names real items"
+    ).toBe(true);
+    expect(library.backgroundSummaries()[0].startingEquipmentOptions.every((entry) => Array.isArray(entry.items))).toBe(
+      true
+    );
   });
 
   // Served payloads must satisfy their own published OpenAPI schemas (`additionalProperties: false`), for
@@ -86,7 +122,10 @@ describe("bundled reference content exposed to the client", () => {
     validate("ContentClassesData", { classes: library.classSummaries(), attribution: library.attribution });
     validate("ContentSubclassesData", { subclasses: library.subclassSummaries(), attribution: library.attribution });
     validate("ContentSpeciesData", { species: library.speciesSummaries(), attribution: library.attribution });
-    validate("ContentBackgroundsData", { backgrounds: library.backgroundSummaries(), attribution: library.attribution });
+    validate("ContentBackgroundsData", {
+      backgrounds: library.backgroundSummaries(),
+      attribution: library.attribution
+    });
     validate("ContentFeatsData", { feats: library.featSummaries(), attribution: library.attribution });
     validate("ContentSpellsData", { spells: library.spellSummaries(), attribution: library.attribution });
     validate("ContentSkillsData", { skills: library.skillSummaries(), attribution: library.attribution });

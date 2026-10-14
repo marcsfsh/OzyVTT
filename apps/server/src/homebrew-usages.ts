@@ -38,17 +38,29 @@ export function buildHomebrewUsageIndex(state: GameState): HomebrewUsageIndex {
 
   for (const actor of state.actors) {
     if (!UUID.test(actor.id)) continue;
-    const at = (kind: string, detail: string | null): HomebrewUsage => ({ actorId: actor.id, actorName: actor.name, kind, detail });
+    const at = (kind: string, detail: string | null): HomebrewUsage => ({
+      actorId: actor.id,
+      actorName: actor.name,
+      kind,
+      detail
+    });
 
     // A monster token re-resolves its definition on every action, recharge and damage roll.
-    if (actor.definitionId) record("monster", actor.definitionId, at("definition", "on the table right now - action and defence edits reach it immediately"));
+    if (actor.definitionId)
+      record(
+        "monster",
+        actor.definitionId,
+        at("definition", "on the table right now - action and defence edits reach it immediately")
+      );
 
     for (const item of actor.inventory) {
       record("equipment", item.id, at("inventory", `carried by ${actor.name}`));
       // A bound template also references its base; deleting the base strands the bind.
-      if (item.baseId !== undefined) record("equipment", item.baseId, at("inventory", `bound base of ${item.name}, carried by ${actor.name}`));
+      if (item.baseId !== undefined)
+        record("equipment", item.baseId, at("inventory", `bound base of ${item.name}, carried by ${actor.name}`));
     }
-    for (const spellId of actor.preparedSpellIds) record("spell", spellId, at("prepared-spell", `prepared by ${actor.name}`));
+    for (const spellId of actor.preparedSpellIds)
+      record("spell", spellId, at("prepared-spell", `prepared by ${actor.name}`));
 
     const definition = actor.definitionId ? definitionsById.get(actor.definitionId) : undefined;
     if (definition) recordDefinitionUsages(definition, record, at);
@@ -57,7 +69,12 @@ export function buildHomebrewUsageIndex(state: GameState): HomebrewUsageIndex {
   // A queued import has no actor yet; included when its queue id is a uuid.
   for (const pending of state.pendingImports) {
     if (!UUID.test(pending.id)) continue;
-    const at = (kind: string, detail: string | null): HomebrewUsage => ({ actorId: pending.id, actorName: pending.name, kind, detail });
+    const at = (kind: string, detail: string | null): HomebrewUsage => ({
+      actorId: pending.id,
+      actorName: pending.name,
+      kind,
+      detail
+    });
     recordDefinitionUsages(pending.definition, record, at);
   }
 
@@ -94,14 +111,19 @@ function recordDefinitionUsages(
   for (const entry of definition.spellcasting?.classes ?? []) record("class", entry.classId, at("spellcasting", null));
   for (const item of definition.startingInventory ?? []) {
     record("equipment", item.id, at("starting-inventory", item.name));
-    if (item.baseId !== undefined) record("equipment", item.baseId, at("starting-inventory", `bound base of ${item.name}`));
+    if (item.baseId !== undefined)
+      record("equipment", item.baseId, at("starting-inventory", `bound base of ${item.name}`));
   }
 }
 
 /** Choice kinds that name a record type; unknown kinds are skipped. "asi-or-feat" is covered by its feat row. */
 const CHOICE_KIND_TYPES: Readonly<Record<string, HomebrewContentType | undefined>> = {
-  feat: "feat", subclass: "subclass", lineage: "species",
-  spell: "spell", cantrip: "spell", equipment: "equipment"
+  feat: "feat",
+  subclass: "subclass",
+  lineage: "species",
+  spell: "spell",
+  cantrip: "spell",
+  equipment: "equipment"
 };
 
 /** Single-record convenience for callers that genuinely want one id (tests, a usages GET). */

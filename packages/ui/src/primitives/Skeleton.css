@@ -16,22 +16,44 @@
   top: -100%;
   height: 100%;
   background-image:
-    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--scanline-gap) - 1px),
+      var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
+    ),
     linear-gradient(to bottom, transparent, color-mix(in srgb, var(--text) 9%, transparent) 70%, transparent);
   background-repeat: repeat, no-repeat;
-  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-size:
+    100% var(--scanline-gap),
+    100% 100%;
   animation: nh-skeleton-sweep 1.6s linear infinite;
 }
-.nh-skeleton--text { height: .8em; width: 100%; }
-.nh-skeleton--block { height: 8rem; width: 100%; }
+.nh-skeleton--text {
+  height: 0.8em;
+  width: 100%;
+}
+.nh-skeleton--block {
+  height: 8rem;
+  width: 100%;
+}
 /* Round stays round: it stands in for an avatar or dot. */
-.nh-skeleton--circle { width: 2.4rem; height: 2.4rem; border-radius: 50%; }
+.nh-skeleton--circle {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+}
 
 @keyframes nh-skeleton-sweep {
-  from { transform: translateY(0); }
-  to { transform: translateY(200%); }
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(200%);
+  }
 }
 /* Under reduced motion the sweep stops and the placeholder holds a static tone. */
 @media (prefers-reduced-motion: reduce) {
-  .nh-skeleton::after { display: none; }
+  .nh-skeleton::after {
+    display: none;
+  }
 }

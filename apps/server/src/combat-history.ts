@@ -23,13 +23,28 @@ export type TimelineOutcome =
  *  actor hp/conditions/effects. Changes outside it never dirty the timeline. */
 function restorableSlice(state: GameState): string {
   // Fog is scene dressing: revealing mid-review must neither dirty the timeline nor re-black the map on rewind.
-  const { scenes: _scenes, activeSceneId: _activeSceneId, historyCursor: _cursor, historyDirty: _dirty, fog: _fog, annotations, ...combat } = state.combat;
+  const {
+    scenes: _scenes,
+    activeSceneId: _activeSceneId,
+    historyCursor: _cursor,
+    historyDirty: _dirty,
+    fog: _fog,
+    annotations,
+    ...combat
+  } = state.combat;
   return JSON.stringify({
     combat: { ...combat, annotations: annotations.filter((annotation) => annotation.expiresAt === null) },
     // Rules-engine state (effects, dying, spent uses) restores with hp/conditions, so a rewind undoes a Rage
     // or a death-save tick. legendaryUsed and the table-wide healthDisplay ride the combat spread; the
     // per-token healthDisplay override is cosmetic and stays out.
-    actors: state.actors.map((actor) => ({ id: actor.id, hp: actor.hp, conditions: actor.conditions, effects: actor.effects, deathSaves: actor.deathSaves, actionUses: actor.actionUses }))
+    actors: state.actors.map((actor) => ({
+      id: actor.id,
+      hp: actor.hp,
+      conditions: actor.conditions,
+      effects: actor.effects,
+      deathSaves: actor.deathSaves,
+      actionUses: actor.actionUses
+    }))
   });
 }
 
@@ -51,10 +66,22 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
   // Defense in depth: roster removal is refused while rewound, but filter anyway rather than corrupt state.
   const initiative = snapshot.combat.initiative.filter((entry) => currentActorIds.has(entry.actorId));
   if (initiative.length === 0) throw new CommandRejectedError("That turn references combatants that no longer exist.");
-  const turnActorId = snapshot.combat.turnActorId !== null && currentActorIds.has(snapshot.combat.turnActorId) ? snapshot.combat.turnActorId : initiative[0].actorId;
+  const turnActorId =
+    snapshot.combat.turnActorId !== null && currentActorIds.has(snapshot.combat.turnActorId)
+      ? snapshot.combat.turnActorId
+      : initiative[0].actorId;
   state.actors = state.actors.map((actor) => {
     const past = snapshotActors.get(actor.id);
-    return past ? { ...actor, hp: structuredClone(past.hp), conditions: structuredClone(past.conditions), effects: structuredClone(past.effects), deathSaves: structuredClone(past.deathSaves), actionUses: structuredClone(past.actionUses) } : actor;
+    return past
+      ? {
+          ...actor,
+          hp: structuredClone(past.hp),
+          conditions: structuredClone(past.conditions),
+          effects: structuredClone(past.effects),
+          deathSaves: structuredClone(past.deathSaves),
+          actionUses: structuredClone(past.actionUses)
+        }
+      : actor;
   });
   state.combat = {
     ...structuredClone(snapshot.combat),
@@ -89,7 +116,8 @@ export function planPreviousTurn(state: GameState, timeline: TimelineOps, confir
     return { kind: "rewound", label: last.label };
   }
   if (state.combat.historyDirty) {
-    if (!confirmDiscard) throw new TimelineConfirmationRequired("discard-changes", "Discard the changes made at this point in history?");
+    if (!confirmDiscard)
+      throw new TimelineConfirmationRequired("discard-changes", "Discard the changes made at this point in history?");
     const snapshot = timeline.read(cursor);
     if (!snapshot) throw new CommandRejectedError("The timeline is out of sync - try again.");
     const entry = entries.find((candidate) => candidate.index === cursor);
@@ -106,7 +134,12 @@ export function planPreviousTurn(state: GameState, timeline: TimelineOps, confir
 
 /** Next: live, capture and advance; rewound and clean, step forward (the return-point resumes live); rewound
  *  and dirty, require confirmRewrite, truncate the undone future, capture and advance. */
-export function planNextTurn(state: GameState, timeline: TimelineOps, confirmRewrite: boolean, advance: (state: GameState) => void = nextInitiativeTurn): TimelineOutcome {
+export function planNextTurn(
+  state: GameState,
+  timeline: TimelineOps,
+  confirmRewrite: boolean,
+  advance: (state: GameState) => void = nextInitiativeTurn
+): TimelineOutcome {
   const cursor = state.combat.historyCursor;
   const entries = timeline.entries();
   if (cursor === null) {
@@ -119,7 +152,11 @@ export function planNextTurn(state: GameState, timeline: TimelineOps, confirmRew
     return { kind: "advanced" };
   }
   if (state.combat.historyDirty) {
-    if (!confirmRewrite) throw new TimelineConfirmationRequired("rewrite-history", "Rewrite history from this turn? Every later turn will be undone.");
+    if (!confirmRewrite)
+      throw new TimelineConfirmationRequired(
+        "rewrite-history",
+        "Rewrite history from this turn? Every later turn will be undone."
+      );
     const rewriteLabel = turnLabel(state);
     timeline.truncateFrom(cursor);
     state.combat = { ...state.combat, historyCursor: null, historyDirty: false };

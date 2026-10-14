@@ -33,7 +33,8 @@ export const HAND_AUTHORED: ReadonlySet<string> = new Set(["fighter", "wizard", 
  * The rider keys an overlay may author, shared by the feature form, the option form and `clears`.
  * Prose (`id`, `name`, `level`, `description`) belongs to the ETL and is excluded.
  */
-type RiderKey = "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices";
+type RiderKey =
+  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices";
 
 /** The rider fields an overlay may add to one pickable option inside a feature's choice. */
 export type OptionMechanics = Partial<Pick<OptionInput, RiderKey>>;
@@ -90,25 +91,26 @@ const isReplaced = (riders: Record<string, unknown>, key: string): boolean =>
  * HAND_AUTHORED classes the ETL writes the merged record back over its own input, so a silent
  * overwrite would be unreviewable. A collision stops the build naming both homes.
  */
-export function applyMechanics(
-  recordId: string,
-  features: Array<{ id: string }>,
-  overlay: MechanicsOverlay
-): string[] {
+export function applyMechanics(recordId: string, features: Array<{ id: string }>, overlay: MechanicsOverlay): string[] {
   const entries = overlay[recordId];
   if (!entries) return [];
   const byId = new Map(features.map((feature) => [feature.id, feature]));
   const unmatched: string[] = [];
   for (const [featureId, mechanics] of Object.entries(entries)) {
     const feature = byId.get(featureId) as (Record<string, unknown> & { id: string }) | undefined;
-    if (!feature) { unmatched.push(`${recordId}.${featureId}`); continue; }
+    if (!feature) {
+      unmatched.push(`${recordId}.${featureId}`);
+      continue;
+    }
     const { options, clears, ...riders } = mechanics;
     if (clears?.length) {
       // Every cleared key must be re-authored by the same entry (an `[]` rider does not count). On a miss
       // the entry contributes nothing, because the delete would be one-way.
       const unreplaced = clears.filter((key) => !isReplaced(riders as Record<string, unknown>, key));
       if (unreplaced.length > 0) {
-        unmatched.push(`${recordId}.${featureId}.clears [${unreplaced.join(", ")}] (deletes without replacing - author the superseding ${unreplaced.length === 1 ? "rider" : "riders"} in the same entry)`);
+        unmatched.push(
+          `${recordId}.${featureId}.clears [${unreplaced.join(", ")}] (deletes without replacing - author the superseding ${unreplaced.length === 1 ? "rider" : "riders"} in the same entry)`
+        );
         continue;
       }
       // Deleting an absent key is a no-op, so the second build of a hand-authored record is clean.
@@ -117,21 +119,29 @@ export function applyMechanics(
     for (const [key, value] of Object.entries(riders)) {
       const existing = feature[key];
       if (!isAbsent(existing) && JSON.stringify(existing) !== JSON.stringify(value)) {
-        unmatched.push(`${recordId}.${featureId}.${key} (already authored on the record - remove it from one of the two homes)`);
+        unmatched.push(
+          `${recordId}.${featureId}.${key} (already authored on the record - remove it from one of the two homes)`
+        );
         continue;
       }
       feature[key] = value;
     }
     if (!options) continue;
-    const inline = (feature.choice as { options?: Array<Record<string, unknown> & { id: string }> } | undefined)?.options ?? [];
+    const inline =
+      (feature.choice as { options?: Array<Record<string, unknown> & { id: string }> } | undefined)?.options ?? [];
     const optionsById = new Map(inline.map((option) => [option.id, option]));
     for (const [optionId, optionMechanics] of Object.entries(options)) {
       const option = optionsById.get(optionId);
-      if (!option) { unmatched.push(`${recordId}.${featureId}.${optionId}`); continue; }
+      if (!option) {
+        unmatched.push(`${recordId}.${featureId}.${optionId}`);
+        continue;
+      }
       for (const [key, value] of Object.entries(optionMechanics)) {
         const existing = option[key];
         if (!isAbsent(existing) && JSON.stringify(existing) !== JSON.stringify(value)) {
-          unmatched.push(`${recordId}.${featureId}.${optionId}.${key} (already authored on the record - remove it from one of the two homes)`);
+          unmatched.push(
+            `${recordId}.${featureId}.${optionId}.${key} (already authored on the record - remove it from one of the two homes)`
+          );
           continue;
         }
         option[key] = value;

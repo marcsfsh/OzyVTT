@@ -1,14 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { armorClassFromEquipment, armorWeightOf, collectRiders, effectiveSlot, sumRiders, triggerKind, type RiderCarrier, type RiderContext } from "../src/index.js";
+import {
+  armorClassFromEquipment,
+  armorWeightOf,
+  collectRiders,
+  effectiveSlot,
+  sumRiders,
+  triggerKind,
+  type RiderCarrier,
+  type RiderContext
+} from "../src/index.js";
 
 const base: Omit<RiderContext, "moment"> = {
-  attunedItemIds: ["ring"], armorWeight: "medium", shieldEquipped: false,
-  classIds: ["paladin"], speciesId: "human",
-  proficientWeapons: ["martial"], proficientArmor: [], proficientTools: [], proficientSkills: ["stealth"],
-  effectTags: ["raging"], hitPointFraction: 0.5, bearerConditionIds: []
+  attunedItemIds: ["ring"],
+  armorWeight: "medium",
+  shieldEquipped: false,
+  classIds: ["paladin"],
+  speciesId: "human",
+  proficientWeapons: ["martial"],
+  proficientArmor: [],
+  proficientTools: [],
+  proficientSkills: ["stealth"],
+  effectTags: ["raging"],
+  hitPointFraction: 0.5,
+  bearerConditionIds: []
 };
-const carrierOf = (modifiers: RiderCarrier["modifiers"], over: Partial<RiderCarrier> = {}): RiderCarrier[] =>
-  [{ label: "Test Item", modifiers, sourceItemId: "ring", ...over }];
+const carrierOf = (modifiers: RiderCarrier["modifiers"], over: Partial<RiderCarrier> = {}): RiderCarrier[] => [
+  { label: "Test Item", modifiers, sourceItemId: "ring", ...over }
+];
 
 describe("triggerKind", () => {
   it("classifies all four kinds, and treats an unknown type as a static gate", () => {
@@ -28,7 +46,9 @@ describe("collectRiders: the two passes", () => {
   });
 
   it("withholds a rider naming a moment from the standing pass - the two sets are disjoint", () => {
-    const carriers = carrierOf([{ type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] }]);
+    const carriers = carrierOf([
+      { type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] }
+    ]);
     expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring" })).toHaveLength(0);
     expect(collectRiders(carriers, { ...base, moment: "on-critical-hit", sourceItemId: "ring" })).toHaveLength(1);
     expect(collectRiders(carriers, { ...base, moment: "on-hit", sourceItemId: "ring" })).toHaveLength(0);
@@ -36,17 +56,29 @@ describe("collectRiders: the two passes", () => {
 
   it("never lets a filter leak into the standing pass and become 'always'", () => {
     // A filter with no moment must never match rather than apply at every read.
-    const carriers = carrierOf([{ type: "attack-bonus", amount: 2, when: [{ type: "versus-size", sizes: ["large"] }] }]);
-    expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring", targetSize: "large" })).toHaveLength(0);
+    const carriers = carrierOf([
+      { type: "attack-bonus", amount: 2, when: [{ type: "versus-size", sizes: ["large"] }] }
+    ]);
+    expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring", targetSize: "large" })).toHaveLength(
+      0
+    );
   });
 });
 
 describe("collectRiders: gates fail closed", () => {
   it("requires every trigger in the AND-list to pass", () => {
-    const carriers = carrierOf([{ type: "attack-bonus", amount: 1, when: [{ type: "while-armored" }, { type: "while-character-is", classIds: ["paladin"] }] }]);
+    const carriers = carrierOf([
+      {
+        type: "attack-bonus",
+        amount: 1,
+        when: [{ type: "while-armored" }, { type: "while-character-is", classIds: ["paladin"] }]
+      }
+    ]);
     expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring" })).toHaveLength(1);
     expect(collectRiders(carriers, { ...base, armorWeight: null, moment: null, sourceItemId: "ring" })).toHaveLength(0);
-    expect(collectRiders(carriers, { ...base, classIds: ["wizard"], moment: null, sourceItemId: "ring" })).toHaveLength(0);
+    expect(collectRiders(carriers, { ...base, classIds: ["wizard"], moment: null, sourceItemId: "ring" })).toHaveLength(
+      0
+    );
   });
 
   it("refuses a trigger the engine cannot evaluate rather than treating it as satisfied", () => {
@@ -56,16 +88,26 @@ describe("collectRiders: gates fail closed", () => {
   });
 
   it("fails a gate closed when the context does not carry the fact it reads", () => {
-    const carriers = carrierOf([{ type: "armor-class", amount: 1, when: [{ type: "while-hp-at-or-below", percent: 50 }] }]);
+    const carriers = carrierOf([
+      { type: "armor-class", amount: 1, when: [{ type: "while-hp-at-or-below", percent: 50 }] }
+    ]);
     expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring" })).toHaveLength(1); // 0.5 -> 50%
-    expect(collectRiders(carriers, { ...base, hitPointFraction: 0.9, moment: null, sourceItemId: "ring" })).toHaveLength(0);
-    expect(collectRiders(carriers, { ...base, hitPointFraction: undefined, moment: null, sourceItemId: "ring" })).toHaveLength(0);
+    expect(
+      collectRiders(carriers, { ...base, hitPointFraction: 0.9, moment: null, sourceItemId: "ring" })
+    ).toHaveLength(0);
+    expect(
+      collectRiders(carriers, { ...base, hitPointFraction: undefined, moment: null, sourceItemId: "ring" })
+    ).toHaveLength(0);
   });
 
   it("armor weights narrow `while-armored`", () => {
-    const heavyOnly = carrierOf([{ type: "armor-class", amount: 1, when: [{ type: "while-armored", weights: ["heavy"] }] }]);
+    const heavyOnly = carrierOf([
+      { type: "armor-class", amount: 1, when: [{ type: "while-armored", weights: ["heavy"] }] }
+    ]);
     expect(collectRiders(heavyOnly, { ...base, moment: null, sourceItemId: "ring" })).toHaveLength(0);
-    expect(collectRiders(heavyOnly, { ...base, armorWeight: "heavy", moment: null, sourceItemId: "ring" })).toHaveLength(1);
+    expect(
+      collectRiders(heavyOnly, { ...base, armorWeight: "heavy", moment: null, sourceItemId: "ring" })
+    ).toHaveLength(1);
   });
 
   it("normalises the legacy `whileArmored` boolean into the same evaluation path", () => {
@@ -75,30 +117,52 @@ describe("collectRiders: gates fail closed", () => {
   });
 
   it("inverts `while-condition` when `present` is false", () => {
-    const carriers = carrierOf([{ type: "armor-class", amount: 1, when: [{ type: "while-condition", conditionIds: ["prone"], present: false }] }]);
+    const carriers = carrierOf([
+      { type: "armor-class", amount: 1, when: [{ type: "while-condition", conditionIds: ["prone"], present: false }] }
+    ]);
     expect(collectRiders(carriers, { ...base, moment: null, sourceItemId: "ring" })).toHaveLength(1);
-    expect(collectRiders(carriers, { ...base, bearerConditionIds: ["prone"], moment: null, sourceItemId: "ring" })).toHaveLength(0);
+    expect(
+      collectRiders(carriers, { ...base, bearerConditionIds: ["prone"], moment: null, sourceItemId: "ring" })
+    ).toHaveLength(0);
   });
 });
 
 describe("collectRiders: scope", () => {
   it("defaults the attack/damage family to this-item on a weapon and to the bearer elsewhere", () => {
-    const weapon = carrierOf([{ type: "attack-bonus", amount: 1 }, { type: "armor-class", amount: 1 }], { sourceItemId: "sword", isWeapon: true });
+    const weapon = carrierOf(
+      [
+        { type: "attack-bonus", amount: 1 },
+        { type: "armor-class", amount: 1 }
+      ],
+      { sourceItemId: "sword", isWeapon: true }
+    );
     // Rolling with the sword: both apply.
-    expect(collectRiders(weapon, { ...base, moment: null, sourceItemId: "sword" }).map((r) => r.modifier.type)).toEqual(["attack-bonus", "armor-class"]);
+    expect(collectRiders(weapon, { ...base, moment: null, sourceItemId: "sword" }).map((r) => r.modifier.type)).toEqual(
+      ["attack-bonus", "armor-class"]
+    );
     // Rolling with something else: the sword's +1 to hit does not follow, but its AC does.
-    expect(collectRiders(weapon, { ...base, moment: null, sourceItemId: "axe" }).map((r) => r.modifier.type)).toEqual(["armor-class"]);
+    expect(collectRiders(weapon, { ...base, moment: null, sourceItemId: "axe" }).map((r) => r.modifier.type)).toEqual([
+      "armor-class"
+    ]);
   });
 
   it("resolves an authored this-item scope to bearer on a carrier with no item (a feat)", () => {
-    const feat: RiderCarrier[] = [{ label: "Feat", modifiers: [{ type: "attack-bonus", amount: 1, scope: "this-item" }] }];
+    const feat: RiderCarrier[] = [
+      { label: "Feat", modifiers: [{ type: "attack-bonus", amount: 1, scope: "this-item" }] }
+    ];
     expect(collectRiders(feat, { ...base, moment: null, sourceItemId: null })).toHaveLength(1);
   });
 });
 
 describe("sumRiders", () => {
   it("sums signed amounts so a curse subtracts", () => {
-    const riders = collectRiders(carrierOf([{ type: "attack-bonus", amount: 2 }, { type: "attack-bonus", amount: -3 }]), { ...base, moment: null, sourceItemId: "ring" });
+    const riders = collectRiders(
+      carrierOf([
+        { type: "attack-bonus", amount: 2 },
+        { type: "attack-bonus", amount: -3 }
+      ]),
+      { ...base, moment: null, sourceItemId: "ring" }
+    );
     expect(sumRiders(riders, "attack-bonus")).toBe(-1);
     expect(sumRiders(riders, "armor-class")).toBe(0);
   });
@@ -119,9 +183,17 @@ describe("armorWeightOf and effectiveSlot", () => {
 });
 
 describe("armorClassFromEquipment with slots", () => {
-  const armor = (acBase: number) => ({ acBase, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null });
+  const armor = (acBase: number) => ({
+    acBase,
+    addDexModifier: false,
+    dexModifierCap: null,
+    stealthDisadvantage: false,
+    strengthRequired: null
+  });
   it("derives AC from an explicit slot on an otherwise-inert category", () => {
-    expect(armorClassFromEquipment(2, [{ equipped: true, category: "relic", slot: "armor", armor: armor(16) }])).toBe(16);
+    expect(armorClassFromEquipment(2, [{ equipped: true, category: "relic", slot: "armor", armor: armor(16) }])).toBe(
+      16
+    );
     expect(armorClassFromEquipment(2, [{ equipped: true, category: "relic", armor: armor(16) }])).toBeNull();
   });
   it("counts one shield only", () => {

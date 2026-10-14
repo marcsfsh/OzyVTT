@@ -31,7 +31,9 @@ export function Alert({ tone = "info", title, className, children }: AlertProps)
       className={cx("nh-alert", `nh-alert--${tone}`, className)}
       role={tone === "danger" || tone === "warning" ? "alert" : "status"}
     >
-      <span className="nh-alert-icon" aria-hidden="true"><ToneIcon /></span>
+      <span className="nh-alert-icon" aria-hidden="true">
+        <ToneIcon />
+      </span>
       <div className="nh-alert-body">
         {title != null && <strong className="nh-alert-title">{title}</strong>}
         {children != null && <div className="nh-alert-text">{children}</div>}

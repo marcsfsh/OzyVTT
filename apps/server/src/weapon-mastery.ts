@@ -30,15 +30,21 @@ export type MasteryAppliedEffect = Readonly<{ targetId: string; targetName: stri
 
 /** A saving throw for the caller to park (`createPendingSaves`), with the condition a failure imposes. */
 export type MasteryPendingSave = Readonly<{
-  targetId: string; targetName: string;
-  ability: AbilityId; dc: number; conditionId: string | null;
+  targetId: string;
+  targetName: string;
+  ability: AbilityId;
+  dc: number;
+  conditionId: string | null;
   /** The tracker row name and the save's dedupe key; the mastery's name (see Topple). */
   actionName: string;
 }>;
 
 /** Forced movement the caller executes: push `targetId` straight away from `awayFromActorId`. */
 export type MasteryPush = Readonly<{
-  targetId: string; targetName: string; awayFromActorId: string; distanceFeet: number;
+  targetId: string;
+  targetName: string;
+  awayFromActorId: string;
+  distanceFeet: number;
   /** The SRD size gate ("Large or smaller"), compared by the caller with `sizeAtMost`. */
   maxTargetSize: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
 }>;
@@ -63,51 +69,56 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   /** Graze (SRD): on a miss (fumbles included), damage equal to the attack's ability modifier, of the
    *  weapon's type. A non-positive modifier deals nothing. */
   graze: {
-    onMiss: (swing) => swing.mastery.abilityModifier > 0
-      ? [{ amount: swing.mastery.abilityModifier, type: swing.damageType, source: "Graze" }]
-      : []
+    onMiss: (swing) =>
+      swing.mastery.abilityModifier > 0
+        ? [{ amount: swing.mastery.abilityModifier, type: swing.damageType, source: "Graze" }]
+        : []
   },
 
   /** Push (SRD): on a hit, push the creature up to 10 feet straight away if it is Large or smaller. The
    *  caller derives direction and does the geometry. Limitation: always the full 10 feet, with no
    *  attacker choice of a shorter push. */
   push: {
-    onHitPush: (swing) => [{
-      targetId: swing.attack.targetId,
-      targetName: swing.attack.targetName,
-      awayFromActorId: swing.attacker.id,
-      distanceFeet: 10,
-      maxTargetSize: "large"
-    }]
+    onHitPush: (swing) => [
+      {
+        targetId: swing.attack.targetId,
+        targetName: swing.attack.targetName,
+        awayFromActorId: swing.attacker.id,
+        distanceFeet: 10,
+        maxTargetSize: "large"
+      }
+    ]
   },
 
   /** Sap (SRD): on a hit, Disadvantage on the target's next attack roll before the start of your next
    *  turn. Approximation: effects don't expire on use, so every attack in that window has Disadvantage
    *  (same as Help). Persists if the attacker drops to 0 HP (they still have a next turn). */
   sap: {
-    onHit: (swing) => [{
-      targetId: swing.attack.targetId,
-      targetName: swing.attack.targetName,
-      effect: {
-        id: `${swing.commandId}:mastery:sap:${swing.attack.targetId}`,
-        name: `Sapped by ${swing.attacker.name}`,
-        tags: ["sap"],
-        sourceActorId: swing.attacker.id,
-        sourceName: swing.attacker.name,
-        sourceActionId: `${swing.actionId}:sap`,
-        startedRound: swing.round,
-        duration: { type: "until-source-next-turn" },
-        endsWhenSourceDefeated: false,
-        voidWhileIncapacitated: false,
-        concentration: false,
-        stackKey: "mastery:sap",
-        modifiers: [{ type: "attack-disadvantage" }],
-        linkedConditionIds: [],
-        escapeDc: null,
-        onEnd: [],
-        endsWithTag: null
+    onHit: (swing) => [
+      {
+        targetId: swing.attack.targetId,
+        targetName: swing.attack.targetName,
+        effect: {
+          id: `${swing.commandId}:mastery:sap:${swing.attack.targetId}`,
+          name: `Sapped by ${swing.attacker.name}`,
+          tags: ["sap"],
+          sourceActorId: swing.attacker.id,
+          sourceName: swing.attacker.name,
+          sourceActionId: `${swing.actionId}:sap`,
+          startedRound: swing.round,
+          duration: { type: "until-source-next-turn" },
+          endsWhenSourceDefeated: false,
+          voidWhileIncapacitated: false,
+          concentration: false,
+          stackKey: "mastery:sap",
+          modifiers: [{ type: "attack-disadvantage" }],
+          linkedConditionIds: [],
+          escapeDc: null,
+          onEnd: [],
+          endsWithTag: null
+        }
       }
-    }]
+    ]
   },
 
   /**
@@ -117,31 +128,33 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
    * via `sourceActionId`. Persists if the attacker drops to 0 HP (they still have a next turn).
    */
   slow: {
-    onHit: (swing) => [{
-      targetId: swing.attack.targetId,
-      targetName: swing.attack.targetName,
-      effect: {
-        id: `${swing.commandId}:mastery:slow:${swing.attack.targetId}`,
-        name: `Slowed by ${swing.attacker.name}`,
-        tags: ["slow"],
-        sourceActorId: swing.attacker.id,
-        sourceName: swing.attacker.name,
-        sourceActionId: `${swing.actionId}:slow`,
-        startedRound: swing.round,
-        duration: { type: "until-source-next-turn" },
-        endsWhenSourceDefeated: false,
-        // A penalty, so it must not lapse while the target is incapacitated (that only applies to benefits).
-        voidWhileIncapacitated: false,
-        concentration: false,
-        // Names the game effect, so every Slow is one reduction (SRD "Combining Game Effects").
-        stackKey: "mastery:slow",
-        modifiers: [{ type: "speed", amount: -10 }],
-        linkedConditionIds: [],
-        escapeDc: null,
-        onEnd: [],
-        endsWithTag: null
+    onHit: (swing) => [
+      {
+        targetId: swing.attack.targetId,
+        targetName: swing.attack.targetName,
+        effect: {
+          id: `${swing.commandId}:mastery:slow:${swing.attack.targetId}`,
+          name: `Slowed by ${swing.attacker.name}`,
+          tags: ["slow"],
+          sourceActorId: swing.attacker.id,
+          sourceName: swing.attacker.name,
+          sourceActionId: `${swing.actionId}:slow`,
+          startedRound: swing.round,
+          duration: { type: "until-source-next-turn" },
+          endsWhenSourceDefeated: false,
+          // A penalty, so it must not lapse while the target is incapacitated (that only applies to benefits).
+          voidWhileIncapacitated: false,
+          concentration: false,
+          // Names the game effect, so every Slow is one reduction (SRD "Combining Game Effects").
+          stackKey: "mastery:slow",
+          modifiers: [{ type: "speed", amount: -10 }],
+          linkedConditionIds: [],
+          escapeDc: null,
+          onEnd: [],
+          endsWithTag: null
+        }
       }
-    }]
+    ]
   },
 
   /**
@@ -151,15 +164,17 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
    * saves. Applied automatically; the GM dismisses the prompt if the attacker declines.
    */
   topple: {
-    onHitSave: (swing) => [{
-      targetId: swing.attack.targetId,
-      targetName: swing.attack.targetName,
-      ability: "con",
-      // Clamped to `PendingSaveSchema`'s 1..40.
-      dc: Math.max(1, Math.min(40, 8 + swing.mastery.abilityModifier + swing.proficiencyBonus)),
-      conditionId: "prone",
-      actionName: "Topple"
-    }]
+    onHitSave: (swing) => [
+      {
+        targetId: swing.attack.targetId,
+        targetName: swing.attack.targetName,
+        ability: "con",
+        // Clamped to `PendingSaveSchema`'s 1..40.
+        dc: Math.max(1, Math.min(40, 8 + swing.mastery.abilityModifier + swing.proficiencyBonus)),
+        conditionId: "prone",
+        actionName: "Topple"
+      }
+    ]
   }
 };
 

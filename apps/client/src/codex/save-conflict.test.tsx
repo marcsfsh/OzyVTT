@@ -13,7 +13,12 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    codexApi: { ...actual.codexApi, updatePage: (...a: unknown[]) => updatePage(...a), getPage: (...a: unknown[]) => getPage(...a), markersForPage: (...a: unknown[]) => markersForPage(...a) },
+    codexApi: {
+      ...actual.codexApi,
+      updatePage: (...a: unknown[]) => updatePage(...a),
+      getPage: (...a: unknown[]) => getPage(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a)
+    },
     journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a) }
   };
 });
@@ -26,17 +31,39 @@ import { CodexRequestError, type CodexPage } from "./api";
  * single-writer with last-writer-wins, so these assert what the code does.
  */
 const page: CodexPage = {
-  id: "page-1", title: "Barovia", entityType: "location", fields: {}, gmFields: {},
-  folder: null, tags: [], revealedToPlayers: false, bannerAssetId: null,
-  inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 3,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z",
-  playerBody: "Fog.", gmBody: ""
+  id: "page-1",
+  title: "Barovia",
+  entityType: "location",
+  fields: {},
+  gmFields: {},
+  folder: null,
+  tags: [],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 3,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  playerBody: "Fog.",
+  gmBody: ""
 };
 
 function renderEditor() {
   return render(
-    <PageEditor gmToken="gm" page={page} pages={[page]} connections={[]} autosave={{ enabled: true, intervalSeconds: 1 }}
-      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onOpenConnection={vi.fn()} onConnectionsChanged={() => {}} />
+    <PageEditor
+      gmToken="gm"
+      page={page}
+      pages={[page]}
+      connections={[]}
+      autosave={{ enabled: true, intervalSeconds: 1 }}
+      onChange={() => {}}
+      onDeleted={() => {}}
+      onNavigate={() => {}}
+      onOpenConnection={vi.fn()}
+      onConnectionsChanged={() => {}}
+    />
   );
 }
 
@@ -53,7 +80,12 @@ describe("PageEditor save/conflict path", () => {
   it("autosaves an edit, showing the in-flight state then settling", async () => {
     // `SaveState` shows "Saved" for both idle and saved, so assert the "Saving..." transition instead.
     let release!: (value: unknown) => void;
-    updatePage.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    updatePage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
     const user = userEvent.setup();
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");

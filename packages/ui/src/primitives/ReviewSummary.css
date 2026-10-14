@@ -1,4 +1,7 @@
-.nh-review { display: grid; gap: var(--space-4); }
+.nh-review {
+  display: grid;
+  gap: var(--space-4);
+}
 
 .nh-review-section {
   display: grid;
@@ -9,26 +12,72 @@
   background: var(--surface-1);
 }
 /* Missing something is caution, not danger; the edge pairs with the words beside the Edit link. */
-.nh-review-section.is-incomplete { border-color: var(--caution); }
+.nh-review-section.is-incomplete {
+  border-color: var(--caution);
+}
 
 /* `max-width: none` so a host's bare `header` rule can't limit this header's width. */
-.nh-review-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); max-width: none; }
-.nh-review-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
+.nh-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  max-width: none;
+}
+.nh-review-title {
+  margin: 0;
+  font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+}
 /* Edit is a ghost Button; this rule only aligns it. */
-.nh-review-edit { flex: none; }
-.nh-review-edit-icon { display: grid; place-items: center; font-size: 0.95em; }
+.nh-review-edit {
+  flex: none;
+}
+.nh-review-edit-icon {
+  display: grid;
+  place-items: center;
+  font-size: 0.95em;
+}
 
-.nh-review-incomplete { margin: 0; display: flex; align-items: center; gap: var(--space-2); color: var(--caution-hi); font-size: var(--fs-sm); }
-.nh-review-incomplete-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+.nh-review-incomplete {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
+.nh-review-incomplete-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
 
 /* Reuses .nh-statlist's grid; a review mixes prose and numbers. */
-.nh-review-stats { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
-.nh-review-stats dd.nh-review-text { font-family: var(--font-body); font-weight: 600; line-height: 1.35; }
-.nh-review-stats dd.nh-review-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.nh-review-stats {
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+}
+.nh-review-stats dd.nh-review-text {
+  font-family: var(--font-body);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.nh-review-stats dd.nh-review-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
 
-.nh-review-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: var(--lh-body); }
+.nh-review-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
 
 /* 560px is the phone step. */
 @media (max-width: 560px) {
-  .nh-review-stats { grid-template-columns: 1fr 1fr; }
+  .nh-review-stats {
+    grid-template-columns: 1fr 1fr;
+  }
 }

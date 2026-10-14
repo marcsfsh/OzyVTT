@@ -42,36 +42,77 @@ const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 // recorded" as "proficient" and the grant would be invisible.
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
-    name: "Hero", armorClass: 12, proficiencyBonus: 3,
+    name: "Hero",
+    armorClass: 12,
+    proficiencyBonus: 3,
     abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 10 },
     hitPoints: { maximum: 30 },
-    actions: [], extensions: {},
+    actions: [],
+    extensions: {},
     character: { classes: [{ id: "wizard", name: "Wizard", level: 5 }], feats: [] },
     proficiencies: { saves: [], skills: [], weapons: [], armor: [], tools: [] },
     ...over
   } as unknown as ActorDefinition;
 }
 
-const item = (over: Record<string, unknown>): InventoryItem => InventoryItemSchema.parse({ id: "x", name: "X", ...over });
+const item = (over: Record<string, unknown>): InventoryItem =>
+  InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
 function stateWith(inventory: InventoryItem[]): GameState {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.hero, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 30, maximum: 30 }, armorClass: 12, definitionId: "def-hero", inventory },
-    { id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: 60, maximum: 60 }, armorClass: 12 }
-  ] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.hero,
+        name: "Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 30, maximum: 30 },
+        armorClass: 12,
+        definitionId: "def-hero",
+        inventory
+      },
+      {
+        id: IDS.foe,
+        name: "Foe",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 60, maximum: 60 },
+        armorClass: 12
+      }
+    ]
+  });
 }
 
 function fight(state: GameState) {
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.hero, score: 20 },
+        { actorId: IDS.foe, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return state;
 }
 
 function deps(faces: number[], definition: ActorDefinition): ResolveDependencies {
   let index = 0;
   return {
-    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
     newRollId: () => `40000000-0000-4000-8000-0000000000${String(index++).padStart(2, "0")}`,
-    gmSessionId: IDS.gmSession, now: () => "2026-08-12T00:00:00.000Z", definition, catalog
+    gmSessionId: IDS.gmSession,
+    now: () => "2026-08-12T00:00:00.000Z",
+    definition,
+    catalog
   };
 }
 
@@ -91,10 +132,17 @@ const fromCatalog = (id: string): InventoryItem => {
   const record = view.equipmentRecord(id)!;
   const weapon = record.weapon!;
   return item({
-    id: record.id, name: record.name, quantity: 1, equipped: true, category: record.category,
+    id: record.id,
+    name: record.name,
+    quantity: 1,
+    equipped: true,
+    category: record.category,
     weapon: {
-      category: weapon.category, damageDice: weapon.damageDice, damageType: weapon.damageType,
-      rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet,
+      category: weapon.category,
+      damageDice: weapon.damageDice,
+      damageType: weapon.damageType,
+      rangeFeet: weapon.rangeFeet,
+      longRangeFeet: weapon.longRangeFeet,
       ...(weapon.properties ? { properties: [...weapon.properties] } : {})
     }
   });
@@ -145,14 +193,36 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
     expect(saveTotalFor(definition, state.actors[0], "dex", withCloak)).toBe(3); // Dex +2, no proficiency, +1 cloak
 
     createPendingSaves(state, {
-      sourceActorId: IDS.foe, sourceName: "Foe", actionName: "Blast", ability: "dex", dc: 16,
-      targetIds: [IDS.hero], proposedDamage: 10, halfOnSuccess: true, conditionId: null,
-      newSaveId: () => "60000000-0000-4000-8000-000000000001", createdAt: 0
+      sourceActorId: IDS.foe,
+      sourceName: "Foe",
+      actionName: "Blast",
+      ability: "dex",
+      dc: 16,
+      targetIds: [IDS.hero],
+      proposedDamage: 10,
+      halfOnSuccess: true,
+      conditionId: null,
+      newSaveId: () => "60000000-0000-4000-8000-000000000001",
+      createdAt: 0
     });
-    const saved = answerSave(state, cmd(1), state.combat.pendingSaves[0].id, "roll", undefined, false, { role: "gm" }, {
-      random: () => 13, newRollId: () => "40000000-0000-4000-8000-000000000000", sessionId: IDS.gmSession, role: "gm",
-      now: () => "2026-08-12T00:00:00.000Z", resolveDefinition: () => definition, catalog
-    });
+    const saved = answerSave(
+      state,
+      cmd(1),
+      state.combat.pendingSaves[0].id,
+      "roll",
+      undefined,
+      false,
+      { role: "gm" },
+      {
+        random: () => 13,
+        newRollId: () => "40000000-0000-4000-8000-000000000000",
+        sessionId: IDS.gmSession,
+        role: "gm",
+        now: () => "2026-08-12T00:00:00.000Z",
+        resolveDefinition: () => definition,
+        catalog
+      }
+    );
     // d20 = 13, +2 Dex, +1 cloak = 16, which meets DC 16.
     expect(saved.outcome).toMatchObject({ total: 16, success: true });
 
@@ -163,14 +233,36 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
     expect(saveTotalFor(definition, bareState.actors[0], "dex", bare)).toBe(2);
 
     createPendingSaves(bareState, {
-      sourceActorId: IDS.foe, sourceName: "Foe", actionName: "Blast", ability: "dex", dc: 16,
-      targetIds: [IDS.hero], proposedDamage: 10, halfOnSuccess: true, conditionId: null,
-      newSaveId: () => "60000000-0000-4000-8000-000000000002", createdAt: 0
+      sourceActorId: IDS.foe,
+      sourceName: "Foe",
+      actionName: "Blast",
+      ability: "dex",
+      dc: 16,
+      targetIds: [IDS.hero],
+      proposedDamage: 10,
+      halfOnSuccess: true,
+      conditionId: null,
+      newSaveId: () => "60000000-0000-4000-8000-000000000002",
+      createdAt: 0
     });
-    const failed = answerSave(bareState, cmd(2), bareState.combat.pendingSaves[0].id, "roll", undefined, false, { role: "gm" }, {
-      random: () => 13, newRollId: () => "40000000-0000-4000-8000-000000000001", sessionId: IDS.gmSession, role: "gm",
-      now: () => "2026-08-12T00:00:00.000Z", resolveDefinition: () => definition, catalog
-    });
+    const failed = answerSave(
+      bareState,
+      cmd(2),
+      bareState.combat.pendingSaves[0].id,
+      "roll",
+      undefined,
+      false,
+      { role: "gm" },
+      {
+        random: () => 13,
+        newRollId: () => "40000000-0000-4000-8000-000000000001",
+        sessionId: IDS.gmSession,
+        role: "gm",
+        now: () => "2026-08-12T00:00:00.000Z",
+        resolveDefinition: () => definition,
+        catalog
+      }
+    );
     expect(failed.outcome).toMatchObject({ total: 15, success: false });
   });
 });
@@ -181,21 +273,33 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
 describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the higher die", () => {
   /** Resolve one builtin action exactly as the `action.resolve` handler does. */
   const check = (state: GameState, actionId: string, definition: ActorDefinition, faces: number[], n = 1) =>
-    resolveDefinitionAction(state, builtinAction(actionId)!, {
-      actorId: IDS.hero, targetIds: [], commandId: cmd(n), builtin: true
-    }, deps(faces, definition));
+    resolveDefinitionAction(
+      state,
+      builtinAction(actionId)!,
+      {
+        actorId: IDS.hero,
+        targetIds: [],
+        commandId: cmd(n),
+        builtin: true
+      },
+      deps(faces, definition)
+    );
 
   it("carries the harvested rider out of the COMMITTED bundle - the first link", () => {
     const record = view.equipmentRecord("boots-of-elvenkind")!;
     expect(record.slot).toBe("feet");
-    expect(record.modifiers).toEqual([{
-      type: "roll-mode", roll: "check", mode: "advantage",
-      when: [
-        { type: "on-ability-check" },
-        { type: "ability-is", abilities: ["dex"] },
-        { type: "skill-is", skills: ["stealth"] }
-      ]
-    }]);
+    expect(record.modifiers).toEqual([
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
+        when: [
+          { type: "on-ability-check" },
+          { type: "ability-is", abilities: ["dex"] },
+          { type: "skill-is", skills: ["stealth"] }
+        ]
+      }
+    ]);
   });
 
   it("rolls 2d20kh1, keeps 17 over 3, and CLEARS Hide's DC 15 - the outcome moved, not just the die", () => {
@@ -204,19 +308,30 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
     const resolution = check(state, "hide", definition, [3, 17]);
 
     // Dex 14 = +2; this Wizard has no Stealth proficiency, so the +2 is the ability alone.
-    expect(resolution.check).toMatchObject({ skill: "Dexterity (Stealth)", naturalRoll: 17, total: 19, dc: 15, success: true });
+    expect(resolution.check).toMatchObject({
+      skill: "Dexterity (Stealth)",
+      naturalRoll: 17,
+      total: 19,
+      dc: 15,
+      success: true
+    });
     expect(resolution.rollMode).toEqual({ mode: "advantage", advantage: ["Boots of Elvenkind"], disadvantage: [] });
     // Two dice were thrown and one was kept.
     const record = state.rolls.find((roll) => roll.purpose === "check")!;
     expect(record.normalizedFormula).toBe("2d20kh1+2");
-    expect(record.dice.map((die) => ({ face: die.face, kept: die.kept }))).toEqual([{ face: 3, kept: false }, { face: 17, kept: true }]);
+    expect(record.dice.map((die) => ({ face: die.face, kept: die.kept }))).toEqual([
+      { face: 3, kept: false },
+      { face: 17, kept: true }
+    ]);
     // The success half moved with it: Hiding grants the Invisible-linked effect.
     expect(state.actors[0].effects.map((effect) => effect.name)).toEqual(["Hiding"]);
   });
 
   it("takes the boots off and the SAME queue gives one d20 and a failure", () => {
     const definition = definitionOf();
-    const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false, equipped: false })]));
+    const state = fight(
+      stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false, equipped: false })])
+    );
     const resolution = check(state, "hide", definition, [3, 17]);
 
     expect(resolution.check).toMatchObject({ naturalRoll: 3, total: 5, dc: 15, success: false });
@@ -228,7 +343,11 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
   it("does NOT reach Search, Study or Influence - the narrow is the whole point", () => {
     // `skill-is: ["stealth"]` fails closed against a check that passes no skill, and `ability-is` fails
     // closed against a different ability, so three items cannot cover five checks.
-    for (const [n, actionId, formula] of [[10, "search", "1d20+0"], [11, "study", "1d20+3"], [12, "influence", "1d20+0"]] as const) {
+    for (const [n, actionId, formula] of [
+      [10, "search", "1d20+0"],
+      [11, "study", "1d20+3"],
+      [12, "influence", "1d20+0"]
+    ] as const) {
       const definition = definitionOf();
       const state = fight(stateWith([worn("boots-of-elvenkind", "Boots of Elvenkind", { attuned: false })]));
       const resolution = check(state, actionId, definition, [3, 17], n);
@@ -244,7 +363,11 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
     expect(view.equipmentRecord("cloak-of-elvenkind")!.attunement?.required).toBe(true);
 
     const unattuned = fight(stateWith([worn("cloak-of-elvenkind", "Cloak of Elvenkind", { attuned: false })]));
-    expect(check(unattuned, "hide", definitionOf(), [3, 17], 20).check).toMatchObject({ naturalRoll: 3, total: 5, success: false });
+    expect(check(unattuned, "hide", definitionOf(), [3, 17], 20).check).toMatchObject({
+      naturalRoll: 3,
+      total: 5,
+      success: false
+    });
     expect(unattuned.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe("1d20+2");
 
     const attuned = fight(stateWith([worn("cloak-of-elvenkind", "Cloak of Elvenkind")]));
@@ -269,10 +392,25 @@ describe("C7c: an AC bonus the SRD gates on wearing nothing", () => {
     expect(state.actors[0].armorClass).toBe(14); // 12 + 2
 
     // A Shield counts as armor for the gate: `while-unarmored` defaults `allowShield: false`.
-    setInventoryItem(state, IDS.hero, item({
-      id: "shield", name: "Shield", category: "shield", equipped: true,
-      armor: { acBase: 2, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null }
-    }), () => definition, { catalog });
+    setInventoryItem(
+      state,
+      IDS.hero,
+      item({
+        id: "shield",
+        name: "Shield",
+        category: "shield",
+        equipped: true,
+        armor: {
+          acBase: 2,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: false,
+          strengthRequired: null
+        }
+      }),
+      () => definition,
+      { catalog }
+    );
     // 10 + Dex 2 + shield 2 = 14. If the gate had not fired this would be 16.
     expect(state.actors[0].armorClass).toBe(14);
   });
@@ -288,7 +426,7 @@ describe("C7c: a +5 that lands on ONE skill row", () => {
     const row = (id: string) => sheet.skills.find((entry) => entry.id === id)!;
 
     expect(row("sleight-of-hand").bonus).toBe(7); // Dex +2 and the glove's +5
-    expect(row("stealth").bonus).toBe(2);         // same ability, untouched: the filter narrows
+    expect(row("stealth").bonus).toBe(2); // same ability, untouched: the filter narrows
     expect(row("acrobatics").bonus).toBe(2);
     // And it is not a blanket ability bonus either: the raw Dex check is unchanged.
     expect(sheet.abilities.find((entry) => entry.ability === "dex")!.check).toBe(2);
@@ -300,20 +438,34 @@ describe("C7c: a proficiency an item hands out, on the swing", () => {
     const definition = definitionOf();
     // The bow's stats come from the shipped catalog, not this file.
     const bow = fromCatalog("longbow");
-    expect(bow.weapon).toEqual({ category: "martial", damageDice: "1d8", damageType: "piercing", rangeFeet: 150, longRangeFeet: 600, properties: ["ammunition", "heavy", "two-handed"] });
-    const without = effectiveActions(definition, fight(stateWith([bow])).actors[0], catalog)
-      .find((entry) => entry.id === "item-longbow")!;
-    const withBracers = effectiveActions(definition, fight(stateWith([bow, worn("bracers-of-archery", "Bracers of Archery")])).actors[0], catalog)
-      .find((entry) => entry.id === "item-longbow")!;
+    expect(bow.weapon).toEqual({
+      category: "martial",
+      damageDice: "1d8",
+      damageType: "piercing",
+      rangeFeet: 150,
+      longRangeFeet: 600,
+      properties: ["ammunition", "heavy", "two-handed"]
+    });
+    const without = effectiveActions(definition, fight(stateWith([bow])).actors[0], catalog).find(
+      (entry) => entry.id === "item-longbow"
+    )!;
+    const withBracers = effectiveActions(
+      definition,
+      fight(stateWith([bow, worn("bracers-of-archery", "Bracers of Archery")])).actors[0],
+      catalog
+    ).find((entry) => entry.id === "item-longbow")!;
 
-    expect(without.attack!.bonus).toBe(2);        // Dex +2, untrained
-    expect(withBracers.attack!.bonus).toBe(5);    // + the proficiency bonus 3, from the bracers
+    expect(without.attack!.bonus).toBe(2); // Dex +2, untrained
+    expect(withBracers.attack!.bonus).toBe(5); // + the proficiency bonus 3, from the bracers
 
     // The grant is the two bows the SRD names, not "weapons": a Longsword from the same catalog stays
     // untrained with the bracers on, which `grants.weapons: ["martial"]` would fail.
-    const swing = effectiveActions(definition, fight(stateWith([fromCatalog("longsword"), worn("bracers-of-archery", "Bracers of Archery")])).actors[0], catalog)
-      .find((entry) => entry.id === "item-longsword")!;
-    expect(swing.attack!.bonus).toBe(0);          // Str +0, still untrained
+    const swing = effectiveActions(
+      definition,
+      fight(stateWith([fromCatalog("longsword"), worn("bracers-of-archery", "Bracers of Archery")])).actors[0],
+      catalog
+    ).find((entry) => entry.id === "item-longsword")!;
+    expect(swing.attack!.bonus).toBe(0); // Str +0, still untrained
   });
 });
 
@@ -321,9 +473,16 @@ describe("C7c: resistance and immunity, at the damage pipeline", () => {
   it("halves Cold through Boots of the Winterlands and names the boots on the line", () => {
     const definition = definitionOf();
     const state = stateWith([worn("boots-of-the-winterlands", "Boots of the Winterlands")]);
-    const outcome = applyDamageDetailed(state, IDS.hero, { amount: 0, parts: [{ amount: 12, type: "cold" }] }, { role: "gm" }, {
-      resolveDefinition: () => definition, catalog
-    });
+    const outcome = applyDamageDetailed(
+      state,
+      IDS.hero,
+      { amount: 0, parts: [{ amount: 12, type: "cold" }] },
+      { role: "gm" },
+      {
+        resolveDefinition: () => definition,
+        catalog
+      }
+    );
     expect(outcome.application.parts).toEqual([
       { amount: 12, type: "cold", adjusted: 6, adjustment: "resistance", adjustmentSource: "Boots of the Winterlands" }
     ]);
@@ -333,18 +492,40 @@ describe("C7c: resistance and immunity, at the damage pipeline", () => {
   it("zeroes Poison through the Periapt of Proof against Poison, and refuses the Poisoned condition by name", () => {
     const definition = definitionOf();
     const state = stateWith([worn("periapt-of-proof-against-poison", "Periapt of Proof against Poison")]);
-    const outcome = applyDamageDetailed(state, IDS.hero, { amount: 0, parts: [{ amount: 14, type: "poison" }] }, { role: "gm" }, {
-      resolveDefinition: () => definition, catalog
-    });
+    const outcome = applyDamageDetailed(
+      state,
+      IDS.hero,
+      { amount: 0, parts: [{ amount: 14, type: "poison" }] },
+      { role: "gm" },
+      {
+        resolveDefinition: () => definition,
+        catalog
+      }
+    );
     expect(outcome.application.parts).toEqual([
-      { amount: 14, type: "poison", adjusted: 0, adjustment: "immunity", adjustmentSource: "Periapt of Proof against Poison" }
+      {
+        amount: 14,
+        type: "poison",
+        adjusted: 0,
+        adjustment: "immunity",
+        adjustmentSource: "Periapt of Proof against Poison"
+      }
     ]);
     expect(state.actors[0].hp.current).toBe(30);
 
     // The condition half, through the GM's own command: narrated as a skip, and not applied.
-    const events = setCondition(state, IDS.hero, "poisoned", true, undefined, { role: "gm" }, {
-      catalog, resolveDefinition: () => definition
-    });
+    const events = setCondition(
+      state,
+      IDS.hero,
+      "poisoned",
+      true,
+      undefined,
+      { role: "gm" },
+      {
+        catalog,
+        resolveDefinition: () => definition
+      }
+    );
     expect(events[0].text).toContain("immune to");
     expect(state.actors[0].conditions).toEqual([]);
   });
@@ -352,12 +533,26 @@ describe("C7c: resistance and immunity, at the damage pipeline", () => {
   it("halves Force through the Brooch of Shielding, and Poison through the Cloak of Arachnida", () => {
     const definition = definitionOf();
     const brooch = stateWith([worn("brooch-of-shielding", "Brooch of Shielding")]);
-    expect(applyDamageDetailed(brooch, IDS.hero, { amount: 0, parts: [{ amount: 9, type: "force" }] }, { role: "gm" }, { resolveDefinition: () => definition, catalog })
-      .application.parts[0]).toMatchObject({ adjusted: 4, adjustment: "resistance", adjustmentSource: "Brooch of Shielding" });
+    expect(
+      applyDamageDetailed(
+        brooch,
+        IDS.hero,
+        { amount: 0, parts: [{ amount: 9, type: "force" }] },
+        { role: "gm" },
+        { resolveDefinition: () => definition, catalog }
+      ).application.parts[0]
+    ).toMatchObject({ adjusted: 4, adjustment: "resistance", adjustmentSource: "Brooch of Shielding" });
 
     const cloak = stateWith([worn("cloak-of-arachnida", "Cloak of Arachnida")]);
-    expect(applyDamageDetailed(cloak, IDS.hero, { amount: 0, parts: [{ amount: 10, type: "poison" }] }, { role: "gm" }, { resolveDefinition: () => definition, catalog })
-      .application.parts[0]).toMatchObject({ adjusted: 5, adjustment: "resistance", adjustmentSource: "Cloak of Arachnida" });
+    expect(
+      applyDamageDetailed(
+        cloak,
+        IDS.hero,
+        { amount: 0, parts: [{ amount: 10, type: "poison" }] },
+        { role: "gm" },
+        { resolveDefinition: () => definition, catalog }
+      ).application.parts[0]
+    ).toMatchObject({ adjusted: 5, adjustment: "resistance", adjustmentSource: "Cloak of Arachnida" });
   });
 });
 
@@ -366,11 +561,18 @@ describe("C7c: the charges a worn item rations", () => {
     const definition = definitionOf();
     const state = fight(stateWith([worn("robe-of-scintillating-colors", "Robe of Scintillating Colors")]));
     const actor = state.actors[0];
-    const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === "item-robe-of-scintillating-colors-dazzle")!;
+    const action = effectiveActions(definition, actor, catalog).find(
+      (entry) => entry.id === "item-robe-of-scintillating-colors-dazzle"
+    )!;
     expect(action.save).toEqual({ ability: "wis", dc: 15 });
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) },
+      deps([], definition)
+    );
     // The condition is not an authored field: `conditionFrom` reads "Stunned" from the prose, which is
     // why the module keeps the SRD's word verbatim.
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionId: "stunned" });
@@ -378,8 +580,14 @@ describe("C7c: the charges a worn item rations", () => {
 
     actor.actionUses = { "robe-of-scintillating-colors-charges": 3 };
     newTurn(state);
-    expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(4) }, deps([], definition)))
-      .toThrow("Scintillating Colors: no uses remaining (3/long rest).");
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(4) },
+        deps([], definition)
+      )
+    ).toThrow("Scintillating Colors: no uses remaining (3/long rest).");
   });
 
   it("rations the Cloak of Invisibility at three and the Winged Boots at four", () => {
@@ -397,8 +605,14 @@ describe("C7c: the charges a worn item rations", () => {
       expect(action.attack).toBeUndefined();
 
       actor.actionUses = { [`${id}-charges`]: limit };
-      expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [], commandId: cmd(5) }, deps([], definition)))
-        .toThrow(`${label}: no uses remaining (${limit}/long rest).`);
+      expect(() =>
+        resolveDefinitionAction(
+          state,
+          action,
+          { actorId: IDS.hero, targetIds: [], commandId: cmd(5) },
+          deps([], definition)
+        )
+      ).toThrow(`${label}: no uses remaining (${limit}/long rest).`);
     }
   });
 });
@@ -421,25 +635,44 @@ describe("C7c: the casts that survived the spell-record check", () => {
     expect(detect.attack).toBeUndefined();
 
     // Separate pools: "that spell can't be cast from it again" gates each spell on its own.
-    resolveDefinitionAction(state, detect, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(6) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      detect,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(6) },
+      deps([], definition)
+    );
     expect(actor.actionUses["helm-of-telepathy-detect-thoughts"]).toBe(1);
     expect(actor.actionUses["helm-of-telepathy-suggestion"]).toBeUndefined();
     newTurn(state);
-    resolveDefinitionAction(state, suggest, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(7) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      suggest,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(7) },
+      deps([], definition)
+    );
     expect(actor.actionUses["helm-of-telepathy-suggestion"]).toBe(1);
   });
 
   it("spends one of the Eyes of Charming's three charges at DC 13, and offers the Medallion five", () => {
     const definition = definitionOf();
     const state = fight(stateWith([worn("eyes-of-charming", "Eyes of Charming")]));
-    const cast = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-eyes-of-charming-cast-charm-person")!;
+    const cast = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-eyes-of-charming-cast-charm-person"
+    )!;
     expect(cast.save).toEqual({ ability: "wis", dc: 13 });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" });
-    resolveDefinitionAction(state, cast, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(8) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      cast,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(8) },
+      deps([], definition)
+    );
     expect(state.actors[0].actionUses["eyes-of-charming-charges"]).toBe(1);
 
     const medallion = fight(stateWith([worn("medallion-of-thoughts", "Medallion of Thoughts")]));
-    const detect = effectiveActions(definition, medallion.actors[0], catalog).find((entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts")!;
+    const detect = effectiveActions(definition, medallion.actors[0], catalog).find(
+      (entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts"
+    )!;
     expect(detect.save).toEqual({ ability: "wis", dc: 13 });
     expect(detect.uses).toEqual({ limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" });
   });
@@ -448,7 +681,11 @@ describe("C7c: the casts that survived the spell-record check", () => {
     const definition = definitionOf();
     for (const [id, name, actionId] of [
       ["hat-of-disguise", "Hat of Disguise", "item-hat-of-disguise-cast-disguise-self"],
-      ["helm-of-comprehending-languages", "Helm of Comprehending Languages", "item-helm-of-comprehending-languages-cast-comprehend-languages"]
+      [
+        "helm-of-comprehending-languages",
+        "Helm of Comprehending Languages",
+        "item-helm-of-comprehending-languages-cast-comprehend-languages"
+      ]
     ] as const) {
       const state = fight(stateWith([worn(id, name, { attuned: id === "hat-of-disguise" })]));
       const cast = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === actionId)!;
@@ -468,16 +705,27 @@ describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by 
   it("leaves a Wand of Paralysis' printed DC 15 alone, and a Breath Weapon's 13, with the robe on", () => {
     const robe = worn("robe-of-the-archmagi", "Robe of the Archmagi");
     // A definition action that is not a spell at all.
-    const definition = definitionOf({ actions: [{
-      id: "breath", name: "Fire Breath", activation: "action",
-      description: "Each creature in a 15-foot Cone makes a DC 13 Dexterity saving throw.",
-      save: { ability: "dex", dc: 13 }, damage: [{ formula: "2d6", type: "fire" }]
-    }] });
+    const definition = definitionOf({
+      actions: [
+        {
+          id: "breath",
+          name: "Fire Breath",
+          activation: "action",
+          description: "Each creature in a 15-foot Cone makes a DC 13 Dexterity saving throw.",
+          save: { ability: "dex", dc: 13 },
+          damage: [{ formula: "2d6", type: "fire" }]
+        }
+      ]
+    });
     // A second item with an SRD-printed DC. The robe is `shoulders` and a wand is `held`, so this is a
     // real loadout.
     const wand = worn("wand-of-paralysis", "Wand of Paralysis", { category: "wand" });
-    const dcs = (inventory: InventoryItem[]) => Object.fromEntries(
-      effectiveActions(definition, stateWith(inventory).actors[0], catalog).filter((entry) => entry.save).map((entry) => [entry.id, entry.save!.dc]));
+    const dcs = (inventory: InventoryItem[]) =>
+      Object.fromEntries(
+        effectiveActions(definition, stateWith(inventory).actors[0], catalog)
+          .filter((entry) => entry.save)
+          .map((entry) => [entry.id, entry.save!.dc])
+      );
 
     const bare = dcs([wand]);
     expect(bare).toEqual({ breath: 13, "item-wand-of-paralysis-paralyzing-ray": 15 });
@@ -491,7 +739,11 @@ describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by 
     expect(record.casts ?? []).toEqual([]);
     expect(record.actions ?? []).toEqual([]);
     // The robe was the only carrier, so no shipped item carries `spell-save-dc`; a new one must justify it.
-    expect(loadMagicItems().filter((row) => (row.modifiers ?? []).some((modifier) => modifier.type === "spell-save-dc")).map((row) => row.id)).toEqual([]);
+    expect(
+      loadMagicItems()
+        .filter((row) => (row.modifiers ?? []).some((modifier) => modifier.type === "spell-save-dc"))
+        .map((row) => row.id)
+    ).toEqual([]);
   });
 
   it("moves the Robe of Stars' +1 into the save the server rolls, and off again", () => {
@@ -505,9 +757,17 @@ describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by 
   it("moves the Scarab of Protection's +1 onto the actor's AC", () => {
     const definition = definitionOf();
     const state = stateWith([]);
-    setInventoryItem(state, IDS.hero, worn("scarab-of-protection", "Scarab of Protection"), () => definition, { catalog });
+    setInventoryItem(state, IDS.hero, worn("scarab-of-protection", "Scarab of Protection"), () => definition, {
+      catalog
+    });
     expect(state.actors[0].armorClass).toBe(13);
-    setInventoryItem(state, IDS.hero, worn("scarab-of-protection", "Scarab of Protection", { equipped: false }), () => definition, { catalog });
+    setInventoryItem(
+      state,
+      IDS.hero,
+      worn("scarab-of-protection", "Scarab of Protection", { equipped: false }),
+      () => definition,
+      { catalog }
+    );
     expect(state.actors[0].armorClass).toBe(12);
   });
 });
@@ -529,12 +789,27 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   it("authors exactly 21 of the 56 and names the other 35 as absences - the two add to the lane", () => {
     const authored = Object.keys(lane.entries).sort();
     expect(authored).toEqual([
-      "boots-of-elvenkind", "boots-of-the-winterlands", "bracers-of-archery", "bracers-of-defense",
-      "brooch-of-shielding", "cloak-of-arachnida", "cloak-of-elvenkind", "cloak-of-invisibility",
-      "cloak-of-protection", "cloak-of-the-bat", "eyes-of-charming",
-      "gloves-of-thievery", "hat-of-disguise", "helm-of-comprehending-languages", "helm-of-telepathy",
-      "medallion-of-thoughts", "periapt-of-proof-against-poison", "robe-of-scintillating-colors",
-      "robe-of-stars", "scarab-of-protection", "winged-boots"
+      "boots-of-elvenkind",
+      "boots-of-the-winterlands",
+      "bracers-of-archery",
+      "bracers-of-defense",
+      "brooch-of-shielding",
+      "cloak-of-arachnida",
+      "cloak-of-elvenkind",
+      "cloak-of-invisibility",
+      "cloak-of-protection",
+      "cloak-of-the-bat",
+      "eyes-of-charming",
+      "gloves-of-thievery",
+      "hat-of-disguise",
+      "helm-of-comprehending-languages",
+      "helm-of-telepathy",
+      "medallion-of-thoughts",
+      "periapt-of-proof-against-poison",
+      "robe-of-scintillating-colors",
+      "robe-of-stars",
+      "scarab-of-protection",
+      "winged-boots"
     ]);
     expect(authored).toHaveLength(21);
     expect(mine.length - authored.length).toBe(35);
@@ -542,13 +817,17 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     for (const id of authored) {
       const row = mine.find((entry) => entry.id === id);
       expect(row, `${id} is not one of C7c's 56 rows`).toBeDefined();
-      const carries = (row!.modifiers?.length ?? 0) + (row!.casts?.length ?? 0) + (row!.actions?.length ?? 0)
-        + (row!.grants ? Object.values(row!.grants).flat().length : 0);
+      const carries =
+        (row!.modifiers?.length ?? 0) +
+        (row!.casts?.length ?? 0) +
+        (row!.actions?.length ?? 0) +
+        (row!.grants ? Object.values(row!.grants).flat().length : 0);
       expect(carries, `${id} merged into the bundle carrying nothing`).toBeGreaterThan(0);
       // Per-slot totals, so a row cannot move group without the module header moving with it.
     }
-    const bySlot = Object.fromEntries(WORN_SLOTS.map((slot) =>
-      [slot, authored.filter((id) => mine.find((row) => row.id === id)!.slot === slot).length]));
+    const bySlot = Object.fromEntries(
+      WORN_SLOTS.map((slot) => [slot, authored.filter((id) => mine.find((row) => row.id === id)!.slot === slot).length])
+    );
     expect(bySlot).toEqual({ shoulders: 7, head: 4, neck: 4, hands: 3, feet: 3, belt: 0 });
   });
 
@@ -579,10 +858,14 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     for (const id of [
       // The gloves need a rolled reduction ("1d10 plus your Dexterity modifier"), a free-hand gate and a
       // Reaction cost; `on-taking-damage` + `damage-reduction` alone cannot express it.
-      "gloves-of-missile-snaring", "periapt-of-wound-closure",         // rolled amount
-      "talisman-of-pure-good", "talisman-of-ultimate-evil",            // needs mechanics not modeled yet
-      "amulet-of-health", "belt-of-giant-strength",                    // ITEM_REFUSED_MODIFIER_TYPES
-      "gauntlets-of-ogre-power", "headband-of-intellect"
+      "gloves-of-missile-snaring",
+      "periapt-of-wound-closure", // rolled amount
+      "talisman-of-pure-good",
+      "talisman-of-ultimate-evil", // needs mechanics not modeled yet
+      "amulet-of-health",
+      "belt-of-giant-strength", // ITEM_REFUSED_MODIFIER_TYPES
+      "gauntlets-of-ogre-power",
+      "headband-of-intellect"
     ]) {
       const row = view.equipmentRecord(id)!;
       expect(row.modifiers ?? [], `${id} must stay prose`).toEqual([]);
@@ -595,10 +878,19 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   it("splits the eight 'Advantage on a check' rows 3 authored / 5 prose, and says why for each", () => {
     // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
     // are authored; authoring the rest would over-grant.
-    const advantageOnChecks = mine.filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? "")).map((row) => row.id).sort();
+    const advantageOnChecks = mine
+      .filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? ""))
+      .map((row) => row.id)
+      .sort();
     expect(advantageOnChecks).toEqual([
-      "belt-of-dwarvenkind", "boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat",
-      "eyes-of-minute-seeing", "eyes-of-the-eagle", "robe-of-eyes", "talisman-of-the-sphere"
+      "belt-of-dwarvenkind",
+      "boots-of-elvenkind",
+      "cloak-of-elvenkind",
+      "cloak-of-the-bat",
+      "eyes-of-minute-seeing",
+      "eyes-of-the-eagle",
+      "robe-of-eyes",
+      "talisman-of-the-sphere"
     ]);
 
     // Authored (3): the clause is "Advantage on Dexterity (Stealth) checks" with no qualifier, and
@@ -607,7 +899,9 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     for (const id of ["boots-of-elvenkind", "cloak-of-elvenkind", "cloak-of-the-bat"]) {
       const row = view.equipmentRecord(id)!;
       expect(row.modifiers, `${id} lost its harvested rider`).toContainEqual({
-        type: "roll-mode", roll: "check", mode: "advantage",
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
         when: [
           { type: "on-ability-check" },
           { type: "ability-is", abilities: ["dex"] },
@@ -632,8 +926,17 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
     // The lane owns `cursed` and has no carrier. `Robe of Eyes` prints a Drawbacks clause but is not
     // cursed: it comes off, and a curse would lock its benefits on.
     expect(mine.filter((row) => row.cursed === true)).toEqual([]);
-    const speakOfCurses = rows.filter((row) => /\bcursed\b/i.test(row.description ?? "")).map((row) => row.id).sort();
-    expect(speakOfCurses).toEqual(["armor-of-vulnerability", "berserker-axe", "demon-armor", "mysterious-deck", "shield-of-missile-attraction"]);
+    const speakOfCurses = rows
+      .filter((row) => /\bcursed\b/i.test(row.description ?? ""))
+      .map((row) => row.id)
+      .sort();
+    expect(speakOfCurses).toEqual([
+      "armor-of-vulnerability",
+      "berserker-axe",
+      "demon-armor",
+      "mysterious-deck",
+      "shield-of-missile-attraction"
+    ]);
     expect(speakOfCurses.filter((id) => mine.some((row) => row.id === id))).toEqual([]);
   });
 

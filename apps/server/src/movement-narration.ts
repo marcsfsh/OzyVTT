@@ -24,14 +24,21 @@ export type MovementNarration = Readonly<{ publicText: string | null; gmText: st
 export const DISTANCE_TOLERANCE_FEET = 0.1;
 
 /** Distance between two image points in map units, or null when the map has no calibration and no scale. */
-export function mapDistance(geometry: TokenMapGeometry, from: Point, to: Point): Readonly<{ value: number; unit: string }> | null {
+export function mapDistance(
+  geometry: TokenMapGeometry,
+  from: Point,
+  to: Point
+): Readonly<{ value: number; unit: string }> | null {
   if (geometry.calibration) {
     // Tokens sit on cell centers; Chebyshev center-to-center matches how the table counts squares.
     const measured = measureGridPath(geometry.calibration, [from, to], { snapMode: "cell-center" });
     return { value: measured.totalDistance, unit: measured.unit };
   }
   if (geometry.scale) {
-    return { value: Math.hypot(to.x - from.x, to.y - from.y) * geometry.scale.distancePerPixel, unit: geometry.scale.unit };
+    return {
+      value: Math.hypot(to.x - from.x, to.y - from.y) * geometry.scale.distancePerPixel,
+      unit: geometry.scale.unit
+    };
   }
   return null;
 }
@@ -44,30 +51,50 @@ export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; s
  * footprint's half-width in cells; scaled gridless maps subtract each token's radius beyond its central
  * cell. Null when unmeasurable.
  */
-export function creatureDistance(geometry: TokenMapGeometry, a: CreatureFootprint, b: CreatureFootprint): Readonly<{ value: number; unit: string }> | null {
+export function creatureDistance(
+  geometry: TokenMapGeometry,
+  a: CreatureFootprint,
+  b: CreatureFootprint
+): Readonly<{ value: number; unit: string }> | null {
   // Round to 0.01 ft so floating-point noise can't put an adjacent creature out of reach.
   const clean = (value: number, unit: string) => ({ value: Math.round(value * 100) / 100, unit });
   if (geometry.calibration) {
     const gridA = imageToGrid(geometry.calibration, a.position);
     const gridB = imageToGrid(geometry.calibration, b.position);
     const centerCells = Math.max(Math.abs(gridA.column - gridB.column), Math.abs(gridA.row - gridB.row));
-    const edgeCells = Math.max(0, centerCells - (Math.max(1, a.sizeCells) - 1) / 2 - (Math.max(1, b.sizeCells) - 1) / 2);
+    const edgeCells = Math.max(
+      0,
+      centerCells - (Math.max(1, a.sizeCells) - 1) / 2 - (Math.max(1, b.sizeCells) - 1) / 2
+    );
     return clean(edgeCells * geometry.calibration.distancePerCell, "ft");
   }
   if (geometry.scale) {
-    const beyondCentralCell = (footprint: CreatureFootprint) => (footprint.sizePx - footprint.sizePx / Math.max(1, footprint.sizeCells)) / 2;
+    const beyondCentralCell = (footprint: CreatureFootprint) =>
+      (footprint.sizePx - footprint.sizePx / Math.max(1, footprint.sizeCells)) / 2;
     const centerPx = Math.hypot(b.position.x - a.position.x, b.position.y - a.position.y);
-    return clean(Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel, geometry.scale.unit);
+    return clean(
+      Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel,
+      geometry.scale.unit
+    );
   }
   return null;
 }
 
 /** creatureDistance from encounter-token lookups: null when either combatant is unplaced. */
-export function tokenCreatureDistance(state: GameState, geometry: TokenMapGeometry, actorIdA: string, actorIdB: string): Readonly<{ value: number; unit: string }> | null {
+export function tokenCreatureDistance(
+  state: GameState,
+  geometry: TokenMapGeometry,
+  actorIdA: string,
+  actorIdB: string
+): Readonly<{ value: number; unit: string }> | null {
   const tokenA = state.combat.tokens.find((token) => token.actorId === actorIdA);
   const tokenB = state.combat.tokens.find((token) => token.actorId === actorIdB);
   if (!tokenA?.position || !tokenB?.position) return null;
-  return creatureDistance(geometry, { position: tokenA.position, sizeCells: tokenA.sizeCells ?? 1, sizePx: tokenA.sizePx }, { position: tokenB.position, sizeCells: tokenB.sizeCells ?? 1, sizePx: tokenB.sizePx });
+  return creatureDistance(
+    geometry,
+    { position: tokenA.position, sizeCells: tokenA.sizeCells ?? 1, sizePx: tokenA.sizePx },
+    { position: tokenB.position, sizeCells: tokenB.sizeCells ?? 1, sizePx: tokenB.sizePx }
+  );
 }
 
 function formatDistance(distance: Readonly<{ value: number; unit: string }>): string {
@@ -75,14 +102,16 @@ function formatDistance(distance: Readonly<{ value: number; unit: string }>): st
   return `${rounded} ${distance.unit}`;
 }
 
-export function narrateTokenMove(input: Readonly<{
-  /** Post-move state (the mutation already ran); every position in it is snapped and authoritative. */
-  state: GameState;
-  actorId: string;
-  /** The mover's position before the mutation; null when it entered from the tray. */
-  from: EncounterTokenPosition | null;
-  geometry: TokenMapGeometry;
-}>): MovementNarration | null {
+export function narrateTokenMove(
+  input: Readonly<{
+    /** Post-move state (the mutation already ran); every position in it is snapped and authoritative. */
+    state: GameState;
+    actorId: string;
+    /** The mover's position before the mutation; null when it entered from the tray. */
+    from: EncounterTokenPosition | null;
+    geometry: TokenMapGeometry;
+  }>
+): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
   const mover = state.actors.find((actor) => actor.id === actorId);
   if (!mover) return null;
@@ -100,7 +129,11 @@ export function narrateTokenMove(input: Readonly<{
 
   // Footprint-aware ranges, so the narrated distance matches what the rules enforce.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
-  const moverAt = (point: Point) => ({ position: point, sizeCells: moverToken?.sizeCells ?? 1, sizePx: moverToken?.sizePx ?? 0 });
+  const moverAt = (point: Point) => ({
+    position: point,
+    sizeCells: moverToken?.sizeCells ?? 1,
+    sizePx: moverToken?.sizePx ?? 0
+  });
   type Range = Readonly<{ name: string; hidden: boolean; label: string }>;
   const ranges: Range[] = [];
   for (const entry of state.combat.initiative) {
@@ -108,24 +141,38 @@ export function narrateTokenMove(input: Readonly<{
     const other = state.actors.find((actor) => actor.id === entry.actorId);
     const otherToken = state.combat.tokens.find((token) => token.actorId === entry.actorId);
     if (!other || !otherToken?.position) continue;
-    const footprint = { position: otherToken.position, sizeCells: otherToken.sizeCells ?? 1, sizePx: otherToken.sizePx };
+    const footprint = {
+      position: otherToken.position,
+      sizeCells: otherToken.sizeCells ?? 1,
+      sizePx: otherToken.sizePx
+    };
     const now = creatureDistance(geometry, moverAt(to), footprint);
     if (now === null) continue; // no measurable map: narrate the move without numbers
     const before = from === null ? null : creatureDistance(geometry, moverAt(from), footprint);
-    const label = before === null ? `${other.name} ${formatDistance(now)}` : `${other.name} ${formatDistance(before)} → ${formatDistance(now)}`;
+    const label =
+      before === null
+        ? `${other.name} ${formatDistance(now)}`
+        : `${other.name} ${formatDistance(before)} → ${formatDistance(now)}`;
     ranges.push({ name: other.name, hidden: other.visibility === "gm-only", label });
   }
 
-  const verb = from === null
-    ? `${mover.name} entered the map`
-    : moved === null ? `${mover.name} moved` : `${mover.name} moved ${formatDistance(moved)}`;
-  const withRanges = (list: readonly Range[]) => (list.length > 0 ? `${verb} - ${list.map((range) => range.label).join(", ")}.` : `${verb}.`);
+  const verb =
+    from === null
+      ? `${mover.name} entered the map`
+      : moved === null
+        ? `${mover.name} moved`
+        : `${mover.name} moved ${formatDistance(moved)}`;
+  const withRanges = (list: readonly Range[]) =>
+    list.length > 0 ? `${verb} - ${list.map((range) => range.label).join(", ")}.` : `${verb}.`;
 
   if (moverHidden) return { publicText: null, gmText: withRanges(ranges) };
   const visible = ranges.filter((range) => !range.hidden);
   const concealed = ranges.filter((range) => range.hidden);
   return {
     publicText: withRanges(visible),
-    gmText: concealed.length > 0 ? `Hidden ranges for ${mover.name} - ${concealed.map((range) => range.label).join(", ")}.` : null
+    gmText:
+      concealed.length > 0
+        ? `Hidden ranges for ${mover.name} - ${concealed.map((range) => range.label).join(", ")}.`
+        : null
   };
 }

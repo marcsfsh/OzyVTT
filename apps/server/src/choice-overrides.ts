@@ -12,8 +12,14 @@ type ReplaceableRecord = Readonly<{
   id: string;
   name: string;
   replaces?: ReadonlyArray<Readonly<{ offer: string; when: string; amount: number }>>;
-  choice?: Readonly<{ from?: readonly string[]; fromCatalog?: string; options?: ReadonlyArray<Readonly<{ id: string }>> }>;
-  choices?: ReadonlyArray<Readonly<{ from?: readonly string[]; fromCatalog?: string; options?: ReadonlyArray<Readonly<{ id: string }>> }>>;
+  choice?: Readonly<{
+    from?: readonly string[];
+    fromCatalog?: string;
+    options?: ReadonlyArray<Readonly<{ id: string }>>;
+  }>;
+  choices?: ReadonlyArray<
+    Readonly<{ from?: readonly string[]; fromCatalog?: string; options?: ReadonlyArray<Readonly<{ id: string }>> }>
+  >;
 }>;
 
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
@@ -52,14 +58,19 @@ export function replaceableOffers(definition: ActorDefinition | undefined, libra
       if (clause.when !== "short-rest" && clause.when !== "long-rest") continue;
       if (offers.some((existing) => existing.offer === clause.offer)) continue;
       // The options are the offer's own list: a re-choice can't reach past what the original pick could choose.
-      const target = clause.offer.startsWith("feature:") && clause.offer.slice("feature:".length).replace(/\/\d+$/, "") === record!.id
-        ? record!
-        : (carriers.map((candidate) => library.featureRecord(candidate) as ReplaceableRecord | undefined)
-            .find((candidate) => candidate && `feature:${candidate.id}` === clause.offer) ?? null);
+      const target =
+        clause.offer.startsWith("feature:") &&
+        clause.offer.slice("feature:".length).replace(/\/\d+$/, "") === record!.id
+          ? record!
+          : (carriers
+              .map((candidate) => library.featureRecord(candidate) as ReplaceableRecord | undefined)
+              .find((candidate) => candidate && `feature:${candidate.id}` === clause.offer) ?? null);
       const choice = target?.choice ?? target?.choices?.[0];
       if (!choice) continue; // a clause naming an offer with no option list re-chooses nothing
       offers.push({
-        offer: clause.offer, per: clause.when, label: target!.name,
+        offer: clause.offer,
+        per: clause.when,
+        label: target!.name,
         options: optionIdsOf(choice, library.catalogChoiceCatalogs())
       });
     }
@@ -71,9 +82,11 @@ export function replaceableOffers(definition: ActorDefinition | undefined, libra
 
 /** A feature or inline option as this half needs it: id, name and defence grants. Structural on purpose. */
 type GrantingRecord = Readonly<{
-  id: string; name?: string;
+  id: string;
+  name?: string;
   grants?: Readonly<{
-    damageResistances?: readonly string[]; damageImmunities?: readonly string[];
+    damageResistances?: readonly string[];
+    damageImmunities?: readonly string[];
     /** `FeatureGrantsSchema.when`; see `ungated` for why gated blocks are refused here. */
     when?: readonly unknown[];
   }>;
@@ -83,7 +96,11 @@ type GrantingRecord = Readonly<{
 // evaluate the gate, so it fails closed. A superseded gated option was never baked, so there is
 // nothing to subtract either. No shipped option is gated.
 const ungated = (record: GrantingRecord | undefined): boolean => (record?.grants?.when?.length ?? 0) === 0;
-type FeatureRef = Readonly<{ id: string; kind: "class" | "subclass" | "species" | "lineage" | "background" | "option"; sourceId: string }>;
+type FeatureRef = Readonly<{
+  id: string;
+  kind: "class" | "subclass" | "species" | "lineage" | "background" | "option";
+  sourceId: string;
+}>;
 type FeatureLookup = (ref: FeatureRef) => GrantingRecord | undefined;
 
 /** Defences a rest-time re-choice puts in force, plus `suppressed`: the baked-in original pick it replaces
@@ -98,7 +115,10 @@ export type OverrideDamageDefenses = Readonly<{
 }>;
 
 const EMPTY_OVERRIDE_DEFENSES: OverrideDamageDefenses = Object.freeze({
-  resistances: [], immunities: [], suppressed: new Set<string>(), sources: new Map<string, string>()
+  resistances: [],
+  immunities: [],
+  suppressed: new Set<string>(),
+  sources: new Map<string, string>()
 });
 
 const defenceGrantsOf = (record: GrantingRecord | undefined) =>
@@ -126,15 +146,16 @@ export function choiceOverrideDefenses(
     if (!offer.startsWith("feature:")) continue;
     const featureId = offer.slice("feature:".length).replace(/\/\d+$/, "");
     const chosenId = overrides![offer]!.id;
-    const label = features
-      .filter((ref) => ref.kind !== "option")
-      .map((ref) => featureRecord(ref))
-      .find((record) => record?.id === featureId)?.name ?? featureId;
+    const label =
+      features
+        .filter((ref) => ref.kind !== "option")
+        .map((ref) => featureRecord(ref))
+        .find((record) => record?.id === featureId)?.name ?? featureId;
 
     // Resolved like the builder resolves an inline option: kind "option" under its parent feature's id.
     const chosen = featureRecord({ kind: "option", sourceId: featureId, id: chosenId });
-    for (const id of ungated(chosen) ? chosen?.grants?.damageResistances ?? [] : []) resistances.push(id);
-    for (const id of ungated(chosen) ? chosen?.grants?.damageImmunities ?? [] : []) immunities.push(id);
+    for (const id of ungated(chosen) ? (chosen?.grants?.damageResistances ?? []) : []) resistances.push(id);
+    for (const id of ungated(chosen) ? (chosen?.grants?.damageImmunities ?? []) : []) immunities.push(id);
     for (const id of defenceGrantsOf(chosen)) {
       const type = normalizeDamageType(id);
       if (!sources.has(type)) sources.set(type, label);
@@ -154,6 +175,8 @@ export function choiceOverrideDefenses(
     if (supersededRefs.has(ref)) continue;
     for (const id of defenceGrantsOf(featureRecord(ref))) grantedElsewhere.add(normalizeDamageType(id));
   }
-  const suppressed = new Set(candidateSuppressions.map(normalizeDamageType).filter((type) => !grantedElsewhere.has(type)));
+  const suppressed = new Set(
+    candidateSuppressions.map(normalizeDamageType).filter((type) => !grantedElsewhere.has(type))
+  );
   return { resistances, immunities, suppressed, sources };
 }

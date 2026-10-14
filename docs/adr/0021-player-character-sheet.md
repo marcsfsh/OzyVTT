@@ -20,21 +20,21 @@ This ADR records the decisions that reshape the prior boundary.
 
 ## Decision
 
-1. **Ship an interactive *play* sheet, not a guided builder — yet.** Players view and act
+1. **Ship an interactive _play_ sheet, not a guided builder — yet.** Players view and act
    from a rich sheet (tap to roll, spend slots, manage prepared spells / inventory /
    currency). The full **builder** (guided creation, level-up, point-buy, class/race/
    background/feat/item content, and rules auto-derivation) is the **next roadmap update**.
 
-2. **"No-rewrite" data-model contract.** The durable schema stores the builder's *choice
-   inputs* — save/skill proficiency selections, spell-slot maxima + known/prepared list,
+2. **"No-rewrite" data-model contract.** The durable schema stores the builder's _choice
+   inputs_ — save/skill proficiency selections, spell-slot maxima + known/prepared list,
    class/level/race/background/feats — with **optional override totals** for imports that
    only know final numbers. A single resolver reads `override ?? selection-derived ??
-   ability-only`. The builder later *fills the same fields*; no consumer changes. (Storing
+ability-only`. The builder later _fills the same fields_; no consumer changes. (Storing
    only derived totals in the free-form `extensions` bag — as before — would have forced the
    builder to replace them.)
 
 3. **Immutable definition vs. live actor split**, mirroring `hitDice`/`actionUses`:
-   identity, proficiency selections, and spell *capability* live on `ActorDefinition`; live
+   identity, proficiency selections, and spell _capability_ live on `ActorDefinition`; live
    `spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency` live on `Actor`, seeded
    in `instantiate()` and projected **owner-only**.
 
@@ -63,9 +63,9 @@ guided builder, point-buy, level-up, and full content/derivation are still defer
 
 ## Consequences
 
-- The `CLAUDE.md` scope line changes from *"not a character builder"* to *"not a character
+- The `CLAUDE.md` scope line changes from _"not a character builder"_ to _"not a character
   builder **yet** — an interactive play sheet ships now; a guided builder is the next roadmap
-  update (ADR-0021)."*
+  update (ADR-0021)."_
 - New schema fields are **additive-optional** (old `GameState` still parses); the JSON-Schema
   mirror is kept in lockstep, and the owner-only projection is covered by leak tests.
 - New player-allowed commands (tap-to-roll via `dice.roll`; `character.set-slot` /

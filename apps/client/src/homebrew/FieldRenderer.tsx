@@ -20,8 +20,14 @@ import {
 import { CatalogPicker } from "./CatalogPicker";
 import { getAt, setAt } from "./paths";
 import {
-  groupOptions, pickValue, resolveOptions, resolveSuggestions, suggestionLabel,
-  type Draft, type FieldDef, type SchemaContext
+  groupOptions,
+  pickValue,
+  resolveOptions,
+  resolveSuggestions,
+  suggestionLabel,
+  type Draft,
+  type FieldDef,
+  type SchemaContext
 } from "./schema";
 
 export type CustomRenderer = (args: {
@@ -49,10 +55,12 @@ export type FieldRendererProps = Readonly<{
 }>;
 
 const asString = (value: unknown): string => (typeof value === "string" ? value : value == null ? "" : String(value));
-const asNumber = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
+const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 const asBoolean = (value: unknown): boolean => value === true;
 const asArray = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : []);
-const asStrings = (value: unknown): readonly string[] => asArray(value).filter((entry): entry is string => typeof entry === "string");
+const asStrings = (value: unknown): readonly string[] =>
+  asArray(value).filter((entry): entry is string => typeof entry === "string");
 
 export function FieldRenderer(props: FieldRendererProps) {
   const { field, value, onValue, draft, ctx, idPrefix, custom, disabled } = props;
@@ -204,7 +212,12 @@ export function FieldRenderer(props: FieldRendererProps) {
             {field.label}
           </span>
           {/* One labelled group of `aria-pressed` buttons; constraints are stated once for the group. */}
-          <div className="hb-chips" role="group" aria-labelledby={`${fieldId}-label`} aria-describedby={help ? `${fieldId}-help` : undefined}>
+          <div
+            className="hb-chips"
+            role="group"
+            aria-labelledby={`${fieldId}-label`}
+            aria-describedby={help ? `${fieldId}-help` : undefined}
+          >
             {options.map((option) => {
               const on = chosen.includes(option.value);
               return (
@@ -308,7 +321,12 @@ export function FieldRenderer(props: FieldRendererProps) {
           {help && <p className="nh-field-help">{help}</p>}
           <FieldGrid>
             {(field.rows ?? []).map((child, childIndex) => (
-              <FieldRenderer {...props} key={`${child.key}-${childIndex}`} field={child} idPrefix={`${idPrefix}-${field.key}`} />
+              <FieldRenderer
+                {...props}
+                key={`${child.key}-${childIndex}`}
+                field={child}
+                idPrefix={`${idPrefix}-${field.key}`}
+              />
             ))}
           </FieldGrid>
         </fieldset>

@@ -16,14 +16,30 @@ import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
 import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../../../server/src/action-resolution.js";
 import { importActorDefinition } from "../../../server/src/actor-roster.js";
-import { buildCharacterDefinition, computeServerOffers, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
+import {
+  buildCharacterDefinition,
+  computeServerOffers,
+  type CharacterCreateRequestInput
+} from "../../../server/src/character-build.js";
 import { choiceOverrideDefenses, replaceableOffers } from "../../../server/src/choice-overrides.js";
-import { ContentLibrary, EMPTY_HOMEBREW_SLICE, type HomebrewContentSource } from "../../../server/src/content-library.js";
+import {
+  ContentLibrary,
+  EMPTY_HOMEBREW_SLICE,
+  type HomebrewContentSource
+} from "../../../server/src/content-library.js";
 import { effectiveActions } from "../../../server/src/effective-actions.js";
 import { equipmentCatalogOf } from "../../../server/src/equipment-derivation.js";
 import { nextInitiativeTurn, startEncounter } from "../../../server/src/encounter.js";
 import {
-  applyField, authored, authoredRow, fieldsWithin, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
+  applyField,
+  authored,
+  authoredRow,
+  fieldsWithin,
+  hasControl,
+  publishVerdict,
+  riderScopeOf,
+  RIDER_EXEMPT,
+  storedBody
 } from "./authoring-harness";
 import { blankDraft, forStorage } from "./defaults";
 import { grantRowsOf, grantsFromRows } from "./RiderEditor";
@@ -34,7 +50,9 @@ import type { HomebrewType } from "./types";
 
 /** The values a `select` offers, whether its options are a literal or a function of the context. */
 const optionValues = (field: FieldDef | undefined): readonly string[] =>
-  (typeof field?.options === "function" ? field.options(EMPTY_CONTEXT, {}) : field?.options ?? []).map((option) => option.value);
+  (typeof field?.options === "function" ? field.options(EMPTY_CONTEXT, {}) : (field?.options ?? [])).map(
+    (option) => option.value
+  );
 
 const IDS = {
   caster: "10000000-0000-4000-8000-000000000101",
@@ -69,23 +87,35 @@ const FIXTURE = {
 
 /** The monster a GM builds through the real form, as the body the save path sends. */
 function authoredMonster(): Draft {
-  const damagePart = authoredRow("monster", ["actions", "damage"], [
-    ["formula", FIXTURE.formula],
-    ["type", FIXTURE.damageType]
-  ]);
-  const action = authoredRow("monster", ["actions"], [
-    ["name", FIXTURE.actionName],
-    ["activation", FIXTURE.activation],
-    ["description", FIXTURE.description],
-    ["damage", [damagePart]],
-    ["save.ability", FIXTURE.saveAbility],
-    ["save.dc", FIXTURE.saveDc]
-  ]);
+  const damagePart = authoredRow(
+    "monster",
+    ["actions", "damage"],
+    [
+      ["formula", FIXTURE.formula],
+      ["type", FIXTURE.damageType]
+    ]
+  );
+  const action = authoredRow(
+    "monster",
+    ["actions"],
+    [
+      ["name", FIXTURE.actionName],
+      ["activation", FIXTURE.activation],
+      ["description", FIXTURE.description],
+      ["damage", [damagePart]],
+      ["save.ability", FIXTURE.saveAbility],
+      ["save.dc", FIXTURE.saveDc]
+    ]
+  );
   // `newRow` mints a random id; pin the SRD's slug so the far end can find the action.
   const withId = { ...action, id: FIXTURE.actionId };
   return authored("monster", "Memory Eater", [
-    ["abilityScores.str", 21], ["abilityScores.dex", 9], ["abilityScores.con", 15],
-    ["abilityScores.int", 18], ["abilityScores.wis", 15], ["abilityScores.cha", 18],
+    ["abilityScores.str", 21],
+    ["abilityScores.dex", 9],
+    ["abilityScores.con", 15],
+    ["abilityScores.int", 18],
+    ["abilityScores.wis", 15],
+    ["abilityScores.cha", 18],
     ["armorClass", 17],
     ["hitPoints.maximum", 150],
     ["proficiencyBonus", 4],
@@ -110,14 +140,42 @@ function resolveTheFixture(definition: ActorDefinition) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 150, maximum: 150 }, armorClass: 17, definitionId: "def-caster" },
-      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: 12 }
+      {
+        id: IDS.caster,
+        name: definition.name,
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 150, maximum: 150 },
+        armorClass: 17,
+        definitionId: "def-caster"
+      },
+      {
+        id: IDS.target,
+        name: "Target Dummy",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        armorClass: 12
+      }
     ]
   });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.caster, score: 20 },
+        { actorId: IDS.target, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
 
   // Through the server's action list, which is what the table rolls from and where riders fold in.
-  const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === FIXTURE.actionId);
+  const action = effectiveActions(definition, state.actors[0], undefined).find(
+    (entry) => entry.id === FIXTURE.actionId
+  );
   if (!action) throw new Error(`${definition.name} has no "${FIXTURE.actionId}" action.`);
 
   const queue = [...FIXTURE.faces];
@@ -171,7 +229,9 @@ describe("a saving-throw action that rolls typed damage — through both paths",
     });
 
     // More than one SRD author, so a regression shows up across content.
-    const carriers = new ContentLibrary().forAudience("gm").monsterSummaries()
+    const carriers = new ContentLibrary()
+      .forAudience("gm")
+      .monsterSummaries()
       .flatMap((summary) => new ContentLibrary().forAudience("gm").monster(summary.id)?.actions ?? [])
       .filter((entry) => entry.save !== undefined && entry.attack === undefined && entry.damage.length > 0);
     expect(carriers.length).toBeGreaterThanOrEqual(100);
@@ -188,7 +248,9 @@ describe("a saving-throw action that rolls typed damage — through both paths",
       const { resolution, pendingSaves } = resolveTheFixture(definition);
 
       // 3d6 rolled as 4/5/6, and a save owed at the authored DC.
-      expect(resolution.damage, label).toEqual([{ formula: FIXTURE.formula, type: FIXTURE.damageType, total: FIXTURE.total }]);
+      expect(resolution.damage, label).toEqual([
+        { formula: FIXTURE.formula, type: FIXTURE.damageType, total: FIXTURE.total }
+      ]);
       expect(resolution.damageTotal, label).toBe(FIXTURE.total);
       expect(resolution.save, label).toEqual({
         ability: FIXTURE.saveAbility,
@@ -228,21 +290,33 @@ const BANDIT = {
 } as const;
 
 function authoredBandit(): Draft {
-  const damagePart = authoredRow("monster", ["actions", "damage"], [
-    ["formula", BANDIT.formula],
-    ["type", BANDIT.damageType]
-  ]);
-  const action = authoredRow("monster", ["actions"], [
-    ["name", BANDIT.actionName],
-    ["activation", "action"],
-    ["description", BANDIT.description],
-    ["damage", [damagePart]],
-    ["attack.bonus", BANDIT.bonus],
-    ["attack.reachFeet", BANDIT.reachFeet]
-  ]);
+  const damagePart = authoredRow(
+    "monster",
+    ["actions", "damage"],
+    [
+      ["formula", BANDIT.formula],
+      ["type", BANDIT.damageType]
+    ]
+  );
+  const action = authoredRow(
+    "monster",
+    ["actions"],
+    [
+      ["name", BANDIT.actionName],
+      ["activation", "action"],
+      ["description", BANDIT.description],
+      ["damage", [damagePart]],
+      ["attack.bonus", BANDIT.bonus],
+      ["attack.reachFeet", BANDIT.reachFeet]
+    ]
+  );
   return authored("monster", "Road Bandit", [
-    ["abilityScores.str", 11], ["abilityScores.dex", 12], ["abilityScores.con", 12],
-    ["abilityScores.int", 10], ["abilityScores.wis", 10], ["abilityScores.cha", 10],
+    ["abilityScores.str", 11],
+    ["abilityScores.dex", 12],
+    ["abilityScores.con", 12],
+    ["abilityScores.int", 10],
+    ["abilityScores.wis", 10],
+    ["abilityScores.cha", 10],
     ["armorClass", 12],
     ["hitPoints.maximum", 11],
     ["proficiencyBonus", 2],
@@ -261,11 +335,37 @@ function swing(definition: ActorDefinition) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 11, maximum: 11 }, armorClass: 12, definitionId: "def-caster" },
-      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: BANDIT.targetAc }
+      {
+        id: IDS.caster,
+        name: definition.name,
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 11, maximum: 11 },
+        armorClass: 12,
+        definitionId: "def-caster"
+      },
+      {
+        id: IDS.target,
+        name: "Target Dummy",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        armorClass: BANDIT.targetAc
+      }
     ]
   });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.caster, score: 20 },
+        { actorId: IDS.target, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
 
   const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === BANDIT.actionId);
   if (!action) throw new Error(`${definition.name} has no "${BANDIT.actionId}" action.`);
@@ -314,7 +414,8 @@ describe("a monster's to-hit bonus — through both paths", () => {
     });
 
     const library = new ContentLibrary().forAudience("gm");
-    const carriers = library.monsterSummaries()
+    const carriers = library
+      .monsterSummaries()
       .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
       .filter((entry) => entry.attack !== undefined);
     expect(carriers.length).toBeGreaterThanOrEqual(400);
@@ -336,7 +437,9 @@ describe("a monster's to-hit bonus — through both paths", () => {
         targetAc: BANDIT.targetAc,
         outcome: "hit"
       });
-      expect(resolution.damage, label).toEqual([{ formula: BANDIT.formula, type: BANDIT.damageType, total: BANDIT.damageTotal }]);
+      expect(resolution.damage, label).toEqual([
+        { formula: BANDIT.formula, type: BANDIT.damageType, total: BANDIT.damageTotal }
+      ]);
     }
   });
 });
@@ -369,22 +472,34 @@ const CROSSBOW = {
 } as const;
 
 function authoredCrossbow(): Draft {
-  const damagePart = authoredRow("monster", ["actions", "damage"], [
-    ["formula", CROSSBOW.formula],
-    ["type", CROSSBOW.damageType]
-  ]);
-  const action = authoredRow("monster", ["actions"], [
-    ["name", CROSSBOW.actionName],
-    ["activation", "action"],
-    ["description", CROSSBOW.description],
-    ["damage", [damagePart]],
-    ["attack.bonus", CROSSBOW.bonus],
-    ["attack.rangeFeet", CROSSBOW.rangeFeet],
-    ["attack.rangeNormalFeet", CROSSBOW.rangeNormalFeet]
-  ]);
+  const damagePart = authoredRow(
+    "monster",
+    ["actions", "damage"],
+    [
+      ["formula", CROSSBOW.formula],
+      ["type", CROSSBOW.damageType]
+    ]
+  );
+  const action = authoredRow(
+    "monster",
+    ["actions"],
+    [
+      ["name", CROSSBOW.actionName],
+      ["activation", "action"],
+      ["description", CROSSBOW.description],
+      ["damage", [damagePart]],
+      ["attack.bonus", CROSSBOW.bonus],
+      ["attack.rangeFeet", CROSSBOW.rangeFeet],
+      ["attack.rangeNormalFeet", CROSSBOW.rangeNormalFeet]
+    ]
+  );
   return authored("monster", "Road Bandit", [
-    ["abilityScores.str", 11], ["abilityScores.dex", 12], ["abilityScores.con", 12],
-    ["abilityScores.int", 10], ["abilityScores.wis", 10], ["abilityScores.cha", 10],
+    ["abilityScores.str", 11],
+    ["abilityScores.dex", 12],
+    ["abilityScores.con", 12],
+    ["abilityScores.int", 10],
+    ["abilityScores.wis", 10],
+    ["abilityScores.cha", 10],
     ["armorClass", 12],
     ["hitPoints.maximum", 11],
     ["proficiencyBonus", 2],
@@ -397,13 +512,41 @@ function shoot(definition: ActorDefinition, feet: number, faces: readonly number
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 11, maximum: 11 }, armorClass: 12, definitionId: "def-caster" },
-      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: CROSSBOW.targetAc }
+      {
+        id: IDS.caster,
+        name: definition.name,
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 11, maximum: 11 },
+        armorClass: 12,
+        definitionId: "def-caster"
+      },
+      {
+        id: IDS.target,
+        name: "Target Dummy",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 40, maximum: 40 },
+        armorClass: CROSSBOW.targetAc
+      }
     ]
   });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.caster, score: 20 },
+        { actorId: IDS.target, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
 
-  const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === CROSSBOW.actionId);
+  const action = effectiveActions(definition, state.actors[0], undefined).find(
+    (entry) => entry.id === CROSSBOW.actionId
+  );
   if (!action) throw new Error(`${definition.name} has no "${CROSSBOW.actionId}" action.`);
 
   const queue = [...faces];
@@ -449,7 +592,8 @@ describe("a two-band range — through both paths", () => {
     });
 
     const library = new ContentLibrary().forAudience("gm");
-    const carriers = library.monsterSummaries()
+    const carriers = library
+      .monsterSummaries()
       .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
       .filter((entry) => entry.attack?.rangeNormalFeet !== undefined);
     expect(carriers.length).toBeGreaterThanOrEqual(40);
@@ -473,7 +617,11 @@ describe("a two-band range — through both paths", () => {
       const far = shoot(definition, CROSSBOW.farFeet, CROSSBOW.farFaces);
       expect(far.rollMode?.mode, label).toBe("disadvantage");
       expect(far.rollMode?.disadvantage, label).toContain(`Long range (beyond ${CROSSBOW.rangeNormalFeet} ft)`);
-      expect(far.attack, label).toMatchObject({ naturalRoll: CROSSBOW.farNatural, total: CROSSBOW.farTotal, outcome: "miss" });
+      expect(far.attack, label).toMatchObject({
+        naturalRoll: CROSSBOW.farNatural,
+        total: CROSSBOW.farTotal,
+        outcome: "miss"
+      });
       expect(far.damageTotal, label).toBe(0);
     }
   });
@@ -507,10 +655,17 @@ const RECKLESS = {
 /** A Halfling Barbarian 2: the lowest level with Reckless Attack, and a species with no bonus,
     modifier or choice of its own. Built through the real builder against the real bundles. */
 const BARBARIAN: CharacterCreateRequestInput = {
-  name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level: 2,
+  name: "Ozar",
+  speciesId: "halfling",
+  backgroundId: "soldier",
+  classId: "barbarian",
+  level: 2,
   abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -525,7 +680,12 @@ const BARBARIAN: CharacterCreateRequestInput = {
   ]
 } as CharacterCreateRequestInput;
 
-type Table = Readonly<{ definition: ActorDefinition; state: GameState; hero: Actor; catalog: ReturnType<typeof equipmentCatalogOf> }>;
+type Table = Readonly<{
+  definition: ActorDefinition;
+  state: GameState;
+  hero: Actor;
+  catalog: ReturnType<typeof equipmentCatalogOf>;
+}>;
 
 /** The Barbarian on a map, first in the order: `attack-advantage` applies only on the bearer's own turn. */
 function barbarianTable(homebrew?: HomebrewContentSource): Table {
@@ -534,10 +694,30 @@ function barbarianTable(homebrew?: HomebrewContentSource): Table {
   const definition = buildCharacterDefinition(BARBARIAN, view, BuilderPolicySchema.parse({}));
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
-    actors: [{ id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 200, maximum: 200 }, armorClass: 12 }]
+    actors: [
+      {
+        id: IDS.target,
+        name: "Target Dummy",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 200, maximum: 200 },
+        armorClass: 12
+      }
+    ]
   });
   importActorDefinition(state, definition, IDS.caster, "public", catalog);
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.caster, score: 20 },
+        { actorId: IDS.target, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return { definition, state, hero: state.actors.find((actor) => actor.id === IDS.caster)!, catalog };
 }
 
@@ -569,18 +749,23 @@ function resolveOn(table: Table, actionId: string, faces: readonly number[], tar
 }
 
 /** Swings the greataxe at the dummy. */
-const swingGreataxe = (table: Table, faces: readonly number[]) => resolveOn(table, RECKLESS.swingId, faces, [IDS.target]);
+const swingGreataxe = (table: Table, faces: readonly number[]) =>
+  resolveOn(table, RECKLESS.swingId, faces, [IDS.target]);
 
 /** An item whose effect carries one `attack-advantage` modifier, authored through the real form. */
 function authoredBracers(): Draft {
   // Nested two containers deep.
   const modifier = authoredRow("equipment", ["effects", "modifiers"], [["type", "attack-advantage"]]);
-  const effect = authoredRow("equipment", ["effects"], [
-    ["name", "Headlong Rush"],
-    ["tags", ["reckless"]],
-    ["duration.type", "encounter"],
-    ["modifiers", [modifier]]
-  ]);
+  const effect = authoredRow(
+    "equipment",
+    ["effects"],
+    [
+      ["name", "Headlong Rush"],
+      ["tags", ["reckless"]],
+      ["duration.type", "encounter"],
+      ["modifiers", [modifier]]
+    ]
+  );
   return authored("equipment", RECKLESS.itemName, [
     ["description", "Iron bracers that pull the wearer forward into the swing."],
     ["category", "wondrous"],
@@ -598,7 +783,15 @@ function barbarianWearingBracers(): Table {
     publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, equipment: [record] }),
     monsterForInstance: () => undefined
   });
-  table.hero.inventory.push(InventoryItemSchema.parse({ id: RECKLESS.itemId, name: RECKLESS.itemName, quantity: 1, equipped: true, category: "wondrous" }));
+  table.hero.inventory.push(
+    InventoryItemSchema.parse({
+      id: RECKLESS.itemId,
+      name: RECKLESS.itemName,
+      quantity: 1,
+      equipped: true,
+      category: "wondrous"
+    })
+  );
   return table;
 }
 
@@ -638,12 +831,16 @@ describe("what an effect DOES — through both paths, across two carriers", () =
 
   it("2. SRD content authors the same shape — and both carriers of it are FEATURES", () => {
     const feature = srdRecklessAttack();
-    expect(feature.effects[0]).toMatchObject({ tags: ["reckless-attack"], modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }] });
+    expect(feature.effects[0]).toMatchObject({
+      tags: ["reckless-attack"],
+      modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }]
+    });
     expect(feature.effects[0].modifiers.map((modifier) => modifier.type)).toEqual([...RECKLESS.srdModifiers]);
 
     // Only two bundled records (both Barbarian features) author `effects[].modifiers`.
     const library = new ContentLibrary().forAudience("gm");
-    const carriers = library.classSummaries()
+    const carriers = library
+      .classSummaries()
       .flatMap((summary) => library.classRecord(summary.id)?.features ?? [])
       .filter((entry) => entry.effects.some((effect) => effect.modifiers.length > 0));
     expect(carriers.map((entry) => entry.id).sort()).toEqual(["reckless-attack", "superior-defense"]);
@@ -652,7 +849,14 @@ describe("what an effect DOES — through both paths, across two carriers", () =
   it("3. one assertion body over both: the swing rolls two d20s and keeps the higher", () => {
     const paths: ReadonlyArray<readonly [string, () => Table]> = [
       // Feature carrier: entering Reckless Attack writes the live effect.
-      ["SRD content", () => { const table = barbarianTable(); resolveOn(table, RECKLESS.featureId, []); return table; }],
+      [
+        "SRD content",
+        () => {
+          const table = barbarianTable();
+          resolveOn(table, RECKLESS.featureId, []);
+          return table;
+        }
+      ],
       // Item carrier: wearing the bracers is the effect.
       ["the homebrew editor", barbarianWearingBracers]
     ];
@@ -699,7 +903,9 @@ function authoredFeat(withGrant = true): Draft {
     ["summary", "A blessing for the road."],
     ["description", "You always have the Bless spell prepared."]
   ]);
-  const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }], {}) : undefined;
+  const grants = withGrant
+    ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }], {})
+    : undefined;
   // A feat's single feature is addressed at `["feature"]`.
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", GRANTED.featName, ["feature"]);
@@ -709,29 +915,37 @@ function authoredFeat(withGrant = true): Draft {
 
 /** A Human Paladin 2 (where `paladins-smite` sits); Human's Versatile trait is the origin-feat slot.
     Neither granted spell is chosen anywhere in the ledger. */
-const paladinInput = (): CharacterCreateRequestInput => ({
-  name: "Sera", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
-    { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    { level: 1, kind: "feat", id: GRANTED.featId, payload: { featureId: "human-versatile" } },
-    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
-    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
-    { level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-    { level: 1, classId: "paladin", kind: "spell", id: "cure-wounds" },
-    { level: 1, classId: "paladin", kind: "spell", id: "heroism" },
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "paladin-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const paladinInput = (): CharacterCreateRequestInput =>
+  ({
+    name: "Sera",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "paladin",
+    level: 2,
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+      { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: GRANTED.featId, payload: { featureId: "human-versatile" } },
+      { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
+      { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
+      { level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+      { level: 1, classId: "paladin", kind: "spell", id: "cure-wounds" },
+      { level: 1, classId: "paladin", kind: "spell", id: "heroism" },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "paladin-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** The sheet from the real builder, with the authored feat merged through a real homebrew slice. */
 function paladinSheet({ withGrant }: { withGrant: boolean }): ActorDefinition {
@@ -741,7 +955,11 @@ function paladinSheet({ withGrant }: { withGrant: boolean }): ActorDefinition {
     publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [record] }),
     monsterForInstance: () => undefined
   };
-  return buildCharacterDefinition(paladinInput(), new ContentLibrary(homebrew).forAudience("gm"), BuilderPolicySchema.parse({}));
+  return buildCharacterDefinition(
+    paladinInput(),
+    new ContentLibrary(homebrew).forAudience("gm"),
+    BuilderPolicySchema.parse({})
+  );
 }
 
 /** Whether the spell is on the sheet the way a grant puts it there. */
@@ -772,7 +990,10 @@ describe("an always-prepared spell grant — through both paths", () => {
     const library = new ContentLibrary().forAudience("gm");
     const carriers: string[] = [];
     const walk = (node: unknown) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       const grants = record.grants as { spells?: unknown[] } | undefined;
@@ -847,46 +1068,59 @@ function authoredFuryFeat(resourceId: string): Draft {
   feature = applyField("feat", feature, "uses.scaling.id", resourceId, ["uses"]);
   feature = applyField("feat", feature, "uses.per", "long-rest", ["uses"]);
   feature = applyField("feat", feature, "name", RAGES.featName, ["feature"]);
-  feature = applyField("feat", feature, "description", "You can bottle your fury as often as you can Rage.", ["feature"]);
+  feature = applyField("feat", feature, "description", "You can bottle your fury as often as you can Rage.", [
+    "feature"
+  ]);
   return { ...shell, feature };
 }
 
 const furyFeatureId = (draft: Draft) => String((draft.feature as { id?: unknown }).id ?? "");
 
 /** A Human Barbarian (Versatile is the origin-feat slot), Berserker at 3, from the real builder. */
-const barbarianInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput => ({
-  name: "Ozar", speciesId: "human", backgroundId: "soldier", classId: "barbarian", level,
-  ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
-    { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
-    // Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
-    ...(level >= 3 ? [{ level: 3, classId: "barbarian", kind: "skill", id: "nature" }] : []),
-    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "greataxe" },
-    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "handaxe" },
-    ...(level >= 3 ? [{ level: 3, classId: "barbarian", kind: "subclass", id: "path-of-the-berserker" }] : []),
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : []),
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "barbarian-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const barbarianInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput =>
+  ({
+    name: "Ozar",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "barbarian",
+    level,
+    ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
+      { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
+      // Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
+      ...(level >= 3 ? [{ level: 3, classId: "barbarian", kind: "skill", id: "nature" }] : []),
+      { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "greataxe" },
+      { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "handaxe" },
+      ...(level >= 3 ? [{ level: 3, classId: "barbarian", kind: "subclass", id: "path-of-the-berserker" }] : []),
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : []),
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "barbarian-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** The sheet with the authored feat merged through a real homebrew slice. */
 function barbarianSheet(level: 1 | 3, feat?: Draft): ActorDefinition {
   const homebrew: HomebrewContentSource | undefined = feat
     ? {
-      revision: 1,
-      publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, RAGES.featId))] }),
-      monsterForInstance: () => undefined
-    }
+        revision: 1,
+        publishedFor: () => ({
+          ...EMPTY_HOMEBREW_SLICE,
+          feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, RAGES.featId))]
+        }),
+        monsterForInstance: () => undefined
+      }
     : undefined;
   return buildCharacterDefinition(
     barbarianInput(level, feat ? RAGES.featId : undefined),
@@ -916,7 +1150,9 @@ describe("uses read off the class table's own column — through both paths", ()
 
     // Not offered on an item: the key exists there, but the option does not.
     expect(hasControl("equipment", "uses.scaling.id")).toBe(false);
-    expect(optionValues(fieldsWithin("equipment", ["uses"]).find((field) => field.key === "mode"))).not.toContain("class-resource");
+    expect(optionValues(fieldsWithin("equipment", ["uses"]).find((field) => field.key === "mode"))).not.toContain(
+      "class-resource"
+    );
   });
 
   it("2. SRD content authors the same shape — and it is 19 records, not a lone one", () => {
@@ -926,7 +1162,10 @@ describe("uses read off the class table's own column — through both paths", ()
 
     const carriers: string[] = [];
     const walk = (node: unknown) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       const uses = record.uses as { scaling?: { type?: string } } | undefined;
@@ -995,10 +1234,14 @@ const RECHARGE = {
 } as const;
 
 function authoredDrake(): Draft {
-  const damagePart = authoredRow("monster", ["actions", "damage"], [
-    ["formula", RECHARGE.formula],
-    ["type", RECHARGE.damageType]
-  ]);
+  const damagePart = authoredRow(
+    "monster",
+    ["actions", "damage"],
+    [
+      ["formula", RECHARGE.formula],
+      ["type", RECHARGE.damageType]
+    ]
+  );
   const edits: ReadonlyArray<readonly [string, unknown]> = [
     ["name", RECHARGE.drakeActionName],
     ["activation", "action"],
@@ -1013,8 +1256,12 @@ function authoredDrake(): Draft {
   ];
   const action = authoredRow("monster", ["actions"], edits);
   return authored("monster", "Cinder Drake", [
-    ["abilityScores.str", 17], ["abilityScores.dex", 11], ["abilityScores.con", 14],
-    ["abilityScores.int", 3], ["abilityScores.wis", 13], ["abilityScores.cha", 6],
+    ["abilityScores.str", 17],
+    ["abilityScores.dex", 11],
+    ["abilityScores.con", 14],
+    ["abilityScores.int", 3],
+    ["abilityScores.wis", 13],
+    ["abilityScores.cha", 6],
     ["armorClass", 14],
     ["hitPoints.maximum", 45],
     ["proficiencyBonus", 2],
@@ -1036,11 +1283,37 @@ function spendThenRecharge(definition: ActorDefinition, actionId: string) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 45, maximum: 45 }, armorClass: 14, definitionId: "def-caster" },
-      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 80, maximum: 80 }, armorClass: 12 }
+      {
+        id: IDS.caster,
+        name: definition.name,
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 45, maximum: 45 },
+        armorClass: 14,
+        definitionId: "def-caster"
+      },
+      {
+        id: IDS.target,
+        name: "Target Dummy",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 80, maximum: 80 },
+        armorClass: 12
+      }
     ]
   });
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.caster, score: 20 },
+        { actorId: IDS.target, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
 
   const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === actionId);
   if (!action) throw new Error(`${definition.name} has no "${actionId}" action.`);
@@ -1090,19 +1363,29 @@ describe("a recharging action — through both paths", () => {
     expect(verdict.publishable).toBe(true);
 
     const body = storedBody("monster", draft, RECORD_ID) as { actions: Array<Record<string, unknown>> };
-    expect(body.actions[0]).toMatchObject({ id: RECHARGE.drakeActionId, uses: { limit: 1, per: "recharge", recharge: RECHARGE.threshold } });
+    expect(body.actions[0]).toMatchObject({
+      id: RECHARGE.drakeActionId,
+      uses: { limit: 1, per: "recharge", recharge: RECHARGE.threshold }
+    });
 
     // An action's control on every carrier, not the record-level `uses` (no `recharge` key there).
     for (const type of ["monster", "equipment", "class"] as const) {
       expect(hasControl(type, "uses.recharge", ["actions"]), type).toBe(true);
     }
-    expect(hasControl("equipment", "uses.recharge")).toBe(true);   // reachable — inside an action row
+    expect(hasControl("equipment", "uses.recharge")).toBe(true); // reachable — inside an action row
     expect(fieldsWithin("equipment", ["uses"]).some((field) => field.key === "uses.recharge")).toBe(false);
   });
 
   it("1b. the two halves of one authored fact are held together by the form and by the schema", () => {
     // Choosing recharge seeds the SRD's commonest threshold.
-    const seeded = authoredRow("monster", ["actions"], [["uses.limit", 1], ["uses.per", "recharge"]]);
+    const seeded = authoredRow(
+      "monster",
+      ["actions"],
+      [
+        ["uses.limit", 1],
+        ["uses.per", "recharge"]
+      ]
+    );
     expect(seeded.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
 
     // Switching away deletes it, so the "threshold only with recharge" refusal is unreachable.
@@ -1112,7 +1395,10 @@ describe("a recharging action — through both paths", () => {
     // Emptying the number is one keystroke away; the refusal is the schema's own sentence.
     const emptied = applyField("monster", seeded, "uses.recharge", undefined, ["actions"]);
     const drake = authoredDrake();
-    const half = { ...drake, actions: [{ ...emptied, id: RECHARGE.drakeActionId, name: RECHARGE.drakeActionName, description: "Half-said." }] };
+    const half = {
+      ...drake,
+      actions: [{ ...emptied, id: RECHARGE.drakeActionId, name: RECHARGE.drakeActionName, description: "Half-said." }]
+    };
     const verdict = publishVerdict("monster", half, RECORD_ID);
     expect(verdict.publishable).toBe(false);
     expect(verdict.why).toContain("Recharge uses need the d6 threshold");
@@ -1123,7 +1409,8 @@ describe("a recharging action — through both paths", () => {
     expect(spray?.uses).toEqual({ limit: 1, per: "recharge", recharge: RECHARGE.threshold });
 
     const library = new ContentLibrary().forAudience("gm");
-    const carriers = library.monsterSummaries()
+    const carriers = library
+      .monsterSummaries()
       .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
       .filter((entry) => entry.uses?.per === "recharge");
     expect(carriers.length).toBeGreaterThanOrEqual(80);
@@ -1145,13 +1432,19 @@ describe("a recharging action — through both paths", () => {
 
       // 2-3. A rolled die and its narration. One short of the threshold is the contrast that proves
       //      the re-arm is conditional.
-      expect(seen.short.map((event) => event.text), label)
-        .toContain(`${definition.name}'s ${seen.actionName} stays spent (rolled ${RECHARGE.threshold - 1}, needs ${RECHARGE.threshold}+).`);
+      expect(
+        seen.short.map((event) => event.text),
+        label
+      ).toContain(
+        `${definition.name}'s ${seen.actionName} stays spent (rolled ${RECHARGE.threshold - 1}, needs ${RECHARGE.threshold}+).`
+      );
       expect(seen.stillSpent, label).toBe(1);
 
       // 4. A re-armed pool and its narration.
-      expect(seen.hit.map((event) => event.text), label)
-        .toContain(`${definition.name}'s ${seen.actionName} recharges (rolled ${RECHARGE.threshold}).`);
+      expect(
+        seen.hit.map((event) => event.text),
+        label
+      ).toContain(`${definition.name}'s ${seen.actionName} recharges (rolled ${RECHARGE.threshold}).`);
       expect(seen.armed, label).toBe(true);
     }
   });
@@ -1196,17 +1489,25 @@ function authoredTwinFeat(withSecondPick = true): Draft {
     ["summary", "Two disciplines, one teacher."],
     ["description", "You learn two cantrips and one level 1 spell."]
   ]);
-  const cantrips = authoredRow("feat", ["feature", "choices"], [
-    ["kind", "cantrip"],
-    ["choose", 2],
-    // One comma-separated box; the block's `write` splits and slugs it.
-    ["from", SEVERAL.hbCantrips.join(", ")]
-  ]);
-  const spell = authoredRow("feat", ["feature", "choices"], [
-    ["kind", "spell"],
-    ["choose", 1],
-    ["from", SEVERAL.hbSpells.join(", ")]
-  ]);
+  const cantrips = authoredRow(
+    "feat",
+    ["feature", "choices"],
+    [
+      ["kind", "cantrip"],
+      ["choose", 2],
+      // One comma-separated box; the block's `write` splits and slugs it.
+      ["from", SEVERAL.hbCantrips.join(", ")]
+    ]
+  );
+  const spell = authoredRow(
+    "feat",
+    ["feature", "choices"],
+    [
+      ["kind", "spell"],
+      ["choose", 1],
+      ["from", SEVERAL.hbSpells.join(", ")]
+    ]
+  );
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", SEVERAL.hbFeatName, ["feature"]);
   feature = applyField("feat", feature, "description", "You learn two cantrips and one level 1 spell.", ["feature"]);
@@ -1216,41 +1517,65 @@ function authoredTwinFeat(withSecondPick = true): Draft {
 
 /** A Human Paladin 2 taking `featId` in the Versatile slot, answering `rows` against the feat's
     feature (`tagId`, since offers are keyed `feature:<feature id>`). */
-const initiateInput = (featId: string, tagId: string, rows: ReadonlyArray<{ kind: string; id: string }>): CharacterCreateRequestInput => ({
-  name: "Sera", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
-    { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    { level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } },
-    ...rows.map((row) => ({ level: 1, kind: row.kind, id: row.id, payload: { featureId: tagId } })),
-    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
-    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
-    { level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-    { level: 1, classId: "paladin", kind: "spell", id: "cure-wounds" },
-    { level: 1, classId: "paladin", kind: "spell", id: "heroism" },
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "paladin-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const initiateInput = (
+  featId: string,
+  tagId: string,
+  rows: ReadonlyArray<{ kind: string; id: string }>
+): CharacterCreateRequestInput =>
+  ({
+    name: "Sera",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "paladin",
+    level: 2,
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+      { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } },
+      ...rows.map((row) => ({ level: 1, kind: row.kind, id: row.id, payload: { featureId: tagId } })),
+      { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
+      { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
+      { level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+      { level: 1, classId: "paladin", kind: "spell", id: "cure-wounds" },
+      { level: 1, classId: "paladin", kind: "spell", id: "heroism" },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "paladin-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** The sheet, with the authored feat merged through a real homebrew slice when given. */
-function initiateSheet(featId: string, tagId: string, rows: ReadonlyArray<{ kind: string; id: string }>, feat?: Draft): ActorDefinition {
+function initiateSheet(
+  featId: string,
+  tagId: string,
+  rows: ReadonlyArray<{ kind: string; id: string }>,
+  feat?: Draft
+): ActorDefinition {
   const homebrew: HomebrewContentSource | undefined = feat
     ? {
-      revision: 1,
-      publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, SEVERAL.hbFeatId))] }),
-      monsterForInstance: () => undefined
-    }
+        revision: 1,
+        publishedFor: () => ({
+          ...EMPTY_HOMEBREW_SLICE,
+          feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, SEVERAL.hbFeatId))]
+        }),
+        monsterForInstance: () => undefined
+      }
     : undefined;
-  return buildCharacterDefinition(initiateInput(featId, tagId, rows), new ContentLibrary(homebrew).forAudience("gm"), BuilderPolicySchema.parse({}));
+  return buildCharacterDefinition(
+    initiateInput(featId, tagId, rows),
+    new ContentLibrary(homebrew).forAudience("gm"),
+    BuilderPolicySchema.parse({})
+  );
 }
 
 describe("several picks on one record (`choices`) — through both paths", () => {
@@ -1269,9 +1594,16 @@ describe("several picks on one record (`choices`) — through both paths", () =>
     ]);
 
     // One block: the singular spelling.
-    const oneBlock = storedBody("feat", authoredTwinFeat(false), SEVERAL.hbFeatId) as { feature: { choice?: unknown; choices?: unknown } };
+    const oneBlock = storedBody("feat", authoredTwinFeat(false), SEVERAL.hbFeatId) as {
+      feature: { choice?: unknown; choices?: unknown };
+    };
     expect(oneBlock.feature.choices).toBeUndefined();
-    expect(oneBlock.feature.choice).toEqual({ kind: "cantrip", choose: 2, from: [...SEVERAL.hbCantrips], repeatable: false });
+    expect(oneBlock.feature.choice).toEqual({
+      kind: "cantrip",
+      choose: 2,
+      from: [...SEVERAL.hbCantrips],
+      repeatable: false
+    });
 
     // The `choice.*` aliases edit block 0 of a plural feature and keep the plural spelling.
     const feature = (draft.feature ?? {}) as Draft;
@@ -1286,7 +1618,8 @@ describe("several picks on one record (`choices`) — through both paths", () =>
 
   it("2. SRD content authors the same shape — three records, every one a Magic Initiate", () => {
     const library = new ContentLibrary().forAudience("gm");
-    const carriers = library.featSummaries()
+    const carriers = library
+      .featSummaries()
       .map((summary) => library.featRecord(summary.id))
       .filter((feat) => feat !== undefined && (feat.feature.choices?.length ?? 0) > 0)
       .map((feat) => feat!.id)
@@ -1304,7 +1637,11 @@ describe("several picks on one record (`choices`) — through both paths", () =>
   it("3. one assertion body over both: every pick — the second included — is a spell on the sheet", () => {
     const paths: ReadonlyArray<readonly [string, ActorDefinition, ReadonlyArray<{ kind: string; id: string }>]> = [
       ["SRD content", initiateSheet(SEVERAL.srdFeatId, SEVERAL.srdFeatId, SEVERAL.srdRows), SEVERAL.srdRows],
-      ["the homebrew editor", initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat()), SEVERAL.hbRows]
+      [
+        "the homebrew editor",
+        initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat()),
+        SEVERAL.hbRows
+      ]
     ];
     for (const [label, definition, rows] of paths) {
       for (const row of rows) {
@@ -1317,8 +1654,9 @@ describe("several picks on one record (`choices`) — through both paths", () =>
 
     // Negative control: only the first block. The spell row now targets a missing pick and the build
     // refuses it by name.
-    expect(() => initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat(false)))
-      .toThrow(`No feature "${SEVERAL.hbFeatureId}" offers a "spell" choice.`);
+    expect(() => initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat(false))).toThrow(
+      `No feature "${SEVERAL.hbFeatureId}" offers a "spell" choice.`
+    );
   });
 });
 
@@ -1357,7 +1695,9 @@ function authoredLoreFeat(): Draft {
   const grant = authoredRow("feat", ["feature", "extraPicks"], [["offer", "class-cantrips"]]);
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", RAISED.featName, ["feature"]);
-  feature = applyField("feat", feature, "description", "You know one extra cantrip from your class's list.", ["feature"]);
+  feature = applyField("feat", feature, "description", "You know one extra cantrip from your class's list.", [
+    "feature"
+  ]);
   feature = applyField("feat", feature, "extraPicks", [grant], ["feature"]);
   return { ...shell, feature };
 }
@@ -1369,71 +1709,101 @@ function authoredInstinctFeat(): Draft {
     ["summary", "Instinct grows with fury."],
     ["description", "You gain extra skill proficiencies as your rage deepens."]
   ]);
-  const grant = authoredRow("feat", ["feature", "extraPicks"], [
-    ["offer", "class-skills"],
-    ["mode", "column-growth"],
-    ["scaling.id", RAISED.scaleColumn]
-  ]);
+  const grant = authoredRow(
+    "feat",
+    ["feature", "extraPicks"],
+    [
+      ["offer", "class-skills"],
+      ["mode", "column-growth"],
+      ["scaling.id", RAISED.scaleColumn]
+    ]
+  );
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", RAISED.scaleFeatName, ["feature"]);
-  feature = applyField("feat", feature, "description", "You gain extra skill proficiencies as your rage deepens.", ["feature"]);
+  feature = applyField("feat", feature, "description", "You gain extra skill proficiencies as your rage deepens.", [
+    "feature"
+  ]);
   feature = applyField("feat", feature, "extraPicks", [grant], ["feature"]);
   return { ...shell, feature };
 }
 
 /** A merged content view carrying one authored feat, or the plain bundles when none is given. */
 function raisedView(featId?: string, feat?: Draft) {
-  const homebrew: HomebrewContentSource | undefined = featId && feat
-    ? {
-      revision: 1,
-      publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, featId))] }),
-      monsterForInstance: () => undefined
-    }
-    : undefined;
+  const homebrew: HomebrewContentSource | undefined =
+    featId && feat
+      ? {
+          revision: 1,
+          publishedFor: () => ({
+            ...EMPTY_HOMEBREW_SLICE,
+            feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, featId))]
+          }),
+          monsterForInstance: () => undefined
+        }
+      : undefined;
   return new ContentLibrary(homebrew).forAudience("gm");
 }
 
 /** A Human Cleric 1 with four cantrips in the ledger. `order` decides what raises the cap: Thaumaturge
     (SRD option), Protector plus the authored feat (editor), or Protector alone (negative control). */
-const clericInput = (order: "protector" | "thaumaturge", featId?: string): CharacterCreateRequestInput => ({
-  name: "Sister Ael", speciesId: "human", backgroundId: "soldier", classId: "cleric", level: 1,
-  abilityMethod: "standard-array",
-  baseScores: { str: 10, dex: 12, con: 14, int: 8, wis: 15, cha: 13 },
-  // Scores play no part in capacity.
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "cleric", kind: "skill", id: "history" },
-    { level: 1, classId: "cleric", kind: "skill", id: "insight" },
-    { level: 1, classId: "cleric", kind: "divine-order", id: order, payload: { featureId: "divine-order" } },
-    ...RAISED.cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : []),
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "cleric-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const clericInput = (order: "protector" | "thaumaturge", featId?: string): CharacterCreateRequestInput =>
+  ({
+    name: "Sister Ael",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "cleric",
+    level: 1,
+    abilityMethod: "standard-array",
+    baseScores: { str: 10, dex: 12, con: 14, int: 8, wis: 15, cha: 13 },
+    // Scores play no part in capacity.
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "cleric", kind: "skill", id: "history" },
+      { level: 1, classId: "cleric", kind: "skill", id: "insight" },
+      { level: 1, classId: "cleric", kind: "divine-order", id: order, payload: { featureId: "divine-order" } },
+      ...RAISED.cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : []),
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "cleric-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** A Human Barbarian at `level`, with the scaling feat when given, as `computeServerOffers` input. */
-const instinctInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput => ({
-  name: "Ozar", speciesId: "human", backgroundId: "soldier", classId: "barbarian", level,
-  ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : [])
-  ]
-} as CharacterCreateRequestInput);
+const instinctInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput =>
+  ({
+    name: "Ozar",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "barbarian",
+    level,
+    ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : [])]
+  }) as CharacterCreateRequestInput;
 
 /** One offer's `capacity` from `computeServerOffers`. */
-const capacityOf = (input: CharacterCreateRequestInput, key: string, featId?: string, feat?: Draft): number | undefined =>
-  computeServerOffers(input, raisedView(featId, feat), BuilderPolicySchema.parse({}))
-    .offers.find((offer) => offer.key === key)?.capacity;
+const capacityOf = (
+  input: CharacterCreateRequestInput,
+  key: string,
+  featId?: string,
+  feat?: Draft
+): number | undefined =>
+  computeServerOffers(input, raisedView(featId, feat), BuilderPolicySchema.parse({})).offers.find(
+    (offer) => offer.key === key
+  )?.capacity;
 
 describe("a budget raised past the printed row (`extraPicks`) — through both paths", () => {
   it("1. the editor can author it: offer, amount and the column rule go through real controls, exactly one of the pair stored", () => {
@@ -1445,29 +1815,62 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     // Thaumaturge's shape, with no `scaling` key.
     expect(body.feature.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
 
-    const scaled = storedBody("feat", authoredInstinctFeat(), RAISED.scaleFeatId) as { feature: { extraPicks?: unknown } };
+    const scaled = storedBody("feat", authoredInstinctFeat(), RAISED.scaleFeatId) as {
+      feature: { extraPicks?: unknown };
+    };
     // The scaling form, with no `amount` key: the mode select keeps them exclusive.
-    expect(scaled.feature.extraPicks).toEqual([{ offer: "class-skills", scaling: { type: "class-resource-growth", id: RAISED.scaleColumn } }]);
+    expect(scaled.feature.extraPicks).toEqual([
+      { offer: "class-skills", scaling: { type: "class-resource-growth", id: RAISED.scaleColumn } }
+    ]);
 
     // Switching back deletes the column rule and re-seeds the flat amount.
-    const grant = authoredRow("feat", ["feature", "extraPicks"], [
-      ["offer", "class-skills"], ["mode", "column-growth"], ["scaling.id", RAISED.scaleColumn]
-    ]);
-    expect(applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toMatchObject({ offer: "class-skills", amount: 1 });
+    const grant = authoredRow(
+      "feat",
+      ["feature", "extraPicks"],
+      [
+        ["offer", "class-skills"],
+        ["mode", "column-growth"],
+        ["scaling.id", RAISED.scaleColumn]
+      ]
+    );
+    expect(applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toMatchObject({
+      offer: "class-skills",
+      amount: 1
+    });
     expect("scaling" in applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toBe(false);
 
     // The column id is seeded empty, so a half-set scaling is refused by name.
-    const half = authoredRow("feat", ["feature", "extraPicks"], [["offer", "class-skills"], ["mode", "column-growth"]]);
-    const feature = applyField("feat", (authoredInstinctFeat().feature ?? {}) as Draft, "extraPicks", [half], ["feature"]);
+    const half = authoredRow(
+      "feat",
+      ["feature", "extraPicks"],
+      [
+        ["offer", "class-skills"],
+        ["mode", "column-growth"]
+      ]
+    );
+    const feature = applyField(
+      "feat",
+      (authoredInstinctFeat().feature ?? {}) as Draft,
+      "extraPicks",
+      [half],
+      ["feature"]
+    );
     expect(publishVerdict("feat", { ...authoredInstinctFeat(), feature }, RAISED.scaleFeatId).publishable).toBe(false);
 
     // Inline options mount the same factory.
     expect(hasControl("class", "extraPicks", ["features", "choice.options"])).toBe(true);
-    const option = authoredRow("feat", ["feature", "choice.options"], [
-      ["name", "Thaumaturge"],
-      ["description", "You know one extra cantrip from the Cleric spell list."],
-      ["extraPicks", [authoredRow("feat", ["feature", "choice.options", "extraPicks"], [["offer", "class-cantrips"]])]]
-    ]);
+    const option = authoredRow(
+      "feat",
+      ["feature", "choice.options"],
+      [
+        ["name", "Thaumaturge"],
+        ["description", "You know one extra cantrip from the Cleric spell list."],
+        [
+          "extraPicks",
+          [authoredRow("feat", ["feature", "choice.options", "extraPicks"], [["offer", "class-cantrips"]])]
+        ]
+      ]
+    );
     expect(option).toMatchObject({ name: "Thaumaturge", extraPicks: [{ offer: "class-cantrips", amount: 1 }] });
   });
 
@@ -1475,11 +1878,15 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     const library = new ContentLibrary().forAudience("gm");
     const carriers: Array<{ id: string; grant: Record<string, unknown> }> = [];
     const walk = (node: unknown) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       if (Array.isArray(record.extraPicks) && record.extraPicks.length > 0) {
-        for (const grant of record.extraPicks) carriers.push({ id: String(record.id ?? "?"), grant: grant as Record<string, unknown> });
+        for (const grant of record.extraPicks)
+          carriers.push({ id: String(record.id ?? "?"), grant: grant as Record<string, unknown> });
       }
       for (const value of Object.values(record)) walk(value);
     };
@@ -1490,7 +1897,11 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     expect(carriers.find((entry) => entry.id === "thaumaturge")?.grant).toEqual({ offer: "class-cantrips", amount: 1 });
     // Three of the eight scale off a printed column.
     const scaled = carriers.filter((entry) => entry.grant.scaling !== undefined);
-    expect(scaled.map((entry) => entry.id).sort()).toEqual(["eldritch-invocations", "weapon-mastery", "weapon-mastery"]);
+    expect(scaled.map((entry) => entry.id).sort()).toEqual([
+      "eldritch-invocations",
+      "weapon-mastery",
+      "weapon-mastery"
+    ]);
     expect(carriers.find((entry) => entry.id === "eldritch-invocations")?.grant).toEqual({
       offer: "feature:eldritch-invocations",
       scaling: { type: "class-resource-growth", id: "eldritch-invocations" }
@@ -1505,7 +1916,11 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
       ["the homebrew editor", "protector", RAISED.featId, authoredLoreFeat()]
     ];
     for (const [label, order, featId, feat] of paths) {
-      const definition = buildCharacterDefinition(clericInput(order, featId), raisedView(feat ? featId : undefined, feat), BuilderPolicySchema.parse({}));
+      const definition = buildCharacterDefinition(
+        clericInput(order, featId),
+        raisedView(feat ? featId : undefined, feat),
+        BuilderPolicySchema.parse({})
+      );
       // All four cantrips on the sheet, prepared.
       for (const id of RAISED.cantrips) {
         expect(preparedSpell(definition, id), `${label}: ${id}`).toMatchObject({ id, prepared: true });
@@ -1513,8 +1928,9 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     }
 
     // Negative control: nothing raises the cap, so the fourth cantrip is refused by the cap itself.
-    expect(() => buildCharacterDefinition(clericInput("protector", "alert"), raisedView(), BuilderPolicySchema.parse({})))
-      .toThrow(RAISED.capSentence);
+    expect(() =>
+      buildCharacterDefinition(clericInput("protector", "alert"), raisedView(), BuilderPolicySchema.parse({}))
+    ).toThrow(RAISED.capSentence);
   });
 
   it("4. the scaling form: an offer's capacity follows the printed column, from both paths", () => {
@@ -1533,14 +1949,22 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
 });
 
 /** A Warlock at `level` with an empty ledger; `computeServerOffers` needs identity and scores only. */
-const warlockInput = (level: 1 | 2): CharacterCreateRequestInput => ({
-  name: "Vex", speciesId: "human", backgroundId: "soldier", classId: "warlock", level,
-  abilityMethod: "standard-array",
-  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: []
-} as CharacterCreateRequestInput);
+const warlockInput = (level: 1 | 2): CharacterCreateRequestInput =>
+  ({
+    name: "Vex",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "warlock",
+    level,
+    abilityMethod: "standard-array",
+    baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: []
+  }) as CharacterCreateRequestInput;
 
 /* ---- a settled pick re-opened (`replaces`, `replacesFeatureId`), both paths --- */
 
@@ -1579,10 +2003,14 @@ const REOPENED = {
 /** One inline option of the authored trait. The resistance goes through `grantsFromRows` (`grants`
     has no `FieldDef`); everything else is the option row's own control. */
 const wardOption = (id: string, name: string): Draft => ({
-  ...authoredRow("species", ["traits", "choice.options"], [
-    ["name", name],
-    ["description", `You have Resistance to ${name} damage until you choose a different type.`]
-  ]),
+  ...authoredRow(
+    "species",
+    ["traits", "choice.options"],
+    [
+      ["name", name],
+      ["description", `You have Resistance to ${name} damage until you choose a different type.`]
+    ]
+  ),
   id,
   grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }], {})
 });
@@ -1590,19 +2018,27 @@ const wardOption = (id: string, name: string): Draft => ({
 /** A species with one choice-asking trait and a short-rest `replaces` clause. `withClause: false` is
     the negative control. */
 function authoredEmberkin(withClause = true): Draft {
-  let trait = authoredRow("species", ["traits"], [
-    ["name", REOPENED.traitName],
-    ["description", "Choose one damage type whenever you finish a Short or Long Rest."],
-    ["choice", true],
-    ["choice.kind", "damage-type"],
-    ["choice.options", [wardOption(REOPENED.built, "Fire"), wardOption(REOPENED.rechosen, "Cold")]]
-  ]);
+  let trait = authoredRow(
+    "species",
+    ["traits"],
+    [
+      ["name", REOPENED.traitName],
+      ["description", "Choose one damage type whenever you finish a Short or Long Rest."],
+      ["choice", true],
+      ["choice.kind", "damage-type"],
+      ["choice.options", [wardOption(REOPENED.built, "Fire"), wardOption(REOPENED.rechosen, "Cold")]]
+    ]
+  );
   trait = { ...trait, id: REOPENED.traitId };
   if (withClause) {
-    const clause = authoredRow("species", ["traits", "replaces"], [
-      ["offer", REOPENED.offer],
-      ["when", "short-rest"]
-    ]);
+    const clause = authoredRow(
+      "species",
+      ["traits", "replaces"],
+      [
+        ["offer", REOPENED.offer],
+        ["when", "short-rest"]
+      ]
+    );
     trait = applyField("species", trait, "replaces", [clause], ["traits"]);
   }
   return authored("species", REOPENED.speciesName, [
@@ -1625,71 +2061,106 @@ const emberkinView = (species: Draft) => {
 };
 
 /** An Emberkin Fighter 1 who has already answered the ward. */
-const emberkinInput = (): CharacterCreateRequestInput => ({
-  name: "Ash", speciesId: REOPENED.speciesId, backgroundId: "soldier", classId: "fighter", level: 1,
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "damage-type", id: REOPENED.built, payload: { featureId: REOPENED.traitId } },
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
-    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
-    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longsword" },
-    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "javelin" },
-    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "fighter-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const emberkinInput = (): CharacterCreateRequestInput =>
+  ({
+    name: "Ash",
+    speciesId: REOPENED.speciesId,
+    backgroundId: "soldier",
+    classId: "fighter",
+    level: 1,
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "damage-type", id: REOPENED.built, payload: { featureId: REOPENED.traitId } },
+      { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+      { level: 1, classId: "fighter", kind: "skill", id: "survival" },
+      { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+      { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longsword" },
+      { level: 1, classId: "fighter", kind: "weapon-mastery", id: "javelin" },
+      { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "fighter-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** A Fiend-Patron Warlock 10 (where Fiendish Resilience arrives) with the damage type already chosen. */
-const resilientWarlock = (damageType: string): CharacterCreateRequestInput => ({
-  name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 10,
-  subclassId: REOPENED.srcSubclassId, abilityMethod: "standard-array",
-  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
-  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
-    // The Acolyte's origin feat, Magic Initiate (Cleric), asks for three picks.
-    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
-    { level: 1, classId: "warlock", kind: "skill", id: "deception" },
-    ...["agonizing-blast", "devils-sight", "eldritch-mind", "repelling-blast", "armor-of-shadows", "ascendant-step", "fiendish-vigor"]
-      .map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })),
-    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
-    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
-    { level: 3, classId: "warlock", kind: "subclass", id: REOPENED.srcSubclassId },
-    // The settled row.
-    { level: 10, kind: "damage-type", id: damageType, payload: { featureId: REOPENED.srdFeatureId } },
-    ...[4, 8].flatMap((at) => [
-      { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
-      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
-      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
-    ]),
-    { level: 1, kind: "cantrip", id: "eldritch-blast" },
-    { level: 1, kind: "cantrip", id: "prestidigitation" },
-    { level: 1, kind: "cantrip", id: "minor-illusion" },
-    { level: 1, kind: "spell", id: "hex" },
-    { level: 1, kind: "spell", id: "hold-person" },
-    { level: 5, kind: "spell", id: "fly" },
-    { level: 1, kind: "equipment", id: "warlock-a" },
-    { level: 1, kind: "equipment", id: "acolyte-a" }
-  ]
-} as CharacterCreateRequestInput);
+const resilientWarlock = (damageType: string): CharacterCreateRequestInput =>
+  ({
+    name: "Vex",
+    speciesId: "human",
+    backgroundId: "acolyte",
+    classId: "warlock",
+    level: 10,
+    subclassId: REOPENED.srcSubclassId,
+    abilityMethod: "standard-array",
+    baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    backgroundBonusAllocation: [
+      { ability: "cha", amount: 2 },
+      { ability: "wis", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+      // The Acolyte's origin feat, Magic Initiate (Cleric), asks for three picks.
+      { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
+      { level: 1, classId: "warlock", kind: "skill", id: "deception" },
+      ...[
+        "agonizing-blast",
+        "devils-sight",
+        "eldritch-mind",
+        "repelling-blast",
+        "armor-of-shadows",
+        "ascendant-step",
+        "fiendish-vigor"
+      ].map((id) => ({
+        level: 1,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id,
+        payload: { featureId: "eldritch-invocations" }
+      })),
+      { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+      { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
+      { level: 3, classId: "warlock", kind: "subclass", id: REOPENED.srcSubclassId },
+      // The settled row.
+      { level: 10, kind: "damage-type", id: damageType, payload: { featureId: REOPENED.srdFeatureId } },
+      ...[4, 8].flatMap((at) => [
+        { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
+        { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+        { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+      ]),
+      { level: 1, kind: "cantrip", id: "eldritch-blast" },
+      { level: 1, kind: "cantrip", id: "prestidigitation" },
+      { level: 1, kind: "cantrip", id: "minor-illusion" },
+      { level: 1, kind: "spell", id: "hex" },
+      { level: 1, kind: "spell", id: "hold-person" },
+      { level: 5, kind: "spell", id: "fly" },
+      { level: 1, kind: "equipment", id: "warlock-a" },
+      { level: 1, kind: "equipment", id: "acolyte-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** What the build says the character resists, what they may take back on a rest, and the result of
     re-answering. `choiceOverrideDefenses` gets the override `actor.rechoose` would write; the command
     itself needs a live store. */
-function reopen(definition: ActorDefinition, view: ReturnType<ContentLibrary["forAudience"]>, offer: string, rechosen: string) {
+function reopen(
+  definition: ActorDefinition,
+  view: ReturnType<ContentLibrary["forAudience"]>,
+  offer: string,
+  rechosen: string
+) {
   const offers = replaceableOffers(definition, view);
   const overrides = { [offer]: { id: rechosen, per: "short-rest" as const } };
   const after = choiceOverrideDefenses(definition, overrides, (ref) => view.featureRecord(ref));
@@ -1707,11 +2178,18 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     // Fiendish Resilience's shape: `when` seeded by the row, `offer` typed.
     expect(body.traits[0].replaces).toEqual([{ offer: REOPENED.offer, when: "short-rest", amount: 1 }]);
     // No rows means no key; an empty list is dropped rather than shipped as `[]`.
-    const noRows = storedBody("species", authoredEmberkin(false), REOPENED.speciesId) as { traits: Array<Record<string, unknown>> };
+    const noRows = storedBody("species", authoredEmberkin(false), REOPENED.speciesId) as {
+      traits: Array<Record<string, unknown>>;
+    };
     expect("replaces" in noRows.traits[0]).toBe(false);
 
     // The clause is offered on every feature carrier...
-    for (const [type, within] of [["class", ["features"]], ["subclass", ["features"]], ["species", ["traits"]], ["feat", ["feature"]]] as const) {
+    for (const [type, within] of [
+      ["class", ["features"]],
+      ["subclass", ["features"]],
+      ["species", ["traits"]],
+      ["feat", ["feature"]]
+    ] as const) {
       expect(hasControl(type, "replaces", within), `${type}: ${within.join(" > ")} > replaces`).toBe(true);
     }
     // ...but not on inline options: no SRD record authors it there.
@@ -1724,7 +2202,12 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     const gate = (type: HomebrewType, within: readonly string[]) =>
       fieldsWithin(type, within).find((field) => field.key === "replacesFeatureId");
     expect(gate("class", ["features"])?.visibleWhen?.({}, blankDraft("class"))).toBe(true);
-    for (const [type, within] of [["subclass", ["features"]], ["species", ["traits"]], ["background", ["features"]], ["feat", ["feature"]]] as const) {
+    for (const [type, within] of [
+      ["subclass", ["features"]],
+      ["species", ["traits"]],
+      ["background", ["features"]],
+      ["feat", ["feature"]]
+    ] as const) {
       expect(gate(type, within)?.visibleWhen?.({}, blankDraft(type)), `${type} shows "Supersedes"`).toBe(false);
     }
     // A feature naming itself would delete itself; `options` gets the record, not the row, so
@@ -1739,13 +2222,18 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
     const supersedes: Array<{ id: string; replaced: string }> = [];
     const walk = (node: unknown) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       if (Array.isArray(record.replaces)) {
-        for (const clause of record.replaces) clauses.push({ id: String(record.id ?? "?"), clause: clause as Record<string, unknown> });
+        for (const clause of record.replaces)
+          clauses.push({ id: String(record.id ?? "?"), clause: clause as Record<string, unknown> });
       }
-      if (typeof record.replacesFeatureId === "string") supersedes.push({ id: String(record.id ?? "?"), replaced: record.replacesFeatureId });
+      if (typeof record.replacesFeatureId === "string")
+        supersedes.push({ id: String(record.id ?? "?"), replaced: record.replacesFeatureId });
       for (const value of Object.values(record)) walk(value);
     };
     for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
@@ -1754,10 +2242,14 @@ describe("a settled pick the character may re-make (`replaces`) — through both
 
     // Two clauses at the time of writing, both on subclass features, each naming its own feature's pick.
     expect(clauses.map((entry) => entry.id).sort()).toEqual(["circle-of-the-land-spells", "fiendish-resilience"]);
-    expect(clauses.find((entry) => entry.id === REOPENED.srdFeatureId)?.clause)
-      .toEqual({ offer: REOPENED.srdOffer, when: "short-rest", amount: 1 });
-    expect(clauses.find((entry) => entry.id === "circle-of-the-land-spells")?.clause)
-      .toMatchObject({ when: "long-rest" });
+    expect(clauses.find((entry) => entry.id === REOPENED.srdFeatureId)?.clause).toEqual({
+      offer: REOPENED.srdOffer,
+      when: "short-rest",
+      amount: 1
+    });
+    expect(clauses.find((entry) => entry.id === "circle-of-the-land-spells")?.clause).toMatchObject({
+      when: "long-rest"
+    });
 
     // Three superseding features: two Fighter attack tiers (read by the builder) and Champion's (not read; see 1b).
     expect(supersedes.map((entry) => `${entry.id} → ${entry.replaced}`).sort()).toEqual([
@@ -1771,9 +2263,23 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     const srdView = new ContentLibrary().forAudience("gm");
     const editorSpecies = authoredEmberkin();
     const editorView = emberkinView(editorSpecies);
-    const paths: ReadonlyArray<readonly [string, ActorDefinition, ReturnType<ContentLibrary["forAudience"]>, string, string]> = [
-      ["SRD content", buildCharacterDefinition(resilientWarlock(REOPENED.built), srdView, BuilderPolicySchema.parse({})), srdView, REOPENED.srdOffer, "Fiendish Resilience"],
-      ["the homebrew editor", buildCharacterDefinition(emberkinInput(), editorView, BuilderPolicySchema.parse({})), editorView, REOPENED.offer, REOPENED.traitName]
+    const paths: ReadonlyArray<
+      readonly [string, ActorDefinition, ReturnType<ContentLibrary["forAudience"]>, string, string]
+    > = [
+      [
+        "SRD content",
+        buildCharacterDefinition(resilientWarlock(REOPENED.built), srdView, BuilderPolicySchema.parse({})),
+        srdView,
+        REOPENED.srdOffer,
+        "Fiendish Resilience"
+      ],
+      [
+        "the homebrew editor",
+        buildCharacterDefinition(emberkinInput(), editorView, BuilderPolicySchema.parse({})),
+        editorView,
+        REOPENED.offer,
+        REOPENED.traitName
+      ]
     ];
 
     for (const [label, definition, view, offer, featureName] of paths) {
@@ -1805,27 +2311,42 @@ describe("a settled pick the character may re-make (`replaces`) — through both
 
   it("4. `replacesFeatureId`: the class stops granting what its successor replaces, from both paths", () => {
     const classFeatureIds = (definition: ActorDefinition, sourceId: string) =>
-      (definition.character?.features ?? []).filter((ref) => ref.kind === "class" && ref.sourceId === sourceId).map((ref) => ref.id);
+      (definition.character?.features ?? [])
+        .filter((ref) => ref.kind === "class" && ref.sourceId === sourceId)
+        .map((ref) => ref.id);
 
     // SRD: at 11 the sheet lists Two Extra Attacks and not Extra Attack.
     const srdView = new ContentLibrary().forAudience("gm");
-    const fighter5 = classFeatureIds(buildCharacterDefinition(fighterInput(5), srdView, BuilderPolicySchema.parse({})), "fighter");
-    const fighter11 = classFeatureIds(buildCharacterDefinition(fighterInput(11), srdView, BuilderPolicySchema.parse({})), "fighter");
+    const fighter5 = classFeatureIds(
+      buildCharacterDefinition(fighterInput(5), srdView, BuilderPolicySchema.parse({})),
+      "fighter"
+    );
+    const fighter11 = classFeatureIds(
+      buildCharacterDefinition(fighterInput(11), srdView, BuilderPolicySchema.parse({})),
+      "fighter"
+    );
     expect(fighter5).toContain(REOPENED.fighterReplaced);
     expect(fighter11).toContain(REOPENED.fighterReplacing);
     expect(fighter11).not.toContain(REOPENED.fighterReplaced);
 
     // Editor: level 2 grants the second feature alone.
     const view = wardenView(authoredWarden());
-    const level1 = classFeatureIds(buildCharacterDefinition(wardenInput(1), view, BuilderPolicySchema.parse({})), REOPENED.classId);
-    const level2 = classFeatureIds(buildCharacterDefinition(wardenInput(2), view, BuilderPolicySchema.parse({})), REOPENED.classId);
+    const level1 = classFeatureIds(
+      buildCharacterDefinition(wardenInput(1), view, BuilderPolicySchema.parse({})),
+      REOPENED.classId
+    );
+    const level2 = classFeatureIds(
+      buildCharacterDefinition(wardenInput(2), view, BuilderPolicySchema.parse({})),
+      REOPENED.classId
+    );
     expect(level1).toEqual([REOPENED.wardId]);
     expect(level2).toEqual([REOPENED.greaterWardId]);
 
     // Negative control: "Supersedes" left at "Nothing", so level 2 grants both.
     const bare = wardenView(authoredWarden(false));
-    expect(classFeatureIds(buildCharacterDefinition(wardenInput(2), bare, BuilderPolicySchema.parse({})), REOPENED.classId))
-      .toEqual([REOPENED.wardId, REOPENED.greaterWardId]);
+    expect(
+      classFeatureIds(buildCharacterDefinition(wardenInput(2), bare, BuilderPolicySchema.parse({})), REOPENED.classId)
+    ).toEqual([REOPENED.wardId, REOPENED.greaterWardId]);
   });
 });
 
@@ -1833,8 +2354,28 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     class's own `levelTable` field: the level chips are bespoke (a two-target write a `FieldDef` can't
     express), so the rows below are what the chips would produce. */
 function authoredWarden(supersede = true): Draft {
-  const ward = { ...authoredRow("class", ["features"], [["name", "Ward"], ["description", "A ward against harm."]]), id: REOPENED.wardId };
-  let greater: Draft = { ...authoredRow("class", ["features"], [["name", "Greater Ward"], ["description", "A better ward against harm."]]), id: REOPENED.greaterWardId };
+  const ward = {
+    ...authoredRow(
+      "class",
+      ["features"],
+      [
+        ["name", "Ward"],
+        ["description", "A ward against harm."]
+      ]
+    ),
+    id: REOPENED.wardId
+  };
+  let greater: Draft = {
+    ...authoredRow(
+      "class",
+      ["features"],
+      [
+        ["name", "Greater Ward"],
+        ["description", "A better ward against harm."]
+      ]
+    ),
+    id: REOPENED.greaterWardId
+  };
   if (supersede) greater = applyField("class", greater, "replacesFeatureId", REOPENED.wardId, ["features"]);
   const draft = authored("class", "Warden", [
     ["summary", "A warden of the deep wood."],
@@ -1848,10 +2389,15 @@ function authoredWarden(supersede = true): Draft {
     ["skillChoices.from", ["athletics", "survival", "perception"]],
     ["features", [ward, greater]]
   ]);
-  return applyField("class", draft, "levelTable", (draft.levelTable as Array<Record<string, unknown>>).map((row, index) => ({
-    ...row,
-    features: index === 0 ? [REOPENED.wardId] : index === 1 ? [REOPENED.greaterWardId] : []
-  })));
+  return applyField(
+    "class",
+    draft,
+    "levelTable",
+    (draft.levelTable as Array<Record<string, unknown>>).map((row, index) => ({
+      ...row,
+      features: index === 0 ? [REOPENED.wardId] : index === 1 ? [REOPENED.greaterWardId] : []
+    }))
+  );
 }
 
 const wardenView = (warden: Draft) => {
@@ -1863,49 +2409,85 @@ const wardenView = (warden: Draft) => {
   }).forAudience("gm");
 };
 
-const wardenInput = (level: 1 | 2): CharacterCreateRequestInput => ({
-  name: "Ash", speciesId: "halfling", backgroundId: "soldier", classId: REOPENED.classId, level,
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: REOPENED.classId, kind: "skill", id: "athletics" },
-    { level: 1, classId: REOPENED.classId, kind: "skill", id: "survival" },
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const wardenInput = (level: 1 | 2): CharacterCreateRequestInput =>
+  ({
+    name: "Ash",
+    speciesId: "halfling",
+    backgroundId: "soldier",
+    classId: REOPENED.classId,
+    level,
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: REOPENED.classId, kind: "skill", id: "athletics" },
+      { level: 1, classId: REOPENED.classId, kind: "skill", id: "survival" },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** A Halfling Champion at `level`, the SRD's `replacesFeatureId` carrier. */
-const fighterInput = (level: 5 | 11): CharacterCreateRequestInput => ({
-  name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level,
-  subclassId: "champion", abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
-    { level: 1, classId: "fighter", kind: "skill", id: "perception" },
-    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-    ...["greatsword", "flail", "longbow", "rapier", "handaxe"].slice(0, level >= 9 ? 5 : 4)
-      .map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id })),
-    { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
-    ...(level >= 7 ? [{ level: 7, classId: "fighter", kind: "fighting-style", id: "great-weapon-fighting", payload: { featureId: "additional-fighting-style" } }] : []),
-    ...([[4, "str"], [6, "con"], [8, "con"]] as const).filter(([at]) => at <= level).flatMap(([at, ability]) => [
-      { level: at, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
-      { level: at, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } },
-      { level: at, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
-    ]),
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "fighter-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const fighterInput = (level: 5 | 11): CharacterCreateRequestInput =>
+  ({
+    name: "Borin",
+    speciesId: "halfling",
+    backgroundId: "soldier",
+    classId: "fighter",
+    level,
+    subclassId: "champion",
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+      { level: 1, classId: "fighter", kind: "skill", id: "perception" },
+      { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+      ...["greatsword", "flail", "longbow", "rapier", "handaxe"]
+        .slice(0, level >= 9 ? 5 : 4)
+        .map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id })),
+      { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
+      ...(level >= 7
+        ? [
+            {
+              level: 7,
+              classId: "fighter",
+              kind: "fighting-style",
+              id: "great-weapon-fighting",
+              payload: { featureId: "additional-fighting-style" }
+            }
+          ]
+        : []),
+      ...(
+        [
+          [4, "str"],
+          [6, "con"],
+          [8, "con"]
+        ] as const
+      )
+        .filter(([at]) => at <= level)
+        .flatMap(([at, ability]) => [
+          { level: at, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
+          { level: at, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } },
+          { level: at, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
+        ]),
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "fighter-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /* ---- the spell window and the ASI ceiling, through both paths ---- */
 
@@ -1960,7 +2542,9 @@ function authoredMystery(window: { min?: number; max?: number }): Draft {
   const block = authoredRow("feat", ["feature", "choices"], edits);
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", WINDOW.featName, ["feature"]);
-  feature = applyField("feat", feature, "description", "You learn one spell of a level you should not yet reach.", ["feature"]);
+  feature = applyField("feat", feature, "description", "You learn one spell of a level you should not yet reach.", [
+    "feature"
+  ]);
   feature = applyField("feat", feature, "choices", [block], ["feature"]);
   return { ...shell, feature: { ...feature, id: WINDOW.featureId } };
 }
@@ -1981,54 +2565,81 @@ function authoredBoon(ceiling?: number): Draft {
   if (ceiling !== undefined) edits.push(["maximum", ceiling]);
   let feature = shell.feature as Draft;
   feature = applyField("feat", feature, "name", WINDOW.boonFeatName, ["feature"]);
-  feature = applyField("feat", feature, "description", "Increase one ability score of your choice by 1, to a maximum of 30.", ["feature"]);
+  feature = applyField(
+    "feat",
+    feature,
+    "description",
+    "Increase one ability score of your choice by 1, to a maximum of 30.",
+    ["feature"]
+  );
   feature = applyField("feat", feature, "choices", [authoredRow("feat", ["feature", "choices"], edits)], ["feature"]);
   return { ...shell, feature: { ...feature, id: WINDOW.boonFeatureId } };
 }
 
 /** A merged view carrying one authored feat under `recordId`. */
-const featView = (draft: Draft, recordId: string) => new ContentLibrary({
-  revision: 1,
-  publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", draft, recordId))] }),
-  monsterForInstance: () => undefined
-}).forAudience("gm");
+const featView = (draft: Draft, recordId: string) =>
+  new ContentLibrary({
+    revision: 1,
+    publishedFor: () => ({
+      ...EMPTY_HOMEBREW_SLICE,
+      feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", draft, recordId))]
+    }),
+    monsterForInstance: () => undefined
+  }).forAudience("gm");
 
 /** A Halfling Open Hand Monk 19 (where an Epic Boon arrives) with Wisdom already 20: 15, +2 at 4, +2
     at 8, +1 at 12. Remaining points go to Dex, so only the boon can raise Wisdom further. */
-const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput => ({
-  name: "Shan", speciesId: "halfling", backgroundId: "criminal", classId: "monk", level: 19,
-  subclassId: "warrior-of-the-open-hand", abilityMethod: "standard-array",
-  baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
-  backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
-    { level: 1, classId: "monk", kind: "skill", id: "insight" },
-    { level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" },
-    ...([[4, "wis", "wis"], [8, "wis", "wis"], [12, "wis", "dex"], [16, "dex", "dex"]] as const).flatMap(([at, first, second]) => [
-      { level: at, classId: "monk", kind: "asi-or-feat", id: "ability-score-improvement" },
-      { level: at, kind: "ability-score", id: first, payload: { featureId: "ability-score-improvement" } },
-      { level: at, kind: "ability-score", id: second, payload: { featureId: "ability-score-improvement" } }
-    ]),
-    // The Epic Boon slot; `tagId` is the feature id the offer key is built from.
-    { level: 19, classId: "monk", kind: "feat", id: boonId, payload: { featureId: "epic-boon" } },
-    { level: 19, kind: "ability-score", id: WINDOW.raised, payload: { featureId: tagId } },
-    { level: 1, kind: "equipment", id: "monk-a" },
-    { level: 1, kind: "equipment", id: "criminal-a" }
-  ]
-} as CharacterCreateRequestInput);
+const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput =>
+  ({
+    name: "Shan",
+    speciesId: "halfling",
+    backgroundId: "criminal",
+    classId: "monk",
+    level: 19,
+    subclassId: "warrior-of-the-open-hand",
+    abilityMethod: "standard-array",
+    baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
+    backgroundBonusAllocation: [
+      { ability: "dex", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
+      { level: 1, classId: "monk", kind: "skill", id: "insight" },
+      { level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" },
+      ...(
+        [
+          [4, "wis", "wis"],
+          [8, "wis", "wis"],
+          [12, "wis", "dex"],
+          [16, "dex", "dex"]
+        ] as const
+      ).flatMap(([at, first, second]) => [
+        { level: at, classId: "monk", kind: "asi-or-feat", id: "ability-score-improvement" },
+        { level: at, kind: "ability-score", id: first, payload: { featureId: "ability-score-improvement" } },
+        { level: at, kind: "ability-score", id: second, payload: { featureId: "ability-score-improvement" } }
+      ]),
+      // The Epic Boon slot; `tagId` is the feature id the offer key is built from.
+      { level: 19, classId: "monk", kind: "feat", id: boonId, payload: { featureId: "epic-boon" } },
+      { level: 19, kind: "ability-score", id: WINDOW.raised, payload: { featureId: tagId } },
+      { level: 1, kind: "equipment", id: "monk-a" },
+      { level: 1, kind: "equipment", id: "criminal-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** A Fiend-Patron Warlock 11 (first Mystic Arcanum) with the given arcanum: the SRD's exact-level pick. */
-const arcanumWarlock = (arcanum: string): CharacterCreateRequestInput => ({
-  ...resilientWarlock(REOPENED.built),
-  level: 11,
-  choices: [
-    ...resilientWarlock(REOPENED.built).choices,
-    { level: 11, kind: "spell", id: arcanum, payload: { featureId: WINDOW.arcanumFeatureId } }
-  ]
-} as CharacterCreateRequestInput);
+const arcanumWarlock = (arcanum: string): CharacterCreateRequestInput =>
+  ({
+    ...resilientWarlock(REOPENED.built),
+    level: 11,
+    choices: [
+      ...resilientWarlock(REOPENED.built).choices,
+      { level: 11, kind: "spell", id: arcanum, payload: { featureId: WINDOW.arcanumFeatureId } }
+    ]
+  }) as CharacterCreateRequestInput;
 
 describe("the spell window and the ASI ceiling — through both paths", () => {
   it("1. the editor can author all three numbers, and on any block — not only the first", () => {
@@ -2047,22 +2658,52 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
 
     // Every block, not just block 0 (Magic Initiate's shape: cantrips at 0, the spell at 1).
     const initiate = ((): Draft => {
-      const cantrips = authoredRow("feat", ["feature", "choices"], [["kind", "cantrip"], ["choose", 2], ["from", "guidance, light"], ["maxSpellLevel", 0]]);
-      const spell = authoredRow("feat", ["feature", "choices"], [["kind", "spell"], ["choose", 1], ["from", "bless"], ["maxSpellLevel", 1]]);
-      const shell = authored("feat", "Twin Mysteries", [["category", "origin"], ["summary", "Two mysteries."], ["description", "Two mysteries."]]);
+      const cantrips = authoredRow(
+        "feat",
+        ["feature", "choices"],
+        [
+          ["kind", "cantrip"],
+          ["choose", 2],
+          ["from", "guidance, light"],
+          ["maxSpellLevel", 0]
+        ]
+      );
+      const spell = authoredRow(
+        "feat",
+        ["feature", "choices"],
+        [
+          ["kind", "spell"],
+          ["choose", 1],
+          ["from", "bless"],
+          ["maxSpellLevel", 1]
+        ]
+      );
+      const shell = authored("feat", "Twin Mysteries", [
+        ["category", "origin"],
+        ["summary", "Two mysteries."],
+        ["description", "Two mysteries."]
+      ]);
       let feature = applyField("feat", shell.feature as Draft, "name", "Twin Mysteries", ["feature"]);
       feature = applyField("feat", feature, "description", "Two mysteries.", ["feature"]);
       return { ...shell, feature: applyField("feat", feature, "choices", [cantrips, spell], ["feature"]) };
     })();
-    const plural = storedBody("feat", initiate, WINDOW.featId) as { feature: { choices?: Array<Record<string, unknown>> } };
+    const plural = storedBody("feat", initiate, WINDOW.featId) as {
+      feature: { choices?: Array<Record<string, unknown>> };
+    };
     expect(plural.feature.choices?.map((block) => block.maxSpellLevel)).toEqual([0, 1]);
     // The first-block alias still reaches block 0 of the plural record.
-    expect((applyField("feat", initiate.feature as Draft, "choice.maxSpellLevel", 3, ["feature"]).choices as Array<{ maxSpellLevel?: number }>)
-      .map((block) => block.maxSpellLevel)).toEqual([3, 1]);
+    expect(
+      (
+        applyField("feat", initiate.feature as Draft, "choice.maxSpellLevel", 3, ["feature"]).choices as Array<{
+          maxSpellLevel?: number;
+        }>
+      ).map((block) => block.maxSpellLevel)
+    ).toEqual([3, 1]);
 
     // The window shows for spell kinds and for any block already holding a bound; the ceiling for the
     // ability-score kind. Visibility rules only: an authored value survives on any kind.
-    const blockField = (key: string) => fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === key)!;
+    const blockField = (key: string) =>
+      fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === key)!;
     for (const key of ["maxSpellLevel", "minSpellLevel"]) {
       expect(blockField(key).visibleWhen?.({ kind: "spell" }, {}), key).toBe(true);
       expect(blockField(key).visibleWhen?.({ kind: "cantrip" }, {}), key).toBe(true);
@@ -2081,23 +2722,41 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
 
   it("2. SRD content authors the same shapes — 17 ceilings, 6 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
-    const found: Array<{ id: string; kind: string; max?: number; min?: number; maximum?: number; fromCatalog?: string }> = [];
+    const found: Array<{
+      id: string;
+      kind: string;
+      max?: number;
+      min?: number;
+      maximum?: number;
+      fromCatalog?: string;
+    }> = [];
     // Choice blocks have no id, so the enclosing feature's id travels with the walk.
     const walk = (node: unknown, owner: string) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry, owner);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       const held = typeof record.id === "string" ? record.id : owner;
-      if (typeof record.kind === "string" && (record.maxSpellLevel !== undefined || record.minSpellLevel !== undefined || record.maximum !== undefined)) {
+      if (
+        typeof record.kind === "string" &&
+        (record.maxSpellLevel !== undefined || record.minSpellLevel !== undefined || record.maximum !== undefined)
+      ) {
         found.push({
-          id: held, kind: record.kind,
-          max: record.maxSpellLevel as number | undefined, min: record.minSpellLevel as number | undefined,
-          maximum: record.maximum as number | undefined, fromCatalog: record.fromCatalog as string | undefined
+          id: held,
+          kind: record.kind,
+          max: record.maxSpellLevel as number | undefined,
+          min: record.minSpellLevel as number | undefined,
+          maximum: record.maximum as number | undefined,
+          fromCatalog: record.fromCatalog as string | undefined
         });
       }
       for (const value of Object.values(record)) walk(value, held);
     };
-    const carriers = <T,>(list: readonly { id: string }[], read: (id: string) => T) => { for (const entry of list) walk(read(entry.id), "?"); };
+    const carriers = <T>(list: readonly { id: string }[], read: (id: string) => T) => {
+      for (const entry of list) walk(read(entry.id), "?");
+    };
     carriers(library.classSummaries(), (id) => library.classRecord(id));
     carriers(library.subclassSummaries(), (id) => library.subclassRecord(id));
     carriers(library.featSummaries(), (id) => library.featRecord(id));
@@ -2109,9 +2768,12 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     const maxima = found.filter((entry) => entry.maximum !== undefined);
     expect(ceilings).toHaveLength(17);
     expect(floors.map((entry) => entry.id).sort()).toEqual([
-      "mystic-arcanum-level-6-spell", "mystic-arcanum-level-7-spell",
-      "mystic-arcanum-level-8-spell", "mystic-arcanum-level-9-spell",
-      "spell-mastery", "spell-mastery"
+      "mystic-arcanum-level-6-spell",
+      "mystic-arcanum-level-7-spell",
+      "mystic-arcanum-level-8-spell",
+      "mystic-arcanum-level-9-spell",
+      "spell-mastery",
+      "spell-mastery"
     ]);
     expect(floors.every((entry) => entry.min === entry.max)).toBe(true);
     expect(maxima).toHaveLength(7);
@@ -2128,11 +2790,22 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     const mysteryRows = [{ kind: "spell", id: "bless" }];
     const paths: ReadonlyArray<readonly [string, () => unknown, RegExp]> = [
       // SRD: a level-6 arcanum spent on a level-1 spell.
-      ["SRD content", () => buildCharacterDefinition(arcanumWarlock(WINDOW.belowFloor), srdView, BuilderPolicySchema.parse({})),
-        new RegExp(`"${WINDOW.belowFloor}" is level 1, below the minimum spell level \\(${WINDOW.windowLevel}\\)`)],
+      [
+        "SRD content",
+        () => buildCharacterDefinition(arcanumWarlock(WINDOW.belowFloor), srdView, BuilderPolicySchema.parse({})),
+        new RegExp(`"${WINDOW.belowFloor}" is level 1, below the minimum spell level \\(${WINDOW.windowLevel}\\)`)
+      ],
       // Editor: the authored floor refuses an answer from the GM's own list.
-      ["the homebrew editor", () => buildCharacterDefinition(initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows), editorView, BuilderPolicySchema.parse({})),
-        new RegExp(`"bless" is level 0, below the minimum spell level \\(${WINDOW.authoredFloor}\\)`)]
+      [
+        "the homebrew editor",
+        () =>
+          buildCharacterDefinition(
+            initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows),
+            editorView,
+            BuilderPolicySchema.parse({})
+          ),
+        new RegExp(`"bless" is level 0, below the minimum spell level \\(${WINDOW.authoredFloor}\\)`)
+      ]
     ];
     for (const [label, build, message] of paths) {
       expect(build, label).toThrowError(message);
@@ -2140,26 +2813,42 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
 
     // Negative control: no window, so the spell lands on the sheet.
     const open = featView(authoredMystery({}), WINDOW.featId);
-    const sheet = buildCharacterDefinition(initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows), open, BuilderPolicySchema.parse({}));
+    const sheet = buildCharacterDefinition(
+      initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows),
+      open,
+      BuilderPolicySchema.parse({})
+    );
     expect(preparedSpell(sheet, "bless")).toMatchObject({ id: "bless", prepared: true });
 
     // The SRD carrier also proves the ceiling: `power-word-kill` breaks it, and the real level-6
     // spell lands at level 6.
-    expect(() => buildCharacterDefinition(arcanumWarlock(WINDOW.aboveCeiling), srdView, BuilderPolicySchema.parse({})))
-      .toThrowError(new RegExp(`"${WINDOW.aboveCeiling}" is level 9, above the maximum spell level \\(${WINDOW.windowLevel}\\)`));
-    const arcanum = preparedSpell(buildCharacterDefinition(arcanumWarlock(WINDOW.inWindow), srdView, BuilderPolicySchema.parse({})), WINDOW.inWindow);
+    expect(() =>
+      buildCharacterDefinition(arcanumWarlock(WINDOW.aboveCeiling), srdView, BuilderPolicySchema.parse({}))
+    ).toThrowError(
+      new RegExp(`"${WINDOW.aboveCeiling}" is level 9, above the maximum spell level \\(${WINDOW.windowLevel}\\)`)
+    );
+    const arcanum = preparedSpell(
+      buildCharacterDefinition(arcanumWarlock(WINDOW.inWindow), srdView, BuilderPolicySchema.parse({})),
+      WINDOW.inWindow
+    );
     expect(arcanum).toMatchObject({ id: WINDOW.inWindow, level: WINDOW.windowLevel });
   });
 
   it("4. one assertion body over both: the ceiling carries a 20 to 21, and without it the point is thrown away", () => {
     const srdView = new ContentLibrary().forAudience("gm");
     const paths: ReadonlyArray<readonly [string, ActorDefinition]> = [
-      ["SRD content", buildCharacterDefinition(boonMonk(WINDOW.srdBoonId, WINDOW.srdBoonId), srdView, BuilderPolicySchema.parse({}))],
-      ["the homebrew editor", buildCharacterDefinition(
-        boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
-        featView(authoredBoon(WINDOW.ceiling), WINDOW.boonFeatId),
-        BuilderPolicySchema.parse({})
-      )]
+      [
+        "SRD content",
+        buildCharacterDefinition(boonMonk(WINDOW.srdBoonId, WINDOW.srdBoonId), srdView, BuilderPolicySchema.parse({}))
+      ],
+      [
+        "the homebrew editor",
+        buildCharacterDefinition(
+          boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
+          featView(authoredBoon(WINDOW.ceiling), WINDOW.boonFeatId),
+          BuilderPolicySchema.parse({})
+        )
+      ]
     ];
     for (const [label, definition] of paths) {
       // A score past the ASI clamp: Wisdom was 20 before the boon.
@@ -2202,12 +2891,24 @@ const LEDGER = {
     ["feature:repelling-blast", "attack-roll"],
     ["feature:eldritch-spear", "ranged"]
   ],
-  invocations: ["agonizing-blast", "repelling-blast", "eldritch-spear", "devils-sight", "eldritch-mind", "armor-of-shadows", "ascendant-step"],
+  invocations: [
+    "agonizing-blast",
+    "repelling-blast",
+    "eldritch-spear",
+    "devils-sight",
+    "eldritch-mind",
+    "armor-of-shadows",
+    "ascendant-step"
+  ],
   featId: "hb-borrowed-blast-a1b2",
   featureId: "borrowed-blast",
   featName: "Borrowed Blast",
   /** Prepared spells in the same ledger, for the spell-level half. */
-  spells: [["hex", 1], ["hold-person", 2], ["fly", 5]],
+  spells: [
+    ["hex", 1],
+    ["hold-person", 2],
+    ["fly", 5]
+  ],
   spellLevels: { hex: 1, "hold-person": 2, fly: 3 },
   floor: 2,
   belowFloor: "hex",
@@ -2216,13 +2917,18 @@ const LEDGER = {
 
 /** A feat with one pick over answers the character already gave. Passing `from` is the negative
     control: the same feat with a typed list instead. */
-function authoredBorrowedBlast(over: Readonly<{ where?: string; offer?: string; kind?: string; min?: number; from?: string }> = {}): Draft {
+function authoredBorrowedBlast(
+  over: Readonly<{ where?: string; offer?: string; kind?: string; min?: number; from?: string }> = {}
+): Draft {
   const shell = authored("feat", LEDGER.featName, [
     ["category", "origin"],
     ["summary", "A trick borrowed from a spell you already know."],
     ["description", "Choose one of the cantrips you already know."]
   ]);
-  const edits: Array<readonly [string, unknown]> = [["kind", over.kind ?? "cantrip"], ["choose", 1]];
+  const edits: Array<readonly [string, unknown]> = [
+    ["kind", over.kind ?? "cantrip"],
+    ["choose", 1]
+  ];
   if (over.from !== undefined) edits.push(["from", over.from]);
   else {
     edits.push(["fromPicks.offer", over.offer ?? "class-cantrips"]);
@@ -2239,43 +2945,62 @@ function authoredBorrowedBlast(over: Readonly<{ where?: string; offer?: string; 
 
 /** A Fiend-Patron Warlock 10 knowing the fixture's cantrips, with `featId` in the origin-feat slot when
     given. At 10 the Invocations column has room for the three `fromPicks` invocations plus four others. */
-const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cantrips): CharacterCreateRequestInput => ({
-  name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 10,
-  subclassId: "fiend-patron", abilityMethod: "standard-array",
-  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
-  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    { level: 1, kind: "feat", id: featId ?? "alert", payload: { featureId: "human-versatile" } },
-    // The Acolyte's origin feat, Magic Initiate (Cleric), is where Sacred Flame comes from.
-    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, kind: "cantrip", id: LEDGER.otherSource, payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
-    { level: 1, classId: "warlock", kind: "skill", id: "deception" },
-    ...LEDGER.invocations.map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })),
-    // Each invocation's own answer is Eldritch Blast, which satisfies every predicate, so swapping
-    // the ledger below never invalidates an answer.
-    ...["agonizing-blast", "repelling-blast", "eldritch-spear"]
-      .map((featureId) => ({ level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId } })),
-    { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
-    // Fiendish Resilience arrives at 10 and must be answered, or the build refuses.
-    { level: 10, kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } },
-    ...[4, 8].flatMap((at) => [
-      { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
-      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
-      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
-    ]),
-    // The ledger: untagged rows, which is what a named budget reads.
-    ...cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
-    ...LEDGER.spells.map(([id, level]) => ({ level, kind: "spell", id })),
-    { level: 1, kind: "equipment", id: "warlock-a" },
-    { level: 1, kind: "equipment", id: "acolyte-a" }
-  ]
-} as CharacterCreateRequestInput);
+const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cantrips): CharacterCreateRequestInput =>
+  ({
+    name: "Vex",
+    speciesId: "human",
+    backgroundId: "acolyte",
+    classId: "warlock",
+    level: 10,
+    subclassId: "fiend-patron",
+    abilityMethod: "standard-array",
+    baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    backgroundBonusAllocation: [
+      { ability: "cha", amount: 2 },
+      { ability: "wis", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: featId ?? "alert", payload: { featureId: "human-versatile" } },
+      // The Acolyte's origin feat, Magic Initiate (Cleric), is where Sacred Flame comes from.
+      { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "cantrip", id: LEDGER.otherSource, payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
+      { level: 1, classId: "warlock", kind: "skill", id: "deception" },
+      ...LEDGER.invocations.map((id) => ({
+        level: 1,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id,
+        payload: { featureId: "eldritch-invocations" }
+      })),
+      // Each invocation's own answer is Eldritch Blast, which satisfies every predicate, so swapping
+      // the ledger below never invalidates an answer.
+      ...["agonizing-blast", "repelling-blast", "eldritch-spear"].map((featureId) => ({
+        level: 1,
+        kind: "cantrip",
+        id: "eldritch-blast",
+        payload: { featureId }
+      })),
+      { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
+      // Fiendish Resilience arrives at 10 and must be answered, or the build refuses.
+      { level: 10, kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } },
+      ...[4, 8].flatMap((at) => [
+        { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
+        { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+        { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+      ]),
+      // The ledger: untagged rows, which is what a named budget reads.
+      ...cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
+      ...LEDGER.spells.map(([id, level]) => ({ level, kind: "spell", id })),
+      { level: 1, kind: "equipment", id: "warlock-a" },
+      { level: 1, kind: "equipment", id: "acolyte-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** One offer's option ids from the server's computation, sorted (membership is what matters). */
 function offeredIds(survey: ReturnType<typeof computeServerOffers>, key: string): readonly string[] {
@@ -2296,13 +3021,19 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
 
     const body = storedBody("feat", draft, LEDGER.featId) as { feature: { choice?: Record<string, unknown> } };
     // Agonizing Blast's shape, with this feat's predicate.
-    expect(body.feature.choice).toMatchObject({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } });
+    expect(body.feature.choice).toMatchObject({
+      kind: "cantrip",
+      choose: 1,
+      fromPicks: { offer: "class-cantrips", where: "attack-roll" }
+    });
     // No other source key: the reader tests `fromPicks` first and would silently drop the other.
     for (const key of ["from", "fromCatalog", "options"]) {
       expect(key in (body.feature.choice ?? {}), `choice.${key} rode along`).toBe(false);
     }
     // `where` is optional; the budget alone offers every answer.
-    const open = storedBody("feat", authoredBorrowedBlast({}), LEDGER.featId) as { feature: { choice?: { fromPicks?: unknown } } };
+    const open = storedBody("feat", authoredBorrowedBlast({}), LEDGER.featId) as {
+      feature: { choice?: { fromPicks?: unknown } };
+    };
     expect(open.feature.choice?.fromPicks).toEqual({ offer: "class-cantrips" });
 
     // Resolves on the class form at the block's scope, and as the first block's alias.
@@ -2319,23 +3050,54 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
 
     // Every block, not just block 0.
     const twinned = ((): Draft => {
-      const first = authoredRow("feat", ["feature", "choices"], [["kind", "cantrip"], ["choose", 1], ["fromPicks.offer", "class-cantrips"], ["fromPicks.where", "deals-damage"]]);
-      const second = authoredRow("feat", ["feature", "choices"], [["kind", "spell"], ["choose", 1], ["fromPicks.offer", "class-spells"]]);
-      const shell = authored("feat", "Twin Echoes", [["category", "origin"], ["summary", "Two echoes."], ["description", "Two echoes."]]);
+      const first = authoredRow(
+        "feat",
+        ["feature", "choices"],
+        [
+          ["kind", "cantrip"],
+          ["choose", 1],
+          ["fromPicks.offer", "class-cantrips"],
+          ["fromPicks.where", "deals-damage"]
+        ]
+      );
+      const second = authoredRow(
+        "feat",
+        ["feature", "choices"],
+        [
+          ["kind", "spell"],
+          ["choose", 1],
+          ["fromPicks.offer", "class-spells"]
+        ]
+      );
+      const shell = authored("feat", "Twin Echoes", [
+        ["category", "origin"],
+        ["summary", "Two echoes."],
+        ["description", "Two echoes."]
+      ]);
       let feature = applyField("feat", shell.feature as Draft, "name", "Twin Echoes", ["feature"]);
       feature = applyField("feat", feature, "description", "Two echoes.", ["feature"]);
       return { ...shell, feature: applyField("feat", feature, "choices", [first, second], ["feature"]) };
     })();
-    const plural = storedBody("feat", twinned, LEDGER.featId) as { feature: { choices?: Array<{ fromPicks?: unknown }> } };
-    expect(plural.feature.choices?.map((block) => block.fromPicks))
-      .toEqual([{ offer: "class-cantrips", where: "deals-damage" }, { offer: "class-spells" }]);
+    const plural = storedBody("feat", twinned, LEDGER.featId) as {
+      feature: { choices?: Array<{ fromPicks?: unknown }> };
+    };
+    expect(plural.feature.choices?.map((block) => block.fromPicks)).toEqual([
+      { offer: "class-cantrips", where: "deals-damage" },
+      { offer: "class-spells" }
+    ]);
 
     // Exclusivity both ways: the ledger source clears a typed list and vice versa.
-    const listed = applyField("feat", { kind: "cantrip", choose: 1 }, "from", "guidance, light", ["feature", "choices"]);
+    const listed = applyField("feat", { kind: "cantrip", choose: 1 }, "from", "guidance, light", [
+      "feature",
+      "choices"
+    ]);
     const swapped = applyField("feat", listed, "fromPicks.offer", "class-cantrips", ["feature", "choices"]);
     expect(swapped).toEqual({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips" } });
-    expect(applyField("feat", swapped, "from", "guidance", ["feature", "choices"]))
-      .toEqual({ kind: "cantrip", choose: 1, from: ["guidance"] });
+    expect(applyField("feat", swapped, "from", "guidance", ["feature", "choices"])).toEqual({
+      kind: "cantrip",
+      choose: 1,
+      from: ["guidance"]
+    });
 
     // `where` is closed because the schema is: three slugs the resolver reads by name.
     const whereField = fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === "fromPicks.where");
@@ -2346,7 +3108,10 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{ id: string; source: Record<string, unknown> }> = [];
     const walk = (node: unknown, owner: string) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry, owner);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       const held = typeof record.id === "string" ? record.id : owner;
@@ -2373,7 +3138,12 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
       // SRD: Repelling Blast, whose "requires an attack roll" matches the feat's predicate.
       ["SRD content", surveyOf(blastWarlock(), srdView), "feature:repelling-blast", LEDGER.attackRoll],
       // Editor: the authored feat over the same ledger.
-      ["the homebrew editor", surveyOf(blastWarlock(LEDGER.featId), editorView), `feature:${LEDGER.featureId}`, LEDGER.attackRoll]
+      [
+        "the homebrew editor",
+        surveyOf(blastWarlock(LEDGER.featId), editorView),
+        `feature:${LEDGER.featureId}`,
+        LEDGER.attackRoll
+      ]
     ];
     for (const [label, survey, key, expected] of paths) {
       // Sacred Flame deals damage and makes no attack roll, yet it is absent from every list because it
@@ -2398,7 +3168,10 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     const wide = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({}), LEDGER.featId));
     expect(offeredIds(wide, `feature:${LEDGER.featureId}`)).toEqual([...LEDGER.cantrips].sort());
     // ...and with a typed list the ledger is not read at all.
-    const typed = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({ from: "guidance, light" }), LEDGER.featId));
+    const typed = surveyOf(
+      blastWarlock(LEDGER.featId),
+      featView(authoredBorrowedBlast({ from: "guidance, light" }), LEDGER.featId)
+    );
     expect(offeredIds(typed, `feature:${LEDGER.featureId}`)).toEqual(["guidance", "light"]);
   });
 
@@ -2406,7 +3179,10 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     /** Spell bounds compare against `optionLevels`. A typed `from` list has none, but
         `resolvePickChoice` looks every answer up in the spell catalog, so a window over `fromPicks`
         really applies from the editor end. */
-    const view = featView(authoredBorrowedBlast({ kind: "spell", offer: "class-spells", min: LEDGER.floor }), LEDGER.featId);
+    const view = featView(
+      authoredBorrowedBlast({ kind: "spell", offer: "class-spells", min: LEDGER.floor }),
+      LEDGER.featId
+    );
     const survey = surveyOf(blastWarlock(LEDGER.featId), view);
     const offer = survey.offers.find((candidate) => candidate.key === `feature:${LEDGER.featureId}`)!;
     // The levels are present for a list no catalog holds.
@@ -2415,19 +3191,31 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
 
     // A level-1 spell is below the authored floor, named by its real level.
     const below = { ...blastWarlock(LEDGER.featId) };
-    below.choices = [...below.choices, { level: 10, kind: "spell", id: LEDGER.belowFloor, payload: { featureId: LEDGER.featureId } }] as typeof below.choices;
-    expect(() => buildCharacterDefinition(below, view, BuilderPolicySchema.parse({})))
-      .toThrowError(new RegExp(`"${LEDGER.belowFloor}" is level 1, below the minimum spell level \\(${LEDGER.floor}\\)`));
+    below.choices = [
+      ...below.choices,
+      { level: 10, kind: "spell", id: LEDGER.belowFloor, payload: { featureId: LEDGER.featureId } }
+    ] as typeof below.choices;
+    expect(() => buildCharacterDefinition(below, view, BuilderPolicySchema.parse({}))).toThrowError(
+      new RegExp(`"${LEDGER.belowFloor}" is level 1, below the minimum spell level \\(${LEDGER.floor}\\)`)
+    );
 
     // Negative control: the same floor over a typed list reads every option as level 0, so it refuses
     // the GM's own options.
-    const listed = featView(authoredBorrowedBlast({ kind: "spell", from: "hex, fly", min: LEDGER.floor }), LEDGER.featId);
-    const listedOffer = surveyOf(blastWarlock(LEDGER.featId), listed).offers.find((candidate) => candidate.key === `feature:${LEDGER.featureId}`)!;
+    const listed = featView(
+      authoredBorrowedBlast({ kind: "spell", from: "hex, fly", min: LEDGER.floor }),
+      LEDGER.featId
+    );
+    const listedOffer = surveyOf(blastWarlock(LEDGER.featId), listed).offers.find(
+      (candidate) => candidate.key === `feature:${LEDGER.featureId}`
+    )!;
     expect(listedOffer.optionLevels).toBeNull();
 
     // A level-3 spell is inside the window when levels are real.
     const inside = { ...blastWarlock(LEDGER.featId) };
-    inside.choices = [...inside.choices, { level: 10, kind: "spell", id: LEDGER.inWindow, payload: { featureId: LEDGER.featureId } }] as typeof inside.choices;
+    inside.choices = [
+      ...inside.choices,
+      { level: 10, kind: "spell", id: LEDGER.inWindow, payload: { featureId: LEDGER.featureId } }
+    ] as typeof inside.choices;
     expect(() => buildCharacterDefinition(inside, view, BuilderPolicySchema.parse({}))).not.toThrow();
   });
 });
@@ -2448,23 +3236,40 @@ const GATED = {
   srdOffer: "feature:natures-ward",
   srdGate: "feature:circle-of-the-land-spells",
   /** The SRD table: which land grants which resistance. */
-  lands: [["arid", "fire"], ["polar", "cold"], ["temperate", "lightning"], ["tropical", "poison"]],
+  lands: [
+    ["arid", "fire"],
+    ["polar", "cold"],
+    ["temperate", "lightning"],
+    ["tropical", "poison"]
+  ],
   speciesId: "hb-echokin-a1b2",
   speciesName: "Echokin",
   /** Pinned because the ledger tags its answer with the feature id, which the gate names. */
   heritageId: "echo-heritage",
   wardId: "echo-ward",
   gate: "feature:echo-heritage",
-  answers: [["emberborn", "ember-ward", "fire"], ["frostborn", "frost-ward", "cold"]]
+  answers: [
+    ["emberborn", "ember-ward", "fire"],
+    ["frostborn", "frost-ward", "cold"]
+  ]
 } as const;
 
 /** One gated option. `requires` uses the option row's controls; the resistance goes through `grantsFromRows`. */
 const echoOption = (id: string, name: string, gate: string | null, resistance: string): Draft => ({
-  ...authoredRow("species", ["traits", "choice.options"], [
-    ["name", name],
-    ["description", `Your heritage answered this for you, so you have Resistance to ${resistance} damage.`],
-    ...(gate ? ([["requires.offer", GATED.gate], ["requires.id", gate]] as Array<readonly [string, unknown]>) : [])
-  ]),
+  ...authoredRow(
+    "species",
+    ["traits", "choice.options"],
+    [
+      ["name", name],
+      ["description", `Your heritage answered this for you, so you have Resistance to ${resistance} damage.`],
+      ...(gate
+        ? ([
+            ["requires.offer", GATED.gate],
+            ["requires.id", gate]
+          ] as Array<readonly [string, unknown]>)
+        : [])
+    ]
+  ),
   id,
   grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }], {})
 });
@@ -2473,24 +3278,41 @@ const echoOption = (id: string, name: string, gate: string | null, resistance: s
     answer. `gated: false` is the negative control. */
 function authoredEchokin(gated = true): Draft {
   const heritage = {
-    ...authoredRow("species", ["traits"], [
-      ["name", "Echoed Heritage"],
-      ["description", "Choose the echo you were born under."],
-      ["choice", true],
-      ["choice.kind", "heritage"],
-      ["choice.from", "emberborn, frostborn"]
-    ]),
+    ...authoredRow(
+      "species",
+      ["traits"],
+      [
+        ["name", "Echoed Heritage"],
+        ["description", "Choose the echo you were born under."],
+        ["choice", true],
+        ["choice.kind", "heritage"],
+        ["choice.from", "emberborn, frostborn"]
+      ]
+    ),
     id: GATED.heritageId
   };
   const ward = {
-    ...authoredRow("species", ["traits"], [
-      ["name", "Echoed Ward"],
-      ["description", "The echo you were born under wards you."],
-      ["choice", true],
-      ["choice.kind", "echo-ward"],
-      ["choice.options", GATED.answers.map(([answer, optionId, resistance]) =>
-        echoOption(optionId, `${resistance[0].toUpperCase()}${resistance.slice(1)} Ward`, gated ? answer : null, resistance))]
-    ]),
+    ...authoredRow(
+      "species",
+      ["traits"],
+      [
+        ["name", "Echoed Ward"],
+        ["description", "The echo you were born under wards you."],
+        ["choice", true],
+        ["choice.kind", "echo-ward"],
+        [
+          "choice.options",
+          GATED.answers.map(([answer, optionId, resistance]) =>
+            echoOption(
+              optionId,
+              `${resistance[0].toUpperCase()}${resistance.slice(1)} Ward`,
+              gated ? answer : null,
+              resistance
+            )
+          )
+        ]
+      ]
+    ),
     id: GATED.wardId
   };
   return authored("species", GATED.speciesName, [
@@ -2502,65 +3324,91 @@ function authoredEchokin(gated = true): Draft {
   ]);
 }
 
-const echokinView = (species: Draft) => new ContentLibrary({
-  revision: 1,
-  publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, species: [HOMEBREW_BODY_SCHEMAS.species.parse(storedBody("species", species, GATED.speciesId))] }),
-  monsterForInstance: () => undefined
-}).forAudience("gm");
+const echokinView = (species: Draft) =>
+  new ContentLibrary({
+    revision: 1,
+    publishedFor: () => ({
+      ...EMPTY_HOMEBREW_SLICE,
+      species: [HOMEBREW_BODY_SCHEMAS.species.parse(storedBody("species", species, GATED.speciesId))]
+    }),
+    monsterForInstance: () => undefined
+  }).forAudience("gm");
 
 /** An Echokin Fighter 1 who has answered the heritage. */
-const echokinInput = (heritage: string): CharacterCreateRequestInput => ({
-  name: "Ash", speciesId: GATED.speciesId, backgroundId: "soldier", classId: "fighter", level: 1,
-  abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    // The earlier answer the ward reads.
-    { level: 1, kind: "heritage", id: heritage, payload: { featureId: GATED.heritageId } },
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
-    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
-    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-    ...["longsword", "javelin", "greatsword"].map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id })),
-    { level: 1, kind: "tool", id: "gaming-set-dice" },
-    { level: 1, kind: "equipment", id: "fighter-a" },
-    { level: 1, kind: "equipment", id: "soldier-a" }
-  ]
-} as CharacterCreateRequestInput);
+const echokinInput = (heritage: string): CharacterCreateRequestInput =>
+  ({
+    name: "Ash",
+    speciesId: GATED.speciesId,
+    backgroundId: "soldier",
+    classId: "fighter",
+    level: 1,
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      // The earlier answer the ward reads.
+      { level: 1, kind: "heritage", id: heritage, payload: { featureId: GATED.heritageId } },
+      { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+      { level: 1, classId: "fighter", kind: "skill", id: "survival" },
+      { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+      ...["longsword", "javelin", "greatsword"].map((id) => ({
+        level: 1,
+        classId: "fighter",
+        kind: "weapon-mastery",
+        id
+      })),
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "fighter-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** A Circle-of-the-Land Druid 10 (where Nature's Ward arrives) whose land was answered at 3. */
-const landDruid = (land: string): CharacterCreateRequestInput => ({
-  name: "Rowan", speciesId: "human", backgroundId: "acolyte", classId: "druid", level: 10,
-  subclassId: "circle-of-the-land", abilityMethod: "standard-array",
-  baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
-  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "int", amount: 1 }],
-  hp: { mode: "average" },
-  choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
-    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
-    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
-    { level: 1, classId: "druid", kind: "skill", id: "nature" },
-    { level: 1, classId: "druid", kind: "skill", id: "perception" },
-    { level: 1, kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
-    { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
-    // The earlier answer, seven levels before the feature that reads it.
-    { level: 3, kind: "land", id: land, payload: { featureId: "circle-of-the-land-spells" } },
-    { level: 7, kind: "elemental-fury", id: "primal-strike", payload: { featureId: "elemental-fury" } },
-    ...[4, 8].flatMap((at) => [
-      { level: at, classId: "druid", kind: "asi-or-feat", id: "ability-score-improvement" },
-      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
-      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
-    ]),
-    { level: 1, kind: "cantrip", id: "druidcraft" },
-    { level: 1, kind: "cantrip", id: "produce-flame" },
-    { level: 1, kind: "equipment", id: "druid-a" },
-    { level: 1, kind: "equipment", id: "acolyte-a" }
-  ]
-} as CharacterCreateRequestInput);
+const landDruid = (land: string): CharacterCreateRequestInput =>
+  ({
+    name: "Rowan",
+    speciesId: "human",
+    backgroundId: "acolyte",
+    classId: "druid",
+    level: 10,
+    subclassId: "circle-of-the-land",
+    abilityMethod: "standard-array",
+    baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
+    backgroundBonusAllocation: [
+      { ability: "wis", amount: 2 },
+      { ability: "int", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+      { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, classId: "druid", kind: "skill", id: "nature" },
+      { level: 1, classId: "druid", kind: "skill", id: "perception" },
+      { level: 1, kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
+      { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
+      // The earlier answer, seven levels before the feature that reads it.
+      { level: 3, kind: "land", id: land, payload: { featureId: "circle-of-the-land-spells" } },
+      { level: 7, kind: "elemental-fury", id: "primal-strike", payload: { featureId: "elemental-fury" } },
+      ...[4, 8].flatMap((at) => [
+        { level: at, classId: "druid", kind: "asi-or-feat", id: "ability-score-improvement" },
+        { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+        { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+      ]),
+      { level: 1, kind: "cantrip", id: "druidcraft" },
+      { level: 1, kind: "cantrip", id: "produce-flame" },
+      { level: 1, kind: "equipment", id: "druid-a" },
+      { level: 1, kind: "equipment", id: "acolyte-a" }
+    ]
+  }) as CharacterCreateRequestInput;
 
 /** Which inline options survived the gate: adopted options join `granted` with `origin.kind ===
     "option"` and the parent's id as source. */
@@ -2577,7 +3425,9 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     expect(verdict.why).toBe("");
     expect(verdict.publishable).toBe(true);
 
-    const body = storedBody("species", draft, GATED.speciesId) as { traits: Array<{ choice?: { options?: Array<Record<string, unknown>> } }> };
+    const body = storedBody("species", draft, GATED.speciesId) as {
+      traits: Array<{ choice?: { options?: Array<Record<string, unknown>> } }>;
+    };
     // Nature's Ward's shape: one gate per option, each naming a different answer to the same pick.
     expect(body.traits[1].choice?.options?.map((option) => option.requires)).toEqual([
       { offer: GATED.gate, id: "emberborn" },
@@ -2586,8 +3436,12 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     // No gate means no key; a half-cleared clause must not survive as `{}`.
     const open = storedBody("species", authoredEchokin(false), GATED.speciesId) as typeof body;
     expect(open.traits[1].choice?.options?.every((option) => !("requires" in option))).toBe(true);
-    expect(applyField("species", { id: "o1", requires: { offer: GATED.gate } }, "requires.offer", "", ["traits", "choice.options"]))
-      .toEqual({ id: "o1" });
+    expect(
+      applyField("species", { id: "o1", requires: { offer: GATED.gate } }, "requires.offer", "", [
+        "traits",
+        "choice.options"
+      ])
+    ).toEqual({ id: "o1" });
 
     // Looked up in the option's own fields; `choice.kind` is unreachable there.
     for (const key of ["requires", "requires.offer", "requires.id"]) {
@@ -2600,7 +3454,10 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
 
     // "Which answer" suggests the record's own option ids and typed-list ids.
     const idField = fieldsWithin("species", ["traits", "choice.options"]).find((field) => field.key === "requires.id")!;
-    const suggested = typeof idField.suggestions === "function" ? idField.suggestions(EMPTY_CONTEXT, forStorage(draft)) : idField.suggestions ?? [];
+    const suggested =
+      typeof idField.suggestions === "function"
+        ? idField.suggestions(EMPTY_CONTEXT, forStorage(draft))
+        : (idField.suggestions ?? []);
     expect([...suggested].sort()).toEqual(["ember-ward", "emberborn", "frost-ward", "frostborn"]);
   });
 
@@ -2609,15 +3466,27 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     const gates: Array<{ owner: string; option: string; offer: string; id: string }> = [];
     // Track the owner explicitly: the last non-option object with an id (choice blocks have none).
     const walk = (node: unknown, owner: string) => {
-      if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
+      if (Array.isArray(node)) {
+        for (const entry of node) walk(entry, owner);
+        return;
+      }
       if (!node || typeof node !== "object") return;
       const record = node as Record<string, unknown>;
       const held = typeof record.id === "string" ? record.id : owner;
       for (const [key, value] of Object.entries(record)) {
-        if (key !== "options" || !Array.isArray(value)) { walk(value, held); continue; }
+        if (key !== "options" || !Array.isArray(value)) {
+          walk(value, held);
+          continue;
+        }
         for (const entry of value as Array<Record<string, unknown>>) {
           const clause = entry?.requires as Record<string, unknown> | undefined;
-          if (clause) gates.push({ owner: held, option: String(entry.id ?? "?"), offer: String(clause.offer), id: String(clause.id) });
+          if (clause)
+            gates.push({
+              owner: held,
+              option: String(entry.id ?? "?"),
+              offer: String(clause.offer),
+              id: String(clause.id)
+            });
           walk(entry, held);
         }
       }
@@ -2628,22 +3497,40 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
 
     // Eight at the time of writing over four features, each naming a `feature:<id>` pick of its own record.
     expect(gates).toHaveLength(8);
-    expect([...new Set(gates.map((gate) => gate.owner))].sort())
-      .toEqual(["improved-blessed-strikes", "improved-elemental-fury", "natures-ward"]);
+    expect([...new Set(gates.map((gate) => gate.owner))].sort()).toEqual([
+      "improved-blessed-strikes",
+      "improved-elemental-fury",
+      "natures-ward"
+    ]);
     expect(gates.every((gate) => gate.offer.startsWith("feature:"))).toBe(true);
     // Nature's Ward: four options, four lands, one budget.
-    expect(gates.filter((gate) => gate.owner === GATED.srdFeatureId).map((gate) => `${gate.id} → ${gate.option}`))
-      .toEqual(GATED.lands.map(([land]) => `${land} → natures-ward-${land}`));
+    expect(
+      gates.filter((gate) => gate.owner === GATED.srdFeatureId).map((gate) => `${gate.id} → ${gate.option}`)
+    ).toEqual(GATED.lands.map(([land]) => `${land} → natures-ward-${land}`));
   });
 
   it("3. one assertion body over both: the option list is the earlier answer, and no second question is asked", () => {
     const srdView = new ContentLibrary().forAudience("gm");
     const editorView = echokinView(authoredEchokin());
-    const paths: ReadonlyArray<readonly [string, () => ReturnType<typeof computeServerOffers>, () => ActorDefinition, string, string, string]> = [
-      ["SRD content", () => surveyOf(landDruid("polar"), srdView), () => buildCharacterDefinition(landDruid("polar"), srdView, BuilderPolicySchema.parse({})),
-        GATED.srdFeatureId, "natures-ward-polar", "cold"],
-      ["the homebrew editor", () => surveyOf(echokinInput("frostborn"), editorView), () => buildCharacterDefinition(echokinInput("frostborn"), editorView, BuilderPolicySchema.parse({})),
-        GATED.wardId, "frost-ward", "cold"]
+    const paths: ReadonlyArray<
+      readonly [string, () => ReturnType<typeof computeServerOffers>, () => ActorDefinition, string, string, string]
+    > = [
+      [
+        "SRD content",
+        () => surveyOf(landDruid("polar"), srdView),
+        () => buildCharacterDefinition(landDruid("polar"), srdView, BuilderPolicySchema.parse({})),
+        GATED.srdFeatureId,
+        "natures-ward-polar",
+        "cold"
+      ],
+      [
+        "the homebrew editor",
+        () => surveyOf(echokinInput("frostborn"), editorView),
+        () => buildCharacterDefinition(echokinInput("frostborn"), editorView, BuilderPolicySchema.parse({})),
+        GATED.wardId,
+        "frost-ward",
+        "cold"
+      ]
     ];
 
     for (const [label, survey, build, parentId, survivor, resistance] of paths) {
@@ -2651,7 +3538,10 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
       // The list narrowed to the one legal option...
       expect(survivorsOf(computed, parentId), label).toEqual([survivor]);
       // ...which is adopted, so nothing is asked...
-      expect(computed.offers.map((offer) => offer.key), label).not.toContain(`feature:${parentId}`);
+      expect(
+        computed.offers.map((offer) => offer.key),
+        label
+      ).not.toContain(`feature:${parentId}`);
       // ...and its grant reaches the sheet.
       expect(build().damageResistances, label).toContain(resistance);
     }
@@ -2659,8 +3549,13 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     // The answer drives it: a different earlier row gives a different survivor.
     for (const [land, resistance] of GATED.lands) {
       const built = buildCharacterDefinition(landDruid(land), srdView, BuilderPolicySchema.parse({}));
-      expect(survivorsOf(surveyOf(landDruid(land), srdView), GATED.srdFeatureId), land).toEqual([`natures-ward-${land}`]);
-      expect((built.damageResistances ?? []).filter((type) => GATED.lands.some(([, held]) => held === type)), land).toEqual([resistance]);
+      expect(survivorsOf(surveyOf(landDruid(land), srdView), GATED.srdFeatureId), land).toEqual([
+        `natures-ward-${land}`
+      ]);
+      expect(
+        (built.damageResistances ?? []).filter((type) => GATED.lands.some(([, held]) => held === type)),
+        land
+      ).toEqual([resistance]);
     }
     for (const [heritage, survivor, resistance] of GATED.answers) {
       const built = buildCharacterDefinition(echokinInput(heritage), editorView, BuilderPolicySchema.parse({}));
@@ -2675,8 +3570,9 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     expect(survivorsOf(survey, GATED.wardId)).toEqual([]);
     const offered = survey.offers.find((offer) => offer.key === `feature:${GATED.wardId}`);
     expect([...(offered?.options ?? [])].sort()).toEqual(["ember-ward", "frost-ward"]);
-    expect(() => buildCharacterDefinition(echokinInput("frostborn"), ungated, BuilderPolicySchema.parse({})))
-      .toThrowError(/needs 1 pick\(s\) of kind "echo-ward"/);
+    expect(() =>
+      buildCharacterDefinition(echokinInput("frostborn"), ungated, BuilderPolicySchema.parse({}))
+    ).toThrowError(/needs 1 pick\(s\) of kind "echo-ward"/);
   });
 });
 
@@ -2689,22 +3585,34 @@ describe("the guard itself refuses what the editor cannot author", () => {
   it("R1: the choice panel is reachable from `fieldsOf`, and what it writes reaches the wire", () => {
     // The three bespoke controls (level chips, source switcher, catalog pair) are excluded; see
     // `featureFields()`.
-    for (const key of ["name", "description", "choice", "choice.kind", "choice.choose", "choice.from", "choice.repeatable"]) {
+    for (const key of [
+      "name",
+      "description",
+      "choice",
+      "choice.kind",
+      "choice.choose",
+      "choice.from",
+      "choice.repeatable"
+    ]) {
       expect(hasControl("class", key, ["features"]), `class: features > ${key}`).toBe(true);
     }
     expect(hasControl("class", "choice.fromCatalog", ["features"])).toBe(false);
 
     // On a feat, the cheapest publishable `FeatureRecord` carrier. `authoredRow` refuses keys with no control.
-    const feature = authoredRow("feat", ["feature"], [
-      ["name", "Divine Order"],
-      ["description", "You gain one of the following options of your choice."],
-      ["choice", true],
-      // Typed as a GM types it; the field's `write` slugs it (`ContentIdSchema`).
-      ["choice.kind", "ASI or Feat"],
-      ["choice.choose", 2],
-      ["choice.from", "Protector, thaumaturge"],
-      ["choice.repeatable", true]
-    ]);
+    const feature = authoredRow(
+      "feat",
+      ["feature"],
+      [
+        ["name", "Divine Order"],
+        ["description", "You gain one of the following options of your choice."],
+        ["choice", true],
+        // Typed as a GM types it; the field's `write` slugs it (`ContentIdSchema`).
+        ["choice.kind", "ASI or Feat"],
+        ["choice.choose", 2],
+        ["choice.from", "Protector, thaumaturge"],
+        ["choice.repeatable", true]
+      ]
+    );
     const draft: Draft = {
       ...authored("feat", "Divine Order", [
         ["category", "general"],
@@ -2730,8 +3638,11 @@ describe("the guard itself refuses what the editor cannot author", () => {
     expect("choice" in applyField("feat", feature, "choice", false, ["feature"])).toBe(false);
 
     // A choice key on a feature with none seeds the same shape the switch does.
-    expect(applyField("feat", { id: "f1" }, "choice.choose", 3, ["feature"]).choice)
-      .toEqual({ kind: "feat", choose: 3, repeatable: false });
+    expect(applyField("feat", { id: "f1" }, "choice.choose", 3, ["feature"]).choice).toEqual({
+      kind: "feat",
+      choose: 3,
+      repeatable: false
+    });
 
     expect(hasControl("feat", "choices", ["feature"])).toBe(true);
   });
@@ -2739,16 +3650,23 @@ describe("the guard itself refuses what the editor cannot author", () => {
   /** An inline option is a real row scope, so `FeatureOption.requires` is a `FieldDef` beside `name`
       and `description`. */
   it("R1: an inline option is a real row scope inside a bespoke component", () => {
-    const option = authoredRow("feat", ["feature", "choice.options"], [
-      ["name", "Thaumaturge"],
-      ["description", "You know one extra cantrip from the Cleric spell list."]
-    ]);
+    const option = authoredRow(
+      "feat",
+      ["feature", "choice.options"],
+      [
+        ["name", "Thaumaturge"],
+        ["description", "You know one extra cantrip from the Cleric spell list."]
+      ]
+    );
     const feature = [
       ["name", "Divine Order"],
       ["description", "You gain one of the following options of your choice."],
       ["choice.kind", "divine-order"],
       ["choice.options", [option]]
-    ].reduce<Draft>((row, [key, value]) => applyField("feat", row, key as string, value, ["feature"]), authoredRow("feat", ["feature"], []));
+    ].reduce<Draft>(
+      (row, [key, value]) => applyField("feat", row, key as string, value, ["feature"]),
+      authoredRow("feat", ["feature"], [])
+    );
 
     const draft: Draft = {
       ...authored("feat", "Divine Order", [
@@ -2760,7 +3678,9 @@ describe("the guard itself refuses what the editor cannot author", () => {
     };
     expect(publishVerdict("feat", draft, RECORD_ID).why).toBe("");
 
-    const body = storedBody("feat", draft, RECORD_ID) as { feature: { choice?: { options?: Array<Record<string, unknown>> } } };
+    const body = storedBody("feat", draft, RECORD_ID) as {
+      feature: { choice?: { options?: Array<Record<string, unknown>> } };
+    };
     expect(body.feature.choice?.options).toHaveLength(1);
     expect(body.feature.choice?.options?.[0]).toMatchObject({
       name: "Thaumaturge",
@@ -2836,7 +3756,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
 
     // A stat block has no record-level `modifiersField`, so this is six carriers, not seven.
     const riderSites: ReadonlyArray<readonly [string, readonly string[]]> = [
-      ["damageType", ["modifiers"]],         // the `extra-damage` rider — the mace's +1d6 lightning
+      ["damageType", ["modifiers"]], // the `extra-damage` rider — the mace's +1d6 lightning
       ["damageTypes", ["modifiers", "when"]] // the `damage-type-is` gate
     ];
     for (const type of carriers.filter((entry) => entry !== "monster")) {
@@ -2849,7 +3769,14 @@ describe("the guard itself refuses what the editor cannot author", () => {
     const weapon = applyField("equipment", { name: "Mace of Storms" }, "weapon.damageType", "lightning");
     expect((storedBody("equipment", weapon, RECORD_ID).weapon as { damageType?: string }).damageType).toBe("lightning");
     // An open slug stays open to the wire: `DamageTypeIdSchema` is a string, so "void" is valid.
-    const homebrewType = authoredRow("equipment", ["actions", "damage"], [["formula", "1d6"], ["type", "void"]]);
+    const homebrewType = authoredRow(
+      "equipment",
+      ["actions", "damage"],
+      [
+        ["formula", "1d6"],
+        ["type", "void"]
+      ]
+    );
     expect(homebrewType).toMatchObject({ formula: "1d6", type: "void" });
   });
 
@@ -2864,7 +3791,8 @@ describe("the guard itself refuses what the editor cannot author", () => {
       ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"]
     ];
     const stillOwed = owed.filter(([type, key, within]) => !hasControl(type, key, within));
-    expect(stillOwed.map(([type, key, within]) => `${type}.${within.length > 0 ? `${within.join(".")}[].` : ""}${key}`))
-      .toEqual(owed.map(([type, key, within]) => `${type}.${within.length > 0 ? `${within.join(".")}[].` : ""}${key}`));
+    expect(
+      stillOwed.map(([type, key, within]) => `${type}.${within.length > 0 ? `${within.join(".")}[].` : ""}${key}`)
+    ).toEqual(owed.map(([type, key, within]) => `${type}.${within.length > 0 ? `${within.join(".")}[].` : ""}${key}`));
   });
 });

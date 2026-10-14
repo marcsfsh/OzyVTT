@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from "react";
-import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, AskableCommand, ContentActionSummary, RulesBlocked } from "@vtt/domain";
+import type {
+  ActionResolution,
+  AnnotationPoint,
+  AnnotationShapeKind,
+  AskableCommand,
+  ContentActionSummary,
+  RulesBlocked
+} from "@vtt/domain";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -7,7 +14,12 @@ import { socket } from "../socket";
  * Shared targeting state, so both action runners and the map agree on the action, targets and
  * template. Resolution stays on the server's `action:resolve`; this only coordinates UX.
  */
-export type TargetingTemplate = Readonly<{ shape: AnnotationShapeKind; sizeFeet: number; widthFeet: number | null; placed: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }> | null }>;
+export type TargetingTemplate = Readonly<{
+  shape: AnnotationShapeKind;
+  sizeFeet: number;
+  widthFeet: number | null;
+  placed: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }> | null;
+}>;
 export type TargetingSession = Readonly<{
   action: ContentActionSummary;
   attackerId: string;
@@ -30,36 +42,79 @@ let blockedPrompt: {
   asked: { type: AskableCommand; payload: unknown };
 } | null = null;
 const listeners = new Set<() => void>();
-const emit = () => { for (const listener of listeners) listener(); };
-const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
+const emit = () => {
+  for (const listener of listeners) listener();
+};
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
 
 export function beginTargeting(action: ContentActionSummary, attackerId: string) {
   const area = action.area;
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
-    const shape: AnnotationShapeKind = area.shape === "sphere" || area.shape === "emanation" ? "circle" : area.shape === "cube" ? "square" : area.shape;
-    session = { action, attackerId, mode: "template", selected: [], template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null } };
+    const shape: AnnotationShapeKind =
+      area.shape === "sphere" || area.shape === "emanation" ? "circle" : area.shape === "cube" ? "square" : area.shape;
+    session = {
+      action,
+      attackerId,
+      mode: "template",
+      selected: [],
+      template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null }
+    };
   } else {
     // An attack lands on exactly one target; single-target builtins (Help, Unarmed Strike) too;
     // a save / pure-damage action can hit many.
-    session = { action, attackerId, mode: action.attackBonus !== null || action.targeting === "single" ? "single" : "multi", selected: [], template: null };
+    session = {
+      action,
+      attackerId,
+      mode: action.attackBonus !== null || action.targeting === "single" ? "single" : "multi",
+      selected: [],
+      template: null
+    };
   }
   result = null;
   emit();
 }
 export function toggleTarget(actorId: string) {
   if (!session || session.mode === "template") return;
-  session = session.mode === "single"
-    ? { ...session, selected: session.selected[0] === actorId ? [] : [actorId] }
-    : { ...session, selected: session.selected.includes(actorId) ? session.selected.filter((id) => id !== actorId) : [...session.selected, actorId] };
+  session =
+    session.mode === "single"
+      ? { ...session, selected: session.selected[0] === actorId ? [] : [actorId] }
+      : {
+          ...session,
+          selected: session.selected.includes(actorId)
+            ? session.selected.filter((id) => id !== actorId)
+            : [...session.selected, actorId]
+        };
   emit();
 }
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
-  if (session?.template) { session = { ...session, template: { ...session.template, placed: { origin, target } } }; emit(); }
+  if (session?.template) {
+    session = { ...session, template: { ...session.template, placed: { origin, target } } };
+    emit();
+  }
 }
-export function clearTargeting() { if (session !== null || blockedPrompt !== null) { session = null; blockedPrompt = null; emit(); } }
-export function setTargetingResult(next: ActionResolution | null) { result = next; emit(); }
-export function clearBlockedPrompt() { if (blockedPrompt !== null) { blockedPrompt = null; emit(); } }
+export function clearTargeting() {
+  if (session !== null || blockedPrompt !== null) {
+    session = null;
+    blockedPrompt = null;
+    emit();
+  }
+}
+export function setTargetingResult(next: ActionResolution | null) {
+  result = next;
+  emit();
+}
+export function clearBlockedPrompt() {
+  if (blockedPrompt !== null) {
+    blockedPrompt = null;
+    emit();
+  }
+}
 
 /**
  * Resolves the current session through `action:resolve`. A rules-mode rejection (ADR-0020) exposes
@@ -79,7 +134,11 @@ export type ResolveOptions = Readonly<{
   critical?: boolean;
 }>;
 
-export function resolveTargeting(revision: number | undefined, onResult: (ok: boolean, message?: string) => void, opts: ResolveOptions = {}) {
+export function resolveTargeting(
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void,
+  opts: ResolveOptions = {}
+) {
   if (!session || busy) return;
   const { attackerId, action, mode, selected, template } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
@@ -87,36 +146,116 @@ export function resolveTargeting(revision: number | undefined, onResult: (ok: bo
   // An explicit `commit` in opts wins (the Confirm tap).
   const isAttack = action.attackBonus !== null && mode === "single";
   const commit = opts.commit ?? !isAttack;
-  const extra = { ...(opts.override ? { override: opts.override } : {}), ...(opts.rollMode ? { rollMode: opts.rollMode } : {}), ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}), ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}), ...(opts.critical !== undefined ? { critical: opts.critical } : {}), commit, ...(revision !== undefined ? { expectedRevision: revision } : {}) };
-  const payload = mode === "template"
-    ? (template?.placed ? { commandId: newId(), actorId: attackerId, actionId: action.id, template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target }, ...extra } : null)
-    : (selected.length > 0 ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra } : null);
+  const extra = {
+    ...(opts.override ? { override: opts.override } : {}),
+    ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
+    ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
+    ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}),
+    ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
+    commit,
+    ...(revision !== undefined ? { expectedRevision: revision } : {})
+  };
+  const payload =
+    mode === "template"
+      ? template?.placed
+        ? {
+            commandId: newId(),
+            actorId: attackerId,
+            actionId: action.id,
+            template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
+            ...extra
+          }
+        : null
+      : selected.length > 0
+        ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra }
+        : null;
   if (!payload) return;
-  busy = true; blockedPrompt = null; emit();
-  socket.emit("action:resolve", payload, (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
-    busy = false;
-    // A preview keeps the session for re-rolls or confirm; a committed resolve ends it.
-    if (response.ok && response.resolution) { result = response.resolution; if (!response.resolution.preview) session = null; }
-    // Overridable rejection: keep the session (same targets) and offer the audited override; the retry
-    // skips expectedRevision because it is an explicit human confirmation. The GM's retry keeps `commit`
-    // as sent; the player's ask is replayed on the GM's socket, so it is parked committing.
-    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }), asked: { type: "action.resolve", payload: { ...payload, commit: true } } };
-    emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
-  });
+  busy = true;
+  blockedPrompt = null;
+  emit();
+  socket.emit(
+    "action:resolve",
+    payload,
+    (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
+      busy = false;
+      // A preview keeps the session for re-rolls or confirm; a committed resolve ends it.
+      if (response.ok && response.resolution) {
+        result = response.resolution;
+        if (!response.resolution.preview) session = null;
+      }
+      // Overridable rejection: keep the session (same targets) and offer the audited override; the retry
+      // skips expectedRevision because it is an explicit human confirmation. The GM's retry keeps `commit`
+      // as sent; the player's ask is replayed on the GM's socket, so it is parked committing.
+      else if (response.blocked?.overridable)
+        blockedPrompt = {
+          blocked: response.blocked,
+          retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }),
+          asked: { type: "action.resolve", payload: { ...payload, commit: true } }
+        };
+      emit();
+      onResult(response.ok, response.blocked ? undefined : response.message);
+    }
+  );
 }
 
 /** Resolve a targetless action (Rage, Reckless Attack, a Multiattack plan) without a targeting session. */
-export function resolveActionDirect(attackerId: string, actionId: string, revision: number | undefined, onResult: (ok: boolean, message?: string) => void, override?: { reason: string }) {
-  socket.emit("action:resolve", { commandId: newId(), actorId: attackerId, actionId, ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) }, (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
-    if (response.ok && response.resolution) { result = response.resolution; session = null; }
-    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed), asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } } };
-    emit();
-    onResult(response.ok, response.blocked ? undefined : response.message);
-  });
+export function resolveActionDirect(
+  attackerId: string,
+  actionId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void,
+  override?: { reason: string }
+) {
+  socket.emit(
+    "action:resolve",
+    {
+      commandId: newId(),
+      actorId: attackerId,
+      actionId,
+      ...(override ? { override } : {}),
+      ...(revision !== undefined ? { expectedRevision: revision } : {})
+    },
+    (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
+      if (response.ok && response.resolution) {
+        result = response.resolution;
+        session = null;
+      } else if (response.blocked?.overridable)
+        blockedPrompt = {
+          blocked: response.blocked,
+          retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed),
+          asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } }
+        };
+      emit();
+      onResult(response.ok, response.blocked ? undefined : response.message);
+    }
+  );
 }
 
-export function useTargeting() { return useSyncExternalStore(subscribe, () => session, () => session); }
-export function useTargetingResult() { return useSyncExternalStore(subscribe, () => result, () => result); }
-export function useTargetingBusy() { return useSyncExternalStore(subscribe, () => busy, () => busy); }
-export function useTargetingBlocked() { return useSyncExternalStore(subscribe, () => blockedPrompt, () => blockedPrompt); }
+export function useTargeting() {
+  return useSyncExternalStore(
+    subscribe,
+    () => session,
+    () => session
+  );
+}
+export function useTargetingResult() {
+  return useSyncExternalStore(
+    subscribe,
+    () => result,
+    () => result
+  );
+}
+export function useTargetingBusy() {
+  return useSyncExternalStore(
+    subscribe,
+    () => busy,
+    () => busy
+  );
+}
+export function useTargetingBlocked() {
+  return useSyncExternalStore(
+    subscribe,
+    () => blockedPrompt,
+    () => blockedPrompt
+  );
+}

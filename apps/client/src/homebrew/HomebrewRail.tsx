@@ -5,7 +5,14 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { Badge, Button, Field, GmOnlyTag, Input, Select } from "@vtt/ui";
 import type { HomebrewRecordSummary } from "./api";
-import { HOMEBREW_TYPES, STATUS_FILTERS, isHomebrewType, typePlural, type HomebrewType, type StatusFilter } from "./types";
+import {
+  HOMEBREW_TYPES,
+  STATUS_FILTERS,
+  isHomebrewType,
+  typePlural,
+  type HomebrewType,
+  type StatusFilter
+} from "./types";
 
 const SEARCH_DEBOUNCE_MS = 160;
 
@@ -17,7 +24,10 @@ export const EMPTY_FILTERS: RailFilters = { type: "all", status: "all", query: "
 /** The single source of the filter rules, shared by the list, its empty state and the
     hidden-removed line. "Removed" means soft-deleted in either state; the other status
     filters exclude removed rows. */
-export function applyFilters(records: readonly HomebrewRecordSummary[], filters: RailFilters): readonly HomebrewRecordSummary[] {
+export function applyFilters(
+  records: readonly HomebrewRecordSummary[],
+  filters: RailFilters
+): readonly HomebrewRecordSummary[] {
   const needle = filters.query.trim().toLowerCase();
   return records.filter((record) => {
     if (filters.type !== "all" && record.type !== filters.type) return false;
@@ -72,7 +82,9 @@ export function HomebrewRail({
 
   const groups = useMemo(() => {
     if (filters.type !== "all") return null;
-    return HOMEBREW_TYPES.map((type) => ({ type, rows: shown.filter((record) => record.type === type) })).filter((group) => group.rows.length > 0);
+    return HOMEBREW_TYPES.map((type) => ({ type, rows: shown.filter((record) => record.type === type) })).filter(
+      (group) => group.rows.length > 0
+    );
   }, [shown, filters.type]);
 
   // The panel fetches removed rows too, so this count is accurate.
@@ -97,9 +109,12 @@ export function HomebrewRail({
         <div className="nh-empty">
           <span className="nh-empty-title">Nothing homebrewed yet.</span>
           <span className="nh-empty-text">
-            Make a class, a creature, an item — anything the SRD doesn&rsquo;t have. Start blank, or duplicate an SRD record and change what you need.
+            Make a class, a monster or an item the SRD doesn&rsquo;t have. Start blank, or duplicate an SRD record and
+            change what you need.
           </span>
-          <Button variant="primary" onClick={onNew}>New homebrew</Button>
+          <Button variant="primary" onClick={onNew}>
+            New homebrew
+          </Button>
         </div>
       );
     }
@@ -107,7 +122,9 @@ export function HomebrewRail({
       return (
         <div className="nh-empty">
           <span className="nh-empty-title">No homebrew matches &ldquo;{filters.query.trim()}&rdquo;.</span>
-          <Button variant="ghost" className="tap-target" onClick={() => onFilters({ ...filters, query: "" })}>Clear search</Button>
+          <Button variant="ghost" className="tap-target" onClick={() => onFilters({ ...filters, query: "" })}>
+            Clear search
+          </Button>
         </div>
       );
     }
@@ -115,7 +132,9 @@ export function HomebrewRail({
       <div className="nh-empty">
         <span className="nh-empty-title">No homebrew matches.</span>
         <span className="nh-empty-text">Try a different kind or status.</span>
-        <Button variant="ghost" className="tap-target" onClick={() => onFilters(EMPTY_FILTERS)}>Clear filters</Button>
+        <Button variant="ghost" className="tap-target" onClick={() => onFilters(EMPTY_FILTERS)}>
+          Clear filters
+        </Button>
       </div>
     );
   };
@@ -130,7 +149,9 @@ export function HomebrewRail({
           aria-label="Search homebrew"
           onChange={(event) => setTyped(event.target.value)}
         />
-        <Button variant="primary" onClick={onNew}>New</Button>
+        <Button variant="primary" onClick={onNew}>
+          New
+        </Button>
       </div>
 
       <div className="hb-rail-filters">
@@ -138,11 +159,15 @@ export function HomebrewRail({
           <Select
             id={typeId}
             value={filters.type}
-            onChange={(event) => onFilters({ ...filters, type: isHomebrewType(event.target.value) ? event.target.value : "all" })}
+            onChange={(event) =>
+              onFilters({ ...filters, type: isHomebrewType(event.target.value) ? event.target.value : "all" })
+            }
           >
             <option value="all">All types</option>
             {HOMEBREW_TYPES.map((type) => (
-              <option key={type} value={type}>{typePlural(type)}</option>
+              <option key={type} value={type}>
+                {typePlural(type)}
+              </option>
             ))}
           </Select>
         </Field>
@@ -153,7 +178,9 @@ export function HomebrewRail({
             onChange={(event) => onFilters({ ...filters, status: event.target.value as StatusFilter })}
           >
             {STATUS_FILTERS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </Select>
         </Field>
@@ -165,7 +192,9 @@ export function HomebrewRail({
           : groups
             ? groups.map((group) => (
                 <div key={group.type} className="hb-group">
-                  <h3 className="hb-group-head">{typePlural(group.type)} ({group.rows.length})</h3>
+                  <h3 className="hb-group-head">
+                    {typePlural(group.type)} ({group.rows.length})
+                  </h3>
                   {group.rows.map(row)}
                 </div>
               ))
@@ -175,7 +204,14 @@ export function HomebrewRail({
       {hiddenRemoved > 0 && (
         <p className="hb-rail-foot">
           {hiddenRemoved} removed {hiddenRemoved === 1 ? "record is" : "records are"} hidden.{" "}
-          <Button variant="ghost" size="sm" className="tap-target" onClick={() => onFilters({ ...filters, status: "removed" })}>Show them</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="tap-target"
+            onClick={() => onFilters({ ...filters, status: "removed" })}
+          >
+            Show them
+          </Button>
         </p>
       )}
     </aside>

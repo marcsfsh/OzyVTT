@@ -29,20 +29,37 @@ import type { CodexSettings } from "./api";
  * anything; delete-all is its own button and confirm (naming the real count), never reached by winding the
  * day field down; and the server's stored answer is what the controls show.
  */
-const SETTINGS = (over: Partial<CodexSettings["revisionHistory"]> = {}): CodexSettings =>
-  ({ autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 1412, versionBytes: 8_400_000, ...over } });
+const SETTINGS = (over: Partial<CodexSettings["revisionHistory"]> = {}): CodexSettings => ({
+  autosave: { enabled: true, intervalSeconds: 1 },
+  revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 1412, versionBytes: 8_400_000, ...over }
+});
 
 const open = async (settings: CodexSettings) => {
   getSettings.mockResolvedValue(settings);
   // The PUT is wholesale: both groups travel on every write.
-  setSettings.mockImplementation((_t: string, input: { revisionHistory: { enabled: boolean; windowMinutes: number }; autosave: { enabled: boolean; intervalSeconds: number } }) =>
-    Promise.resolve({ revisionHistory: { ...settings.revisionHistory, ...input.revisionHistory }, autosave: { ...settings.autosave, ...input.autosave } }));
+  setSettings.mockImplementation(
+    (
+      _t: string,
+      input: {
+        revisionHistory: { enabled: boolean; windowMinutes: number };
+        autosave: { enabled: boolean; intervalSeconds: number };
+      }
+    ) =>
+      Promise.resolve({
+        revisionHistory: { ...settings.revisionHistory, ...input.revisionHistory },
+        autosave: { ...settings.autosave, ...input.autosave }
+      })
+  );
   render(<CodexSettingsView gmToken="gm" />);
   await waitFor(() => expect(getSettings).toHaveBeenCalledWith("gm"));
   return userEvent.setup();
 };
 
-beforeEach(() => { getSettings.mockReset(); setSettings.mockReset(); deleteRevisions.mockReset(); });
+beforeEach(() => {
+  getSettings.mockReset();
+  setSettings.mockReset();
+  deleteRevisions.mockReset();
+});
 
 describe("Version history can be switched off (owner decision, 2026-07-30)", () => {
   it("writes the switch through to the server", async () => {
@@ -52,7 +69,12 @@ describe("Version history can be switched off (owner decision, 2026-07-30)", () 
 
     await user.click(toggle);
 
-    await waitFor(() => expect(setSettings).toHaveBeenCalledWith("gm", { autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: false, windowMinutes: 90 } }));
+    await waitFor(() =>
+      expect(setSettings).toHaveBeenCalledWith("gm", {
+        autosave: { enabled: true, intervalSeconds: 1 },
+        revisionHistory: { enabled: false, windowMinutes: 90 }
+      })
+    );
   });
 
   /** Turning history off stops writing only, and the copy says the kept versions remain restorable. */
@@ -78,7 +100,12 @@ describe("How often a version is kept is configurable", () => {
     await user.clear(field);
     await user.type(field, "30");
 
-    await waitFor(() => expect(setSettings).toHaveBeenCalledWith("gm", { autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 30 } }));
+    await waitFor(() =>
+      expect(setSettings).toHaveBeenCalledWith("gm", {
+        autosave: { enabled: true, intervalSeconds: 1 },
+        revisionHistory: { enabled: true, windowMinutes: 30 }
+      })
+    );
   });
 
   /**
@@ -104,7 +131,12 @@ describe("How often a version is kept is configurable", () => {
     await user.clear(field);
     await user.type(field, "99999");
 
-    await waitFor(() => expect(setSettings).toHaveBeenLastCalledWith("gm", { autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 10_080 } }));
+    await waitFor(() =>
+      expect(setSettings).toHaveBeenLastCalledWith("gm", {
+        autosave: { enabled: true, intervalSeconds: 1 },
+        revisionHistory: { enabled: true, windowMinutes: 10_080 }
+      })
+    );
   });
 
   /** Zero is "keep every save", not off. */
@@ -139,7 +171,11 @@ describe("Existing history can be deleted (owner decision, 2026-07-30)", () => {
     await user.click(await screen.findByRole("button", { name: /Delete versions older than 30 days/ }));
     // The confirm says what is lost and what is not.
     expect(await screen.findByText(/older than 30 days, across every page/)).toBeInTheDocument();
-    expect(screen.getByText("Delete saved versions older than 30 days, across every page? Your pages are not changed. Only the earlier versions are deleted. This cannot be undone.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Delete saved versions older than 30 days, across every page? Your pages are not changed. Only the earlier versions are deleted. This cannot be undone."
+      )
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete them" }));
 
     await waitFor(() => expect(deleteRevisions).toHaveBeenCalledWith("gm", 30));
@@ -206,6 +242,8 @@ describe("The screen never claims a setting it could not read", () => {
     await user.click(await screen.findByRole("switch", { name: "Keep version history" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
-    await waitFor(() => expect(screen.getByRole("switch", { name: "Keep version history" })).toHaveAttribute("aria-checked", "true"));
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "Keep version history" })).toHaveAttribute("aria-checked", "true")
+    );
   });
 });

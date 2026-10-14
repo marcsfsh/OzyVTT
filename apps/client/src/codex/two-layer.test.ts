@@ -8,7 +8,9 @@ import { splitEntityFields, entityDef, ENTITY_DEFS } from "./entities";
 describe("two-layer secrecy — client field split", () => {
   it("routes a secret-schema field into gmFields and leaves public ones in fields", () => {
     const { fields, gmFields } = splitEntityFields("character", {
-      race: "Human", location: "Barovia", goals: "Betray the party at the gate"
+      race: "Human",
+      location: "Barovia",
+      goals: "Betray the party at the gate"
     });
     expect(fields).toEqual({ race: "Human", location: "Barovia" });
     expect(gmFields).toEqual({ goals: "Betray the party at the gate" });
@@ -33,11 +35,14 @@ describe("two-layer secrecy — client field split", () => {
 
   it("every entity type that declares a secret field can round-trip it out of the player-facing map", () => {
     // Covers every type's secret fields at once.
-    const typesWithSecrets = (Object.keys(ENTITY_DEFS) as Array<keyof typeof ENTITY_DEFS>)
-      .filter((type) => entityDef(type).fields.some((field) => field.secret));
+    const typesWithSecrets = (Object.keys(ENTITY_DEFS) as Array<keyof typeof ENTITY_DEFS>).filter((type) =>
+      entityDef(type).fields.some((field) => field.secret)
+    );
     expect(typesWithSecrets.length).toBeGreaterThan(0);
     for (const type of typesWithSecrets) {
-      const secretKeys = entityDef(type).fields.filter((field) => field.secret).map((field) => field.key);
+      const secretKeys = entityDef(type)
+        .fields.filter((field) => field.secret)
+        .map((field) => field.key);
       const values = Object.fromEntries(secretKeys.map((key) => [key, "SECRETVALUE"]));
       const { fields, gmFields } = splitEntityFields(type, values);
       expect(fields, `${type} leaked a secret field into the player map`).toEqual({});

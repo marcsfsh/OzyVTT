@@ -3,19 +3,33 @@
 
 /* The modebar is the fixed chrome row and the workspace fills the rest. The rail's list and
    the detail pane each scroll themselves. */
-.hb-root { display: flex; flex-direction: column; gap: 0; }
+.hb-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
 
 /* ---- Modebar: derived counts on the left, library-wide ops on the right ---- */
 .hb-modebar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--space-3); flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
   border: 1px solid transparent;
-  padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
   min-height: var(--tap-min);
 }
-.hb-count { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-count {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 
-.hb-unavailable-text { margin: 0 0 var(--space-3); }
+.hb-unavailable-text {
+  margin: 0 0 var(--space-3);
+}
 
 /* ---- Master-detail ---- */
 .hb-workspace {
@@ -29,13 +43,23 @@
 
 /* min-height: 0 lets the list shrink and scroll instead of stretching the workspace. */
 .hb-rail {
-  display: flex; flex-direction: column; gap: var(--space-3);
-  min-width: 0; min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
   border: 1px solid transparent;
   padding: var(--space-3);
 }
-.hb-rail-head { display: flex; gap: var(--space-2); align-items: center; }
-.hb-rail-head > :first-child { flex: 1 1 auto; min-width: 0; }
+.hb-rail-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.hb-rail-head > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 
 /* 165px so a 375px phone stacks the filters one per row: two ~155px columns clip the longest
    <select> value. min(…, 100%) stops a track overflowing at 320px. */
@@ -44,16 +68,30 @@
   grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
   gap: var(--space-2);
 }
-.hb-filter { min-width: 0; }
+.hb-filter {
+  min-width: 0;
+}
 
 /* flex: 1 with min-height: 0 makes a long library scroll the list, not the page. */
-.hb-list { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-height: 0; position: relative; }
-.hb-group { display: flex; flex-direction: column; gap: 2px; }
+.hb-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+.hb-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 /* Full font shorthand: the global h3 weight would otherwise synthesise faux-bold. */
 .hb-group-head {
   margin: 0;
   font: 400 var(--fs-2xs) / 1.3 var(--font-display);
-  letter-spacing: 0.08em; text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-dim);
   padding: var(--space-1) var(--space-2);
 }
@@ -63,56 +101,106 @@
    row's tick uses ::before because ::after is .tap-target's hit area. */
 .hb-row {
   position: relative;
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
-  width: 100%; min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
   text-align: left;
   padding: var(--space-2) var(--space-3);
-  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
-  background: none; color: var(--text-dim);
-  font-family: inherit; font-size: var(--fs-sm);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
-.hb-group > .hb-row:last-child { border-bottom: 0; }
-.hb-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-group > .hb-row:last-child {
+  border-bottom: 0;
+}
+.hb-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The global `button:hover:not(:disabled)` is (0,2,1), so the active row doubles its class to
    reach (0,3,0). */
-.hb-row:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--line-hover); }
-.hb-row.is-active.is-active { background: none; color: var(--text); font-weight: 700; }
+.hb-row:hover:not(:disabled) {
+  color: var(--text);
+  border-bottom-color: var(--line-hover);
+}
+.hb-row.is-active.is-active {
+  background: none;
+  color: var(--text);
+  font-weight: 700;
+}
 .hb-row.is-active::before {
   content: "";
   position: absolute;
   inset-inline-start: 2px;
   top: 50%;
-  width: var(--cue-w); height: var(--cue-h);
+  width: var(--cue-w);
+  height: var(--cue-h);
   transform: translateY(-50%);
   color: var(--cyan);
   background: var(--cue-mark);
   pointer-events: none;
 }
 
-.hb-rail-foot { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-rail-foot {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 
 /* The detail column: the back link (single-pane only) above the scrolling .hb-detail region. */
-.hb-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; min-height: 0; }
+.hb-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
 
 /* The back control only exists in the single-pane layout. */
-.hb-back { display: none; align-self: flex-start; }
-.hb-back-icon { display: inline-flex; transform: rotate(90deg); font-size: 1.05em; }
+.hb-back {
+  display: none;
+  align-self: flex-start;
+}
+.hb-back-icon {
+  display: inline-flex;
+  transform: rotate(90deg);
+  font-size: 1.05em;
+}
 
 /* ---- Detail ----
    Scrolls inside itself; scroll-padding keeps a focused field off its edges. */
 .hb-detail {
-  display: flex; flex-direction: column; gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   border: 1px solid transparent;
   padding: var(--space-4);
-  min-width: 0; min-height: 0; flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
   /* position: relative makes this region the containing block for absolutely-positioned
      descendants (such as .nh-sr-only), so they are clipped here instead of growing the document. */
   position: relative;
   overscroll-behavior: contain;
-  scroll-padding-top: var(--space-6); scroll-padding-bottom: var(--space-6);
+  scroll-padding-top: var(--space-6);
+  scroll-padding-bottom: var(--space-6);
 }
-.hb-detail-head { display: flex; flex-direction: column; gap: var(--space-3); max-width: none; }
+.hb-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: none;
+}
 .hb-detail-title {
   margin: 0;
   font: 400 var(--fs-h2) / var(--lh-tight) var(--font-display);
@@ -120,31 +208,100 @@
   overflow-wrap: anywhere;
 }
 /* The head heading takes focus on remount; a programmatic focus still needs a ring. */
-.hb-detail-title:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: var(--radius-sm); }
+.hb-detail-title:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
 
-.hb-state { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.hb-state-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
+.hb-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.hb-state-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
 
 /* Why publishing is blocked or the server refused. Never dimmed or --text-muted: it must stay
    readable (AA) while its control is disabled. */
-.hb-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }
+.hb-blocked {
+  margin: 0;
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
 /* The forward chevron is the back icon rotated the other way. */
-.hb-blocked-jump { vertical-align: middle; }
-.hb-blocked-jump-icon { display: inline-flex; transform: rotate(-90deg); font-size: 1.05em; }
+.hb-blocked-jump {
+  vertical-align: middle;
+}
+.hb-blocked-jump-icon {
+  display: inline-flex;
+  transform: rotate(-90deg);
+  font-size: 1.05em;
+}
 /* Two or more outstanding requirements become an unbulleted list under a count. */
-.hb-blocked-list { margin: var(--space-1) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
-.hb-blocked-line { margin: 0; }
-.hb-blocked-count { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-.hb-usage { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-.hb-create-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-blocked-list {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.hb-blocked-line {
+  margin: 0;
+}
+.hb-blocked-count {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.hb-usage {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.hb-create-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 
-.hb-detail-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-.hb-name-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.hb-name-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 
 /* ---- The schema form ---- */
-.hb-form { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-.hb-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.hb-section:focus-visible { outline: 2px solid var(--cyan); outline-offset: 6px; border-radius: var(--radius-md); }
+.hb-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.hb-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.hb-section:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 6px;
+  border-radius: var(--radius-md);
+}
 /* Full font shorthand so the global h3 weight cannot synthesise faux-bold. The h2 size and top
    rule keep sections distinguishable down a long editor. */
 .hb-section-title {
@@ -155,45 +312,95 @@
   color: var(--text);
 }
 /* No divider above the first section. */
-.hb-form > .hb-section:first-child > .hb-section-title { padding-top: 0; border-top: 0; }
-.hb-section-blurb { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); max-width: 60ch; }
+.hb-form > .hb-section:first-child > .hb-section-title {
+  padding-top: 0;
+  border-top: 0;
+}
+.hb-section-blurb {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  max-width: 60ch;
+}
 
 .hb-section--advanced {
   border: 1px solid transparent;
   padding: var(--space-3);
 }
 .hb-section-summary {
-  cursor: pointer; min-height: var(--tap-min); display: flex; align-items: center;
+  cursor: pointer;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
   font: 400 var(--fs-sm) / 1.3 var(--font-display);
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
-.hb-section-summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: var(--radius-sm); }
+.hb-section-summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 
-.hb-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.hb-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
 /* Note for a field nothing reads yet. --text-dim, since --text-muted fails AA. */
-.hb-note { color: var(--text-dim); font-style: italic; }
+.hb-note {
+  color: var(--text-dim);
+  font-style: italic;
+}
 
-.hb-chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.hb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
 /* Level chips stay above the 44px target floor via .nh-chip's own min-height. */
-.hb-levels > * { min-width: 2.75rem; justify-content: center; }
+.hb-levels > * {
+  min-width: 2.75rem;
+  justify-content: center;
+}
 /* A class feature's last level is disabled but on; the primitive's disabled opacity would
    misstate that and fail AA, so keep full contrast. */
-.hb-levels .nh-chip--pressable[aria-pressed="true"]:disabled { opacity: 1; cursor: default; }
+.hb-levels .nh-chip--pressable[aria-pressed="true"]:disabled {
+  opacity: 1;
+  cursor: default;
+}
 
 .hb-fieldset {
   border: 1px solid transparent;
-  padding: var(--space-3); margin: 0; min-width: 0;
-  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-3);
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .hb-fieldset-legend {
   padding: 0 var(--space-2);
   font: 400 var(--fs-xs) / 1.3 var(--font-display);
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
 /* ---- Riders, features, choices ---- */
-.hb-riders { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.hb-riders-when { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-riders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.hb-riders-when {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 /* The derived attack/damage line. Wraps rather than forcing horizontal scroll. */
 .hb-riders-readout {
   margin: 0;
@@ -204,31 +411,85 @@
   overflow-wrap: anywhere;
 }
 /* Wraps so two names at 320px cannot widen the document. */
-.hb-broke-list { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--space-2); margin-top: var(--space-2); }
-.hb-feature { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.hb-broke-list {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.hb-feature {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
 .hb-choice {
-  display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
-  border-left: 2px solid var(--line-strong); padding-left: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  border-left: 2px solid var(--line-strong);
+  padding-left: var(--space-3);
 }
 /* Header for one of several choice blocks; wraps to keep Remove above the 44px floor. */
-.hb-choice-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
-.hb-choice-add { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
-.hb-picks { margin: 0; color: var(--text); font-size: var(--fs-sm); }
+.hb-choice-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.hb-choice-add {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.hb-picks {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
 
 /* ---- Catalog picker ----
    No cap or scroller: the Modal body is already the scrolling region. */
-.hb-catalog-grid { min-width: 0; }
-.hb-catalog-foot { margin-top: var(--space-3); }
+.hb-catalog-grid {
+  min-width: 0;
+}
+.hb-catalog-foot {
+  margin-top: var(--space-3);
+}
 
 /* ---- Level table ----
    One Slots cell (with an aria-label) holds all nine slot levels instead of nine columns. */
-.hb-lt { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.hb-lt-summary { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-lt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.hb-lt-summary {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 /* The table scrolls inside itself so the page body never scrolls sideways. */
-.hb-lt-scroll { overflow-x: auto; min-width: 0; }
-.hb-lt-table { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hb-lt-scroll {
+  overflow-x: auto;
+  min-width: 0;
+}
+.hb-lt-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
 
-.hb-lt-head, .hb-lt-row {
+.hb-lt-head,
+.hb-lt-row {
   display: grid;
   grid-template-columns: 3.5rem 3rem minmax(10rem, 1.4fr) minmax(9rem, 1fr) 5.5rem 5.5rem minmax(8rem, 1fr);
   gap: var(--space-2);
@@ -242,61 +503,124 @@
 .hb-lt-head {
   padding: var(--space-1) var(--space-2);
   font: 400 var(--fs-2xs) / 1.3 var(--font-display);
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 /* Rows are hairline rules, not cards. */
 .hb-lt-row {
   padding: var(--space-2);
-  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
   background: none;
   font-size: var(--fs-sm);
 }
-.hb-lt-table > .hb-lt-row:last-child { border-bottom: 0; }
-.hb-lt-cell { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.hb-lt-wrapcell { overflow-wrap: anywhere; }
+.hb-lt-table > .hb-lt-row:last-child {
+  border-bottom: 0;
+}
+.hb-lt-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.hb-lt-wrapcell {
+  overflow-wrap: anywhere;
+}
 /* Derived cells are plain text; a disabled input would imply interactivity. */
-.hb-lt-derived { color: var(--text-dim); }
-.hb-lt-level { font-variant-numeric: tabular-nums; }
-.hb-lt-slots { flex-wrap: wrap; }
-.hb-lt-edit { margin-left: auto; }
+.hb-lt-derived {
+  color: var(--text-dim);
+}
+.hb-lt-level {
+  font-variant-numeric: tabular-nums;
+}
+.hb-lt-slots {
+  flex-wrap: wrap;
+}
+.hb-lt-edit {
+  margin-left: auto;
+}
 /* Micro-labels show only in the mobile card fold. overflow-wrap: normal undoes the parent
    cell's `anywhere` so labels never break mid-word. */
 .hb-lt-micro {
-  display: none; color: var(--text-dim); font-size: var(--fs-2xs);
-  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
-  overflow-wrap: normal; white-space: nowrap;
+  display: none;
+  color: var(--text-dim);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 /* min-width: 0 so the nested RowEditor's wide Add button cannot push the document sideways. */
 .hb-lt-strip {
   grid-column: 1 / -1;
   min-width: 0;
-  display: flex; flex-direction: column; gap: var(--space-3);
-  padding-top: var(--space-3); margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
   border-top: 1px solid var(--line);
 }
-.hb-lt-slotstrip { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.hb-lt-slotstrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
 /* Wide enough to keep nine adjacent number fields above the 44px floor. */
-.hb-lt-slotfield { display: flex; flex-direction: column; gap: var(--space-1); width: 3.75rem; }
-.hb-lt-resources { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.hb-lt-slotfield {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 3.75rem;
+}
+.hb-lt-resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
 
 /* ---- Create modal ---- */
-.hb-create-body { display: flex; flex-direction: column; gap: var(--space-4); }
+.hb-create-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
 /* Create sits in the modal footer outside the scrolling body, so the grid needs no height cap. */
-.hb-create-grid { min-width: 0; }
+.hb-create-grid {
+  min-width: 0;
+}
 
 @media (max-width: 760px) {
   /* Single-pane swap: a flex column so the visible pane takes the fill. */
-  .hb-workspace { display: flex; flex-direction: column; }
-  .hb-rail { flex: 1 1 auto; }
-  .hb-main { flex: 0 1 auto; }
-  .hb-workspace.has-selection .hb-rail { display: none; }
-  .hb-workspace.has-selection .hb-main { flex: 1 1 auto; }
-  .hb-workspace.has-selection .hb-back { display: inline-flex; }
+  .hb-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .hb-rail {
+    flex: 1 1 auto;
+  }
+  .hb-main {
+    flex: 0 1 auto;
+  }
+  .hb-workspace.has-selection .hb-rail {
+    display: none;
+  }
+  .hb-workspace.has-selection .hb-main {
+    flex: 1 1 auto;
+  }
+  .hb-workspace.has-selection .hb-back {
+    display: inline-flex;
+  }
 
   /* ---- Level table: one card per level. Folds here rather than narrower because seven
      columns truncate Features and Resources below this width. */
-  .hb-lt-head { display: none; }
+  .hb-lt-head {
+    display: none;
+  }
   /* Stated at the non-caster selector's specificity as well, or its four-column tracks would
      win over this rule. */
   .hb-lt-row,
@@ -306,11 +630,20 @@
     gap: var(--space-2);
     padding: var(--space-3);
   }
-  .hb-lt-cell { justify-content: space-between; }
-  .hb-lt-micro { display: inline; }
-  .hb-lt-slotfield { width: 4rem; }
+  .hb-lt-cell {
+    justify-content: space-between;
+  }
+  .hb-lt-micro {
+    display: inline;
+  }
+  .hb-lt-slotfield {
+    width: 4rem;
+  }
   /* The state cluster wraps to its own line, keeping Publish above the 44px floor. */
-  .hb-state-actions { margin-left: 0; width: 100%; }
+  .hb-state-actions {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 
 /* Material: the chamfer, rim and fill go on a ::before backing layer, not the element, because
@@ -344,16 +677,29 @@
   background-clip: border-box;
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
-  transition: border-color var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
 }
-.hb-rail, .hb-main { --material-fill: var(--material-scanline), var(--material-plate); }
-.hb-modebar, .hb-section--advanced, .hb-fieldset { --material-fill: var(--material-plate); }
+.hb-rail,
+.hb-main {
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.hb-modebar,
+.hb-section--advanced,
+.hb-fieldset {
+  --material-fill: var(--material-plate);
+}
 
 /* `isolation: isolate` keeps each backing layer inside its panel but also confines
    .nh-combobox-list's z-index to the fieldset, so later siblings cover the list's tail.
    Lift the fieldset only while a list is open. */
-.hb-fieldset:has(.nh-combobox-list) { z-index: 1; }
+.hb-fieldset:has(.nh-combobox-list) {
+  z-index: 1;
+}
 
 /* An absolutely-positioned child of a scroll container scrolls with it, so the material goes
    on the non-scrolling .hb-main and .hb-detail stays plain. */
-.hb-detail { background: none; }
+.hb-detail {
+  background: none;
+}

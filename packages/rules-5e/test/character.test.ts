@@ -17,7 +17,7 @@ describe("weaponAbilityModifierFrom - the ONE rule the server and the sheet both
   const dex = abilityModifier(18); // +4
 
   it("takes the better score for Finesse, and Strength for a plain melee weapon", () => {
-    expect(weaponAbilityModifierFrom(["finesse"], null, str, dex)).toBe(4);        // Rapier
+    expect(weaponAbilityModifierFrom(["finesse"], null, str, dex)).toBe(4); // Rapier
     expect(weaponAbilityModifierFrom(["finesse", "light"], null, str, dex)).toBe(4); // Shortsword
     expect(weaponAbilityModifierFrom(["heavy", "two-handed"], null, str, dex)).toBe(1); // Greatsword
     // Finesse takes the better of the two, so a STR 18 / DEX 12 brute keeps Strength.
@@ -26,9 +26,9 @@ describe("weaponAbilityModifierFrom - the ONE rule the server and the sheet both
 
   it("rolls a THROWN weapon off Strength even though it has a range", () => {
     // Having a range is not the same as being ranged: throwing a Javelin is a Strength attack.
-    expect(weaponAbilityModifierFrom(["thrown"], 30, str, dex)).toBe(1);            // Javelin
-    expect(weaponAbilityModifierFrom(["light", "thrown"], 20, str, dex)).toBe(1);   // Handaxe
-    expect(weaponAbilityModifierFrom([], 80, str, dex)).toBe(4);                    // Shortbow
+    expect(weaponAbilityModifierFrom(["thrown"], 30, str, dex)).toBe(1); // Javelin
+    expect(weaponAbilityModifierFrom(["light", "thrown"], 20, str, dex)).toBe(1); // Handaxe
+    expect(weaponAbilityModifierFrom([], 80, str, dex)).toBe(4); // Shortbow
     // Finesse wins when both properties are present (Dagger).
     expect(weaponAbilityModifierFrom(["finesse", "light", "thrown"], 20, str, dex)).toBe(4);
   });
@@ -103,14 +103,26 @@ describe("spellSaveDc / spellAttackBonus", () => {
 });
 
 describe("armorClassFromEquipment", () => {
-  const armor = (acBase: number, addDexModifier: boolean, dexModifierCap: number | null) => ({ acBase, addDexModifier, dexModifierCap });
-  const item = (over: Partial<{ equipped: boolean; category: string; armor: { acBase: number; addDexModifier: boolean; dexModifierCap: number | null } }>) => ({ equipped: true, ...over });
+  const armor = (acBase: number, addDexModifier: boolean, dexModifierCap: number | null) => ({
+    acBase,
+    addDexModifier,
+    dexModifierCap
+  });
+  const item = (
+    over: Partial<{
+      equipped: boolean;
+      category: string;
+      armor: { acBase: number; addDexModifier: boolean; dexModifierCap: number | null };
+    }>
+  ) => ({ equipped: true, ...over });
 
   it("returns null when nothing armor-like is equipped (keep the stored/base AC)", () => {
     expect(armorClassFromEquipment(3, [])).toBeNull();
     expect(armorClassFromEquipment(3, [item({ category: "weapon" })])).toBeNull();
     // an unequipped suit of armor does not count
-    expect(armorClassFromEquipment(3, [item({ equipped: false, category: "armor", armor: armor(14, true, 2) })])).toBeNull();
+    expect(
+      armorClassFromEquipment(3, [item({ equipped: false, category: "armor", armor: armor(14, true, 2) })])
+    ).toBeNull();
   });
   it("light armor adds full Dex", () => {
     // leather 11 + Dex +4 (uncapped)

@@ -38,11 +38,16 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
 
   // Charge-alone: three pulls a day. Which beast (a 1d8 table per bag color) is the GM's.
   "bag-of-tricks": {
-    actions: [{
-      id: "pull", name: "Pull a Fuzzy Object", activation: "action",
-      description: "Pull the fuzzy object from the bag and throw it up to 20 feet. When the object lands, it transforms into a creature determined by rolling on the table for the bag's color. The creature vanishes at the next dawn or when it is reduced to 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count.",
-      uses: { limit: 3, per: "long-rest", pool: "bag-of-tricks-charges" }
-    }]
+    actions: [
+      {
+        id: "pull",
+        name: "Pull a Fuzzy Object",
+        activation: "action",
+        description:
+          "Pull the fuzzy object from the bag and throw it up to 20 feet. When the object lands, it transforms into a creature determined by rolling on the table for the bag's color. The creature vanishes at the next dawn or when it is reduced to 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count.",
+        uses: { limit: 3, per: "long-rest", pool: "bag-of-tricks-charges" }
+      }
+    ]
   },
 
   // `bead-of-force` - destroyed on use, and its save sentence would be read as half on a success.
@@ -55,18 +60,28 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * is added by the GM; nothing mints an actor. Each description follows its own row's wording.
    */
   "bowl-of-commanding-water-elementals": {
-    actions: [{
-      id: "summon", name: "Summon Water Elemental", activation: "action",
-      description: "While this bowl is filled with water and you are within 5 feet of it, summon a Water Elemental. It appears in an unoccupied space as close to the bowl as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The bowl can't be used this way again until the next dawn.",
-      uses: { limit: 1, per: "long-rest", pool: "bowl-of-commanding-water-elementals-charges" }
-    }]
+    actions: [
+      {
+        id: "summon",
+        name: "Summon Water Elemental",
+        activation: "action",
+        description:
+          "While this bowl is filled with water and you are within 5 feet of it, summon a Water Elemental. It appears in an unoccupied space as close to the bowl as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The bowl can't be used this way again until the next dawn.",
+        uses: { limit: 1, per: "long-rest", pool: "bowl-of-commanding-water-elementals-charges" }
+      }
+    ]
   },
   "brazier-of-commanding-fire-elementals": {
-    actions: [{
-      id: "summon", name: "Summon Fire Elemental", activation: "action",
-      description: "While you are within 5 feet of this brazier, summon a Fire Elemental. It appears in an unoccupied space as close to the brazier as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The brazier can't be used this way again until the next dawn.",
-      uses: { limit: 1, per: "long-rest", pool: "brazier-of-commanding-fire-elementals-charges" }
-    }]
+    actions: [
+      {
+        id: "summon",
+        name: "Summon Fire Elemental",
+        activation: "action",
+        description:
+          "While you are within 5 feet of this brazier, summon a Fire Elemental. It appears in an unoccupied space as close to the brazier as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The brazier can't be used this way again until the next dawn.",
+        uses: { limit: 1, per: "long-rest", pool: "brazier-of-commanding-fire-elementals-charges" }
+      }
+    ]
   },
 
   // `broom-of-flying` - Fly Speed is not modeled (also `carpet-of-flying`, `horseshoes-of-a-zephyr`).
@@ -75,11 +90,16 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
 
   // One of the four elemental-commanding items; see the bowl.
   "censer-of-controlling-air-elementals": {
-    actions: [{
-      id: "summon", name: "Summon Air Elemental", activation: "action",
-      description: "While gently swinging this censer, summon an Air Elemental. It appears in an unoccupied space as close to the censer as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The censer can't be used this way again until the next dawn.",
-      uses: { limit: 1, per: "long-rest", pool: "censer-of-controlling-air-elementals-charges" }
-    }]
+    actions: [
+      {
+        id: "summon",
+        name: "Summon Air Elemental",
+        activation: "action",
+        description:
+          "While gently swinging this censer, summon an Air Elemental. It appears in an unoccupied space as close to the censer as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The censer can't be used this way again until the next dawn.",
+        uses: { limit: 1, per: "long-rest", pool: "censer-of-controlling-air-elementals-charges" }
+      }
+    ]
   },
 
   // `chime-of-opening` - ten uses that never come back.
@@ -140,11 +160,16 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
 
   // Charge-alone. Not cast as True Seeing (that spell targets someone you touch); the Truesight is narrated.
   "gem-of-seeing": {
-    actions: [{
-      id: "peer", name: "Peer Through the Gem", activation: "action",
-      description: "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
-      uses: { limit: 3, per: "long-rest", pool: "gem-of-seeing-charges" }
-    }]
+    actions: [
+      {
+        id: "peer",
+        name: "Peer Through the Gem",
+        activation: "action",
+        description:
+          "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
+        uses: { limit: 3, per: "long-rest", pool: "gem-of-seeing-charges" }
+      }
+    ]
   },
 
   // `handy-haversack` - a container.
@@ -163,22 +188,32 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * destroyed when broken.
    */
   "iron-bands": {
-    actions: [{
-      id: "throw", name: "Throw the Bands", activation: "action",
-      description: "Throw the sphere at a Huge or smaller creature you can see within 60 feet of yourself. As the sphere moves through the air, it opens into a tangle of metal bands. On a hit, the target has the Restrained condition until you take a Bonus Action to issue a command that releases it. Doing so or missing with the attack causes the bands to contract and become a sphere once more. A creature that can touch the bands, including the one Restrained, can take an action to make a DC 20 Strength (Athletics) check to break the iron bands. On a successful check, the item is destroyed, and the Restrained creature is freed. On a failed check, any further attempts made by that creature automatically fail until 24 hours have elapsed. Once the bands are used, they can't be used again until the next dawn.",
-      attack: { ability: "dex", proficient: true, rangeFeet: 60 },
-      uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" }
-    }]
+    actions: [
+      {
+        id: "throw",
+        name: "Throw the Bands",
+        activation: "action",
+        description:
+          "Throw the sphere at a Huge or smaller creature you can see within 60 feet of yourself. As the sphere moves through the air, it opens into a tangle of metal bands. On a hit, the target has the Restrained condition until you take a Bonus Action to issue a command that releases it. Doing so or missing with the attack causes the bands to contract and become a sphere once more. A creature that can touch the bands, including the one Restrained, can take an action to make a DC 20 Strength (Athletics) check to break the iron bands. On a successful check, the item is destroyed, and the Restrained creature is freed. On a failed check, any further attempts made by that creature automatically fail until 24 hours have elapsed. Once the bands are used, they can't be used again until the next dawn.",
+        attack: { ability: "dex", proficient: true, rangeFeet: 60 },
+        uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" }
+      }
+    ]
   },
 
   // No limit on attempts, as printed. Not modeled: the trapping itself and the "native to another
   // plane" precondition (carried in the description for the GM).
   "iron-flask": {
-    actions: [{
-      id: "trap", name: "Trap a Creature", activation: "action",
-      description: "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
-      save: { ability: "wis", dc: 17 }
-    }]
+    actions: [
+      {
+        id: "trap",
+        name: "Trap a Creature",
+        activation: "action",
+        description:
+          "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
+        save: { ability: "wis", dc: 17 }
+      }
+    ]
   },
 
   // `lantern-of-revealing` - no rider suppresses Invisible within a light radius.
@@ -199,12 +234,17 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * repeat save, and the 24-hour immunity after a success.
    */
   "pipes-of-haunting": {
-    actions: [{
-      id: "play", name: "Play the Pipes", activation: "action",
-      description: "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
-      save: { ability: "wis", dc: 15 },
-      uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
-    }]
+    actions: [
+      {
+        id: "play",
+        name: "Play the Pipes",
+        activation: "action",
+        description:
+          "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
+        save: { ability: "wis", dc: 15 },
+        uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
+      }
+    ]
   },
 
   /**
@@ -213,11 +253,16 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
    * made by the swarm, so it is not this action's `save`.
    */
   "pipes-of-the-sewers": {
-    actions: [{
-      id: "call", name: "Call a Swarm of Rats", activation: "action",
-      description: "Play the pipes and expend 1 charge, calling forth one Swarm of Rats if enough rats are within half a mile of you to be called in this fashion (as determined by the GM). If there aren't enough rats to form a swarm, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
-      uses: { limit: 3, per: "long-rest", pool: "pipes-of-the-sewers-charges" }
-    }]
+    actions: [
+      {
+        id: "call",
+        name: "Call a Swarm of Rats",
+        activation: "action",
+        description:
+          "Play the pipes and expend 1 charge, calling forth one Swarm of Rats if enough rats are within half a mile of you to be called in this fashion (as determined by the GM). If there aren't enough rats to form a swarm, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
+        uses: { limit: 3, per: "long-rest", pool: "pipes-of-the-sewers-charges" }
+      }
+    ]
   },
 
   // `portable-hole` - a container.
@@ -225,11 +270,16 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
 
   // Unlimited, as printed; the resolver reads Restrained from the description. The escape check is not modeled.
   "rope-of-entanglement": {
-    actions: [{
-      id: "entangle", name: "Entangle", activation: "action",
-      description: "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
-      save: { ability: "dex", dc: 15 }
-    }]
+    actions: [
+      {
+        id: "entangle",
+        name: "Entangle",
+        activation: "action",
+        description:
+          "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
+        save: { ability: "dex", dc: 15 }
+      }
+    ]
   },
 
   // The pairing with the other stone is not modeled.
@@ -242,11 +292,16 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
 
   // One of the four elemental-commanding items; this one's wording differs (no languages, placed within 30 feet).
   "stone-of-controlling-earth-elementals": {
-    actions: [{
-      id: "summon", name: "Summon Earth Elemental", activation: "action",
-      description: "While touching this stone to the ground, summon an Earth Elemental. It appears in an unoccupied space you choose within 30 feet of yourself, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The stone can't be used this way again until the next dawn.",
-      uses: { limit: 1, per: "long-rest", pool: "stone-of-controlling-earth-elementals-charges" }
-    }]
+    actions: [
+      {
+        id: "summon",
+        name: "Summon Earth Elemental",
+        activation: "action",
+        description:
+          "While touching this stone to the ground, summon an Earth Elemental. It appears in an unoccupied space you choose within 30 feet of yourself, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The stone can't be used this way again until the next dawn.",
+        uses: { limit: 1, per: "long-rest", pool: "stone-of-controlling-earth-elementals-charges" }
+      }
+    ]
   },
 
   /**
@@ -258,7 +313,7 @@ export const CARRIED_AND_POTIONS: ItemMechanicsModule = {
       { type: "check-bonus", amount: 1 },
       { type: "save-bonus", amount: 1 }
     ]
-  },
+  }
 
   // `universal-solvent` - consumed ounces.
   // `well-of-many-worlds` - a rolled 1d8-hour cooldown and planar travel.

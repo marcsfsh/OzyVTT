@@ -16,13 +16,21 @@ export const POINT_BUY_BUDGET = 27;
 
 /** SRD point-buy cost table: 8-13 cost one point each, 14 and 15 cost two. */
 export const POINT_BUY_COSTS: Readonly<Record<number, number>> = Object.freeze({
-  8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
+  8: 0,
+  9: 1,
+  10: 2,
+  11: 3,
+  12: 4,
+  13: 5,
+  14: 7,
+  15: 9
 });
 
 /** Points a single score costs. Throws for anything outside the legal 8-15 buy range. */
 export function pointBuyCost(score: number): number {
   const cost = POINT_BUY_COSTS[score];
-  if (cost === undefined) throw new RangeError(`Point buy only covers scores ${POINT_BUY_MINIMUM}-${POINT_BUY_MAXIMUM}; got ${score}.`);
+  if (cost === undefined)
+    throw new RangeError(`Point buy only covers scores ${POINT_BUY_MINIMUM}-${POINT_BUY_MAXIMUM}; got ${score}.`);
   return cost;
 }
 
@@ -53,36 +61,63 @@ export function diceExpressionBounds(expression: DiceExpression): { minimum: num
   let minimum = 0;
   let maximum = 0;
   for (const term of expression.terms) {
-    if (term.kind === "modifier") { minimum += term.sign * term.value; maximum += term.sign * term.value; continue; }
+    if (term.kind === "modifier") {
+      minimum += term.sign * term.value;
+      maximum += term.sign * term.value;
+      continue;
+    }
     const kept = term.keep?.count ?? term.count;
     const termMinimum = kept * 1;
     const termMaximum = kept * term.sides;
-    if (term.sign === 1) { minimum += termMinimum; maximum += termMaximum; }
-    else { minimum -= termMaximum; maximum -= termMinimum; }
+    if (term.sign === 1) {
+      minimum += termMinimum;
+      maximum += termMaximum;
+    } else {
+      minimum -= termMaximum;
+      maximum -= termMinimum;
+    }
   }
   return { minimum, maximum };
 }
 
 export type AbilityFormulaCheck =
-  | { ok: true; formula: string; minimum: number; maximum: number }
-  | { ok: false; message: string };
+  { ok: true; formula: string; minimum: number; maximum: number } | { ok: false; message: string };
 
 /** Validate a GM-configured ability formula with the same dice parser as every other roll: it must roll at
  * least one die and only produce scores of 1-30. */
 export function validateAbilityFormula(formula: string): AbilityFormulaCheck {
   let expression: DiceExpression;
-  try { expression = parseDiceFormula(formula); }
-  catch (error) { return { ok: false, message: error instanceof DiceFormulaError ? error.message : "That dice formula could not be read." }; }
-  if (!expression.terms.some((term) => term.kind === "dice")) return { ok: false, message: "An ability formula has to roll at least one die." };
+  try {
+    expression = parseDiceFormula(formula);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof DiceFormulaError ? error.message : "That dice formula could not be read."
+    };
+  }
+  if (!expression.terms.some((term) => term.kind === "dice"))
+    return { ok: false, message: "An ability formula has to roll at least one die." };
   const { minimum, maximum } = diceExpressionBounds(expression);
-  if (minimum < ABILITY_SCORE_MINIMUM) return { ok: false, message: `That formula can roll as low as ${minimum}; ability scores start at ${ABILITY_SCORE_MINIMUM}.` };
-  if (maximum > ABILITY_SCORE_MAXIMUM) return { ok: false, message: `That formula can roll as high as ${maximum}; ability scores stop at ${ABILITY_SCORE_MAXIMUM}.` };
+  if (minimum < ABILITY_SCORE_MINIMUM)
+    return {
+      ok: false,
+      message: `That formula can roll as low as ${minimum}; ability scores start at ${ABILITY_SCORE_MINIMUM}.`
+    };
+  if (maximum > ABILITY_SCORE_MAXIMUM)
+    return {
+      ok: false,
+      message: `That formula can roll as high as ${maximum}; ability scores stop at ${ABILITY_SCORE_MAXIMUM}.`
+    };
   return { ok: true, formula, minimum, maximum };
 }
 
 /** Roll six ability scores, highest first, with the caller's `random` (the server's RNG, or a fixed sequence in
  * tests). The formula must pass `validateAbilityFormula`. */
-export function rollAbilityScores(random: RandomSource, formula: string = ABILITY_ROLL_FORMULA, count: number = ABILITY_SCORE_COUNT): number[] {
+export function rollAbilityScores(
+  random: RandomSource,
+  formula: string = ABILITY_ROLL_FORMULA,
+  count: number = ABILITY_SCORE_COUNT
+): number[] {
   const check = validateAbilityFormula(formula);
   if (!check.ok) throw new DiceFormulaError(check.message);
   const expression = parseDiceFormula(formula);
@@ -92,10 +127,13 @@ export function rollAbilityScores(random: RandomSource, formula: string = ABILIT
 
 /** Assign scores by class stat priority, best score first; abilities the priority omits get the rest in sheet order. */
 export function assignByPriority(scores: readonly number[], priority: readonly Ability[]): Record<Ability, number> {
-  if (scores.length !== ABILITY_SCORE_COUNT) throw new RangeError(`Assigning scores needs exactly ${ABILITY_SCORE_COUNT} values; got ${scores.length}.`);
+  if (scores.length !== ABILITY_SCORE_COUNT)
+    throw new RangeError(`Assigning scores needs exactly ${ABILITY_SCORE_COUNT} values; got ${scores.length}.`);
   const order: Ability[] = [...new Set([...priority, ...ABILITIES])];
   const descending = [...scores].sort((left, right) => right - left);
   const assigned = {} as Record<Ability, number>;
-  order.forEach((ability, index) => { assigned[ability] = descending[index]; });
+  order.forEach((ability, index) => {
+    assigned[ability] = descending[index];
+  });
   return assigned;
 }

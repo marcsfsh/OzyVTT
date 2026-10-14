@@ -36,18 +36,52 @@
   font-size: var(--fs-sm);
   line-height: 1;
 }
-.nh-alert-body { min-width: 0; }
-.nh-alert-title { display: block; color: var(--text); font-size: var(--fs-body); }
-.nh-alert-text { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
-.nh-alert-title + .nh-alert-text { margin-top: 2px; }
+.nh-alert-body {
+  min-width: 0;
+}
+.nh-alert-title {
+  display: block;
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.nh-alert-text {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.nh-alert-title + .nh-alert-text {
+  margin-top: 2px;
+}
 
 /* Tone: the leading rule plus a matching icon; the surface stays quiet. */
-.nh-alert--info    { --nh-rule: var(--info); }
-.nh-alert--info    .nh-alert-icon { color: var(--indigo); background: color-mix(in srgb, var(--info) 22%, transparent); }
-.nh-alert--success { --nh-rule: var(--success); }
-.nh-alert--success .nh-alert-icon { color: var(--cyan-hi); background: color-mix(in srgb, var(--cyan) 20%, transparent); }
-.nh-alert--warning { --nh-rule: var(--caution); }
-.nh-alert--warning .nh-alert-icon { color: var(--caution-hi); background: color-mix(in srgb, var(--caution) 22%, transparent); }
-.nh-alert--danger  { --nh-rule: var(--danger); }
-.nh-alert--danger  .nh-alert-icon { color: var(--danger-hi); background: color-mix(in srgb, var(--danger) 20%, transparent); }
-:root[data-theme="light"] .nh-alert--info .nh-alert-icon { color: var(--info); }
+.nh-alert--info {
+  --nh-rule: var(--info);
+}
+.nh-alert--info .nh-alert-icon {
+  color: var(--indigo);
+  background: color-mix(in srgb, var(--info) 22%, transparent);
+}
+.nh-alert--success {
+  --nh-rule: var(--success);
+}
+.nh-alert--success .nh-alert-icon {
+  color: var(--cyan-hi);
+  background: color-mix(in srgb, var(--cyan) 20%, transparent);
+}
+.nh-alert--warning {
+  --nh-rule: var(--caution);
+}
+.nh-alert--warning .nh-alert-icon {
+  color: var(--caution-hi);
+  background: color-mix(in srgb, var(--caution) 22%, transparent);
+}
+.nh-alert--danger {
+  --nh-rule: var(--danger);
+}
+.nh-alert--danger .nh-alert-icon {
+  color: var(--danger-hi);
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+}
+:root[data-theme="light"] .nh-alert--info .nh-alert-icon {
+  color: var(--info);
+}

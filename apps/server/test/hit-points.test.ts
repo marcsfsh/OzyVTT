@@ -16,10 +16,20 @@ const GM = { role: "gm" } as const;
 const OWNER = { role: "player", sessionId: IDS.session } as const;
 
 function state() {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.pc, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20, temporary: 5 }, ownerSessionId: IDS.session },
-    { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
-  ] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.pc,
+        name: "Alpha",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20, temporary: 5 },
+        ownerSessionId: IDS.session
+      },
+      { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
+    ]
+  });
 }
 
 describe("hit point tracking", () => {
@@ -81,14 +91,33 @@ describe("hit point tracking", () => {
 
   it("adds health to public initiative but never leaks it to the viewer", () => {
     const game = state();
-    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.pc, score: 15 }, { actorId: IDS.monster, score: 10 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    startEncounter(
+      game,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.pc, score: 15 },
+          { actorId: IDS.monster, score: 10 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
     applyDamage(game, IDS.monster, 10, GM);
     const initiative = projectPublicInitiative(game);
     expect(initiative.find((entry) => entry.actorId === IDS.monster)?.health).toBe("down");
     const viewer = projectViewerInitiative(game);
     // The shared screen carries the coarse band and condition labels, never an exact hp shape.
     for (const entry of viewer.entries) {
-      expect(Object.keys(entry).sort()).toEqual(["active", "actorId", "conditionIds", "conditions", "health", "initiative", "name"]);
+      expect(Object.keys(entry).sort()).toEqual([
+        "active",
+        "actorId",
+        "conditionIds",
+        "conditions",
+        "health",
+        "initiative",
+        "name"
+      ]);
       expect(["healthy", "bloodied", "down"]).toContain(entry.health);
     }
     expect(JSON.stringify(viewer)).not.toMatch(/"current"|"maximum"|"temporary"/);

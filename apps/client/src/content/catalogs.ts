@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
-  CatalogChoiceCatalogs, ContentBackgroundSummary, ContentClassSummary, ContentFeatSummary,
-  ContentLanguageSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSubclassSummary
+  CatalogChoiceCatalogs,
+  ContentBackgroundSummary,
+  ContentClassSummary,
+  ContentFeatSummary,
+  ContentLanguageSummary,
+  ContentNameBundle,
+  ContentSkillSummary,
+  ContentSpeciesSummary,
+  ContentSubclassSummary
 } from "@vtt/domain";
 import { useEquipmentReference } from "../encounter/equipment";
 import { useSpellReference } from "../encounter/spells";
@@ -22,7 +29,9 @@ type CatalogRead<T> = Readonly<{ items: readonly T[]; attribution: string | null
 const EMPTY: readonly never[] = Object.freeze([]);
 
 /** Builds one cached catalog and its hook. `fetcher` owns the typed socket emit. */
-function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attribution: string | undefined) => void) => void) {
+function makeCatalog<T>(
+  fetcher: (done: (items: readonly T[] | undefined, attribution: string | undefined) => void) => void
+) {
   let cache: readonly T[] | null = null;
   let attribution: string | null = null;
   let inFlight: Promise<void> | null = null;
@@ -47,7 +56,9 @@ function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attrib
   };
 
   // A GM can publish content mid-session; a cold cache does nothing (see `content/invalidate.ts`).
-  registerContentCache(() => { if (cache) request(true); });
+  registerContentCache(() => {
+    if (cache) request(true);
+  });
 
   function useCatalog(): CatalogRead<T> {
     const [, bump] = useState(0);
@@ -57,7 +68,9 @@ function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attrib
       const listener = () => bump((count) => count + 1);
       listeners.add(listener);
       request();
-      return () => { listeners.delete(listener); };
+      return () => {
+        listeners.delete(listener);
+      };
     }, []);
     return { items: cache ?? EMPTY, attribution, loaded: cache !== null };
   }
@@ -65,14 +78,30 @@ function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attrib
   return { useCatalog, request };
 }
 
-const classes = makeCatalog<ContentClassSummary>((done) => socket.emit("content:classes", {}, (result) => done(result.classes, result.attribution)));
-const subclasses = makeCatalog<ContentSubclassSummary>((done) => socket.emit("content:subclasses", {}, (result) => done(result.subclasses, result.attribution)));
-const species = makeCatalog<ContentSpeciesSummary>((done) => socket.emit("content:species", {}, (result) => done(result.species, result.attribution)));
-const backgrounds = makeCatalog<ContentBackgroundSummary>((done) => socket.emit("content:backgrounds", {}, (result) => done(result.backgrounds, result.attribution)));
-const feats = makeCatalog<ContentFeatSummary>((done) => socket.emit("content:feats", {}, (result) => done(result.feats, result.attribution)));
-const names = makeCatalog<ContentNameBundle>((done) => socket.emit("content:names", {}, (result) => done(result.names, result.attribution)));
-const skills = makeCatalog<ContentSkillSummary>((done) => socket.emit("content:skills", {}, (result) => done(result.skills, result.attribution)));
-const languages = makeCatalog<ContentLanguageSummary>((done) => socket.emit("content:languages", {}, (result) => done(result.languages, result.attribution)));
+const classes = makeCatalog<ContentClassSummary>((done) =>
+  socket.emit("content:classes", {}, (result) => done(result.classes, result.attribution))
+);
+const subclasses = makeCatalog<ContentSubclassSummary>((done) =>
+  socket.emit("content:subclasses", {}, (result) => done(result.subclasses, result.attribution))
+);
+const species = makeCatalog<ContentSpeciesSummary>((done) =>
+  socket.emit("content:species", {}, (result) => done(result.species, result.attribution))
+);
+const backgrounds = makeCatalog<ContentBackgroundSummary>((done) =>
+  socket.emit("content:backgrounds", {}, (result) => done(result.backgrounds, result.attribution))
+);
+const feats = makeCatalog<ContentFeatSummary>((done) =>
+  socket.emit("content:feats", {}, (result) => done(result.feats, result.attribution))
+);
+const names = makeCatalog<ContentNameBundle>((done) =>
+  socket.emit("content:names", {}, (result) => done(result.names, result.attribution))
+);
+const skills = makeCatalog<ContentSkillSummary>((done) =>
+  socket.emit("content:skills", {}, (result) => done(result.skills, result.attribution))
+);
+const languages = makeCatalog<ContentLanguageSummary>((done) =>
+  socket.emit("content:languages", {}, (result) => done(result.languages, result.attribution))
+);
 
 export const useClassCatalog = classes.useCatalog;
 export const useSubclassCatalog = subclasses.useCatalog;
@@ -123,7 +152,13 @@ export function useBuilderCatalogs(): BuilderCatalogs {
    */
   return useMemo(() => {
     const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, languageRead, nameRead];
-    const attributions = [...new Set([...reads.map((read) => read.attribution), equipment.attribution].filter((line): line is string => typeof line === "string" && line.length > 0))];
+    const attributions = [
+      ...new Set(
+        [...reads.map((read) => read.attribution), equipment.attribution].filter(
+          (line): line is string => typeof line === "string" && line.length > 0
+        )
+      )
+    ];
     return {
       choice: {
         classes: classRead.items,
@@ -142,9 +177,24 @@ export function useBuilderCatalogs(): BuilderCatalogs {
     };
     // `loaded` flips exactly when a list identity does (a miss is never cached), so it needs no key.
   }, [
-    classRead.items, subclassRead.items, speciesRead.items, backgroundRead.items, featRead.items, skillRead.items, languageRead.items, nameRead.items,
-    spells, equipment.catalog,
-    classRead.attribution, subclassRead.attribution, speciesRead.attribution, backgroundRead.attribution,
-    featRead.attribution, skillRead.attribution, languageRead.attribution, nameRead.attribution, equipment.attribution
+    classRead.items,
+    subclassRead.items,
+    speciesRead.items,
+    backgroundRead.items,
+    featRead.items,
+    skillRead.items,
+    languageRead.items,
+    nameRead.items,
+    spells,
+    equipment.catalog,
+    classRead.attribution,
+    subclassRead.attribution,
+    speciesRead.attribution,
+    backgroundRead.attribution,
+    featRead.attribution,
+    skillRead.attribution,
+    languageRead.attribution,
+    nameRead.attribution,
+    equipment.attribution
   ]);
 }

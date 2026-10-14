@@ -3,13 +3,31 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema,
-  SpeciesReferenceSchema, SpellListReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema, loadSpells
+  BackgroundReferenceSchema,
+  ClassReferenceSchema,
+  EquipmentReferenceSchema,
+  FeatReferenceSchema,
+  SpeciesReferenceSchema,
+  SpellListReferenceSchema,
+  SpellReferenceSchema,
+  SubclassReferenceSchema,
+  loadSpells
 } from "@vtt/content-srd-5.2.1";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { CombatLogStore } from "../src/combat-log.js";
-import { ContentLibrary, type ContentAudience, type HomebrewCatalogSlice, type HomebrewContentSource } from "../src/content-library.js";
-import { createGameOperations, GameAccessDeniedError, type GameOperations, type GameOperationsContext, type GamePrincipal } from "../src/game-operations.js";
+import {
+  ContentLibrary,
+  type ContentAudience,
+  type HomebrewCatalogSlice,
+  type HomebrewContentSource
+} from "../src/content-library.js";
+import {
+  createGameOperations,
+  GameAccessDeniedError,
+  type GameOperations,
+  type GameOperationsContext,
+  type GamePrincipal
+} from "../src/game-operations.js";
 import { GameStore } from "../src/game-store.js";
 import { HomebrewStore } from "../src/homebrew-store.js";
 
@@ -26,60 +44,147 @@ type Tier = (typeof TIERS)[number];
 const titled = (tier: Tier) => `${tier[0].toUpperCase()}${tier.slice(1)}`;
 
 /** A minimal but schema-valid record of every authorable type, tagged with its tier in id and name. */
-const levelTable = Array.from({ length: 20 }, (_, index) => ({ level: index + 1, proficiencyBonus: 2 + Math.floor(index / 4) }));
+const levelTable = Array.from({ length: 20 }, (_, index) => ({
+  level: index + 1,
+  proficiencyBonus: 2 + Math.floor(index / 4)
+}));
 
 function sliceFor(tier: Tier): HomebrewCatalogSlice {
   const name = titled(tier);
   return {
-    classes: [ClassReferenceSchema.parse({
-      id: `hb-${tier}-class`, name: `${name} Class`, source: "homebrew",
-      // A distinctive hit die and ASI spread: the progression-table assertion below reads them back.
-      hitDie: "d12", statPriority: ["str", "con", "dex", "wis", "int", "cha"], primaryAbilities: ["str"],
-      savingThrows: ["str", "con"], skillChoices: { choose: 2, from: ["athletics", "perception"] },
-      asiLevels: [4, 8, 12, 16, 19], subclassLevel: 3, levelTable
-    })],
-    subclasses: [SubclassReferenceSchema.parse({ id: `hb-${tier}-subclass`, name: `${name} Subclass`, source: "homebrew", classId: `hb-${tier}-class` })],
-    species: [SpeciesReferenceSchema.parse({ id: `hb-${tier}-species`, name: `${name} Species`, source: "homebrew", speedFeet: 30 })],
-    backgrounds: [BackgroundReferenceSchema.parse({ id: `hb-${tier}-background`, name: `${name} Background`, source: "homebrew" })],
-    feats: [FeatReferenceSchema.parse({
-      id: `hb-${tier}-feat`, name: `${name} Feat`, source: "homebrew",
-      feature: { id: `hb-${tier}-feat-feature`, name: `${name} Feat`, description: "A homebrew feat." }
-    })],
-    spells: [SpellReferenceSchema.parse({
-      // `source` defaults to "srd", so the fake must set it or it would assert homebrew is bundled content.
-      id: `hb-${tier}-spell`, name: `${name} Spell`, source: "homebrew", level: 1, school: "evocation", castingTime: "1 action",
-      reactionCondition: null, range: { distance: 30, unit: "feet", text: "30 feet" },
-      components: { verbal: true, somatic: false, material: false, materialText: null, materialConsumed: false },
-      duration: "Instantaneous", concentration: false, ritual: false, attackRoll: false,
-      damage: { roll: null, types: [] }, save: null, target: { type: null, count: null }, shape: null,
-      classes: [], description: "A homebrew spell.", higherLevel: null, castingOptions: []
-    })],
-    equipment: [EquipmentReferenceSchema.parse({ id: `hb-${tier}-item`, name: `${name} Item`, source: "homebrew", category: "wondrous", costGp: null, weightLb: null, description: null })],
+    classes: [
+      ClassReferenceSchema.parse({
+        id: `hb-${tier}-class`,
+        name: `${name} Class`,
+        source: "homebrew",
+        // A distinctive hit die and ASI spread: the progression-table assertion below reads them back.
+        hitDie: "d12",
+        statPriority: ["str", "con", "dex", "wis", "int", "cha"],
+        primaryAbilities: ["str"],
+        savingThrows: ["str", "con"],
+        skillChoices: { choose: 2, from: ["athletics", "perception"] },
+        asiLevels: [4, 8, 12, 16, 19],
+        subclassLevel: 3,
+        levelTable
+      })
+    ],
+    subclasses: [
+      SubclassReferenceSchema.parse({
+        id: `hb-${tier}-subclass`,
+        name: `${name} Subclass`,
+        source: "homebrew",
+        classId: `hb-${tier}-class`
+      })
+    ],
+    species: [
+      SpeciesReferenceSchema.parse({
+        id: `hb-${tier}-species`,
+        name: `${name} Species`,
+        source: "homebrew",
+        speedFeet: 30
+      })
+    ],
+    backgrounds: [
+      BackgroundReferenceSchema.parse({ id: `hb-${tier}-background`, name: `${name} Background`, source: "homebrew" })
+    ],
+    feats: [
+      FeatReferenceSchema.parse({
+        id: `hb-${tier}-feat`,
+        name: `${name} Feat`,
+        source: "homebrew",
+        feature: { id: `hb-${tier}-feat-feature`, name: `${name} Feat`, description: "A homebrew feat." }
+      })
+    ],
+    spells: [
+      SpellReferenceSchema.parse({
+        // `source` defaults to "srd", so the fake must set it or it would assert homebrew is bundled content.
+        id: `hb-${tier}-spell`,
+        name: `${name} Spell`,
+        source: "homebrew",
+        level: 1,
+        school: "evocation",
+        castingTime: "1 action",
+        reactionCondition: null,
+        range: { distance: 30, unit: "feet", text: "30 feet" },
+        components: { verbal: true, somatic: false, material: false, materialText: null, materialConsumed: false },
+        duration: "Instantaneous",
+        concentration: false,
+        ritual: false,
+        attackRoll: false,
+        damage: { roll: null, types: [] },
+        save: null,
+        target: { type: null, count: null },
+        shape: null,
+        classes: [],
+        description: "A homebrew spell.",
+        higherLevel: null,
+        castingOptions: []
+      })
+    ],
+    equipment: [
+      EquipmentReferenceSchema.parse({
+        id: `hb-${tier}-item`,
+        name: `${name} Item`,
+        source: "homebrew",
+        category: "wondrous",
+        costGp: null,
+        weightLb: null,
+        description: null
+      })
+    ],
     monsters: [monsterFor(tier)],
     // A membership overlay: it stamps this tier's list id into the tier's own spell, so an overlay that
     // crossed the audience boundary shows up as a leaked id in a player-visible spell's `classes`.
-    spellLists: [SpellListReferenceSchema.parse({ id: `hb-${tier}-list`, name: `${name} List`, source: "homebrew", add: [`hb-${tier}-spell`] })]
+    spellLists: [
+      SpellListReferenceSchema.parse({
+        id: `hb-${tier}-list`,
+        name: `${name} List`,
+        source: "homebrew",
+        add: [`hb-${tier}-spell`]
+      })
+    ]
   };
 }
 
 function monsterFor(tier: Tier): ActorDefinition {
   return ActorDefinitionSchema.parse({
-    schemaId: "vtt.actor-monster", schemaVersion: 1,
+    schemaId: "vtt.actor-monster",
+    schemaVersion: 1,
     source: { name: "Homebrew", version: "1", externalId: `hb-m-${tier}` },
-    name: `${titled(tier)} Monster`, size: "medium",
+    name: `${titled(tier)} Monster`,
+    size: "medium",
     abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    proficiencyBonus: 2, armorClass: 12, hitPoints: { maximum: 10 }, speedFeet: 30,
-    actions: [{ id: "smash", name: "Smash", activation: "action", description: "It smashes.", damage: [{ formula: "1d6", type: "bludgeoning" }] }]
+    proficiencyBonus: 2,
+    armorClass: 12,
+    hitPoints: { maximum: 10 },
+    speedFeet: 30,
+    actions: [
+      {
+        id: "smash",
+        name: "Smash",
+        activation: "action",
+        description: "It smashes.",
+        damage: [{ formula: "1d6", type: "bludgeoning" }]
+      }
+    ]
   });
 }
 
-const SLICES: Readonly<Record<Tier, HomebrewCatalogSlice>> = { draftonly: sliceFor("draftonly"), gmonly: sliceFor("gmonly"), playersafe: sliceFor("playersafe") };
+const SLICES: Readonly<Record<Tier, HomebrewCatalogSlice>> = {
+  draftonly: sliceFor("draftonly"),
+  gmonly: sliceFor("gmonly"),
+  playersafe: sliceFor("playersafe")
+};
 
 const concatSlices = (...slices: readonly HomebrewCatalogSlice[]): HomebrewCatalogSlice => ({
-  classes: slices.flatMap((slice) => slice.classes), subclasses: slices.flatMap((slice) => slice.subclasses),
-  species: slices.flatMap((slice) => slice.species), backgrounds: slices.flatMap((slice) => slice.backgrounds),
-  feats: slices.flatMap((slice) => slice.feats), spells: slices.flatMap((slice) => slice.spells),
-  equipment: slices.flatMap((slice) => slice.equipment), monsters: slices.flatMap((slice) => slice.monsters),
+  classes: slices.flatMap((slice) => slice.classes),
+  subclasses: slices.flatMap((slice) => slice.subclasses),
+  species: slices.flatMap((slice) => slice.species),
+  backgrounds: slices.flatMap((slice) => slice.backgrounds),
+  feats: slices.flatMap((slice) => slice.feats),
+  spells: slices.flatMap((slice) => slice.spells),
+  equipment: slices.flatMap((slice) => slice.equipment),
+  monsters: slices.flatMap((slice) => slice.monsters),
   spellLists: slices.flatMap((slice) => slice.spellLists)
 });
 
@@ -89,7 +194,8 @@ function fakeHomebrew(revision = 1): HomebrewContentSource {
   const byExternalId = new Map(TIERS.map((tier) => [`hb-m-${tier}`, SLICES[tier].monsters[0]]));
   return {
     revision,
-    publishedFor: (audience: ContentAudience) => audience === "gm" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe,
+    publishedFor: (audience: ContentAudience) =>
+      audience === "gm" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe,
     // Status-blind, including drafts: the live-instance lookup.
     monsterForInstance: (id: string) => byExternalId.get(id)
   };
@@ -99,11 +205,17 @@ function fakeHomebrew(revision = 1): HomebrewContentSource {
 
 const GM: GamePrincipal = { kind: "gm", sessionId: "11111111-1111-4111-8111-111111111111" };
 const PLAYER: GamePrincipal = { kind: "player", sessionId: "22222222-2222-4222-8222-222222222222" };
-const INTEGRATION: GamePrincipal = { kind: "integration", credentialId: "33333333-3333-4333-8333-333333333333", name: "Overlay" };
+const INTEGRATION: GamePrincipal = {
+  kind: "integration",
+  credentialId: "33333333-3333-4333-8333-333333333333",
+  name: "Overlay"
+};
 
 /** Content reads touch neither persistence nor projections, so everything else in the context is an unused stub. */
 function operationsWith(contentLibrary: ContentLibrary): GameOperations {
-  const unused = () => { throw new Error("a content read must not touch this"); };
+  const unused = () => {
+    throw new Error("a content read must not touch this");
+  };
   return createGameOperations({
     // Never initialized, so nothing is written: `snapshot` still serves the parsed default state.
     store: new GameStore(join(tmpdir(), "vtt-homebrew-visibility-unused.sqlite")),
@@ -129,14 +241,25 @@ function operationsWith(contentLibrary: ContentLibrary): GameOperations {
 // The classification every `content*` operation must appear in. These two lists are checked against
 // the operations object itself, so a new content read cannot be added without a decision here.
 const PLAYER_READABLE_CONTENT_OPS = [
-  "contentConditions", "contentSkills", "contentLanguages", "contentSpells", "contentEquipment",
-  "contentClasses", "contentSubclasses", "contentSpecies", "contentBackgrounds", "contentFeats", "contentNames"
+  "contentConditions",
+  "contentSkills",
+  "contentLanguages",
+  "contentSpells",
+  "contentEquipment",
+  "contentClasses",
+  "contentSubclasses",
+  "contentSpecies",
+  "contentBackgrounds",
+  "contentFeats",
+  "contentNames"
 ] as const;
 /** The bestiary and stat blocks: GM-grade only, and that gate is asserted below rather than assumed. */
 const GM_ONLY_CONTENT_OPS = ["contentMonsters", "contentMonsterActions", "contentMonsterSheet"] as const;
 
 const readAs = (operations: GameOperations, name: string, principal: GamePrincipal) =>
-  (operations[name as keyof GameOperations] as (principal: GamePrincipal, raw?: unknown) => unknown)(principal, { definitionId: "hb-m-playersafe" });
+  (operations[name as keyof GameOperations] as (principal: GamePrincipal, raw?: unknown) => unknown)(principal, {
+    definitionId: "hb-m-playersafe"
+  });
 
 // Markers are matched over the serialized payload, so it works for any catalog shape. Reduced to a
 // boolean so a failure does not print a 300-spell catalog.
@@ -161,10 +284,14 @@ describe("homebrew never reaches an audience it was not published to", () => {
   it("keeps a DRAFT out of both audiences' catalogs", () => {
     const operations = operationsWith(new ContentLibrary(fakeHomebrew()));
     for (const principal of [GM, INTEGRATION, PLAYER]) {
-      const reachable = principal === PLAYER ? PLAYER_READABLE_CONTENT_OPS : [...PLAYER_READABLE_CONTENT_OPS, ...GM_ONLY_CONTENT_OPS];
+      const reachable =
+        principal === PLAYER ? PLAYER_READABLE_CONTENT_OPS : [...PLAYER_READABLE_CONTENT_OPS, ...GM_ONLY_CONTENT_OPS];
       for (const name of reachable) {
         if (name === "contentMonsterSheet") continue; // resolves a live instance regardless of status; covered separately below
-        expect(carries(readAs(operations, name, principal), "draftonly"), `${name} served a DRAFT to a ${principal.kind}`).toBe(false);
+        expect(
+          carries(readAs(operations, name, principal), "draftonly"),
+          `${name} served a DRAFT to a ${principal.kind}`
+        ).toBe(false);
       }
     }
   });
@@ -172,7 +299,10 @@ describe("homebrew never reaches an audience it was not published to", () => {
   it("keeps a PUBLISHED but player-invisible record out of every player-readable catalog", () => {
     const operations = operationsWith(new ContentLibrary(fakeHomebrew()));
     for (const name of PLAYER_READABLE_CONTENT_OPS) {
-      expect(carries(readAs(operations, name, PLAYER), "gmonly"), `${name} served a GM-only homebrew record to a player`).toBe(false);
+      expect(
+        carries(readAs(operations, name, PLAYER), "gmonly"),
+        `${name} served a GM-only homebrew record to a player`
+      ).toBe(false);
     }
     // ...while the GM and the GM's integration credential see it.
     for (const principal of [GM, INTEGRATION]) {
@@ -202,7 +332,10 @@ describe("homebrew never reaches an audience it was not published to", () => {
     const gm = new ContentLibrary(fakeHomebrew()).forAudience("gm");
     expect(gm.classSummaries().some((entry) => entry.id === "hb-gmonly-class")).toBe(true);
     expect(gm.classRecord("hb-gmonly-class")?.hitDie).toBe("d12");
-    expect(gm.classProgressionTable()["hb-gmonly-class"]).toMatchObject({ hitDie: "d12", asiLevels: [4, 8, 12, 16, 19] });
+    expect(gm.classProgressionTable()["hb-gmonly-class"]).toMatchObject({
+      hitDie: "d12",
+      asiLevels: [4, 8, 12, 16, 19]
+    });
 
     const player = new ContentLibrary(fakeHomebrew()).forAudience("player");
     expect(player.classRecord("hb-gmonly-class")).toBeUndefined();
@@ -226,8 +359,13 @@ describe("homebrew never reaches an audience it was not published to", () => {
     let revision = -1; // what an uninitialized store reports
     let builds = 0;
     const source: HomebrewContentSource = {
-      get revision() { return revision; },
-      publishedFor: (audience) => { builds += 1; return audience === "gm" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe; },
+      get revision() {
+        return revision;
+      },
+      publishedFor: (audience) => {
+        builds += 1;
+        return audience === "gm" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe;
+      },
       monsterForInstance: () => undefined
     };
     const library = new ContentLibrary(source);
@@ -243,7 +381,12 @@ describe("homebrew never reaches an audience it was not published to", () => {
     // The path every existing table takes: both audiences resolve to the same SRD-only catalog.
     const library = new ContentLibrary();
     expect(library.forAudience("gm").classSummaries()).toBe(library.forAudience("player").classSummaries());
-    expect(library.forAudience("player").classSummaries().every((entry) => entry.source === "srd")).toBe(true);
+    expect(
+      library
+        .forAudience("player")
+        .classSummaries()
+        .every((entry) => entry.source === "srd")
+    ).toBe(true);
   });
 });
 
@@ -268,8 +411,14 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
     // One class and one monster per tier, taken through the real GM transitions.
     const ids: Record<Tier, { classId: string; monsterId: string }> = {} as never;
     for (const tier of TIERS) {
-      const created = store.create({ type: "class", body: SLICES[tier].classes[0] as unknown as Record<string, unknown> });
-      const monster = store.create({ type: "monster", body: SLICES[tier].monsters[0] as unknown as Record<string, unknown> });
+      const created = store.create({
+        type: "class",
+        body: SLICES[tier].classes[0] as unknown as Record<string, unknown>
+      });
+      const monster = store.create({
+        type: "monster",
+        body: SLICES[tier].monsters[0] as unknown as Record<string, unknown>
+      });
       if (tier !== "draftonly") {
         store.setState(created.id, "published", undefined);
         store.setState(monster.id, "published", undefined);
@@ -289,7 +438,9 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
 
     // The draft is in no merged catalog for any principal.
     for (const principal of [GM, INTEGRATION, PLAYER]) {
-      expect(carries(operations.contentClasses(principal), "draftonly class"), `${principal.kind} saw a draft`).toBe(false);
+      expect(carries(operations.contentClasses(principal), "draftonly class"), `${principal.kind} saw a draft`).toBe(
+        false
+      );
     }
     expect(carries(operations.contentMonsters(GM), "draftonly monster")).toBe(false);
 
@@ -318,7 +469,10 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
 
   it("applies a published spell list to the audience that can see it, and to no other", async () => {
     const { store } = await seededStore();
-    const spell = store.create({ type: "spell", body: SLICES.playersafe.spells[0] as unknown as Record<string, unknown> });
+    const spell = store.create({
+      type: "spell",
+      body: SLICES.playersafe.spells[0] as unknown as Record<string, unknown>
+    });
     store.setState(spell.id, "published", undefined);
     store.setVisibility(spell.id, true, undefined);
     // The list is published but not player-visible: its id must never appear in a player-visible spell's
@@ -327,13 +481,29 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
     store.setState(list.id, "published", undefined);
 
     const library = new ContentLibrary(store);
-    const gmSpell = library.forAudience("gm").spellSummaries().find((entry) => entry.id === spell.id);
-    const playerSpell = library.forAudience("player").spellSummaries().find((entry) => entry.id === spell.id);
+    const gmSpell = library
+      .forAudience("gm")
+      .spellSummaries()
+      .find((entry) => entry.id === spell.id);
+    const playerSpell = library
+      .forAudience("player")
+      .spellSummaries()
+      .find((entry) => entry.id === spell.id);
     expect(gmSpell?.classes).toContain(list.id);
     expect(playerSpell?.classes).not.toContain(list.id);
     // An SRD spell joins the list too; membership is an overlay, never an edit to the bundle.
-    expect(library.forAudience("gm").spellSummaries().find((entry) => entry.id === "fireball")?.classes).toContain(list.id);
-    expect(library.forAudience("player").spellSummaries().find((entry) => entry.id === "fireball")?.classes).not.toContain(list.id);
+    expect(
+      library
+        .forAudience("gm")
+        .spellSummaries()
+        .find((entry) => entry.id === "fireball")?.classes
+    ).toContain(list.id);
+    expect(
+      library
+        .forAudience("player")
+        .spellSummaries()
+        .find((entry) => entry.id === "fireball")?.classes
+    ).not.toContain(list.id);
     // The loader caches parsed rows by identity, so mutating the bundle would corrupt every later reader.
     expect(loadSpells().find((entry) => entry.id === "fireball")?.classes).not.toContain(list.id);
   });
@@ -351,12 +521,20 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
     store.setVisibility(list.id, true, undefined);
 
     const library = new ContentLibrary(store);
-    expect(library.forAudience("player").spellSummaries().find((entry) => entry.id === "fireball")?.classes).toContain(list.id);
+    expect(
+      library
+        .forAudience("player")
+        .spellSummaries()
+        .find((entry) => entry.id === "fireball")?.classes
+    ).toContain(list.id);
   });
 
   it("drops a published row that no longer parses instead of taking down every catalog", async () => {
     const { store } = await seededStore();
-    const good = store.create({ type: "class", body: SLICES.playersafe.classes[0] as unknown as Record<string, unknown> });
+    const good = store.create({
+      type: "class",
+      body: SLICES.playersafe.classes[0] as unknown as Record<string, unknown>
+    });
     store.setState(good.id, "published", undefined);
     store.setVisibility(good.id, true, undefined);
     // A body the schema refuses, as stored data looks after a schema tightens. It cannot be published
@@ -377,7 +555,10 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
     // `Actor.definitionId`; an arbitrary value would save and then fail `GameStateSchema.parse` on boot.
     const created = store.create({
       type: "monster",
-      body: { ...(SLICES.playersafe.monsters[0] as unknown as Record<string, unknown>), source: { name: "Homebrew", version: "1", externalId: "not:a:slug" } }
+      body: {
+        ...(SLICES.playersafe.monsters[0] as unknown as Record<string, unknown>),
+        source: { name: "Homebrew", version: "1", externalId: "not:a:slug" }
+      }
     });
     expect((created.body.source as { externalId: string }).externalId).toBe(created.id);
     expect(new ContentLibrary(store).monsterForInstance(created.id)?.name).toContain("Monster");

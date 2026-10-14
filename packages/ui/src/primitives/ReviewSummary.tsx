@@ -44,7 +44,9 @@ export function ReviewSummary({ sections, children, ariaLabel = "Character summa
             <h3 className="nh-review-title">{section.title}</h3>
             {section.onEdit && (
               <Button variant="ghost" size="sm" className="nh-review-edit" onClick={section.onEdit}>
-                <span className="nh-review-edit-icon" aria-hidden="true"><IconPencil /></span>
+                <span className="nh-review-edit-icon" aria-hidden="true">
+                  <IconPencil />
+                </span>
                 {section.editLabel ?? "Edit"}
                 <span className="nh-sr-only"> {typeof section.title === "string" ? section.title : ""}</span>
               </Button>
@@ -52,7 +54,12 @@ export function ReviewSummary({ sections, children, ariaLabel = "Character summa
           </header>
 
           {section.incomplete != null && (
-            <p className="nh-review-incomplete"><span className="nh-review-incomplete-icon" aria-hidden="true"><IconWarning /></span>{section.incomplete}</p>
+            <p className="nh-review-incomplete">
+              <span className="nh-review-incomplete-icon" aria-hidden="true">
+                <IconWarning />
+              </span>
+              {section.incomplete}
+            </p>
           )}
 
           <dl className="nh-statlist nh-review-stats">

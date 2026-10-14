@@ -10,7 +10,9 @@ import type { HomebrewBody } from "./homebrew-store.js";
  */
 
 /** Which catalogs are searched, in order, when an id arrives with no type attached. */
-const LOOKUPS: ReadonlyArray<Readonly<{ type: HomebrewContentType; find: (catalog: ContentView, id: string) => unknown }>> = [
+const LOOKUPS: ReadonlyArray<
+  Readonly<{ type: HomebrewContentType; find: (catalog: ContentView, id: string) => unknown }>
+> = [
   { type: "class", find: (catalog, id) => catalog.classRecord(id) },
   { type: "subclass", find: (catalog, id) => catalog.subclassRecord(id) },
   { type: "species", find: (catalog, id) => catalog.speciesRecord(id) },
@@ -52,7 +54,12 @@ function choiceBlocksOn(feature: Record<string, unknown>): Record<string, unknow
 }
 
 /** Re-point ids naming the record itself. Walks only named fields, so an unknown body comes back unchanged. */
-export function rewriteForNewId(type: HomebrewContentType, body: HomebrewBody, oldId: string, newId: string): HomebrewBody {
+export function rewriteForNewId(
+  type: HomebrewContentType,
+  body: HomebrewBody,
+  oldId: string,
+  newId: string
+): HomebrewBody {
   const next = structuredClone(body) as Record<string, unknown>;
   next.id = newId;
   // Leaving `source: "srd"` would badge hand-edited content as SRD and attach CC-BY attribution.
@@ -88,7 +95,9 @@ export function rewriteForNewId(type: HomebrewContentType, body: HomebrewBody, o
 /** Every place a `FeatureRecord` can sit inside a body: class/subclass/background features, species traits (incl. lineage traits), a feat's single feature. */
 function featureBearingRecords(body: Record<string, unknown>): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
-  const collect = (value: unknown) => { for (const entry of asArray(value)) if (isObject(entry)) out.push(entry); };
+  const collect = (value: unknown) => {
+    for (const entry of asArray(value)) if (isObject(entry)) out.push(entry);
+  };
   collect(body.features);
   collect(body.traits);
   for (const lineage of asArray(body.lineages)) if (isObject(lineage)) collect(lineage.traits);
@@ -96,8 +105,9 @@ function featureBearingRecords(body: Record<string, unknown>): Record<string, un
   return out;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const asArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 /** A monster's authored `name` lives on the definition, so the router's rename is type-blind. */
 export type SrdCopyableDefinition = ActorDefinition;

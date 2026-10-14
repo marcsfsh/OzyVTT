@@ -35,7 +35,6 @@ export type PlayerReplayDocument = Readonly<{
   attribution: string | null;
 }>;
 
-
 /** Log rows from this boundary's revision up to the next boundary's; the last turn takes the rest. */
 function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): readonly CombatLogEntry[] {
   const turns = document.turns;
@@ -73,14 +72,21 @@ function turnLabel(turn: EncounterArchiveTurn): string {
 /** Builds the player's replay. `now` is injected so annotation expiry is deterministic. There is no
  *  `playerSessionId`: the combat projection runs with `undefined`, so owner-only extras stay off and
  *  every reader gets the same spectator document. */
-export function projectPlayerReplay(id: number, document: EncounterArchiveDocument, now = Date.now()): PlayerReplayDocument {
+export function projectPlayerReplay(
+  id: number,
+  document: EncounterArchiveDocument,
+  now = Date.now()
+): PlayerReplayDocument {
   const turns = document.turns.map((turn, index): PlayerReplayTurn => ({
     index: turn.index,
     at: turn.at,
     label: turnLabel(turn),
     combat: projectPlayerCombat(turn.state, undefined, now),
     actors: turnActors(turn),
-    log: logSliceFor(document, index).flatMap((entry) => { const row = playerLogRow(entry); return row ? [row] : []; })
+    log: logSliceFor(document, index).flatMap((entry) => {
+      const row = playerLogRow(entry);
+      return row ? [row] : [];
+    })
   }));
   return {
     id,
@@ -99,6 +105,14 @@ export function projectPlayerReplay(id: number, document: EncounterArchiveDocume
 /** The battle-map images a shared archive's player replay renders, so the map router can serve them.
  *  Derived from the projected player document, not the stored one, which also references prepared
  *  scenes' maps players must not see. Does not check the shared flag: never call it on an unshared archive. */
-export function playerReplayMapAssetIds(id: number, document: EncounterArchiveDocument, now = Date.now()): ReadonlySet<string> {
-  return new Set(projectPlayerReplay(id, document, now).turns.flatMap((turn) => turn.combat.mapAssetId === null ? [] : [turn.combat.mapAssetId]));
+export function playerReplayMapAssetIds(
+  id: number,
+  document: EncounterArchiveDocument,
+  now = Date.now()
+): ReadonlySet<string> {
+  return new Set(
+    projectPlayerReplay(id, document, now).turns.flatMap((turn) =>
+      turn.combat.mapAssetId === null ? [] : [turn.combat.mapAssetId]
+    )
+  );
 }

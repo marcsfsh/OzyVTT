@@ -4,10 +4,33 @@
  */
 
 import type { BadgeTone, MeterTone } from "@vtt/ui";
-import { calendarDaysPerYear, calendarYearOf, dateToInstant, formatWorldYear, instantToDate, type CodexCalendar, type CodexChronicleKind, type CodexChronicleRecord, type CodexDowntimeSummary, type CodexInWorldDate, type CodexJournalKind, type CodexJournalPayload, type CodexMilestonePayload, type CodexPlayerChroniclePayload, type CodexQuestStatus, type CodexStandingChange, type GmCodexCalendar } from "./api";
+import {
+  calendarDaysPerYear,
+  calendarYearOf,
+  dateToInstant,
+  formatWorldYear,
+  instantToDate,
+  type CodexCalendar,
+  type CodexChronicleKind,
+  type CodexChronicleRecord,
+  type CodexDowntimeSummary,
+  type CodexInWorldDate,
+  type CodexJournalKind,
+  type CodexJournalPayload,
+  type CodexMilestonePayload,
+  type CodexPlayerChroniclePayload,
+  type CodexQuestStatus,
+  type CodexStandingChange,
+  type GmCodexCalendar
+} from "./api";
 
 /** How a record says when it happened, in order of preference. Shared by both journals and the dashboard. */
-export type ChronicleWhen = Readonly<{ inWorldLabel: string | null; sessionNumber: number | null; realDate: string | null; createdAt: string }>;
+export type ChronicleWhen = Readonly<{
+  inWorldLabel: string | null;
+  sessionNumber: number | null;
+  realDate: string | null;
+  createdAt: string;
+}>;
 export function chronicleWhenLabel(record: ChronicleWhen): string {
   if (record.inWorldLabel) return record.inWorldLabel;
   if (record.sessionNumber !== null) return `Session ${record.sessionNumber}`;
@@ -16,13 +39,24 @@ export function chronicleWhenLabel(record: ChronicleWhen): string {
 }
 
 /** The Journal filter's kinds, in reading order. Shared so both journals offer the same options. */
-export const CHRONICLE_FILTER_KINDS: readonly CodexChronicleKind[] = ["entry", "combat", "event", "deadline", "downtime", "milestone", "standing", "quest"];
+export const CHRONICLE_FILTER_KINDS: readonly CodexChronicleKind[] = [
+  "entry",
+  "combat",
+  "event",
+  "deadline",
+  "downtime",
+  "milestone",
+  "standing",
+  "quest"
+];
 
 /**
  * A kind reads by icon plus label, never colour alone. Every `iconId` must exist in `CODEX_ICONS`:
  * `iconChildren` silently falls back to `pin` for an unknown id.
  */
-export const CHRONICLE_KIND_META: Readonly<Record<CodexChronicleKind, Readonly<{ iconId: string; label: string; tone: "neutral" | "caution" | "info" }>>> = {
+export const CHRONICLE_KIND_META: Readonly<
+  Record<CodexChronicleKind, Readonly<{ iconId: string; label: string; tone: "neutral" | "caution" | "info" }>>
+> = {
   entry: { iconId: "scroll", label: "Entry", tone: "neutral" },
   combat: { iconId: "battle", label: "Battle", tone: "caution" },
   event: { iconId: "hourglass", label: "Event", tone: "info" },
@@ -38,13 +72,19 @@ export const CHRONICLE_KIND_META: Readonly<Record<CodexChronicleKind, Readonly<{
  * payload's status only; it never guesses the sequence (e.g. "reopened").
  */
 export const QUEST_EVENT_VERB: Readonly<Record<CodexQuestStatus, string>> = {
-  "not-started": "has not started", active: "started", completed: "completed", failed: "failed", canceled: "was canceled"
+  "not-started": "has not started",
+  active: "started",
+  completed: "completed",
+  failed: "failed",
+  canceled: "was canceled"
 };
 export function questEventLabel(payload: Readonly<{ status: CodexQuestStatus }>, questTitle: string | null): string {
   return `${questTitle?.trim() || "A quest"} ${QUEST_EVENT_VERB[payload.status]}`;
 }
 /** The kind gate for a quest-history payload, like `downtimeOf`. */
-export function questEventOf(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>): Readonly<{ questId: string | null; status: CodexQuestStatus }> | null {
+export function questEventOf(
+  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
+): Readonly<{ questId: string | null; status: CodexQuestStatus }> | null {
   const payload = record.payload;
   return record.kind === "quest" && payload !== null && "questId" in payload ? payload : null;
 }
@@ -96,11 +136,18 @@ export function standingLabel(value: number): string {
 /** Decorative only; `standingLabel` carries the meaning. */
 export function standingTone(value: number): BadgeTone {
   switch (standingTier(value)) {
-    case "hunted": case "hostile": return "danger";
-    case "unfriendly": return "caution";
-    case "uninvested": return "neutral";
-    case "friendly": return "info";
-    case "allied": case "exalted": return "success";
+    case "hunted":
+    case "hostile":
+      return "danger";
+    case "unfriendly":
+      return "caution";
+    case "uninvested":
+      return "neutral";
+    case "friendly":
+      return "info";
+    case "allied":
+    case "exalted":
+      return "success";
   }
 }
 
@@ -115,11 +162,17 @@ export function standingValueLabel(value: number): string {
  * -100 -> 0, 0 -> 100, +100 -> 200. Never pass `Meter`'s `label`, which would show these shifted numbers.
  */
 export const STANDING_METER_MAX = STANDING_MAX - STANDING_MIN;
-export function standingMeterValue(value: number): number { return clampStanding(value) - STANDING_MIN; }
+export function standingMeterValue(value: number): number {
+  return clampStanding(value) - STANDING_MIN;
+}
 /** Decorative, like `standingTone`. */
 export function standingMeterTone(value: number): MeterTone {
   const tier = standingTier(value);
-  return tier === "uninvested" ? "violet" : tier === "friendly" || tier === "allied" || tier === "exalted" ? "cyan" : "magenta";
+  return tier === "uninvested"
+    ? "violet"
+    : tier === "friendly" || tier === "allied" || tier === "exalted"
+      ? "cyan"
+      : "magenta";
 }
 
 // ----- Reading a record's payload, gated by its kind -----
@@ -133,16 +186,22 @@ export type ChroniclePayloadRef<P> = Readonly<{ kind: CodexChronicleKind; payloa
 /** Satisfied by both projections (the player's id is nullable). */
 export type CodexQuestEventRef = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
 
-export function downtimeOf<P extends CodexDowntimeSummary>(record: ChroniclePayloadRef<P | CodexMilestonePayload | CodexStandingChange | CodexQuestEventRef>): P | null {
+export function downtimeOf<P extends CodexDowntimeSummary>(
+  record: ChroniclePayloadRef<P | CodexMilestonePayload | CodexStandingChange | CodexQuestEventRef>
+): P | null {
   const payload = record.payload;
   return record.kind === "downtime" && payload !== null && "days" in payload ? payload : null;
 }
-export function milestoneOf(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>): CodexMilestonePayload | null {
+export function milestoneOf(
+  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
+): CodexMilestonePayload | null {
   const payload = record.payload;
   return record.kind === "milestone" && payload !== null && "level" in payload ? payload : null;
 }
 /** Returns the wide shape with a nullable `factionPageId`, since a player's copy nulls an unrevealed faction. */
-export function standingOf(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>): CodexStandingChange | null {
+export function standingOf(
+  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
+): CodexStandingChange | null {
   const payload = record.payload;
   return record.kind === "standing" && payload !== null && "delta" in payload ? payload : null;
 }
@@ -172,10 +231,17 @@ export function deadlineFired(record: DeadlineRef): boolean {
   return record.kind === "deadline" && record.fired === true;
 }
 
-export const DEADLINE_STATE_LABEL: Readonly<Record<"fired" | "pending", string>> = { fired: "Passed", pending: "Approaching" };
-export function deadlineStateLabel(fired: boolean): string { return fired ? DEADLINE_STATE_LABEL.fired : DEADLINE_STATE_LABEL.pending; }
+export const DEADLINE_STATE_LABEL: Readonly<Record<"fired" | "pending", string>> = {
+  fired: "Passed",
+  pending: "Approaching"
+};
+export function deadlineStateLabel(fired: boolean): string {
+  return fired ? DEADLINE_STATE_LABEL.fired : DEADLINE_STATE_LABEL.pending;
+}
 /** Decorative only; `deadlineStateLabel` carries the meaning. */
-export function deadlineStateTone(fired: boolean): BadgeTone { return fired ? "danger" : "caution"; }
+export function deadlineStateTone(fired: boolean): BadgeTone {
+  return fired ? "danger" : "caution";
+}
 
 /**
  * Passed first, then approaching, each in server order. Passed deadlines are kept: the clock finishes a
@@ -183,7 +249,10 @@ export function deadlineStateTone(fired: boolean): BadgeTone { return fired ? "d
  */
 export function campaignDeadlines<T extends DeadlineRef>(records: readonly T[]): readonly T[] {
   const deadlines = records.filter((record) => record.kind === "deadline");
-  return [...deadlines.filter((record) => deadlineFired(record)), ...deadlines.filter((record) => !deadlineFired(record))];
+  return [
+    ...deadlines.filter((record) => deadlineFired(record)),
+    ...deadlines.filter((record) => !deadlineFired(record))
+  ];
 }
 
 // ----- Dates the GM is about to move to -----
@@ -205,32 +274,56 @@ export function downtimeProposedDate(calendar: CodexCalendar | null, days: numbe
 
 /** How many not-yet-passed deadlines a clock move to `target` would pass, so the GM is warned before confirming. */
 export type DatedDeadlineRef = DeadlineRef & Readonly<{ calendarInstant: number | null }>;
-export function deadlinesPassedBy(records: readonly DatedDeadlineRef[], calendar: CodexCalendar | null, target: CodexInWorldDate | null): number {
+export function deadlinesPassedBy(
+  records: readonly DatedDeadlineRef[],
+  calendar: CodexCalendar | null,
+  target: CodexInWorldDate | null
+): number {
   if (!calendar || !target) return 0;
   // `target` is already a valid calendar date (built by `instantToDate`), so no clamping is needed.
   const targetInstant = dateToInstant(calendar, target);
-  return records.filter((record) => record.kind === "deadline" && !deadlineFired(record)
-    && record.calendarInstant !== null && record.calendarInstant <= targetInstant).length;
+  return records.filter(
+    (record) =>
+      record.kind === "deadline" &&
+      !deadlineFired(record) &&
+      record.calendarInstant !== null &&
+      record.calendarInstant <= targetInstant
+  ).length;
 }
 
 /** The journal's `note` is the chronicle's `entry`; every other kind has the same name. */
 const JOURNAL_TO_CHRONICLE_KIND: Readonly<Record<CodexJournalKind, CodexChronicleKind>> = {
-  note: "entry", combat: "combat", deadline: "deadline", downtime: "downtime", milestone: "milestone", standing: "standing", quest: "quest"
+  note: "entry",
+  combat: "combat",
+  deadline: "deadline",
+  downtime: "downtime",
+  milestone: "milestone",
+  standing: "standing",
+  quest: "quest"
 };
-export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKind { return JOURNAL_TO_CHRONICLE_KIND[kind]; }
+export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKind {
+  return JOURNAL_TO_CHRONICLE_KIND[kind];
+}
 
 /**
  * Kinds the dashboard's "Recent journal activity" feed omits because a card already shows them: `event`
  * pages are listed as pages, deadlines have their own card, and the standing card lists every faction.
  */
-export const DASHBOARD_CARDED_KINDS: ReadonlySet<CodexChronicleKind> = new Set<CodexChronicleKind>(["event", "deadline", "standing"]);
+export const DASHBOARD_CARDED_KINDS: ReadonlySet<CodexChronicleKind> = new Set<CodexChronicleKind>([
+  "event",
+  "deadline",
+  "standing"
+]);
 
 /**
  * Would revealing this record show players a date past their published clock? Records are dated at the
  * GM's prep clock, so this warns at reveal time. Silent for undated records and when nothing has been
  * published yet. Strictly after: a record at the published date is the party's present.
  */
-export function revealAheadOfPlayers(record: Readonly<{ calendarInstant: number | null }>, calendar: GmCodexCalendar | null): boolean {
+export function revealAheadOfPlayers(
+  record: Readonly<{ calendarInstant: number | null }>,
+  calendar: GmCodexCalendar | null
+): boolean {
   // Falsy checks, not `=== null`: a caller with a narrower calendar shape passes `undefined`.
   const published = calendar?.publishedDate;
   if (!calendar || !published || typeof record.calendarInstant !== "number") return false;
@@ -239,7 +332,10 @@ export function revealAheadOfPlayers(record: Readonly<{ calendarInstant: number 
 }
 
 /** One row's text on a summary surface. Standing, milestone and quest records carry their meaning in the payload, not prose. */
-export function chronicleRowSummary(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> & Readonly<{ text: string; gmText?: string | null }>): string {
+export function chronicleRowSummary(
+  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> &
+    Readonly<{ text: string; gmText?: string | null }>
+): string {
   // A quest-history record has no prose; the caller resolves the quest title where it can.
   const questEvent = questEventOf(record);
   if (questEvent) return questEventLabel(questEvent, null);
@@ -260,7 +356,10 @@ export function downtimeSummaryLabel(payload: CodexDowntimeSummary): string {
 }
 
 /** Do the GM's clock and the players' clock agree? Nothing to publish, and nothing to say, when they do. */
-export function sameInWorldDate(a: CodexInWorldDate | null | undefined, b: CodexInWorldDate | null | undefined): boolean {
+export function sameInWorldDate(
+  a: CodexInWorldDate | null | undefined,
+  b: CodexInWorldDate | null | undefined
+): boolean {
   if (!a || !b) return !a && !b;
   return a.year === b.year && a.month === b.month && a.day === b.day;
 }
@@ -278,12 +377,19 @@ export type ChronicleGroup = Readonly<{ key: string; label: string; records: rea
  * Both lenses read earliest first, with keyless records last. Within a group the server's order is kept.
  * By session, an `event` page always lands in "No session yet".
  */
-export function groupChronicle(records: readonly CodexChronicleRecord[], lens: ChronicleLens, calendar: CodexCalendar | null): ChronicleGroup[] {
+export function groupChronicle(
+  records: readonly CodexChronicleRecord[],
+  lens: ChronicleLens,
+  calendar: CodexCalendar | null
+): ChronicleGroup[] {
   const buckets = new Map<number | null, CodexChronicleRecord[]>();
   for (const record of records) {
-    const key = lens === "session"
-      ? record.sessionNumber
-      : (record.calendarInstant !== null && calendar ? calendarYearOf(calendar, record.calendarInstant) : null);
+    const key =
+      lens === "session"
+        ? record.sessionNumber
+        : record.calendarInstant !== null && calendar
+          ? calendarYearOf(calendar, record.calendarInstant)
+          : null;
     const bucket = buckets.get(key) ?? [];
     bucket.push(record);
     buckets.set(key, bucket);
@@ -292,9 +398,16 @@ export function groupChronicle(records: readonly CodexChronicleRecord[], lens: C
     .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
     .map((key) => ({
       key: key === null ? "none" : String(key),
-      label: key === null
-        ? (lens === "session" ? "No session yet" : "Undated")
-        : (lens === "session" ? `Session ${key}` : (calendar ? formatWorldYear(calendar, key) : String(key))),
+      label:
+        key === null
+          ? lens === "session"
+            ? "No session yet"
+            : "Undated"
+          : lens === "session"
+            ? `Session ${key}`
+            : calendar
+              ? formatWorldYear(calendar, key)
+              : String(key),
       records: buckets.get(key)!
     }));
 }

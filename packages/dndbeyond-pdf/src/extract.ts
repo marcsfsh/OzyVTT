@@ -30,15 +30,30 @@ const SKILLS: { id: string; ability: Ability; aliases: string[] }[] = [
   { id: "religion", ability: "int", aliases: ["religion"] },
   { id: "sleight-of-hand", ability: "dex", aliases: ["sleightofhand"] },
   { id: "stealth", ability: "dex", aliases: ["stealth"] },
-  { id: "survival", ability: "wis", aliases: ["survival"] },
+  { id: "survival", ability: "wis", aliases: ["survival"] }
 ];
 
 const nkey = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "x";
+const slug = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "x";
 /** DDB appends ritual/concentration tags to spell names; strip them for the display name + id. */
-const cleanSpellName = (raw: string): string => raw.replace(/\s*[[(](?:R|C|Ritual|Concentration)[\])]\s*$/gi, "").replace(/\s+/g, " ").trim();
+const cleanSpellName = (raw: string): string =>
+  raw
+    .replace(/\s*[[(](?:R|C|Ritual|Concentration)[\])]\s*$/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
 /** SRD content ids are name-slugs with apostrophes removed ("Hunter's Mark" -> "hunters-mark"). */
-const contentId = (name: string): string => name.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "x";
+const contentId = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "x";
 const toInt = (v: string | undefined): number | undefined => {
   if (v == null) return undefined;
   const m = v.match(/-?\d+/);
@@ -50,7 +65,9 @@ const parseSpellLevel = (h: string): number => {
   return m ? Math.min(9, parseInt(m[1], 10)) : 0;
 };
 
-interface Keyed extends Widget { key: string; }
+interface Keyed extends Widget {
+  key: string;
+}
 
 export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: ReadonlySet<string> } = {}): DraftResult {
   const warnings: string[] = [];
@@ -70,7 +87,10 @@ export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: Re
     if (m) classes.push({ id: slug(m[1]), name: m[1].trim().slice(0, 60), level: parseInt(m[2], 10) });
   }
   const totalLevel = classes.reduce((s, c) => s + c.level, 0) || 1;
-  if (classes.length > 4) warnings.push(`This character has ${classes.length} classes; the schema supports at most 4. The extras were dropped — confirm before saving.`);
+  if (classes.length > 4)
+    warnings.push(
+      `This character has ${classes.length} classes; the schema supports at most 4. The extras were dropped — confirm before saving.`
+    );
   if (classes.length) {
     const character: Record<string, unknown> = { classes: classes.slice(0, 4) };
     const race = val("race");
@@ -93,12 +113,15 @@ export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: Re
 
   // ---- core numbers ----
   const ac = num("ac");
-  if (ac != null) draft.armorClass = ac; else warnings.push("Armor Class not found.");
+  if (ac != null) draft.armorClass = ac;
+  else warnings.push("Armor Class not found.");
   const maxhp = num("maxhp");
-  if (maxhp != null && maxhp > 0) draft.hitPoints = { maximum: maxhp }; else warnings.push("Max HP not found.");
+  if (maxhp != null && maxhp > 0) draft.hitPoints = { maximum: maxhp };
+  else warnings.push("Max HP not found.");
   draft.initiativeBonus = num("init") ?? 0;
   const speed = num("speed");
-  if (speed != null) draft.speedFeet = speed; else warnings.push("Speed not found.");
+  if (speed != null) draft.speedFeet = speed;
+  else warnings.push("Speed not found.");
   draft.proficiencyBonus = num("profbonus") ?? 2 + Math.floor((totalLevel - 1) / 4);
   const hitDice = val("total");
   if (hitDice && draft.hitPoints && /^\d+d(4|6|8|10|12|20)$/.test(hitDice.replace(/\s/g, ""))) {
@@ -110,7 +133,10 @@ export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: Re
   if (defenses) {
     const m = /resist\w*\s*[-:]\s*([^|]+)/i.exec(defenses);
     if (m) {
-      const types = m[1].split(/,|\band\b/).map((t) => slug(t)).filter(Boolean);
+      const types = m[1]
+        .split(/,|\band\b/)
+        .map((t) => slug(t))
+        .filter(Boolean);
       if (types.length) draft.damageResistances = types.slice(0, 20);
     }
   }
@@ -122,7 +148,10 @@ export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: Re
     let prof: string | undefined;
     for (const a of sk.aliases) {
       const v = val(a + "prof");
-      if (v != null) { prof = v; break; }
+      if (v != null) {
+        prof = v;
+        break;
+      }
     }
     if (prof == null || prof === "") continue;
     skills.push({ id: sk.id, proficiency: /e/i.test(prof) ? "expertise" : "proficient" });
@@ -146,13 +175,20 @@ export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: Re
   draft.size = "medium";
   draft.token = { disposition: "friendly", footprint: { width: 1, height: 1 } };
   draft.source = { name: "D&D Beyond PDF (2024)", version: "1" };
-  const summary = [val("race"), classes.map((c) => `${c.name} ${c.level}`).join(" / ")].filter(Boolean).join(" ").slice(0, 280);
+  const summary = [val("race"), classes.map((c) => `${c.name} ${c.level}`).join(" / ")]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 280);
   if (summary) draft.summary = summary;
 
   return { draft, warnings };
 }
 
-function buildSpellcasting(items: Keyed[], warnings: string[], knownSpellIds?: ReadonlySet<string>): Record<string, unknown> | null {
+function buildSpellcasting(
+  items: Keyed[],
+  warnings: string[],
+  knownSpellIds?: ReadonlySet<string>
+): Record<string, unknown> | null {
   const spell = items.filter((i) => i.key.startsWith("spell"));
   if (!spell.length) return null;
   const first = new Map<string, string>();
@@ -165,7 +201,10 @@ function buildSpellcasting(items: Keyed[], warnings: string[], knownSpellIds?: R
   if (dc != null) sc.saveDc = dc;
   if (atk != null) sc.attackBonus = atk;
   const castingClasses = new Set(spell.filter((i) => /^spellcastingclass\d+$/.test(i.key)).map((i) => i.value));
-  if (castingClasses.size > 1) warnings.push(`Multiclass spellcasting (${[...castingClasses].join(", ")}); one spellcasting ability is stored (${String(sc.ability).toUpperCase()}) — review the per-class DC/attack.`);
+  if (castingClasses.size > 1)
+    warnings.push(
+      `Multiclass spellcasting (${[...castingClasses].join(", ")}); one spellcasting ability is stored (${String(sc.ability).toUpperCase()}) — review the per-class DC/attack.`
+    );
 
   // Position-walk: headers set the current level, slot headers set slot maxima, names emit spells.
   type Ev = { kind: "header" | "slot" | "name"; value: string; idx: number; page: number; y: number };
@@ -174,9 +213,12 @@ function buildSpellcasting(items: Keyed[], warnings: string[], knownSpellIds?: R
   const source = new Map<number, string>();
   for (const it of spell) {
     let m: RegExpExecArray | null;
-    if ((m = /^spellheader(\d+)$/.exec(it.key))) evs.push({ kind: "header", value: it.value, idx: +m[1], page: it.page, y: it.y });
-    else if ((m = /^spellslotheader(\d+)$/.exec(it.key))) evs.push({ kind: "slot", value: it.value, idx: +m[1], page: it.page, y: it.y });
-    else if ((m = /^spellname(\d+)$/.exec(it.key))) evs.push({ kind: "name", value: it.value, idx: +m[1], page: it.page, y: it.y });
+    if ((m = /^spellheader(\d+)$/.exec(it.key)))
+      evs.push({ kind: "header", value: it.value, idx: +m[1], page: it.page, y: it.y });
+    else if ((m = /^spellslotheader(\d+)$/.exec(it.key)))
+      evs.push({ kind: "slot", value: it.value, idx: +m[1], page: it.page, y: it.y });
+    else if ((m = /^spellname(\d+)$/.exec(it.key)))
+      evs.push({ kind: "name", value: it.value, idx: +m[1], page: it.page, y: it.y });
     else if ((m = /^spellprepared(\d+)$/.exec(it.key))) prepared.set(+m[1], it.value);
     else if ((m = /^spellsource(\d+)$/.exec(it.key))) source.set(+m[1], it.value);
   }
@@ -199,17 +241,35 @@ function buildSpellcasting(items: Keyed[], warnings: string[], knownSpellIds?: R
       const always = /always prepared/i.test(src);
       const name = cleanSpellName(ev.value);
       if (!name) continue;
-      spells.push({ id: contentId(name), name: name.slice(0, 120), level: cur, prepared: prepared.get(ev.idx) === "P" || always, alwaysPrepared: always });
+      spells.push({
+        id: contentId(name),
+        name: name.slice(0, 120),
+        level: cur,
+        prepared: prepared.get(ev.idx) === "P" || always,
+        alwaysPrepared: always
+      });
     }
   }
-  sc.slots = Object.entries(slots).map(([level, max]) => ({ level: +level, max })).sort((a, b) => a.level - b.level);
+  sc.slots = Object.entries(slots)
+    .map(([level, max]) => ({ level: +level, max }))
+    .sort((a, b) => a.level - b.level);
   if (pact) sc.pact = pact;
   const seen = new Set<string>();
-  const deduped = spells.filter((s) => { const k = `${s.id}@${s.level}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 400);
+  const deduped = spells
+    .filter((s) => {
+      const k = `${s.id}@${s.level}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 400);
   sc.spells = deduped;
   if (knownSpellIds && knownSpellIds.size) {
     const unmatched = deduped.filter((s) => !knownSpellIds.has(s.id)).length;
-    if (unmatched) warnings.push(`${unmatched} spell(s) aren't in the SRD list (homebrew, renamed, or another source) — they import by name but won't link to the reference.`);
+    if (unmatched)
+      warnings.push(
+        `${unmatched} spell(s) aren't in the SRD list (homebrew, renamed, or another source) — they import by name but won't link to the reference.`
+      );
   }
   return sc;
 }
@@ -224,12 +284,18 @@ function buildWeapons(first: Map<string, Keyed>): Record<string, unknown>[] {
   const actions: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   for (const idx of [...idxs].sort((a, b) => a - b)) {
-    const name = (idx === 1 ? first.get("wpnname") : first.get("wpnname" + idx))?.value ?? first.get("wpnname" + idx)?.value;
+    const name =
+      (idx === 1 ? first.get("wpnname") : first.get("wpnname" + idx))?.value ?? first.get("wpnname" + idx)?.value;
     if (!name) continue;
     let id = slug(name);
     while (seen.has(id)) id = `${id}-${idx}`;
     seen.add(id);
-    const action: Record<string, unknown> = { id, name: name.slice(0, 120), activation: "action", description: name.slice(0, 120) };
+    const action: Record<string, unknown> = {
+      id,
+      name: name.slice(0, 120),
+      activation: "action",
+      description: name.slice(0, 120)
+    };
     const atk = toInt(first.get("wpn" + idx + "atkbonus")?.value);
     if (atk != null) action.attack = { bonus: atk };
     const dmg = first.get("wpn" + idx + "damage")?.value;

@@ -4,7 +4,7 @@
 
 Accepted by implementation — recorded 2026-08-01. **Closes** ADR-0009 ("Square grid /
 five-foot cells for MVP; measurement conventions pending spike"), which had no file and stood
-as *Proposed … pending spike* in `docs/adr/README.md`.
+as _Proposed … pending spike_ in `docs/adr/README.md`.
 
 ## What happened
 

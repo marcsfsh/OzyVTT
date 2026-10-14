@@ -9,26 +9,26 @@
   /* ---- Theme: dark (default), deep indigo/purple rather than black ---- */
 
   /* Surfaces */
-  --void: #0A0714;
-  --bg: #0E0A1C;
-  --surface-1: #16112B;
-  --surface-2: #1E1838;
+  --void: #0a0714;
+  --bg: #0e0a1c;
+  --surface-1: #16112b;
+  --surface-2: #1e1838;
   --surface-3: #292145;
   --overlay: rgba(10, 7, 20, 0.72);
 
   /* Lines */
-  --line: #2E2A4E;
-  --line-strong: #3F3970;
-  --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent);   /* adapts per theme via --cyan */
+  --line: #2e2a4e;
+  --line-strong: #3f3970;
+  --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent); /* adapts per theme via --cyan */
 
   /* Neon accents (magenta leads, cyan supports) */
-  --magenta: #FF2E9A;
-  --magenta-hi: #FF5CB8;
-  --cyan: #2DE2FF;
-  --cyan-hi: #7CEFFF;
-  --violet: #A45CFF;
-  --violet-hi: #C79BFF;   /* readable violet for text on dark surfaces */
-  --indigo: #5B6EF5;
+  --magenta: #ff2e9a;
+  --magenta-hi: #ff5cb8;
+  --cyan: #2de2ff;
+  --cyan-hi: #7cefff;
+  --violet: #a45cff;
+  --violet-hi: #c79bff; /* readable violet for text on dark surfaces */
+  --indigo: #5b6ef5;
 
   /* Codex entity-kind accent: one hue for all eight kinds; the entity icon carries the distinction.
      Every other accent already means something (magenta = action, cyan = focus/selection,
@@ -47,24 +47,24 @@
 
   /* Atlas pin palette offered to the GM. Pins persist as hex on the wire, so a pin in a colour outside
      this list still renders as itself. */
-  --pin-1: #FF2E9A;
-  --pin-2: #2DE2FF;
-  --pin-3: #A45CFF;
-  --pin-4: #FF2D5E;
-  --pin-5: #FFB020;
-  --pin-6: #57E39A;
-  --pin-7: #E8ECF4;
-  --pin-8: #94A3B8;
+  --pin-1: #ff2e9a;
+  --pin-2: #2de2ff;
+  --pin-3: #a45cff;
+  --pin-4: #ff2d5e;
+  --pin-5: #ffb020;
+  --pin-6: #57e39a;
+  --pin-7: #e8ecf4;
+  --pin-8: #94a3b8;
 
   /* Semantic (hue is a hint; always pair with icon + label) */
   --primary: var(--magenta);
   --success: var(--cyan);
   /* Caution is warm orange because violet is reserved for GM-only content. */
-  --caution: #FF9E4A;
+  --caution: #ff9e4a;
   /* Caution as text: --caution for edges and fills, --caution-hi for words. */
-  --caution-hi: #FFB877;
-  --danger: #FF2D5E;
-  --danger-hi: #FF6B8E;
+  --caution-hi: #ffb877;
+  --danger: #ff2d5e;
+  --danger-hi: #ff6b8e;
   --info: var(--indigo);
 
   /* ---- State: on ----
@@ -72,38 +72,39 @@
      retuning --caution never moves a state colour. Hue collisions with other accents are resolved by
      shape in SegmentedControl.css, not here. Fill must reach 3:1 against the surfaces and the label
      4.5:1 against the fill. Night uses the --magenta hue. */
-  --state-on: #FF2E9A;
+  --state-on: #ff2e9a;
   /* The label on the fill; --text-on-neon clears 4.5:1 on all three themes' values. */
   --state-on-ink: var(--text-on-neon);
 
   /* Text */
-  --text: #ECEAFB;
-  --text-dim: #A8A2CC;
+  --text: #eceafb;
+  --text-dim: #a8a2cc;
   /* Raised to pass AA on all three surfaces in every theme. */
-  --text-muted: #9A94C2;
-  --text-on-neon: #0C0A18;   /* dark ink on bright neon fills */
+  --text-muted: #9a94c2;
+  --text-on-neon: #0c0a18; /* dark ink on bright neon fills */
 
   /* Glows: bloom in dark/dusk. State only, never resting elevation.
      Glow switches on/off smoothly and never pulses. */
-  --glow-magenta:        0 0 0 1px rgba(255, 46, 154, 0.55), 0 0 16px 2px rgba(255, 46, 154, 0.35);
-  --glow-magenta-strong: 0 0 0 1.5px rgba(255, 46, 154, 0.70), 0 0 26px 4px rgba(255, 46, 154, 0.50);
-  --glow-cyan:           0 0 0 1px rgba(45, 226, 255, 0.55), 0 0 16px 2px rgba(45, 226, 255, 0.32);
-  --glow-violet:         0 0 0 1px rgba(164, 92, 255, 0.55), 0 0 16px 2px rgba(164, 92, 255, 0.32);
-  --glow-danger:         0 0 0 1px rgba(255, 45, 94, 0.55), 0 0 16px 2px rgba(255, 45, 94, 0.32);
+  --glow-magenta: 0 0 0 1px rgba(255, 46, 154, 0.55), 0 0 16px 2px rgba(255, 46, 154, 0.35);
+  --glow-magenta-strong: 0 0 0 1.5px rgba(255, 46, 154, 0.7), 0 0 26px 4px rgba(255, 46, 154, 0.5);
+  --glow-cyan: 0 0 0 1px rgba(45, 226, 255, 0.55), 0 0 16px 2px rgba(45, 226, 255, 0.32);
+  --glow-violet: 0 0 0 1px rgba(164, 92, 255, 0.55), 0 0 16px 2px rgba(164, 92, 255, 0.32);
+  --glow-danger: 0 0 0 1px rgba(255, 45, 94, 0.55), 0 0 16px 2px rgba(255, 45, 94, 0.32);
 
   /* Drop-shadow twins of the glows for clip-path (chamfered) surfaces, which box-shadow cannot follow. */
-  --glow-drop-magenta:        drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.33));
-  --glow-drop-magenta-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85)) drop-shadow(0 0 30px rgba(255, 46, 154, 0.5));
-  --glow-drop-cyan:           drop-shadow(0 0 6px rgba(45, 226, 255, 0.55)) drop-shadow(0 0 18px rgba(45, 226, 255, 0.30));
-  --glow-drop-violet:         drop-shadow(0 0 6px rgba(164, 92, 255, 0.55)) drop-shadow(0 0 18px rgba(164, 92, 255, 0.30));
-  --glow-drop-danger:         drop-shadow(0 0 6px rgba(255, 45, 94, 0.55)) drop-shadow(0 0 18px rgba(255, 45, 94, 0.30));
+  --glow-drop-magenta: drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.33));
+  --glow-drop-magenta-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85))
+    drop-shadow(0 0 30px rgba(255, 46, 154, 0.5));
+  --glow-drop-cyan: drop-shadow(0 0 6px rgba(45, 226, 255, 0.55)) drop-shadow(0 0 18px rgba(45, 226, 255, 0.3));
+  --glow-drop-violet: drop-shadow(0 0 6px rgba(164, 92, 255, 0.55)) drop-shadow(0 0 18px rgba(164, 92, 255, 0.3));
+  --glow-drop-danger: drop-shadow(0 0 6px rgba(255, 45, 94, 0.55)) drop-shadow(0 0 18px rgba(255, 45, 94, 0.3));
 
   /* Ambient shadows (dark, for resting elevation) */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
   /* Drop-shadow twin of --shadow-2 for chamfered surfaces. Blur is halved because drop-shadow's radius is
      the Gaussian sigma and box-shadow's is twice it. */
-  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.50));
+  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
 
   /* Texture (retro screen surface) */
   --grid-line: rgba(255, 46, 154, 0.16);
@@ -112,58 +113,76 @@
   /* ---- Shared across all themes (structure, not color) ---- */
 
   /* Signature color ramp (a color and a light source, not a sun) */
-  --grad-bloom: linear-gradient(180deg, #FF2E9A 0%, #A45CFF 48%, #2DE2FF 100%);
-  --grad-horizon: linear-gradient(180deg, #FF2E9A 0%, #5B6EF5 100%);
+  --grad-bloom: linear-gradient(180deg, #ff2e9a 0%, #a45cff 48%, #2de2ff 100%);
+  --grad-horizon: linear-gradient(180deg, #ff2e9a 0%, #5b6ef5 100%);
   /* Chrome ramp for the arcade wordmark (top light, warm core, cool base) */
-  --grad-chrome: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 34%, #A45CFF 62%, #2DE2FF 100%);
+  --grad-chrome: linear-gradient(180deg, #ffe7f6 0%, #ff5cb8 34%, #a45cff 62%, #2de2ff 100%);
 
   /* ---- The landing scene ----
      The title screen's palette. The [data-theme] blocks at the end of this file override exactly these
      tokens: dark is night, dusk is sunset, light is daybreak. Base values are night. */
   --landing-sky:
     radial-gradient(130% 80% at 50% 112%, rgba(164, 92, 255, 0.34) 0%, transparent 56%),
-    linear-gradient(180deg, #030210 0%, #070417 20%, #0B0722 38%, #150E33 56%, #241448 74%, #301A5E 88%, #3A1B72 100%);
+    linear-gradient(180deg, #030210 0%, #070417 20%, #0b0722 38%, #150e33 56%, #241448 74%, #301a5e 88%, #3a1b72 100%);
   --landing-star: rgba(255, 255, 255, 1);
   --landing-star-dim: rgba(199, 155, 255, 0.6);
-  --landing-sun: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 26%, #FF2E9A 52%, #A45CFF 84%, #5B6EF5 100%);
-  --landing-sun-glow:
-    0 0 40px 12px rgba(255, 46, 154, 0.46),
-    0 0 110px 40px rgba(164, 92, 255, 0.30);
+  --landing-sun: linear-gradient(180deg, #ffe7f6 0%, #ff5cb8 26%, #ff2e9a 52%, #a45cff 84%, #5b6ef5 100%);
+  --landing-sun-glow: 0 0 40px 12px rgba(255, 46, 154, 0.46), 0 0 110px 40px rgba(164, 92, 255, 0.3);
   --landing-slat: rgba(6, 4, 18, 0.92);
-  --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(45, 226, 255, 0.9) 22%, rgba(255, 92, 184, 0.95) 50%, rgba(45, 226, 255, 0.9) 78%, transparent 100%);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(45, 226, 255, 0.9) 22%,
+    rgba(255, 92, 184, 0.95) 50%,
+    rgba(45, 226, 255, 0.9) 78%,
+    transparent 100%
+  );
   --landing-horizon-glow:
-    0 0 14px 3px rgba(45, 226, 255, 0.85),
-    0 0 52px 14px rgba(255, 46, 154, 0.55),
-    0 0 26px 8px rgba(255, 158, 74, 0.22);
+    0 0 14px 3px rgba(45, 226, 255, 0.85), 0 0 52px 14px rgba(255, 46, 154, 0.55), 0 0 26px 8px rgba(255, 158, 74, 0.22);
   --landing-grid-x: rgba(255, 46, 154, 0.55);
-  --landing-grid-y: rgba(45, 226, 255, 0.50);
-  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.50) 100%);
+  --landing-grid-y: rgba(45, 226, 255, 0.5);
+  --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.5) 100%);
   --landing-scanline: rgba(0, 0, 0, 0.26);
   --landing-noise-opacity: 0.05;
   /* The sign: blue-steel chrome, a metal the warm scene doesn't use, so it stands out over sky and sun.
      Night and sunset share it; daybreak tunes its depth. */
-  --landing-sign: linear-gradient(180deg, #FAFDFF 0%, #EDF6FE 10%, #C6E0F7 22%, #93BEEA 34%, #5E92D4 44%, #2F5C9C 47%, #1F4276 50%, #FBFEFF 54%, #E2F1FC 61%, #A6CBF0 71%, #6FA0DF 82%, #3E6BB1 92%, #254789 100%);
+  --landing-sign: linear-gradient(
+    180deg,
+    #fafdff 0%,
+    #edf6fe 10%,
+    #c6e0f7 22%,
+    #93beea 34%,
+    #5e92d4 44%,
+    #2f5c9c 47%,
+    #1f4276 50%,
+    #fbfeff 54%,
+    #e2f1fc 61%,
+    #a6cbf0 71%,
+    #6fa0df 82%,
+    #3e6bb1 92%,
+    #254789 100%
+  );
   --landing-stroke: rgba(12, 32, 72, 0.78);
-  --landing-title-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
-    drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
+  --landing-title-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85)) drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
   /* The doors: chamfered clip-path panels, so their glow uses drop-shadow. Deep-violet panels with
      white-hot labels; they stand out by luminance, with a magenta rim (player) and violet rim (GM). */
-  --landing-door-bg: linear-gradient(180deg, #261448 0%, #170B31 100%);
-  --landing-door-label: #FBF7FF;
-  --landing-door-play-rim: #FF3FA4;
+  --landing-door-bg: linear-gradient(180deg, #261448 0%, #170b31 100%);
+  --landing-door-label: #fbf7ff;
+  --landing-door-play-rim: #ff3fa4;
   --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
-  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 63, 164, 0.85)) drop-shadow(0 0 30px rgba(255, 63, 164, 0.5));
-  --landing-door-gm-rim: #9F6BFF;
+  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 63, 164, 0.85))
+    drop-shadow(0 0 30px rgba(255, 63, 164, 0.5));
+  --landing-door-gm-rim: #9f6bff;
   --landing-door-gm-glow: drop-shadow(0 0 6px rgba(159, 107, 255, 0.55)) drop-shadow(0 0 18px rgba(159, 107, 255, 0.33));
-  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(159, 107, 255, 0.85)) drop-shadow(0 0 30px rgba(159, 107, 255, 0.5));
+  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(159, 107, 255, 0.85))
+    drop-shadow(0 0 30px rgba(159, 107, 255, 0.5));
   /* Larger than the app texture's 34px cell so the drive reads as a road, not a mesh. */
   --landing-grid-cell: 56px;
   /* Violet glass + deep ink for the panels that stand on the scene (theme switch, GM card). */
   --landing-glass: rgba(23, 11, 49, 0.72);
-  --landing-ink-deep: #0B0620;
+  --landing-ink-deep: #0b0620;
   /* A small ringed planet, upper right; daybreak hides it (opacity 0). */
-  --landing-planet: radial-gradient(circle at 35% 30%, #C79BFF 0%, #7A3FD6 55%, #4A2699 100%);
+  --landing-planet: radial-gradient(circle at 35% 30%, #c79bff 0%, #7a3fd6 55%, #4a2699 100%);
   --landing-planet-ring: rgba(255, 92, 184, 0.75);
   --landing-planet-glow: 0 0 16px 2px rgba(164, 92, 255, 0.45);
   --landing-planet-opacity: 0.55;
@@ -182,14 +201,16 @@
   /* Night: the whole ramp clears AA for --text-dim/--text-muted/--text without truncation.
      Every stop is a fraction of `100% - inset` so the list stays monotonic at any height; percentage
      stops cross the knee on short panes and collapse into a hard band. */
-  --sky-wash: linear-gradient(180deg,
+  --sky-wash: linear-gradient(
+    180deg,
     #030210 0%,
     #070417 calc((100% - var(--sky-horizon-inset)) * 0.27),
-    #0B0722 calc((100% - var(--sky-horizon-inset)) * 0.52),
-    #150E33 calc((100% - var(--sky-horizon-inset)) * 0.76),
+    #0b0722 calc((100% - var(--sky-horizon-inset)) * 0.52),
+    #150e33 calc((100% - var(--sky-horizon-inset)) * 0.76),
     #241448 calc(100% - var(--sky-horizon-inset)),
-    #301A5E calc(100% - var(--sky-horizon-inset) * 0.5),
-    #3A1B72 100%);
+    #301a5e calc(100% - var(--sky-horizon-inset) * 0.5),
+    #3a1b72 100%
+  );
   /* One flat tile of stars. Daybreak hides them by making the ink transparent, so the layer list never changes. */
   --sky-star: rgba(236, 234, 251, 0.8);
   --sky-star-dim: rgba(164, 92, 255, 0.45);
@@ -198,19 +219,25 @@
      the crown so the ratio can't break. The crown is also the space the scene keeps clear of text. */
   --sky-sun-crown: 4rem;
   --sky-sun-d: calc(var(--sky-sun-crown) * 2);
-  --sky-sun: linear-gradient(180deg,
+  --sky-sun: linear-gradient(
+    180deg,
     rgba(255, 231, 246, 0) 0%,
     rgba(255, 92, 184, 0.42) 52%,
-    rgba(255, 46, 154, 0.86) 100%);
+    rgba(255, 46, 154, 0.86) 100%
+  );
   --sky-sun-mask: radial-gradient(circle calc(var(--sky-sun-d) / 2) at 50% 100%, #000 97%, rgba(0, 0, 0, 0) 100%);
   --sky-sun-opacity: 0.5;
   /* The horizon beam; the same pair drives the `.neon-beam` divider. */
   --sky-horizon-a: color-mix(in srgb, var(--cyan) 85%, transparent);
   --sky-horizon-b: color-mix(in srgb, var(--magenta) 92%, transparent);
-  --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 46, 154, 0.30) 0%, rgba(45, 226, 255, 0.12) 46%, transparent 74%);
+  --sky-horizon-glow: radial-gradient(
+    46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(255, 46, 154, 0.3) 0%,
+    rgba(45, 226, 255, 0.12) 46%,
+    transparent 74%
+  );
   /* Night's bloom; 0.20 stays under its AA ceiling for --text-dim. */
-  --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.20) 0%, transparent 68%);
+  --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.2) 0%, transparent 68%);
   /* The floor: a shallow strip, not the landing's highway. Rows are denser than columns to sell the recession. */
   --sky-grid-x: color-mix(in srgb, var(--magenta) 50%, transparent);
   --sky-grid-y: color-mix(in srgb, var(--cyan) 45%, transparent);
@@ -228,18 +255,22 @@
      The horizon's line reused as a structural rule (chrome row against region, dock against map). It is
      scene language, not state: it never marks a control or a state, and runs at about half the horizon's
      intensity so a resting rule never reads as "live". Derived from --cyan/--magenta. */
-  --rule-beam: linear-gradient(90deg,
+  --rule-beam: linear-gradient(
+    90deg,
     transparent 0%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 22%,
     color-mix(in srgb, var(--magenta) 62%, transparent) 50%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 78%,
-    transparent 100%);
-  --rule-beam-v: linear-gradient(180deg,
+    transparent 100%
+  );
+  --rule-beam-v: linear-gradient(
+    180deg,
     transparent 0%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 22%,
     color-mix(in srgb, var(--magenta) 62%, transparent) 50%,
     color-mix(in srgb, var(--cyan) 48%, transparent) 78%,
-    transparent 100%);
+    transparent 100%
+  );
   --rule-beam-glow: 0 0 10px color-mix(in srgb, var(--magenta) 18%, transparent);
 
   /* ---- Role rims ----
@@ -247,8 +278,8 @@
      inline-start edge plus a faint wash). The hue alone does not mean GM (violet has other meanings),
      and a rim is never the only signal: every site also names its role in text. Lifted above
      --magenta/--violet because an edge needs more contrast than a fill. */
-  --rim-player: #FF3FA4;
-  --rim-gm: #9F6BFF;
+  --rim-player: #ff3fa4;
+  --rim-gm: #9f6bff;
   --rim-player-wash: color-mix(in srgb, var(--rim-player) 7%, transparent);
   --rim-gm-wash: color-mix(in srgb, var(--rim-gm) 7%, transparent);
   --rim-player-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
@@ -258,11 +289,24 @@
      Hero titles only (a full-page title that is the screen), never panel or section headings. Legibility
      comes from the chrome bands, so the stroke is a hairline. Duplicates --landing-sign/--landing-stroke/
      --landing-title-glow; the landing tokens could alias these. */
-  --sign-chrome: linear-gradient(180deg, #FAFDFF 0%, #EDF6FE 10%, #C6E0F7 22%, #93BEEA 34%, #5E92D4 44%, #2F5C9C 47%, #1F4276 50%, #FBFEFF 54%, #E2F1FC 61%, #A6CBF0 71%, #6FA0DF 82%, #3E6BB1 92%, #254789 100%);
+  --sign-chrome: linear-gradient(
+    180deg,
+    #fafdff 0%,
+    #edf6fe 10%,
+    #c6e0f7 22%,
+    #93beea 34%,
+    #5e92d4 44%,
+    #2f5c9c 47%,
+    #1f4276 50%,
+    #fbfeff 54%,
+    #e2f1fc 61%,
+    #a6cbf0 71%,
+    #6fa0df 82%,
+    #3e6bb1 92%,
+    #254789 100%
+  );
   --sign-stroke: rgba(12, 32, 72, 0.78);
-  --sign-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
-    drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
+  --sign-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85)) drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
 
   /* Texture sizing and noise tile. --noise-opacity is per theme. */
   --grid-cell: 34px;
@@ -288,7 +332,7 @@
   --fs-body: 15px;
   --fs-sm: 13px;
   --fs-xs: 11px;
-  --fs-2xs: 10px;   /* uppercase tracked labels only, never body */
+  --fs-2xs: 10px; /* uppercase tracked labels only, never body */
 
   --lh-tight: 1.15;
   --lh-snug: 1.3;
@@ -299,9 +343,16 @@
 
   /* Spacing. Step names are ordinal, not pixel values (`--space-4` is the fourth step). The two smallest
      steps (hairlines and tight glyph/chip gaps) stay put; tightening lives in the large steps. */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 10px;  --space-4: 14px;
-  --space-5: 16px;  --space-6: 20px;  --space-8: 26px;  --space-10: 32px;
-  --space-12: 38px; --space-16: 50px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-8: 26px;
+  --space-10: 32px;
+  --space-12: 38px;
+  --space-16: 50px;
 
   /* Radius: surfaces are square (panels, cards, inputs, controls); big-choice surfaces use the .chamfer cut.
      --radius-pill is not for pills: tags, chips, counts and status labels are rectangular. It is only for
@@ -314,8 +365,15 @@
   /* The chamfer: the corner cut on panels, cards, feature tiles, status tags and primary/danger buttons.
      --chamfer-cut is the polygon for rules that can't use the .chamfer class. Glow on a cut surface uses the
      --glow-drop-* filters, never box-shadow. */
-  --chamfer: .6rem;
-  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --chamfer: 0.6rem;
+  --chamfer-cut: polygon(
+    0 var(--chamfer),
+    var(--chamfer) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    0 100%
+  );
   /* The masked form of the same cut: two 45° gradient masks intersected. Paint-only (hit-testing still works
      at the cut corners), needs no pseudo-element, and the background doesn't scroll (see `.chamfer`); but a
      masked element paints no box-shadow. The stop is --chamfer / √2 because the gradient runs along the
@@ -334,8 +392,7 @@
   --rim-color-hi: color-mix(in srgb, var(--cyan) 70%, var(--line-strong));
   /* The rest glow, derived from the rim so a repainted rim glows in its own hue. A filter because the
      material is cut; daybreak grounds it instead of blooming. */
-  --rim-glow:
-    drop-shadow(0 0 6px color-mix(in srgb, var(--rim-color) 62%, transparent))
+  --rim-glow: drop-shadow(0 0 6px color-mix(in srgb, var(--rim-color) 62%, transparent))
     drop-shadow(0 0 18px color-mix(in srgb, var(--rim-color) 34%, transparent));
   /* The bezel: a quieter currentColor outline just inside the rim. --bezel-inset must stay >= --chamfer / 2
      or the ring's corner is clipped to a notch. */
@@ -344,19 +401,21 @@
   /* The cue: a small triangle shown on hover/focus/press, drawn as a conic wedge so it can be a background
      layer (`::before` is the backing layer, `::after` belongs to `.tap-target`). The 225deg/90deg pair
      assumes --cue-w is half --cue-h. */
-  --cue-w: .45rem;
-  --cue-h: .9rem;
-  --cue-inset: .95rem;
+  --cue-w: 0.45rem;
+  --cue-h: 0.9rem;
+  --cue-inset: 0.95rem;
   --cue-mark: conic-gradient(from 225deg at 100% 50%, currentColor 0 90deg, transparent 0);
   /* The fill: consumers set --material-fill (inherited); --material-* are ready-made values. Defaults to
      transparent so the utility composes. Scanline-over-gradient is `var(--material-scanline),
      var(--material-plate)`. Not the `.scanlines` utility, which is a full-surface CRT overlay. */
   --material-fill: transparent;
   --material-plate: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
-  --material-scanline: repeating-linear-gradient(to bottom,
+  --material-scanline: repeating-linear-gradient(
+    to bottom,
     transparent 0 calc(var(--scanline-gap) - 1px),
     var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap));
+    var(--scanline-color) var(--scanline-gap)
+  );
 
   /* ---- Scrollbars ----
      A thin, always-visible neon track so scrollable regions are discoverable. Style the native scroller,
@@ -368,14 +427,14 @@
   --scrollbar-thumb-hi: var(--rim-color-hi);
 
   /* Layout: the frame's shared dimensions. */
-  --app-bar-h: calc(var(--tap-min) + 1px);  /* one 44px tab + the bar's 1px baseline */
+  --app-bar-h: calc(var(--tap-min) + 1px); /* one 44px tab + the bar's 1px baseline */
   /* The table's own gutter (.table-layout and .table-sidebar only), kept separate so it can be cut
      without moving every consumer of the same step. */
   --pane-gap: var(--space-2);
-  --rail-w: clamp(220px, 22vw, 280px);      /* nav/list rails */
-  --dock-w: 22rem;                          /* the table's side dock */
-  --row-h: var(--tap-min);                  /* comfortable rows, the default everywhere */
-  --row-h-compact: 36px;                    /* compact row paint for GM data regions only, never on a phone; .tap-target keeps the hit area */
+  --rail-w: clamp(220px, 22vw, 280px); /* nav/list rails */
+  --dock-w: 22rem; /* the table's side dock */
+  --row-h: var(--tap-min); /* comfortable rows, the default everywhere */
+  --row-h-compact: 36px; /* compact row paint for GM data regions only, never on a phone; .tap-target keeps the hit area */
 
   /* Touch-target floor: every interactive control presents at least this hit area. Controls painted smaller
      keep their visual weight and grow the area with `.tap-target`. */
@@ -384,12 +443,12 @@
   /* Motion (between snappy and glidey) */
   --ease-settle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-drawer: cubic-bezier(0.4, 0, 0.2, 1);
-  --dur-press: 100ms;   /* transform on press               */
-  --dur-hover: 140ms;   /* color/bg/border/shadow, glow on-off */
-  --dur-base: 200ms;    /* panels, tabs, popovers, combat tint */
-  --dur-enter: 260ms;   /* full view entrances               */
-  --dur-reveal: 560ms;  /* one-time data reveals             */
-  --dur-theme: 400ms;   /* the theme-switch sky moment       */
+  --dur-press: 100ms; /* transform on press               */
+  --dur-hover: 140ms; /* color/bg/border/shadow, glow on-off */
+  --dur-base: 200ms; /* panels, tabs, popovers, combat tint */
+  --dur-enter: 260ms; /* full view entrances               */
+  --dur-reveal: 560ms; /* one-time data reveals             */
+  --dur-theme: 400ms; /* the theme-switch sky moment       */
 
   /* Focus ring */
   --focus-ring-color: var(--cyan);
@@ -397,29 +456,29 @@
 
 /* ---- Theme: dusk, the sunset hour: deeper, warmer, more saturated twilight purple ---- */
 [data-theme="dusk"] {
-  --void: #1C1238;
-  --bg: #251A4E;
-  --surface-1: #2E2160;
+  --void: #1c1238;
+  --bg: #251a4e;
+  --surface-1: #2e2160;
   --surface-2: #382970;
   --surface-3: #443381;
-  --overlay: rgba(18, 12, 40, 0.60);
+  --overlay: rgba(18, 12, 40, 0.6);
 
-  --line: #5A4A9A;
-  --line-strong: #7D6BC0;
+  --line: #5a4a9a;
+  --line-strong: #7d6bc0;
 
   /* Dusk inherits the dark theme's caution pair, which clears AA on these surfaces. */
 
   /* State on: sunset orange. Its own literal, not var(--caution), so a caution retune can't move it. */
-  --state-on: #FF9E4A;
+  --state-on: #ff9e4a;
 
-  --text: #F0EEFB;
-  --text-dim: #C4BEE2;
-  --text-muted: #C2BBE0;
-  --text-on-neon: #16132C;
+  --text: #f0eefb;
+  --text-dim: #c4bee2;
+  --text-muted: #c2bbe0;
+  --text-on-neon: #16132c;
 
-  --violet-hi: #D3AEFF;
+  --violet-hi: #d3aeff;
   /* Lifted so --indigo (and --info, which aliases it) clears AA on dusk's surfaces. */
-  --indigo: #93A4FF;
+  --indigo: #93a4ff;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.34);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.42);
@@ -432,75 +491,75 @@
 /* ---- Theme: light. Accessibility first: soft cool off-white, deep indigo ink, deepened neon, glow becomes
    a ring, texture off. Legibility outranks aesthetic. ---- */
 [data-theme="light"] {
-  --void: #E7E6F2;
-  --bg: #F1F0F8;
-  --surface-1: #FCFBFF;
-  --surface-2: #F4F3FB;
-  --surface-3: #ECEBF6;
+  --void: #e7e6f2;
+  --bg: #f1f0f8;
+  --surface-1: #fcfbff;
+  --surface-2: #f4f3fb;
+  --surface-3: #ecebf6;
   --overlay: rgba(23, 19, 46, 0.28);
 
-  --line: #D6D3E6;
-  --line-strong: #BCB8D4;
+  --line: #d6d3e6;
+  --line-strong: #bcb8d4;
 
   /* Deepened neon so accents keep contrast on light */
-  --magenta: #C81D80;
-  --magenta-hi: #E24C9C;
-  --cyan: #0F7FC0;      /* blue-leaning cyan, never teal */
+  --magenta: #c81d80;
+  --magenta-hi: #e24c9c;
+  --cyan: #0f7fc0; /* blue-leaning cyan, never teal */
   /* On light the readable `-hi` twin is the deeper one (on dark it is the lighter one). */
-  --cyan-hi: #0B6497;
-  --violet: #7A3FD0;
-  --violet-hi: #7A3FD0; /* keep deep for text contrast on light */
-  --indigo: #3D50D6;
+  --cyan-hi: #0b6497;
+  --violet: #7a3fd0;
+  --violet-hi: #7a3fd0; /* keep deep for text contrast on light */
+  --indigo: #3d50d6;
 
   --primary: var(--magenta);
   --success: var(--cyan);
   /* Darkened pins so markers stay legible on a pale map. */
-  --pin-1: #C81D80;
-  --pin-2: #0F7FC0;
-  --pin-3: #7A3FD0;
-  --pin-4: #C8143E;
-  --pin-5: #9A6100;
-  --pin-6: #0E7A55;
-  --pin-7: #4A4568;
-  --pin-8: #5A6472;
+  --pin-1: #c81d80;
+  --pin-2: #0f7fc0;
+  --pin-3: #7a3fd0;
+  --pin-4: #c8143e;
+  --pin-5: #9a6100;
+  --pin-6: #0e7a55;
+  --pin-7: #4a4568;
+  --pin-8: #5a6472;
   /* --caution is the edge/fill; --caution-hi is for text. */
-  --caution: #B4560A;
-  --caution-hi: #8F4406;
-  --danger: #C8143E;
-  --danger-hi: #E24C6C;
+  --caution: #b4560a;
+  --caution-hi: #8f4406;
+  --danger: #c8143e;
+  --danger-hi: #e24c6c;
   --info: var(--indigo);
 
   /* State on: a deepened cyan, because no ink reaches 4.5:1 on --cyan itself. */
-  --state-on: #0B6497;
+  --state-on: #0b6497;
 
   /* The material in daylight: the rim is a hard dark line (an inverted neon would vanish on a pale ground),
      interaction changes chroma rather than lightness, the glow grounds instead of blooming, and the bezel
      firms up because currentColor is deep ink here. */
-  --rim-color: #3B547E;
+  --rim-color: #3b547e;
   --rim-color-hi: var(--cyan);
   --rim-glow: drop-shadow(0 1px 4px color-mix(in srgb, var(--rim-color) 34%, transparent));
   --bezel-color: color-mix(in srgb, currentColor 30%, transparent);
-  --scrollbar-thumb: #3B547E;
+  --scrollbar-thumb: #3b547e;
   --scrollbar-thumb-hi: var(--cyan);
 
-  --text: #17132E;      /* deep indigo ink */
-  --text-dim: #4A4568;
-  --text-muted: #5B5578;
-  --text-on-neon: #FFFFFF;
+  --text: #17132e; /* deep indigo ink */
+  --text-dim: #4a4568;
+  --text-muted: #5b5578;
+  --text-on-neon: #ffffff;
 
   /* Glow becomes a solid accent ring plus a faint soft shadow */
-  --glow-magenta:        0 0 0 2px rgba(200, 29, 128, 0.90), 0 2px 6px rgba(200, 29, 128, 0.20);
-  --glow-magenta-strong: 0 0 0 2.5px rgba(200, 29, 128, 1),  0 2px 10px rgba(200, 29, 128, 0.28);
-  --glow-cyan:           0 0 0 2px rgba(15, 127, 192, 0.90), 0 2px 6px rgba(15, 127, 192, 0.20);
-  --glow-violet:         0 0 0 2px rgba(122, 63, 208, 0.90), 0 2px 6px rgba(122, 63, 208, 0.20);
-  --glow-danger:         0 0 0 2px rgba(200, 20, 62, 0.90),  0 2px 6px rgba(200, 20, 62, 0.20);
+  --glow-magenta: 0 0 0 2px rgba(200, 29, 128, 0.9), 0 2px 6px rgba(200, 29, 128, 0.2);
+  --glow-magenta-strong: 0 0 0 2.5px rgba(200, 29, 128, 1), 0 2px 10px rgba(200, 29, 128, 0.28);
+  --glow-cyan: 0 0 0 2px rgba(15, 127, 192, 0.9), 0 2px 6px rgba(15, 127, 192, 0.2);
+  --glow-violet: 0 0 0 2px rgba(122, 63, 208, 0.9), 0 2px 6px rgba(122, 63, 208, 0.2);
+  --glow-danger: 0 0 0 2px rgba(200, 20, 62, 0.9), 0 2px 6px rgba(200, 20, 62, 0.2);
 
   /* A filter can't draw the solid ring, so chamfered surfaces get a tight low shadow instead of a bloom. */
-  --glow-drop-magenta:        drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --glow-drop-magenta: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --glow-drop-magenta-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --glow-drop-cyan:           drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
-  --glow-drop-violet:         drop-shadow(0 1px 4px rgba(122, 63, 208, 0.28));
-  --glow-drop-danger:         drop-shadow(0 1px 4px rgba(200, 20, 62, 0.30));
+  --glow-drop-cyan: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
+  --glow-drop-violet: drop-shadow(0 1px 4px rgba(122, 63, 208, 0.28));
+  --glow-drop-danger: drop-shadow(0 1px 4px rgba(200, 20, 62, 0.3));
 
   --shadow-1: 0 1px 2px rgba(23, 19, 46, 0.08);
   --shadow-2: 0 10px 30px rgba(23, 19, 46, 0.12);
@@ -554,12 +613,18 @@ body {
    are <summary> elements. `:where()` adds no specificity, so primitives' own focus styles win. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
   border-radius: var(--radius-sm);
 }
 
 /* ---- Interaction defaults ---- */
-button, a, .interactive, [role="button"], summary {
+button,
+a,
+.interactive,
+[role="button"],
+summary {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -567,7 +632,9 @@ button, a, .interactive, [role="button"], summary {
 /* 44px hit-area floor for controls painted smaller (icon buttons, chip removes): the pseudo-element grows
    the finger target without changing layout or weight. Don't use on a control that already uses ::after
    (e.g. the active tab underline); give it a min-height instead. */
-.tap-target { position: relative; }
+.tap-target {
+  position: relative;
+}
 .tap-target::after {
   content: "";
   position: absolute;
@@ -577,7 +644,6 @@ button, a, .interactive, [role="button"], summary {
   height: max(100%, var(--tap-min));
   transform: translate(-50%, -50%);
 }
-
 
 /* House transition recipe; never `all`. `filter` is included because chamfered surfaces glow through
    drop-shadow filters. */
@@ -589,7 +655,9 @@ button, a, .interactive, [role="button"], summary {
     filter var(--dur-hover),
     transform var(--dur-press) var(--ease-settle);
 }
-.interactive:active { transform: translateY(0.5px); }
+.interactive:active {
+  transform: translateY(0.5px);
+}
 
 /* Hover-lift for genuine cards (never dense list rows); composes with .interactive. */
 .lift {
@@ -599,15 +667,31 @@ button, a, .interactive, [role="button"], summary {
     border-color var(--dur-hover),
     background var(--dur-hover);
 }
-.lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
-.lift:active { transform: translateY(0); }
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.lift:active {
+  transform: translateY(0);
+}
 
 /* Forward-nav nudge: put <span class="nav-arrow">→</span> at the end of the label. `color: inherit` is
    needed because the client's `button span { color: var(--text-dim) }` would otherwise paint the arrow
    unreadably on a primary button's fill. */
-.nav-arrow { display: inline-block; margin-left: .35em; color: inherit; transition: transform var(--dur-press) var(--ease-settle); }
-button:hover .nav-arrow, a:hover .nav-arrow, [role="button"]:hover .nav-arrow, .lift:hover .nav-arrow,
-button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: translateX(2px); }
+.nav-arrow {
+  display: inline-block;
+  margin-left: 0.35em;
+  color: inherit;
+  transition: transform var(--dur-press) var(--ease-settle);
+}
+button:hover .nav-arrow,
+a:hover .nav-arrow,
+[role="button"]:hover .nav-arrow,
+.lift:hover .nav-arrow,
+button:focus-visible .nav-arrow,
+a:focus-visible .nav-arrow {
+  transform: translateX(2px);
+}
 
 /* Frosted floating/sticky surfaces (the chrome glass tier). Keep panels mostly opaque. */
 .surface-frost {
@@ -645,7 +729,14 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    ============================================================ */
 
 /* The shared backing layer: behind the content, above the element's background, pointer-transparent. */
-.chamfer, .rim, .bezel, .rim-lit, .cue { position: relative; isolation: isolate; }
+.chamfer,
+.rim,
+.bezel,
+.rim-lit,
+.cue {
+  position: relative;
+  isolation: isolate;
+}
 .chamfer::before,
 .rim::before,
 .bezel::before,
@@ -655,31 +746,52 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   position: absolute;
   inset: 0;
   z-index: -1;
-  box-sizing: border-box;   /* packages/ui has no `*` reset; the client's is in styles.css */
+  box-sizing: border-box; /* packages/ui has no `*` reset; the client's is in styles.css */
   pointer-events: none;
   background: var(--material-fill);
   border: 0 solid transparent;
-  transition: border-color var(--dur-hover), background var(--dur-hover), filter var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover),
+    filter var(--dur-hover);
 }
 
-.chamfer { border-radius: 0; }
-.chamfer::before { clip-path: var(--chamfer-cut); }
-.chamfer.chamfer { background-color: transparent; background-image: none; border-color: transparent; }
+.chamfer {
+  border-radius: 0;
+}
+.chamfer::before {
+  clip-path: var(--chamfer-cut);
+}
+.chamfer.chamfer {
+  background-color: transparent;
+  background-image: none;
+  border-color: transparent;
+}
 
 /* The rim follows the cut; the diagonal stays unrimmed, matching the landing door. */
-.rim::before { border-width: var(--rim-w); border-color: var(--rim-color); }
+.rim::before {
+  border-width: var(--rim-w);
+  border-color: var(--rim-color);
+}
 /* The rim brightens on hover and press alike, since many devices have no hover. */
 .rim:hover:not(:disabled)::before,
 .rim:focus-visible::before,
 .rim:active:not(:disabled)::before,
-.rim.is-active::before { border-color: var(--rim-color-hi); }
+.rim.is-active::before {
+  border-color: var(--rim-color-hi);
+}
 
 /* An outline costs no layout and doesn't contest the rim's properties. */
-.bezel::before { outline: 1px solid var(--bezel-color); outline-offset: calc(-1 * var(--bezel-inset)); }
+.bezel::before {
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+}
 
 /* Opt-in rest glow. On the backing layer because a filter follows the cut, and a filter on the element
    would make it the containing block for fixed overlays inside it. */
-.rim-lit::before { filter: var(--rim-glow); }
+.rim-lit::before {
+  filter: var(--rim-glow);
+}
 
 /* The cue: a background layer on the backing layer. Not on the element itself, whose background paints
    below the backing layer and would be hidden by an opaque --material-fill. Prepending one layer to
@@ -695,9 +807,16 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 
 /* Disabled reads as a flat box: rim and texture go. Not wrapped in `:where()` because at zero specificity a
    consumer's own --material-fill would win on source order. */
-.chamfer:disabled, .rim:disabled, .bezel:disabled, .rim-lit:disabled, .cue:disabled,
-.chamfer[aria-disabled="true"], .rim[aria-disabled="true"], .bezel[aria-disabled="true"],
-.rim-lit[aria-disabled="true"], .cue[aria-disabled="true"] {
+.chamfer:disabled,
+.rim:disabled,
+.bezel:disabled,
+.rim-lit:disabled,
+.cue:disabled,
+.chamfer[aria-disabled="true"],
+.rim[aria-disabled="true"],
+.bezel[aria-disabled="true"],
+.rim-lit[aria-disabled="true"],
+.cue[aria-disabled="true"] {
   --material-fill: var(--surface-2);
   --rim-color: transparent;
   --rim-color-hi: transparent;
@@ -712,12 +831,19 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    here loses to consumers' `border` shorthands and an inset shadow adds no width; it does conflict with
    `.is-selected` / `.is-active-turn`. The utility is the edge only; sites apply the wash token in their
    own background rule so it composes with `.surface-glass`. */
-.rim-player { box-shadow: inset 3px 0 0 0 var(--rim-player); }
-.rim-gm     { box-shadow: inset 3px 0 0 0 var(--rim-gm); }
+.rim-player {
+  box-shadow: inset 3px 0 0 0 var(--rim-player);
+}
+.rim-gm {
+  box-shadow: inset 3px 0 0 0 var(--rim-gm);
+}
 
 /* The beam divider: the sky's horizon as a 1px rule along the bottom edge of an element whose bottom is a
    structural boundary (a scene surface's heading row). One per boundary. */
-.neon-beam { position: relative; padding-bottom: var(--space-3); }
+.neon-beam {
+  position: relative;
+  padding-bottom: var(--space-3);
+}
 .neon-beam::after {
   content: "";
   position: absolute;
@@ -732,8 +858,15 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 
 /* Frame utilities: a frame is a column that never scrolls. `.frame-col` lets children shrink below their
    content; `.frame-fill` is the region that takes leftover space. Regions that can overflow add `.scroll-y`. */
-.frame-col { display: flex; flex-direction: column; min-height: 0; }
-.frame-fill { flex: 1; min-height: 0; }
+.frame-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.frame-fill {
+  flex: 1;
+  min-height: 0;
+}
 
 /* Thin neon scrollbars, always visible, so scrollable regions are discoverable. Style the real scroller,
    never replace it.
@@ -743,25 +876,37 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    alone, regions fell back to a 15px gutter. Elements that set `scrollbar-width: none` themselves
    (Tabs.css, the Codex rail, Steps.css) still win. OS overlay scrollbars (macOS, phones, headless
    Chromium) may not render any of this. */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 .scroll-y {
   overflow-y: auto;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;   /* restated so a region never falls back to the 15px bar */
+  scrollbar-width: thin; /* restated so a region never falls back to the 15px bar */
 }
-*::-webkit-scrollbar { width: var(--scrollbar-w); height: var(--scrollbar-w); }
-*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar {
+  width: var(--scrollbar-w);
+  height: var(--scrollbar-w);
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
 *::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: var(--radius-pill);
   border: 3px solid transparent;
   background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hi); background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hi);
+  background-clip: content-box;
+}
 
 /* ---- Signature color bloom ---- */
 .bloom {
@@ -778,9 +923,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter:
-    drop-shadow(0 1px 0 rgba(6, 4, 16, 0.85))
-    drop-shadow(0 0 7px rgba(255, 46, 154, 0.22))
+  filter: drop-shadow(0 1px 0 rgba(6, 4, 16, 0.85)) drop-shadow(0 0 7px rgba(255, 46, 154, 0.22))
     drop-shadow(0 0 7px rgba(45, 226, 255, 0.14));
 }
 /* Light theme: solid ink wordmark for legibility, no bevel/glow */
@@ -795,7 +938,8 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    so it must not shrink below display scale there.
    It must come after `.wordmark-name` to override its fill at equal specificity; the [data-theme] half
    beats daybreak's flat-ink `.wordmark-name` rule. */
-.sign, [data-theme="light"] .sign {
+.sign,
+[data-theme="light"] .sign {
   background-image: var(--sign-chrome);
   -webkit-background-clip: text;
   background-clip: text;
@@ -810,7 +954,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    battle-map grid is drawn by the map renderer, not this. */
 .grid-floor {
   background-image:
-    repeating-linear-gradient(to right,  var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
+    repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
     repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-cell));
   transform: perspective(420px) rotateX(62deg);
   transform-origin: center bottom;
@@ -819,23 +963,29 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 
 /* Faint CRT scanlines on a positioned container. A one-gap tile rather than one large repeating gradient,
    which rasterizes unevenly over large layers. */
-.scanlines { position: relative; }
+.scanlines {
+  position: relative;
+}
 .scanlines::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(to bottom,
+  background-image: linear-gradient(
+    to bottom,
     transparent 0,
     transparent calc(var(--scanline-gap) - 1px),
     var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap));
+    var(--scanline-color) var(--scanline-gap)
+  );
   background-size: 100% var(--scanline-gap);
   opacity: 0.5;
 }
 
 /* Analog static / grain overlay, kept very low opacity (--noise-opacity, per theme) */
-.static-noise { position: relative; }
+.static-noise {
+  position: relative;
+}
 .static-noise::after {
   content: "";
   position: absolute;
@@ -857,8 +1007,12 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 /* Light theme: texture off, wordmark fringing off */
 [data-theme="light"] .grid-floor,
 [data-theme="light"] .scanlines::after,
-[data-theme="light"] .static-noise::after { display: none; }
-[data-theme="light"] .chromatic { text-shadow: none; }
+[data-theme="light"] .static-noise::after {
+  display: none;
+}
+[data-theme="light"] .chromatic {
+  text-shadow: none;
+}
 
 /* ---- State treatments ---- */
 
@@ -887,47 +1041,158 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 /* ---- One-shot cues (allowed; they settle, they do not loop) ---- */
 
 /* Entrance vocabulary. Attach to containers, not list items. */
-@keyframes view-in    { from { opacity: 0; transform: translateY(7px); }  to { opacity: 1; transform: none; } }
-@keyframes popover-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
-@keyframes dialog-in  { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
-@keyframes backdrop-in{ from { opacity: 0; } to { opacity: 1; } }
-@keyframes sheet-up   { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
-@keyframes panel-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes panel-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
-.anim-view    { animation: view-in    var(--dur-enter) var(--ease-settle) both; }
-.anim-panel   { animation: panel-fade var(--dur-base)  ease both; }
-.anim-popover { animation: popover-in var(--dur-base)  var(--ease-settle) both; }
-.anim-dialog  { animation: dialog-in  var(--dur-base)  var(--ease-settle) both; }
-.anim-dialog::backdrop { animation: backdrop-in var(--dur-base) ease both; }
-.anim-sheet   { animation: sheet-up   var(--dur-enter) var(--ease-settle) both; }
+.anim-view {
+  animation: view-in var(--dur-enter) var(--ease-settle) both;
+}
+.anim-panel {
+  animation: panel-fade var(--dur-base) ease both;
+}
+.anim-popover {
+  animation: popover-in var(--dur-base) var(--ease-settle) both;
+}
+.anim-dialog {
+  animation: dialog-in var(--dur-base) var(--ease-settle) both;
+}
+.anim-dialog::backdrop {
+  animation: backdrop-in var(--dur-base) ease both;
+}
+.anim-sheet {
+  animation: sheet-up var(--dur-enter) var(--ease-settle) both;
+}
 
 /* One-shot attention flash when jumping to a target */
 @keyframes attention-flash {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  16% { box-shadow: var(--glow-cyan); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  16% {
+    box-shadow: var(--glow-cyan);
+  }
 }
-.is-flashing { animation: attention-flash 1.2s var(--ease-settle); }
+.is-flashing {
+  animation: attention-flash 1.2s var(--ease-settle);
+}
 
 /* One-time data reveal, e.g. an HP/progress bar filling on first paint */
-@keyframes bar-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-.anim-bar-reveal { animation: bar-reveal var(--dur-reveal) var(--ease-settle) both; }
+@keyframes bar-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.anim-bar-reveal {
+  animation: bar-reveal var(--dur-reveal) var(--ease-settle) both;
+}
 
 /* View-swap cascade: a frame's direct children settle in with a brief, capped stagger. Containers only,
    never long lists. */
-.anim-cascade > * { animation: view-in var(--dur-enter) var(--ease-settle) both; }
-.anim-cascade > :nth-child(2) { animation-delay: 60ms; }
-.anim-cascade > :nth-child(3) { animation-delay: 120ms; }
-.anim-cascade > :nth-child(n + 4) { animation-delay: 180ms; }
+.anim-cascade > * {
+  animation: view-in var(--dur-enter) var(--ease-settle) both;
+}
+.anim-cascade > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.anim-cascade > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.anim-cascade > :nth-child(n + 4) {
+  animation-delay: 180ms;
+}
 
 /* Landing → app entry: .anim-entry-dip on the departing landing, .anim-entry-settle on the arriving frame. */
-@keyframes entry-dip    { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.015); } }
-@keyframes entry-settle { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.anim-entry-dip    { animation: entry-dip    var(--dur-base)  var(--ease-settle) both; }
-.anim-entry-settle { animation: entry-settle var(--dur-enter) var(--ease-settle) both; }
+@keyframes entry-dip {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+@keyframes entry-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-entry-dip {
+  animation: entry-dip var(--dur-base) var(--ease-settle) both;
+}
+.anim-entry-settle {
+  animation: entry-settle var(--dur-enter) var(--ease-settle) both;
+}
 
 /* Theme switch: put .theme-switching on the root for about --dur-theme so surfaces cross-fade. Not
    !important, so the reduced-motion rule below still wins. */
-.theme-switching, .theme-switching *, .theme-switching *::before, .theme-switching *::after {
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
   transition:
     background-color var(--dur-theme) ease,
     color var(--dur-theme) ease,
@@ -951,12 +1216,16 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
     -webkit-backdrop-filter: none;
   }
   .scanlines::after,
-  .static-noise::after { display: none; }
+  .static-noise::after {
+    display: none;
+  }
 }
 
 /* Reduced motion: collapse all motion, keep end states */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
@@ -968,63 +1237,98 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 [data-theme="dusk"] {
   --landing-sky:
     radial-gradient(120% 70% at 50% 108%, rgba(255, 120, 60, 0.28) 0%, transparent 55%),
-    linear-gradient(180deg, #140A2E 0%, #1F0C44 20%, #2A1055 36%, #4A1560 52%, #6E1B66 64%, #92285F 74%, #B23A62 84%, #D0623F 93%, #E88A4A 100%);
+    linear-gradient(
+      180deg,
+      #140a2e 0%,
+      #1f0c44 20%,
+      #2a1055 36%,
+      #4a1560 52%,
+      #6e1b66 64%,
+      #92285f 74%,
+      #b23a62 84%,
+      #d0623f 93%,
+      #e88a4a 100%
+    );
   --landing-star: rgba(255, 235, 220, 0.85);
   --landing-star-dim: rgba(255, 170, 190, 0.5);
-  --landing-sun: linear-gradient(180deg, #FFF3C9 0%, #FFC15C 26%, #FF7BAB 55%, #FF2E9A 78%, #A45CFF 100%);
-  --landing-sun-glow:
-    0 0 48px 14px rgba(255, 150, 80, 0.50),
-    0 0 150px 60px rgba(255, 46, 154, 0.40);
+  --landing-sun: linear-gradient(180deg, #fff3c9 0%, #ffc15c 26%, #ff7bab 55%, #ff2e9a 78%, #a45cff 100%);
+  --landing-sun-glow: 0 0 48px 14px rgba(255, 150, 80, 0.5), 0 0 150px 60px rgba(255, 46, 154, 0.4);
   --landing-slat: rgba(24, 7, 32, 0.9);
-  --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(255, 193, 92, 0.95) 22%, rgba(255, 92, 184, 0.95) 50%, rgba(255, 193, 92, 0.95) 78%, transparent 100%);
-  --landing-horizon-glow:
-    0 0 14px 3px rgba(255, 193, 92, 0.80),
-    0 0 52px 14px rgba(255, 46, 154, 0.55);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 193, 92, 0.95) 22%,
+    rgba(255, 92, 184, 0.95) 50%,
+    rgba(255, 193, 92, 0.95) 78%,
+    transparent 100%
+  );
+  --landing-horizon-glow: 0 0 14px 3px rgba(255, 193, 92, 0.8), 0 0 52px 14px rgba(255, 46, 154, 0.55);
   --landing-grid-x: rgba(255, 140, 90, 0.55);
-  --landing-grid-y: rgba(255, 46, 154, 0.50);
+  --landing-grid-y: rgba(255, 46, 154, 0.5);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-planet: radial-gradient(circle at 35% 30%, #FFD9A6 0%, #C86AD9 55%, #7A35B8 100%);
+  --landing-planet: radial-gradient(circle at 35% 30%, #ffd9a6 0%, #c86ad9 55%, #7a35b8 100%);
   --landing-planet-ring: rgba(255, 193, 92, 0.7);
   --landing-planet-glow: 0 0 16px 2px rgba(255, 150, 80, 0.4);
   --landing-planet-opacity: 0.4;
   --landing-stroke: rgba(12, 32, 72, 0.72);
-  --landing-title-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8))
-    drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
+  --landing-title-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8)) drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
 }
 [data-theme="light"] {
-  --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%, #FBD9E4 68%, #FDD8CE 84%, #FFD6B4 100%);
+  --landing-sky: linear-gradient(
+    180deg,
+    #dce6fb 0%,
+    #e6e2f9 24%,
+    #efdff6 42%,
+    #f6daec 56%,
+    #fbd9e4 68%,
+    #fdd8ce 84%,
+    #ffd6b4 100%
+  );
   /* Daybreak: no stars. Transparent star inks keep the layers (and their markup) inert. */
   --landing-star: rgba(255, 255, 255, 0);
   --landing-star-dim: rgba(255, 255, 255, 0);
-  --landing-sun: linear-gradient(180deg, #FFFBEA 0%, #FFD98F 30%, #FF8FC0 62%, #E24C9C 88%, #A45CFF 100%);
-  --landing-sun-glow:
-    0 0 44px 12px rgba(255, 150, 150, 0.45),
-    0 0 120px 48px rgba(255, 190, 120, 0.40);
+  --landing-sun: linear-gradient(180deg, #fffbea 0%, #ffd98f 30%, #ff8fc0 62%, #e24c9c 88%, #a45cff 100%);
+  --landing-sun-glow: 0 0 44px 12px rgba(255, 150, 150, 0.45), 0 0 120px 48px rgba(255, 190, 120, 0.4);
   --landing-slat: rgba(255, 244, 235, 0.95);
-  --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(15, 127, 192, 0.85) 22%, rgba(200, 29, 128, 0.90) 50%, rgba(15, 127, 192, 0.85) 78%, transparent 100%);
-  --landing-horizon-glow:
-    0 0 10px 2px rgba(200, 29, 128, 0.35),
-    0 0 36px 10px rgba(255, 150, 120, 0.35);
-  --landing-grid-x: rgba(200, 29, 128, 0.40);
+  --landing-horizon: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(15, 127, 192, 0.85) 22%,
+    rgba(200, 29, 128, 0.9) 50%,
+    rgba(15, 127, 192, 0.85) 78%,
+    transparent 100%
+  );
+  --landing-horizon-glow: 0 0 10px 2px rgba(200, 29, 128, 0.35), 0 0 36px 10px rgba(255, 150, 120, 0.35);
+  --landing-grid-x: rgba(200, 29, 128, 0.4);
   --landing-grid-y: rgba(15, 127, 192, 0.35);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EFF6FD 12%, #CBE0F5 26%, #9DBFE7 38%, #6E93CC 47%, #40619E 50%, #FBFDFF 54%, #E2EEFA 63%, #ABCAED 75%, #7396CE 87%, #47649F 100%);
+  --landing-sign: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #eff6fd 12%,
+    #cbe0f5 26%,
+    #9dbfe7 38%,
+    #6e93cc 47%,
+    #40619e 50%,
+    #fbfdff 54%,
+    #e2eefa 63%,
+    #abcaed 75%,
+    #7396ce 87%,
+    #47649f 100%
+  );
   --landing-planet-opacity: 0;
   --landing-stroke: rgba(20, 40, 90, 0.55);
-  --landing-title-glow:
-    drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5))
-    drop-shadow(0 0 8px rgba(226, 76, 156, 0.30));
+  --landing-title-glow: drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5)) drop-shadow(0 0 8px rgba(226, 76, 156, 0.3));
   /* Daybreak doors: pale glass with deep-inked rims and labels. */
   --landing-door-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(242, 233, 255, 0.88) 100%);
-  --landing-door-label: #3A2470;
-  --landing-door-play-rim: #C81D80;
-  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --landing-door-label: #3a2470;
+  --landing-door-play-rim: #c81d80;
+  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --landing-door-play-glow-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --landing-door-gm-rim: #6C3FD4;
+  --landing-door-gm-rim: #6c3fd4;
   --landing-door-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
   --landing-door-gm-glow-strong: drop-shadow(0 2px 8px rgba(108, 63, 212, 0.42));
   --landing-glass: rgba(255, 255, 255, 0.66);
@@ -1036,21 +1340,30 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 /* Dusk: the landing's ember end fails AA against text, so the wash stops at #6E1B66 and the ember lives
    in the beam and a bloom confined below the horizon. */
 [data-theme="dusk"] {
-  --sky-wash: linear-gradient(180deg,
-    #140A2E 0%, #1F0C44 24%, #2A1055 44%, #4A1560 68%, #6E1B66 100%);
+  --sky-wash: linear-gradient(180deg, #140a2e 0%, #1f0c44 24%, #2a1055 44%, #4a1560 68%, #6e1b66 100%);
   --sky-star: rgba(255, 235, 220, 0.85);
   --sky-star-dim: rgba(255, 170, 190, 0.5);
   /* An amber-gold sun on the gold (--caution-hi) beam; no rose. */
-  --sky-sun: linear-gradient(180deg,
+  --sky-sun: linear-gradient(
+    180deg,
     rgba(255, 243, 201, 0) 0%,
     rgba(255, 206, 122, 0.5) 46%,
-    rgba(255, 168, 66, 0.9) 100%);
+    rgba(255, 168, 66, 0.9) 100%
+  );
   --sky-horizon-a: color-mix(in srgb, var(--caution-hi) 90%, transparent);
-  --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(255, 150, 80, 0.34) 0%, rgba(255, 46, 154, 0.14) 46%, transparent 74%);
+  --sky-horizon-glow: radial-gradient(
+    46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(255, 150, 80, 0.34) 0%,
+    rgba(255, 46, 154, 0.14) 46%,
+    transparent 74%
+  );
   /* The bloom's vertical radius is the horizon inset, so the ember stops at the line and never reaches text. */
-  --sky-bloom: radial-gradient(110% var(--sky-horizon-inset) at 50% 100%,
-    rgba(255, 120, 60, 0.16) 0%, rgba(255, 46, 154, 0.07) 46%, transparent 72%);
+  --sky-bloom: radial-gradient(
+    110% var(--sky-horizon-inset) at 50% 100%,
+    rgba(255, 120, 60, 0.16) 0%,
+    rgba(255, 46, 154, 0.07) 46%,
+    transparent 72%
+  );
   --sky-grid-x: color-mix(in srgb, var(--caution) 55%, transparent);
   --sky-grid-y: color-mix(in srgb, var(--magenta) 50%, transparent);
   /* Stays under the tighter (column) AA ceiling on #6E1B66. */
@@ -1062,23 +1375,31 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    sky layer and not the theme-gated `.grid-floor` utility. */
 [data-theme="light"] {
   /* Horizon-relative stops, as for night. */
-  --sky-wash: linear-gradient(180deg,
-    #DCE6FB 0%,
-    #E6E2F9 calc((100% - var(--sky-horizon-inset)) * 0.27),
-    #EFDFF6 calc((100% - var(--sky-horizon-inset)) * 0.47),
-    #F6DAEC calc((100% - var(--sky-horizon-inset)) * 0.63),
-    #FBD9E4 calc(100% - var(--sky-horizon-inset)),
-    #FDD8CE calc(100% - var(--sky-horizon-inset) * 0.4),
-    #FFD6B4 100%);
+  --sky-wash: linear-gradient(
+    180deg,
+    #dce6fb 0%,
+    #e6e2f9 calc((100% - var(--sky-horizon-inset)) * 0.27),
+    #efdff6 calc((100% - var(--sky-horizon-inset)) * 0.47),
+    #f6daec calc((100% - var(--sky-horizon-inset)) * 0.63),
+    #fbd9e4 calc(100% - var(--sky-horizon-inset)),
+    #fdd8ce calc(100% - var(--sky-horizon-inset) * 0.4),
+    #ffd6b4 100%
+  );
   --sky-star: rgba(255, 255, 255, 0);
   --sky-star-dim: rgba(255, 255, 255, 0);
-  --sky-sun: linear-gradient(180deg,
+  --sky-sun: linear-gradient(
+    180deg,
     rgba(255, 251, 234, 0) 0%,
     rgba(255, 217, 143, 0.5) 52%,
-    rgba(255, 143, 192, 0.72) 100%);
+    rgba(255, 143, 192, 0.72) 100%
+  );
   --sky-sun-opacity: 0.4;
-  --sky-horizon-glow: radial-gradient(46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
-    rgba(200, 29, 128, 0.16) 0%, rgba(255, 150, 120, 0.14) 48%, transparent 76%);
+  --sky-horizon-glow: radial-gradient(
+    46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(200, 29, 128, 0.16) 0%,
+    rgba(255, 150, 120, 0.14) 48%,
+    transparent 76%
+  );
   --sky-bloom: none;
   /* Below the AA ceilings for grid lines on #FBD9E4. */
   --sky-floor-opacity: 0.55;
@@ -1087,25 +1408,37 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 /* On phones the horizon is most of the visible sky, so step the inset down (it also keeps the grid clear of
    the iOS home indicator). Only the crown steps; the diameter follows, so the sun stays a hemisphere. */
 @media (max-width: 760px) {
-  :root { --sky-horizon-inset: 5.75rem; --sky-sun-crown: 3.25rem; }
+  :root {
+    --sky-horizon-inset: 5.75rem;
+    --sky-sun-crown: 3.25rem;
+  }
 }
 
 /* ---- Role rims and the sign per theme. Night and dusk share rims and steel; only the sign's halo follows
    dusk. Daybreak deepens everything and grounds the glow. ---- */
 [data-theme="dusk"] {
-  --sign-glow:
-    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8))
-    drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
+  --sign-glow: drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8)) drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
   --sign-stroke: rgba(12, 32, 72, 0.72);
 }
 [data-theme="light"] {
-  --rim-player: #C81D80;
-  --rim-gm: #6C3FD4;
-  --rim-player-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --rim-player: #c81d80;
+  --rim-gm: #6c3fd4;
+  --rim-player-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --rim-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
-  --sign-chrome: linear-gradient(180deg, #FFFFFF 0%, #EFF6FD 12%, #CBE0F5 26%, #9DBFE7 38%, #6E93CC 47%, #40619E 50%, #FBFDFF 54%, #E2EEFA 63%, #ABCAED 75%, #7396CE 87%, #47649F 100%);
+  --sign-chrome: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #eff6fd 12%,
+    #cbe0f5 26%,
+    #9dbfe7 38%,
+    #6e93cc 47%,
+    #40619e 50%,
+    #fbfdff 54%,
+    #e2eefa 63%,
+    #abcaed 75%,
+    #7396ce 87%,
+    #47649f 100%
+  );
   --sign-stroke: rgba(20, 40, 90, 0.55);
-  --sign-glow:
-    drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5))
-    drop-shadow(0 0 8px rgba(226, 76, 156, 0.30));
+  --sign-glow: drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5)) drop-shadow(0 0 8px rgba(226, 76, 156, 0.3));
 }

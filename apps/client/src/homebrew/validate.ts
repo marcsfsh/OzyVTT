@@ -89,7 +89,10 @@ function badGating(draft: Draft, sectionId: string): BlockedReason | null {
         return;
       }
       if (kinds.includes("filter") && !kinds.includes("moment")) {
-        found = { text: `Add an “Only when…” line to “${name}” — an “Only for…” line has nothing to narrow on its own.`, sectionId };
+        found = {
+          text: `Add an “Only when…” line to “${name}” — an “Only for…” line has nothing to narrow on its own.`,
+          sectionId
+        };
         return;
       }
     }
@@ -118,7 +121,8 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
   const table = Array.isArray(draft.levelTable) ? (draft.levelTable as Array<Record<string, unknown>>) : [];
   if (table.length === 0) return null;
   const granted = new Set<string>();
-  for (const row of table) for (const id of Array.isArray(row.features) ? (row.features as string[]) : []) granted.add(id);
+  for (const row of table)
+    for (const id of Array.isArray(row.features) ? (row.features as string[]) : []) granted.add(id);
   for (const entry of featuresOf(draft)) {
     if (draftPicksOf(entry).length === 0 || typeof entry.id !== "string" || granted.has(entry.id)) continue;
     return {
@@ -178,10 +182,18 @@ const hasDerivedCard = (draft: Draft): boolean => {
 
 /** The field each player-facing pick card is built from (a `summary`, or an item's `description`).
     A creature's browse row has no prose field, so it has no entry. */
-const SHOWN_TO_PLAYERS: Partial<Record<HomebrewType, Readonly<{ path: string; text: string; unless?: (draft: Draft) => boolean }>>> = {
+const SHOWN_TO_PLAYERS: Partial<
+  Record<HomebrewType, Readonly<{ path: string; text: string; unless?: (draft: Draft) => boolean }>>
+> = {
   class: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this class from." },
-  species: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this species from." },
-  background: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this background from." },
+  species: {
+    path: "summary",
+    text: "Write the one-line summary — it's the whole card a player picks this species from."
+  },
+  background: {
+    path: "summary",
+    text: "Write the one-line summary — it's the whole card a player picks this background from."
+  },
   feat: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this feat from." },
   equipment: {
     path: "description",
@@ -233,8 +245,12 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         blankCard,
         // Don't end the sentence on the section title ("Belongs to"); the jump control shows it.
         need(draft, "classId", "Choose the class this subclass is for.", "belongs-to"),
-        (draft.spellcasting as Record<string, unknown> | null | undefined) && blank(getAt(draft, "spellcasting.spellListId"))
-          ? { text: "Choose a spell list. A subclass caster falls back to the class list, which for a homebrew class is empty.", sectionId: "belongs-to" }
+        (draft.spellcasting as Record<string, unknown> | null | undefined) &&
+          blank(getAt(draft, "spellcasting.spellListId"))
+          ? {
+              text: "Choose a spell list. A subclass caster falls back to the class list, which for a homebrew class is empty.",
+              sectionId: "belongs-to"
+            }
           : null,
         formulaBlocker,
         brokenCatalog(draft, ctx, "features"),
@@ -293,7 +309,10 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
       return all(
         blankCard,
         add.length === 0 && basedOn.length === 0
-          ? { text: "Add at least one spell to this list — a class using an empty list can't be created.", sectionId: "contents" }
+          ? {
+              text: "Add at least one spell to this list — a class using an empty list can't be created.",
+              sectionId: "contents"
+            }
           : null
       );
     }
@@ -307,12 +326,19 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // The editor seeds the whole weapon block on first touch, so the remaining hole is empty
         // dice: an attack that rolls nothing.
         weapon && blank(weapon.damageDice)
-          ? { text: "Give this weapon its damage, or clear the whole Weapon section — a weapon with no dice rolls nothing.", sectionId: "weapon", path: "weapon.damageDice" }
+          ? {
+              text: "Give this weapon its damage, or clear the whole Weapon section — a weapon with no dice rolls nothing.",
+              sectionId: "weapon",
+              path: "weapon.damageDice"
+            }
           : null,
         weapon && !blank(weapon.damageDice) && blank(weapon.damageType)
           ? { text: "Give this item a damage type.", sectionId: "weapon", path: "weapon.damageType" }
           : null,
-        weapon && typeof weapon.damageDice === "string" && weapon.damageDice.trim() !== "" && !isDiceFormula(weapon.damageDice)
+        weapon &&
+          typeof weapon.damageDice === "string" &&
+          weapon.damageDice.trim() !== "" &&
+          !isDiceFormula(weapon.damageDice)
           ? { text: `Fix the damage formula “${weapon.damageDice}”.`, sectionId: "weapon" }
           : null,
         casts.some((cast) => blank(cast.spellId))
@@ -320,16 +346,30 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
           : null,
         // `appliesTo` is both-or-neither: label and bases are required together.
         !blank(getAt(draft, "appliesTo.label")) && blank(getAt(draft, "appliesTo.baseIds"))
-          ? { text: "List the bases this item can be, or clear its “applies to” line.", sectionId: "magic", path: "appliesTo.baseIds" }
+          ? {
+              text: "List the bases this item can be, or clear its “applies to” line.",
+              sectionId: "magic",
+              path: "appliesTo.baseIds"
+            }
           : null,
         blank(getAt(draft, "appliesTo.label")) && !blank(getAt(draft, "appliesTo.baseIds"))
-          ? { text: "Give the “applies to” choice its printed wording, or clear the base list.", sectionId: "magic", path: "appliesTo.label" }
+          ? {
+              text: "Give the “applies to” choice its printed wording, or clear the base list.",
+              sectionId: "magic",
+              path: "appliesTo.label"
+            }
           : null,
         // Attunement is what springs a curse and the boundary the hiding rule needs.
         draft.cursed === true && getAt(draft, "attunement.required") !== true
-          ? { text: "Make this item require attunement — attuning is what springs a curse and what reveals it.", sectionId: "magic" }
+          ? {
+              text: "Make this item require attunement — attuning is what springs a curse and what reveals it.",
+              sectionId: "magic"
+            }
           : null,
-        draft.isMagic === true && !!draft.uses && blank(getAt(draft, "uses.limit")) && blank(getAt(draft, "uses.scaling"))
+        draft.isMagic === true &&
+          !!draft.uses &&
+          blank(getAt(draft, "uses.limit")) &&
+          blank(getAt(draft, "uses.scaling"))
           ? { text: "Say how many charges this item has, or turn charges off.", sectionId: "magic" }
           : null,
         formulaBlocker,
@@ -348,8 +388,8 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         need(draft, "armorClass", "Give this creature an armour class.", "defences"),
         need(draft, "hitPoints.maximum", "Give this creature hit points.", "defences"),
         typeof getAt(draft, "hitPoints.formula") === "string" &&
-        String(getAt(draft, "hitPoints.formula")).trim() !== "" &&
-        !isDiceFormula(String(getAt(draft, "hitPoints.formula")))
+          String(getAt(draft, "hitPoints.formula")).trim() !== "" &&
+          !isDiceFormula(String(getAt(draft, "hitPoints.formula")))
           ? { text: `Fix the hit-point formula “${getAt(draft, "hitPoints.formula")}”.`, sectionId: "defences" }
           : null,
         formulaBlocker
@@ -366,7 +406,9 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
 export function issueReason(
   type: HomebrewType,
   issue: { path: ReadonlyArray<string | number>; message: string } | undefined,
-  lookup: (path: ReadonlyArray<string | number>) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null = (path) => fieldAt(type, path)
+  lookup: (
+    path: ReadonlyArray<string | number>
+  ) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null = (path) => fieldAt(type, path)
 ): BlockedReason | null {
   if (!issue) return null;
   const dotted = issue.path.filter((segment) => typeof segment === "string").join(".");
@@ -376,7 +418,7 @@ export function issueReason(
     return { text: issue.message, path: dotted || undefined };
   }
   const required = /required/i.test(issue.message);
-    // Zod messages lack terminal punctuation; the template adds it once.
+  // Zod messages lack terminal punctuation; the template adds it once.
   const detail = issue.message.replace(/[.\s]+$/, "");
   return {
     text: required
@@ -388,7 +430,12 @@ export function issueReason(
 }
 
 /** The first entry of `publishIssues`. */
-export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: SchemaContext, recordId = ctx.recordId): BlockedReason | null {
+export function publishBlockedReason(
+  type: HomebrewType,
+  draft: Draft,
+  ctx: SchemaContext,
+  recordId = ctx.recordId
+): BlockedReason | null {
   return publishIssues(type, draft, ctx, recordId)[0] ?? null;
 }
 
@@ -400,7 +447,10 @@ export function bodyForPublish(type: HomebrewType, draft: Draft, recordId: strin
   // The row owns the type; a `type` key would fail the `.strict()` body schemas.
   delete body.type;
   if (type === "monster") {
-    const source = body.source && typeof body.source === "object" && !Array.isArray(body.source) ? (body.source as Record<string, unknown>) : {};
+    const source =
+      body.source && typeof body.source === "object" && !Array.isArray(body.source)
+        ? (body.source as Record<string, unknown>)
+        : {};
     body.source = { ...source, externalId: recordId };
   }
   return body;
@@ -433,7 +483,12 @@ const coveredBy = (owned: ReadonlySet<string>, path: string | undefined): boolea
 
 /** Everything outstanding, in priority order: the hand-written sentences, then whatever the
     record's own schema still refuses. */
-export function publishIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext, recordId = ctx.recordId): readonly BlockedReason[] {
+export function publishIssues(
+  type: HomebrewType,
+  draft: Draft,
+  ctx: SchemaContext,
+  recordId = ctx.recordId
+): readonly BlockedReason[] {
   const local = localIssues(type, draft, ctx);
   // An unnamed record shows only that.
   if (local.length === 1 && local[0].path === "name") return local;
@@ -445,7 +500,9 @@ export function publishIssues(type: HomebrewType, draft: Draft, ctx: SchemaConte
 export function duplicateNameNote(type: HomebrewType, name: string, ctx: SchemaContext): string | null {
   const trimmed = name.trim().toLowerCase();
   if (trimmed === "") return null;
-  const clash = ctx.siblings.some((sibling) => sibling.id !== ctx.recordId && sibling.name.trim().toLowerCase() === trimmed);
+  const clash = ctx.siblings.some(
+    (sibling) => sibling.id !== ctx.recordId && sibling.name.trim().toLowerCase() === trimmed
+  );
   if (!clash) return null;
   const word = TYPE_WORDS[type]?.label ?? type;
   return `Another ${word} is also called ${name.trim()}.`;

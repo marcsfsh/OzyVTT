@@ -29,16 +29,23 @@ function requestEquipmentReference(force = false) {
 }
 
 // A homebrew item can be published mid-session; a cold cache does nothing (see `content/invalidate.ts`).
-registerContentCache(() => { if (catalogCache) requestEquipmentReference(true); });
+registerContentCache(() => {
+  if (catalogCache) requestEquipmentReference(true);
+});
 
-export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEquipmentSummary[]; attribution: string | null }> {
+export function useEquipmentReference(): Readonly<{
+  catalog: readonly ContentEquipmentSummary[];
+  attribution: string | null;
+}> {
   const [catalog, setCatalog] = useState<readonly ContentEquipmentSummary[]>(catalogCache ?? []);
   useEffect(() => {
     // Subscribe even with a warm cache, so a later invalidation still reaches this consumer.
     if (catalogCache) setCatalog(catalogCache);
     listeners.add(setCatalog);
     requestEquipmentReference();
-    return () => { listeners.delete(setCatalog); };
+    return () => {
+      listeners.delete(setCatalog);
+    };
   }, []);
   return { catalog, attribution: attributionCache };
 }
@@ -52,13 +59,16 @@ export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEqu
  */
 export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary["weapon"]>) {
   return {
-    category: weapon.category, damageDice: weapon.damageDice, damageType: weapon.damageType,
-    rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet,
+    category: weapon.category,
+    damageDice: weapon.damageDice,
+    damageType: weapon.damageType,
+    rangeFeet: weapon.rangeFeet,
+    longRangeFeet: weapon.longRangeFeet,
     ...(weapon.properties ? { properties: [...weapon.properties] } : {})
   };
 }
 
-const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
+const titleCase = (value: string) => (value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 const categoryLabel = (category: string) => category.split("-").map(titleCase).join(" ");
 
 /** The picker's filter groups, each folding one or more catalog categories. */
@@ -91,9 +101,17 @@ function metaLine(item: ContentEquipmentSummary): string {
   const parts: string[] = [categoryLabel(item.category)];
   if (item.weapon) {
     parts.push(`${item.weapon.damageDice} ${item.weapon.damageType}`);
-    if (item.weapon.rangeFeet) parts.push(`range ${item.weapon.rangeFeet}${item.weapon.longRangeFeet ? `/${item.weapon.longRangeFeet}` : ""} ft`);
+    if (item.weapon.rangeFeet)
+      parts.push(
+        `range ${item.weapon.rangeFeet}${item.weapon.longRangeFeet ? `/${item.weapon.longRangeFeet}` : ""} ft`
+      );
   }
-  if (item.armor) parts.push(item.category === "shield" ? `+${item.armor.acBase} AC` : `AC ${item.armor.acBase}${item.armor.addDexModifier ? " + Dex" : ""}`);
+  if (item.armor)
+    parts.push(
+      item.category === "shield"
+        ? `+${item.armor.acBase} AC`
+        : `AC ${item.armor.acBase}${item.armor.addDexModifier ? " + Dex" : ""}`
+    );
   const cost = formatCost(item.costGp);
   if (cost) parts.push(cost);
   if (item.weightLb) parts.push(`${item.weightLb} lb`);
@@ -105,7 +123,13 @@ function metaLine(item: ContentEquipmentSummary): string {
  * picker's chooser step and the sheet's bind prompt. Each row shows the base's own numbers. Bases the
  * catalog cannot resolve (e.g. a deleted homebrew base) are omitted; the server would refuse them.
  */
-export function BaseOptionList({ template, catalog, busy, query, onPick }: Readonly<{
+export function BaseOptionList({
+  template,
+  catalog,
+  busy,
+  query,
+  onPick
+}: Readonly<{
   template: ContentEquipmentSummary;
   catalog: readonly ContentEquipmentSummary[];
   busy: boolean;
@@ -117,20 +141,42 @@ export function BaseOptionList({ template, catalog, busy, query, onPick }: Reado
     .map((id) => catalog.find((entry) => entry.id === id))
     .filter((base): base is ContentEquipmentSummary => base !== undefined)
     .filter((base) => !needle || base.name.toLowerCase().includes(needle));
-  if (bases.length === 0) return <p className="sheet-picker-empty">{needle ? "No base matches that search." : "None of this item's bases are in the catalog."}</p>;
-  return <ul className="sheet-picker-list scroll-y">
-    {bases.map((base) => <li key={base.id}>
-      <div className="sheet-picker-item">
-        <span className="sheet-picker-name">{base.name}</span>
-        <span className="sheet-picker-meta">{metaLine(base)}</span>
-      </div>
-      <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Make it a ${base.name}`} onClick={() => onPick(base.id)}>Pick</button>
-    </li>)}
-  </ul>;
+  if (bases.length === 0)
+    return (
+      <p className="sheet-picker-empty">
+        {needle ? "No base matches that search." : "None of this item's bases are in the catalog."}
+      </p>
+    );
+  return (
+    <ul className="sheet-picker-list scroll-y">
+      {bases.map((base) => (
+        <li key={base.id}>
+          <div className="sheet-picker-item">
+            <span className="sheet-picker-name">{base.name}</span>
+            <span className="sheet-picker-meta">{metaLine(base)}</span>
+          </div>
+          <button
+            type="button"
+            className="sheet-picker-add tap-target"
+            disabled={busy}
+            aria-label={`Make it a ${base.name}`}
+            onClick={() => onPick(base.id)}
+          >
+            Pick
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** The sheet's chooser for an older template row that has no base picked: same list, own modal. */
-export function BindItemModal({ template, busy, onPick, onClose }: Readonly<{
+export function BindItemModal({
+  template,
+  busy,
+  onPick,
+  onClose
+}: Readonly<{
   template: ContentEquipmentSummary;
   busy: boolean;
   onPick: (baseId: string) => void;
@@ -138,13 +184,34 @@ export function BindItemModal({ template, busy, onPick, onClose }: Readonly<{
 }>) {
   const { catalog } = useEquipmentReference();
   const [query, setQuery] = useState("");
-  return <Modal open onClose={onClose} size="lg" accent="cyan" title={`${template.name} — what is it?`} ariaLabel={`Choose which ${template.category} ${template.name} is`}>
-    <p className="sheet-picker-empty">{template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is - its numbers come from that choice.</p>
-    <div className="sheet-picker-controls">
-      <Input type="search" className="sheet-picker-search" value={query} maxLength={60} placeholder="Search…" aria-label="Search bases" onChange={(event) => setQuery(event.target.value)} autoFocus />
-    </div>
-    <BaseOptionList template={template} catalog={catalog} busy={busy} query={query} onPick={onPick} />
-  </Modal>;
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      accent="cyan"
+      title={`${template.name} — what is it?`}
+      ariaLabel={`Choose which ${template.category} ${template.name} is`}
+    >
+      <p className="sheet-picker-empty">
+        {template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is - its numbers come from
+        that choice.
+      </p>
+      <div className="sheet-picker-controls">
+        <Input
+          type="search"
+          className="sheet-picker-search"
+          value={query}
+          maxLength={60}
+          placeholder="Search…"
+          aria-label="Search bases"
+          onChange={(event) => setQuery(event.target.value)}
+          autoFocus
+        />
+      </div>
+      <BaseOptionList template={template} catalog={catalog} busy={busy} query={query} onPick={onPick} />
+    </Modal>
+  );
 }
 
 /**
@@ -156,7 +223,12 @@ export function BindItemModal({ template, busy, onPick, onClose }: Readonly<{
  * the add completes with the pick. A single-base template never asks (the server auto-binds), and
  * re-adding an owned template grows the stack, keeping its pick.
  */
-export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<{
+export function EquipmentPicker({
+  ownedCounts,
+  busy,
+  onAdd,
+  onClose
+}: Readonly<{
   ownedCounts: ReadonlyMap<string, number>;
   busy: boolean;
   onAdd: (item: ContentEquipmentSummary, baseId?: string) => void;
@@ -189,43 +261,132 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
   };
 
   if (choosing) {
-    return <Modal open onClose={onClose} size="lg" accent="cyan" title={`${choosing.name} — what is it?`} ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}>
-      <p className="sheet-picker-empty">{choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is - its dice, reach and properties come from that choice.</p>
-      <div className="sheet-picker-controls">
-        <Input type="search" className="sheet-picker-search" value={query} maxLength={60} placeholder="Search…" aria-label="Search bases" onChange={(event) => setQuery(event.target.value)} autoFocus />
-        <button type="button" className="sheet-picker-chip" onClick={() => { setQuery(""); setChoosing(null); }}>Back to the list</button>
-      </div>
-      <BaseOptionList template={choosing} catalog={catalog} busy={busy} query={query} onPick={(baseId) => { onAdd(choosing, baseId); setQuery(""); setChoosing(null); }} />
-    </Modal>;
+    return (
+      <Modal
+        open
+        onClose={onClose}
+        size="lg"
+        accent="cyan"
+        title={`${choosing.name} — what is it?`}
+        ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}
+      >
+        <p className="sheet-picker-empty">
+          {choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is - its dice, reach and properties
+          come from that choice.
+        </p>
+        <div className="sheet-picker-controls">
+          <Input
+            type="search"
+            className="sheet-picker-search"
+            value={query}
+            maxLength={60}
+            placeholder="Search…"
+            aria-label="Search bases"
+            onChange={(event) => setQuery(event.target.value)}
+            autoFocus
+          />
+          <button
+            type="button"
+            className="sheet-picker-chip"
+            onClick={() => {
+              setQuery("");
+              setChoosing(null);
+            }}
+          >
+            Back to the list
+          </button>
+        </div>
+        <BaseOptionList
+          template={choosing}
+          catalog={catalog}
+          busy={busy}
+          query={query}
+          onPick={(baseId) => {
+            onAdd(choosing, baseId);
+            setQuery("");
+            setChoosing(null);
+          }}
+        />
+      </Modal>
+    );
   }
 
-  return <Modal open onClose={onClose} size="lg" accent="cyan" title="Add equipment" ariaLabel="Browse the SRD equipment catalog">
-    <div className="sheet-picker-controls">
-      <input type="search" className="sheet-picker-search" value={query} maxLength={60} placeholder="Search equipment…" aria-label="Search equipment" onChange={(event) => setQuery(event.target.value)} autoFocus />
-      <div className="sheet-picker-filters" role="group" aria-label="Filter by category">
-        {FILTERS.map((entry) => <button key={entry.id} type="button" className={`sheet-picker-chip${entry.id === filter ? " is-active" : ""}`} aria-pressed={entry.id === filter} onClick={() => setFilter(entry.id)}>{entry.label}</button>)}
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      accent="cyan"
+      title="Add equipment"
+      ariaLabel="Browse the SRD equipment catalog"
+    >
+      <div className="sheet-picker-controls">
+        <input
+          type="search"
+          className="sheet-picker-search"
+          value={query}
+          maxLength={60}
+          placeholder="Search equipment…"
+          aria-label="Search equipment"
+          onChange={(event) => setQuery(event.target.value)}
+          autoFocus
+        />
+        <div className="sheet-picker-filters" role="group" aria-label="Filter by category">
+          {FILTERS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={`sheet-picker-chip${entry.id === filter ? " is-active" : ""}`}
+              aria-pressed={entry.id === filter}
+              onClick={() => setFilter(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
-    {catalog.length === 0 ? <p className="sheet-picker-empty">Loading the catalog…</p>
-      : results.length === 0 ? <p className="sheet-picker-empty">No equipment matches that search.</p>
-      : <ul className="sheet-picker-list scroll-y">
-        {results.map((item) => {
-          const owned = ownedCounts.get(item.id) ?? 0;
-          return <li key={item.id}>
-            {/* The description's first sentence is the SRD type line, the only place a magic item's rarity
+      {catalog.length === 0 ? (
+        <p className="sheet-picker-empty">Loading the catalog…</p>
+      ) : results.length === 0 ? (
+        <p className="sheet-picker-empty">No equipment matches that search.</p>
+      ) : (
+        <ul className="sheet-picker-list scroll-y">
+          {results.map((item) => {
+            const owned = ownedCounts.get(item.id) ?? 0;
+            return (
+              <li key={item.id}>
+                {/* The description's first sentence is the SRD type line, the only place a magic item's rarity
                 and attunement requirement appear (magic rows carry no cost or weight for `metaLine`).
                 Clamped to one line. */}
-            <div className="sheet-picker-item">
-              <span className="sheet-picker-name">{item.name}{owned > 0 && <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>×{owned}</span>}</span>
-              <span className="sheet-picker-meta">{metaLine(item)}</span>
-              {item.description && <span className="sheet-picker-desc">{item.description}</span>}
-            </div>
-            {/* `.tap-target` reaches the 44px floor through a centred `::after` (the material uses `::before`),
+                <div className="sheet-picker-item">
+                  <span className="sheet-picker-name">
+                    {item.name}
+                    {owned > 0 && (
+                      <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>
+                        ×{owned}
+                      </span>
+                    )}
+                  </span>
+                  <span className="sheet-picker-meta">{metaLine(item)}</span>
+                  {item.description && <span className="sheet-picker-desc">{item.description}</span>}
+                </div>
+                {/* `.tap-target` reaches the 44px floor through a centred `::after` (the material uses `::before`),
                 so the row's rhythm does not change. */}
-            <button type="button" className="sheet-picker-add tap-target" disabled={busy} aria-label={`Add ${item.name}`} onClick={() => startAdd(item)}>Add</button>
-          </li>;
-        })}
-      </ul>}
-    {attribution && <p className="sheet-picker-attribution">{attribution}</p>}
-  </Modal>;
+                <button
+                  type="button"
+                  className="sheet-picker-add tap-target"
+                  disabled={busy}
+                  aria-label={`Add ${item.name}`}
+                  onClick={() => startAdd(item)}
+                >
+                  Add
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {attribution && <p className="sheet-picker-attribution">{attribution}</p>}
+    </Modal>
+  );
 }

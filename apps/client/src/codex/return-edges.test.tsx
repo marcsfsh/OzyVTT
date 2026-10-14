@@ -5,8 +5,9 @@ import userEvent from "@testing-library/user-event";
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
 vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) =>
+  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
     <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+  )
 }));
 
 const listPages = vi.fn();
@@ -42,7 +43,13 @@ vi.mock("./api", async (importOriginal) => {
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      timeline: (...a: unknown[]) => timeline(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forMarker: (...a: unknown[]) => forMarker(...a)
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -66,27 +73,93 @@ import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
-  id: "j1", playerText: "A battle was fought here.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "j1",
+  playerText: "A battle was fought here.",
+  gmText: null,
+  revealedToPlayers: false,
+  kind: "note",
+  attachMarkerId: null,
+  attachPageId: null,
+  sourceEncounterId: null,
+  payload: null,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 /** The Journal reads the chronicle record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "A battle was fought here.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "A battle was fought here.",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 /** The atlas defaults to `maps[0]`, so the pin's map is second and a jump that skips resolving it fails. */
-const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MAP_OTHER: CodexMap = {
+  id: "m0",
+  assetId: "a0",
+  name: "Castle Ravenloft",
+  kind: "battlemap",
+  parentMapId: null,
+  revealedToPlayers: false,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
-const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MARKER: CodexMarker = {
+  id: "k1",
+  mapId: "m1",
+  x: 0.4,
+  y: 0.6,
+  iconId: "pin",
+  iconColor: "#FF2E9A",
+  label: "Old Svalich Road",
+  revealedToPlayers: false,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
 
 const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
-  (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" onOpenReplay={onOpenReplay} /></ToastProvider>);
+  (goTo("/codex/pages"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" onOpenReplay={onOpenReplay} />
+    </ToastProvider>
+  );
 
 /** Open the Journal from the nav and wait for the chronicle. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -102,7 +175,9 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     // One read resolves the pin's map.
-    markerById.mockImplementation(async (_token: string, id: string) => (id === MARKER.id ? MARKER : Promise.reject(new Error("not found"))));
+    markerById.mockImplementation(async (_token: string, id: string) =>
+      id === MARKER.id ? MARKER : Promise.reject(new Error("not found"))
+    );
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, connections: [] });
@@ -126,7 +201,9 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     // The pin's map, not the default.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
-    expect(within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })
+    ).toBeInTheDocument();
     // The pin is selected: its inspector is open.
     expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");

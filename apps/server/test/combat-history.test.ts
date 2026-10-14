@@ -21,12 +21,33 @@ const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 const GM = { role: "gm" } as const;
 
 function activeState(): GameState {
-  const game = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: PC, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, ownerSessionId: null },
-    { id: MON, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
-  ] });
+  const game = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: PC,
+        name: "Alpha",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        ownerSessionId: null
+      },
+      { id: MON, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
+    ]
+  });
   // Turn order: Alpha (20) then Goblin (10). Live from Alpha's turn, round 1.
-  startEncounter(game, { mapAssetId: MAP, entries: [{ actorId: PC, score: 20 }, { actorId: MON, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    game,
+    {
+      mapAssetId: MAP,
+      entries: [
+        { actorId: PC, score: 20 },
+        { actorId: MON, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return game;
 }
 
@@ -38,10 +59,19 @@ describe("turn time-travel timeline", () => {
     store = new GameStore(join(directory, "vtt.sqlite"), activeState(), { timelineDirtied });
     await store.initialize();
   });
-  afterEach(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  afterEach(async () => {
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  });
 
-  const next = (confirmRewrite = false) => store.executeTimeline({ id: randomUUID(), type: "initiative.next" }, (state, timeline) => planNextTurn(state, timeline, confirmRewrite));
-  const previous = (confirmDiscard = false) => store.executeTimeline({ id: randomUUID(), type: "initiative.previous" }, (state, timeline) => planPreviousTurn(state, timeline, confirmDiscard));
+  const next = (confirmRewrite = false) =>
+    store.executeTimeline({ id: randomUUID(), type: "initiative.next" }, (state, timeline) =>
+      planNextTurn(state, timeline, confirmRewrite)
+    );
+  const previous = (confirmDiscard = false) =>
+    store.executeTimeline({ id: randomUUID(), type: "initiative.previous" }, (state, timeline) =>
+      planPreviousTurn(state, timeline, confirmDiscard)
+    );
 
   it("captures a boundary and advances on a live Next", async () => {
     expect(store.snapshot.combat.turnActorId).toBe(PC);
@@ -56,7 +86,9 @@ describe("turn time-travel timeline", () => {
   it("rewinds the whole table to the end of the prior turn and resumes live without undoing anything", async () => {
     await next(); // capture Alpha's turn @0, now live on Goblin
     // Goblin takes damage during its (live) turn - this must survive a rewind-and-resume round trip.
-    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: MON }, (state) => applyDamage(state, MON, 4, GM));
+    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: MON }, (state) =>
+      applyDamage(state, MON, 4, GM)
+    );
     expect(store.snapshot.actors.find((a) => a.id === MON)?.hp.current).toBe(6);
 
     await previous(); // park a return-point, restore Alpha's-turn snapshot (Goblin back to full)
@@ -78,10 +110,15 @@ describe("turn time-travel timeline", () => {
     await previous(); // rewound at cursor 0
     expect(store.snapshot.combat.historyDirty).toBe(false);
     // A claim changes no restorable state (hp/conditions/combat are untouched) → stays clean.
-    await store.execute({ id: randomUUID(), type: "character.claim", actorId: PC }, (state) => { const actor = state.actors.find((candidate) => candidate.id === PC); if (actor) actor.ownerSessionId = randomUUID(); });
+    await store.execute({ id: randomUUID(), type: "character.claim", actorId: PC }, (state) => {
+      const actor = state.actors.find((candidate) => candidate.id === PC);
+      if (actor) actor.ownerSessionId = randomUUID();
+    });
     expect(store.snapshot.combat.historyDirty).toBe(false);
     // Damage changes actor hp → dirties.
-    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: PC }, (state) => applyDamage(state, PC, 3, GM));
+    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: PC }, (state) =>
+      applyDamage(state, PC, 3, GM)
+    );
     expect(store.snapshot.combat.historyDirty).toBe(true);
   });
 
@@ -92,7 +129,9 @@ describe("turn time-travel timeline", () => {
     await previous(); // return-point @2, rewound to @1 (Goblin's turn end)
     await previous(); // rewound to @0 (Alpha's turn end)
     expect(store.snapshot.combat.historyCursor).toBe(0);
-    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: MON }, (state) => applyDamage(state, MON, 2, GM));
+    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: MON }, (state) =>
+      applyDamage(state, MON, 2, GM)
+    );
     expect(store.snapshot.combat.historyDirty).toBe(true);
 
     await expect(next(false)).rejects.toBeInstanceOf(TimelineConfirmationRequired);
@@ -113,7 +152,9 @@ describe("turn time-travel timeline", () => {
   it("discards an in-place change on a confirmed Previous without moving the cursor", async () => {
     await next();
     await previous(); // rewound at 0
-    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: PC }, (state) => applyDamage(state, PC, 5, GM));
+    await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: PC }, (state) =>
+      applyDamage(state, PC, 5, GM)
+    );
     expect(store.snapshot.actors.find((a) => a.id === PC)?.hp.current).toBe(15);
     expect(store.snapshot.combat.historyDirty).toBe(true);
 
@@ -150,31 +191,44 @@ describe("turn time-travel timeline", () => {
     try {
       expect(reopened.snapshot.combat.historyCursor).toBe(cursor);
       expect(reopened.listTurnSnapshots().map((entry) => entry.kind)).toEqual(["turn", "return"]);
-    } finally { reopened.close(); store = new GameStore(join(directory, "vtt.sqlite")); await store.initialize(); }
+    } finally {
+      reopened.close();
+      store = new GameStore(join(directory, "vtt.sqlite"));
+      await store.initialize();
+    }
   });
 
   // The encounter:end handler builds this document and archives it in the same transaction as the
   // truncate; here we drive that plan directly to prove the archive is atomic, complete, and permanent.
-  const LOG: readonly CombatLogEntry[] = [{ id: 1, at: new Date(0).toISOString(), kind: "damage", text: "Goblin took 6 damage.", gmOnly: false, revision: 2 }];
-  const endAndArchive = (endId: string) => store.executeTimeline({ id: endId, type: "encounter.end" }, (state, timeline) => {
-    const finalState = structuredClone(state);
-    endEncounter(state);
-    const entries = timeline.entries();
-    const document = buildEncounterArchive({
-      entries,
-      readState: timeline.read,
-      log: LOG,
-      journal: timeline.journalEntries(),
-      finalState,
-      postEncounterState: structuredClone(state),
-      endedAt: new Date(1000).toISOString(),
-      resolveBundledDefinition: () => undefined,
-      attribution: "test attribution"
+  const LOG: readonly CombatLogEntry[] = [
+    { id: 1, at: new Date(0).toISOString(), kind: "damage", text: "Goblin took 6 damage.", gmOnly: false, revision: 2 }
+  ];
+  const endAndArchive = (endId: string) =>
+    store.executeTimeline({ id: endId, type: "encounter.end" }, (state, timeline) => {
+      const finalState = structuredClone(state);
+      endEncounter(state);
+      const entries = timeline.entries();
+      const document = buildEncounterArchive({
+        entries,
+        readState: timeline.read,
+        log: LOG,
+        journal: timeline.journalEntries(),
+        finalState,
+        postEncounterState: structuredClone(state),
+        endedAt: new Date(1000).toISOString(),
+        resolveBundledDefinition: () => undefined,
+        attribution: "test attribution"
+      });
+      timeline.archive({
+        commandId: endId,
+        startedAt: document.startedAt,
+        endedAt: document.endedAt,
+        turnCount: document.turnCount,
+        documentJson: JSON.stringify(document)
+      });
+      timeline.truncateAll();
+      timeline.clearJournal();
     });
-    timeline.archive({ commandId: endId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
-    timeline.truncateAll();
-    timeline.clearJournal();
-  });
 
   it("archives the whole fight permanently on end, then wipes the live buffer", async () => {
     await next(); // capture Alpha's turn @0
@@ -196,7 +250,10 @@ describe("turn time-travel timeline", () => {
     expect(document.turns[0].revision).toBe(document.turns[0].state.revision);
     expect(document.log).toEqual(LOG);
     // The fight's command journal and the last live state before the end cleared it.
-    expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["initiative.next", "initiative.next"]);
+    expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual([
+      "initiative.next",
+      "initiative.next"
+    ]);
     expect(document.finalState.combat.active).toBe(true);
     // The aftermath, captured after encounter.end cleared the fight.
     expect(document.postEncounterState.combat.active).toBe(false);
@@ -218,7 +275,9 @@ describe("turn time-travel timeline", () => {
     await next();
     const endId = randomUUID();
     await endAndArchive(endId);
-    const retry = await store.executeTimeline({ id: endId, type: "encounter.end" }, () => { throw new Error("a duplicate end must not run the plan"); });
+    const retry = await store.executeTimeline({ id: endId, type: "encounter.end" }, () => {
+      throw new Error("a duplicate end must not run the plan");
+    });
     expect(retry.duplicate).toBe(true);
     expect(store.listEncounterArchives()).toHaveLength(1);
   });

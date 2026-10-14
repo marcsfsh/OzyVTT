@@ -13,9 +13,10 @@ import { RiderEditor } from "./RiderEditor";
 import { EMPTY_CONTEXT, type Draft } from "./schema";
 
 /** One authored Unarmored Defense rider, in the shape `FeatureModifierSchema` accepts. */
-const body = (allowShield: boolean): Draft => ({
-  modifiers: [{ rowId: "row-1", type: "unarmored-defense", ability: "con", allowShield }]
-}) as unknown as Draft;
+const body = (allowShield: boolean): Draft =>
+  ({
+    modifiers: [{ rowId: "row-1", type: "unarmored-defense", ability: "con", allowShield }]
+  }) as unknown as Draft;
 
 function mount(allowShield: boolean, scope: "feature" | "item" = "feature") {
   let latest: Draft = body(allowShield);
@@ -24,7 +25,10 @@ function mount(allowShield: boolean, scope: "feature" | "item" = "feature") {
     return (
       <RiderEditor
         value={draft}
-        onChange={(next) => { setDraft(next); latest = next; }}
+        onChange={(next) => {
+          setDraft(next);
+          latest = next;
+        }}
         enabled={["modifiers", "uses", "tags", "actions", "effects"]}
         scope={scope}
         ctx={EMPTY_CONTEXT}
@@ -36,7 +40,8 @@ function mount(allowShield: boolean, scope: "feature" | "item" = "feature") {
   return {
     container: view.container,
     /** A modifier row with more than two fields is collapsible, so open it first, as a GM would. */
-    open: () => userEvent.click(within(view.container).getByRole("button", { expanded: false, name: /Unarmoured defence/ })),
+    open: () =>
+      userEvent.click(within(view.container).getByRole("button", { expanded: false, name: /Unarmoured defence/ })),
     shieldSwitch: () => within(view.container).getByRole("switch", { name: "A shield still counts" }),
     /** Every interactive target on the form (what a 375px tap audit walks). */
     controls: () => view.container.querySelectorAll("button, input, select, textarea, [role='switch']").length,

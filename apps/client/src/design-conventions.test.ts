@@ -76,14 +76,19 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["packages/ui/src/primitives/Toast.tsx", "✕"]
 ];
 
-interface GlyphHit { path: string; line: number; glyph: string }
+interface GlyphHit {
+  path: string;
+  line: number;
+  glyph: string;
+}
 
 function glyphHits(sources: readonly Source[]): GlyphHit[] {
   const hits: GlyphHit[] = [];
   for (const source of sources) {
     // Strip comments first; what survives is in a string literal or JSX text, so a person sees it.
     const src = stripComments(source.read());
-    for (const match of src.matchAll(GLYPH)) hits.push({ path: source.path, line: lineOf(src, match.index), glyph: match[0] });
+    for (const match of src.matchAll(GLYPH))
+      hits.push({ path: source.path, line: lineOf(src, match.index), glyph: match[0] });
   }
   return hits;
 }
@@ -177,7 +182,12 @@ function countRaw(sources: readonly Source[], type: string): Map<string, number>
   return counts;
 }
 
-function describeRawInput(type: string, primitive: string, allow: ReadonlyArray<readonly [string, number]>, pins: { files: number; sites: number }) {
+function describeRawInput(
+  type: string,
+  primitive: string,
+  allow: ReadonlyArray<readonly [string, number]>,
+  pins: { files: number; sites: number }
+) {
   describe(`(b) no raw <input type="${type}"> — use ${primitive}`, () => {
     const sources = playTsx();
     const counts = countRaw(sources, type);
@@ -254,7 +264,10 @@ function classNameValues(src: string): { value: string; index: number }[] {
       let depth = 0;
       for (let i = start; i < src.length; i++) {
         if (src[i] === "{") depth++;
-        else if (src[i] === "}" && --depth === 0) { values.push({ value: src.slice(start + 1, i), index: start }); break; }
+        else if (src[i] === "}" && --depth === 0) {
+          values.push({ value: src.slice(start + 1, i), index: start });
+          break;
+        }
       }
     }
   }
@@ -267,7 +280,8 @@ describe("(c) one Eyebrow, and it is the primitive", () => {
   for (const source of sources) {
     const src = stripComments(source.read());
     for (const { value, index } of classNameValues(src)) {
-      for (const token of value.split(CLASS_TOKEN)) if (token === "eyebrow") uses.push(cite(source.path, lineOf(src, index), value.trim().slice(0, 60)));
+      for (const token of value.split(CLASS_TOKEN))
+        if (token === "eyebrow") uses.push(cite(source.path, lineOf(src, index), value.trim().slice(0, 60)));
     }
   }
 
@@ -287,12 +301,16 @@ describe("(c) one Eyebrow, and it is the primitive", () => {
         `Fix: import { Eyebrow } from "@vtt/ui" and render <Eyebrow>LABEL</Eyebrow>. The primitive owns the tracking, the size tier and the muted colour; the local class is a second copy of all three.\n` +
         `If this number went DOWN, that is the migration working — lower CONVENTION_SHAPE.eyebrowUses (and eyebrowFiles) in the same commit.`
     ).toBe(CONVENTION_SHAPE.eyebrowUses);
-    expect(new Set(uses.map((use) => use.split(":")[0])).size, "files using the local eyebrow class").toBe(CONVENTION_SHAPE.eyebrowFiles);
+    expect(new Set(uses.map((use) => use.split(":")[0])).size, "files using the local eyebrow class").toBe(
+      CONVENTION_SHAPE.eyebrowFiles
+    );
   });
 
   it("does not let apps/client/src/styles.css grow another .eyebrow rule", () => {
     // The lookarounds keep `.viewer-eyebrow` and `var(--tracking-eyebrow)` out: only `.eyebrow` itself counts.
-    const selectors = [...readFileSync(`${process.cwd()}/src/styles.css`, "utf8").matchAll(/(?<![\w-])\.eyebrow(?![\w-])/g)];
+    const selectors = [
+      ...readFileSync(`${process.cwd()}/src/styles.css`, "utf8").matchAll(/(?<![\w-])\.eyebrow(?![\w-])/g)
+    ];
     expect(
       selectors.length,
       `apps/client/src/styles.css has ${selectors.length} \`.eyebrow\` selector(s); ${CONVENTION_SHAPE.eyebrowCssSelectors} are on record (the declaration at :18 and the second consumer at :250).\n` +
@@ -317,7 +335,11 @@ const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: str
   ["apps/client/src/codex/codex.css", 1, "graph node-icon fill over arbitrary map art"],
   ["apps/client/src/maps/map-manager.css", 11, "SVG-context paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG-context paint: annotation strokes over image content"],
-  ["apps/client/src/scene/encounter-map.css", 8, "SVG-context paint + the black/white pair a token ring needs against any map"],
+  [
+    "apps/client/src/scene/encounter-map.css",
+    8,
+    "SVG-context paint + the black/white pair a token ring needs against any map"
+  ],
   ["apps/client/src/styles.css", 2, "a two-stop black scrim"],
   ["apps/client/src/viewer/viewer-controls.css", 1, "the white A/B measurement labels, over arbitrary map art"],
   ["apps/client/src/viewer/viewer.css", 6, "SVG-context paint + scrim over the projected map"],
@@ -368,7 +390,10 @@ describe("(d) colours come from design-tokens.css — design-language.md:46-47",
     expect(COLOR_ALLOW.length, "COLOR_ALLOW file count").toBe(CONVENTION_SHAPE.colorAllowFiles);
     // Rows here must carry a reason, and the reason is asserted.
     for (const [file, , why] of COLOR_ALLOW) {
-      expect(why.trim().length, `COLOR_ALLOW row for ${file} has no reason attached.\nFix: say why these literals cannot be tokens, or take the row out and tokenize them.`).toBeGreaterThan(15);
+      expect(
+        why.trim().length,
+        `COLOR_ALLOW row for ${file} has no reason attached.\nFix: say why these literals cannot be tokens, or take the row out and tokenize them.`
+      ).toBeGreaterThan(15);
     }
     expect(
       COLOR_ALLOW.reduce((n, [, count]) => n + count, 0),
@@ -521,12 +546,17 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 
 /** Reasoned survivors: rows carry a why, and growth must be argued. */
 const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
-  ["apps/client/src/encounter/encounter-panel.css", ["85vh", "52vh", "94vh", "92vh"],
-    "overlay caps bounding fixed/modal layers (⋯-menu, sheet modal + its capped picker, monster browser) — §8 reference implementations"],
-  ["apps/client/src/styles.css", ["4vh", "3.5vh", "4.5vh"],
-    "landing clamp() mid-terms — fluid spacing inside the locked hero, rem-bounded, cannot grow the page"],
-  ["apps/client/src/viewer/viewer.css", ["32vh"],
-    "the conforming shared-screen viewer's portrait initiative band"]
+  [
+    "apps/client/src/encounter/encounter-panel.css",
+    ["85vh", "52vh", "94vh", "92vh"],
+    "overlay caps bounding fixed/modal layers (⋯-menu, sheet modal + its capped picker, monster browser) — §8 reference implementations"
+  ],
+  [
+    "apps/client/src/styles.css",
+    ["4vh", "3.5vh", "4.5vh"],
+    "landing clamp() mid-terms — fluid spacing inside the locked hero, rem-bounded, cannot grow the page"
+  ],
+  ["apps/client/src/viewer/viewer.css", ["32vh"], "the conforming shared-screen viewer's portrait initiative band"]
 ];
 
 /**
@@ -536,7 +566,11 @@ const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonl
 // Empty. Do not add a row.
 const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phase: string]> = [];
 
-interface ViewportHit { path: string; line: number; value: string }
+interface ViewportHit {
+  path: string;
+  line: number;
+  value: string;
+}
 
 function viewportHits(sources: readonly Source[]): ViewportHit[] {
   const hits: ViewportHit[] = [];
@@ -548,8 +582,8 @@ function viewportHits(sources: readonly Source[]): ViewportHit[] {
       if (value === "100dvh" || value === "100svh") continue;
       const line = lineOf(src, match.index);
       if (value === "100vh") {
-        // The fallback pair: `height: 100vh; height: 100dvh;` on one line.
-        if (/\b\d+(?:\.\d+)?dvh\b/.test(lines[line - 1] ?? "")) continue;
+        // The fallback pair: `height: 100vh;` with `height: 100dvh;` on the same or the next line.
+        if (/\b\d+(?:\.\d+)?dvh\b/.test(`${lines[line - 1] ?? ""} ${lines[line] ?? ""}`)) continue;
         // The `:fullscreen` selector: walk back to this declaration block's selector text.
         const open = src.lastIndexOf("{", match.index);
         const boundary = Math.max(src.lastIndexOf("}", open), src.lastIndexOf("{", open - 1));
@@ -576,15 +610,23 @@ describe("(g) no viewport-fraction caps on in-flow content — design-language.m
   it("adds no viewport-fraction value that no row answers for", () => {
     // Every hit spends a row; leftover hits are offenders, leftover rows are dead. Conforming rows are
     // consulted first.
-    const remainingConforming = VIEWPORT_CONFORMING.flatMap(([file, values]) => values.map((value) => `${file} ${value}`));
+    const remainingConforming = VIEWPORT_CONFORMING.flatMap(([file, values]) =>
+      values.map((value) => `${file} ${value}`)
+    );
     const remainingLegacy = VIEWPORT_LEGACY.map(([file, value]) => `${file} ${value}`);
     const offenders: string[] = [];
     for (const hit of hits) {
       const key = `${hit.path} ${hit.value}`;
       const conforming = remainingConforming.indexOf(key);
-      if (conforming >= 0) { remainingConforming.splice(conforming, 1); continue; }
+      if (conforming >= 0) {
+        remainingConforming.splice(conforming, 1);
+        continue;
+      }
       const legacy = remainingLegacy.indexOf(key);
-      if (legacy >= 0) { remainingLegacy.splice(legacy, 1); continue; }
+      if (legacy >= 0) {
+        remainingLegacy.splice(legacy, 1);
+        continue;
+      }
       offenders.push(cite(hit.path, hit.line, `${hit.value} on in-flow content`));
     }
     expect(
@@ -612,15 +654,24 @@ describe("(g) no viewport-fraction caps on in-flow content — design-language.m
         `Fix: the pin follows the list down. It does not follow it up without a commit message that argues the new occurrence.`
     ).toBe(CONVENTION_SHAPE.viewportConformingTotal);
     for (const [file, , why] of VIEWPORT_CONFORMING) {
-      expect(why.trim().length, `VIEWPORT_CONFORMING row for ${file} has no reason attached.\nFix: say why these caps are structural, or take the row out and convert them.`).toBeGreaterThan(15);
+      expect(
+        why.trim().length,
+        `VIEWPORT_CONFORMING row for ${file} has no reason attached.\nFix: say why these caps are structural, or take the row out and convert them.`
+      ).toBeGreaterThan(15);
     }
-    expect(VIEWPORT_LEGACY.length, `VIEWPORT_LEGACY holds ${VIEWPORT_LEGACY.length} rows; design-conventions-shape.ts pins ${CONVENTION_SHAPE.viewportLegacyTotal}.`).toBe(CONVENTION_SHAPE.viewportLegacyTotal);
+    expect(
+      VIEWPORT_LEGACY.length,
+      `VIEWPORT_LEGACY holds ${VIEWPORT_LEGACY.length} rows; design-conventions-shape.ts pins ${CONVENTION_SHAPE.viewportLegacyTotal}.`
+    ).toBe(CONVENTION_SHAPE.viewportLegacyTotal);
     expect(
       new Set(VIEWPORT_LEGACY.map(([file]) => file)).size,
       "VIEWPORT_LEGACY distinct-file count vs CONVENTION_SHAPE.viewportLegacyFiles"
     ).toBe(CONVENTION_SHAPE.viewportLegacyFiles);
     for (const [file, , phase] of VIEWPORT_LEGACY) {
-      expect(/^[ABC](\/[ABC])?$/.test(phase), `VIEWPORT_LEGACY row for ${file} carries no drain phase (A, B, C or a pair).`).toBe(true);
+      expect(
+        /^[ABC](\/[ABC])?$/.test(phase),
+        `VIEWPORT_LEGACY row for ${file} carries no drain phase (A, B, C or a pair).`
+      ).toBe(true);
     }
   });
 });
@@ -720,7 +771,9 @@ describe("the design-convention checks themselves", () => {
     // An empty or over-broad prefix would silently empty every scan above.
     for (const [prefix, why] of PLAY_EXCLUDED) {
       expect(prefix.trim(), "an empty PLAY_EXCLUDED prefix excludes the whole tree").not.toBe("");
-      expect(prefix.endsWith("/"), `PLAY_EXCLUDED entry ${JSON.stringify(prefix)} is not a directory prefix`).toBe(true);
+      expect(prefix.endsWith("/"), `PLAY_EXCLUDED entry ${JSON.stringify(prefix)} is not a directory prefix`).toBe(
+        true
+      );
       expect(why.length, `PLAY_EXCLUDED entry ${JSON.stringify(prefix)} has no reason attached`).toBeGreaterThan(20);
     }
     expect(

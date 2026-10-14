@@ -38,12 +38,20 @@ async function startTestServer(overrides: Partial<CreateServerOptions> = {}) {
 }
 
 async function bootstrapGm(url: string) {
-  const response = await fetch(`${url}/api/bootstrap`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: PASSWORD }) });
+  const response = await fetch(`${url}/api/bootstrap`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: PASSWORD })
+  });
   if (!response.ok) throw new Error(`bootstrap failed with status ${response.status}`);
 }
 
 async function loginGm(url: string) {
-  const response = await fetch(`${url}/api/gm/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: PASSWORD }) });
+  const response = await fetch(`${url}/api/gm/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: PASSWORD })
+  });
   const body = (await response.json()) as { token: string };
   return body.token;
 }
@@ -51,7 +59,9 @@ async function loginGm(url: string) {
 /** Collects every `state:updated` payload a socket receives, so tests can wait for convergence. */
 function trackState(socket: Socket) {
   let latest: AnyView | undefined;
-  socket.on("state:updated", (state: AnyView) => { latest = state; });
+  socket.on("state:updated", (state: AnyView) => {
+    latest = state;
+  });
   return () => latest;
 }
 
@@ -66,7 +76,11 @@ async function connectAndJoin(url: string, token?: string) {
   return { socket, join, getState };
 }
 
-async function waitFor<T>(getValue: () => T, predicate: (value: T) => boolean, { timeoutMs = 2000, intervalMs = 20 } = {}) {
+async function waitFor<T>(
+  getValue: () => T,
+  predicate: (value: T) => boolean,
+  { timeoutMs = 2000, intervalMs = 20 } = {}
+) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const value = getValue();
@@ -91,7 +105,9 @@ describe("realtime presence, reconnect, and convergence", () => {
 
       const view = await waitFor(player.getState, (state): state is PlayerView => !!state && "actors" in state);
       expect((view as PlayerView).actors.every((actor) => actor.presence === null)).toBe(true);
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 
   it("keeps a session online while any of its multiple connections remain open, and only leaves once the last one drops", async () => {
@@ -111,9 +127,15 @@ describe("realtime presence, reconnect, and convergence", () => {
       expect(server.presence.statusFor(sessionId)).toBe("online");
 
       second.socket.close();
-      await waitFor(() => server.presence.statusFor(sessionId), (status) => status !== "online", { timeoutMs: 500 });
+      await waitFor(
+        () => server.presence.statusFor(sessionId),
+        (status) => status !== "online",
+        { timeoutMs: 500 }
+      );
       expect(server.presence.statusFor(sessionId)).toBe("reconnecting");
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 
   it("enters a reconnecting grace period on disconnect and only becomes offline once the grace period elapses", async () => {
@@ -121,21 +143,39 @@ describe("realtime presence, reconnect, and convergence", () => {
     try {
       await bootstrapGm(server.url);
       const gm = await connectAndJoin(server.url, await loginGm(server.url));
-      const gmState = await waitFor(gm.getState, (state): state is GmView => !!state && (state as GmView).actors.length > 0);
+      const gmState = await waitFor(
+        gm.getState,
+        (state): state is GmView => !!state && (state as GmView).actors.length > 0
+      );
       const actorId = (gmState as GmView).actors[0].id;
 
       const player = await connectAndJoin(server.url);
-      const claim = await new Promise<{ ok: boolean }>((resolve) => player.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve));
+      const claim = await new Promise<{ ok: boolean }>((resolve) =>
+        player.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve)
+      );
       expect(claim.ok).toBe(true);
 
-      await waitFor(gm.getState, (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.presence === "online");
+      await waitFor(
+        gm.getState,
+        (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.presence === "online"
+      );
 
       player.socket.close();
-      const reconnecting = await waitFor(gm.getState, (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.presence === "reconnecting", { timeoutMs: 500 });
+      const reconnecting = await waitFor(
+        gm.getState,
+        (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.presence === "reconnecting",
+        { timeoutMs: 500 }
+      );
       expect((reconnecting as GmView).actors.find((actor) => actor.id === actorId)?.presence).toBe("reconnecting");
 
-      await waitFor(gm.getState, (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.presence === "offline", { timeoutMs: 1000 });
-    } finally { await server.close(); }
+      await waitFor(
+        gm.getState,
+        (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.presence === "offline",
+        { timeoutMs: 1000 }
+      );
+    } finally {
+      await server.close();
+    }
   });
 
   it("cancels the reconnecting grace period and recovers the same presence and claimed character for a remembered player token", async () => {
@@ -143,29 +183,43 @@ describe("realtime presence, reconnect, and convergence", () => {
     try {
       await bootstrapGm(server.url);
       const gm = await connectAndJoin(server.url, await loginGm(server.url));
-      const gmState = await waitFor(gm.getState, (state): state is GmView => !!state && (state as GmView).actors.length > 0);
+      const gmState = await waitFor(
+        gm.getState,
+        (state): state is GmView => !!state && (state as GmView).actors.length > 0
+      );
       const actorId = (gmState as GmView).actors[0].id;
 
       const player = await connectAndJoin(server.url);
       const rememberedToken = player.join.token!;
       const sessionId = player.join.sessionId!;
-      await new Promise<{ ok: boolean }>((resolve) => player.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve));
+      await new Promise<{ ok: boolean }>((resolve) =>
+        player.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve)
+      );
       player.socket.close();
 
-      await waitFor(() => server.presence.statusFor(sessionId), (status) => status === "reconnecting", { timeoutMs: 300 });
+      await waitFor(
+        () => server.presence.statusFor(sessionId),
+        (status) => status === "reconnecting",
+        { timeoutMs: 300 }
+      );
 
       const reconnected = await connectAndJoin(server.url, rememberedToken);
       expect(reconnected.join.sessionId).toBe(sessionId);
       expect(server.presence.statusFor(sessionId)).toBe("online");
 
-      const reconnectedView = await waitFor(reconnected.getState, (state): state is PlayerView => !!state && "claimStatus" in ((state as PlayerView).actors[0] ?? {}));
+      const reconnectedView = await waitFor(
+        reconnected.getState,
+        (state): state is PlayerView => !!state && "claimStatus" in ((state as PlayerView).actors[0] ?? {})
+      );
       const claimedActor = (reconnectedView as PlayerView).actors.find((actor) => actor.id === actorId);
       expect(claimedActor?.claimStatus).toBe("mine");
       expect(claimedActor?.presence).toBe("online");
 
       await new Promise((resolve) => setTimeout(resolve, 500));
       expect(server.presence.statusFor(sessionId)).toBe("online");
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 
   it("lets exactly one of two racing players claim the same character and converges both clients on the same outcome", async () => {
@@ -173,27 +227,50 @@ describe("realtime presence, reconnect, and convergence", () => {
     try {
       await bootstrapGm(server.url);
       const gm = await connectAndJoin(server.url, await loginGm(server.url));
-      const gmState = await waitFor(gm.getState, (state): state is GmView => !!state && (state as GmView).actors.length > 0);
+      const gmState = await waitFor(
+        gm.getState,
+        (state): state is GmView => !!state && (state as GmView).actors.length > 0
+      );
       const actorId = (gmState as GmView).actors[0].id;
 
       const [playerA, playerB] = await Promise.all([connectAndJoin(server.url), connectAndJoin(server.url)]);
       expect(playerA.join.sessionId).not.toBe(playerB.join.sessionId);
 
       const [resultA, resultB] = await Promise.all([
-        new Promise<{ ok: boolean }>((resolve) => playerA.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve)),
-        new Promise<{ ok: boolean }>((resolve) => playerB.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve))
+        new Promise<{ ok: boolean }>((resolve) =>
+          playerA.socket.emit(
+            "character:claim",
+            { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 },
+            resolve
+          )
+        ),
+        new Promise<{ ok: boolean }>((resolve) =>
+          playerB.socket.emit(
+            "character:claim",
+            { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 },
+            resolve
+          )
+        )
       ]);
       expect([resultA.ok, resultB.ok].filter(Boolean)).toHaveLength(1);
 
-      const finalGmState = await waitFor(gm.getState, (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.ownerSessionId !== null);
+      const finalGmState = await waitFor(
+        gm.getState,
+        (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.ownerSessionId !== null
+      );
       const owner = (finalGmState as GmView).actors.find((actor) => actor.id === actorId)?.ownerSessionId;
       expect([playerA.join.sessionId, playerB.join.sessionId]).toContain(owner);
 
       const winner = resultA.ok ? playerA : playerB;
-      const winnerView = await waitFor(winner.getState, (state): state is PlayerView => !!state && (state as PlayerView).actors.some((actor) => actor.id === actorId));
+      const winnerView = await waitFor(
+        winner.getState,
+        (state): state is PlayerView => !!state && (state as PlayerView).actors.some((actor) => actor.id === actorId)
+      );
       expect((winnerView as PlayerView).actors.find((actor) => actor.id === actorId)?.claimStatus).toBe("mine");
       expect(winner.join.sessionId).toBe(owner);
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 
   it("converges every connected client after force-release, a duplicate command retry, and a stale-revision conflict", async () => {
@@ -201,30 +278,53 @@ describe("realtime presence, reconnect, and convergence", () => {
     try {
       await bootstrapGm(server.url);
       const gm = await connectAndJoin(server.url, await loginGm(server.url));
-      const gmState = await waitFor(gm.getState, (state): state is GmView => !!state && (state as GmView).actors.length > 0);
+      const gmState = await waitFor(
+        gm.getState,
+        (state): state is GmView => !!state && (state as GmView).actors.length > 0
+      );
       const actorId = (gmState as GmView).actors[0].id;
 
       const player = await connectAndJoin(server.url);
       const observer = await connectAndJoin(server.url);
 
       const commandId = crypto.randomUUID();
-      const claim = await new Promise<{ ok: boolean; revision?: number }>((resolve) => player.socket.emit("character:claim", { commandId, actorId, expectedRevision: 0 }, resolve));
+      const claim = await new Promise<{ ok: boolean; revision?: number }>((resolve) =>
+        player.socket.emit("character:claim", { commandId, actorId, expectedRevision: 0 }, resolve)
+      );
       expect(claim.ok).toBe(true);
 
-      const retry = await new Promise<{ ok: boolean; duplicate?: boolean; revision?: number }>((resolve) => player.socket.emit("character:claim", { commandId, actorId, expectedRevision: 0 }, resolve));
+      const retry = await new Promise<{ ok: boolean; duplicate?: boolean; revision?: number }>((resolve) =>
+        player.socket.emit("character:claim", { commandId, actorId, expectedRevision: 0 }, resolve)
+      );
       expect(retry.duplicate).toBe(true);
       expect(retry.revision).toBe(claim.revision);
 
-      const stale = await new Promise<{ ok: boolean; message?: string }>((resolve) => player.socket.emit("character:release", { commandId: crypto.randomUUID(), expectedRevision: 0 }, resolve));
+      const stale = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
+        player.socket.emit("character:release", { commandId: crypto.randomUUID(), expectedRevision: 0 }, resolve)
+      );
       expect(stale.ok).toBe(false);
 
-      const forceRelease = await new Promise<{ ok: boolean; revision?: number }>((resolve) => gm.socket.emit("character:force-release", { commandId: crypto.randomUUID(), actorId, expectedRevision: claim.revision }, resolve));
+      const forceRelease = await new Promise<{ ok: boolean; revision?: number }>((resolve) =>
+        gm.socket.emit(
+          "character:force-release",
+          { commandId: crypto.randomUUID(), actorId, expectedRevision: claim.revision },
+          resolve
+        )
+      );
       expect(forceRelease.ok).toBe(true);
 
-      await waitFor(observer.getState, (state) => (state as PlayerView).actors.find((actor) => actor.id === actorId)?.claimStatus === "available");
-      await waitFor(gm.getState, (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.ownerSessionId === null);
+      await waitFor(
+        observer.getState,
+        (state) => (state as PlayerView).actors.find((actor) => actor.id === actorId)?.claimStatus === "available"
+      );
+      await waitFor(
+        gm.getState,
+        (state) => (state as GmView).actors.find((actor) => actor.id === actorId)?.ownerSessionId === null
+      );
       expect((observer.getState() as PlayerView).revision).toBe((gm.getState() as GmView).revision);
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 
   it("never sends a session ID, token, socket ID, or address in either the player or GM projection", async () => {
@@ -233,20 +333,33 @@ describe("realtime presence, reconnect, and convergence", () => {
       await bootstrapGm(server.url);
       const gmToken = await loginGm(server.url);
       const gm = await connectAndJoin(server.url, gmToken);
-      const gmState = await waitFor(gm.getState, (state): state is GmView => !!state && (state as GmView).actors.length > 0);
+      const gmState = await waitFor(
+        gm.getState,
+        (state): state is GmView => !!state && (state as GmView).actors.length > 0
+      );
       const actorId = (gmState as GmView).actors[0].id;
 
       const player = await connectAndJoin(server.url);
-      await new Promise<{ ok: boolean }>((resolve) => player.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve));
-      const playerView = await waitFor(player.getState, (state): state is PlayerView => !!state && (state as PlayerView).actors.some((actor) => actor.id === actorId && actor.claimStatus === "mine"));
+      await new Promise<{ ok: boolean }>((resolve) =>
+        player.socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: 0 }, resolve)
+      );
+      const playerView = await waitFor(
+        player.getState,
+        (state): state is PlayerView =>
+          !!state && (state as PlayerView).actors.some((actor) => actor.id === actorId && actor.claimStatus === "mine")
+      );
 
       const serializedPlayerView = JSON.stringify(playerView);
       expect(serializedPlayerView).not.toContain(player.join.sessionId);
       expect(serializedPlayerView).not.toContain(gm.join.sessionId);
       expect(serializedPlayerView).not.toContain(gmToken);
       expect(serializedPlayerView).not.toContain(player.socket.id);
-      expect((playerView as PlayerView).actors.every((actor) => !("ownerSessionId" in actor) && !("notes" in actor))).toBe(true);
-    } finally { await server.close(); }
+      expect(
+        (playerView as PlayerView).actors.every((actor) => !("ownerSessionId" in actor) && !("notes" in actor))
+      ).toBe(true);
+    } finally {
+      await server.close();
+    }
   });
 
   it("immediately drops a revoked GM session's presence and denies it further GM authority without affecting other sessions", async () => {
@@ -259,15 +372,24 @@ describe("realtime presence, reconnect, and convergence", () => {
       const other = await connectAndJoin(server.url, otherToken);
       expect(server.presence.statusFor(revoked.join.sessionId!)).toBe("online");
 
-      const logout = await fetch(`${server.url}/api/gm/logout`, { method: "POST", headers: { authorization: `Bearer ${revokedToken}` } });
+      const logout = await fetch(`${server.url}/api/gm/logout`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${revokedToken}` }
+      });
       expect(logout.status).toBe(200);
 
-      await waitFor(() => server.presence.statusFor(revoked.join.sessionId!), (status) => status === null, { timeoutMs: 1000 });
+      await waitFor(
+        () => server.presence.statusFor(revoked.join.sessionId!),
+        (status) => status === null,
+        { timeoutMs: 1000 }
+      );
       expect(server.presence.statusFor(other.join.sessionId!)).toBe("online");
 
       const rejoin = await connectAndJoin(server.url, revokedToken);
       expect(rejoin.join.role).not.toBe("gm");
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 });
 
@@ -282,18 +404,30 @@ describe("codex:changed on the wire (D22, socket half)", () => {
       const gmToken = await loginGm(server.url);
       const player = await connectAndJoin(server.url);
       const pings: unknown[] = [];
-      player.socket.on("codex:changed", (event: unknown) => { pings.push(event); });
+      player.socket.on("codex:changed", (event: unknown) => {
+        pings.push(event);
+      });
 
       const created = await fetch(`${server.url}/api/v1/codex/pages`, {
-        method: "POST", headers: { authorization: `Bearer ${gmToken}`, "content-type": "application/json" }, body: JSON.stringify({ title: "Vallaki" })
+        method: "POST",
+        headers: { authorization: `Bearer ${gmToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ title: "Vallaki" })
       });
       expect(created.status).toBe(201);
 
-      await waitFor(() => pings, (received) => received.length > 0);
+      await waitFor(
+        () => pings,
+        (received) => received.length > 0
+      );
       for (const event of pings) {
-        expect(Object.keys(event as Record<string, unknown>), "the ping's key set is exactly one revision counter").toEqual(["codexRevision"]);
+        expect(
+          Object.keys(event as Record<string, unknown>),
+          "the ping's key set is exactly one revision counter"
+        ).toEqual(["codexRevision"]);
         expect(typeof (event as { codexRevision: unknown }).codexRevision).toBe("number");
       }
-    } finally { await server.close(); }
+    } finally {
+      await server.close();
+    }
   });
 });

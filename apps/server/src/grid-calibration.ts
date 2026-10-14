@@ -46,21 +46,24 @@ function positive(value: number, label: string) {
 }
 
 function pointWithinMap(point: ImagePoint, width: number, height: number, label: string) {
-  finite(point.x, `${label} x`); finite(point.y, `${label} y`);
-  if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) throw new Error(`${label} must be inside the map bounds.`);
+  finite(point.x, `${label} x`);
+  finite(point.y, `${label} y`);
+  if (point.x < 0 || point.x > width || point.y < 0 || point.y > height)
+    throw new Error(`${label} must be inside the map bounds.`);
 }
 
 export function normalizeRotation(radians: number) {
   finite(radians, "Rotation");
   const fullTurn = Math.PI * 2;
-  const normalized = ((radians + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
+  const normalized = ((((radians + Math.PI) % fullTurn) + fullTurn) % fullTurn) - Math.PI;
   return Object.is(normalized, -0) ? 0 : normalized;
 }
 
 export function validateSquareGridCalibration(calibration: SquareGridCalibration) {
   pointWithinMap(calibration.origin, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, "Grid origin");
   if (calibration.kind !== "square") throw new Error("Only square-grid calibration is supported.");
-  if (calibration.cellSizePx < MIN_CELL_SIZE_PX || calibration.cellSizePx > MAX_CELL_SIZE_PX) throw new Error(`Grid cell size must be between ${MIN_CELL_SIZE_PX} and ${MAX_CELL_SIZE_PX} pixels.`);
+  if (calibration.cellSizePx < MIN_CELL_SIZE_PX || calibration.cellSizePx > MAX_CELL_SIZE_PX)
+    throw new Error(`Grid cell size must be between ${MIN_CELL_SIZE_PX} and ${MAX_CELL_SIZE_PX} pixels.`);
   positive(calibration.distancePerCell, "Distance per cell");
   finite(calibration.rotationRadians, "Grid rotation");
   return calibration;
@@ -74,16 +77,26 @@ export function deriveSquareGridFromSegment(input: SegmentCalibrationInput): Squ
   const mapHeightPx = positive(input.mapHeightPx, "Map height");
   pointWithinMap(input.start, mapWidthPx, mapHeightPx, "Segment start");
   pointWithinMap(input.end, mapWidthPx, mapHeightPx, "Segment end");
-  if (!Number.isInteger(input.cellsBetween) || input.cellsBetween < 1 || input.cellsBetween > MAX_CELLS_BETWEEN) throw new Error(`Cells between must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
+  if (!Number.isInteger(input.cellsBetween) || input.cellsBetween < 1 || input.cellsBetween > MAX_CELLS_BETWEEN)
+    throw new Error(`Cells between must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
   const dx = input.end.x - input.start.x;
   const dy = input.end.y - input.start.y;
   const length = Math.hypot(dx, dy);
   if (length === 0) throw new Error("Draw the calibration segment across at least one grid cell.");
   const cellSizePx = length / input.cellsBetween;
-  if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX) throw new Error(`The selected segment produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`);
+  if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX)
+    throw new Error(
+      `The selected segment produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`
+    );
   const segmentAngle = Math.atan2(dy, dx);
   const rotationRadians = normalizeRotation(input.axis === "horizontal" ? segmentAngle : segmentAngle - Math.PI / 2);
-  return validateSquareGridCalibration({ kind: "square", origin: { ...input.start }, cellSizePx, rotationRadians, distancePerCell: input.distancePerCell ?? 5 });
+  return validateSquareGridCalibration({
+    kind: "square",
+    origin: { ...input.start },
+    cellSizePx,
+    rotationRadians,
+    distancePerCell: input.distancePerCell ?? 5
+  });
 }
 
 /** Derives a square grid from opposite corners of a known rectangular grid area (the UI uses 3x3), so
@@ -94,20 +107,32 @@ export function deriveSquareGridFromArea(input: AreaCalibrationInput): SquareGri
   const mapHeightPx = positive(input.mapHeightPx, "Map height");
   pointWithinMap(input.start, mapWidthPx, mapHeightPx, "Area start");
   pointWithinMap(input.end, mapWidthPx, mapHeightPx, "Area end");
-  if (!Number.isInteger(input.cellsAcross) || input.cellsAcross < 1 || input.cellsAcross > MAX_CELLS_BETWEEN) throw new Error(`Cells across must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
-  if (!Number.isInteger(input.cellsDown) || input.cellsDown < 1 || input.cellsDown > MAX_CELLS_BETWEEN) throw new Error(`Cells down must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
+  if (!Number.isInteger(input.cellsAcross) || input.cellsAcross < 1 || input.cellsAcross > MAX_CELLS_BETWEEN)
+    throw new Error(`Cells across must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
+  if (!Number.isInteger(input.cellsDown) || input.cellsDown < 1 || input.cellsDown > MAX_CELLS_BETWEEN)
+    throw new Error(`Cells down must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
   const width = Math.abs(input.end.x - input.start.x);
   const height = Math.abs(input.end.y - input.start.y);
   if (width === 0 || height === 0) throw new Error("Drag across the full calibration area before releasing.");
   const cellSizePx = (width / input.cellsAcross + height / input.cellsDown) / 2;
-  if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX) throw new Error(`The selected area produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`);
+  if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX)
+    throw new Error(
+      `The selected area produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`
+    );
   const origin = { x: Math.min(input.start.x, input.end.x), y: Math.min(input.start.y, input.end.y) };
-  return validateSquareGridCalibration({ kind: "square", origin, cellSizePx, rotationRadians: 0, distancePerCell: input.distancePerCell ?? 5 });
+  return validateSquareGridCalibration({
+    kind: "square",
+    origin,
+    cellSizePx,
+    rotationRadians: 0,
+    distancePerCell: input.distancePerCell ?? 5
+  });
 }
 
 export function imageToGrid(calibration: SquareGridCalibration, point: ImagePoint): GridPoint {
   validateSquareGridCalibration(calibration);
-  finite(point.x, "Image x"); finite(point.y, "Image y");
+  finite(point.x, "Image x");
+  finite(point.y, "Image y");
   const dx = point.x - calibration.origin.x;
   const dy = point.y - calibration.origin.y;
   const cosine = Math.cos(calibration.rotationRadians);
@@ -120,7 +145,8 @@ export function imageToGrid(calibration: SquareGridCalibration, point: ImagePoin
 
 export function gridToImage(calibration: SquareGridCalibration, point: GridPoint): ImagePoint {
   validateSquareGridCalibration(calibration);
-  finite(point.column, "Grid column"); finite(point.row, "Grid row");
+  finite(point.column, "Grid column");
+  finite(point.row, "Grid row");
   const localX = point.column * calibration.cellSizePx;
   const localY = point.row * calibration.cellSizePx;
   const cosine = Math.cos(calibration.rotationRadians);
@@ -131,15 +157,23 @@ export function gridToImage(calibration: SquareGridCalibration, point: GridPoint
   };
 }
 
-export function snapImagePoint(calibration: SquareGridCalibration, point: ImagePoint, mode: "intersection" | "cell-center" = "intersection") {
+export function snapImagePoint(
+  calibration: SquareGridCalibration,
+  point: ImagePoint,
+  mode: "intersection" | "cell-center" = "intersection"
+) {
   const grid = imageToGrid(calibration, point);
-  const snapped = mode === "intersection"
-    ? { column: Math.round(grid.column), row: Math.round(grid.row) }
-    : { column: Math.floor(grid.column) + 0.5, row: Math.floor(grid.row) + 0.5 };
+  const snapped =
+    mode === "intersection"
+      ? { column: Math.round(grid.column), row: Math.round(grid.row) }
+      : { column: Math.floor(grid.column) + 0.5, row: Math.floor(grid.row) + 0.5 };
   return { image: gridToImage(calibration, snapped), grid: snapped };
 }
 
-export function nudgeSquareGrid(calibration: SquareGridCalibration, adjustment: Readonly<{ originDelta?: ImagePoint; cellSizeDeltaPx?: number; rotationDeltaRadians?: number }>): SquareGridCalibration {
+export function nudgeSquareGrid(
+  calibration: SquareGridCalibration,
+  adjustment: Readonly<{ originDelta?: ImagePoint; cellSizeDeltaPx?: number; rotationDeltaRadians?: number }>
+): SquareGridCalibration {
   const next = {
     ...calibration,
     origin: {
@@ -153,13 +187,23 @@ export function nudgeSquareGrid(calibration: SquareGridCalibration, adjustment: 
 }
 
 /** Pixel residual used by the wizard to say whether a third known intersection aligns. */
-export function calibrationErrorPx(calibration: SquareGridCalibration, imagePoint: ImagePoint, expectedGridPoint: GridPoint) {
+export function calibrationErrorPx(
+  calibration: SquareGridCalibration,
+  imagePoint: ImagePoint,
+  expectedGridPoint: GridPoint
+) {
   const expected = gridToImage(calibration, expectedGridPoint);
-  finite(imagePoint.x, "Image x"); finite(imagePoint.y, "Image y");
+  finite(imagePoint.x, "Image x");
+  finite(imagePoint.y, "Image y");
   return Math.hypot(imagePoint.x - expected.x, imagePoint.y - expected.y);
 }
 
-export function distanceForGridPath(calibration: SquareGridCalibration, from: GridPoint, to: GridPoint, diagonal: "euclidean" | "chebyshev" = "euclidean") {
+export function distanceForGridPath(
+  calibration: SquareGridCalibration,
+  from: GridPoint,
+  to: GridPoint,
+  diagonal: "euclidean" | "chebyshev" = "euclidean"
+) {
   validateSquareGridCalibration(calibration);
   const columns = Math.abs(to.column - from.column);
   const rows = Math.abs(to.row - from.row);

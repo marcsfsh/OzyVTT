@@ -9,7 +9,13 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, IconChevron, Menu, MenuItem, RevealSwitch, SaveState } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
-import { HomebrewRequestError, homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
+import {
+  HomebrewRequestError,
+  homebrewApi,
+  listAllHomebrew,
+  type HomebrewRecordDocument,
+  type HomebrewRecordSummary
+} from "./api";
 import { FeatureEditor } from "./FeatureEditor";
 import { LevelTableEditor } from "./LevelTableEditor";
 import { ITEM_RIDERS, RiderEditor } from "./RiderEditor";
@@ -44,9 +50,16 @@ function ChecklistLine({
       {section && reason.sectionId && (
         <>
           {" "}
-          <Button variant="secondary" size="sm" className="tap-target hb-blocked-jump" onClick={() => onJump(reason.sectionId!)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="tap-target hb-blocked-jump"
+            onClick={() => onJump(reason.sectionId!)}
+          >
             {section}
-            <span className="hb-blocked-jump-icon" aria-hidden="true"><IconChevron /></span>
+            <span className="hb-blocked-jump-icon" aria-hidden="true">
+              <IconChevron />
+            </span>
           </Button>
         </>
       )}
@@ -136,10 +149,7 @@ export function RecordDetail({
   /** Everything outstanding before publish, listed in one place beneath the button. Drafts show no
       per-field errors because a draft may be incomplete. `publishIssues` runs the record's server
       schema, so the list is complete and no looser than the store. */
-  const issues = useMemo(
-    () => publishIssues(doc.type, draft, ctx, doc.id),
-    [doc.type, doc.id, draft, ctx]
-  );
+  const issues = useMemo(() => publishIssues(doc.type, draft, ctx, doc.id), [doc.type, doc.id, draft, ctx]);
   /** The server's issues for what the shared schema cannot check: identity and cross-record
       references. Shown only once the local list is empty, because until then the stored verdict
       describes an outdated body. */
@@ -147,7 +157,9 @@ export function RecordDetail({
     () =>
       issues.length > 0 || doc.validity.valid
         ? []
-        : doc.validity.issues.map((issue) => issueReason(doc.type, issue, (path) => fieldAt(doc.type, path))).filter((reason) => reason !== null),
+        : doc.validity.issues
+            .map((issue) => issueReason(doc.type, issue, (path) => fieldAt(doc.type, path)))
+            .filter((reason) => reason !== null),
     [issues.length, doc.type, doc.validity]
   );
   const checklist = issues.length > 0 ? issues : serverIssues;
@@ -157,7 +169,10 @@ export function RecordDetail({
   const jumpToSection = (sectionId: string) => {
     const element = document.getElementById(sectionDomId(doc.type, sectionId));
     if (!element) return;
-    element.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    element.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+    });
     (element as HTMLElement).focus?.();
   };
 
@@ -194,7 +209,9 @@ export function RecordDetail({
         idPrefix={`hb-${doc.type}`}
       />
     ),
-    spellListContents: () => <SpellListContents draft={draft} onDraft={setDraft} ctx={ctx} listId={doc.id} spells={spells} />
+    spellListContents: () => (
+      <SpellListContents draft={draft} onDraft={setDraft} ctx={ctx} listId={doc.id} spells={spells} />
+    )
   };
 
   /** Every state change bumps the revision server-side, so each re-baselines the autosave. */
@@ -222,7 +239,8 @@ export function RecordDetail({
 
   const publish = () => runStateChange(() => homebrewApi.publish(gmToken, docRef.current.id, docRef.current.rev));
   const unpublish = () => runStateChange(() => homebrewApi.unpublish(gmToken, docRef.current.id, docRef.current.rev));
-  const setVisible = (visible: boolean) => void runStateChange(() => homebrewApi.setVisibility(gmToken, docRef.current.id, visible, docRef.current.rev));
+  const setVisible = (visible: boolean) =>
+    void runStateChange(() => homebrewApi.setVisibility(gmToken, docRef.current.id, visible, docRef.current.rev));
   const restore = () => runStateChange(() => homebrewApi.restore(gmToken, docRef.current.id));
 
   /**
@@ -245,7 +263,9 @@ export function RecordDetail({
     setActionError(null);
     setBrokeOthers([]);
     const wereFine = new Set(
-      records.filter((row) => row.state === "published" && row.valid && !row.deletedAt && row.id !== docRef.current.id).map((row) => row.id)
+      records
+        .filter((row) => row.state === "published" && row.valid && !row.deletedAt && row.id !== docRef.current.id)
+        .map((row) => row.id)
     );
     try {
       await autosave.flush();
@@ -253,7 +273,9 @@ export function RecordDetail({
       // Best-effort: a failed re-list must not turn a successful removal into an error.
       try {
         const rows = await listAllHomebrew(gmToken);
-        setBrokeOthers(rows.filter((row) => wereFine.has(row.id) && row.state === "published" && !row.valid && !row.deletedAt));
+        setBrokeOthers(
+          rows.filter((row) => wereFine.has(row.id) && row.state === "published" && !row.valid && !row.deletedAt)
+        );
       } catch {
         setBrokeOthers([]);
       }
@@ -280,7 +302,13 @@ export function RecordDetail({
         </h2>
 
         <div className="hb-state">
-          {removed ? <Badge tone="neutral">Archived</Badge> : published ? <Badge tone="neutral">Published</Badge> : <Badge tone="caution">Draft</Badge>}
+          {removed ? (
+            <Badge tone="neutral">Archived</Badge>
+          ) : published ? (
+            <Badge tone="neutral">Published</Badge>
+          ) : (
+            <Badge tone="caution">Draft</Badge>
+          )}
           {/* No `GmOnlyTag` here: the `RevealSwitch` beside it already says "GM only". */}
           <SaveState status={autosave.status} onReload={() => void reload()} onRetry={autosave.retry} />
 
@@ -304,8 +332,14 @@ export function RecordDetail({
             )}
             {!removed && (
               <Menu trigger="⋯" label={`More actions for this ${typeLabel(doc.type)}`} icon align="end">
-                {published && <MenuItem onClick={() => void unpublish()} disabled={busy}>Unpublish</MenuItem>}
-                <MenuItem onClick={() => void remove()} disabled={busy}>Remove</MenuItem>
+                {published && (
+                  <MenuItem onClick={() => void unpublish()} disabled={busy}>
+                    Unpublish
+                  </MenuItem>
+                )}
+                <MenuItem onClick={() => void remove()} disabled={busy}>
+                  Remove
+                </MenuItem>
               </Menu>
             )}
           </div>
@@ -351,25 +385,35 @@ export function RecordDetail({
 
         {/* "In use" is a count, not a badge: it is a fact about other records. */}
         {usageCount > 0 && !removed && (
-          <p className="hb-usage">Used by {usageCount} {usageCount === 1 ? "character" : "characters"}.</p>
+          <p className="hb-usage">
+            Used by {usageCount} {usageCount === 1 ? "character" : "characters"}.
+          </p>
         )}
       </header>
 
       {removed && (
         <Alert tone="info">
           Removed from pickers. Nothing was deleted.{" "}
-          <Button variant="secondary" size="sm" className="tap-target" onClick={() => void restore()} disabled={busy}>Restore</Button>
+          <Button variant="secondary" size="sm" className="tap-target" onClick={() => void restore()} disabled={busy}>
+            Restore
+          </Button>
         </Alert>
       )}
 
       {/* The removal's consequence for other records. `warning`, not `error`: nothing failed,
           and Restore undoes it. */}
       {brokeOthers.length > 0 && (
-        <Alert tone="warning" title={brokeOthers.length === 1 ? "This broke another record" : "This broke other records"}>
+        <Alert
+          tone="warning"
+          title={brokeOthers.length === 1 ? "This broke another record" : "This broke other records"}
+        >
           <p>
-            {brokeOthers.length === 1 ? "It's still published, but it can't be published as it stands" : "They're still published, but they can't be published as they stand"}
-            , so the next edit to {brokeOthers.length === 1 ? "it" : "them"} puts {brokeOthers.length === 1 ? "it" : "them"} back to Draft.
-            Restore this one, or fix {brokeOthers.length === 1 ? "it" : "them"}.
+            {brokeOthers.length === 1
+              ? "It's still published, but it can't be published as it stands"
+              : "They're still published, but they can't be published as they stand"}
+            , so the next edit to {brokeOthers.length === 1 ? "it" : "them"} puts{" "}
+            {brokeOthers.length === 1 ? "it" : "them"} back to Draft. Restore this one, or fix{" "}
+            {brokeOthers.length === 1 ? "it" : "them"}.
           </p>
           <div className="hb-broke-list">
             {brokeOthers.map((row) => (
@@ -382,7 +426,9 @@ export function RecordDetail({
                 onClick={() => onSelect?.(row.id)}
               >
                 {row.name || `Untitled ${typeLabel(row.type)}`}
-                <span className="hb-blocked-jump-icon" aria-hidden="true"><IconChevron /></span>
+                <span className="hb-blocked-jump-icon" aria-hidden="true">
+                  <IconChevron />
+                </span>
               </Button>
             ))}
           </div>
@@ -397,7 +443,10 @@ export function RecordDetail({
           <SchemaForm schema={schema} draft={draft} onDraft={setDraft} ctx={ctx} custom={custom} disabled={removed} />
         ) : (
           <Alert tone="warning" title="No editor for this kind yet">
-            <p>Nothing here knows how to author a {typeLabel(doc.type)}. Your record is safe — it just can&rsquo;t be edited from this screen.</p>
+            <p>
+              Nothing here knows how to author a {typeLabel(doc.type)}. Your record is safe — it just can&rsquo;t be
+              edited from this screen.
+            </p>
           </Alert>
         )}
       </div>

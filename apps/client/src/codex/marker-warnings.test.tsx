@@ -15,30 +15,67 @@ import type { CodexMap, CodexMarker } from "./api";
  * hidden pin, a revealed map, or both revealed.
  */
 const MAP = (revealed: boolean): CodexMap => ({
-  id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null,
-  revealedToPlayers: revealed, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia",
+  kind: "regional",
+  parentMapId: null,
+  revealedToPlayers: revealed,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const MARKER = (revealed: boolean): CodexMarker => ({
-  id: "k1", mapId: "m1", x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Castle Ravenloft",
-  revealedToPlayers: revealed, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [],
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id: "k1",
+  mapId: "m1",
+  x: 0.5,
+  y: 0.5,
+  iconId: "pin",
+  iconColor: "#FF2E9A",
+  label: "Castle Ravenloft",
+  revealedToPlayers: revealed,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
 const renderInspector = (markerRevealed: boolean, mapRevealed: boolean, onRevealMap?: () => void) =>
   render(
     <MarkerInspector
-      gmToken="gm" marker={MARKER(markerRevealed)} maps={[MAP(mapRevealed)]} pages={[]} scenes={[]} actors={[]}
-      activeSceneId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
-      onCreatePage={vi.fn()} onRevealPage={vi.fn()} onRevealMap={onRevealMap} onActivateScene={vi.fn()}
-      onOpenReplay={vi.fn()} onClose={vi.fn()}
+      gmToken="gm"
+      marker={MARKER(markerRevealed)}
+      maps={[MAP(mapRevealed)]}
+      pages={[]}
+      scenes={[]}
+      actors={[]}
+      activeSceneId={null}
+      autosave={{ enabled: true, intervalSeconds: 1 }}
+      onUpdated={vi.fn()}
+      onDeleted={vi.fn()}
+      onOpenMap={vi.fn()}
+      onOpenPage={vi.fn()}
+      onCreatePage={vi.fn()}
+      onRevealPage={vi.fn()}
+      onRevealMap={onRevealMap}
+      onActivateScene={vi.fn()}
+      onOpenReplay={vi.fn()}
+      onClose={vi.fn()}
     />
   );
 
 describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
   it("warns when the pin is shown but its map is still secret", () => {
     renderInspector(true, false);
-    expect(screen.getByText("This pin is shown to players, but the map is hidden from them. Players cannot see either.")).toBeInTheDocument();
-    expect(screen.getByText("Barovia")).toBeInTheDocument();   // names the map that needs revealing
+    expect(
+      screen.getByText("This pin is shown to players, but the map is hidden from them. Players cannot see either.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Barovia")).toBeInTheDocument(); // names the map that needs revealing
   });
 
   it("offers to reveal the map when the caller can do it", async () => {
@@ -51,7 +88,9 @@ describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
 
   it("still warns without an action when the caller cannot reveal the map", () => {
     renderInspector(true, false);
-    expect(screen.getByText("This pin is shown to players, but the map is hidden from them. Players cannot see either.")).toBeInTheDocument();
+    expect(
+      screen.getByText("This pin is shown to players, but the map is hidden from them. Players cannot see either.")
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /show the map too/i })).not.toBeInTheDocument();
   });
 

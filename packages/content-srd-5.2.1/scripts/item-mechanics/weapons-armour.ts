@@ -80,7 +80,9 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
     modifiers: [
       { type: "roll-mode", roll: "initiative", mode: "advantage" },
       {
-        type: "roll-mode", roll: "check", mode: "advantage",
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
         when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
       }
     ]
@@ -99,13 +101,31 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
    * not only those using this ammunition. The damage half is not authored.
    */
   "ammunition-1": {
-    modifiers: [{ type: "attack-bonus", amount: 1, when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }] }]
+    modifiers: [
+      {
+        type: "attack-bonus",
+        amount: 1,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+      }
+    ]
   },
   "ammunition-2": {
-    modifiers: [{ type: "attack-bonus", amount: 2, when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }] }]
+    modifiers: [
+      {
+        type: "attack-bonus",
+        amount: 2,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+      }
+    ]
   },
   "ammunition-3": {
-    modifiers: [{ type: "attack-bonus", amount: 3, when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }] }]
+    modifiers: [
+      {
+        type: "attack-bonus",
+        amount: 3,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+      }
+    ]
   },
 
   // ---- Weapon rows whose riders are not weapon-scoped (plus their +N halves) -----------------------
@@ -139,55 +159,137 @@ export const WEAPONS_ARMOUR: ItemMechanicsModule = {
   // ---- +N weapon pairs and unconditional on-hit dice ---------------------------------------------
 
   // Uncommon +1, Rare +2, Very Rare +3: one row per tier.
-  "weapon-1": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
-  "weapon-2": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
-  "weapon-3": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+  "weapon-1": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
+  "weapon-2": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 }
+    ]
+  },
+  "weapon-3": {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ]
+  },
 
   // Not modeled: the Thrown property and range (the bound Warhammer block has neither), the ranged
   // 1d8 Force, the 2d8 against Giants.
-  "dwarven-thrower": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+  "dwarven-thrower": {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ]
+  },
 
   // Transferring the bonus to AC is not expressible; this is the untransferred default.
-  "defender": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+  defender: {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ]
+  },
 
   // Not modeled: ignoring Slashing resistance and the natural-20 decapitation (30 damage exceeds the range).
-  "vorpal-sword": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+  "vorpal-sword": {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ]
+  },
 
   // Not modeled: 2d10 Radiant vs Fiends/Undead (creature-type gate) and the ally aura.
-  "holy-avenger": { modifiers: [{ type: "attack-bonus", amount: 3 }, { type: "damage-bonus", amount: 3 }] },
+  "holy-avenger": {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ]
+  },
 
   // The Bonus Action attack is not modeled (`extra-attack` multiplies the Attack action instead).
-  "scimitar-of-speed": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+  "scimitar-of-speed": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 }
+    ]
+  },
 
   // Life Stealing (rolled charges, crit + HP threshold + save trigger) is not expressible.
-  "nine-lives-stealer": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+  "nine-lives-stealer": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 }
+    ]
+  },
 
   // Not modeled: Acrobatic Assist (gated on the item's current form), Attack Deflection, the form changes.
-  "quarterstaff-of-the-acrobat": { modifiers: [{ type: "attack-bonus", amount: 2 }, { type: "damage-bonus", amount: 2 }] },
+  "quarterstaff-of-the-acrobat": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 }
+    ]
+  },
 
   // The armed-then-discharged poison coating needs item state and is not modeled.
-  "dagger-of-venom": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "dagger-of-venom": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   // The extra 2d6 vs Giants needs a creature-type gate and a "weapon's type" damage.
-  "giant-slayer": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "giant-slayer": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   // The extra 3d6 vs Dragons needs a creature-type gate and a "weapon's type" damage.
-  "dragon-slayer": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "dragon-slayer": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   // Not modeled: +3 vs Constructs (creature-type gate) and the crit-only 7 Bludgeoning.
-  "mace-of-smiting": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "mace-of-smiting": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   // Not modeled: the thrown thunderclap area, Giant's Bane and Might of Giants (cross-item triggers).
-  "hammer-of-thunderbolts": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "hammer-of-thunderbolts": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   // Not modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse.
-  "berserker-axe": { modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }] },
+  "berserker-axe": {
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 }
+    ]
+  },
 
   // Authored always on: the command-word lit state is not modeled, and a drawn Flame Tongue in combat is lit.
   "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }] },
 
   // The "can't regain Hit Points" save is not expressible.
-  "sword-of-wounding": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }] }
+  "sword-of-wounding": {
+    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }]
+  }
 
   // Prose-only items:
   //   `javelin-of-lightning` - Lightning instead of Piercing, and a Line area.

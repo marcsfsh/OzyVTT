@@ -14,18 +14,43 @@ export type AttackKind = "melee" | "ranged" | "spell" | "unarmed" | "thrown" | "
 
 /** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =
-  | "on-attack-roll" | "on-hit" | "on-critical-hit" | "on-critical-miss" | "on-damage-roll"
-  | "on-saving-throw" | "on-ability-check" | "on-initiative-roll" | "on-death-save"
-  | "on-taking-damage" | "on-spell-cast";
+  | "on-attack-roll"
+  | "on-hit"
+  | "on-critical-hit"
+  | "on-critical-miss"
+  | "on-damage-roll"
+  | "on-saving-throw"
+  | "on-ability-check"
+  | "on-initiative-roll"
+  | "on-death-save"
+  | "on-taking-damage"
+  | "on-spell-cast";
 
 const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
-  "on-attack-roll", "on-hit", "on-critical-hit", "on-critical-miss", "on-damage-roll",
-  "on-saving-throw", "on-ability-check", "on-initiative-roll", "on-death-save",
-  "on-taking-damage", "on-spell-cast"
+  "on-attack-roll",
+  "on-hit",
+  "on-critical-hit",
+  "on-critical-miss",
+  "on-damage-roll",
+  "on-saving-throw",
+  "on-ability-check",
+  "on-initiative-roll",
+  "on-death-save",
+  "on-taking-damage",
+  "on-spell-cast"
 ]);
 const FILTERS: ReadonlySet<string> = new Set([
-  "attack-kind-is", "weapon-property-is", "damage-type-is", "ability-is", "skill-is",
-  "spell-school-is", "spell-level-is", "spell-id-is", "versus-creature-type", "versus-size", "versus-condition"
+  "attack-kind-is",
+  "weapon-property-is",
+  "damage-type-is",
+  "ability-is",
+  "skill-is",
+  "spell-school-is",
+  "spell-level-is",
+  "spell-id-is",
+  "versus-creature-type",
+  "versus-size",
+  "versus-condition"
 ]);
 const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
 
@@ -152,27 +177,42 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
     case "attuned":
       return context.sourceItemId != null && (context.attunedItemIds ?? []).includes(context.sourceItemId);
     case "while-armored":
-      return context.armorWeight != null && (trigger.weights === undefined || trigger.weights.includes(context.armorWeight));
+      return (
+        context.armorWeight != null && (trigger.weights === undefined || trigger.weights.includes(context.armorWeight))
+      );
     case "while-unarmored":
       return context.armorWeight == null && (trigger.allowShield === true || context.shieldEquipped !== true);
     case "while-shield":
       return (trigger.wielding ?? true) === (context.shieldEquipped === true);
     case "while-character-is":
-      return overlaps(trigger.classIds, context.classIds)
-        || (trigger.speciesIds !== undefined && context.speciesId != null && trigger.speciesIds.includes(context.speciesId));
+      return (
+        overlaps(trigger.classIds, context.classIds) ||
+        (trigger.speciesIds !== undefined &&
+          context.speciesId != null &&
+          trigger.speciesIds.includes(context.speciesId))
+      );
     case "while-proficient-with": {
-      const have = trigger.kind === "weapon" ? context.proficientWeapons
-        : trigger.kind === "armor" ? context.proficientArmor
-        : trigger.kind === "tool" ? context.proficientTools
-        : trigger.kind === "skill" ? context.proficientSkills : undefined;
+      const have =
+        trigger.kind === "weapon"
+          ? context.proficientWeapons
+          : trigger.kind === "armor"
+            ? context.proficientArmor
+            : trigger.kind === "tool"
+              ? context.proficientTools
+              : trigger.kind === "skill"
+                ? context.proficientSkills
+                : undefined;
       return overlaps(trigger.ids, have);
     }
     // ---- dynamic gates ----
     case "while-effect-tag":
       return overlaps(trigger.tags, context.effectTags);
     case "while-hp-at-or-below":
-      return context.hitPointFraction !== undefined && trigger.percent !== undefined
-        && context.hitPointFraction * 100 <= trigger.percent;
+      return (
+        context.hitPointFraction !== undefined &&
+        trigger.percent !== undefined &&
+        context.hitPointFraction * 100 <= trigger.percent
+      );
     case "while-condition": {
       const present = overlaps(trigger.conditionIds, context.bearerConditionIds);
       return (trigger.present ?? true) ? present : !present;
@@ -185,19 +225,35 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
     case "damage-type-is":
       return overlaps(trigger.damageTypes, context.damageTypes);
     case "ability-is":
-      return trigger.abilities !== undefined && context.ability !== undefined && trigger.abilities.includes(context.ability);
+      return (
+        trigger.abilities !== undefined && context.ability !== undefined && trigger.abilities.includes(context.ability)
+      );
     case "skill-is":
       return trigger.skills !== undefined && context.skill !== undefined && trigger.skills.includes(context.skill);
     case "spell-school-is":
-      return trigger.schools !== undefined && context.spellSchool !== undefined && trigger.schools.includes(context.spellSchool);
+      return (
+        trigger.schools !== undefined &&
+        context.spellSchool !== undefined &&
+        trigger.schools.includes(context.spellSchool)
+      );
     case "spell-level-is":
-      return trigger.levels !== undefined && context.spellLevel !== undefined && trigger.levels.includes(context.spellLevel);
+      return (
+        trigger.levels !== undefined && context.spellLevel !== undefined && trigger.levels.includes(context.spellLevel)
+      );
     case "spell-id-is":
-      return trigger.spellIds !== undefined && context.spellId !== undefined && trigger.spellIds.includes(context.spellId);
+      return (
+        trigger.spellIds !== undefined && context.spellId !== undefined && trigger.spellIds.includes(context.spellId)
+      );
     case "versus-creature-type":
-      return trigger.creatureTypes !== undefined && context.targetCreatureType !== undefined && trigger.creatureTypes.includes(context.targetCreatureType);
+      return (
+        trigger.creatureTypes !== undefined &&
+        context.targetCreatureType !== undefined &&
+        trigger.creatureTypes.includes(context.targetCreatureType)
+      );
     case "versus-size":
-      return trigger.sizes !== undefined && context.targetSize !== undefined && trigger.sizes.includes(context.targetSize);
+      return (
+        trigger.sizes !== undefined && context.targetSize !== undefined && trigger.sizes.includes(context.targetSize)
+      );
     case "versus-condition":
       return overlaps(trigger.conditionIds, context.targetConditionIds);
     default:
@@ -214,7 +270,13 @@ function gatesOf(modifier: RiderModifier): readonly RiderTrigger[] {
 }
 
 /** Riders that default to `scope: "this-item"` on a weapon. */
-const THIS_ITEM_BY_DEFAULT: ReadonlySet<string> = new Set(["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"]);
+const THIS_ITEM_BY_DEFAULT: ReadonlySet<string> = new Set([
+  "attack-bonus",
+  "extra-damage",
+  "critical-range",
+  "critical-bonus-dice",
+  "damage-bonus"
+]);
 function scopeOf(modifier: RiderModifier, carrier: RiderCarrier): "bearer" | "this-item" {
   if (modifier.scope !== undefined) return carrier.sourceItemId === undefined ? "bearer" : modifier.scope;
   return carrier.isWeapon === true && THIS_ITEM_BY_DEFAULT.has(modifier.type) ? "this-item" : "bearer";
@@ -237,10 +299,19 @@ export function collectRiders(carriers: readonly RiderCarrier[], context: RiderC
       if (context.moment === null) {
         if (moment !== undefined || hasFilter) continue;
       } else if (moment?.type !== context.moment) continue;
-      if (scopeOf(modifier, carrier) === "this-item" && (context.sourceItemId == null || context.sourceItemId !== carrier.sourceItemId)) continue;
-      const itemContext = carrier.sourceItemId === undefined ? context : { ...context, sourceItemId: carrier.sourceItemId };
+      if (
+        scopeOf(modifier, carrier) === "this-item" &&
+        (context.sourceItemId == null || context.sourceItemId !== carrier.sourceItemId)
+      )
+        continue;
+      const itemContext =
+        carrier.sourceItemId === undefined ? context : { ...context, sourceItemId: carrier.sourceItemId };
       if (!gates.every((trigger) => triggerKind(trigger.type) === "moment" || passes(trigger, itemContext))) continue;
-      collected.push({ modifier, label: carrier.label, ...(carrier.sourceItemId !== undefined ? { sourceItemId: carrier.sourceItemId } : {}) });
+      collected.push({
+        modifier,
+        label: carrier.label,
+        ...(carrier.sourceItemId !== undefined ? { sourceItemId: carrier.sourceItemId } : {})
+      });
     }
   }
   return collected;
@@ -255,7 +326,11 @@ const GATE_PROBE_TYPE = "__gate-probe";
  * unknown triggers, moments and filters all read false, so an uncheckable gate never grants.
  * Pass the item's id as `sourceItemId` for an item's grants so `attuned` binds to it; omit it for features.
  */
-export function gatePasses(when: readonly RiderTrigger[] | undefined, context: Omit<RiderContext, "moment">, sourceItemId?: string): boolean {
+export function gatePasses(
+  when: readonly RiderTrigger[] | undefined,
+  context: Omit<RiderContext, "moment">,
+  sourceItemId?: string
+): boolean {
   if (when === undefined || when.length === 0) return true;
   const carrier: RiderCarrier = {
     label: "",
@@ -267,11 +342,16 @@ export function gatePasses(when: readonly RiderTrigger[] | undefined, context: O
 
 /** Sum the `amount` of every collected rider of one type. Signed, so a curse subtracts. */
 export function sumRiders(riders: readonly ResolvedRider[], type: string): number {
-  return riders.reduce((total, rider) => rider.modifier.type === type ? total + (rider.modifier.amount ?? 0) : total, 0);
+  return riders.reduce(
+    (total, rider) => (rider.modifier.type === type ? total + (rider.modifier.amount ?? 0) : total),
+    0
+  );
 }
 
 /** SRD armor weight from the item's AC fields: heavy adds no Dex, medium caps it at +2, light adds it uncapped. */
-export function armorWeightOf(armor: Readonly<{ addDexModifier: boolean; dexModifierCap: number | null }>): ArmorWeight {
+export function armorWeightOf(
+  armor: Readonly<{ addDexModifier: boolean; dexModifierCap: number | null }>
+): ArmorWeight {
   if (!armor.addDexModifier) return "heavy";
   return armor.dexModifierCap === null ? "light" : "medium";
 }

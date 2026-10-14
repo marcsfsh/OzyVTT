@@ -19,7 +19,12 @@ export type PlayerDamageDeps = Readonly<{
 
 /** The applied result for table narration. `sourceActorId` rides along so narration includes it in `actorIds`,
  *  making the line GM-only when the attacker is hidden. */
-export type AppliedDamage = Readonly<{ outcome: DamageOutcome; targetId: string; sourceActorId: string; label: string }>;
+export type AppliedDamage = Readonly<{
+  outcome: DamageOutcome;
+  targetId: string;
+  sourceActorId: string;
+  label: string;
+}>;
 
 /** Typed damage components (attack dice + bonus lines) of a resolution, for parking or applying. */
 export function resolutionDamageParts(resolution: ActionResolution): Array<{ amount: number; type: string }> {
@@ -33,11 +38,13 @@ export function resolutionDamageParts(resolution: ActionResolution): Array<{ amo
  *  on a reaction window (Uncanny Dodge applies it there). */
 export function playerHitOwesDamage(resolution: ActionResolution): boolean {
   const attack = resolution.attack;
-  return attack !== null
-    && !resolution.preview
-    && (attack.outcome === "hit" || attack.outcome === "crit" || attack.outcome === "unknown")
-    && resolution.damageTotal > 0
-    && !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId);
+  return (
+    attack !== null &&
+    !resolution.preview &&
+    (attack.outcome === "hit" || attack.outcome === "crit" || attack.outcome === "unknown") &&
+    resolution.damageTotal > 0 &&
+    !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId)
+  );
 }
 
 function isoOf(now: () => number) {
@@ -47,16 +54,51 @@ function isoOf(now: () => number) {
 /** Settles a player's confirmed hit per the player-damage policy, mutating `state` (parks a proposal or
  *  applies the damage GM-scoped). Returns the applied outcome in direct mode, or null when parked or not
  *  a qualifying hit. */
-export function settlePlayerHit(state: GameState, resolution: ActionResolution, attackerName: string, sourceActorId: string, mode: "proposal" | "direct", deps: PlayerDamageDeps): AppliedDamage | null {
+export function settlePlayerHit(
+  state: GameState,
+  resolution: ActionResolution,
+  attackerName: string,
+  sourceActorId: string,
+  mode: "proposal" | "direct",
+  deps: PlayerDamageDeps
+): AppliedDamage | null {
   const attack = resolution.attack;
   if (!attack || !playerHitOwesDamage(resolution)) return null;
   const parts = resolutionDamageParts(resolution);
   const label = `${attackerName}'s ${resolution.actionName}`;
   if (mode === "direct") {
-    const outcome = applyDamageDetailed(state, attack.targetId, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now), ...(deps.catalog ? { catalog: deps.catalog } : {}) });
+    const outcome = applyDamageDetailed(
+      state,
+      attack.targetId,
+      { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label },
+      { role: "gm" },
+      {
+        resolveDefinition: deps.resolveDefinition,
+        newId: deps.newId,
+        now: isoOf(deps.now),
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      }
+    );
     return { outcome, targetId: attack.targetId, sourceActorId, label };
   }
-  state.combat = { ...state.combat, pendingDamage: [...state.combat.pendingDamage, { id: deps.newId(), sourceActorId, sourceName: attackerName, actionName: resolution.actionName, targetActorId: attack.targetId, targetName: attack.targetName, proposedDamageParts: parts, proposedTotal: resolution.damageTotal, critical: resolution.crit, createdAt: deps.now() }] };
+  state.combat = {
+    ...state.combat,
+    pendingDamage: [
+      ...state.combat.pendingDamage,
+      {
+        id: deps.newId(),
+        sourceActorId,
+        sourceName: attackerName,
+        actionName: resolution.actionName,
+        targetActorId: attack.targetId,
+        targetName: attack.targetName,
+        proposedDamageParts: parts,
+        proposedTotal: resolution.damageTotal,
+        critical: resolution.crit,
+        createdAt: deps.now()
+      }
+    ]
+  };
   return null;
 }
 
@@ -66,18 +108,44 @@ export function settlePlayerHit(state: GameState, resolution: ActionResolution, 
  * just removes it. Returns the applied outcome, or null (dismissed, overridden to nothing, or already
  * resolved; idempotent).
  */
-export function resolvePendingDamage(state: GameState, proposalId: string, apply: boolean, amount: number | undefined, deps: PlayerDamageDeps): AppliedDamage | null {
+export function resolvePendingDamage(
+  state: GameState,
+  proposalId: string,
+  apply: boolean,
+  amount: number | undefined,
+  deps: PlayerDamageDeps
+): AppliedDamage | null {
   const proposal = state.combat.pendingDamage.find((entry) => entry.id === proposalId);
   if (!proposal) return null; // already resolved or dismissed - idempotent retry
   let applied: AppliedDamage | null = null;
   if (apply) {
     const label = `${proposal.sourceName}'s ${proposal.actionName}`;
-    const input = amount !== undefined
-      ? { amount, critical: proposal.critical, sourceName: label }
-      : { amount: proposal.proposedTotal, parts: proposal.proposedDamageParts, critical: proposal.critical, sourceName: label };
-    const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now), ...(deps.catalog ? { catalog: deps.catalog } : {}) });
+    const input =
+      amount !== undefined
+        ? { amount, critical: proposal.critical, sourceName: label }
+        : {
+            amount: proposal.proposedTotal,
+            parts: proposal.proposedDamageParts,
+            critical: proposal.critical,
+            sourceName: label
+          };
+    const outcome = applyDamageDetailed(
+      state,
+      proposal.targetActorId,
+      input,
+      { role: "gm" },
+      {
+        resolveDefinition: deps.resolveDefinition,
+        newId: deps.newId,
+        now: isoOf(deps.now),
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      }
+    );
     applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };
   }
-  state.combat = { ...state.combat, pendingDamage: state.combat.pendingDamage.filter((entry) => entry.id !== proposalId) };
+  state.combat = {
+    ...state.combat,
+    pendingDamage: state.combat.pendingDamage.filter((entry) => entry.id !== proposalId)
+  };
   return applied;
 }

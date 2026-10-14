@@ -71,7 +71,14 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
     lineages: []
   }),
 
-  background: () => ({ ...BASE, abilityOptions: { from: [], spreads: [] }, skillProficiencies: [], toolProficiencies: [], startingEquipment: [], features: [] }),
+  background: () => ({
+    ...BASE,
+    abilityOptions: { from: [], spreads: [] },
+    skillProficiencies: [],
+    toolProficiencies: [],
+    startingEquipment: [],
+    features: []
+  }),
 
   /* `feature` (singular, required): a feat is one `FeatureRecord` plus catalog metadata, and
      `FeatReferenceSchema` is `.strict()`. */
@@ -140,7 +147,9 @@ export function blankDraft(type: HomebrewType): Draft {
  * number (an unset `acBase` makes the checklist ask for it). `weapon.category` is a closed enum
  * with no null, and its select already displays "simple".
  */
-export const SUB_OBJECT_DEFAULTS: Readonly<Partial<Record<HomebrewType, Readonly<Record<string, Readonly<Record<string, unknown>>>>>>> = {
+export const SUB_OBJECT_DEFAULTS: Readonly<
+  Partial<Record<HomebrewType, Readonly<Record<string, Readonly<Record<string, unknown>>>>>>
+> = {
   equipment: {
     // `null` ranges mean a melee weapon, the shape every SRD melee weapon carries.
     weapon: { category: "simple", damageDice: "", damageType: "", rangeFeet: null, longRangeFeet: null },
@@ -186,8 +195,12 @@ export function withDefaults(type: HomebrewType, record: Draft): Draft {
   for (const [key, fallback] of Object.entries(base)) {
     const current = record[key];
     const mergeable =
-      fallback !== null && typeof fallback === "object" && !Array.isArray(fallback) &&
-      current !== null && typeof current === "object" && !Array.isArray(current);
+      fallback !== null &&
+      typeof fallback === "object" &&
+      !Array.isArray(fallback) &&
+      current !== null &&
+      typeof current === "object" &&
+      !Array.isArray(current);
     if (mergeable) out[key] = { ...(fallback as object), ...(current as object) };
     if (current === undefined) out[key] = fallback;
   }

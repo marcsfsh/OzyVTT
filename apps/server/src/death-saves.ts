@@ -30,7 +30,12 @@ export type DeathSaveRollResult = Readonly<{
  * `commit=false` previews: the die is recorded for the table but pips are untouched. `commit` applies
  * the next pip state. A provided `naturalRoll` confirms a previewed or physical die without rolling.
  */
-export function rollDeathSave(state: GameState, actor: Actor, options: Readonly<{ commit: boolean; rollMode?: DeathSaveMode; naturalRoll?: number }>, deps: DeathSaveRollDependencies): DeathSaveRollResult {
+export function rollDeathSave(
+  state: GameState,
+  actor: Actor,
+  options: Readonly<{ commit: boolean; rollMode?: DeathSaveMode; naturalRoll?: number }>,
+  deps: DeathSaveRollDependencies
+): DeathSaveRollResult {
   if (actor.deathSaves === null) throw new Error("rollDeathSave requires a dying actor.");
   let face: number;
   let mode: DeathSaveMode | undefined;
@@ -45,11 +50,30 @@ export function rollDeathSave(state: GameState, actor: Actor, options: Readonly<
     // Recorded under the dying character with the real initiator role; hidden combatants stay GM-only.
     let group = 0;
     const record: RollRecord = {
-      id: deps.rollId, commandId: deps.commandId, initiatorSessionId: deps.sessionId, initiatorRole: deps.role, initiatorLabel: actor.name, actorId: actor.id,
-      purpose: "save", visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
-      formula, normalizedFormula: resolution.expression.normalized,
-      dice: resolution.terms.flatMap((term) => { if (term.kind !== "dice") return []; const currentGroup = group++; return term.dice.map((die) => ({ group: currentGroup, sides: term.sides, face: die.face, kept: die.kept, sign: term.sign })); }),
-      modifiers: [], total: resolution.total, createdAt: deps.now()
+      id: deps.rollId,
+      commandId: deps.commandId,
+      initiatorSessionId: deps.sessionId,
+      initiatorRole: deps.role,
+      initiatorLabel: actor.name,
+      actorId: actor.id,
+      purpose: "save",
+      visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
+      formula,
+      normalizedFormula: resolution.expression.normalized,
+      dice: resolution.terms.flatMap((term) => {
+        if (term.kind !== "dice") return [];
+        const currentGroup = group++;
+        return term.dice.map((die) => ({
+          group: currentGroup,
+          sides: term.sides,
+          face: die.face,
+          kept: die.kept,
+          sign: term.sign
+        }));
+      }),
+      modifiers: [],
+      total: resolution.total,
+      createdAt: deps.now()
     };
     recordRollInHistory(state, record);
   }

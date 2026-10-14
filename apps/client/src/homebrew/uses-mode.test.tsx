@@ -16,7 +16,10 @@ function Riders({ body, scope, onBody }: { body: Draft; scope: "feature" | "item
   return (
     <RiderEditor
       value={draft}
-      onChange={(next) => { setDraft(next); onBody(next); }}
+      onChange={(next) => {
+        setDraft(next);
+        onBody(next);
+      }}
       enabled={scope === "item" ? ITEM_RIDERS : ["modifiers", "uses", "tags", "actions", "effects"]}
       scope={scope}
       ctx={EMPTY_CONTEXT}
@@ -27,7 +30,15 @@ function Riders({ body, scope, onBody }: { body: Draft; scope: "feature" | "item
 
 function mount(body: Draft, scope: "feature" | "item" = "item") {
   let latest: Draft = body;
-  const view = render(<Riders body={body} scope={scope} onBody={(next) => { latest = next; }} />);
+  const view = render(
+    <Riders
+      body={body}
+      scope={scope}
+      onBody={(next) => {
+        latest = next;
+      }}
+    />
+  );
   // Scoped to this mount's container: some tests mount two forms at once.
   return {
     /** The label is the phrase each option completes ("Uses are… A flat number"). */
@@ -40,7 +51,9 @@ function mount(body: Draft, scope: "feature" | "item" = "item") {
 
 /** The four shapes the select reads back, as schema literals. */
 const FLAT: Draft = { uses: { limit: 3, per: "short-rest" } };
-const ABILITY: Draft = { uses: { scaling: { type: "ability-modifier", ability: "con", minimum: 1 }, per: "long-rest" } };
+const ABILITY: Draft = {
+  uses: { scaling: { type: "ability-modifier", ability: "con", minimum: 1 }, per: "long-rest" }
+};
 const BY_LEVEL: Draft = { uses: { scaling: { type: "by-level", table: [{ level: 1, limit: 2 }] }, per: "long-rest" } };
 const PROFICIENCY: Draft = { uses: { scaling: { type: "proficiency-bonus" }, per: "long-rest" } };
 

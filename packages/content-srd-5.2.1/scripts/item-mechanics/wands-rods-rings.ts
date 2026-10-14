@@ -29,7 +29,11 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
    */
   "ring-of-animal-influence": {
     casts: [
-      { spellId: "animal-friendship", saveDc: 13, uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } },
+      {
+        spellId: "animal-friendship",
+        saveDc: 13,
+        uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" }
+      },
       { spellId: "fear", saveDc: 13, uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } },
       { spellId: "speak-with-animals", uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } }
     ]
@@ -41,11 +45,16 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
 
   // Auto-succeeding a save is not expressible; the reaction and its 3-charge pool are, and the GM rules the success.
   "ring-of-evasion": {
-    actions: [{
-      id: "evade", name: "Evade", activation: "reaction",
-      description: "When you fail a Dexterity saving throw while wearing the ring, you can take a Reaction to expend 1 charge to succeed on that save instead.",
-      uses: { limit: 3, per: "long-rest", pool: "ring-of-evasion-charges" }
-    }]
+    actions: [
+      {
+        id: "evade",
+        name: "Evade",
+        activation: "reaction",
+        description:
+          "When you fail a Dexterity saving throw while wearing the ring, you can take a Reaction to expend 1 charge to succeed on that save instead.",
+        uses: { limit: 3, per: "long-rest", pool: "ring-of-evasion-charges" }
+      }
+    ]
   },
 
   // `ring-of-feather-falling` - no falling model.
@@ -78,17 +87,19 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
    * 2-3 charge Shooting Stars (multi-charge).
    */
   "ring-of-shooting-stars": {
-    casts: [
-      { spellId: "dancing-lights" },
-      { spellId: "light" }
-    ],
-    actions: [{
-      id: "shooting-stars", name: "Shooting Stars", activation: "action",
-      description: "Expend 1 charge to launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
-      save: { ability: "dex", dc: 15 },
-      damage: [{ formula: "5d4", type: "radiant" }],
-      uses: { limit: 6, per: "long-rest", pool: "ring-of-shooting-stars-charges" }
-    }]
+    casts: [{ spellId: "dancing-lights" }, { spellId: "light" }],
+    actions: [
+      {
+        id: "shooting-stars",
+        name: "Shooting Stars",
+        activation: "action",
+        description:
+          "Expend 1 charge to launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
+        save: { ability: "dex", dc: 15 },
+        damage: [{ formula: "5d4", type: "radiant" }],
+        uses: { limit: 6, per: "long-rest", pool: "ring-of-shooting-stars-charges" }
+      }
+    ]
   },
 
   // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
@@ -122,7 +133,9 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
     modifiers: [
       { type: "roll-mode", roll: "initiative", mode: "advantage" },
       {
-        type: "roll-mode", roll: "check", mode: "advantage",
+        type: "roll-mode",
+        roll: "check",
+        mode: "advantage",
         when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
       }
     ],
@@ -132,11 +145,16 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
       { spellId: "detect-poison-and-disease" },
       { spellId: "see-invisibility" }
     ],
-    actions: [{
-      id: "protective-aura", name: "Protective Aura", activation: "action",
-      description: "Plant the haft end of the rod in the ground. Its head sheds Bright Light in a 60-foot radius and Dim Light for an additional 60 feet. While in that Bright Light, you and your allies gain a +1 bonus to Armor Class and saving throws and can sense the location of any Invisible creature that is also in the Bright Light. Ends after 10 minutes or when a creature pulls the rod from the ground.",
-      uses: { limit: 1, per: "long-rest" }
-    }]
+    actions: [
+      {
+        id: "protective-aura",
+        name: "Protective Aura",
+        activation: "action",
+        description:
+          "Plant the haft end of the rod in the ground. Its head sheds Bright Light in a 60-foot radius and Dim Light for an additional 60 feet. While in that Bright Light, you and your allies gain a +1 bonus to Armor Class and saving throws and can sense the location of any Invisible creature that is also in the Bright Light. Ends after 10 minutes or when a creature pulls the rod from the ground.",
+        uses: { limit: 1, per: "long-rest" }
+      }
+    ]
   },
 
   // `rod-of-lordly-might` - no weapon block, and its buttons turn one record into several weapons.
@@ -145,12 +163,17 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
 
   // The resolver reads Charmed from the description (`conditionFrom`), so the word must stay in it.
   "rod-of-rulership": {
-    actions: [{
-      id: "command-obedience", name: "Command Obedience", activation: "action",
-      description: "Present the rod and command obedience from each creature of your choice that you can see within 120 feet. Each target must succeed on a DC 15 Wisdom saving throw or have the Charmed condition for 8 hours. If harmed by you or your allies, or commanded to do something contrary to its nature, a target ceases to be Charmed in this way.",
-      save: { ability: "wis", dc: 15 },
-      uses: { limit: 1, per: "long-rest" }
-    }]
+    actions: [
+      {
+        id: "command-obedience",
+        name: "Command Obedience",
+        activation: "action",
+        description:
+          "Present the rod and command obedience from each creature of your choice that you can see within 120 feet. Each target must succeed on a DC 15 Wisdom saving throw or have the Charmed condition for 8 hours. If harmed by you or your allies, or commanded to do something contrary to its nature, a target ceases to be Charmed in this way.",
+        save: { ability: "wis", dc: 15 },
+        uses: { limit: 1, per: "long-rest" }
+      }
+    ]
   },
 
   // `rod-of-security` - no plane model, and "once per 10 days" is not a `per` value.
@@ -203,11 +226,16 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
 
   // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
   "staff-of-swarming-insects": {
-    actions: [{
-      id: "insect-cloud", name: "Insect Cloud", activation: "action",
-      description: "Expend 1 charge to fill a 30-foot Emanation originating from you with a swarm of harmless flying insects. They remain for 10 minutes, making the area Heavily Obscured for creatures other than you. A strong wind disperses the swarm and ends the effect.",
-      uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
-    }]
+    actions: [
+      {
+        id: "insect-cloud",
+        name: "Insect Cloud",
+        activation: "action",
+        description:
+          "Expend 1 charge to fill a 30-foot Emanation originating from you with a swarm of harmless flying insects. They remain for 10 minutes, making the area Heavily Obscured for creatures other than you. A strong wind disperses the swarm and ends the effect.",
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
+      }
+    ]
   },
 
   /**
@@ -216,12 +244,7 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
    * spells, the multi-charge rows, Spell Absorption and Retributive Strike.
    */
   "staff-of-the-magi": {
-    casts: [
-      { spellId: "arcane-lock" },
-      { spellId: "detect-magic" },
-      { spellId: "enlargereduce" },
-      { spellId: "light" }
-    ]
+    casts: [{ spellId: "arcane-lock" }, { spellId: "detect-magic" }, { spellId: "enlargereduce" }, { spellId: "light" }]
   },
 
   // `staff-of-the-python` - summoning a controlled creature is not expressible.
@@ -233,11 +256,16 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
       { spellId: "speak-with-animals", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } }
     ],
-    actions: [{
-      id: "tree-form", name: "Tree Form", activation: "action",
-      description: "Plant one end of the staff in earth in an unoccupied space and expend 1 charge to transform it into a healthy tree, 60 feet tall with a 5-foot-diameter trunk and a 20-foot-radius crown. While touching the tree and using a Magic action, you return the staff to its normal form.",
-      uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" }
-    }]
+    actions: [
+      {
+        id: "tree-form",
+        name: "Tree Form",
+        activation: "action",
+        description:
+          "Plant one end of the staff in earth in an unoccupied space and expend 1 charge to transform it into a healthy tree, 60 feet tall with a 5-foot-diameter trunk and a 20-foot-radius crown. While touching the tree and using a Magic action, you return the staff to its normal form.",
+        uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" }
+      }
+    ]
   },
 
   /**
@@ -247,15 +275,21 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
   "staff-of-thunder-and-lightning": {
     actions: [
       {
-        id: "lightning-strike", name: "Lightning Strike", activation: "action",
-        description: "A bolt of lightning leaps from the staff's tip in a Line 5 feet wide and 120 feet long. Each creature in that Line makes a DC 17 Dexterity saving throw, taking 9d6 Lightning damage on a failed save or half as much damage on a successful one.",
+        id: "lightning-strike",
+        name: "Lightning Strike",
+        activation: "action",
+        description:
+          "A bolt of lightning leaps from the staff's tip in a Line 5 feet wide and 120 feet long. Each creature in that Line makes a DC 17 Dexterity saving throw, taking 9d6 Lightning damage on a failed save or half as much damage on a successful one.",
         save: { ability: "dex", dc: 17 },
         damage: [{ formula: "9d6", type: "lightning" }],
         uses: { limit: 1, per: "long-rest" }
       },
       {
-        id: "thunderclap", name: "Thunderclap", activation: "action",
-        description: "The staff produces a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
+        id: "thunderclap",
+        name: "Thunderclap",
+        activation: "action",
+        description:
+          "The staff produces a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
         save: { ability: "con", dc: 17 },
         damage: [{ formula: "2d6", type: "thunder" }],
         uses: { limit: 1, per: "long-rest" }
@@ -271,11 +305,16 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
 
   // The detection is GM information; the charge is real.
   "wand-of-enemy-detection": {
-    actions: [{
-      id: "detect-enemies", name: "Detect Enemies", activation: "action",
-      description: "Expend 1 charge. For 1 minute, you know the direction of the nearest creature Hostile to you within 60 feet, but not its distance. The wand senses Hostile creatures that are Invisible, ethereal, disguised, or hidden, as well as those in plain sight. The effect ends if you stop holding the wand.",
-      uses: { limit: 7, per: "long-rest", pool: "wand-of-enemy-detection-charges" }
-    }]
+    actions: [
+      {
+        id: "detect-enemies",
+        name: "Detect Enemies",
+        activation: "action",
+        description:
+          "Expend 1 charge. For 1 minute, you know the direction of the nearest creature Hostile to you within 60 feet, but not its distance. The wand senses Hostile creatures that are Invisible, ethereal, disguised, or hidden, as well as those in plain sight. The effect ends if you stop holding the wand.",
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-enemy-detection-charges" }
+      }
+    ]
   },
 
   // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
@@ -288,18 +327,24 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
    * level. The 2-3 charge upcasts are multi-charge.
    */
   "wand-of-fireballs": {
-    casts: [{
-      spellId: "fireball", saveDc: 15,
-      uses: { limit: 7, per: "long-rest", pool: "wand-of-fireballs-charges" }
-    }]
+    casts: [
+      {
+        spellId: "fireball",
+        saveDc: 15,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-fireballs-charges" }
+      }
+    ]
   },
 
   /** The Fireball wand's twin: Lightning Bolt (save DC 15), 1 charge, 7 charges. Upcasts are multi-charge. */
   "wand-of-lightning-bolts": {
-    casts: [{
-      spellId: "lightning-bolt", saveDc: 15,
-      uses: { limit: 7, per: "long-rest", pool: "wand-of-lightning-bolts-charges" }
-    }]
+    casts: [
+      {
+        spellId: "lightning-bolt",
+        saveDc: 15,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-lightning-bolts-charges" }
+      }
+    ]
   },
 
   /** "This wand has 3 charges. While holding it, you can expend 1 charge to cast Detect Magic from it." Complete. */
@@ -311,25 +356,37 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
 
   // The wand's own effect; the resolver reads Paralyzed from the description.
   "wand-of-paralysis": {
-    actions: [{
-      id: "paralyzing-ray", name: "Paralyzing Ray", activation: "action",
-      description: "Expend 1 charge to send a thin blue ray toward a creature you can see within 60 feet. The target must succeed on a DC 15 Constitution saving throw or have the Paralyzed condition for 1 minute. At the end of each of its turns, it repeats the save, ending the effect on itself on a success.",
-      save: { ability: "con", dc: 15 },
-      uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
-    }]
+    actions: [
+      {
+        id: "paralyzing-ray",
+        name: "Paralyzing Ray",
+        activation: "action",
+        description:
+          "Expend 1 charge to send a thin blue ray toward a creature you can see within 60 feet. The target must succeed on a DC 15 Constitution saving throw or have the Paralyzed condition for 1 minute. At the end of each of its turns, it repeats the save, ending the effect on itself on a success.",
+        save: { ability: "con", dc: 15 },
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
+      }
+    ]
   },
 
   /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC. Complete. */
   "wand-of-polymorph": {
-    casts: [{ spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }]
+    casts: [
+      { spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }
+    ]
   },
 
   "wand-of-secrets": {
-    actions: [{
-      id: "find-secrets", name: "Find Secrets", activation: "action",
-      description: "Expend 1 charge. If a secret door or trap is within 60 feet of you, the wand pulses and points at the one nearest to you.",
-      uses: { limit: 3, per: "long-rest", pool: "wand-of-secrets-charges" }
-    }]
+    actions: [
+      {
+        id: "find-secrets",
+        name: "Find Secrets",
+        activation: "action",
+        description:
+          "Expend 1 charge. If a secret door or trap is within 60 feet of you, the wand pulses and points at the one nearest to you.",
+        uses: { limit: 3, per: "long-rest", pool: "wand-of-secrets-charges" }
+      }
+    ]
   },
 
   // `wand-of-the-war-mage-1`, `wand-of-the-war-mage-2`, `wand-of-the-war-mage-3` - a spell attack
@@ -339,10 +396,15 @@ export const WANDS_RODS_RINGS: ItemMechanicsModule = {
 
   // The d100 effect table is GM-rolled; the charge is real.
   "wand-of-wonder": {
-    actions: [{
-      id: "wild-surge", name: "Wild Surge", activation: "action",
-      description: "Expend 1 charge and choose a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table in this item's description. Spells cast from the wand have a save DC of 15, and any spell whose maximum range is normally less than 120 feet has a range of 120 feet when cast from the wand.",
-      uses: { limit: 7, per: "long-rest", pool: "wand-of-wonder-charges" }
-    }]
+    actions: [
+      {
+        id: "wild-surge",
+        name: "Wild Surge",
+        activation: "action",
+        description:
+          "Expend 1 charge and choose a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table in this item's description. Spells cast from the wand have a save DC of 15, and any spell whose maximum range is normally less than 120 feet has a range of 120 feet when cast from the wand.",
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-wonder-charges" }
+      }
+    ]
   }
 };

@@ -41,17 +41,20 @@ function validateViewport(viewport: ImageViewport) {
   finite(viewport.minY, "Viewport minimum y");
   finite(viewport.maxX, "Viewport maximum x");
   finite(viewport.maxY, "Viewport maximum y");
-  if (viewport.minX >= viewport.maxX || viewport.minY >= viewport.maxY) throw new Error("Viewport must have positive width and height.");
+  if (viewport.minX >= viewport.maxX || viewport.minY >= viewport.maxY)
+    throw new Error("Viewport must have positive width and height.");
   return viewport;
 }
 
 function positiveInteger(value: number, label: string, maximum: number) {
-  if (!Number.isInteger(value) || value < 1 || value > maximum) throw new Error(`${label} must be an integer from 1 to ${maximum}.`);
+  if (!Number.isInteger(value) || value < 1 || value > maximum)
+    throw new Error(`${label} must be an integer from 1 to ${maximum}.`);
   return value;
 }
 
 function nonNegativeInteger(value: number, label: string, maximum: number) {
-  if (!Number.isInteger(value) || value < 0 || value > maximum) throw new Error(`${label} must be an integer from 0 to ${maximum}.`);
+  if (!Number.isInteger(value) || value < 0 || value > maximum)
+    throw new Error(`${label} must be an integer from 0 to ${maximum}.`);
   return value;
 }
 
@@ -116,10 +119,19 @@ export function gridOverlayLines(
     imageToGrid(calibration, { x: viewport.maxX, y: viewport.maxY }),
     imageToGrid(calibration, { x: viewport.minX, y: viewport.maxY })
   ];
-  const columns = lineRange(corners.map((corner) => corner.column), overscan);
-  const rows = lineRange(corners.map((corner) => corner.row), overscan);
+  const columns = lineRange(
+    corners.map((corner) => corner.column),
+    overscan
+  );
+  const rows = lineRange(
+    corners.map((corner) => corner.row),
+    overscan
+  );
   const requested = columns.maximum - columns.minimum + 1 + rows.maximum - rows.minimum + 1;
-  if (requested > maxLines) throw new Error(`Grid overlay requires ${requested} lines, exceeding the ${maxLines} line safety limit. Zoom in before displaying the grid.`);
+  if (requested > maxLines)
+    throw new Error(
+      `Grid overlay requires ${requested} lines, exceeding the ${maxLines} line safety limit. Zoom in before displaying the grid.`
+    );
 
   const lines: GridOverlayLine[] = [];
   for (let column = columns.minimum; column <= columns.maximum; column++) {
@@ -128,13 +140,14 @@ export function gridOverlayLines(
       gridToImage(calibration, { column, row: rows.maximum + 1 }),
       viewport
     );
-    if (clipped) lines.push({
-      axis: "column",
-      index: column,
-      start: { x: normalizeCoordinate(clipped.start.x), y: normalizeCoordinate(clipped.start.y) },
-      end: { x: normalizeCoordinate(clipped.end.x), y: normalizeCoordinate(clipped.end.y) },
-      major: ((column % majorEvery) + majorEvery) % majorEvery === 0
-    });
+    if (clipped)
+      lines.push({
+        axis: "column",
+        index: column,
+        start: { x: normalizeCoordinate(clipped.start.x), y: normalizeCoordinate(clipped.start.y) },
+        end: { x: normalizeCoordinate(clipped.end.x), y: normalizeCoordinate(clipped.end.y) },
+        major: ((column % majorEvery) + majorEvery) % majorEvery === 0
+      });
   }
   for (let row = rows.minimum; row <= rows.maximum; row++) {
     const clipped = clipSegment(
@@ -142,13 +155,14 @@ export function gridOverlayLines(
       gridToImage(calibration, { column: columns.maximum + 1, row }),
       viewport
     );
-    if (clipped) lines.push({
-      axis: "row",
-      index: row,
-      start: { x: normalizeCoordinate(clipped.start.x), y: normalizeCoordinate(clipped.start.y) },
-      end: { x: normalizeCoordinate(clipped.end.x), y: normalizeCoordinate(clipped.end.y) },
-      major: ((row % majorEvery) + majorEvery) % majorEvery === 0
-    });
+    if (clipped)
+      lines.push({
+        axis: "row",
+        index: row,
+        start: { x: normalizeCoordinate(clipped.start.x), y: normalizeCoordinate(clipped.start.y) },
+        end: { x: normalizeCoordinate(clipped.end.x), y: normalizeCoordinate(clipped.end.y) },
+        major: ((row % majorEvery) + majorEvery) % majorEvery === 0
+      });
   }
   return lines;
 }

@@ -37,7 +37,17 @@ export interface ComboboxProps {
  * `::after` would overhang into the row below and steal its taps.
  */
 export function Combobox({
-  options, value, onChange, placeholder = "Search…", ariaLabel, id, disabled = false, limit = 8, className, allowFreeText = false, describedBy
+  options,
+  value,
+  onChange,
+  placeholder = "Search…",
+  ariaLabel,
+  id,
+  disabled = false,
+  limit = 8,
+  className,
+  allowFreeText = false,
+  describedBy
 }: ComboboxProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -52,7 +62,12 @@ export function Combobox({
     return (needle ? options.filter((option) => option.label.toLowerCase().includes(needle)) : options).slice(0, limit);
   }, [options, query, limit]);
 
-  const pick = (nextId: string) => { onChange(nextId); setQuery(""); setOpen(false); setActive(0); };
+  const pick = (nextId: string) => {
+    onChange(nextId);
+    setQuery("");
+    setOpen(false);
+    setActive(0);
+  };
 
   /**
    * On blur, keep typed text only when typed text is a value (`allowFreeText`). An exact label match commits
@@ -72,7 +87,13 @@ export function Combobox({
         <span className="nh-combobox-chip">
           {selected?.icon}
           <span className="nh-combobox-chiplabel">{selected?.label ?? freeText}</span>
-          <button type="button" className="nh-combobox-clear tap-target interactive" aria-label={`Clear ${selected?.label ?? freeText}`} onClick={() => onChange(null)} disabled={disabled}>
+          <button
+            type="button"
+            className="nh-combobox-clear tap-target interactive"
+            aria-label={`Clear ${selected?.label ?? freeText}`}
+            onClick={() => onChange(null)}
+            disabled={disabled}
+          >
             <IconX />
           </button>
         </span>
@@ -81,7 +102,16 @@ export function Combobox({
   }
 
   return (
-    <div className={cx("nh-combobox", className)} ref={boxRef} onBlur={(event) => { if (!boxRef.current?.contains(event.relatedTarget as Node)) { setOpen(false); commitOnBlur(); } }}>
+    <div
+      className={cx("nh-combobox", className)}
+      ref={boxRef}
+      onBlur={(event) => {
+        if (!boxRef.current?.contains(event.relatedTarget as Node)) {
+          setOpen(false);
+          commitOnBlur();
+        }
+      }}
+    >
       <input
         id={id}
         className="nh-input nh-combobox-input"
@@ -101,14 +131,29 @@ export function Combobox({
          * value, and `pick()` closes the list while leaving focus on the input.
          */
         onClick={() => setOpen(true)}
-        onChange={(event) => { setQuery(event.target.value); setOpen(true); setActive(0); }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+          setActive(0);
+        }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown") { event.preventDefault(); setActive((index) => Math.min(index + 1, matches.length - 1)); }
-          else if (event.key === "ArrowUp") { event.preventDefault(); setActive((index) => Math.max(index - 1, 0)); }
-          else if (event.key === "Enter") {
-            if (matches[active]) { event.preventDefault(); pick(matches[active].id); }
-            else if (allowFreeText && query.trim()) { event.preventDefault(); pick(query.trim()); }
-          } else if (event.key === "Escape") { setOpen(false); }
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActive((index) => Math.min(index + 1, matches.length - 1));
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActive((index) => Math.max(index - 1, 0));
+          } else if (event.key === "Enter") {
+            if (matches[active]) {
+              event.preventDefault();
+              pick(matches[active].id);
+            } else if (allowFreeText && query.trim()) {
+              event.preventDefault();
+              pick(query.trim());
+            }
+          } else if (event.key === "Escape") {
+            setOpen(false);
+          }
         }}
       />
       {open && matches.length > 0 && (
@@ -116,7 +161,9 @@ export function Combobox({
           {matches.map((option, index) => (
             <li key={option.id}>
               <button
-                type="button" role="option" aria-selected={index === active}
+                type="button"
+                role="option"
+                aria-selected={index === active}
                 className={cx("nh-combobox-option", index === active && "is-active")}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActive(index)}

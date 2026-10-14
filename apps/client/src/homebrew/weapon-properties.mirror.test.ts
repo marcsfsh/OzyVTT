@@ -20,22 +20,27 @@ const GM = { authorization: "Bearer gm-token", "content-type": "application/json
     weapons differ by exactly one and only the right ability satisfies the assertion. PB +2, and the
     fighter is proficient with both weapons. */
 const DUELLIST = {
-  name: "Vane", armorClass: 13, proficiencyBonus: 2,
+  name: "Vane",
+  armorClass: 13,
+  proficiencyBonus: 2,
   abilityScores: { str: 12, dex: 15, con: 12, int: 10, wis: 10, cha: 10 },
-  hitPoints: { maximum: 22 }, actions: [], extensions: {},
+  hitPoints: { maximum: 22 },
+  actions: [],
+  extensions: {},
   character: { classes: [{ id: "fighter", name: "Fighter", level: 1 }], feats: [] },
   proficiencies: { saves: [], skills: [] }
 } as unknown as ActorDefinition;
 
 /** The record the GM types, with `properties` as the one variable the probes move. */
-const weaponDraft = (properties: readonly string[]) => authored("equipment", "Duellist's Needle", [
-  ["description", "A needle-thin duelling blade, balanced for the wrist."],
-  ["category", "weapon"],
-  ["weapon.category", "martial"],
-  ["weapon.damageDice", "1d8"],
-  ["weapon.damageType", "piercing"],
-  ["weapon.properties", [...properties]]
-]);
+const weaponDraft = (properties: readonly string[]) =>
+  authored("equipment", "Duellist's Needle", [
+    ["description", "A needle-thin duelling blade, balanced for the wrist."],
+    ["category", "weapon"],
+    ["weapon.category", "martial"],
+    ["weapon.damageDice", "1d8"],
+    ["weapon.damageType", "piercing"],
+    ["weapon.properties", [...properties]]
+  ]);
 
 let api: ApiFixture;
 let library: ContentLibrary;
@@ -44,18 +49,22 @@ beforeAll(async () => {
   api = await bootHomebrewApi();
   library = new ContentLibrary(api.store);
 });
-afterAll(async () => { await api.close(); });
+afterAll(async () => {
+  await api.close();
+});
 
 /** Publish a draft over the wire and hand back the id the catalog will know it by. */
 async function publishThroughApi(draft: ReturnType<typeof weaponDraft>): Promise<string> {
   const created = await fetch(`${api.base}${HOMEBREW_PATHS.content}`, {
-    method: "POST", headers: GM,
+    method: "POST",
+    headers: GM,
     body: JSON.stringify({ record: { type: "equipment", ...storedBody("equipment", draft, "hb-c3-probe") } })
   });
   expect(created.status, "create").toBe(201);
   const { id } = (await created.json()).data.record as { id: string };
   const published = await fetch(`${api.base}${HOMEBREW_PATHS.contentById.replace("{id}", id)}/publish`, {
-    method: "POST", headers: GM
+    method: "POST",
+    headers: GM
   });
   expect(published.status, `publish: ${await published.clone().text()}`).toBe(200);
   return id;
@@ -67,7 +76,11 @@ function carried(view: ReturnType<ContentLibrary["forAudience"]>, id: string) {
   const record = view.equipmentRecord(id);
   if (!record?.weapon) throw new Error(`"${id}" is not a weapon in the merged catalog.`);
   return InventoryItemSchema.parse({
-    id: record.id, name: record.name, quantity: 1, equipped: true, category: record.category,
+    id: record.id,
+    name: record.name,
+    quantity: 1,
+    equipped: true,
+    category: record.category,
     weapon: inventoryWeaponFrom(record.weapon)
   });
 }
@@ -92,12 +105,19 @@ describe("C3 — a homebrew weapon's properties reach the engine", () => {
     const rapier = carried(view, "rapier");
     const maul = carried(view, "maul");
     const actor = {
-      id: "actor-vane", name: "Vane", kind: "player-character", visibility: "public",
-      hp: { current: 22, maximum: 22, temporary: 0 }, conditions: [], effects: [],
+      id: "actor-vane",
+      name: "Vane",
+      kind: "player-character",
+      visibility: "public",
+      hp: { current: 22, maximum: 22, temporary: 0 },
+      conditions: [],
+      effects: [],
       inventory: [needle, rapier, maul]
     } as unknown as Actor;
 
-    const derivation = deriveEquipment(actor, DUELLIST, { equipmentRecord: (key: string) => view.equipmentRecord(key) });
+    const derivation = deriveEquipment(actor, DUELLIST, {
+      equipmentRecord: (key: string) => view.equipmentRecord(key)
+    });
     const swing = (key: string) => derivation.actions.find((action) => action.id === `item-${key}`)!;
 
     /* ------------------------------------------------------------------ far end ---- */

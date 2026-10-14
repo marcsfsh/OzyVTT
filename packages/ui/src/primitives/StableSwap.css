@@ -1,7 +1,16 @@
 /* One cell, two occupants: the visible face and the other state's width, so the box is identical in both states. */
-.nh-stableswap { display: inline-grid; }
-.nh-stableswap > * { grid-area: 1 / 1; }
+.nh-stableswap {
+  display: inline-grid;
+}
+.nh-stableswap > * {
+  grid-area: 1 / 1;
+}
 /* `visibility: hidden` keeps the box in flow while removing it from paint and the accessibility tree.
    `white-space: pre` so spaces in the generated string reserve their real width. */
-.nh-stableswap-ghost { visibility: hidden; white-space: pre; }
-.nh-stableswap-ghost::after { content: attr(data-stable-swap-alt); }
+.nh-stableswap-ghost {
+  visibility: hidden;
+  white-space: pre;
+}
+.nh-stableswap-ghost::after {
+  content: attr(data-stable-swap-alt);
+}

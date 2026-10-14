@@ -5,8 +5,14 @@ import { buildCharacterDefinition } from "../../../server/src/character-build.js
 import { ContentLibrary } from "../../../server/src/content-library.js";
 import type { BuilderCatalogs } from "../content/catalogs";
 import {
-  buildCreatePayload, computeOffers, emptyDraft, offerFilled, prunePicks, stepBlockedReason,
-  type BuilderDraft, type BuilderOffer
+  buildCreatePayload,
+  computeOffers,
+  emptyDraft,
+  offerFilled,
+  prunePicks,
+  stepBlockedReason,
+  type BuilderDraft,
+  type BuilderOffer
 } from "./build-payload";
 
 /**
@@ -30,7 +36,10 @@ const catalogs: BuilderCatalogs = {
   attributions: []
 };
 
-const CLASS_IDS = view.classSummaries().map((entry) => entry.id).sort();
+const CLASS_IDS = view
+  .classSummaries()
+  .map((entry) => entry.id)
+  .sort();
 const LEVELS = [1, 3, 5, 11, 16, 20] as const;
 
 /** Human + Soldier: a species whose traits ask for a skill, an origin feat and a size, and a
@@ -61,13 +70,16 @@ function fillGreedily(classId: string, level: number): FillResult {
     level,
     // Standard array, straight down the six abilities, plus Soldier's legal +2/+1 spread.
     poolAssignment: Object.fromEntries(ABILITIES.map((ability, index) => [ability, `sa-${index}`])),
-    backgroundBonus: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }]
+    backgroundBonus: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ]
   };
   const unfillable: string[] = [];
   let rotation = 0;
 
   const answerFor = (offer: BuilderOffer): string[] | null => {
-    const usable = offer.options.filter((option) => !(offer.unavailable?.[option.id]));
+    const usable = offer.options.filter((option) => !offer.unavailable?.[option.id]);
     if (usable.length < offer.capacity) return null;
     if (offer.kind !== "ability-score") return usable.slice(0, offer.capacity).map((option) => option.id);
     const picked = Array.from({ length: offer.capacity }, (_, index) => usable[(rotation + index) % usable.length].id);
@@ -83,7 +95,10 @@ function fillGreedily(classId: string, level: number): FillResult {
     const next = offers.find((offer) => !offerFilled(offer, draft) && !unfillable.includes(offer.key));
     if (!next) return { draft, offers, unfillable };
     const answer = answerFor(next);
-    if (answer === null) { unfillable.push(next.key); continue; }
+    if (answer === null) {
+      unfillable.push(next.key);
+      continue;
+    }
     draft = { ...draft, picks: { ...draft.picks, [next.key]: answer } };
   }
   throw new Error(`greedy fill did not settle for ${classId} ${level}`);
@@ -106,8 +121,18 @@ const cases = CLASS_IDS.flatMap((classId) => LEVELS.map((level) => [classId, lev
 describe("the wizard's offers mirror the server's, on the real bundles", () => {
   it("sweeps every SRD class at six levels", () => {
     expect(CLASS_IDS).toEqual([
-      "barbarian", "bard", "cleric", "druid", "fighter", "monk",
-      "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"
+      "barbarian",
+      "bard",
+      "cleric",
+      "druid",
+      "fighter",
+      "monk",
+      "paladin",
+      "ranger",
+      "rogue",
+      "sorcerer",
+      "warlock",
+      "wizard"
     ]);
     expect(cases).toHaveLength(72);
   });

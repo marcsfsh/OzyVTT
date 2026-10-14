@@ -43,15 +43,36 @@ import { AtlasView } from "./AtlasView";
 import { MapSurface } from "./MapSurface";
 import type { CodexMap, CodexMarker } from "./api";
 
-
 const MAP: CodexMap = {
-  id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null,
-  revealedToPlayers: true, sortKey: 0, tags: [], createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z"
+  id: "m1",
+  assetId: "a1",
+  name: "Barovia",
+  kind: "regional",
+  parentMapId: null,
+  revealedToPlayers: true,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z"
 };
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
-  id: "k1", mapId: "m1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki",
-  revealedToPlayers: true, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false,
-  tags: [], createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
+  id: "k1",
+  mapId: "m1",
+  x: 100,
+  y: 200,
+  iconId: "village",
+  iconColor: "#FF2E9A",
+  label: "Vallaki",
+  revealedToPlayers: true,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: [],
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  ...over
 });
 
 /** Feeds the address back like `CodexShell`, since selecting a pin is a navigation (`?pin=`). */
@@ -61,11 +82,23 @@ function AtlasHarness() {
   const query = new URLSearchParams(search ?? "");
   return (
     <ToastProvider>
-      <AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()}
-        mapId={path.split("/")[3] ?? null} pinId={query.get("pin")}
-        autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()}
+      <AtlasView
+        gmToken="gm"
+        scenes={[]}
+        actors={[]}
+        activeSceneId={null}
+        onActivateScene={vi.fn()}
+        mapId={path.split("/")[3] ?? null}
+        pinId={query.get("pin")}
+        autosave={{ enabled: true, intervalSeconds: 1 }}
+        onQuickCreate={vi.fn()}
         onNavigate={setHref}
-        onReplaceQuery={(mutate) => { const next = new URLSearchParams(search ?? ""); mutate(next); setHref(next.toString() ? `${path}?${next}` : path); }} />
+        onReplaceQuery={(mutate) => {
+          const next = new URLSearchParams(search ?? "");
+          mutate(next);
+          setHref(next.toString() ? `${path}?${next}` : path);
+        }}
+      />
     </ToastProvider>
   );
 }
@@ -82,9 +115,20 @@ const renderAtlas = async (markers: CodexMarker[]) => {
 
 describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () => {
   it("draws the words on the map and names the pin for a screen reader", () => {
-    render(<MapSurface token="gm" assetId="a1" placing={false} selectedMarkerId={null}
-      markers={[{ id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki", isParty: true }]}
-      onBackgroundClick={vi.fn()} onMarkerClick={vi.fn()} onMarkerDragEnd={vi.fn()} />);
+    render(
+      <MapSurface
+        token="gm"
+        assetId="a1"
+        placing={false}
+        selectedMarkerId={null}
+        markers={[
+          { id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki", isParty: true }
+        ]}
+        onBackgroundClick={vi.fn()}
+        onMarkerClick={vi.fn()}
+        onMarkerDragEnd={vi.fn()}
+      />
+    );
 
     const pin = document.querySelector('[data-marker-id="k1"]')!;
     expect(pin.textContent).toContain("The party is here");
@@ -93,9 +137,18 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
   });
 
   it("says nothing at all on an ordinary pin", () => {
-    render(<MapSurface token="gm" assetId="a1" placing={false} selectedMarkerId={null}
-      markers={[{ id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki" }]}
-      onBackgroundClick={vi.fn()} onMarkerClick={vi.fn()} onMarkerDragEnd={vi.fn()} />);
+    render(
+      <MapSurface
+        token="gm"
+        assetId="a1"
+        placing={false}
+        selectedMarkerId={null}
+        markers={[{ id: "k1", x: 100, y: 200, iconId: "village", iconColor: "#FF2E9A", label: "Vallaki" }]}
+        onBackgroundClick={vi.fn()}
+        onMarkerClick={vi.fn()}
+        onMarkerDragEnd={vi.fn()}
+      />
+    );
 
     const pin = document.querySelector('[data-marker-id="k1"]')!;
     expect(pin.textContent).not.toContain("The party");
@@ -193,11 +246,14 @@ describe("One party pin for the whole atlas (M12-C)", () => {
 
     // Exactly one party control in the inspector: the flag. A second way to move the party would make two.
     const inspector = screen.getByRole("complementary", { name: "Pin" });
-    const partyControls = [...inspector.querySelectorAll("button, input, select, textarea")]
-      .filter((element) => /party/i.test(`${element.getAttribute("aria-label") ?? ""} ${element.textContent ?? ""}`));
+    const partyControls = [...inspector.querySelectorAll("button, input, select, textarea")].filter((element) =>
+      /party/i.test(`${element.getAttribute("aria-label") ?? ""} ${element.textContent ?? ""}`)
+    );
     expect(partyControls).toHaveLength(1);
     expect(partyControls[0]).toHaveAttribute("role", "switch");
     expect(moveMarker).not.toHaveBeenCalled();
-    expect(screen.getByText("Players see this pin marked as the party. Drag the pin to move the party.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Players see this pin marked as the party. Drag the pin to move the party.")
+    ).toBeInTheDocument();
   });
 });

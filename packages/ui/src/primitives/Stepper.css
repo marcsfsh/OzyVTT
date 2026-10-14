@@ -1,9 +1,20 @@
-.nh-stepper { display: inline-flex; align-items: center; gap: var(--space-3); }
+.nh-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
 /* Same font as `.nh-field-label` so a labeled Stepper's label occupies the identical band in a form row. */
-.nh-stepper-label { color: var(--text-dim); font: 600 var(--fs-sm) / 1.3 var(--font-body); }
+.nh-stepper-label {
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+}
 /* A visible label stacks above the control so the −/+ group lines up with neighbouring input wells. The unlabeled
    form (aria-label only, e.g. the ability steppers) stays inline. */
-.nh-stepper--labeled { display: grid; gap: var(--space-2); justify-items: start; }
+.nh-stepper--labeled {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
 .nh-stepper-controls {
   display: inline-flex;
   align-items: stretch;
@@ -28,8 +39,14 @@
   line-height: 1;
   cursor: pointer;
 }
-.nh-stepper-btn:hover:not(:disabled) { background: var(--surface-3); color: var(--cyan-hi); }
-.nh-stepper-btn:disabled { color: var(--text-muted); cursor: not-allowed; }
+.nh-stepper-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--cyan-hi);
+}
+.nh-stepper-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
 .nh-stepper-value {
   min-width: 2.4rem;
   padding: 0 var(--space-2);

@@ -23,7 +23,11 @@ function everyField(): ReadonlyArray<{ type: HomebrewType; field: FieldDef }> {
       if (field.rows) walk(type, field.rows);
     }
   };
-  for (const [type, schema] of Object.entries(SCHEMAS)) walk(type as HomebrewType, schema.sections.flatMap((section) => section.fields));
+  for (const [type, schema] of Object.entries(SCHEMAS))
+    walk(
+      type as HomebrewType,
+      schema.sections.flatMap((section) => section.fields)
+    );
   // The shared rider fields, mounted by every rider carrier.
   walk("equipment", RIDER_FIELDS_FOR_TEST);
   return out;
@@ -67,7 +71,9 @@ describe("enumerated fields offer the complete SRD list", () => {
   });
 
   it("every condition field offers all fifteen", () => {
-    const fields = everyField().filter(({ field }) => field.key === "conditionImmunities" || field.key === "conditionIds");
+    const fields = everyField().filter(
+      ({ field }) => field.key === "conditionImmunities" || field.key === "conditionIds"
+    );
     expect(fields.length).toBeGreaterThanOrEqual(2);
     for (const { type, field } of fields) {
       expect(suggestionsOf(field), `${type}.${field.key}`).toEqual(CONDITION_IDS);
@@ -84,7 +90,12 @@ describe("enumerated fields offer the complete SRD list", () => {
   });
 
   it("every creature-type field offers all fourteen", () => {
-    const fields = everyField().filter(({ field }) => field.key === "creatureType" || field.key === "creatureTypes" || (field.key === "type" && field.label === "Creature type"));
+    const fields = everyField().filter(
+      ({ field }) =>
+        field.key === "creatureType" ||
+        field.key === "creatureTypes" ||
+        (field.key === "type" && field.label === "Creature type")
+    );
     expect(fields.length).toBeGreaterThanOrEqual(3);
     for (const { type, field } of fields) {
       expect(suggestionsOf(field), `${type}.${field.key}`).toEqual(ctx.creatureTypes);
@@ -96,7 +107,11 @@ describe("an open slug always keeps its “other”", () => {
   it("the open-slug fields are text or tag inputs, never closed selects", () => {
     // Open `ContentIdSchema` columns: a closed select would make values like "unique" unauthorable.
     const openSlugs: ReadonlyArray<readonly [HomebrewType, string]> = [
-      ["equipment", "rarity"], ["equipment", "category"], ["feat", "category"], ["spell", "school"], ["species", "creatureType"]
+      ["equipment", "rarity"],
+      ["equipment", "category"],
+      ["feat", "category"],
+      ["spell", "school"],
+      ["species", "creatureType"]
     ];
     for (const [type, key] of openSlugs) {
       const found = everyField().find((entry) => entry.type === type && entry.field.key === key);
@@ -114,7 +129,9 @@ describe("an open slug always keeps its “other”", () => {
     // Closed in their schemas, so they stay selects, and "Not set" omits the key (`.optional()`
     // rejects `null`).
     const closed: ReadonlyArray<readonly [HomebrewType, string]> = [
-      ["equipment", "slot"], ["equipment", "weapon.category"], ["class", "hitDie"]
+      ["equipment", "slot"],
+      ["equipment", "weapon.category"],
+      ["class", "hitDie"]
     ];
     for (const [type, key] of closed) {
       const found = everyField().find((entry) => entry.type === type && entry.field.key === key);
@@ -134,8 +151,9 @@ describe("an open slug always keeps its “other”", () => {
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
       // A flag on `text` or `tags`, never its own kind; both keep the column open.
-      expect(["text", "tags"], `${type}.${field.key} — pick is a flag on text or tags, not a kind`)
-        .toContain(field.kind ?? "text");
+      expect(["text", "tags"], `${type}.${field.key} — pick is a flag on text or tags, not a kind`).toContain(
+        field.kind ?? "text"
+      );
     }
   });
 

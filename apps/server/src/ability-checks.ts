@@ -1,4 +1,10 @@
-import { aggregateRollMode, collectRiders, type AggregatedRollMode, type RiderAbility, type RollModeSource } from "@vtt/rules-5e";
+import {
+  aggregateRollMode,
+  collectRiders,
+  type AggregatedRollMode,
+  type RiderAbility,
+  type RollModeSource
+} from "@vtt/rules-5e";
 import type { EquipmentDerivation } from "./equipment-derivation.js";
 
 /**
@@ -25,8 +31,12 @@ export function checkRollSources(
   };
   for (const moment of [null, "on-ability-check"] as const) {
     for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...narrowed, moment })) {
-      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "check" || rider.modifier.mode === undefined) continue;
-      (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: rider.label });
+      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "check" || rider.modifier.mode === undefined)
+        continue;
+      (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({
+        source: `item:${rider.sourceItemId ?? rider.label}`,
+        label: rider.label
+      });
     }
   }
   return { advantage, disadvantage };

@@ -10,7 +10,11 @@ export function nextSessionNumber(sessions: readonly SessionRef[]): number {
 
 /** A duplicate number is a clean 400, so the suggestion can be wrong without harm. */
 export function createSession(gmToken: string, sessions: readonly SessionRef[]): Promise<CodexSession> {
-  return sessionApi.create(gmToken, { sessionNumber: nextSessionNumber(sessions), status: "planned", commandId: newId() });
+  return sessionApi.create(gmToken, {
+    sessionNumber: nextSessionNumber(sessions),
+    status: "planned",
+    commandId: newId()
+  });
 }
 
 /** The route requires a title, so a default is supplied. */

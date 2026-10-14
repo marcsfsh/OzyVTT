@@ -7,10 +7,22 @@
 
 import { useMemo } from "react";
 import {
-  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS
+  CONDITION_IDS,
+  CREATURE_TYPE_IDS,
+  DAMAGE_TYPE_IDS,
+  MAGIC_SCHOOL_IDS,
+  WEAPON_MASTERY_IDS,
+  WEAPON_PROPERTY_IDS
 } from "@vtt/content-srd-5.2.1/schemas";
 import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
-import { useBackgroundCatalog, useBuilderCatalogs, useClassCatalog, useFeatCatalog, useSkillCatalog, useSpeciesCatalog } from "../content/catalogs";
+import {
+  useBackgroundCatalog,
+  useBuilderCatalogs,
+  useClassCatalog,
+  useFeatCatalog,
+  useSkillCatalog,
+  useSpeciesCatalog
+} from "../content/catalogs";
 import { useEquipmentReference } from "../encounter/equipment";
 import { useSpellReference } from "../encounter/spells";
 import type { HomebrewRecordSummary } from "./api";
@@ -25,7 +37,11 @@ const WEAPON_SLUGS: readonly string[] = [...WEAPON_PROPERTY_IDS, ...WEAPON_MASTE
 
 /** SRD rows plus every homebrew record of `type`, de-duplicated by id; homebrew wins a clash
     because a homebrew record with an SRD id is an override. */
-function merge(srd: readonly SelectOption[], records: readonly HomebrewRecordSummary[], type: HomebrewType): readonly SelectOption[] {
+function merge(
+  srd: readonly SelectOption[],
+  records: readonly HomebrewRecordSummary[],
+  type: HomebrewType
+): readonly SelectOption[] {
   const map = new Map<string, SelectOption>();
   for (const option of srd) map.set(option.value, option);
   for (const record of records) {
@@ -71,7 +87,9 @@ export function useSchemaContext(
       })),
       // A draft homebrew spell not yet in the merged catalog is still a valid target.
       ...records
-        .filter((record) => record.type === "spell" && !record.deletedAt && !spellRows.some((spell) => spell.id === record.id))
+        .filter(
+          (record) => record.type === "spell" && !record.deletedAt && !spellRows.some((spell) => spell.id === record.id)
+        )
         .map((record) => ({ id: record.id, name: record.name, origin: "homebrew" as const, meta: "Draft" }))
     ];
 
@@ -85,7 +103,9 @@ export function useSchemaContext(
 
     // Derived from the catalog so homebrew categories appear too.
     const distinct = (values: readonly string[]): readonly SelectOption[] =>
-      [...new Set(values.filter(Boolean))].sort().map((value) => ({ value, label: value.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()) }));
+      [...new Set(values.filter(Boolean))]
+        .sort()
+        .map((value) => ({ value, label: value.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()) }));
 
     // A spell list is any id a spell tags itself with (per `resolveCatalogChoice`), plus every
     // homebrew list and class.
@@ -97,17 +117,44 @@ export function useSchemaContext(
     }
     const nameOf = new Map(records.map((record) => [record.id, record.name]));
     const spellLists = [...listIds]
-      .map((id) => ({ value: id, label: nameOf.get(id) ?? id.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase()) }))
+      .map((id) => ({
+        value: id,
+        label: nameOf.get(id) ?? id.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())
+      }))
       .sort(byLabel);
 
     const ctx: SchemaContext = {
       recordId,
-      siblings: records.filter((record) => record.type === type && !record.deletedAt).map((record) => ({ id: record.id, name: record.name })),
-      classes: merge(classes.items.map((row) => ({ value: row.id, label: row.name })), records, "class"),
-      species: merge(species.items.map((row) => ({ value: row.id, label: row.name })), records, "species"),
-      backgrounds: merge(backgrounds.items.map((row) => ({ value: row.id, label: row.name })), records, "background"),
-      feats: merge(feats.items.map((row) => ({ value: row.id, label: row.name })), records, "feat"),
-      featCategories: distinct([...feats.items.map((row) => row.category), "origin", "general", "fighting-style", "epic-boon"]),
+      siblings: records
+        .filter((record) => record.type === type && !record.deletedAt)
+        .map((record) => ({ id: record.id, name: record.name })),
+      classes: merge(
+        classes.items.map((row) => ({ value: row.id, label: row.name })),
+        records,
+        "class"
+      ),
+      species: merge(
+        species.items.map((row) => ({ value: row.id, label: row.name })),
+        records,
+        "species"
+      ),
+      backgrounds: merge(
+        backgrounds.items.map((row) => ({ value: row.id, label: row.name })),
+        records,
+        "background"
+      ),
+      feats: merge(
+        feats.items.map((row) => ({ value: row.id, label: row.name })),
+        records,
+        "feat"
+      ),
+      featCategories: distinct([
+        ...feats.items.map((row) => row.category),
+        "origin",
+        "general",
+        "fighting-style",
+        "epic-boon"
+      ]),
       skills: skills.items.map((row) => ({ value: row.id, label: row.name })),
       spellLists,
       spells: spellEntries,
@@ -130,5 +177,17 @@ export function useSchemaContext(
     };
 
     return { ctx, spells };
-  }, [recordId, type, records, classes.items, species.items, backgrounds.items, feats.items, skills.items, spellRows, equipment.catalog, builder.choice]);
+  }, [
+    recordId,
+    type,
+    records,
+    classes.items,
+    species.items,
+    backgrounds.items,
+    feats.items,
+    skills.items,
+    spellRows,
+    equipment.catalog,
+    builder.choice
+  ]);
 }

@@ -22,7 +22,7 @@ describe("homebrew id shapes are per type, in both directions", () => {
     expect(isMintedHomebrewId(OPAQUE, "class")).toBe(false);
   });
 
-  it("accepts a builder id that merely STARTS like a monster's - a class named \"M\" is not a monster", () => {
+  it('accepts a builder id that merely STARTS like a monster\'s - a class named "M" is not a monster', () => {
     // `hb-m-` alone is not proof of a monster: a class named "M copy" mints `hb-m-copy-<6hex>`. The
     // shapes cannot overlap because a builder suffix is 6 or 8 hex and a monster's is 12.
     const minted = mintHomebrewId("class", "M copy", () => false);

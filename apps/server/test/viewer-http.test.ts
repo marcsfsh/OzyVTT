@@ -10,7 +10,9 @@ import { createViewerRouter } from "../src/viewer-http.js";
 import { ViewerPresentationStore } from "../src/viewer-presentation-store.js";
 
 const cleanups: Array<() => Promise<void> | void> = [];
-afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()!();
+});
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "vtt-viewer-http-"));
@@ -18,22 +20,46 @@ async function fixture() {
   const databasePath = join(directory, "vtt.sqlite");
   const access = new ViewerAccessStore(databasePath, () => now);
   const presentation = new ViewerPresentationStore(databasePath);
-  await access.initialize(); await presentation.initialize();
+  await access.initialize();
+  await presentation.initialize();
   const authorizeGm = (token: string | undefined) => token === "gm-secret";
   const coordinator = new ViewerCoordinator(access, presentation, authorizeGm, () => now);
-  const app = express(); app.use(express.json()); app.use(createViewerRouter({ access, presentation, coordinator, authorizeGm, now: () => now }));
-  const server = createServer(app); await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address(); if (!address || typeof address === "string") throw new Error("Test server did not bind.");
-  cleanups.push(async () => { await new Promise<void>((resolve) => server.close(() => resolve())); access.close(); presentation.close(); await rm(directory, { recursive: true, force: true }); });
-  return { base: `http://127.0.0.1:${address.port}`, access, presentation, coordinator, setNow: (value: number) => { now = value; } };
+  const app = express();
+  app.use(express.json());
+  app.use(createViewerRouter({ access, presentation, coordinator, authorizeGm, now: () => now }));
+  const server = createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Test server did not bind.");
+  cleanups.push(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    access.close();
+    presentation.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  return {
+    base: `http://127.0.0.1:${address.port}`,
+    access,
+    presentation,
+    coordinator,
+    setNow: (value: number) => {
+      now = value;
+    }
+  };
 }
 
-async function json(response: Response) { return response.json() as Promise<Record<string, any>>; }
+async function json(response: Response) {
+  return response.json() as Promise<Record<string, any>>;
+}
 
 describe("viewer HTTP vertical slice", () => {
   it("pairs with an HttpOnly cookie, converges, commands, and revokes immediately", async () => {
     const test = await fixture();
-    const unauthorized = await fetch(`${test.base}/api/v1/viewer/pairings`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const unauthorized = await fetch(`${test.base}/api/v1/viewer/pairings`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    });
     expect(unauthorized.status).toBe(401);
     const unauthorizedBody = await json(unauthorized);
     expect(unauthorizedBody.ok).toBe(false);
@@ -42,17 +68,29 @@ describe("viewer HTTP vertical slice", () => {
     // ADR-0016: a UUID v4 correlation id is echoed; anything else is replaced, which keeps
     // caller-chosen text out of the log line and the error body.
     const correlationId = "8d976bbc-59f4-4e1b-ac00-e198dbf40d9c";
-    const pairingResponse = await fetch(`${test.base}/api/v1/viewer/pairings`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": correlationId }, body: "{}" });
+    const pairingResponse = await fetch(`${test.base}/api/v1/viewer/pairings`, {
+      method: "POST",
+      headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": correlationId },
+      body: "{}"
+    });
     expect(pairingResponse.status).toBe(201);
     expect(pairingResponse.headers.get("x-request-id")).toBe(correlationId);
     const code = (await json(pairingResponse)).pairing.code as string;
 
     // A non-UUID token is replaced, not echoed.
-    const substituted = await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { authorization: "Bearer gm-secret", "x-request-id": "pair-1" } });
+    const substituted = await fetch(`${test.base}/api/v1/viewer/presentation`, {
+      headers: { authorization: "Bearer gm-secret", "x-request-id": "pair-1" }
+    });
     expect(substituted.headers.get("x-request-id")).not.toBe("pair-1");
-    expect(substituted.headers.get("x-request-id")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(substituted.headers.get("x-request-id")).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
 
-    const exchange = await fetch(`${test.base}/api/v1/viewer/pairings/exchange`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name: "Table TV" }) });
+    const exchange = await fetch(`${test.base}/api/v1/viewer/pairings/exchange`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, name: "Table TV" })
+    });
     const exchangeBody = await json(exchange);
     expect(exchange.status).toBe(201);
     expect(exchangeBody).not.toHaveProperty("token");
@@ -60,14 +98,36 @@ describe("viewer HTTP vertical slice", () => {
     expect(exchange.headers.get("set-cookie")).toContain("SameSite=Strict");
     const cookie = exchange.headers.get("set-cookie")!.split(";", 1)[0];
 
-    const begin = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json" }, body: JSON.stringify({ id: "begin", expectedRevision: 0, payload: { type: "viewer.presentation.begin", assetId: "map-1", altText: "Dungeon", camera: { center: { x: 500, y: 300 }, zoom: 1 } } }) });
+    const begin = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, {
+      method: "POST",
+      headers: { authorization: "Bearer gm-secret", "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "begin",
+        expectedRevision: 0,
+        payload: {
+          type: "viewer.presentation.begin",
+          assetId: "map-1",
+          altText: "Dungeon",
+          camera: { center: { x: 500, y: 300 }, zoom: 1 }
+        }
+      })
+    });
     expect(begin.status).toBe(200);
     const snapshot = await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { cookie } });
-    expect((await json(snapshot)).presentation).toMatchObject({ revision: 1, enabled: true, activeMap: { assetId: "map-1" } });
+    expect((await json(snapshot)).presentation).toMatchObject({
+      revision: 1,
+      enabled: true,
+      activeMap: { assetId: "map-1" }
+    });
 
-    const accessList = await fetch(`${test.base}/api/v1/viewer/access`, { headers: { authorization: "Bearer gm-secret" } });
+    const accessList = await fetch(`${test.base}/api/v1/viewer/access`, {
+      headers: { authorization: "Bearer gm-secret" }
+    });
     const viewerId = (await json(accessList)).viewers[0].id;
-    const revoked = await fetch(`${test.base}/api/v1/viewer/access/${viewerId}`, { method: "DELETE", headers: { authorization: "Bearer gm-secret" } });
+    const revoked = await fetch(`${test.base}/api/v1/viewer/access/${viewerId}`, {
+      method: "DELETE",
+      headers: { authorization: "Bearer gm-secret" }
+    });
     expect(revoked.status).toBe(200);
     expect((await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { cookie } })).status).toBe(401);
   });
@@ -78,10 +138,29 @@ describe("viewer HTTP vertical slice", () => {
     const created = test.access.exchangePairingCode(pairing.code, "Projector");
     const received: unknown[] = [];
     let closed = false;
-    test.coordinator.connectViewer(created.token, (state) => received.push(state), () => { closed = true; });
-    await test.coordinator.executeGm("gm-secret", { id: "begin", expectedRevision: 0, payload: { type: "viewer.presentation.begin", assetId: "map-live", altText: "Live map", camera: { center: { x: 50, y: 40 }, zoom: 1 } } });
+    test.coordinator.connectViewer(
+      created.token,
+      (state) => received.push(state),
+      () => {
+        closed = true;
+      }
+    );
+    await test.coordinator.executeGm("gm-secret", {
+      id: "begin",
+      expectedRevision: 0,
+      payload: {
+        type: "viewer.presentation.begin",
+        assetId: "map-live",
+        altText: "Live map",
+        camera: { center: { x: 50, y: 40 }, zoom: 1 }
+      }
+    });
     expect(received).toHaveLength(2);
-    expect(received[1]).toMatchObject({ enabled: true, activeMap: { assetId: "map-live" }, camera: { center: { x: 50, y: 40 } } });
+    expect(received[1]).toMatchObject({
+      enabled: true,
+      activeMap: { assetId: "map-live" },
+      camera: { center: { x: 50, y: 40 } }
+    });
     expect(received[1]).not.toHaveProperty("acceptedCommandIds");
     test.access.revoke(created.viewer.id);
     test.coordinator.broadcast();
@@ -93,22 +172,46 @@ describe("viewer HTTP vertical slice", () => {
     const test = await fixture();
     const received: unknown[] = [];
     let closed = false;
-    const connection = test.coordinator.connectGm("gm-secret", (state) => received.push(state), () => { closed = true; });
+    const connection = test.coordinator.connectGm(
+      "gm-secret",
+      (state) => received.push(state),
+      () => {
+        closed = true;
+      }
+    );
     expect(received).toHaveLength(1);
-    await test.coordinator.executeGm("gm-secret", { id: "begin", expectedRevision: 0, payload: { type: "viewer.presentation.begin", assetId: "map-preview", altText: "Preview map", camera: { center: { x: 10, y: 10 }, zoom: 1 } } });
+    await test.coordinator.executeGm("gm-secret", {
+      id: "begin",
+      expectedRevision: 0,
+      payload: {
+        type: "viewer.presentation.begin",
+        assetId: "map-preview",
+        altText: "Preview map",
+        camera: { center: { x: 10, y: 10 }, zoom: 1 }
+      }
+    });
     expect(received).toHaveLength(2);
     expect(received[1]).toMatchObject({ enabled: true, activeMap: { assetId: "map-preview" } });
     connection.disconnect();
     test.coordinator.broadcast();
     expect(received).toHaveLength(2);
     expect(closed).toBe(false); // an explicit disconnect() does not itself call the close callback - that's for server-initiated drops.
-    expect(() => test.coordinator.connectGm("not-the-gm", () => {}, () => {})).toThrow();
+    expect(() =>
+      test.coordinator.connectGm(
+        "not-the-gm",
+        () => {},
+        () => {}
+      )
+    ).toThrow();
   });
 
   it("mints a GM preview cookie that authenticates as a read-only viewer, and rejects non-GM callers", async () => {
     const test = await fixture();
     expect((await fetch(`${test.base}/api/v1/viewer/preview-session`, { method: "POST" })).status).toBe(401);
-    const minted = await fetch(`${test.base}/api/v1/viewer/preview-session`, { method: "POST", headers: { authorization: "Bearer gm-secret" } });
+    const minted = await fetch(`${test.base}/api/v1/viewer/preview-session`, {
+      method: "POST",
+      headers: { authorization: "Bearer gm-secret" }
+    });
     expect(minted.status).toBe(201);
     const cookie = minted.headers.get("set-cookie")!;
     expect(cookie).toContain("vtt_viewer_session=");
@@ -124,7 +227,10 @@ describe("viewer HTTP vertical slice", () => {
     expect(unauthenticated.status).toBe(401);
 
     const controller = new AbortController();
-    const live = await fetch(`${test.base}/api/v1/viewer/events`, { headers: { authorization: "Bearer gm-secret" }, signal: controller.signal });
+    const live = await fetch(`${test.base}/api/v1/viewer/events`, {
+      headers: { authorization: "Bearer gm-secret" },
+      signal: controller.signal
+    });
     expect(live.status).toBe(200);
     expect(live.headers.get("content-type")).toContain("text/event-stream");
     const reader = live.body!.getReader();
@@ -136,14 +242,36 @@ describe("viewer HTTP vertical slice", () => {
   it("returns stable validation and revision-conflict envelopes without secrets", async () => {
     const test = await fixture();
     const callerId = "1f0c6b52-9a4e-4d3f-8f0a-2b6c1d5e7a90";
-    const malformed = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": callerId }, body: JSON.stringify({ id: "bad", payload: { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: "huge" } } }) });
+    const malformed = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, {
+      method: "POST",
+      headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": callerId },
+      body: JSON.stringify({
+        id: "bad",
+        payload: { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: "huge" } }
+      })
+    });
     expect(malformed.status).toBe(400);
     // The error body carries the correlation id too, and it is the caller's own only when the caller
     // sent a UUID v4.
-    expect(await json(malformed)).toEqual({ ok: false, apiVersion: "1", error: { code: "validation_failed", message: "Viewer request body is invalid.", requestId: callerId } });
+    expect(await json(malformed)).toEqual({
+      ok: false,
+      apiVersion: "1",
+      error: { code: "validation_failed", message: "Viewer request body is invalid.", requestId: callerId }
+    });
 
-    await test.coordinator.executeGm("gm-secret", { id: "first", payload: { type: "viewer.enabled.set", enabled: true } });
-    const conflict = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json" }, body: JSON.stringify({ id: "stale", expectedRevision: 0, payload: { type: "viewer.enabled.set", enabled: false } }) });
+    await test.coordinator.executeGm("gm-secret", {
+      id: "first",
+      payload: { type: "viewer.enabled.set", enabled: true }
+    });
+    const conflict = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, {
+      method: "POST",
+      headers: { authorization: "Bearer gm-secret", "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "stale",
+        expectedRevision: 0,
+        payload: { type: "viewer.enabled.set", enabled: false }
+      })
+    });
     const text = await conflict.text();
     expect(conflict.status).toBe(409);
     expect(text).not.toContain("gm-secret");

@@ -39,31 +39,61 @@ export function useMapCatalog(token?: string | null): MapCatalog {
   const bearer = token ?? sessionToken();
   const [maps, setMaps] = useState<readonly PickerMap[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const reload = useCallback(async (preferId?: string) => {
-    if (!bearer) return undefined;
-    const data = await readBody(await fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${bearer}` } }));
-    const rows: readonly PickerMap[] = (data.assets as readonly (PickerMap & { folder?: string | null })[]).map((asset) => ({
-      id: asset.id, name: asset.name, kind: asset.kind, folder: asset.folder ?? null,
-      width: asset.width, height: asset.height, calibration: asset.calibration, scale: asset.scale
-    }));
-    setMaps(rows);
-    return preferId ? rows.find((row) => row.id === preferId) : undefined;
-  }, [bearer]);
-  useEffect(() => { void reload().catch((failure: Error) => setError(failure.message)); }, [reload]);
+  const reload = useCallback(
+    async (preferId?: string) => {
+      if (!bearer) return undefined;
+      const data = await readBody(
+        await fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${bearer}` } })
+      );
+      const rows: readonly PickerMap[] = (data.assets as readonly (PickerMap & { folder?: string | null })[]).map(
+        (asset) => ({
+          id: asset.id,
+          name: asset.name,
+          kind: asset.kind,
+          folder: asset.folder ?? null,
+          width: asset.width,
+          height: asset.height,
+          calibration: asset.calibration,
+          scale: asset.scale
+        })
+      );
+      setMaps(rows);
+      return preferId ? rows.find((row) => row.id === preferId) : undefined;
+    },
+    [bearer]
+  );
+  useEffect(() => {
+    void reload().catch((failure: Error) => setError(failure.message));
+  }, [reload]);
   return { maps, reload, token: bearer, error };
 }
 
 /** POST an image to the library. Returns the created (or deduplicated) asset row. */
-export async function uploadMap(bearer: string, file: File, kind: MapSelection["kind"]): Promise<{ asset: PickerMap; duplicate: boolean }> {
+export async function uploadMap(
+  bearer: string,
+  file: File,
+  kind: MapSelection["kind"]
+): Promise<{ asset: PickerMap; duplicate: boolean }> {
   const query = new URLSearchParams({ filename: file.name, name: file.name.replace(/\.[^.]+$/, ""), kind });
-  const data = await readBody(await fetch(`/api/v1/map-assets?${query}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${bearer}`, "content-type": file.type || "application/octet-stream" },
-    body: file
-  }));
+  const data = await readBody(
+    await fetch(`/api/v1/map-assets?${query}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bearer}`, "content-type": file.type || "application/octet-stream" },
+      body: file
+    })
+  );
   const asset = data.asset as PickerMap & { folder?: string | null };
   return {
-    asset: { id: asset.id, name: asset.name, kind: asset.kind, folder: asset.folder ?? null, width: asset.width, height: asset.height, calibration: asset.calibration, scale: asset.scale },
+    asset: {
+      id: asset.id,
+      name: asset.name,
+      kind: asset.kind,
+      folder: asset.folder ?? null,
+      width: asset.width,
+      height: asset.height,
+      calibration: asset.calibration,
+      scale: asset.scale
+    },
     duplicate: data.duplicate === true
   };
 }

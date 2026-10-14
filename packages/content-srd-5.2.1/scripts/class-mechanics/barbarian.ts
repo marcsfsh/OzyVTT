@@ -10,23 +10,36 @@ export const barbarian: ClassMechanicsModule = {
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
-      actions: [{
-        id: "rage",
-        name: "Rage",
-        activation: "bonus-action",
-        description: "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
-        damage: [],
-        grants: {
-          name: "Raging",
-          tags: ["raging"],
-          duration: { type: "encounter" },
-          modifiers: [
-            { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
-            { type: "roll-mode", roll: "check", mode: "advantage", when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }] },
-            { type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }] }
-          ]
+      actions: [
+        {
+          id: "rage",
+          name: "Rage",
+          activation: "bonus-action",
+          description:
+            "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
+          damage: [],
+          grants: {
+            name: "Raging",
+            tags: ["raging"],
+            duration: { type: "encounter" },
+            modifiers: [
+              { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+              {
+                type: "roll-mode",
+                roll: "check",
+                mode: "advantage",
+                when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }]
+              },
+              {
+                type: "roll-mode",
+                roll: "save",
+                mode: "advantage",
+                when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+              }
+            ]
+          }
         }
-      }]
+      ]
     },
     // Constitution, Shield allowed. The Monk's feature with the same id differs, hence (recordId, featureId) keys.
     "unarmored-defense": {
@@ -34,21 +47,32 @@ export const barbarian: ClassMechanicsModule = {
     },
     // Weapon Mastery grows with the printed column: 2 -> 3 at level 4 -> 4 at level 10.
     "weapon-mastery": {
-      extraPicks: [{ offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }]
+      extraPicks: [
+        { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
+      ]
     },
     // Advantage on Dexterity saves; the Incapacitated exception needs negation and stays prose.
     "danger-sense": {
-      modifiers: [{ type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] }]
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "save",
+          mode: "advantage",
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+        }
+      ]
     },
     // Authored as `effects` so an activation is synthesised. "Using Strength" stays prose: attack
     // advantage cannot be gated on the attack's ability.
     "reckless-attack": {
-      effects: [{
-        name: "Reckless Attack",
-        tags: ["reckless-attack"],
-        duration: { type: "until-source-next-turn" },
-        modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }]
-      }]
+      effects: [
+        {
+          name: "Reckless Attack",
+          tags: ["reckless-attack"],
+          duration: { type: "until-source-next-turn" },
+          modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }]
+        }
+      ]
     },
     // One more pick from the class skill list. The "as a Strength check" half stays prose.
     "primal-knowledge": {
@@ -90,14 +114,17 @@ export const barbarian: ClassMechanicsModule = {
        */
       "intimidating-presence": {
         uses: { limit: 1, per: "long-rest" },
-        actions: [{
-          id: "intimidating-presence",
-          name: "Intimidating Presence",
-          activation: "bonus-action",
-          description: "Each creature of your choice in a 30-foot Emanation makes a Wisdom saving throw. On a failed save, the creature has the Frightened condition for 1 minute; at the end of each of its turns it repeats the save, ending the effect on itself on a success.",
-          damage: [],
-          save: { ability: "wis", dc: { base: 8, ability: "str", proficiencyBonus: true } }
-        }]
+        actions: [
+          {
+            id: "intimidating-presence",
+            name: "Intimidating Presence",
+            activation: "bonus-action",
+            description:
+              "Each creature of your choice in a 30-foot Emanation makes a Wisdom saving throw. On a failed save, the creature has the Frightened condition for 1 minute; at the end of each of its turns it repeats the save, ending the effect on itself on a success.",
+            damage: [],
+            save: { ability: "wis", dc: { base: 8, ability: "str", proficiencyBonus: true } }
+          }
+        ]
       },
       /**
        * Immunity gated on the `raging` tag Rage's effect writes, evaluated per read by

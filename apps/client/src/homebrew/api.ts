@@ -160,11 +160,16 @@ export const homebrewApi = {
 
   /** POST /content — always lands as `state: "draft"`, `visibleToPlayers: false`. */
   create: (token: string, record: Readonly<Record<string, unknown>>) =>
-    request<{ record: HomebrewRecordDocument }>(token, "/content", { method: "POST", body: JSON.stringify({ record }) }).then((data) => data.record),
+    request<{ record: HomebrewRecordDocument }>(token, "/content", {
+      method: "POST",
+      body: JSON.stringify({ record })
+    }).then((data) => data.record),
 
   /** GET /content/{id} — the record plus its full validity report. */
   get: (token: string, id: string) =>
-    request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}`).then((data) => data.record),
+    request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}`).then(
+      (data) => data.record
+    ),
 
   /** PATCH /content/{id} — replaces the whole authored body (no partial merge); leaves state,
       visibility and deletedAt alone. */
@@ -176,11 +181,15 @@ export const homebrewApi = {
 
   /** DELETE /content/{id} — soft delete, idempotent. Restorable; nothing is destroyed. */
   remove: (token: string, id: string) =>
-    request<{ id: string; deleted: true; deletedAt: string }>(token, `/content/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    request<{ id: string; deleted: true; deletedAt: string }>(token, `/content/${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    }),
 
   /** POST /content/{id}/restore — the explicit inverse of soft delete, never a PATCH of `deletedAt: null`. */
   restore: (token: string, id: string) =>
-    request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/restore`, { method: "POST" }).then((data) => data.record),
+    request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/restore`, {
+      method: "POST"
+    }).then((data) => data.record),
 
   /** POST /content/{id}/duplicate — `{id}` may be an SRD id. The copy lands as a draft hidden from players. */
   duplicate: (token: string, id: string, name?: string) =>
@@ -211,8 +220,7 @@ export const homebrewApi = {
     }).then((data) => data.record),
 
   /** GET /content/{id}/usages — which characters took this, computed on demand. */
-  usages: (token: string, id: string) =>
-    request<HomebrewUsages>(token, `/content/${encodeURIComponent(id)}/usages`),
+  usages: (token: string, id: string) => request<HomebrewUsages>(token, `/content/${encodeURIComponent(id)}/usages`),
 
   /** GET /packs/export — published, non-deleted records as a shareable pack. */
   exportPack: (token: string, params: Readonly<{ type?: HomebrewType; ids?: readonly string[] }> = {}) => {
@@ -238,7 +246,10 @@ export const homebrewApi = {
 
 /** Reads every keyset page. Fetching the whole library, removed rows included, keeps every derived
     count in the modebar and rail exact, including "N removed records are hidden". */
-export async function listAllHomebrew(token: string, params: HomebrewListQuery = {}): Promise<readonly HomebrewRecordSummary[]> {
+export async function listAllHomebrew(
+  token: string,
+  params: HomebrewListQuery = {}
+): Promise<readonly HomebrewRecordSummary[]> {
   const rows: HomebrewRecordSummary[] = [];
   let cursor: string | null = null;
   // Page ceiling so a server that always returns a cursor cannot loop forever.

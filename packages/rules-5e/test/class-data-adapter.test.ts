@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  meetsMulticlassPrerequisites, progressionFromClass, progressionTableFromClasses, spellSlotsForClass,
-  SRD_CLASS_PROGRESSION, type ClassProgressionSource
+  meetsMulticlassPrerequisites,
+  progressionFromClass,
+  progressionTableFromClasses,
+  spellSlotsForClass,
+  SRD_CLASS_PROGRESSION,
+  type ClassProgressionSource
 } from "../src/index.js";
 
 /** A fully homebrew class record: the adapter must carry its values, never SRD defaults. */
@@ -14,7 +18,13 @@ const bloodKnight: ClassProgressionSource = {
   asiLevels: [4, 8, 12, 16, 19],
   subclassLevel: 2,
   spellcasting: { ability: "cha", multiclassProgression: "third" },
-  multiclassPrerequisites: { mode: "any", minimums: [{ ability: "con", minimum: 13 }, { ability: "cha", minimum: 13 }] }
+  multiclassPrerequisites: {
+    mode: "any",
+    minimums: [
+      { ability: "con", minimum: 13 },
+      { ability: "cha", minimum: 13 }
+    ]
+  }
 };
 
 describe("progressionFromClass (bundle -> rules adapter)", () => {
@@ -25,7 +35,13 @@ describe("progressionFromClass (bundle -> rules adapter)", () => {
     expect(row.spellcastingAbility).toBe("cha");
     expect(row.asiLevels).toEqual([4, 8, 12, 16, 19]); // not 4/8/12/16
     expect(row.subclassLevel).toBe(2);
-    expect(row.multiclassPrerequisite).toEqual({ mode: "any", minimums: [["con", 13], ["cha", 13]] });
+    expect(row.multiclassPrerequisite).toEqual({
+      mode: "any",
+      minimums: [
+        ["con", 13],
+        ["cha", 13]
+      ]
+    });
   });
 
   it("maps a non-caster (no spellcasting block) to progression none / no ability", () => {

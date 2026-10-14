@@ -20,7 +20,16 @@ export interface MenuProps {
 
 /** Disclosure menu on native <details>/<summary>: the caret rotates on open, the popover eases in, and it closes
     on Escape, outside click or item activation. */
-export function Menu({ trigger, children, align = "start", label, hideCaret = false, icon = false, className, triggerClassName }: MenuProps) {
+export function Menu({
+  trigger,
+  children,
+  align = "start",
+  label,
+  hideCaret = false,
+  icon = false,
+  className,
+  triggerClassName
+}: MenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -97,9 +106,17 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
 
   return (
     <details ref={ref} className={cx("nh-menu", `nh-menu--${align}`, className)}>
-      <summary className={cx("nh-menu-trigger", icon && "nh-menu-trigger--icon", "interactive", triggerClassName)} aria-label={label} aria-haspopup="menu">
+      <summary
+        className={cx("nh-menu-trigger", icon && "nh-menu-trigger--icon", "interactive", triggerClassName)}
+        aria-label={label}
+        aria-haspopup="menu"
+      >
         <span className="nh-menu-trigger-label">{trigger}</span>
-        {!hideCaret && !icon && <span className="nh-menu-caret" aria-hidden="true">▾</span>}
+        {!hideCaret && !icon && (
+          <span className="nh-menu-caret" aria-hidden="true">
+            ▾
+          </span>
+        )}
       </summary>
       <div ref={popoverRef} className="nh-menu-popover anim-popover" role="menu" onClick={closeAfterItem}>
         {children}
@@ -114,8 +131,17 @@ export interface MenuItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 export function MenuItem({ icon, tone = "default", className, type = "button", children, ...rest }: MenuItemProps) {
   return (
-    <button role="menuitem" type={type} className={cx("nh-menu-item", tone === "danger" && "nh-menu-item--danger", className)} {...rest}>
-      {icon != null && <span className="nh-menu-item-icon" aria-hidden="true">{icon}</span>}
+    <button
+      role="menuitem"
+      type={type}
+      className={cx("nh-menu-item", tone === "danger" && "nh-menu-item--danger", className)}
+      {...rest}
+    >
+      {icon != null && (
+        <span className="nh-menu-item-icon" aria-hidden="true">
+          {icon}
+        </span>
+      )}
       {children}
     </button>
   );

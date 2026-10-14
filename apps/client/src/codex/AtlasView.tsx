@@ -1,7 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Combobox, Field, IconEyeOff, IconPlus, Input, Modal, RevealSwitch, Select, Skeleton, Switch, TagInput, useToast } from "@vtt/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Combobox,
+  Field,
+  IconEyeOff,
+  IconPlus,
+  Input,
+  Modal,
+  RevealSwitch,
+  Select,
+  Skeleton,
+  Switch,
+  TagInput,
+  useToast
+} from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
+import {
+  atlasApi,
+  type CodexMap,
+  type CodexMapKind,
+  type CodexMarker,
+  type CodexPageSummary,
+  type MapAsset
+} from "./api";
 import { codexApi } from "./api";
 import { MapSurface } from "./MapSurface";
 import { MarkerInspector } from "./MarkerInspector";
@@ -19,7 +42,9 @@ import type { CodexAutosaveSettings } from "./api";
 type AtlasScene = Readonly<{ id: string; name: string }>;
 type AtlasActor = Readonly<{ id: string; name: string }>;
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
-  { value: "world", label: "World" }, { value: "regional", label: "Regional" }, { value: "battlemap", label: "Battle map" }
+  { value: "world", label: "World" },
+  { value: "regional", label: "Regional" },
+  { value: "battlemap", label: "Battle map" }
 ];
 /**
  * A request to land somewhere in the atlas. Opening a pin means opening its map first, then selecting the
@@ -29,10 +54,29 @@ export type AtlasTarget = Readonly<{ mapId: string | null; markerId: string | nu
 
 /** "Players can't see this map yet" on a drill chip: the design system's GM-only glyph, not an emoji. */
 function GmOnlyMark() {
-  return <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM only. Players cannot see this map."><IconEyeOff /></span>;
+  return (
+    <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM only. Players cannot see this map.">
+      <IconEyeOff />
+    </span>
+  );
 }
 
-export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActivateScene, onOpenReplay, mapId, pinId, filter = "", tagFilter, autosave, onQuickCreate, onNavigate, onReplaceQuery }: Readonly<{
+export function AtlasView({
+  gmToken,
+  scenes,
+  actors = [],
+  activeSceneId,
+  onActivateScene,
+  onOpenReplay,
+  mapId,
+  pinId,
+  filter = "",
+  tagFilter,
+  autosave,
+  onQuickCreate,
+  onNavigate,
+  onReplaceQuery
+}: Readonly<{
   gmToken: string;
   scenes: readonly AtlasScene[];
   actors?: readonly AtlasActor[];
@@ -61,7 +105,9 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
    * `?pin=` link whose map must be resolved first.
    */
   const [currentMapId, setCurrentMapId] = useState<string | null>(mapId);
-  useEffect(() => { if (mapId) setCurrentMapId(mapId); }, [mapId]);
+  useEffect(() => {
+    if (mapId) setCurrentMapId(mapId);
+  }, [mapId]);
   const [markers, setMarkers] = useState<CodexMarker[]>([]);
   /**
    * The selected pin is the `?pin=` address, so selection survives a refresh and every change goes through
@@ -70,13 +116,19 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   const selectedMarkerId = pinId;
   /** This atlas address with a pin selected (or none), keeping the `?q=`/`?tag=` filters. */
   const pinHref = useCallback(
-    (markerId: string | null) => withQuery(currentMapId ? `${CODEX_ROOT}/atlas/${currentMapId}` : `${CODEX_ROOT}/atlas`,
-      { q: filter || null, tag: tagFilter ?? null, pin: markerId }),
+    (markerId: string | null) =>
+      withQuery(currentMapId ? `${CODEX_ROOT}/atlas/${currentMapId}` : `${CODEX_ROOT}/atlas`, {
+        q: filter || null,
+        tag: tagFilter ?? null,
+        pin: markerId
+      }),
     [currentMapId, filter, tagFilter]
   );
   const selectPin = useCallback((markerId: string) => onNavigate(pinHref(markerId)), [onNavigate, pinHref]);
   /** Closing the inspector is a departure too, so it is guarded. */
-  const deselectPin = useCallback(() => { if (selectedMarkerId) onNavigate(pinHref(null)); }, [onNavigate, pinHref, selectedMarkerId]);
+  const deselectPin = useCallback(() => {
+    if (selectedMarkerId) onNavigate(pinHref(null));
+  }, [onNavigate, pinHref, selectedMarkerId]);
   /** Clears the selection without the guard, for a just-deleted pin with nothing left to save. */
   const clearDeletedPin = useCallback(() => onReplaceQuery((query) => query.delete("pin")), [onReplaceQuery]);
   /** "Show the pin" selects it, asks the surface to centre on it, and scrolls the map into view (on a phone it is often below the fold). */
@@ -101,26 +153,61 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
 
   const loadMeta = useCallback(async () => {
     try {
-      const [nextMaps, nextPages, nextAssets] = await Promise.all([atlasApi.listMaps(gmToken), codexApi.listPages(gmToken), atlasApi.listAssets(gmToken).catch(() => [])]);
-      setMaps(nextMaps); setPages(nextPages); setAssets(nextAssets); setError(null);
-      setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
-    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the atlas."); }
-    finally { setLoading(false); }
+      const [nextMaps, nextPages, nextAssets] = await Promise.all([
+        atlasApi.listMaps(gmToken),
+        codexApi.listPages(gmToken),
+        atlasApi.listAssets(gmToken).catch(() => [])
+      ]);
+      setMaps(nextMaps);
+      setPages(nextPages);
+      setAssets(nextAssets);
+      setError(null);
+      setCurrentMapId(
+        (current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null
+      );
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load the atlas.");
+    } finally {
+      setLoading(false);
+    }
   }, [gmToken]);
 
-  const loadMarkers = useCallback(async (mapId: string) => {
-    try { setMarkers(await atlasApi.listMarkers(gmToken, mapId)); } catch { setMarkers([]); }
-  }, [gmToken]);
+  const loadMarkers = useCallback(
+    async (mapId: string) => {
+      try {
+        setMarkers(await atlasApi.listMarkers(gmToken, mapId));
+      } catch {
+        setMarkers([]);
+      }
+    },
+    [gmToken]
+  );
 
-  useEffect(() => { void loadMeta(); }, [loadMeta]);
-  useEffect(() => { if (currentMapId) void loadMarkers(currentMapId); else setMarkers([]); }, [currentMapId, loadMarkers]);
   useEffect(() => {
-    const onChanged = () => { void loadMeta(); if (currentMapId) void loadMarkers(currentMapId); };
+    void loadMeta();
+  }, [loadMeta]);
+  useEffect(() => {
+    if (currentMapId) void loadMarkers(currentMapId);
+    else setMarkers([]);
+  }, [currentMapId, loadMarkers]);
+  useEffect(() => {
+    const onChanged = () => {
+      void loadMeta();
+      if (currentMapId) void loadMarkers(currentMapId);
+    };
     socket.on("codex:changed", onChanged);
-    return () => { socket.off("codex:changed", onChanged); };
+    return () => {
+      socket.off("codex:changed", onChanged);
+    };
   }, [loadMeta, loadMarkers, currentMapId]);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setPlacing(false); setPicking(false); deselectPin(); } };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPlacing(false);
+        setPicking(false);
+        deselectPin();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [deselectPin]);
@@ -132,7 +219,8 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
     if (resolvedPinRef.current === pinId) return;
     resolvedPinRef.current = pinId;
     let live = true;
-    void codexApi.marker(gmToken, pinId)
+    void codexApi
+      .marker(gmToken, pinId)
       .then((marker) => {
         if (!live) return;
         setError(null);
@@ -146,7 +234,9 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
         setError("That pin is no longer in the atlas.");
         clearDeletedPin();
       });
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [pinId, mapId, loading, gmToken, onNavigate, clearDeletedPin]);
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
@@ -158,9 +248,14 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   const partyMarker = markers.find((marker) => marker.isParty) ?? null;
   /** Client-side over this map's pins. Non-matching pins dim rather than disappear. */
   const pinNeedle = filter.trim().toLowerCase();
-  const matchesFilter = useCallback((marker: CodexMarker) =>
-    (!pinNeedle || (marker.label ?? "").toLowerCase().includes(pinNeedle) || marker.tags.some((tag) => tag.includes(pinNeedle)))
-    && (!tagFilter || marker.tags.includes(tagFilter)), [pinNeedle, tagFilter]);
+  const matchesFilter = useCallback(
+    (marker: CodexMarker) =>
+      (!pinNeedle ||
+        (marker.label ?? "").toLowerCase().includes(pinNeedle) ||
+        marker.tags.some((tag) => tag.includes(pinNeedle))) &&
+      (!tagFilter || marker.tags.includes(tagFilter)),
+    [pinNeedle, tagFilter]
+  );
   const filtering = pinNeedle !== "" || Boolean(tagFilter);
   const matchCount = filtering ? markers.filter(matchesFilter).length : markers.length;
   const dimmedIds = useMemo(
@@ -169,17 +264,27 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   );
   const pinTags = useMemo(() => [...new Set(markers.flatMap((marker) => marker.tags))].sort(), [markers]);
   // Suggest tags already in use on pages and maps.
-  const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(), [pages, maps]);
+  const tagSuggestions = useMemo(
+    () => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(),
+    [pages, maps]
+  );
 
   const breadcrumb = useMemo(() => {
     const chain: CodexMap[] = [];
     let cursor = currentMap;
     const guard = new Set<string>();
-    while (cursor && !guard.has(cursor.id)) { chain.unshift(cursor); guard.add(cursor.id); cursor = maps.find((map) => map.id === cursor!.parentMapId) ?? null; }
+    while (cursor && !guard.has(cursor.id)) {
+      chain.unshift(cursor);
+      guard.add(cursor.id);
+      cursor = maps.find((map) => map.id === cursor!.parentMapId) ?? null;
+    }
     return chain;
   }, [currentMap, maps]);
   // Maps nested directly under this one: the way down, since the breadcrumb only goes up.
-  const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
+  const childMaps = useMemo(
+    () => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []),
+    [maps, currentMapId]
+  );
   // The atlas is a forest; without this row a second root map is unreachable once you leave it.
   const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
   const currentRootId = breadcrumb[0]?.id ?? null;
@@ -191,7 +296,8 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   /** The shared map-asset library, the same route `MapManager` uses. */
   const uploadAsset = async (file: File | undefined) => {
     if (!file) return;
-    setUploading(true); setError(null);
+    setUploading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/v1/map-assets?filename=${encodeURIComponent(file.name)}`, {
         method: "POST",
@@ -203,21 +309,39 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
       const next = await atlasApi.listAssets(gmToken).catch(() => assets);
       setAssets(next);
       toast("Map image uploaded.", { tone: "success" });
-    } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "The upload failed."); }
-    finally { setUploading(false); }
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "The upload failed.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const createFromAsset = async (asset: MapAsset) => {
     try {
-      const map = await atlasApi.createMap(gmToken, { assetId: asset.id, name: asset.name, kind: asset.kind, parentMapId: nestNew ? currentMapId : null });
-      setPicking(false); await loadMeta(); onNavigate(atlasPath(map.id));
-    } catch (createError) { setError(createError instanceof Error ? createError.message : "Could not add the map."); }
+      const map = await atlasApi.createMap(gmToken, {
+        assetId: asset.id,
+        name: asset.name,
+        kind: asset.kind,
+        parentMapId: nestNew ? currentMapId : null
+      });
+      setPicking(false);
+      await loadMeta();
+      onNavigate(atlasPath(map.id));
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Could not add the map.");
+    }
   };
   // Excluded from "sits inside" so a map can't be moved into its own subtree (the server also guards).
   const descendantIds = useMemo(() => {
     if (!currentMapId) return new Set<string>();
     const out = new Set<string>();
-    const walk = (parentId: string) => { for (const map of maps) if (map.parentMapId === parentId && !out.has(map.id)) { out.add(map.id); walk(map.id); } };
+    const walk = (parentId: string) => {
+      for (const map of maps)
+        if (map.parentMapId === parentId && !out.has(map.id)) {
+          out.add(map.id);
+          walk(map.id);
+        }
+    };
     walk(currentMapId);
     return out;
   }, [maps, currentMapId]);
@@ -225,56 +349,114 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
     if (!currentMap) return;
     const name = settingsName.trim();
     if (!name || name === currentMap.name) return;
-    try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { name })); }
-    catch (renameError) { setError(renameError instanceof Error ? renameError.message : "Couldn't rename the map."); }
+    try {
+      onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { name }));
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : "Couldn't rename the map.");
+    }
   };
   const retypeMap = async (kind: CodexMapKind) => {
     if (!currentMap) return;
-    try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { kind })); }
-    catch (retypeError) { setError(retypeError instanceof Error ? retypeError.message : "Couldn't change the map kind."); }
+    try {
+      onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { kind }));
+    } catch (retypeError) {
+      setError(retypeError instanceof Error ? retypeError.message : "Couldn't change the map kind.");
+    }
   };
   // Saved per committed tag; `tags` is always sent in full, so clearing travels as [].
   const retagMap = async (tags: readonly string[]) => {
     if (!currentMap) return;
-    try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { tags })); }
-    catch (tagError) { setError(tagError instanceof Error ? tagError.message : "Couldn't save the tags."); }
+    try {
+      onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { tags }));
+    } catch (tagError) {
+      setError(tagError instanceof Error ? tagError.message : "Couldn't save the tags.");
+    }
   };
   const reparentMap = async (parentMapId: string | null) => {
     if (!currentMap) return;
-    try { onMapReplace(await atlasApi.setMapParent(gmToken, currentMap.id, parentMapId)); await loadMeta(); }
-    catch (parentError) { setError(parentError instanceof Error ? parentError.message : "Couldn't move the map."); }
+    try {
+      onMapReplace(await atlasApi.setMapParent(gmToken, currentMap.id, parentMapId));
+      await loadMeta();
+    } catch (parentError) {
+      setError(parentError instanceof Error ? parentError.message : "Couldn't move the map.");
+    }
   };
   const placeMarker = async (point: { x: number; y: number }) => {
     if (!currentMapId) return;
-    try { const marker = await atlasApi.createMarker(gmToken, currentMapId, { x: point.x, y: point.y, iconId: DEFAULT_ICON, iconColor: DEFAULT_COLOR }); setMarkers((prev) => [...prev, marker]); setPlacing(false); selectPin(marker.id); }
-    catch (placeError) { setError(placeError instanceof Error ? placeError.message : "Could not place the pin."); }
+    try {
+      const marker = await atlasApi.createMarker(gmToken, currentMapId, {
+        x: point.x,
+        y: point.y,
+        iconId: DEFAULT_ICON,
+        iconColor: DEFAULT_COLOR
+      });
+      setMarkers((prev) => [...prev, marker]);
+      setPlacing(false);
+      selectPin(marker.id);
+    } catch (placeError) {
+      setError(placeError instanceof Error ? placeError.message : "Could not place the pin.");
+    }
   };
   const moveMarker = async (markerId: string, point: { x: number; y: number }) => {
-    setMarkers((prev) => prev.map((marker) => (marker.id === markerId ? { ...marker, x: point.x, y: point.y } : marker)));
-    try { await atlasApi.moveMarker(gmToken, markerId, point.x, point.y); } catch { void loadMarkers(currentMapId!); }
-  };
-  const onMarkerUpdated = (marker: CodexMarker) => setMarkers((prev) => prev.map((existing) => (existing.id === marker.id ? marker : existing)));
-  /** Opens quick-create with the pin's label prefilled, and links the new page to the pin. Cancelling creates nothing. */
-  const createPageForMarker = (marker: CodexMarker) => onQuickCreate({
-    title: marker.label?.trim() || "",
-    entityType: "location",
-    onCreated: async (page) => {
-      onMarkerUpdated(await atlasApi.updateMarker(gmToken, marker.id, { pageIds: [...marker.pageIds, page.id] }));
-      await loadMeta();
+    setMarkers((prev) =>
+      prev.map((marker) => (marker.id === markerId ? { ...marker, x: point.x, y: point.y } : marker))
+    );
+    try {
+      await atlasApi.moveMarker(gmToken, markerId, point.x, point.y);
+    } catch {
+      void loadMarkers(currentMapId!);
     }
-  });
-  const revealLinkedPage = async (pageId: string) => {
-    try { await codexApi.revealPage(gmToken, pageId, true); await loadMeta(); }
-    catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Could not reveal the page."); }
   };
-  const onMarkerDeleted = (markerId: string) => { setMarkers((prev) => prev.filter((marker) => marker.id !== markerId)); clearDeletedPin(); };
-  const onMapReplace = (map: CodexMap) => setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
+  const onMarkerUpdated = (marker: CodexMarker) =>
+    setMarkers((prev) => prev.map((existing) => (existing.id === marker.id ? marker : existing)));
+  /** Opens quick-create with the pin's label prefilled, and links the new page to the pin. Cancelling creates nothing. */
+  const createPageForMarker = (marker: CodexMarker) =>
+    onQuickCreate({
+      title: marker.label?.trim() || "",
+      entityType: "location",
+      onCreated: async (page) => {
+        onMarkerUpdated(await atlasApi.updateMarker(gmToken, marker.id, { pageIds: [...marker.pageIds, page.id] }));
+        await loadMeta();
+      }
+    });
+  const revealLinkedPage = async (pageId: string) => {
+    try {
+      await codexApi.revealPage(gmToken, pageId, true);
+      await loadMeta();
+    } catch (revealError) {
+      setError(revealError instanceof Error ? revealError.message : "Could not reveal the page.");
+    }
+  };
+  const onMarkerDeleted = (markerId: string) => {
+    setMarkers((prev) => prev.filter((marker) => marker.id !== markerId));
+    clearDeletedPin();
+  };
+  const onMapReplace = (map: CodexMap) =>
+    setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
   const revealMap = async (revealed: boolean) => {
     if (!currentMap) return;
-    try { onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); }
-    catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Couldn't change who can see this map."); }
+    try {
+      onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed));
+    } catch (revealError) {
+      setError(revealError instanceof Error ? revealError.message : "Couldn't change who can see this map.");
+    }
   };
-  const deleteMap = async () => { if (currentMap && await confirm({ title: "Delete map", body: `Delete map "${currentMap.name}"? Its pins are removed.`, confirmLabel: "Delete", danger: true })) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); onNavigate(parent ? atlasPath(parent) : "/codex/atlas"); } };
+  const deleteMap = async () => {
+    if (
+      currentMap &&
+      (await confirm({
+        title: "Delete map",
+        body: `Delete map "${currentMap.name}"? Its pins are removed.`,
+        confirmLabel: "Delete",
+        danger: true
+      }))
+    ) {
+      await atlasApi.deleteMap(gmToken, currentMap.id);
+      const parent = currentMap.parentMapId;
+      await loadMeta();
+      onNavigate(parent ? atlasPath(parent) : "/codex/atlas");
+    }
+  };
 
   return (
     <div className="codex-atlas">
@@ -282,7 +464,13 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
         <nav className="codex-atlas-descend" aria-label="Top-level maps">
           <span className="codex-descend-label">Top level</span>
           {rootMaps.map((root) => (
-            <button key={root.id} type="button" className={`codex-descend-chip${root.id === currentRootId ? " is-current" : ""}`} aria-current={root.id === currentRootId ? "true" : undefined} onClick={() => enterMap(root.id)}>
+            <button
+              key={root.id}
+              type="button"
+              className={`codex-descend-chip${root.id === currentRootId ? " is-current" : ""}`}
+              aria-current={root.id === currentRootId ? "true" : undefined}
+              onClick={() => enterMap(root.id)}
+            >
               {root.name}
               {!root.revealedToPlayers && <GmOnlyMark />}
             </button>
@@ -294,29 +482,96 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
           {breadcrumb.map((map, index) => (
             <span key={map.id}>
-              {index > 0 && <span className="codex-crumb-sep" aria-hidden="true">›</span>}
-              <button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => enterMap(map.id)}>{map.name}</button>
+              {index > 0 && (
+                <span className="codex-crumb-sep" aria-hidden="true">
+                  ›
+                </span>
+              )}
+              <button
+                type="button"
+                className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`}
+                onClick={() => enterMap(map.id)}
+              >
+                {map.name}
+              </button>
             </span>
           ))}
         </nav>
         <div className="codex-atlas-actions">
-          {currentMap && <RevealSwitch revealed={currentMap.revealedToPlayers} onChange={revealMap} ariaLabel="Show this map to players" />}
-          {currentMap && <Button variant={placing ? "primary" : "secondary"} size="sm" aria-pressed={placing} onClick={() => setPlacing((value) => !value)}>{placing ? "Placing…" : "Add pin"}</Button>}
-          <Button variant="secondary" size="sm" onClick={() => { setNestNew(true); setPicking(true); }}>{currentMap ? "Add sub-map" : "New map"}</Button>
-          {currentMap && <Button variant="ghost" size="sm" onClick={() => { setSettingsName(currentMap.name); setSettingsOpen(true); }}>Map settings</Button>}
+          {currentMap && (
+            <RevealSwitch
+              revealed={currentMap.revealedToPlayers}
+              onChange={revealMap}
+              ariaLabel="Show this map to players"
+            />
+          )}
+          {currentMap && (
+            <Button
+              variant={placing ? "primary" : "secondary"}
+              size="sm"
+              aria-pressed={placing}
+              onClick={() => setPlacing((value) => !value)}
+            >
+              {placing ? "Placing…" : "Add pin"}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setNestNew(true);
+              setPicking(true);
+            }}
+          >
+            {currentMap ? "Add sub-map" : "New map"}
+          </Button>
+          {currentMap && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSettingsName(currentMap.name);
+                setSettingsOpen(true);
+              }}
+            >
+              Map settings
+            </Button>
+          )}
         </div>
       </div>
 
       {currentMap && markers.length > 0 && (
         <div className="codex-atlas-filter">
-          <Input aria-label="Filter pins" placeholder="Filter pins" value={filter}
-            onChange={(event) => onReplaceQuery((query) => { if (event.target.value) query.set("q", event.target.value); else query.delete("q"); })} />
+          <Input
+            aria-label="Filter pins"
+            placeholder="Filter pins"
+            value={filter}
+            onChange={(event) =>
+              onReplaceQuery((query) => {
+                if (event.target.value) query.set("q", event.target.value);
+                else query.delete("q");
+              })
+            }
+          />
           {pinTags.length > 0 && (
-            <Combobox options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={tagFilter ?? null}
-              onChange={(tag) => onReplaceQuery((query) => { if (tag) query.set("tag", tag); else query.delete("tag"); })}
-              ariaLabel="Filter pins by tag" placeholder="Filter by tag" />
+            <Combobox
+              options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))}
+              value={tagFilter ?? null}
+              onChange={(tag) =>
+                onReplaceQuery((query) => {
+                  if (tag) query.set("tag", tag);
+                  else query.delete("tag");
+                })
+              }
+              ariaLabel="Filter pins by tag"
+              placeholder="Filter by tag"
+            />
           )}
-          {filtering && <span className="codex-atlas-filtercount" role="status">{matchCount} of {markers.length} pins match</span>}
+          {filtering && (
+            <span className="codex-atlas-filtercount" role="status">
+              {matchCount} of {markers.length} pins match
+            </span>
+          )}
         </div>
       )}
 
@@ -325,7 +580,8 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           <span className="codex-descend-label">Drill into</span>
           {childMaps.map((child) => (
             <button key={child.id} type="button" className="codex-descend-chip" onClick={() => enterMap(child.id)}>
-              <span className="codex-descend-arrow" aria-hidden="true" />{child.name}
+              <span className="codex-descend-arrow" aria-hidden="true" />
+              {child.name}
               {!child.revealedToPlayers && <GmOnlyMark />}
             </button>
           ))}
@@ -335,37 +591,112 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
       {/* The party's position in words, not only as a ring on the map. */}
       {partyMarker && (
         <div className="codex-atlas-party">
-          <span className="codex-atlas-partytext">The party is on this map{partyMarker.label ? <> at <strong>{partyMarker.label}</strong></> : null}.</span>
-          <Button variant="ghost" onClick={() => showPin(partyMarker.id)}>Show the pin</Button>
+          <span className="codex-atlas-partytext">
+            The party is on this map
+            {partyMarker.label ? (
+              <>
+                {" "}
+                at <strong>{partyMarker.label}</strong>
+              </>
+            ) : null}
+            .
+          </span>
+          <Button variant="ghost" onClick={() => showPin(partyMarker.id)}>
+            Show the pin
+          </Button>
         </div>
       )}
 
       {error && <Alert tone="danger">{error}</Alert>}
 
       <div className="codex-atlas-body" ref={mapBodyRef}>
-        {currentMap
-          ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
-              dimmedMarkerIds={dimmedIds}
-              centerOnMarkerId={centerOnMarkerId} onCentered={() => setCenterOnMarkerId(null)}
-              onBackgroundClick={placeMarker} onMarkerClick={(markerId) => { selectPin(markerId); if (window.innerWidth <= 760) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} onMarkerDragEnd={moveMarker} />
-          : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
-          : <div className="codex-main-empty"><h3>No map yet</h3><p>An atlas is built from uploaded map images. Add a map, drop pins on it, and link each pin to a page or to a map nested underneath.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
+        {currentMap ? (
+          <MapSurface
+            token={gmToken}
+            assetId={currentMap.assetId}
+            markers={markers}
+            placing={placing}
+            selectedMarkerId={selectedMarkerId}
+            dimmedMarkerIds={dimmedIds}
+            centerOnMarkerId={centerOnMarkerId}
+            onCentered={() => setCenterOnMarkerId(null)}
+            onBackgroundClick={placeMarker}
+            onMarkerClick={(markerId) => {
+              selectPin(markerId);
+              if (window.innerWidth <= 760)
+                requestAnimationFrame(() =>
+                  inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+                );
+            }}
+            onMarkerDragEnd={moveMarker}
+          />
+        ) : loading ? (
+          <div className="codex-main-loading">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} variant="text" />
+            ))}
+          </div>
+        ) : (
+          <div className="codex-main-empty">
+            <h3>No map yet</h3>
+            <p>
+              An atlas is built from uploaded map images. Add a map, drop pins on it, and link each pin to a page or to
+              a map nested underneath.
+            </p>
+            <Button variant="primary" onClick={() => setPicking(true)}>
+              New map
+            </Button>
+          </div>
+        )}
         <div ref={inspectorRef} />
-        {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId} autosave={autosave}
-          onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={(pageId) => onNavigate(`/codex/pages/${pageId}`)}
-          onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onRevealMap={() => void revealMap(true)} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay}
-          /* Setting the party can clear a pin on another map, so re-read this map's pins. */
-          onPartyChanged={async () => { if (currentMapId) await loadMarkers(currentMapId); }}
-          onClose={deselectPin} />}
+        {selectedMarker && (
+          <MarkerInspector
+            key={selectedMarker.id}
+            gmToken={gmToken}
+            marker={selectedMarker}
+            pages={pages}
+            maps={maps}
+            scenes={scenes}
+            actors={actors}
+            activeSceneId={activeSceneId}
+            autosave={autosave}
+            onUpdated={onMarkerUpdated}
+            onDeleted={onMarkerDeleted}
+            onOpenMap={enterMap}
+            onOpenPage={(pageId) => onNavigate(`/codex/pages/${pageId}`)}
+            onCreatePage={() => createPageForMarker(selectedMarker)}
+            onRevealPage={revealLinkedPage}
+            onRevealMap={() => void revealMap(true)}
+            onActivateScene={onActivateScene}
+            onOpenReplay={onOpenReplay}
+            /* Setting the party can clear a pin on another map, so re-read this map's pins. */
+            onPartyChanged={async () => {
+              if (currentMapId) await loadMarkers(currentMapId);
+            }}
+            onClose={deselectPin}
+          />
+        )}
       </div>
 
-      <Modal open={picking} onClose={() => setPicking(false)} title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">
+      <Modal
+        open={picking}
+        onClose={() => setPicking(false)}
+        title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"}
+        size="md"
+        ariaLabel="Choose a map"
+      >
         {currentMap && (
           <div className="codex-atlas-nestrow">
             <Switch checked={nestNew} onChange={setNestNew} label={`Nest inside “${currentMap.name}”`} />
-            <p className="codex-inspector-hint">{nestNew
-              ? <>The new map sits inside <strong>{currentMap.name}</strong>, and you can drill into it from here.</>
-              : <>The new map is added at the top level, not inside any other map.</>}</p>
+            <p className="codex-inspector-hint">
+              {nestNew ? (
+                <>
+                  The new map sits inside <strong>{currentMap.name}</strong>, and you can drill into it from here.
+                </>
+              ) : (
+                <>The new map is added at the top level, not inside any other map.</>
+              )}
+            </p>
           </div>
         )}
         {/* Upload here; it is the same asset library Scenes uses. */}
@@ -373,9 +704,22 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           <Button variant="secondary" size="sm" disabled={uploading} onClick={() => uploadInputRef.current?.click()}>
             <IconPlus /> {uploading ? "Uploading…" : "Upload a map image"}
           </Button>
-          <input ref={uploadInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadAsset(event.target.files?.[0]); event.target.value = ""; }} />
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(event) => {
+              void uploadAsset(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
         </div>
-        {assetsEmpty(assets) ? <p className="codex-list-empty">No map images yet. Upload one to start your atlas. Scenes uses the same image library.</p> : (
+        {assetsEmpty(assets) ? (
+          <p className="codex-list-empty">
+            No map images yet. Upload one to start your atlas. Scenes uses the same image library.
+          </p>
+        ) : (
           <div className="codex-asset-grid">
             {assets.map((asset) => (
               <button key={asset.id} type="button" className="codex-asset-card" onClick={() => createFromAsset(asset)}>
@@ -386,35 +730,92 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           </div>
         )}
       </Modal>
-      <Modal open={settingsOpen && !!currentMap} onClose={() => { void renameMap(); setSettingsOpen(false); }} title="Map settings" size="sm" ariaLabel="Map settings">
+      <Modal
+        open={settingsOpen && !!currentMap}
+        onClose={() => {
+          void renameMap();
+          setSettingsOpen(false);
+        }}
+        title="Map settings"
+        size="sm"
+        ariaLabel="Map settings"
+      >
         {currentMap && (
           <div className="codex-map-settings">
             {/* The page's Alert is behind the overlay, and every write here is immediate, so show errors here too. */}
             {error && <Alert tone="danger">{error}</Alert>}
             <Field label="Name" htmlFor="map-name">
-              <Input id="map-name" value={settingsName} onChange={(event) => setSettingsName(event.target.value)} onBlur={renameMap}
-                onKeyDown={(event) => { if (event.key === "Enter") void renameMap(); }} />
+              <Input
+                id="map-name"
+                value={settingsName}
+                onChange={(event) => setSettingsName(event.target.value)}
+                onBlur={renameMap}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void renameMap();
+                }}
+              />
             </Field>
-            <Field label="Kind" htmlFor="map-kind" help="Where this map sits in the atlas: a world, a region within a world, or a local place.">
-              <Select id="map-kind" value={currentMap.kind} onChange={(event) => void retypeMap(event.target.value as CodexMapKind)}>
-                {MAP_KINDS.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}
+            <Field
+              label="Kind"
+              htmlFor="map-kind"
+              help="Where this map sits in the atlas: a world, a region within a world, or a local place."
+            >
+              <Select
+                id="map-kind"
+                value={currentMap.kind}
+                onChange={(event) => void retypeMap(event.target.value as CodexMapKind)}
+              >
+                {MAP_KINDS.map((kind) => (
+                  <option key={kind.value} value={kind.value}>
+                    {kind.label}
+                  </option>
+                ))}
               </Select>
             </Field>
-            <Field label="Sits inside" htmlFor="map-parent" help="Move this map elsewhere in the atlas. Any maps nested under it move with it.">
-              <Select id="map-parent" value={currentMap.parentMapId ?? ""} onChange={(event) => void reparentMap(event.target.value || null)}>
+            <Field
+              label="Sits inside"
+              htmlFor="map-parent"
+              help="Move this map elsewhere in the atlas. Any maps nested under it move with it."
+            >
+              <Select
+                id="map-parent"
+                value={currentMap.parentMapId ?? ""}
+                onChange={(event) => void reparentMap(event.target.value || null)}
+              >
                 <option value="">Top level</option>
-                {maps.filter((map) => map.id !== currentMap.id && !descendantIds.has(map.id)).map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
+                {maps
+                  .filter((map) => map.id !== currentMap.id && !descendantIds.has(map.id))
+                  .map((map) => (
+                    <option key={map.id} value={map.id}>
+                      {map.name}
+                    </option>
+                  ))}
               </Select>
             </Field>
             <Field label="Tags" htmlFor="map-tags">
-              <TagInput id="map-tags" ariaLabel="Tags" placeholder="underdark, faerun" values={currentMap.tags}
+              <TagInput
+                id="map-tags"
+                ariaLabel="Tags"
+                placeholder="underdark, faerun"
+                values={currentMap.tags}
                 onChange={(next) => void retagMap(next)}
-                max={24} maxReachedReason="A map may carry at most 24 tags."
+                max={24}
+                maxReachedReason="A map may carry at most 24 tags."
                 suggestions={tagSuggestions}
-                /* Default slugify matches the server's tag rule. */ />
+                /* Default slugify matches the server's tag rule. */
+              />
             </Field>
             <div className="codex-inspector-foot">
-              <Button variant="ghost" size="sm" onClick={() => { setSettingsOpen(false); void deleteMap(); }}>Delete map</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSettingsOpen(false);
+                  void deleteMap();
+                }}
+              >
+                Delete map
+              </Button>
             </div>
           </div>
         )}
@@ -424,4 +825,6 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   );
 }
 
-function assetsEmpty(assets: readonly MapAsset[]) { return assets.length === 0; }
+function assetsEmpty(assets: readonly MapAsset[]) {
+  return assets.length === 0;
+}

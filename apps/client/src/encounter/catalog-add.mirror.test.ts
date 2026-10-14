@@ -17,7 +17,10 @@ const weapons = catalog.filter((item) => item.weapon !== null);
 
 /** Exactly what `addFromCatalog` posts, minus the ids and quantity the sheet fills in. */
 const addPayload = (item: (typeof catalog)[number]) => ({
-  id: item.id, name: item.name, quantity: 1, category: item.category,
+  id: item.id,
+  name: item.name,
+  quantity: 1,
+  category: item.category,
   ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
   ...(item.description ? { description: item.description } : {}),
   ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
@@ -40,11 +43,23 @@ describe("adding a catalog weapon to a sheet", () => {
     // The catalog record really carries both; this is not a synthetic fixture.
     expect(longsword.weapon).toMatchObject({ mastery: "sap", properties: ["versatile"] });
     const posted = inventoryWeaponFrom(longsword.weapon!);
-    expect(Object.keys(posted).sort()).toEqual(["category", "damageDice", "damageType", "longRangeFeet", "properties", "rangeFeet"]);
+    expect(Object.keys(posted).sort()).toEqual([
+      "category",
+      "damageDice",
+      "damageType",
+      "longRangeFeet",
+      "properties",
+      "rangeFeet"
+    ]);
     expect("mastery" in posted).toBe(false);
 
     // Negative control: the unnarrowed block is refused, by name.
-    const wholesale = InventoryItemSchema.safeParse({ id: "longsword", name: "Longsword", quantity: 1, weapon: longsword.weapon });
+    const wholesale = InventoryItemSchema.safeParse({
+      id: "longsword",
+      name: "Longsword",
+      quantity: 1,
+      weapon: longsword.weapon
+    });
     expect(wholesale.success).toBe(false);
     expect(wholesale.success ? "" : wholesale.error.issues[0].message).toContain("mastery");
   });
@@ -53,16 +68,26 @@ describe("adding a catalog weapon to a sheet", () => {
     // `properties` is not display data: weapon ability and reach are read off the inventory row
     // through `weaponPropertiesOf`.
     const definition = {
-      name: "Duellist", armorClass: 12, proficiencyBonus: 2,
+      name: "Duellist",
+      armorClass: 12,
+      proficiencyBonus: 2,
       abilityScores: { str: 10, dex: 18, con: 12, int: 10, wis: 10, cha: 10 },
-      hitPoints: { maximum: 20 }, actions: [], extensions: {},
+      hitPoints: { maximum: 20 },
+      actions: [],
+      extensions: {},
       character: { classes: [{ id: "rogue", name: "Rogue", level: 1 }], feats: [] },
       proficiencies: { saves: [], skills: [] }
     } as unknown as ActorDefinition;
-    const carry = (id: string) => InventoryItemSchema.parse({ ...addPayload(catalog.find((item) => item.id === id)!), equipped: true });
+    const carry = (id: string) =>
+      InventoryItemSchema.parse({ ...addPayload(catalog.find((item) => item.id === id)!), equipped: true });
     const actor = {
-      id: "a", name: "Duellist", kind: "player-character", visibility: "public",
-      hp: { current: 20, maximum: 20, temporary: 0 }, conditions: [], effects: [],
+      id: "a",
+      name: "Duellist",
+      kind: "player-character",
+      visibility: "public",
+      hp: { current: 20, maximum: 20, temporary: 0 },
+      conditions: [],
+      effects: [],
       inventory: [carry("rapier"), carry("glaive"), carry("mace")]
     } as unknown as Actor;
 

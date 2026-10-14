@@ -57,7 +57,9 @@ function requestMonsterReference(force = false) {
 }
 
 // A homebrew creature published mid-session must reach this picker without a reload.
-registerContentCache(() => { if (monsterCache) requestMonsterReference(true); });
+registerContentCache(() => {
+  if (monsterCache) requestMonsterReference(true);
+});
 
 function useMonsterReference(): readonly ContentMonsterSummary[] {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[]>(monsterCache ?? []);
@@ -112,21 +114,26 @@ export function useDuplicateSources(
             name: row.name,
             origin: "srd",
             meta: `Hit die ${row.hitDie}`,
-            ...(children.length > 0 ? { companions: children.map((entry) => ({ id: entry.id, name: entry.name })) } : {})
+            ...(children.length > 0
+              ? { companions: children.map((entry) => ({ id: entry.id, name: entry.name })) }
+              : {})
           });
         }
         break;
       case "subclass":
-        for (const row of bundled(subclasses.items)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.classId, keywords: row.classId });
+        for (const row of bundled(subclasses.items))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.classId, keywords: row.classId });
         break;
       case "species":
-        for (const row of bundled(species.items)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: `${row.speedFeet} ft` });
+        for (const row of bundled(species.items))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: `${row.speedFeet} ft` });
         break;
       case "background":
         for (const row of bundled(backgrounds.items)) srd.push({ id: row.id, name: row.name, origin: "srd" });
         break;
       case "feat":
-        for (const row of bundled(feats.items)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
+        for (const row of bundled(feats.items))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
         break;
       case "spell":
         for (const row of bundled(spells)) {
@@ -140,10 +147,18 @@ export function useDuplicateSources(
         }
         break;
       case "equipment":
-        for (const row of bundled(equipment.catalog)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
+        for (const row of bundled(equipment.catalog))
+          srd.push({ id: row.id, name: row.name, origin: "srd", meta: row.category, keywords: row.category });
         break;
       case "monster":
-        for (const row of bundled(monsters)) srd.push({ id: row.id, name: row.name, origin: "srd", meta: `CR ${row.challengeRating}`, keywords: `${row.type} ${row.size}` });
+        for (const row of bundled(monsters))
+          srd.push({
+            id: row.id,
+            name: row.name,
+            origin: "srd",
+            meta: `CR ${row.challengeRating}`,
+            keywords: `${row.type} ${row.size}`
+          });
         break;
       case "spell-list":
         // The SRD lists are bundle data, not an HTTP catalog.
@@ -165,5 +180,16 @@ export function useDuplicateSources(
       });
 
     return [...srd.sort(byName), ...mine.sort(byName)];
-  }, [type, classes.items, subclasses.items, species.items, backgrounds.items, feats.items, spells, equipment.catalog, monsters, homebrew]);
+  }, [
+    type,
+    classes.items,
+    subclasses.items,
+    species.items,
+    backgrounds.items,
+    feats.items,
+    spells,
+    equipment.catalog,
+    monsters,
+    homebrew
+  ]);
 }

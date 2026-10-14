@@ -29,19 +29,49 @@ const PAGES = [
 ];
 const MAPS = [{ id: "m1", name: "Barovia", tags: ["coast"], revealedToPlayers: false }];
 const RECORDS = [
-  { id: "j1", kind: "entry" as const, text: "We reached the shore", payload: null, tags: ["coast"], revealedToPlayers: true },
+  {
+    id: "j1",
+    kind: "entry" as const,
+    text: "We reached the shore",
+    payload: null,
+    tags: ["coast"],
+    revealedToPlayers: true
+  },
   { id: "j2", kind: "entry" as const, text: "Inland", payload: null, tags: ["mountain"], revealedToPlayers: true }
 ];
 const SESSIONS = [{ id: "s1", sessionNumber: 4, tags: ["coast"], revealedToPlayers: false }];
-const QUESTS = [{ id: "q1", title: "The Missing Cask", status: "active" as const, tags: ["coast"], revealedToPlayers: true }];
+const QUESTS = [
+  { id: "q1", title: "The Missing Cask", status: "active" as const, tags: ["coast"], revealedToPlayers: true }
+];
 
-const PIN_HIT = { kind: "marker" as const, id: "k1", title: "The lighthouse", tags: ["coast"], entityType: null, mapId: "m1" };
-const OTHER_PIN = { kind: "marker" as const, id: "k2", title: "Inland well", tags: ["coastal"], entityType: null, mapId: "m1" };
+const PIN_HIT = {
+  kind: "marker" as const,
+  id: "k1",
+  title: "The lighthouse",
+  tags: ["coast"],
+  entityType: null,
+  mapId: "m1"
+};
+const OTHER_PIN = {
+  kind: "marker" as const,
+  id: "k2",
+  title: "Inland well",
+  tags: ["coastal"],
+  entityType: null,
+  mapId: "m1"
+};
 
 const renderTags = (over: Partial<TagViewProps> = {}) => {
   const props: TagViewProps = {
-    gmToken: "gm", tag: "coast", pages: PAGES, maps: MAPS, records: RECORDS, sessions: SESSIONS, quests: QUESTS,
-    onNavigate: vi.fn(), ...over
+    gmToken: "gm",
+    tag: "coast",
+    pages: PAGES,
+    maps: MAPS,
+    records: RECORDS,
+    sessions: SESSIONS,
+    quests: QUESTS,
+    onNavigate: vi.fn(),
+    ...over
   };
   return { props, ...render(<TagView {...props} />) };
 };
@@ -56,13 +86,25 @@ describe("Everything that carries the tag, across types", () => {
     renderTags();
 
     expect(screen.getByRole("heading", { name: "#coast" })).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Pages with this tag" })).getAllByRole("button")).toHaveLength(1);
+    expect(within(screen.getByRole("navigation", { name: "Pages with this tag" })).getAllByRole("button")).toHaveLength(
+      1
+    );
     expect(screen.queryByText("Strahd")).toBeNull();
     expect(screen.getByText("Vallaki")).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Maps with this tag" })).getByText("Barovia")).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Journal entries with this tag" })).getByText("We reached the shore")).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Sessions with this tag" })).getByText("Session 4")).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Quests with this tag" })).getByText("The Missing Cask")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Maps with this tag" })).getByText("Barovia")
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Journal entries with this tag" })).getByText(
+        "We reached the shore"
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Sessions with this tag" })).getByText("Session 4")
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Quests with this tag" })).getByText("The Missing Cask")
+    ).toBeInTheDocument();
 
     const pins = within(await screen.findByRole("navigation", { name: "Pins with this tag" }));
     expect(pins.getByText("The lighthouse")).toBeInTheDocument();
@@ -93,7 +135,9 @@ describe("Everything that carries the tag, across types", () => {
   it("names a quest's status in the word every other surface uses", () => {
     renderTags();
     // The status label, never the wire value.
-    expect(within(screen.getByRole("navigation", { name: "Quests with this tag" })).getByText("Active")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Quests with this tag" })).getByText("Active")
+    ).toBeInTheDocument();
   });
 
   it("says the tag is unused rather than rendering empty sections", async () => {
@@ -113,7 +157,11 @@ describe("Everything that carries the tag, across types", () => {
 describe("Pins — the one kind that is not client-enumerable", () => {
   it("waits for the search rather than claiming there are no pins", () => {
     let resolve: (value: unknown) => void = () => {};
-    gmSearch.mockReturnValue(new Promise((done) => { resolve = done; }));
+    gmSearch.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      })
+    );
     const { container } = renderTags();
 
     expect(container.querySelector(".codex-list-loading")).not.toBeNull();
@@ -125,7 +173,9 @@ describe("Pins — the one kind that is not client-enumerable", () => {
     gmSearch.mockResolvedValue({ hits: [PIN_HIT], truncated: true });
     renderTags();
 
-    expect(await screen.findByText("More pins may carry this tag. Filter by tag in the Atlas to see all of them.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("More pins may carry this tag. Filter by tag in the Atlas to see all of them.")
+    ).toBeInTheDocument();
   });
 
   it("says so plainly when the search comes back with none", async () => {
@@ -141,19 +191,30 @@ describe("Role-blindness (invariant §3.3)", () => {
     renderTags();
     // The badge is per row.
     expect(within(screen.getByRole("button", { name: /Vallaki/ })).getByText("Shown to players")).toBeInTheDocument();
-    expect(within(screen.getByRole("button", { name: /Barovia/ })).getByText("Hidden from players")).toBeInTheDocument();
-    expect(within(screen.getByRole("button", { name: /Session 4/ })).getByText("Hidden from players")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: /Barovia/ })).getByText("Hidden from players")
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: /Session 4/ })).getByText("Hidden from players")
+    ).toBeInTheDocument();
   });
 
   it("shows no reveal badge at all on player rows — because the field is absent, not because a flag says so", async () => {
     playerSearch.mockResolvedValue({ hits: [PIN_HIT], truncated: false });
     // Player projections have no `revealedToPlayers`; they type-check unchanged.
-    render(<TagView gmToken="player-token" player tag="coast" onNavigate={vi.fn()}
-      pages={[{ id: "p1", title: "Vallaki", entityType: "location", tags: ["coast"] }]}
-      maps={[{ id: "m1", name: "Barovia", tags: ["coast"] }]}
-      records={[{ id: "j1", kind: "entry", text: "We reached the shore", payload: null, tags: ["coast"] }]}
-      sessions={[{ id: "s1", sessionNumber: 4, tags: ["coast"] }]}
-      quests={[{ id: "q1", title: "The Missing Cask", status: "active", tags: ["coast"] }]} />);
+    render(
+      <TagView
+        gmToken="player-token"
+        player
+        tag="coast"
+        onNavigate={vi.fn()}
+        pages={[{ id: "p1", title: "Vallaki", entityType: "location", tags: ["coast"] }]}
+        maps={[{ id: "m1", name: "Barovia", tags: ["coast"] }]}
+        records={[{ id: "j1", kind: "entry", text: "We reached the shore", payload: null, tags: ["coast"] }]}
+        sessions={[{ id: "s1", sessionNumber: 4, tags: ["coast"] }]}
+        quests={[{ id: "q1", title: "The Missing Cask", status: "active", tags: ["coast"] }]}
+      />
+    );
 
     await screen.findByRole("navigation", { name: "Pins with this tag" });
     expect(screen.queryByText("Shown to players")).toBeNull();
@@ -162,8 +223,19 @@ describe("Role-blindness (invariant §3.3)", () => {
 
   it("a player's pins come from the PLAYER search route and never the GM's", async () => {
     playerSearch.mockResolvedValue({ hits: [PIN_HIT], truncated: false });
-    render(<TagView gmToken="player-token" player tag="coast" onNavigate={vi.fn()}
-      pages={[]} maps={[]} records={[]} sessions={[]} quests={[]} />);
+    render(
+      <TagView
+        gmToken="player-token"
+        player
+        tag="coast"
+        onNavigate={vi.fn()}
+        pages={[]}
+        maps={[]}
+        records={[]}
+        sessions={[]}
+        quests={[]}
+      />
+    );
 
     await waitFor(() => expect(playerSearch).toHaveBeenCalledWith("player-token", "coast"));
     // The GM search is never called from the player view.

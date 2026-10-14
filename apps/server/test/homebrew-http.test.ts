@@ -5,15 +5,25 @@ import { join } from "node:path";
 import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  HOMEBREW_PATHS, HomebrewContentListResponseSchema, HomebrewContentResponseSchema,
-  HomebrewDeletedResponseSchema, HomebrewPackExportResponseSchema, HomebrewPackImportResponseSchema,
-  HomebrewUsagesResponseSchema, openApiDocument
+  HOMEBREW_PATHS,
+  HomebrewContentListResponseSchema,
+  HomebrewContentResponseSchema,
+  HomebrewDeletedResponseSchema,
+  HomebrewPackExportResponseSchema,
+  HomebrewPackImportResponseSchema,
+  HomebrewUsagesResponseSchema,
+  openApiDocument
 } from "@vtt/api-contract";
 import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
 import { buildCharacterDefinition } from "../src/character-build.js";
 import { createServer as createAppServer } from "../src/server.js";
 import { HomebrewStore } from "../src/homebrew-store.js";
-import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH, type HomebrewValidator } from "../src/homebrew-http.js";
+import {
+  createHomebrewRouter,
+  homebrewPackBodyParser,
+  HOMEBREW_PACK_IMPORT_PATH,
+  type HomebrewValidator
+} from "../src/homebrew-http.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { findCatalogRecord } from "../src/homebrew-srd-copy.js";
 import { createHomebrewValidator } from "../src/homebrew-validate.js";
@@ -25,7 +35,9 @@ import { buildHomebrewUsageIndex } from "../src/homebrew-usages.js";
 // router cannot drift from the published OpenAPI document.
 
 const cleanups: Array<() => Promise<void> | void> = [];
-afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()!();
+});
 
 async function fixture(options: { validate?: HomebrewValidator; realValidation?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-http-"));
@@ -39,26 +51,36 @@ async function fixture(options: { validate?: HomebrewValidator; realValidation?:
   // Mirrors server.ts: the pack parser runs first, so its larger limit wins for that one route.
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
   app.use(express.json({ limit: "512kb" }));
-  app.use(createHomebrewRouter({
-    store,
-    authorizeGm: (token) => token === "gm-token",
-    authorizePlayer: (token) => token === "player-token",
-    notifyChanged: () => { pings.push(store.revision); },
-    validate: options.validate ?? (options.realValidation
-      ? createHomebrewValidator({
-        forAudience: (audience) => contentLibrary.forAudience(audience),
-        publishedSpellLists: () => store.publishedFor("gm").spellLists,
-        authoredIndex: () => store.authoredIndex()
-      })
-      : undefined),
-    usagesOf: (type, id) => buildHomebrewUsageIndex(GameStateSchema.parse({ schemaVersion: 1 })).of(type, id),
-    catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
-  }));
+  app.use(
+    createHomebrewRouter({
+      store,
+      authorizeGm: (token) => token === "gm-token",
+      authorizePlayer: (token) => token === "player-token",
+      notifyChanged: () => {
+        pings.push(store.revision);
+      },
+      validate:
+        options.validate ??
+        (options.realValidation
+          ? createHomebrewValidator({
+              forAudience: (audience) => contentLibrary.forAudience(audience),
+              publishedSpellLists: () => store.publishedFor("gm").spellLists,
+              authoredIndex: () => store.authoredIndex()
+            })
+          : undefined),
+      usagesOf: (type, id) => buildHomebrewUsageIndex(GameStateSchema.parse({ schemaVersion: 1 })).of(type, id),
+      catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
+    })
+  );
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Homebrew test server did not bind.");
-  cleanups.push(async () => { await new Promise<void>((resolve) => server.close(() => resolve())); store.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, store, pings, contentLibrary };
 }
 
@@ -104,12 +126,28 @@ describe("homebrew HTTP authorization gate", () => {
       ["POST duplicate", () => post(base, sub(HOMEBREW_PATHS.contentDuplicate, draft.id), ANON, {})],
       ["POST publish", () => post(base, sub(HOMEBREW_PATHS.contentPublish, draft.id), ANON, {})],
       ["POST unpublish", () => post(base, sub(HOMEBREW_PATHS.contentUnpublish, draft.id), ANON, {})],
-      ["POST visibility", () => post(base, sub(HOMEBREW_PATHS.contentVisibility, draft.id), ANON, { visibleToPlayers: true })],
+      [
+        "POST visibility",
+        () => post(base, sub(HOMEBREW_PATHS.contentVisibility, draft.id), ANON, { visibleToPlayers: true })
+      ],
       ["GET usages", () => get(base, sub(HOMEBREW_PATHS.contentUsages, draft.id), ANON)],
       ["GET packsExport", () => get(base, HOMEBREW_PATHS.packsExport, ANON)],
-      ["POST packsImport", () => post(base, HOMEBREW_PATHS.packsImport, ANON, { pack: { schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "P", attribution: null, exportedAt: new Date().toISOString(), records: [] } })]
+      [
+        "POST packsImport",
+        () =>
+          post(base, HOMEBREW_PATHS.packsImport, ANON, {
+            pack: {
+              schemaId: "vtt.homebrew-pack",
+              schemaVersion: 1,
+              name: "P",
+              attribution: null,
+              exportedAt: new Date().toISOString(),
+              records: []
+            }
+          })
+      ]
     ];
-    expect(calls).toHaveLength(13);   // the contract declares exactly 13 operations across 10 paths
+    expect(calls).toHaveLength(13); // the contract declares exactly 13 operations across 10 paths
 
     for (const [label, call] of calls) {
       const anonymous = await call();
@@ -139,14 +177,21 @@ describe("homebrew HTTP authorization gate", () => {
     // A path added to the contract without a route (or the reverse) is a documented endpoint that 404s.
     const declared = Object.values(HOMEBREW_PATHS);
     expect(declared).toHaveLength(10);
-    expect(Object.keys(openApiDocument.paths).filter((path) => path.startsWith("/api/v1/homebrew")).sort()).toEqual([...declared].sort());
+    expect(
+      Object.keys(openApiDocument.paths)
+        .filter((path) => path.startsWith("/api/v1/homebrew"))
+        .sort()
+    ).toEqual([...declared].sort());
     // Read Express's route table rather than probing over HTTP: the router's header middleware runs for every
     // request, so a probe would pass for any path. The route table is exactly what was registered, so a
     // documented-but-unmounted path cannot hide. Same shape as `codex-http.test.ts`'s mount check.
     const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-mount-"));
     const store = new HomebrewStore(join(directory, "vtt.sqlite"));
     await store.initialize();
-    cleanups.push(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+    cleanups.push(async () => {
+      store.close();
+      await rm(directory, { recursive: true, force: true });
+    });
     const router = createHomebrewRouter({
       store,
       authorizeGm: (token) => token === "gm-token",
@@ -166,7 +211,8 @@ describe("homebrew HTTP authorization gate", () => {
     // ...and per path, the methods match the document, so a dropped GET cannot hide behind a surviving PATCH.
     for (const path of declared) {
       const documented = Object.keys((openApiDocument.paths as Record<string, Record<string, unknown>>)[path] ?? {})
-        .filter((method) => ["get", "post", "put", "patch", "delete"].includes(method)).sort();
+        .filter((method) => ["get", "post", "put", "patch", "delete"].includes(method))
+        .sort();
       expect([...(mounted.get(path) ?? [])].sort(), `methods on ${path}`).toEqual(documented);
     }
   });
@@ -184,7 +230,7 @@ describe("homebrew HTTP CRUD", () => {
     // `record` is self-describing on the wire (the pack format is a bare array of records) even
     // though `type` is stored on the row rather than inside the authored body.
     expect(record.record).toMatchObject({ id: record.id, type: "class", name: "Blood Hunter", hitDie: "d10" });
-    expect(pings).toEqual([1]);   // one content-free ping per write
+    expect(pings).toEqual([1]); // one content-free ping per write
 
     const fetched = await body(await get(base, byId(record.id), GM));
     expect(HomebrewContentResponseSchema.safeParse(fetched).success).toBe(true);
@@ -207,7 +253,9 @@ describe("homebrew HTTP CRUD", () => {
   it("409s a stale expectedRev and hands back the row's current revision", async () => {
     const { base } = await fixture();
     const record = await createRecord(base);
-    const first = await body(await patch(base, byId(record.id), GM, { record: classBody("Blood Hunter II"), expectedRev: 1 }));
+    const first = await body(
+      await patch(base, byId(record.id), GM, { record: classBody("Blood Hunter II"), expectedRev: 1 })
+    );
     expect(first.data.record.rev).toBe(2);
 
     const stale = await patch(base, byId(record.id), GM, { record: classBody("Clobbered"), expectedRev: 1 });
@@ -252,7 +300,12 @@ describe("homebrew HTTP CRUD", () => {
     const published = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, record.id), GM, {}));
     // Publishing does not show it to players; that is the separate endpoint's job.
     expect(published.data.record).toMatchObject({ state: "published", visibleToPlayers: false });
-    const visible = await body(await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, { visibleToPlayers: true, expectedRev: published.data.record.rev }));
+    const visible = await body(
+      await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, {
+        visibleToPlayers: true,
+        expectedRev: published.data.record.rev
+      })
+    );
     expect(visible.data.record.visibleToPlayers).toBe(true);
     const unpublished = await body(await post(base, sub(HOMEBREW_PATHS.contentUnpublish, record.id), GM, {}));
     expect(unpublished.data.record.state).toBe("draft");
@@ -260,12 +313,16 @@ describe("homebrew HTTP CRUD", () => {
 
   it("refuses to publish an invalid draft with a 409 carrying every blocking issue", async () => {
     // The validation seam (`homebrew-validate.ts`) plugs in here.
-    const validate: HomebrewValidator = (_type, record) => record.hitDie === "d10"
-      ? { valid: true, issues: [] }
-      : { valid: false, issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }] };
+    const validate: HomebrewValidator = (_type, record) =>
+      record.hitDie === "d10"
+        ? { valid: true, issues: [] }
+        : { valid: false, issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }] };
     const { base } = await fixture({ validate });
     const bad = await createRecord(base, { type: "class", name: "Half-Formed" });
-    expect(bad.validity).toEqual({ valid: false, issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }] });
+    expect(bad.validity).toEqual({
+      valid: false,
+      issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }]
+    });
     const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, bad.id), GM, {});
     // 409 not 400: the request is well-formed; the stored draft refuses the transition.
     expect(refused.status).toBe(409);
@@ -287,7 +344,9 @@ describe("homebrew HTTP CRUD", () => {
       const created = await createRecord(base, { type: "spell-list", name: "Blood Magic", add: ["fireball"] });
       const published = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, created.id), GM, {}));
       expect(published.data.record.state).toBe("published");
-      const shared = await body(await post(base, sub(HOMEBREW_PATHS.contentVisibility, created.id), GM, { visibleToPlayers: true }));
+      const shared = await body(
+        await post(base, sub(HOMEBREW_PATHS.contentVisibility, created.id), GM, { visibleToPlayers: true })
+      );
       expect(shared.data.record.visibleToPlayers).toBe(true);
       return created.id as string;
     };
@@ -298,7 +357,9 @@ describe("homebrew HTTP CRUD", () => {
       expect(store.publishedFor("player").spellLists).toHaveLength(1);
 
       // The autosave that empties the list - still a legal PATCH, and it still lands.
-      const patched = await body(await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: [] } }));
+      const patched = await body(
+        await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: [] } })
+      );
       expect(patched.data.record.record.add).toEqual([]);
       // ...but the record no longer claims to be live.
       expect(patched.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
@@ -314,7 +375,9 @@ describe("homebrew HTTP CRUD", () => {
       const id = await publishAndShare(base);
       // `add` must be an array of ids. This body saves and parses as JSON but fails its own Zod schema, the
       // shape `publishedFor` would drop.
-      const patched = await body(await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: "fireball" } }));
+      const patched = await body(
+        await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: "fireball" } })
+      );
       expect(patched.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
       // The invariant, stated directly: nothing published is ever missing from the merged catalog.
       const publishedRows = store.list({ state: "published" }).rows;
@@ -325,12 +388,20 @@ describe("homebrew HTTP CRUD", () => {
     it("leaves a still-valid edit published, and never demotes a draft it had no business touching", async () => {
       const { base } = await fixture({ realValidation: true });
       const id = await publishAndShare(base);
-      const fine = await body(await patch(base, byId(id), GM, { record: { id, name: "Blood Magic II", source: "homebrew", add: ["fireball", "fire-bolt"] } }));
+      const fine = await body(
+        await patch(base, byId(id), GM, {
+          record: { id, name: "Blood Magic II", source: "homebrew", add: ["fireball", "fire-bolt"] }
+        })
+      );
       expect(fine.data.record).toMatchObject({ state: "published", visibleToPlayers: true });
 
       // A draft may be invalid, so editing one into nonsense is fine.
       const draft = await createRecord(base, { type: "spell-list", name: "Scratch", add: ["fireball"] });
-      const edited = await body(await patch(base, byId(draft.id), GM, { record: { id: draft.id, name: "Scratch", source: "homebrew", add: [] } }));
+      const edited = await body(
+        await patch(base, byId(draft.id), GM, {
+          record: { id: draft.id, name: "Scratch", source: "homebrew", add: [] }
+        })
+      );
       expect(edited.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
       expect(edited.status).toBeUndefined();
     });
@@ -345,7 +416,9 @@ describe("homebrew HTTP CRUD", () => {
     expect(listed.data.records.map((row: Json) => row.name)).toEqual(["Alpha", "Bravo"]);
     expect(listed.data.total).toBe(3);
     expect(listed.data.records[0]).toMatchObject({ source: "homebrew", state: "draft", valid: true, usageCount: 0 });
-    const next = await body(await get(base, `${CONTENT}?type=class&limit=2&cursor=${encodeURIComponent(listed.data.nextCursor)}`, GM));
+    const next = await body(
+      await get(base, `${CONTENT}?type=class&limit=2&cursor=${encodeURIComponent(listed.data.nextCursor)}`, GM)
+    );
     expect(next.data.records.map((row: Json) => row.name)).toEqual(["Charlie"]);
     expect(next.data.nextCursor).toBeNull();
     expect((await body(await get(base, `${CONTENT}?q=cinder`, GM))).data.total).toBe(1);
@@ -390,9 +463,10 @@ describe("homebrew HTTP CRUD", () => {
 
   // End to end in the order a GM would work: duplicate a class and a subclass, re-point the subclass,
   // publish in either order, and build a character, checking the resulting numbers.
-  it("takes a GM from \"duplicate Fighter\" to a published, playable class - and the character is really built", async () => {
+  it('takes a GM from "duplicate Fighter" to a published, playable class - and the character is really built', async () => {
     const { base, contentLibrary } = await fixture({ realValidation: true });
-    const duplicate = async (id: string) => (await body(await post(base, sub(HOMEBREW_PATHS.contentDuplicate, id), GM, {}))).data.record as Json;
+    const duplicate = async (id: string) =>
+      (await body(await post(base, sub(HOMEBREW_PATHS.contentDuplicate, id), GM, {}))).data.record as Json;
     const publish = (id: string) => post(base, sub(HOMEBREW_PATHS.contentPublish, id), GM, {});
 
     // 1. Duplicate Fighter. 2. Duplicate Champion. Both land as invisible drafts.
@@ -400,47 +474,73 @@ describe("homebrew HTTP CRUD", () => {
     const subclass = await duplicate("champion");
     // 3. Point the copy at the new class (a dropdown by name in the editor); the id comes from the
     //    duplicate response, as the editor's class picker gets it.
-    const repointed = await patch(base, byId(subclass.id), GM, { record: { ...subclass.record, classId: heroClass.id } });
+    const repointed = await patch(base, byId(subclass.id), GM, {
+      record: { ...subclass.record, classId: heroClass.id }
+    });
     expect(repointed.status).toBe(200);
 
     // 4. Publish the class first, while its subclass is still a draft.
     const publishedClass = await publish(heroClass.id);
-    expect(publishedClass.status, JSON.stringify((await body(await publish(heroClass.id))).error?.details ?? {})).toBe(200);
+    expect(publishedClass.status, JSON.stringify((await body(await publish(heroClass.id))).error?.details ?? {})).toBe(
+      200
+    );
     expect((await publish(subclass.id)).status).toBe(200);
 
     // 5. Play. The class is in the GM's merged catalog with its own subclass under it.
     const gm = contentLibrary.forAudience("gm");
     expect(gm.classRecord(heroClass.id)?.name).toBe("Fighter (copy)");
-    expect(gm.subclassSummaries().filter((row) => row.classId === heroClass.id).map((row) => row.name)).toEqual(["Champion (copy)"]);
+    expect(
+      gm
+        .subclassSummaries()
+        .filter((row) => row.classId === heroClass.id)
+        .map((row) => row.name)
+    ).toEqual(["Champion (copy)"]);
 
-    const built = buildCharacterDefinition({
-      name: "Borin", speciesId: "human", backgroundId: "soldier",
-      classId: heroClass.id, level: 5, subclassId: subclass.id,
-      abilityMethod: "standard-array",
-      baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-      backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
-      hp: { mode: "entries", entries: [1, 10, 4, 6] },
-      choices: [
-        { level: 1, kind: "language", id: "dwarvish" },
-        { level: 1, kind: "language", id: "giant" },
-        { level: 1, classId: heroClass.id, kind: "skill", id: "athletics" },
-        { level: 1, classId: heroClass.id, kind: "skill", id: "perception" },
-        { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
-        { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
-        { level: 1, classId: heroClass.id, kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
-        { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "greatsword" },
-        { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "flail" },
-        { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "longbow" },
-        { level: 4, classId: heroClass.id, kind: "weapon-mastery", id: "rapier" },
-        { level: 3, classId: heroClass.id, kind: "subclass", id: subclass.id },
-        { level: 4, classId: heroClass.id, kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-        { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-        { level: 1, kind: "tool", id: "gaming-set-dice" },
-        { level: 1, kind: "equipment", id: "fighter-a" },
-        { level: 1, kind: "equipment", id: "soldier-a" }
-      ]
-    }, gm, BuilderPolicySchema.parse({}));
+    const built = buildCharacterDefinition(
+      {
+        name: "Borin",
+        speciesId: "human",
+        backgroundId: "soldier",
+        classId: heroClass.id,
+        level: 5,
+        subclassId: subclass.id,
+        abilityMethod: "standard-array",
+        baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+        backgroundBonusAllocation: [
+          { ability: "str", amount: 2 },
+          { ability: "con", amount: 1 }
+        ],
+        hp: { mode: "entries", entries: [1, 10, 4, 6] },
+        choices: [
+          { level: 1, kind: "language", id: "dwarvish" },
+          { level: 1, kind: "language", id: "giant" },
+          { level: 1, classId: heroClass.id, kind: "skill", id: "athletics" },
+          { level: 1, classId: heroClass.id, kind: "skill", id: "perception" },
+          { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+          { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+          {
+            level: 1,
+            classId: heroClass.id,
+            kind: "fighting-style",
+            id: "defense",
+            payload: { featureId: "fighting-style" }
+          },
+          { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "greatsword" },
+          { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "flail" },
+          { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "longbow" },
+          { level: 4, classId: heroClass.id, kind: "weapon-mastery", id: "rapier" },
+          { level: 3, classId: heroClass.id, kind: "subclass", id: subclass.id },
+          { level: 4, classId: heroClass.id, kind: "asi-or-feat", id: "ability-score-improvement" },
+          { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+          { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+          { level: 1, kind: "tool", id: "gaming-set-dice" },
+          { level: 1, kind: "equipment", id: "fighter-a" },
+          { level: 1, kind: "equipment", id: "soldier-a" }
+        ]
+      },
+      gm,
+      BuilderPolicySchema.parse({})
+    );
 
     // The numbers, not just the absence of a throw, and they match the SRD Fighter's: a duplicate that
     // publishes but computes differently would be wrong.
@@ -451,13 +551,20 @@ describe("homebrew HTTP CRUD", () => {
     // Chain mail 16 from the copied starting-equipment option + the Defense style's +1.
     expect(built.armorClass).toBe(17);
     // The homebrew class and its subclass are what the sheet records, not the SRD originals.
-    expect(built.character?.classes).toEqual([{
-      id: heroClass.id, name: "Fighter (copy)", level: 5, hitDie: "d10",
-      subclass: { id: subclass.id, name: "Champion (copy)" }
-    }]);
+    expect(built.character?.classes).toEqual([
+      {
+        id: heroClass.id,
+        name: "Fighter (copy)",
+        level: 5,
+        hitDie: "d10",
+        subclass: { id: subclass.id, name: "Champion (copy)" }
+      }
+    ]);
     // The copied class's features came across, the level-3 subclass feature included.
     expect(built.actions.map((action) => action.name)).toContain("Second Wind");
-    const traits = (built.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    const traits = (built.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map(
+      (trait) => trait.name
+    );
     expect(traits).toContain("Improved Critical");
     expect(traits).toContain("Extra Attack");
   });
@@ -506,7 +613,10 @@ describe("homebrew HTTP packs", () => {
     const { base, store } = await fixture();
     const existing = await createRecord(base);
     const pack = {
-      schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Ozy's Homebrew", attribution: null,
+      schemaId: "vtt.homebrew-pack",
+      schemaVersion: 1,
+      name: "Ozy's Homebrew",
+      attribution: null,
       exportedAt: "2026-07-27T03:00:00.000Z",
       records: [
         { id: existing.id, type: "class", name: "Colliding Hunter" },
@@ -517,13 +627,15 @@ describe("homebrew HTTP packs", () => {
     const dry = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { pack, dryRun: true }));
     expect(HomebrewPackImportResponseSchema.safeParse(dry).success).toBe(true);
     expect(dry.data.dryRun).toBe(true);
-    expect(store.list().total).toBe(1);   // the plan only; nothing written
+    expect(store.list().total).toBe(1); // the plan only; nothing written
 
     const applied = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { pack }));
     expect(applied.data.imported).toHaveLength(3);
     // Every id that is not one of our shapes is re-minted: the one colliding with an existing row, the one
     // in our reserved namespace that we did not mint, and the "clean" foreign id, which could never publish.
-    expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort()).toEqual([existing.id, "brand-new-feat", "hb-not-ours"].sort());
+    expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort()).toEqual(
+      [existing.id, "brand-new-feat", "hb-not-ours"].sort()
+    );
     for (const entry of applied.data.imported) expect(entry.id).toMatch(/^hb-[a-z0-9-]+-[0-9a-f]{6}$/);
     // Everything lands as an invisible draft, which is what makes importing an invalid pack harmless.
     for (const row of store.list().rows) expect(row).toMatchObject({ state: "draft", visibleToPlayers: false });
@@ -538,11 +650,38 @@ describe("homebrew HTTP packs", () => {
     // load once in a persisted ActorDefinition).
     const longId = "x".repeat(200);
     const pack = {
-      schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Foreign", attribution: null,
+      schemaId: "vtt.homebrew-pack",
+      schemaVersion: 1,
+      name: "Foreign",
+      attribution: null,
       exportedAt: "2026-07-27T03:00:00.000Z",
       records: [
-        { id: "wizard", type: "class", name: "Wizard", hitDie: "d6", statPriority: ["int", "con", "dex", "wis", "cha", "str"], primaryAbilities: ["int"], savingThrows: ["int", "wis"], skillChoices: { choose: 2, from: ["arcana", "history"] }, subclassLevel: 3, levelTable: Array.from({ length: 20 }, (_, index) => ({ level: index + 1, proficiencyBonus: 2 + Math.floor(index / 4) })) },
-        { id: "fire-bolt", type: "spell", name: "Fire Bolt", level: 0, school: "evocation", castingTime: "action", range: { text: "120 feet" }, duration: "instantaneous", description: "A mote of fire." },
+        {
+          id: "wizard",
+          type: "class",
+          name: "Wizard",
+          hitDie: "d6",
+          statPriority: ["int", "con", "dex", "wis", "cha", "str"],
+          primaryAbilities: ["int"],
+          savingThrows: ["int", "wis"],
+          skillChoices: { choose: 2, from: ["arcana", "history"] },
+          subclassLevel: 3,
+          levelTable: Array.from({ length: 20 }, (_, index) => ({
+            level: index + 1,
+            proficiencyBonus: 2 + Math.floor(index / 4)
+          }))
+        },
+        {
+          id: "fire-bolt",
+          type: "spell",
+          name: "Fire Bolt",
+          level: 0,
+          school: "evocation",
+          castingTime: "action",
+          range: { text: "120 feet" },
+          duration: "instantaneous",
+          description: "A mote of fire."
+        },
         { id: "my-list-spells", type: "spell-list", name: "My List", add: ["fireball"] },
         { id: longId, type: "feat", name: "Overlong" }
       ]
@@ -554,8 +693,9 @@ describe("homebrew HTTP packs", () => {
     // All reported, and the 200-character id is rendered rather than emitted verbatim, which would fail the
     // response contract.
     expect(applied.data.reminted).toHaveLength(4);
-    expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort())
-      .toEqual(["fire-bolt", "my-list-spells", "wizard", "x".repeat(60)].sort());
+    expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort()).toEqual(
+      ["fire-bolt", "my-list-spells", "wizard", "x".repeat(60)].sort()
+    );
     // Nothing outside `hb-` is ours, so the reason names the namespace it came from.
     for (const entry of applied.data.reminted) expect(entry.reason).toBe("srd-collision");
 
@@ -563,7 +703,10 @@ describe("homebrew HTTP packs", () => {
     // row permanently unpublishable.
     for (const row of store.list().rows) {
       const document = (await body(await get(base, byId(row.id), GM))).data.record;
-      expect(document.validity.issues.filter((issue: Json) => issue.path[0] === "id"), row.name).toEqual([]);
+      expect(
+        document.validity.issues.filter((issue: Json) => issue.path[0] === "id"),
+        row.name
+      ).toEqual([]);
       expect(row.id).toMatch(/^hb-[a-z0-9-]+-[0-9a-f]{6}$/);
     }
     // And the spell list, which needed nothing but a usable id, publishes outright.
@@ -581,7 +724,10 @@ describe("homebrew HTTP packs", () => {
     const draft = await createRecord(base, { type: "feat", name: "Plain Draft" });
 
     const pack = {
-      schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Update", attribution: null,
+      schemaId: "vtt.homebrew-pack",
+      schemaVersion: 1,
+      name: "Update",
+      attribution: null,
       exportedAt: "2026-07-27T03:00:00.000Z",
       records: [
         { id: live.id, type: "spell-list", name: "Clobbered", add: [] },
@@ -598,8 +744,12 @@ describe("homebrew HTTP packs", () => {
     expect(HomebrewPackImportResponseSchema.safeParse(dry).success).toBe(true);
 
     expect(applied.data.rejected.map((entry: Json) => entry.originalId).sort()).toEqual([live.id, deleted.id].sort());
-    expect(applied.data.rejected.find((entry: Json) => entry.originalId === live.id).issues[0].message).toContain("shown to players");
-    expect(applied.data.rejected.find((entry: Json) => entry.originalId === deleted.id).issues[0].message).toContain("Restore it");
+    expect(applied.data.rejected.find((entry: Json) => entry.originalId === live.id).issues[0].message).toContain(
+      "shown to players"
+    );
+    expect(applied.data.rejected.find((entry: Json) => entry.originalId === deleted.id).issues[0].message).toContain(
+      "Restore it"
+    );
 
     // The live record is exactly as it was: same name, same body, still published, still shared.
     const untouched = (await body(await get(base, byId(live.id), GM))).data.record;
@@ -618,9 +768,15 @@ describe("homebrew HTTP packs", () => {
     // response fail its schema.
     const { base } = await fixture();
     const pack = {
-      schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Ragged", attribution: null,
+      schemaId: "vtt.homebrew-pack",
+      schemaVersion: 1,
+      name: "Ragged",
+      attribution: null,
       exportedAt: "2026-07-27T03:00:00.000Z",
-      records: [{ id: "hb-nameless-a1b2c3", type: "feat" }, { type: "feat", name: "Fine" }]
+      records: [
+        { id: "hb-nameless-a1b2c3", type: "feat" },
+        { type: "feat", name: "Fine" }
+      ]
     };
     const dry = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { pack, dryRun: true }));
     const applied = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { pack }));
@@ -635,7 +791,14 @@ describe("homebrew HTTP packs", () => {
     const { base } = await fixture();
     const records = Array.from({ length: 501 }, (_, index) => ({ type: "feat", name: `Feat ${index}` }));
     const response = await post(base, HOMEBREW_PATHS.packsImport, GM, {
-      pack: { schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Huge", attribution: null, exportedAt: "2026-07-27T03:00:00.000Z", records }
+      pack: {
+        schemaId: "vtt.homebrew-pack",
+        schemaVersion: 1,
+        name: "Huge",
+        attribution: null,
+        exportedAt: "2026-07-27T03:00:00.000Z",
+        records
+      }
     });
     expect(response.status).toBe(413);
   });
@@ -692,7 +855,10 @@ describe("homebrew wiring in the real server", () => {
     const address = server.httpServer.address();
     if (!address || typeof address === "string") throw new Error("Server did not bind.");
     const base = `http://127.0.0.1:${address.port}`;
-    cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+    cleanups.push(async () => {
+      server.close();
+      await rm(directory, { recursive: true, force: true });
+    });
     const auth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
 
     const created = await post(base, CONTENT, auth, { record: classBody() });
@@ -704,9 +870,20 @@ describe("homebrew wiring in the real server", () => {
     // ~900kb of pack: past the global 512kb limit, inside the route-scoped 4mb one. Without the ordering in
     // server.ts this is a 413.
     const filler = "x".repeat(3000);
-    const records = Array.from({ length: 300 }, (_, index) => ({ type: "feat", name: `Feat ${index}`, description: filler }));
+    const records = Array.from({ length: 300 }, (_, index) => ({
+      type: "feat",
+      name: `Feat ${index}`,
+      description: filler
+    }));
     const imported = await post(base, HOMEBREW_PATHS.packsImport, auth, {
-      pack: { schemaId: "vtt.homebrew-pack", schemaVersion: 1, name: "Big", attribution: null, exportedAt: "2026-07-27T03:00:00.000Z", records }
+      pack: {
+        schemaId: "vtt.homebrew-pack",
+        schemaVersion: 1,
+        name: "Big",
+        attribution: null,
+        exportedAt: "2026-07-27T03:00:00.000Z",
+        records
+      }
     });
     expect(imported.status).toBe(200);
     expect((await body(imported)).data.imported).toHaveLength(300);

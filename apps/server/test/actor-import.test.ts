@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import character from "../../../packages/test-fixtures/actors/player-character.v1.json" with { type: "json" };
-import { importActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "../src/actor-roster.js";
+import {
+  importActorDefinition,
+  removeActor,
+  resolvePendingImport,
+  storedDefinition,
+  submitPendingImport
+} from "../src/actor-roster.js";
 import { claimCharacter } from "../src/character-claims.js";
 import { projectGmView, projectPlayerView } from "../src/projections.js";
 import { ActorDefinitionSchema } from "@vtt/schemas";

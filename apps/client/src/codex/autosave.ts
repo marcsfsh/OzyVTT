@@ -52,13 +52,18 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
   saveRef.current = save;
   serializeRef.current = serialize;
   conflictRef.current = onConflict;
-  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   const current = serialize(draft);
   const dirty = !disabled && current !== savedRef.current;
 
   const flush = useCallback(async () => {
-    if (savingRef.current) { pendingRef.current = true; return; }
+    if (savingRef.current) {
+      pendingRef.current = true;
+      return;
+    }
     const snapshot = serializeRef.current(draftRef.current);
     if (snapshot === savedRef.current) return;
     savingRef.current = true;
@@ -77,7 +82,10 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
       }
     } finally {
       savingRef.current = false;
-      if (pendingRef.current) { pendingRef.current = false; void flush(); }
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        void flush();
+      }
     }
   }, []);
 
@@ -92,17 +100,22 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
   useEffect(() => {
     if (disabled || !settings.enabled) return;
     if (current === savedRef.current) return;
-    const timer = setTimeout(() => { void flush(); }, interval * 1000);
+    const timer = setTimeout(() => {
+      void flush();
+    }, interval * 1000);
     return () => clearTimeout(timer);
   }, [current, disabled, settings.enabled, interval, flush]);
 
   // Flush a pending edit on unmount so the last keystrokes aren't dropped. `flush` is stable.
   const enabledRef = useRef(settings.enabled);
   enabledRef.current = settings.enabled && !disabled;
-  useEffect(() => () => {
-    if (!enabledRef.current) return;
-    if (serializeRef.current(draftRef.current) !== savedRef.current) void flush();
-  }, [flush]);
+  useEffect(
+    () => () => {
+      if (!enabledRef.current) return;
+      if (serializeRef.current(draftRef.current) !== savedRef.current) void flush();
+    },
+    [flush]
+  );
 
   // ----- Autosave OFF: the guards -----
   useEffect(() => {
@@ -110,9 +123,15 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
     // A native confirm: the guard fires from the router outside any mounted dialog, and pairs with the
     // browser-owned `beforeunload` prompt.
     const release = registerNavigationGuard(() => window.confirm(LEAVE_PROMPT));
-    const onBeforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
     window.addEventListener("beforeunload", onBeforeUnload);
-    return () => { release(); window.removeEventListener("beforeunload", onBeforeUnload); };
+    return () => {
+      release();
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
   }, [disabled, settings.enabled, dirty]);
 
   // With autosave off, an unsaved draft reads "Unsaved changes" rather than a misleading "Saved".

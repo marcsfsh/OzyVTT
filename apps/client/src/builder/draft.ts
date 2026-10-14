@@ -18,10 +18,18 @@ const storageKey = (sessionKey: string) => `${KEY_PREFIX}${sessionKey}`;
 
 /** Private-mode / quota-safe: a browser that refuses storage loses resume, not the wizard. */
 function readRaw(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 function writeRaw(key: string, value: string): void {
-  try { localStorage.setItem(key, value); } catch { /* storage unavailable; the draft stays in memory */ }
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable; the draft stays in memory */
+  }
 }
 
 export function loadDraft(sessionKey: string): StoredDraft | null {
@@ -44,7 +52,11 @@ export function saveDraft(sessionKey: string, draft: BuilderDraft): void {
 }
 
 export function clearDraft(sessionKey: string): void {
-  try { localStorage.removeItem(storageKey(sessionKey)); } catch { /* nothing to clear */ }
+  try {
+    localStorage.removeItem(storageKey(sessionKey));
+  } catch {
+    /* nothing to clear */
+  }
 }
 
 /** "3 minutes ago" / "yesterday" for the resume banner. */

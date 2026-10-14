@@ -13,22 +13,41 @@ const ACTOR_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const PENDING = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 const CHARACTER: ActorDefinition = ActorDefinitionSchema.parse({
-  schemaId: "vtt.actor-character", schemaVersion: 1,
+  schemaId: "vtt.actor-character",
+  schemaVersion: 1,
   source: { name: "Builder", version: "1" },
-  name: "Sera", size: "medium",
+  name: "Sera",
+  size: "medium",
   abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 8 },
-  proficiencyBonus: 2, armorClass: 12, hitPoints: { maximum: 8 }, speedFeet: 30,
+  proficiencyBonus: 2,
+  armorClass: 12,
+  hitPoints: { maximum: 8 },
+  speedFeet: 30,
   token: { disposition: "friendly" },
   character: {
-    classes: [{ id: "hb-blood-hunter-a1b2c3", name: "Blood Hunter", level: 3, subclass: { id: "hb-mutant-d4e5f6", name: "Mutant" } }],
+    classes: [
+      {
+        id: "hb-blood-hunter-a1b2c3",
+        name: "Blood Hunter",
+        level: 3,
+        subclass: { id: "hb-mutant-d4e5f6", name: "Mutant" }
+      }
+    ],
     race: { id: "hb-gith-a1b2c3", name: "Gith" },
     background: { id: "hb-hermit-a1b2c3", name: "Hermit" },
     feats: [{ id: "hb-blood-maledict-a1b2c3", name: "Blood Maledict" }],
     // The provenance ledger is the only record of which option a character took, because most riders
     // are flattened into actions/traits/proficiencies at build time.
-    choices: [{ level: 1, kind: "lineage", id: "yanki" }, { level: 4, kind: "feat", id: "hb-crimson-rite-a1b2c3" }]
+    choices: [
+      { level: 1, kind: "lineage", id: "yanki" },
+      { level: 4, kind: "feat", id: "hb-crimson-rite-a1b2c3" }
+    ]
   },
-  spellcasting: { ability: "int", slots: [{ level: 1, max: 2 }], spells: [{ id: "hb-crimson-bolt-a1b2c3", name: "Crimson Bolt", level: 1, classId: "hb-blood-hunter-a1b2c3" }] },
+  spellcasting: {
+    ability: "int",
+    slots: [{ level: 1, max: 2 }],
+    spells: [{ id: "hb-crimson-bolt-a1b2c3", name: "Crimson Bolt", level: 1, classId: "hb-blood-hunter-a1b2c3" }]
+  },
   startingInventory: [{ id: "hb-hunters-blade-a1b2c3", name: "Hunter's Blade" }]
 });
 
@@ -37,12 +56,21 @@ function stateWith(overrides: Partial<GameState> = {}): GameState {
     schemaVersion: 1,
     actors: [
       ActorSchema.parse({
-        id: ACTOR_A, name: "Sera", kind: "player-character", hp: { current: 8, maximum: 8 },
+        id: ACTOR_A,
+        name: "Sera",
+        kind: "player-character",
+        hp: { current: 8, maximum: 8 },
         definitionId: `import-${ACTOR_A}`,
         inventory: [{ id: "hb-hunters-blade-a1b2c3", name: "Hunter's Blade" }],
         preparedSpellIds: ["hb-crimson-bolt-a1b2c3"]
       }),
-      ActorSchema.parse({ id: ACTOR_B, name: "Bone Colossus", kind: "monster", hp: { current: 90, maximum: 90 }, definitionId: "hb-m-4f19c8b02de7" })
+      ActorSchema.parse({
+        id: ACTOR_B,
+        name: "Bone Colossus",
+        kind: "monster",
+        hp: { current: 90, maximum: 90 },
+        definitionId: "hb-m-4f19c8b02de7"
+      })
     ],
     definitions: [{ id: `import-${ACTOR_A}`, definition: CHARACTER }],
     ...overrides
@@ -52,7 +80,13 @@ function stateWith(overrides: Partial<GameState> = {}): GameState {
 describe("homebrew usages", () => {
   it("finds a homebrew class, subclass, species, background and feat through a built character", () => {
     const state = stateWith();
-    for (const [type, id] of [["class", "hb-blood-hunter-a1b2c3"], ["subclass", "hb-mutant-d4e5f6"], ["species", "hb-gith-a1b2c3"], ["background", "hb-hermit-a1b2c3"], ["feat", "hb-blood-maledict-a1b2c3"]] as const) {
+    for (const [type, id] of [
+      ["class", "hb-blood-hunter-a1b2c3"],
+      ["subclass", "hb-mutant-d4e5f6"],
+      ["species", "hb-gith-a1b2c3"],
+      ["background", "hb-hermit-a1b2c3"],
+      ["feat", "hb-blood-maledict-a1b2c3"]
+    ] as const) {
       const usages = homebrewUsages(state, type, id);
       expect(usages.length, `${type} ${id}`).toBeGreaterThan(0);
       expect(usages[0].actorId).toBe(ACTOR_A);
@@ -69,7 +103,11 @@ describe("homebrew usages", () => {
 
   it("finds live inventory, prepared spells and the starting loadout", () => {
     const state = stateWith();
-    expect(homebrewUsages(state, "equipment", "hb-hunters-blade-a1b2c3").map((usage) => usage.kind).sort()).toEqual(["inventory", "starting-inventory"]);
+    expect(
+      homebrewUsages(state, "equipment", "hb-hunters-blade-a1b2c3")
+        .map((usage) => usage.kind)
+        .sort()
+    ).toEqual(["inventory", "starting-inventory"]);
     expect(homebrewUsages(state, "spell", "hb-crimson-bolt-a1b2c3").length).toBeGreaterThan(0);
   });
 
@@ -83,7 +121,9 @@ describe("homebrew usages", () => {
   });
 
   it("finds a reference inside a pending import, before the GM has approved it", () => {
-    const state = stateWith({ pendingImports: [{ id: PENDING, name: "Sera II", submittedBy: "player", definition: CHARACTER }] });
+    const state = stateWith({
+      pendingImports: [{ id: PENDING, name: "Sera II", submittedBy: "player", definition: CHARACTER }]
+    });
     const usages = homebrewUsages(state, "class", "hb-blood-hunter-a1b2c3");
     expect(usages.map((usage) => usage.actorId)).toContain(PENDING);
   });
@@ -100,9 +140,21 @@ describe("homebrew usages", () => {
     expect(homebrewUsages(orphaned, "class", "hb-blood-hunter-a1b2c3")).toEqual([]);
 
     const index = buildHomebrewUsageIndex(stateWith());
-    for (const type of ["class", "subclass", "species", "background", "feat", "spell", "equipment", "monster"] as const) {
+    for (const type of [
+      "class",
+      "subclass",
+      "species",
+      "background",
+      "feat",
+      "spell",
+      "equipment",
+      "monster"
+    ] as const) {
       const usages = index.of(type, type === "monster" ? "hb-m-4f19c8b02de7" : "hb-blood-hunter-a1b2c3");
-      expect(HomebrewUsagesSchema.safeParse({ id: "hb-blood-hunter-a1b2c3", usages, safeToDelete: true }).success, type).toBe(true);
+      expect(
+        HomebrewUsagesSchema.safeParse({ id: "hb-blood-hunter-a1b2c3", usages, safeToDelete: true }).success,
+        type
+      ).toBe(true);
     }
   });
 

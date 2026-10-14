@@ -26,18 +26,18 @@ and a change to one never bumps another. They are constructed together in
 
 ## Workspaces
 
-| Package | What it holds |
-| --- | --- |
-| `apps/server` | Express + Socket.IO service: stores, command handlers, projections, HTTP routers. |
-| `apps/client` | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet), `styleguide.html`. |
-| `packages/domain` | The realtime wire contract: `GameState`, socket event maps, projection view types. |
-| `packages/schemas` | Zod schemas for actors, effects and riders shared by server and content. |
-| `packages/api-contract` | The public HTTP API: OpenAPI document, path constants, command scopes. |
-| `packages/rules-5e` | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation. |
-| `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources. |
-| `packages/dndbeyond-pdf` | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser). |
-| `packages/ui` | Design tokens, fonts and the `nh-` UI primitives. |
-| `packages/test-fixtures` | Actor fixtures shared by tests. |
+| Package                      | What it holds                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/server`                | Express + Socket.IO service: stores, command handlers, projections, HTTP routers.                                                 |
+| `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet), `styleguide.html`. |
+| `packages/domain`            | The realtime wire contract: `GameState`, socket event maps, projection view types.                                                |
+| `packages/schemas`           | Zod schemas for actors, effects and riders shared by server and content.                                                          |
+| `packages/api-contract`      | The public HTTP API: OpenAPI document, path constants, command scopes.                                                            |
+| `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                                        |
+| `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                                               |
+| `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                                            |
+| `packages/ui`                | Design tokens, fonts and the `nh-` UI primitives.                                                                                 |
+| `packages/test-fixtures`     | Actor fixtures shared by tests.                                                                                                   |
 
 Packages are consumed as TypeScript source; only the client and server have build steps.
 

@@ -44,7 +44,10 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
     const observer = new ResizeObserver(measure);
     observer.observe(bar);
     bar.addEventListener("scroll", measure, { passive: true });
-    return () => { observer.disconnect(); bar.removeEventListener("scroll", measure); };
+    return () => {
+      observer.disconnect();
+      bar.removeEventListener("scroll", measure);
+    };
   }, [horizontal, tabs.length]);
 
   /* Scroll the bar itself, not `scrollIntoView`, which would scroll every ancestor (and the page on mount).
@@ -80,10 +83,25 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const nextKey = horizontal ? "ArrowRight" : "ArrowDown";
     const prevKey = horizontal ? "ArrowLeft" : "ArrowUp";
-    if (event.key === nextKey) { event.preventDefault(); step(index, 1); }
-    else if (event.key === prevKey) { event.preventDefault(); step(index, -1); }
-    else if (event.key === "Home") { event.preventDefault(); const i = tabs.findIndex((t) => !t.disabled); if (i >= 0) focusTab(i); }
-    else if (event.key === "End") { event.preventDefault(); for (let i = tabs.length - 1; i >= 0; i--) { if (!tabs[i].disabled) { focusTab(i); break; } } }
+    if (event.key === nextKey) {
+      event.preventDefault();
+      step(index, 1);
+    } else if (event.key === prevKey) {
+      event.preventDefault();
+      step(index, -1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      const i = tabs.findIndex((t) => !t.disabled);
+      if (i >= 0) focusTab(i);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      for (let i = tabs.length - 1; i >= 0; i--) {
+        if (!tabs[i].disabled) {
+          focusTab(i);
+          break;
+        }
+      }
+    }
   };
 
   return (
@@ -106,7 +124,9 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
         return (
           <button
             key={tab.id}
-            ref={(el) => { refs.current[index] = el; }}
+            ref={(el) => {
+              refs.current[index] = el;
+            }}
             role="tab"
             type="button"
             aria-selected={active}

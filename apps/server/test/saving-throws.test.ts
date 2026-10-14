@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { answerSave, conditionFrom, createPendingSaves, dismissSave, halfOnSuccessFrom, saveModifierFor, type SaveAnswerDependencies } from "../src/saving-throws.js";
+import {
+  answerSave,
+  conditionFrom,
+  createPendingSaves,
+  dismissSave,
+  halfOnSuccessFrom,
+  saveModifierFor,
+  type SaveAnswerDependencies
+} from "../src/saving-throws.js";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
 import { projectPlayerCombat } from "../src/projections.js";
@@ -16,30 +24,103 @@ const IDS = {
   map: "20000000-0000-5000-8000-000000000001"
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
-const BREATH = { id: "breath", name: "Fire Breath", activation: "action" as const, description: "Dexterity Saving Throw: DC 15. Failure: 10 (3d6) Fire damage. Success: Half damage.", save: { ability: "dex" as const, dc: 15 }, damage: [{ formula: "3d6", type: "fire" }] };
+const BREATH = {
+  id: "breath",
+  name: "Fire Breath",
+  activation: "action" as const,
+  description: "Dexterity Saving Throw: DC 15. Failure: 10 (3d6) Fire damage. Success: Half damage.",
+  save: { ability: "dex" as const, dc: 15 },
+  damage: [{ formula: "3d6", type: "fire" }]
+};
 
 // saveModifierFor only reads abilityScores + the untyped open5e extension, so a partial cast is enough.
-const monsterDef = { abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, extensions: { "open5e.srd-2024": { savingThrows: { dex: 7 } } } } as unknown as ActorDefinition;
-const pcDef = { abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 }, extensions: {} } as unknown as ActorDefinition;
+const monsterDef = {
+  abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+  extensions: { "open5e.srd-2024": { savingThrows: { dex: 7 } } }
+} as unknown as ActorDefinition;
+const pcDef = {
+  abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 },
+  extensions: {}
+} as unknown as ActorDefinition;
 const resolveDefinition = (id: string) => (id === "pc-def" ? pcDef : id === "gob-def" ? monsterDef : undefined);
 
 function state() {
-  const game = GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.source, name: "Dragon", kind: "monster", visibility: "public", hp: { current: 100, maximum: 100 }, definitionId: "src-def" },
-    { id: IDS.pc, name: "Borin", kind: "player-character", visibility: "public", hp: { current: 30, maximum: 30, temporary: 4 }, ownerSessionId: IDS.pcSession, definitionId: "pc-def" },
-    { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 12, maximum: 12 }, definitionId: "gob-def" }
-  ] });
-  startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.source, score: 20 }, { actorId: IDS.pc, score: 12 }, { actorId: IDS.monster, score: 8 }] }, () => 1, GEOMETRY);
+  const game = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.source,
+        name: "Dragon",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 100, maximum: 100 },
+        definitionId: "src-def"
+      },
+      {
+        id: IDS.pc,
+        name: "Borin",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 30, maximum: 30, temporary: 4 },
+        ownerSessionId: IDS.pcSession,
+        definitionId: "pc-def"
+      },
+      {
+        id: IDS.monster,
+        name: "Goblin",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 12, maximum: 12 },
+        definitionId: "gob-def"
+      }
+    ]
+  });
+  startEncounter(
+    game,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.source, score: 20 },
+        { actorId: IDS.pc, score: 12 },
+        { actorId: IDS.monster, score: 8 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return game;
 }
 function deps(faces: number[], role: "gm" | "player" = "gm", sessionId: string = IDS.gm): SaveAnswerDependencies {
-  return { random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; }, newRollId: () => "40000000-0000-4000-8000-000000000000", sessionId, role, now: () => "2026-07-17T00:00:00.000Z", resolveDefinition };
+  return {
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
+    newRollId: () => "40000000-0000-4000-8000-000000000000",
+    sessionId,
+    role,
+    now: () => "2026-07-17T00:00:00.000Z",
+    resolveDefinition
+  };
 }
 let saveSeq = 0;
-const pendingInput = (targetIds: readonly string[], overrides: Partial<Parameters<typeof createPendingSaves>[1]> = {}) => ({
-  sourceActorId: IDS.source, sourceName: "Dragon", actionName: "Fire Breath", ability: "dex" as const, dc: 15,
-  targetIds, proposedDamage: 12, halfOnSuccess: true, conditionId: null as string | null,
-  newSaveId: () => `60000000-0000-4000-8000-00000000000${saveSeq++}`, createdAt: 0, ...overrides
+const pendingInput = (
+  targetIds: readonly string[],
+  overrides: Partial<Parameters<typeof createPendingSaves>[1]> = {}
+) => ({
+  sourceActorId: IDS.source,
+  sourceName: "Dragon",
+  actionName: "Fire Breath",
+  ability: "dex" as const,
+  dc: 15,
+  targetIds,
+  proposedDamage: 12,
+  halfOnSuccess: true,
+  conditionId: null as string | null,
+  newSaveId: () => `60000000-0000-4000-8000-00000000000${saveSeq++}`,
+  createdAt: 0,
+  ...overrides
 });
 const cmd = (n: number) => `50000000-0000-4000-8000-00000000000${n}`;
 const outcomeOf = (result: ReturnType<typeof answerSave>) => result.outcome;
@@ -47,10 +128,27 @@ const outcomeOf = (result: ReturnType<typeof answerSave>) => result.outcome;
 describe("saving-throw prompts", () => {
   it("creates one pending save per target when a save action resolves", () => {
     const game = state();
-    resolveDefinitionAction(game, BREATH, { actorId: IDS.source, targetIds: [IDS.pc, IDS.monster], commandId: cmd(1) }, { random: () => 4, newRollId: () => "40000000-0000-4000-8000-000000000000", gmSessionId: IDS.gm, now: () => "2026-07-17T00:00:00.000Z" });
+    resolveDefinitionAction(
+      game,
+      BREATH,
+      { actorId: IDS.source, targetIds: [IDS.pc, IDS.monster], commandId: cmd(1) },
+      {
+        random: () => 4,
+        newRollId: () => "40000000-0000-4000-8000-000000000000",
+        gmSessionId: IDS.gm,
+        now: () => "2026-07-17T00:00:00.000Z"
+      }
+    );
     expect(game.combat.pendingSaves).toHaveLength(2);
     const forPc = game.combat.pendingSaves.find((save) => save.targetActorId === IDS.pc)!;
-    expect(forPc).toMatchObject({ ability: "dex", dc: 15, halfOnSuccess: true, sourceName: "Dragon", actionName: "Fire Breath", proposedDamage: 12 });
+    expect(forPc).toMatchObject({
+      ability: "dex",
+      dc: 15,
+      halfOnSuccess: true,
+      sourceName: "Dragon",
+      actionName: "Fire Breath",
+      proposedDamage: 12
+    });
   });
 
   it("chooses the monster save bonus, else the ability modifier", () => {
@@ -67,7 +165,9 @@ describe("saving-throw prompts", () => {
   });
 
   it("detects a condition a failed save imposes from the action prose", () => {
-    expect(conditionFrom("Failure: The target has the Poisoned condition until the end of its next turn.")).toBe("poisoned");
+    expect(conditionFrom("Failure: The target has the Poisoned condition until the end of its next turn.")).toBe(
+      "poisoned"
+    );
     expect(conditionFrom("On a failed save the target is knocked Prone.")).toBe("prone");
     expect(conditionFrom("Failure: 15 Fire damage.")).toBeNull();
   });
@@ -82,7 +182,11 @@ describe("saving-throw prompts", () => {
     expect(goblin.hp.current).toBe(0);
     expect(goblin.conditions.some((condition) => condition.id === "prone")).toBe(true);
     expect(game.combat.pendingSaves).toHaveLength(0);
-    expect(game.rolls.find((roll) => roll.purpose === "save")).toMatchObject({ actorId: IDS.monster, initiatorLabel: "Goblin", visibility: "public" });
+    expect(game.rolls.find((roll) => roll.purpose === "save")).toMatchObject({
+      actorId: IDS.monster,
+      initiatorLabel: "Goblin",
+      visibility: "public"
+    });
   });
 
   it("previews a roll without applying it (commit=false): records the die, keeps the save, applies nothing", () => {
@@ -90,7 +194,13 @@ describe("saving-throw prompts", () => {
     createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
     const saveId = game.combat.pendingSaves[0].id;
     const preview = outcomeOf(answerSave(game, cmd(20), saveId, "roll", undefined, false, { role: "gm" }, deps([5]))); // 12 < 15 → would fail
-    expect(preview).toMatchObject({ success: false, total: 12, appliedDamage: 12, conditionApplied: true, committed: false });
+    expect(preview).toMatchObject({
+      success: false,
+      total: 12,
+      appliedDamage: 12,
+      conditionApplied: true,
+      committed: false
+    });
     const goblin = game.actors.find((actor) => actor.id === IDS.monster)!;
     expect(goblin.hp.current).toBe(12); // untouched
     expect(goblin.conditions).toHaveLength(0); // not applied yet
@@ -105,12 +215,18 @@ describe("saving-throw prompts", () => {
   it("applies half on success, or nothing when the action says no damage on success", () => {
     const half = state();
     createPendingSaves(half, pendingInput([IDS.monster]));
-    expect(answerSave(half, cmd(3), half.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).outcome.appliedDamage).toBe(6); // 10+7 = 17 >= 15
+    expect(
+      answerSave(half, cmd(3), half.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10]))
+        .outcome.appliedDamage
+    ).toBe(6); // 10+7 = 17 >= 15
     expect(half.actors.find((actor) => actor.id === IDS.monster)!.hp.current).toBe(6);
 
     const none = state();
     createPendingSaves(none, pendingInput([IDS.monster], { halfOnSuccess: false }));
-    expect(answerSave(none, cmd(4), none.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).outcome.appliedDamage).toBe(0);
+    expect(
+      answerSave(none, cmd(4), none.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10]))
+        .outcome.appliedDamage
+    ).toBe(0);
     expect(none.actors.find((actor) => actor.id === IDS.monster)!.hp.current).toBe(12);
   });
 
@@ -127,16 +243,25 @@ describe("saving-throw prompts", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId = game.combat.pendingSaves[0].id;
-    expect(() => answerSave(game, cmd(6), saveId, "manual", undefined, true, { role: "gm" }, deps([]))).toThrow(/whole number/);
-    expect(() => answerSave(game, cmd(6), saveId, "manual", 999, true, { role: "gm" }, deps([]))).toThrow(/whole number/);
+    expect(() => answerSave(game, cmd(6), saveId, "manual", undefined, true, { role: "gm" }, deps([]))).toThrow(
+      /whole number/
+    );
+    expect(() => answerSave(game, cmd(6), saveId, "manual", 999, true, { role: "gm" }, deps([]))).toThrow(
+      /whole number/
+    );
   });
 
   it("lets the owning player answer their own save but not another's, and only the GM dismiss", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId = game.combat.pendingSaves[0].id;
-    expect(() => answerSave(game, cmd(7), saveId, "manual", 20, true, { role: "player", sessionId: IDS.otherSession }, deps([]))).toThrow(/own character/);
-    expect(answerSave(game, cmd(8), saveId, "manual", 20, true, { role: "player", sessionId: IDS.pcSession }, deps([])).outcome.success).toBe(true);
+    expect(() =>
+      answerSave(game, cmd(7), saveId, "manual", 20, true, { role: "player", sessionId: IDS.otherSession }, deps([]))
+    ).toThrow(/own character/);
+    expect(
+      answerSave(game, cmd(8), saveId, "manual", 20, true, { role: "player", sessionId: IDS.pcSession }, deps([]))
+        .outcome.success
+    ).toBe(true);
 
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId2 = game.combat.pendingSaves[0].id;
@@ -150,7 +275,10 @@ describe("saving-throw prompts", () => {
     game.actors.find((actor) => actor.id === IDS.monster)!.visibility = "gm-only";
     createPendingSaves(game, pendingInput([IDS.monster]));
     answerSave(game, cmd(9), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10]));
-    expect(game.rolls.find((roll) => roll.purpose === "save")).toMatchObject({ actorId: IDS.monster, visibility: "gm-only" });
+    expect(game.rolls.find((roll) => roll.purpose === "save")).toMatchObject({
+      actorId: IDS.monster,
+      visibility: "gm-only"
+    });
   });
 
   it("projects only a player's own saves, strips the source id, and masks a hidden source", () => {
@@ -173,7 +301,16 @@ describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
     createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
     game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "paralyzed" }];
     // Empty dice queue proves no d20 was consumed.
-    const { outcome, events } = answerSave(game, cmd(30), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([]));
+    const { outcome, events } = answerSave(
+      game,
+      cmd(30),
+      game.combat.pendingSaves[0].id,
+      "roll",
+      undefined,
+      true,
+      { role: "gm" },
+      deps([])
+    );
     expect(outcome).toMatchObject({ success: false, autoFailed: "paralyzed", appliedDamage: 12, committed: true });
     expect(events.some((event) => /automatically fails the DEX save \(Paralyzed\)/.test(event.text))).toBe(true);
     expect(game.rolls.filter((roll) => roll.purpose === "save")).toHaveLength(0);
@@ -184,7 +321,16 @@ describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
     createPendingSaves(game, pendingInput([IDS.monster]));
     game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "restrained" }];
     // 2d20kl1: faces 18 then 2 keep the 2 → 2 + 7 = 9 < 15 fails.
-    const { outcome } = answerSave(game, cmd(31), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([18, 2]));
+    const { outcome } = answerSave(
+      game,
+      cmd(31),
+      game.combat.pendingSaves[0].id,
+      "roll",
+      undefined,
+      true,
+      { role: "gm" },
+      deps([18, 2])
+    );
     expect(outcome.success).toBe(false);
     expect(outcome.total).toBe(9);
     expect(outcome.rollMode?.disadvantage).toContain("Restrained (Dex saves)");
@@ -195,7 +341,16 @@ describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
     createPendingSaves(game, pendingInput([IDS.monster]));
     game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "exhaustion", level: 2 }];
     // 10 + 7 − 4 = 13 < 15: what passed clean now fails.
-    const { outcome } = answerSave(game, cmd(32), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10]));
+    const { outcome } = answerSave(
+      game,
+      cmd(32),
+      game.combat.pendingSaves[0].id,
+      "roll",
+      undefined,
+      true,
+      { role: "gm" },
+      deps([10])
+    );
     expect(outcome).toMatchObject({ success: false, total: 13 });
   });
 
@@ -203,7 +358,16 @@ describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.monster]));
     game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "stunned" }];
-    const { outcome } = answerSave(game, cmd(33), game.combat.pendingSaves[0].id, "manual", 20, true, { role: "gm" }, deps([]));
+    const { outcome } = answerSave(
+      game,
+      cmd(33),
+      game.combat.pendingSaves[0].id,
+      "manual",
+      20,
+      true,
+      { role: "gm" },
+      deps([])
+    );
     expect(outcome.success).toBe(true);
     expect(outcome.autoFailed).toBeNull();
   });

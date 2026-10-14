@@ -34,11 +34,23 @@ export function Button({
   return (
     <button
       type={type}
-      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm tap-target", block && "nh-btn--block", "interactive", lift && "lift", className)}
+      className={cx(
+        "nh-btn",
+        `nh-btn--${variant}`,
+        size === "sm" && "nh-btn--sm tap-target",
+        block && "nh-btn--block",
+        "interactive",
+        lift && "lift",
+        className
+      )}
       {...rest}
     >
       {children}
-      {arrow && <span className="nav-arrow" aria-hidden="true">→</span>}
+      {arrow && (
+        <span className="nav-arrow" aria-hidden="true">
+          →
+        </span>
+      )}
     </button>
   );
 }
@@ -53,14 +65,35 @@ export interface LinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement>
 }
 
 /** Anchor styled as a button, for real navigations (download links, viewer URL). */
-export function LinkButton({ variant = "secondary", size = "md", block = false, lift = false, arrow = false, className, children, ...rest }: LinkButtonProps) {
+export function LinkButton({
+  variant = "secondary",
+  size = "md",
+  block = false,
+  lift = false,
+  arrow = false,
+  className,
+  children,
+  ...rest
+}: LinkButtonProps) {
   return (
     <a
-      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm tap-target", block && "nh-btn--block", "interactive", lift && "lift", className)}
+      className={cx(
+        "nh-btn",
+        `nh-btn--${variant}`,
+        size === "sm" && "nh-btn--sm tap-target",
+        block && "nh-btn--block",
+        "interactive",
+        lift && "lift",
+        className
+      )}
       {...rest}
     >
       {children}
-      {arrow && <span className="nav-arrow" aria-hidden="true">→</span>}
+      {arrow && (
+        <span className="nav-arrow" aria-hidden="true">
+          →
+        </span>
+      )}
     </a>
   );
 }

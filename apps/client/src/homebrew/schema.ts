@@ -7,7 +7,12 @@
  */
 
 import {
-  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS
+  CONDITION_IDS,
+  CREATURE_TYPE_IDS,
+  DAMAGE_TYPE_IDS,
+  MAGIC_SCHOOL_IDS,
+  WEAPON_MASTERY_IDS,
+  WEAPON_PROPERTY_IDS
 } from "@vtt/content-srd-5.2.1/schemas";
 import { setAt } from "./paths";
 import type { HomebrewType } from "./types";
@@ -245,7 +250,10 @@ export function inContainer(
     ...field,
     write: (next: unknown, scope: Draft): Draft => {
       const current = scope[container];
-      const held = current !== null && typeof current === "object" && !Array.isArray(current) ? (current as Record<string, unknown>) : {};
+      const held =
+        current !== null && typeof current === "object" && !Array.isArray(current)
+          ? (current as Record<string, unknown>)
+          : {};
       const leaf = field.key.startsWith(`${container}.`) ? field.key.slice(container.length + 1) : field.key;
       return { ...scope, [container]: setAt({ ...defaults, ...held }, leaf, next) };
     }
@@ -256,13 +264,22 @@ export function inContainer(
     schemas are `.strict()`; `id` and `source` are auto-generated and never shown. */
 export function basicsSection(
   typeWord: string,
-  has: Readonly<{ summary?: boolean; description?: boolean; attribution?: boolean }> = { summary: true, description: true, attribution: true }
+  has: Readonly<{ summary?: boolean; description?: boolean; attribution?: boolean }> = {
+    summary: true,
+    description: true,
+    attribution: true
+  }
 ): SectionDef {
   const fields: FieldDef[] = [{ key: "name", label: "Name", required: true }];
-  if (has.summary) fields.push({ key: "summary", label: "Summary", help: "One line for the pick list.", max: 280, wide: true });
+  if (has.summary)
+    fields.push({ key: "summary", label: "Summary", help: "One line for the pick list.", max: 280, wide: true });
   if (has.description) fields.push({ key: "description", label: "Description", kind: "textarea", wide: true });
   if (has.attribution) {
-    fields.push({ key: "attribution", label: "Attribution", help: `Credit the original author, if this ${typeWord} came from somewhere.` });
+    fields.push({
+      key: "attribution",
+      label: "Attribution",
+      help: `Credit the original author, if this ${typeWord} came from somewhere.`
+    });
   }
   return { id: "basics", title: "Basics", fields };
 }
@@ -276,10 +293,15 @@ export const opt = (value: string, label?: string, group?: string): SelectOption
 });
 
 /** `opt` bound to one `<optgroup>`. */
-export const grouped = (group: string) => (value: string, label?: string): SelectOption => opt(value, label, group);
+export const grouped =
+  (group: string) =>
+  (value: string, label?: string): SelectOption =>
+    opt(value, label, group);
 
 /** Groups consecutive options, preserving declaration order. Ungrouped options come first. */
-export function groupOptions(options: readonly SelectOption[]): ReadonlyArray<Readonly<{ group: string | null; options: readonly SelectOption[] }>> {
+export function groupOptions(
+  options: readonly SelectOption[]
+): ReadonlyArray<Readonly<{ group: string | null; options: readonly SelectOption[] }>> {
   const out: Array<{ group: string | null; options: SelectOption[] }> = [];
   for (const option of options) {
     const group = option.group ?? null;
@@ -319,14 +341,23 @@ export function resolveSuggestions(field: FieldDef, ctx: SchemaContext, draft: D
 export function suggestionLabel(slug: string): string {
   return slug
     .split(":")
-    .map((part) => part.split("-").map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word)).join(" "))
+    .map((part) =>
+      part
+        .split("-")
+        .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
+        .join(" ")
+    )
     .join(": ");
 }
 
 /** Typed `pick` text as a slug: lowercased, whitespace to hyphens, padding around a colon removed
     ("Feature: Divine Order" → `feature:divine-order`). */
 export function pickValue(text: string): string {
-  return text.trim().toLowerCase().replace(/\s*:\s*/g, ":").replace(/\s+/g, "-");
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s*:\s*/g, ":")
+    .replace(/\s+/g, "-");
 }
 
 /** Every visible field of a section, flattened through `group` but not `rows` (row fields belong

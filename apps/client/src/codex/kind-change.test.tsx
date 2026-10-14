@@ -34,21 +34,40 @@ import type { CodexPage } from "./api";
  */
 
 const PAGE = (over: Partial<CodexPage> = {}): CodexPage => ({
-  id: "p1", title: "Strahd von Zarovich", entityType: "character",
-  fields: { role: "Lord of Barovia", status: "Undead" }, gmFields: {},
-  folder: null, tags: [], playerBody: "", gmBody: "", revealedToPlayers: false,
-  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 3, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  id: "p1",
+  title: "Strahd von Zarovich",
+  entityType: "character",
+  fields: { role: "Lord of Barovia", status: "Undead" },
+  gmFields: {},
+  folder: null,
+  tags: [],
+  playerBody: "",
+  gmBody: "",
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 3,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const renderEditor = (page = PAGE()) =>
   (goTo("/codex/pages/p1"), render)(
     <ToastProvider>
       <PageEditor
-        gmToken="gm" page={page} pages={[]} connections={[]}
+        gmToken="gm"
+        page={page}
+        pages={[]}
+        connections={[]}
         autosave={{ enabled: false, intervalSeconds: 1 }}
-        onChange={vi.fn()} onDeleted={vi.fn()} onNavigate={vi.fn()}
-        onConnectionsChanged={vi.fn()} onOpenConnection={vi.fn()}
+        onChange={vi.fn()}
+        onDeleted={vi.fn()}
+        onNavigate={vi.fn()}
+        onConnectionsChanged={vi.fn()}
+        onOpenConnection={vi.fn()}
       />
     </ToastProvider>
   );
@@ -58,8 +77,16 @@ const dialog = () => screen.findByRole("dialog");
 beforeEach(() => {
   // These tests are about the Details panel's contents, so its remembered state is seeded open.
   localStorage.setItem("codex-page-details", "open");
-  getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: false, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 10 } });
-  updatePage.mockImplementation(async (_t: string, _id: string, input: Record<string, unknown>) => ({ ...PAGE(), ...input, rev: 4 }));
+  getSettings.mockResolvedValue({
+    revealWarn: true,
+    autosave: { enabled: false, intervalSeconds: 1 },
+    revisionHistory: { enabled: true, windowMinutes: 10 }
+  });
+  updatePage.mockImplementation(async (_t: string, _id: string, input: Record<string, unknown>) => ({
+    ...PAGE(),
+    ...input,
+    rev: 4
+  }));
   markersForPage.mockResolvedValue([]);
   forPage.mockResolvedValue([]);
 });
@@ -80,7 +107,7 @@ describe("Changing a page's kind (R7)", () => {
 
   it("names the fields at risk when text WOULD be dropped", async () => {
     const user = userEvent.setup();
-    renderEditor();                                   // a character with Role and Status filled in
+    renderEditor(); // a character with Role and Status filled in
     await waitFor(() => expect(getSettings).toHaveBeenCalled());
 
     await user.selectOptions(screen.getByLabelText(/kind/i), "item");
@@ -104,7 +131,11 @@ describe("Changing a page's kind (R7)", () => {
 
   it("SOFTENS the recovery promise when version history is off, rather than repeating it", async () => {
     // With history off there is no snapshot, so the copy must not reassure.
-    getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: false, intervalSeconds: 1 }, revisionHistory: { enabled: false, windowMinutes: 10 } });
+    getSettings.mockResolvedValue({
+      revealWarn: true,
+      autosave: { enabled: false, intervalSeconds: 1 },
+      revisionHistory: { enabled: false, windowMinutes: 10 }
+    });
     const user = userEvent.setup();
     renderEditor();
     await waitFor(() => expect(getSettings).toHaveBeenCalled());

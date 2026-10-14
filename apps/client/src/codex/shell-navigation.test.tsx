@@ -30,14 +30,28 @@ vi.mock("./api", async (importOriginal) => {
     ...actual,
     codexApi: {
       ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a), listFolders: (...a: unknown[]) => listFolders(...a),
-      listConnections: (...a: unknown[]) => listConnections(...a), party: (...a: unknown[]) => party(...a),
-      getPage: (...a: unknown[]) => getPage(...a), getSettings: (...a: unknown[]) => getSettings(...a),
-      search: (...a: unknown[]) => search(...a), markersForPage: (...a: unknown[]) => markersForPage(...a),
-      revealAudit: (...a: unknown[]) => auditList(...a), exportBundle: (...a: unknown[]) => exportBundle(...a)
+      listPages: (...a: unknown[]) => listPages(...a),
+      listFolders: (...a: unknown[]) => listFolders(...a),
+      listConnections: (...a: unknown[]) => listConnections(...a),
+      party: (...a: unknown[]) => party(...a),
+      getPage: (...a: unknown[]) => getPage(...a),
+      getSettings: (...a: unknown[]) => getSettings(...a),
+      search: (...a: unknown[]) => search(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a),
+      revealAudit: (...a: unknown[]) => auditList(...a),
+      exportBundle: (...a: unknown[]) => exportBundle(...a)
     },
-    journalApi: { ...actual.journalApi, chronicle: (...a: unknown[]) => chronicle(...a), forPage: (...a: unknown[]) => forPage(...a) },
-    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: (...a: unknown[]) => listAssets(...a), listMarkers: async () => [] },
+    journalApi: {
+      ...actual.journalApi,
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forPage: (...a: unknown[]) => forPage(...a)
+    },
+    atlasApi: {
+      ...actual.atlasApi,
+      listMaps: (...a: unknown[]) => listMaps(...a),
+      listAssets: (...a: unknown[]) => listAssets(...a),
+      listMarkers: async () => []
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a) },
     questApi: { ...actual.questApi, list: (...a: unknown[]) => listQuests(...a) },
@@ -51,15 +65,29 @@ import { navigate, registerNavigationGuard } from "../router";
 import { CodexShell } from "./CodexShell";
 import { GM_SIDEBAR } from "./routes";
 
-
 const PAGE = {
-  id: "p1", title: "Strahd", entityType: "character" as const, fields: {}, folder: null, tags: ["villain"],
-  revealedToPlayers: false, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  id: "p1",
+  title: "Strahd",
+  entityType: "character" as const,
+  fields: {},
+  folder: null,
+  tags: ["villain"],
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 };
 
 const renderShell = (at: string) =>
-  (goTo(at), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+  (goTo(at), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 
 beforeEach(() => {
   listPages.mockResolvedValue([PAGE]);
@@ -75,7 +103,13 @@ beforeEach(() => {
   forPage.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
   listAssets.mockResolvedValue([]);
-  getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [], currentInstant: 0, publishedInstant: 0 });
+  getCalendar.mockResolvedValue({
+    yearName: "DR",
+    months: [{ name: "Hammer", days: 30 }],
+    weekdays: [],
+    currentInstant: 0,
+    publishedInstant: 0
+  });
   listSessions.mockResolvedValue({ sessions: [], activeSessionId: null });
   listQuests.mockResolvedValue([]);
   listStanding.mockResolvedValue([]);
@@ -169,9 +203,13 @@ describe("The browser's own buttons (D3)", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
 
     window.history.back();
-    await waitFor(() => expect(sidebar.getByRole("button", { name: "Quests" })).toHaveAttribute("aria-current", "page"));
+    await waitFor(() =>
+      expect(sidebar.getByRole("button", { name: "Quests" })).toHaveAttribute("aria-current", "page")
+    );
     window.history.forward();
-    await waitFor(() => expect(sidebar.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page"));
+    await waitFor(() =>
+      expect(sidebar.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page")
+    );
   });
 
   it("does not stack a history entry when the section already open is chosen again", async () => {
@@ -194,7 +232,7 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     const user = userEvent.setup();
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(drawerNav()).toHaveLength(1);        // the closed drawer is hidden from the a11y tree
+    expect(drawerNav()).toHaveLength(1); // the closed drawer is hidden from the a11y tree
 
     await user.click(screen.getByRole("button", { name: "Codex sections" }));
     await waitFor(() => expect(drawerNav()).toHaveLength(2));
@@ -260,7 +298,7 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(window.location.pathname).toBe("/codex/quests");
     await waitFor(() => expect(drawerNav()).toHaveLength(1));
-    release();   // the GM saves, so the guard goes away
+    release(); // the GM saves, so the guard goes away
 
     // One press must now leave the section.
     window.history.back();

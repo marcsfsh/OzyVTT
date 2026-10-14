@@ -27,8 +27,19 @@ import type { JournalEntry } from "./game-store.js";
  */
 export const ENCOUNTER_ARCHIVE_SCHEMA_VERSION = 3;
 
-export type EncounterArchiveTurn = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string; state: GameState }>;
-export type EncounterArchiveDefinition = Readonly<{ id: string; source: "imported" | "bundled"; definition: ActorDefinition }>;
+export type EncounterArchiveTurn = Readonly<{
+  index: number;
+  kind: "turn" | "return";
+  label: string;
+  revision: number;
+  at: string;
+  state: GameState;
+}>;
+export type EncounterArchiveDefinition = Readonly<{
+  id: string;
+  source: "imported" | "bundled";
+  definition: ActorDefinition;
+}>;
 export type EncounterArchiveDocument = Readonly<{
   archiveSchemaVersion: number;
   startedAt: string | null;
@@ -65,7 +76,9 @@ export type BuildEncounterArchiveInput = Readonly<{
 export function buildEncounterArchive(input: BuildEncounterArchiveInput): EncounterArchiveDocument {
   const turns = input.entries.flatMap((entry): EncounterArchiveTurn[] => {
     const state = input.readState(entry.index);
-    return state ? [{ index: entry.index, kind: entry.kind, label: entry.label, revision: entry.revision, at: entry.at, state }] : [];
+    return state
+      ? [{ index: entry.index, kind: entry.kind, label: entry.label, revision: entry.revision, at: entry.at, state }]
+      : [];
   });
   const states = [...turns.map((turn) => turn.state), input.finalState];
   // The live state keeps a rolling window of rolls; the union across all boundaries keeps the full record.
@@ -78,9 +91,13 @@ export function buildEncounterArchive(input: BuildEncounterArchiveInput): Encoun
     for (const actor of state.actors) {
       if (!actor.definitionId || definitions.has(actor.definitionId)) continue;
       const imported = state.definitions.find((entry) => entry.id === actor.definitionId)?.definition;
-      if (imported) { definitions.set(actor.definitionId, { id: actor.definitionId, source: "imported", definition: imported }); continue; }
+      if (imported) {
+        definitions.set(actor.definitionId, { id: actor.definitionId, source: "imported", definition: imported });
+        continue;
+      }
       const bundled = input.resolveBundledDefinition(actor.definitionId);
-      if (bundled) definitions.set(actor.definitionId, { id: actor.definitionId, source: "bundled", definition: bundled });
+      if (bundled)
+        definitions.set(actor.definitionId, { id: actor.definitionId, source: "bundled", definition: bundled });
     }
   }
   const includesBundled = [...definitions.values()].some((entry) => entry.source === "bundled");

@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { io as connect, type Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
-import { BuilderPolicySchema, GameStateSchema, type Actor, type CombatLogEntry, type GameState, type MutationResult } from "@vtt/domain";
+import {
+  BuilderPolicySchema,
+  GameStateSchema,
+  type Actor,
+  type CombatLogEntry,
+  type GameState,
+  type MutationResult
+} from "@vtt/domain";
 import { loadWeapons } from "@vtt/content-srd-5.2.1";
 import { EffectInstanceSchema, InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
@@ -43,15 +50,25 @@ const IDS = {
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 type Row = CharacterCreateRequestInput["choices"][number];
-type MutableInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & { choices: Row[] };
+type MutableInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
+  choices: Row[];
+};
 
 // A level-3 Halfling Champion whose three mastery picks are each test's parameter (Str 17, proficiency 2).
 // At level 5 Extra Attack gives two swings, Str is 19 and proficiency 3, so a mastery DC moves to 15.
 const fighter = (masteries: readonly string[], level: 3 | 5 = 3): MutableInput => ({
-  name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level,
-  subclassId: "champion", abilityMethod: "standard-array",
+  name: "Borin",
+  speciesId: "halfling",
+  backgroundId: "soldier",
+  classId: "fighter",
+  level,
+  subclassId: "champion",
+  abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
@@ -60,11 +77,11 @@ const fighter = (masteries: readonly string[], level: 3 | 5 = 3): MutableInput =
     ...masteries.slice(0, 3).map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id }) as Row),
     ...masteries.slice(3).map((id) => ({ level: 4, classId: "fighter", kind: "weapon-mastery", id }) as Row),
     ...(level === 5
-      ? [
+      ? ([
           { level: 4, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
           { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
           { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } }
-        ] as Row[]
+        ] as Row[])
       : []),
     { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
     { level: 1, kind: "language", id: "dwarvish" },
@@ -77,14 +94,27 @@ const fighter = (masteries: readonly string[], level: 3 | 5 = 3): MutableInput =
 
 /** A foe that can swing back, so Sap is proved on the die the target rolls. */
 const FOE_DEFINITION = {
-  schemaId: "vtt.actor-character", schemaVersion: 1,
+  schemaId: "vtt.actor-character",
+  schemaVersion: 1,
   source: { name: "test", version: "1" },
-  name: "Foe", size: "medium",
+  name: "Foe",
+  size: "medium",
   abilityScores: { str: 16, dex: 12, con: 14, int: 6, wis: 10, cha: 6 },
-  proficiencyBonus: 2, armorClass: 13,
+  proficiencyBonus: 2,
+  armorClass: 13,
   hitPoints: { maximum: 200, formula: "20d10" },
-  initiativeBonus: 1, speedFeet: 30,
-  actions: [{ id: "claw", name: "Claw", activation: "action", description: "A claw.", attack: { bonus: 5, reachFeet: 5 }, damage: [{ formula: "1d6 + 3", type: "slashing" }] }],
+  initiativeBonus: 1,
+  speedFeet: 30,
+  actions: [
+    {
+      id: "claw",
+      name: "Claw",
+      activation: "action",
+      description: "A claw.",
+      attack: { bonus: 5, reachFeet: 5 },
+      damage: [{ formula: "1d6 + 3", type: "slashing" }]
+    }
+  ],
   token: { disposition: "hostile", footprint: { width: 1, height: 1 } },
   extensions: {}
 } as unknown as ActorDefinition;
@@ -98,27 +128,53 @@ function weaponRow(weaponId: string): InventoryItem {
   if (!record?.weapon) throw new Error(`${weaponId} is not a catalog weapon`);
   // Parsed rather than cast, so a row that drifted from the bundle's shape fails here.
   return InventoryItemSchema.parse({
-    id: weaponId, name: record.name, quantity: 1, equipped: true, attuned: false, category: record.category,
+    id: weaponId,
+    name: record.name,
+    quantity: 1,
+    equipped: true,
+    attuned: false,
+    category: record.category,
     weapon: {
-      category: record.weapon.category, damageDice: record.weapon.damageDice, damageType: record.weapon.damageType,
-      rangeFeet: record.weapon.rangeFeet, longRangeFeet: record.weapon.longRangeFeet,
+      category: record.weapon.category,
+      damageDice: record.weapon.damageDice,
+      damageType: record.weapon.damageType,
+      rangeFeet: record.weapon.rangeFeet,
+      longRangeFeet: record.weapon.longRangeFeet,
       ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {})
     }
   });
 }
 
-function table(masteries: readonly string[], extraWeaponIds: readonly string[] = [], geometry: TokenMapGeometry = GEOMETRY, level: 3 | 5 = 3): Built {
+function table(
+  masteries: readonly string[],
+  extraWeaponIds: readonly string[] = [],
+  geometry: TokenMapGeometry = GEOMETRY,
+  level: 3 | 5 = 3
+): Built {
   const built = buildCharacterDefinition(fighter(masteries, level) as CharacterCreateRequestInput, view, POLICY);
-  const definition = extraWeaponIds.length === 0
-    ? built
-    : { ...built, startingInventory: [...built.startingInventory ?? [], ...extraWeaponIds.map(weaponRow)] };
+  const definition =
+    extraWeaponIds.length === 0
+      ? built
+      : { ...built, startingInventory: [...(built.startingInventory ?? []), ...extraWeaponIds.map(weaponRow)] };
   const state = GameStateSchema.parse({ schemaVersion: 1, actors: [] }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
   importActorDefinition(state, FOE_DEFINITION, IDS.foe, "public", catalog);
   // The hero acts first, so `until-source-next-turn` has not yet expired when the foe swings back.
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, geometry);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.hero, score: 20 },
+        { actorId: IDS.foe, score: 10 }
+      ]
+    },
+    () => 1,
+    geometry
+  );
   return {
-    definition, state,
+    definition,
+    state,
     hero: state.actors.find((actor) => actor.id === IDS.hero)!,
     foe: state.actors.find((actor) => actor.id === IDS.foe)!
   };
@@ -130,11 +186,18 @@ let command = 0;
 let rollId = 0;
 function deps(built: Built, definition: ActorDefinition, faces: number[]): ResolveDependencies {
   return {
-    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
     newRollId: () => `40000000-0000-4000-8000-${String(++rollId).padStart(12, "0")}`,
-    gmSessionId: IDS.gmSession, now: () => "2026-08-08T00:00:00.000Z",
-    definition, catalog,
-    resolveDefinition: (definitionId: string) => built.state.definitions.find((entry) => entry.id === definitionId)?.definition
+    gmSessionId: IDS.gmSession,
+    now: () => "2026-08-08T00:00:00.000Z",
+    definition,
+    catalog,
+    resolveDefinition: (definitionId: string) =>
+      built.state.definitions.find((entry) => entry.id === definitionId)?.definition
   };
 }
 
@@ -142,7 +205,11 @@ const swing = (built: Built, actionId: string, faces: number[]) =>
   resolveDefinitionAction(
     built.state,
     effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === actionId)!,
-    { actorId: IDS.hero, targetIds: [IDS.foe], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
+    {
+      actorId: IDS.hero,
+      targetIds: [IDS.foe],
+      commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+    },
     deps(built, built.definition, faces)
   );
 
@@ -151,7 +218,11 @@ const swingBack = (built: Built, faces: number[]) =>
   resolveDefinitionAction(
     built.state,
     FOE_DEFINITION.actions.find((action) => action.id === "claw")!,
-    { actorId: IDS.foe, targetIds: [IDS.hero], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
+    {
+      actorId: IDS.foe,
+      targetIds: [IDS.hero],
+      commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+    },
     deps(built, FOE_DEFINITION, faces)
   );
 
@@ -160,16 +231,36 @@ describe("every SRD weapon names its mastery", () => {
     const weapons = loadWeapons();
     expect(weapons).toHaveLength(38);
     expect(weapons.filter((weapon) => weapon.mastery === undefined)).toEqual([]);
-    expect([...new Set(weapons.map((weapon) => weapon.mastery))].sort())
-      .toEqual(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]);
+    expect([...new Set(weapons.map((weapon) => weapon.mastery))].sort()).toEqual([
+      "cleave",
+      "graze",
+      "nick",
+      "push",
+      "sap",
+      "slow",
+      "topple",
+      "vex"
+    ]);
     // Spot-checks off the printed table, one per property, so a wholesale mis-mapping cannot pass.
     const of = (id: string) => weapons.find((weapon) => weapon.id === id)?.mastery;
     expect({
-      greataxe: of("greataxe"), greatsword: of("greatsword"), dagger: of("dagger"), greatclub: of("greatclub"),
-      mace: of("mace"), club: of("club"), quarterstaff: of("quarterstaff"), rapier: of("rapier")
+      greataxe: of("greataxe"),
+      greatsword: of("greatsword"),
+      dagger: of("dagger"),
+      greatclub: of("greatclub"),
+      mace: of("mace"),
+      club: of("club"),
+      quarterstaff: of("quarterstaff"),
+      rapier: of("rapier")
     }).toEqual({
-      greataxe: "cleave", greatsword: "graze", dagger: "nick", greatclub: "push",
-      mace: "sap", club: "slow", quarterstaff: "topple", rapier: "vex"
+      greataxe: "cleave",
+      greatsword: "graze",
+      dagger: "nick",
+      greatclub: "push",
+      mace: "sap",
+      club: "slow",
+      quarterstaff: "topple",
+      rapier: "vex"
     });
   });
 });
@@ -178,7 +269,11 @@ describe("every SRD weapon names its mastery", () => {
 
 describe("a mastery reaches a swing only when the character unlocked THAT weapon", () => {
   it("arms the greatsword for a Fighter who picked it, and leaves the flail alone", () => {
-    const picked = deriveEquipment(table(["greatsword", "longbow", "rapier"]).hero, table(["greatsword", "longbow", "rapier"]).definition, catalog);
+    const picked = deriveEquipment(
+      table(["greatsword", "longbow", "rapier"]).hero,
+      table(["greatsword", "longbow", "rapier"]).definition,
+      catalog
+    );
     expect(picked.masteryByActionId["item-greatsword"]).toEqual({ id: "graze", abilityModifier: 3 });
     // The flail is equipped and has a mastery (sap), but it is not one of this Fighter's three.
     expect(picked.masteryByActionId["item-flail"]).toBeUndefined();
@@ -195,7 +290,9 @@ describe("a mastery reaches a swing only when the character unlocked THAT weapon
     // The shortbow is held, legally picked and recorded; only the unimplemented Vex leaves it unarmed. The
     // greataxe and scimitar are unheld picks, showing picks are unrestricted.
     const built = table(["shortbow", "greataxe", "scimitar"]);
-    expect(effectiveActions(built.definition, built.hero, catalog).some((action) => action.id === "item-shortbow")).toBe(true);
+    expect(
+      effectiveActions(built.definition, built.hero, catalog).some((action) => action.id === "item-shortbow")
+    ).toBe(true);
     const derivation = deriveEquipment(built.hero, built.definition, catalog);
     expect(derivation.masteryByActionId).toEqual({});
   });
@@ -248,7 +345,9 @@ describe("Sap makes the target's next attack roll worse", () => {
     const built = table(["flail", "longbow", "rapier"]);
     const hit = swing(built, "item-flail", [15, 5]);
     expect(hit.attack?.outcome).toBe("hit");
-    expect(hit.effectsApplied).toEqual([{ targetId: IDS.foe, targetName: "Foe", name: "Sapped by Borin", conditionIds: [] }]);
+    expect(hit.effectsApplied).toEqual([
+      { targetId: IDS.foe, targetName: "Foe", name: "Sapped by Borin", conditionIds: [] }
+    ]);
     // On the actor, not just in the response: this is what survives to the foe's turn.
     const sapped = built.state.actors.find((actor) => actor.id === IDS.foe)!;
     expect(sapped.effects.map((effect) => effect.name)).toEqual(["Sapped by Borin"]);
@@ -284,15 +383,30 @@ describe("Sap makes the target's next attack roll worse", () => {
 
 /** The GM answering the foe's save. The foe's definition is the imported one, so its CON is read off the sheet. */
 const saveDeps = (built: Built, faces: number[]): SaveAnswerDependencies => ({
-  random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
-  newRollId: () => `40000000-0000-4000-8000-0000000000ff`, sessionId: IDS.gmSession, role: "gm",
+  random: () => {
+    const face = faces.shift();
+    if (face === undefined) throw new Error("dice queue empty");
+    return face;
+  },
+  newRollId: () => `40000000-0000-4000-8000-0000000000ff`,
+  sessionId: IDS.gmSession,
+  role: "gm",
   now: () => "2026-08-08T00:00:00.000Z",
-  resolveDefinition: (definitionId: string) => built.state.definitions.find((entry) => entry.id === definitionId)?.definition,
+  resolveDefinition: (definitionId: string) =>
+    built.state.definitions.find((entry) => entry.id === definitionId)?.definition,
   catalog
 });
 const answer = (built: Built, faces: number[]) =>
-  answerSave(built.state, `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
-    built.state.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, saveDeps(built, faces));
+  answerSave(
+    built.state,
+    `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+    built.state.combat.pendingSaves[0].id,
+    "roll",
+    undefined,
+    true,
+    { role: "gm" },
+    saveDeps(built, faces)
+  );
 
 describe("Topple forces a Constitution save, and a failure lands Prone", () => {
   it("parks the save at DC 13 and the foe's own failed die puts Prone in its conditions", () => {
@@ -302,14 +416,28 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     expect(hit.attack?.outcome).toBe("hit");
     // A real prompt in the tracker: the ability, the DC and the condition a failure imposes are on it,
     // and it carries no damage (Topple deals none).
-    expect(built.state.combat.pendingSaves).toMatchObject([{
-      targetActorId: IDS.foe, ability: "con", dc: 13, conditionId: "prone",
-      proposedDamage: 0, halfOnSuccess: false, actionName: "Topple", sourceName: "Borin"
-    }]);
+    expect(built.state.combat.pendingSaves).toMatchObject([
+      {
+        targetActorId: IDS.foe,
+        ability: "con",
+        dc: 13,
+        conditionId: "prone",
+        proposedDamage: 0,
+        halfOnSuccess: false,
+        actionName: "Topple",
+        sourceName: "Borin"
+      }
+    ]);
     // Two sentences, split by what may cross: the GM's keeps the DC; the table's names what forced the
     // save and carries no number, because the DC is the attacker's.
     expect(hit.warnings).toContain("Topple: Foe's save is DC 13 - the prompt is in the turn order.");
-    expect(hit.tableNarration).toEqual([{ kind: "save", text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.tableNarration).toEqual([
+      {
+        kind: "save",
+        text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
+        actorIds: [IDS.hero, IDS.foe]
+      }
+    ]);
     expect(JSON.stringify(hit.tableNarration)).not.toContain("13");
 
     // The foe rolls its own Constitution save (CON 14 -> +2) and 5 + 2 = 7 is under 13.
@@ -331,13 +459,21 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     // Level 5: two swings, DC 15. The SRD puts no once-per-turn limit on Topple, so two hits owe two saves
     // even though both share the prompt's dedupe key.
     const built = table(["quarterstaff", "longbow", "rapier", "flail"], ["quarterstaff"], GEOMETRY, 5);
-    const staff = effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-quarterstaff")!;
+    const staff = effectiveActions(built.definition, built.hero, catalog).find(
+      (action) => action.id === "item-quarterstaff"
+    )!;
     expect(staff.attack?.count).toBe(2);
     const first = swing(built, "item-quarterstaff", [15, 3]);
     const second = swing(built, "item-quarterstaff", [15, 3]);
     expect([first.attack?.outcome, second.attack?.outcome]).toEqual(["hit", "hit"]);
     expect(second.warnings).toContain("Topple: Foe's save is DC 15 - the prompt is in the turn order.");
-    expect(second.tableNarration).toEqual([{ kind: "save", text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(second.tableNarration).toEqual([
+      {
+        kind: "save",
+        text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
+        actorIds: [IDS.hero, IDS.foe]
+      }
+    ]);
     // Two live rows in the tracker: the second hit parks beside the first instead of evicting it.
     expect(built.state.combat.pendingSaves).toMatchObject([
       { targetActorId: IDS.foe, ability: "con", dc: 15, conditionId: "prone", actionName: "Topple" },
@@ -374,20 +510,28 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
 // A calibrated battlemap: 50 px cells worth 5 ft each, so 10 feet is two cells. Odd footprints snap to
 // cell centres, so every position is an odd multiple of 25.
 const GRID = {
-  width: 900, height: 600,
+  width: 900,
+  height: 600,
   calibration: { kind: "square", origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 }
 } as const satisfies TokenMapGeometry;
 
 /** Cell (column, row) → its centre in image pixels, so the fixtures read as squares rather than pixels. */
 const cell = (column: number, row: number) => ({ x: (column + 0.5) * 50, y: (row + 0.5) * 50 });
 
-function battlefield(masteries: readonly string[], extraWeaponIds: readonly string[], hero: { x: number; y: number }, foe: { x: number; y: number }, level: 3 | 5 = 3): Built {
+function battlefield(
+  masteries: readonly string[],
+  extraWeaponIds: readonly string[],
+  hero: { x: number; y: number },
+  foe: { x: number; y: number },
+  level: 3 | 5 = 3
+): Built {
   const built = table(masteries, extraWeaponIds, GRID, level);
   moveEncounterToken(built.state, IDS.hero, hero, GRID);
   moveEncounterToken(built.state, IDS.foe, foe, GRID);
   return built;
 }
-const positionOf = (built: Built, actorId: string) => built.state.combat.tokens.find((token) => token.actorId === actorId)!.position;
+const positionOf = (built: Built, actorId: string) =>
+  built.state.combat.tokens.find((token) => token.actorId === actorId)!.position;
 
 // The same swing plus the geometry callback. `wired` mirrors what `game-operations.ts` hands the
 // resolver; `wired: false` is how `reactions.ts` resolves.
@@ -395,14 +539,23 @@ const pushSwing = (built: Built, actionId: string, faces: number[], wired = true
   resolveDefinitionAction(
     built.state,
     effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === actionId)!,
-    { actorId: IDS.hero, targetIds: [IDS.foe], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
-    { ...deps(built, built.definition, faces), ...(wired ? { pushToken: (input) => pushTokenAway(built.state, input, geometry) } : {}) }
+    {
+      actorId: IDS.hero,
+      targetIds: [IDS.foe],
+      commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+    },
+    {
+      ...deps(built, built.definition, faces),
+      ...(wired ? { pushToken: (input) => pushTokenAway(built.state, input, geometry) } : {})
+    }
   );
 
 // A map with no grid, just a saved image scale (`saveScale` in `map-catalog.ts`, `calibration` null).
 // 5 ft every 12 px, so 10 feet is 24 px; nothing rounds the landing point, so an inverted ratio shows.
 const SCALED = {
-  width: 900, height: 600, calibration: null,
+  width: 900,
+  height: 600,
+  calibration: null,
   scale: { kind: "image-scale", distancePerPixel: 5 / 12, unit: "ft" }
 } as const satisfies TokenMapGeometry;
 
@@ -424,7 +577,9 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(after.x).toBeGreaterThan(before.x);
     expect(reachBefore).toEqual({ value: 5, unit: "ft" });
     expect(tokenCreatureDistance(built.state, GRID, IDS.hero, IDS.foe)).toEqual({ value: 15, unit: "ft" });
-    expect(hit.tableNarration).toEqual([{ kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.tableNarration).toEqual([
+      { kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }
+    ]);
     expect(hit.warnings).toBeUndefined();
   });
 
@@ -442,7 +597,9 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(after).toEqual(cell(7, 4));
     // The snap did not cost the push its distance: still exactly 10 ft by the table's measure.
     expect(mapDistance(GRID, before, after)).toEqual({ value: 10, unit: "ft" });
-    expect(hit.tableNarration).toEqual([{ kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.tableNarration).toEqual([
+      { kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }
+    ]);
     expect(hit.warnings).toBeUndefined();
   });
 
@@ -458,7 +615,9 @@ describe("Push moves the target's token 10 feet straight away", () => {
     // 24 px further along the line, which is 10 ft at 5 ft per 12 px.
     expect(positionOf(built, IDS.foe)).toEqual({ x: 354, y: 300 });
     expect(mapDistance(SCALED, before, positionOf(built, IDS.foe)!)).toEqual({ value: 10, unit: "ft" });
-    expect(hit.tableNarration).toEqual([{ kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }]);
+    expect(hit.tableNarration).toEqual([
+      { kind: "movement", text: "Foe is pushed 10 ft straight away from Borin.", actorIds: [IDS.hero, IDS.foe] }
+    ]);
     expect(hit.warnings).toBeUndefined();
   });
 
@@ -499,7 +658,11 @@ describe("Push moves the target's token 10 feet straight away", () => {
     const hit = resolveDefinitionAction(
       built.state,
       effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-warhammer")!,
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+      },
       { ...deps(built, built.definition, [15, 4]), pushToken: (input) => pushTokenAway(built.state, input, GEOMETRY) }
     );
     expect(hit.attack?.outcome).toBe("hit");
@@ -530,7 +693,9 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.damageTotal).toBe(7);
 
     expect(positionOf(built, IDS.foe)).toEqual(before);
-    expect(hit.warnings).toContain("Foe is pushed straight away from Borin, but the map has nowhere to put it - the token stays where it is.");
+    expect(hit.warnings).toContain(
+      "Foe is pushed straight away from Borin, but the map has nowhere to put it - the token stays where it is."
+    );
     expect(hit.warnings).not.toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
   });
 
@@ -554,11 +719,16 @@ let slowPrompt = 0;
 const foeMoves = (built: Built, cells: number) => {
   const from = positionOf(built, IDS.foe)!;
   return applyMovementRules(built.state, {
-    actorId: IDS.foe, from, to: { x: from.x + cells * 50, y: from.y }, override: null,
+    actorId: IDS.foe,
+    from,
+    to: { x: from.x + cells * 50, y: from.y },
+    override: null,
     distance: (a, b) => mapDistance(GRID, a, b)?.value ?? null,
-    resolveDefinition: (definitionId: string) => built.state.definitions.find((entry) => entry.id === definitionId)?.definition,
+    resolveDefinition: (definitionId: string) =>
+      built.state.definitions.find((entry) => entry.id === definitionId)?.definition,
     newPromptId: () => `70000000-0000-4000-8000-${String(++slowPrompt).padStart(12, "0")}`,
-    now: () => 0, commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+    now: () => 0,
+    commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
   });
 };
 
@@ -569,7 +739,9 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
     const hit = swing(built, "item-javelin", [15, 4]);
     expect(hit.attack?.outcome).toBe("hit");
-    expect(hit.effectsApplied).toEqual([{ targetId: IDS.foe, targetName: "Foe", name: "Slowed by Borin", conditionIds: [] }]);
+    expect(hit.effectsApplied).toEqual([
+      { targetId: IDS.foe, targetName: "Foe", name: "Slowed by Borin", conditionIds: [] }
+    ]);
 
     const slowed = built.state.actors.find((actor) => actor.id === IDS.foe)!;
     expect(slowed.effects.map((effect) => effect.name)).toEqual(["Slowed by Borin"]);
@@ -632,7 +804,10 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     // `addEffect` replaces a grant from the same source actor and action in place.
     const built = battlefield(["javelin", "longbow", "rapier", "flail"], [], cell(2, 2), cell(3, 2), 5);
     // Str 19 (+4) + proficiency 3 = +7 to hit; a natural 15 is 22 against AC 13.
-    expect(effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-javelin")!.attack?.count).toBe(2);
+    expect(
+      effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-javelin")!.attack
+        ?.count
+    ).toBe(2);
     expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
     expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
     const slowed = built.state.actors.find((actor) => actor.id === IDS.foe)!;
@@ -675,11 +850,22 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     // Control: a homebrew curse is not a Slow, so it carries its own key and the two sum: 30 - 10 - 5 = 15.
     const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
     expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
-    addEffect(built.state, IDS.foe, EffectInstanceSchema.parse({
-      id: "curse-1", name: "Clinging Tar", tags: [], sourceActorId: null, sourceName: null, sourceActionId: "tar",
-      startedRound: 1, duration: { type: "encounter" }, stackKey: "homebrew:tar",
-      modifiers: [{ type: "speed", amount: -5 }]
-    }));
+    addEffect(
+      built.state,
+      IDS.foe,
+      EffectInstanceSchema.parse({
+        id: "curse-1",
+        name: "Clinging Tar",
+        tags: [],
+        sourceActorId: null,
+        sourceName: null,
+        sourceActionId: "tar",
+        startedRound: 1,
+        duration: { type: "encounter" },
+        stackKey: "homebrew:tar",
+        modifiers: [{ type: "speed", amount: -5 }]
+      })
+    );
 
     nextInitiativeTurn(built.state);
     expect(() => foeMoves(built, 4)).toThrow("Foe has 15 ft of movement left (this move needs 20 ft).");
@@ -699,7 +885,9 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     nextInitiativeTurn(built.state);
     expect(built.state.combat.turnActorId).toBe(IDS.foe);
     expect(() => foeMoves(built, 5)).toThrow("Foe has 20 ft of movement left (this move needs 25 ft).");
-    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects.map((effect) => effect.name)).toEqual(["Slowed by Borin"]);
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects.map((effect) => effect.name)).toEqual([
+      "Slowed by Borin"
+    ]);
 
     // ...and the dying attacker's turn begins anyway, which is where the feet come back.
     nextInitiativeTurn(built.state);
@@ -714,7 +902,9 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
 // The off-turn swing, where a mastery that cannot be applied must be narrated.
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
 type FeedLine = Readonly<{ kind: string; text: string; gmOnly?: boolean; actorIds?: readonly string[] }>;
 
@@ -724,26 +914,41 @@ async function operationsFor(built: Built, duringGeometryFetch?: (live: GameStor
   const directory = await mkdtemp(join(tmpdir(), "vtt-mastery-reaction-"));
   const store = new GameStore(join(directory, "game.sqlite"), built.state);
   await store.initialize();
-  cleanups.push(async () => { await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    await rm(directory, { recursive: true, force: true });
+  });
   const logged: FeedLine[] = [];
   const broadcast: FeedLine[] = [];
-  const unused = () => { throw new Error("answering a reaction must not touch this"); };
+  const unused = () => {
+    throw new Error("answering a reaction must not touch this");
+  };
   const operations = createGameOperations({
-    store, contentLibrary: new ContentLibrary(),
+    store,
+    contentLibrary: new ContentLibrary(),
     combatLog: { append: () => {} },
     mapCatalog: { get: () => undefined },
     tokenCatalog: { get: () => undefined, touchLastUsed: () => {}, rememberForDefinition: () => {} },
     // The real one is a file read that `actionResolve` awaits outside the command queue, so this hook can
     // commit another command in that window.
-    tokenGeometryFor: async () => { if (duringGeometryFetch) await duringGeometryFetch(store); return GRID; },
+    tokenGeometryFor: async () => {
+      if (duringGeometryFetch) await duringGeometryFetch(store);
+      return GRID;
+    },
     publishGameState: async () => {},
     presentSceneMap: async () => {},
-    broadcastTableEvent: (event: FeedLine) => { broadcast.push({ kind: event.kind, text: event.text, gmOnly: event.gmOnly }); },
+    broadcastTableEvent: (event: FeedLine) => {
+      broadcast.push({ kind: event.kind, text: event.text, gmOnly: event.gmOnly });
+    },
     // `actorIds` is captured because the real `appendLog` (`server.ts`) makes a row GM-only when any
     // combatant it names is hidden.
-    appendLog: (entry: FeedLine) => { logged.push({ kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly, actorIds: entry.actorIds }); },
-    logTurnBegin: () => {}, logTimelineOutcome: () => {}, scheduleAnnotationExpiry: () => {},
-    gmView: unused, playerView: unused,
+    appendLog: (entry: FeedLine) => {
+      logged.push({ kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly, actorIds: entry.actorIds });
+    },
+    logTurnBegin: () => {},
+    logTimelineOutcome: () => {},
+    scheduleAnnotationExpiry: () => {},
+    gmView: unused,
+    playerView: unused,
     // Every die the swing rolls after `attackNatural` pins the d20: the pike's damage.
     random: () => 4,
     newId: () => randomUUID()
@@ -756,12 +961,24 @@ function parkOpportunityAttack(built: Built): string {
   const id = "60000000-0000-4000-8000-000000000001";
   built.state.combat = {
     ...built.state.combat,
-    pendingReactions: [...built.state.combat.pendingReactions, {
-      id, kind: "leaves-reach" as const, actorId: IDS.hero, actionId: "opportunity-attack", actionName: "Opportunity Attack",
-      sourceActorId: IDS.foe, sourceName: "Foe", targetActorId: IDS.foe,
-      triggerCommandId: "50000000-0000-4000-8000-0000000000ff",
-      proposedDamage: 0, proposedDamageParts: [], critical: false, createdAt: 0
-    }]
+    pendingReactions: [
+      ...built.state.combat.pendingReactions,
+      {
+        id,
+        kind: "leaves-reach" as const,
+        actorId: IDS.hero,
+        actionId: "opportunity-attack",
+        actionName: "Opportunity Attack",
+        sourceActorId: IDS.foe,
+        sourceName: "Foe",
+        targetActorId: IDS.foe,
+        triggerCommandId: "50000000-0000-4000-8000-0000000000ff",
+        proposedDamage: 0,
+        proposedDamageParts: [],
+        critical: false,
+        createdAt: 0
+      }
+    ]
   };
   return id;
 }
@@ -776,18 +993,32 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
 
     // +5 to hit vs AC 13, so a pinned natural 18 lands.
-    await operations.reactionAnswer({ kind: "gm", sessionId: IDS.gmSession }, {
-      commandId: randomUUID(), reactionId, use: true, actionId: "item-pike", commit: true, attackNatural: 18
-    });
+    await operations.reactionAnswer(
+      { kind: "gm", sessionId: IDS.gmSession },
+      {
+        commandId: randomUUID(),
+        reactionId,
+        use: true,
+        actionId: "item-pike",
+        commit: true,
+        attackNatural: 18
+      }
+    );
 
     // A GM-only feed row naming the push the engine could not perform.
     expect(logged).toContainEqual({
-      kind: "action", gmOnly: true, actorIds: [IDS.hero],
+      kind: "action",
+      gmOnly: true,
+      actorIds: [IDS.hero],
       text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
     });
     // ...and the swing itself still hit and narrated, and the token did not move, so the sentence is an
     // instruction rather than a report.
-    expect(broadcast.some((line) => line.kind === "reaction" && line.text.includes("made an opportunity attack against Foe - HIT"))).toBe(true);
+    expect(
+      broadcast.some(
+        (line) => line.kind === "reaction" && line.text.includes("made an opportunity attack against Foe - HIT")
+      )
+    ).toBe(true);
     expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(before);
   });
 
@@ -802,14 +1033,23 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     });
     const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
 
-    await operations.actionResolve({ kind: "gm", sessionId: IDS.gmSession }, {
-      commandId: randomUUID(), actorId: IDS.hero, actionId: "item-warhammer", targetIds: [IDS.foe], attackNatural: 18
-    });
+    await operations.actionResolve(
+      { kind: "gm", sessionId: IDS.gmSession },
+      {
+        commandId: randomUUID(),
+        actorId: IDS.hero,
+        actionId: "item-warhammer",
+        targetIds: [IDS.foe],
+        attackNatural: 18
+      }
+    );
 
     // The foe stands where it stood, and the GM is told to place it by hand.
     expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(before);
     expect(logged).toContainEqual({
-      kind: "action", gmOnly: true, actorIds: [IDS.hero],
+      kind: "action",
+      gmOnly: true,
+      actorIds: [IDS.hero],
       text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
     });
   });
@@ -818,14 +1058,26 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
     const { operations, store, logged } = await operationsFor(built);
 
-    await operations.actionResolve({ kind: "gm", sessionId: IDS.gmSession }, {
-      commandId: randomUUID(), actorId: IDS.hero, actionId: "item-warhammer", targetIds: [IDS.foe], attackNatural: 18
-    });
+    await operations.actionResolve(
+      { kind: "gm", sessionId: IDS.gmSession },
+      {
+        commandId: randomUUID(),
+        actorId: IDS.hero,
+        actionId: "item-warhammer",
+        targetIds: [IDS.foe],
+        attackNatural: 18
+      }
+    );
 
     expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(5, 2));
     // ...and the sentence is a `movement` row naming both combatants with no gmOnly of its own, so the
     // feed's gate decides, as with `narrateTokenMove`'s public half.
-    expect(logged).toContainEqual({ kind: "movement", gmOnly: undefined, actorIds: [IDS.hero, IDS.foe], text: "Foe is pushed 10 ft straight away from Borin." });
+    expect(logged).toContainEqual({
+      kind: "movement",
+      gmOnly: undefined,
+      actorIds: [IDS.hero, IDS.foe],
+      text: "Foe is pushed 10 ft straight away from Borin."
+    });
     // One moment, one row: it did not also print as a rules note.
     expect(logged.filter((line) => line.text.includes("pushed 10 ft"))).toHaveLength(1);
   });
@@ -835,9 +1087,17 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     const reactionId = parkOpportunityAttack(built);
     const { operations, logged } = await operationsFor(built);
 
-    await operations.reactionAnswer({ kind: "gm", sessionId: IDS.gmSession }, {
-      commandId: randomUUID(), reactionId, use: true, actionId: "item-pike", commit: false, attackNatural: 18
-    });
+    await operations.reactionAnswer(
+      { kind: "gm", sessionId: IDS.gmSession },
+      {
+        commandId: randomUUID(),
+        reactionId,
+        use: true,
+        actionId: "item-pike",
+        commit: false,
+        attackNatural: 18
+      }
+    );
     expect(logged.filter((line) => line.text.startsWith("Rules note:"))).toEqual([]);
   });
 });
@@ -851,7 +1111,10 @@ const LURKER = "10000000-0000-4000-8000-000000000003";
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8); buffer.write("IHDR", 12, "ascii"); buffer.writeUInt32BE(width, 16); buffer.writeUInt32BE(height, 20);
+  buffer.writeUInt32BE(13, 8);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
   return buffer;
 }
 
@@ -859,10 +1122,18 @@ async function joinSocket(base: string, token: string) {
   const socket = connect(base, { auth: { token }, transports: ["websocket"], reconnection: false, forceNew: true });
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Socket connection timed out.")), 5_000);
-    socket.once("connect", () => { clearTimeout(timeout); resolve(); });
-    socket.once("connect_error", (error) => { clearTimeout(timeout); reject(error); });
+    socket.once("connect", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    socket.once("connect_error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
   });
-  const joined = await new Promise<{ ok: boolean; message?: string }>((resolve) => socket.emit("session:join", { token }, resolve));
+  const joined = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
+    socket.emit("session:join", { token }, resolve)
+  );
   if (!joined.ok) throw new Error(joined.message ?? "Session join failed.");
   return socket;
 }
@@ -877,14 +1148,22 @@ async function heardLine(heard: readonly CombatLogEntry[], matches: (text: strin
     if (found) return found;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  throw new Error(`The player socket never received ${what}. It heard: ${JSON.stringify(heard.map((entry) => entry.text))}`);
+  throw new Error(
+    `The player socket never received ${what}. It heard: ${JSON.stringify(heard.map((entry) => entry.text))}`
+  );
 }
 
 // The fixture battlefield plus a combatant the GM has not revealed. The stalker is present in every
 // test, so a feed row leaking its name fails the push and topple tests too.
 function hiddenAmongThem(masteries: readonly string[], extraWeaponIds: readonly string[]): Built {
   const built = battlefield(masteries, extraWeaponIds, cell(2, 2), cell(3, 2));
-  importActorDefinition(built.state, { ...FOE_DEFINITION, name: "Unseen Stalker" } as ActorDefinition, LURKER, "gm-only", catalog);
+  importActorDefinition(
+    built.state,
+    { ...FOE_DEFINITION, name: "Unseen Stalker" } as ActorDefinition,
+    LURKER,
+    "gm-only",
+    catalog
+  );
   addCombatant(built.state, LURKER, 5, () => 1, GRID);
   // Diagonally adjacent to Borin (5 ft by the engine's Chebyshev measure), with two clear cells for a
   // 10 ft shove, so the map edge cannot clamp the push.
@@ -916,7 +1195,12 @@ async function liveTable(built: Built) {
   });
   await server.initialize();
   server.mapCatalog.register(imported.metadata.id, "Arena", "battlemap");
-  server.mapCatalog.saveCalibration(imported.metadata.id, { calibration: GRID.calibration, verifiedAt: null, verificationPoint: null, verificationErrorPx: null });
+  server.mapCatalog.saveCalibration(imported.metadata.id, {
+    calibration: GRID.calibration,
+    verifiedAt: null,
+    verificationPoint: null,
+    verificationErrorPx: null
+  });
   await server.auth.bootstrap("a sufficiently long GM password");
   const gmToken = (await server.auth.login("a sufficiently long GM password"))!;
   const playerToken = server.auth.issuePlayerSession();
@@ -928,19 +1212,31 @@ async function liveTable(built: Built) {
   const player = await joinSocket(base, playerToken);
   const heard: CombatLogEntry[] = [];
   const gmHeard: CombatLogEntry[] = [];
-  player.on("log:entry", (entry: CombatLogEntry) => { heard.push(entry); });
+  player.on("log:entry", (entry: CombatLogEntry) => {
+    heard.push(entry);
+  });
   // The GM's feed is captured too: the DC must be present for the GM and absent for the player, or
   // "it does not cross" is indistinguishable from "it was never written".
-  gm.on("log:entry", (entry: CombatLogEntry) => { gmHeard.push(entry); });
+  gm.on("log:entry", (entry: CombatLogEntry) => {
+    gmHeard.push(entry);
+  });
   cleanups.push(async () => {
-    gm.disconnect(); player.disconnect(); server.close();
+    gm.disconnect();
+    player.disconnect();
+    server.close();
     await rm(directory, { recursive: true, force: true });
   });
   return { server, gm, player, heard, gmHeard };
 }
 
 const swingAt = (gm: Socket, actionId: string, targetId: string) =>
-  emitCommand(gm, "action:resolve", { commandId: randomUUID(), actorId: IDS.hero, actionId, targetIds: [targetId], attackNatural: 18 });
+  emitCommand(gm, "action:resolve", {
+    commandId: randomUUID(),
+    actorId: IDS.hero,
+    actionId,
+    targetIds: [targetId],
+    attackNatural: 18
+  });
 
 describe("the table's own line reaches a player, not just the GM", () => {
   it("hands a bystanding player the sentence for the push that really moved the token", async () => {
@@ -954,7 +1250,9 @@ describe("the table's own line reaches a player, not just the GM", () => {
     const line = await heardLine(heard, (text) => text.includes("pushed"), "the push narration");
     expect(line.text).toBe("Foe is pushed 10 ft straight away from Borin.");
     expect(line.gmOnly).toBe(false);
-    expect(server.store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(5, 2));
+    expect(server.store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(
+      cell(5, 2)
+    );
   });
 
   it("gives the table the line that names the save, and keeps Topple's DC in the GM's feed alone", async () => {
@@ -971,13 +1269,17 @@ describe("the table's own line reaches a player, not just the GM", () => {
 
     // The DC is the attacker's number and does not cross. The tracker holds a real save with a real DC,
     // and the GM's feed carries it; the player's never does.
-    expect(server.store.snapshot.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.foe, ability: "con", dc: 13, actionName: "Topple" }]);
+    expect(server.store.snapshot.combat.pendingSaves).toMatchObject([
+      { targetActorId: IDS.foe, ability: "con", dc: 13, actionName: "Topple" }
+    ]);
     const playerHeard = JSON.stringify(heard);
     expect(playerHeard).not.toContain("DC 13");
     expect(playerHeard).not.toContain("Rules note");
     expect(playerHeard).not.toContain("the prompt is in the turn order");
     await heardLine(gmHeard, (text) => text.startsWith("Rules note:"), "the GM's own rules note");
-    expect(gmHeard.map((entry) => entry.text)).toContain("Rules note: Topple: Foe's save is DC 13 - the prompt is in the turn order.");
+    expect(gmHeard.map((entry) => entry.text)).toContain(
+      "Rules note: Topple: Foe's save is DC 13 - the prompt is in the turn order."
+    );
   });
 
   it("says nothing to the table when the shoved creature is one the GM has not revealed", async () => {
@@ -1006,7 +1308,11 @@ const swingTarget = (built: Built, actionId: string, targetId: string, faces: nu
   resolveDefinitionAction(
     built.state,
     effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === actionId)!,
-    { actorId: IDS.hero, targetIds: [targetId], commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}` },
+    {
+      actorId: IDS.hero,
+      targetIds: [targetId],
+      commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+    },
     deps(built, built.definition, faces)
   );
 
@@ -1014,37 +1320,58 @@ describe("the resolver stamps its own verdict on the table's line, and the ack r
   it("marks the line gmOnly when the swing names a combatant the GM has not revealed", () => {
     // `namesAHiddenCombatant` decides this field; a Topple against the stalker exercises its true branch.
     const built = hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]);
-    expect(swingTarget(built, "item-quarterstaff", LURKER, [15, 3]).tableNarration).toEqual([{
-      kind: "save",
-      text: "Borin's Topple forces Unseen Stalker to make a CON save or have the Prone condition.",
-      actorIds: [IDS.hero, LURKER],
-      gmOnly: true
-    }]);
+    expect(swingTarget(built, "item-quarterstaff", LURKER, [15, 3]).tableNarration).toEqual([
+      {
+        kind: "save",
+        text: "Borin's Topple forces Unseen Stalker to make a CON save or have the Prone condition.",
+        actorIds: [IDS.hero, LURKER],
+        gmOnly: true
+      }
+    ]);
   });
 
   it("leaves it UNSTAMPED when the same swing names only public combatants - the control", () => {
     // A fresh table, since the action slot is spent once per turn. This control rules out a field
     // hardcoded to true.
     const built = hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]);
-    expect(swingTarget(built, "item-quarterstaff", IDS.foe, [15, 3]).tableNarration).toEqual([{
-      kind: "save",
-      text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
-      actorIds: [IDS.hero, IDS.foe]
-    }]);
+    expect(swingTarget(built, "item-quarterstaff", IDS.foe, [15, 3]).tableNarration).toEqual([
+      {
+        kind: "save",
+        text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
+        actorIds: [IDS.hero, IDS.foe]
+      }
+    ]);
   });
 
   // The GM hides a player's own character and that player swings at a public foe. `canInitiateForActor`
   // ignores the actor's visibility, so the resolve is allowed but its line is stamped GM-only.
   async function hiddenSwinger(built: Built) {
     const table = await liveTable(built);
-    expect(await emitCommand(table.player, "character:claim", { commandId: randomUUID(), actorId: IDS.hero })).toMatchObject({ ok: true });
-    expect(await emitCommand(table.gm, "actor:set-visibility", { commandId: randomUUID(), actorId: IDS.hero, visibility: "gm-only" })).toMatchObject({ ok: true });
+    expect(
+      await emitCommand(table.player, "character:claim", { commandId: randomUUID(), actorId: IDS.hero })
+    ).toMatchObject({ ok: true });
+    expect(
+      await emitCommand(table.gm, "actor:set-visibility", {
+        commandId: randomUUID(),
+        actorId: IDS.hero,
+        visibility: "gm-only"
+      })
+    ).toMatchObject({ ok: true });
     return table;
   }
-  const topple = (socket: Socket) => emitCommand(socket, "action:resolve", { commandId: randomUUID(), actorId: IDS.hero, actionId: "item-quarterstaff", targetIds: [IDS.foe], attackNatural: 18 }) as Promise<{ ok: boolean; resolution?: { tableNarration?: ReadonlyArray<{ text: string; gmOnly?: boolean }> } }>;
+  const topple = (socket: Socket) =>
+    emitCommand(socket, "action:resolve", {
+      commandId: randomUUID(),
+      actorId: IDS.hero,
+      actionId: "item-quarterstaff",
+      targetIds: [IDS.foe],
+      attackNatural: 18
+    }) as Promise<{ ok: boolean; resolution?: { tableNarration?: ReadonlyArray<{ text: string; gmOnly?: boolean }> } }>;
 
   it("strips the gmOnly line off the ACK a player receives, feed and ack agreeing", async () => {
-    const { gm, player, heard, server } = await hiddenSwinger(hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]));
+    const { gm, player, heard, server } = await hiddenSwinger(
+      hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"])
+    );
 
     const ack = await topple(player);
     expect(ack).toMatchObject({ ok: true });
@@ -1062,17 +1389,21 @@ describe("the resolver stamps its own verdict on the table's line, and the ack r
   });
 
   it("keeps that same line on the GM's ack - the console this gate must not break", async () => {
-    const { gm, server } = await hiddenSwinger(hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]));
+    const { gm, server } = await hiddenSwinger(
+      hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"])
+    );
 
     const ack = await topple(gm);
     expect(ack).toMatchObject({ ok: true });
     expect(server.store.snapshot.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.foe, actionName: "Topple" }]);
-    expect(ack.resolution?.tableNarration).toEqual([{
-      kind: "save",
-      text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
-      actorIds: [IDS.hero, IDS.foe],
-      gmOnly: true
-    }]);
+    expect(ack.resolution?.tableNarration).toEqual([
+      {
+        kind: "save",
+        text: "Borin's Topple forces Foe to make a CON save or have the Prone condition.",
+        actorIds: [IDS.hero, IDS.foe],
+        gmOnly: true
+      }
+    ]);
   });
 });
 

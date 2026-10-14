@@ -101,11 +101,17 @@ export function RowEditor<T>({
     let over = drag.over;
     for (let i = 0; i < items.length; i++) {
       const box = items[i].getBoundingClientRect();
-      if (event.clientY >= box.top && event.clientY <= box.bottom) { over = i; break; }
+      if (event.clientY >= box.top && event.clientY <= box.bottom) {
+        over = i;
+        break;
+      }
       if (i === 0 && event.clientY < box.top) over = 0;
       if (i === items.length - 1 && event.clientY > box.bottom) over = items.length - 1;
     }
-    if (over !== drag.over) { drag.over = over; setDragOver(over); }
+    if (over !== drag.over) {
+      drag.over = over;
+      setDragOver(over);
+    }
   };
   const onGripUp = () => {
     const drag = dragRef.current;
@@ -159,9 +165,13 @@ export function RowEditor<T>({
                       className="nh-roweditor-toggle interactive"
                       aria-expanded={open}
                       aria-controls={bodyId}
-                      onClick={() => setExpanded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))}
+                      onClick={() =>
+                        setExpanded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+                      }
                     >
-                      <span className={cx("nh-roweditor-caret", open && "is-open")} aria-hidden="true"><IconChevron /></span>
+                      <span className={cx("nh-roweditor-caret", open && "is-open")} aria-hidden="true">
+                        <IconChevron />
+                      </span>
                       <span className="nh-roweditor-label">{label}</span>
                     </button>
                   ) : (
@@ -171,16 +181,24 @@ export function RowEditor<T>({
                   {/* Row-scoped names so a screen reader doesn't hear five bare "Remove"s. */}
                   <Menu icon trigger="⋯" align="end" label={`Actions for ${label}`} className="nh-roweditor-menu">
                     {reorderable && (
-                      <MenuItem disabled={index === 0} onClick={() => move(index, index - 1)}>Move {label} up</MenuItem>
+                      <MenuItem disabled={index === 0} onClick={() => move(index, index - 1)}>
+                        Move {label} up
+                      </MenuItem>
                     )}
                     {reorderable && (
-                      <MenuItem disabled={index === rows.length - 1} onClick={() => move(index, index + 1)}>Move {label} down</MenuItem>
+                      <MenuItem disabled={index === rows.length - 1} onClick={() => move(index, index + 1)}>
+                        Move {label} down
+                      </MenuItem>
                     )}
-                    <MenuItem tone="danger" icon={<IconTrash />} onClick={() => remove(index)}>Remove {label}</MenuItem>
+                    <MenuItem tone="danger" icon={<IconTrash />} onClick={() => remove(index)}>
+                      Remove {label}
+                    </MenuItem>
                   </Menu>
                 </div>
 
-                <div className="nh-roweditor-body" id={bodyId} hidden={!open}>{renderRow(row, index)}</div>
+                <div className="nh-roweditor-body" id={bodyId} hidden={!open}>
+                  {renderRow(row, index)}
+                </div>
               </li>
             );
           })}
@@ -197,13 +215,21 @@ export function RowEditor<T>({
           aria-describedby={full && maxReachedReason ? reasonId : undefined}
           onClick={add}
         >
-          <span className="nh-roweditor-add-icon" aria-hidden="true"><IconPlus /></span>
+          <span className="nh-roweditor-add-icon" aria-hidden="true">
+            <IconPlus />
+          </span>
           {addLabel}
         </Button>
-        {full && maxReachedReason && <p className="nh-roweditor-reason" id={reasonId}>{maxReachedReason}</p>}
+        {full && maxReachedReason && (
+          <p className="nh-roweditor-reason" id={reasonId}>
+            {maxReachedReason}
+          </p>
+        )}
       </div>
 
-      <span className="nh-sr-only" role="status">{announcement}</span>
+      <span className="nh-sr-only" role="status">
+        {announcement}
+      </span>
     </div>
   );
 }

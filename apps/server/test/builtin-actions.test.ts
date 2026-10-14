@@ -27,8 +27,22 @@ describe("builtin action catalog", () => {
 
   it("keeps the frozen id set (journal replay contract)", () => {
     expect(BUILTIN_ACTIONS.map((action) => action.id).sort()).toEqual([
-      "dash", "disengage", "dodge", "escape-grapple", "help", "hide", "influence", "magic",
-      "ready", "search", "study", "unarmed-grapple", "unarmed-shove-prone", "unarmed-shove-push", "unarmed-strike", "utilize"
+      "dash",
+      "disengage",
+      "dodge",
+      "escape-grapple",
+      "help",
+      "hide",
+      "influence",
+      "magic",
+      "ready",
+      "search",
+      "study",
+      "unarmed-grapple",
+      "unarmed-shove-prone",
+      "unarmed-shove-push",
+      "unarmed-strike",
+      "utilize"
     ]);
   });
 
@@ -47,7 +61,12 @@ describe("builtin action catalog", () => {
       { type: "save-disadvantage", ability: "str" }
     ];
     for (const sample of samples) {
-      const parsed = EffectAddSchema.safeParse({ commandId: "50000000-0000-4000-8000-000000000001", actorId: "10000000-0000-4000-8000-000000000001", name: "Test", modifiers: [sample] });
+      const parsed = EffectAddSchema.safeParse({
+        commandId: "50000000-0000-4000-8000-000000000001",
+        actorId: "10000000-0000-4000-8000-000000000001",
+        name: "Test",
+        modifiers: [sample]
+      });
       expect(parsed.success, parsed.success ? JSON.stringify(sample) : JSON.stringify(parsed.error.issues)).toBe(true);
     }
   });

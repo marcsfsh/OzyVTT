@@ -120,7 +120,10 @@ async function newPage() {
 
 /** The app sets `html { scroll-behavior: smooth }` — leave it on and every scrolled measurement is
     stale. Animations off for the same reason: a control mid-transition reports a transitional box. */
-const settle = (page) => page.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
+const settle = (page) =>
+  page.addStyleTag({
+    content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }"
+  });
 
 const p = await newPage();
 // D2/D3: the GM token is memory-only, so a cold load of ANY address shows the login screen at that
@@ -266,7 +269,7 @@ const MEASURE = `((rootSelector) => {
  */
 async function openCombobox(page, selector, missing) {
   const box = page.locator(`${selector}[role=combobox]`).first();
-  if (await box.count() === 0) throw new Error(missing);
+  if ((await box.count()) === 0) throw new Error(missing);
   await box.scrollIntoViewIfNeeded();
   await box.click({ timeout: 8_000 });
   await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
@@ -275,7 +278,7 @@ async function openCombobox(page, selector, missing) {
 
 async function openFirstRecord(page, { rows, expect, what }) {
   const row = page.locator(rows).first();
-  if (await row.count() === 0) throw new Error(`no ${what} row in the rail to open the editor with`);
+  if ((await row.count()) === 0) throw new Error(`no ${what} row in the rail to open the editor with`);
   await row.click({ timeout: 10_000 });
   await page.waitForSelector(expect, { timeout: 10_000 });
   await page.waitForTimeout(1200);
@@ -290,8 +293,8 @@ async function openFirstRecord(page, { rows, expect, what }) {
  * selector would treat one of those inner rows as a feature and open the wrong thing.
  */
 const FEATURE_ROW_TOGGLE =
-  '.hb-detail ul.nh-roweditor-rows[aria-label="feature list"] > li > .nh-roweditor-head > button.nh-roweditor-toggle,'
-  + ' .hb-detail ul.nh-roweditor-rows[aria-label="trait list"] > li > .nh-roweditor-head > button.nh-roweditor-toggle';
+  '.hb-detail ul.nh-roweditor-rows[aria-label="feature list"] > li > .nh-roweditor-head > button.nh-roweditor-toggle,' +
+  ' .hb-detail ul.nh-roweditor-rows[aria-label="trait list"] > li > .nh-roweditor-head > button.nh-roweditor-toggle';
 
 /**
  * A record whose features are a LIST — something to open — and deliberately not "a record with a
@@ -355,7 +358,10 @@ async function openHomebrewFeature(page) {
       await selectHomebrewRow(page, index);
       found = await hasFeatureList(page);
     }
-    if (!found) throw new Error("no homebrew record carries a feature LIST - a class, subclass, species or background; a feat's single feature is already open and play-homebrew-record measures it");
+    if (!found)
+      throw new Error(
+        "no homebrew record carries a feature LIST - a class, subclass, species or background; a feat's single feature is already open and play-homebrew-record measures it"
+      );
   }
 
   const toggles = page.locator(FEATURE_ROW_TOGGLE);
@@ -363,7 +369,10 @@ async function openHomebrewFeature(page) {
   let target = 0;
   for (let index = 0; index < count; index++) {
     const label = (await toggles.nth(index).innerText()).replace(/\s+/g, " ");
-    if (/asks (a|\d+) choices?/.test(label)) { target = index; break; }
+    if (/asks (a|\d+) choices?/.test(label)) {
+      target = index;
+      break;
+    }
   }
   await toggles.nth(target).scrollIntoViewIfNeeded();
   await toggles.nth(target).click({ timeout: 8_000 });
@@ -373,7 +382,8 @@ async function openHomebrewFeature(page) {
      shut, and a bare `count()` answers "a panel is open" about a screen showing none. Measured: with
      the tap above disabled, a count-only assertion passed and the surface measured 200 controls —
      `play-homebrew-record`'s number to the control. */
-  if (await page.locator(".hb-detail .hb-feature:visible").count() === 0) throw new Error("the feature row opened no panel");
+  if ((await page.locator(".hb-detail .hb-feature:visible").count()) === 0)
+    throw new Error("the feature row opened no panel");
 
   /* Then everything the panel itself keeps collapsed — an inline option, its `requires` gate and its
      own extra picks, the feature's `extraPicks` and `replaces` rows. Opening one row reveals more, so
@@ -382,7 +392,7 @@ async function openHomebrewFeature(page) {
      row nested in a container that is still closed has a laid-out box and cannot be clicked. */
   for (let round = 0; round < 12; round++) {
     const row = page.locator('.hb-feature .nh-roweditor-toggle[aria-expanded="false"]:visible').first();
-    if (await row.count() === 0) break;
+    if ((await row.count()) === 0) break;
     await row.scrollIntoViewIfNeeded();
     await row.click({ timeout: 6_000 });
     await page.waitForTimeout(300);
@@ -420,12 +430,21 @@ async function openPinWithLinks(page) {
     await page.evaluate((idx) => {
       const marker = document.querySelectorAll("[data-marker-id]")[idx];
       const box = marker.getBoundingClientRect();
-      const options = { bubbles: true, cancelable: true, composed: true, pointerId: 1, pointerType: "touch", isPrimary: true, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+      const options = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        pointerId: 1,
+        pointerType: "touch",
+        isPrimary: true,
+        clientX: box.left + box.width / 2,
+        clientY: box.top + box.height / 2
+      };
       marker.dispatchEvent(new PointerEvent("pointerdown", options));
       marker.dispatchEvent(new PointerEvent("pointerup", options));
     }, index);
     await page.waitForTimeout(900);
-    if (await page.locator(".codex-marker-link-open").count() > 0) return true;
+    if ((await page.locator(".codex-marker-link-open").count()) > 0) return true;
   }
   return false;
 }
@@ -470,18 +489,29 @@ async function ensureLinkedPin() {
   for (const map of shownMaps) {
     const { markers } = await get(`/maps/${map.id}/markers`);
     for (const marker of markers) {
-      if (marker.pageIds.length > 0 && marker.revealedToPlayers) return { note: `pin fixture: already present (marker ${marker.id})`, undo: async () => {} };
+      if (marker.pageIds.length > 0 && marker.revealedToPlayers)
+        return { note: `pin fixture: already present (marker ${marker.id})`, undo: async () => {} };
       if (marker.revealedToPlayers) candidates.push(marker);
     }
   }
-  if (process.env.AUDIT_NO_FIXTURE) return { note: "pin fixture: ABSENT and AUDIT_NO_FIXTURE set - the two pin surfaces will report NOT MEASURED", undo: async () => {} };
+  if (process.env.AUDIT_NO_FIXTURE)
+    return {
+      note: "pin fixture: ABSENT and AUDIT_NO_FIXTURE set - the two pin surfaces will report NOT MEASURED",
+      undo: async () => {}
+    };
   const marker = candidates[0];
-  if (!marker) return { note: "pin fixture: ABSENT and unprovisionable - no revealed pin on any revealed map", undo: async () => {} };
+  if (!marker)
+    return {
+      note: "pin fixture: ABSENT and unprovisionable - no revealed pin on any revealed map",
+      undo: async () => {}
+    };
   const { pages } = await get("/pages");
   const page = pages.find((candidate) => candidate.revealedToPlayers);
-  if (!page) return { note: "pin fixture: ABSENT and unprovisionable - no page is shown to players", undo: async () => {} };
+  if (!page)
+    return { note: "pin fixture: ABSENT and unprovisionable - no page is shown to players", undo: async () => {} };
   const before = [...marker.pageIds];
-  const patch = (pageIds) => api(`v1/codex/markers/${marker.id}`, { method: "PATCH", headers: auth, body: JSON.stringify({ pageIds }) });
+  const patch = (pageIds) =>
+    api(`v1/codex/markers/${marker.id}`, { method: "PATCH", headers: auth, body: JSON.stringify({ pageIds }) });
   await patch([page.id]);
   return {
     note: `pin fixture: LINKED page "${page.title}" to pin "${marker.label ?? marker.id}" (${marker.id}) for this run; restored at the end. Undo by hand if the run dies: PATCH /api/v1/codex/markers/${marker.id} {"pageIds":${JSON.stringify(before)}}`,
@@ -494,12 +524,21 @@ const SURFACES = [
   { name: "pages", path: "/codex/pages" },
   // The page editor is the single densest surface in the Codex: a toolbar, a field grid, the tag input,
   // the connections list and its per-row controls. A section-only audit measures none of them.
-  { name: "page-editor", path: "/codex/pages", open: (page) => openFirstRecord(page, {
-      rows: ".codex-shell-content button.codex-tree-page, .codex-shell-content button.codex-list-item",
-      expect: ".codex-editor", what: "page"
-    }) },
+  {
+    name: "page-editor",
+    path: "/codex/pages",
+    open: (page) =>
+      openFirstRecord(page, {
+        rows: ".codex-shell-content button.codex-tree-page, .codex-shell-content button.codex-list-item",
+        expect: ".codex-editor",
+        what: "page"
+      })
+  },
   { name: "atlas", path: "/codex/atlas" },
-  { name: "pin-inspector", path: "/codex/atlas", open: async (page) => {
+  {
+    name: "pin-inspector",
+    path: "/codex/atlas",
+    open: async (page) => {
       await page.waitForTimeout(1200);
       // A pin with a LINKED PAGE, not just the first pin: `.codex-marker-link-open` only renders for one,
       // and it is the row this surface most needs measured. Walking until the row appears is what makes
@@ -510,10 +549,11 @@ const SURFACES = [
       // and ~60 icon buttons have zero rendered boxes until it is opened — the densest cluster of small
       // controls in the Codex, and every previous run skipped all of it.
       const appearance = page.locator("details.codex-marker-appearance").first();
-      if (await appearance.count() === 0) throw new Error("no Appearance disclosure in the pin inspector");
+      if ((await appearance.count()) === 0) throw new Error("no Appearance disclosure in the pin inspector");
       await appearance.locator("summary").click({ timeout: 8_000 });
       await page.waitForTimeout(600);
-    } },
+    }
+  },
   { name: "graph", path: "/codex/graph" },
   { name: "sessions", path: "/codex/sessions" },
   // The session EDITOR, not just the list: it carries the shared markdown toolbar twice (prep + recap)
@@ -521,9 +561,14 @@ const SURFACES = [
   // Was `hasText: /^Session \d/`, which is not a fixture reference but is the same coupling one step
   // weaker: it passes only while `sessionTitle()` is falling back to its numbered default, and a
   // campaign whose sessions carry real names would have reported this surface unmeasured.
-  { name: "session-editor", path: "/codex/sessions", open: async (page) => {
+  {
+    name: "session-editor",
+    path: "/codex/sessions",
+    open: async (page) => {
       await openFirstRecord(page, {
-        rows: ".codex-shell-content button.codex-session-row", expect: ".codex-session-editor", what: "session"
+        rows: ".codex-shell-content button.codex-session-row",
+        expect: ".codex-session-editor",
+        what: "session"
       });
       // …with "Who played" OPEN (`5a`). Since it became a `TagInput pick` chooser, its option rows are
       // the densest control cluster on this surface and they do not exist until the box is tapped —
@@ -531,37 +576,56 @@ const SURFACES = [
       // Same shape as `play-homebrew-picker`; the run's third overlay mechanism excludes the fields
       // BENEATH the open list from the reach verdict while still measuring the list's own rows.
       await openCombobox(page, "#s-attendees", 'the session editor has no "Who played" chooser to open');
-    } },
+    }
+  },
   { name: "quests", path: "/codex/quests" },
-  { name: "quest-editor", path: "/codex/quests", open: (page) => openFirstRecord(page, {
-      rows: ".codex-shell-content button.codex-quest-row", expect: ".codex-quest-editor", what: "quest"
-    }) },
+  {
+    name: "quest-editor",
+    path: "/codex/quests",
+    open: (page) =>
+      openFirstRecord(page, {
+        rows: ".codex-shell-content button.codex-quest-row",
+        expect: ".codex-quest-editor",
+        what: "quest"
+      })
+  },
   { name: "journal", path: "/codex/journal" },
   { name: "calendar", path: "/codex/calendar" },
   // The GM's clock on its own (`5f`(i)). The date used to be the FOURTH field of the structure modal, so
   // the only surface a run ever measured was `calendar-editor`; this dialog is new, it is the one a GM
   // opens most, and its three date boxes plus two footer buttons exist only once it is opened.
-  { name: "calendar-date-editor", path: "/codex/calendar", open: async (page) => {
+  {
+    name: "calendar-date-editor",
+    path: "/codex/calendar",
+    open: async (page) => {
       const door = page.locator(".codex-calendar-clockset").first();
-      if (await door.count() === 0) throw new Error("the Calendar has no clock button to open the date editor");
+      if ((await door.count()) === 0) throw new Error("the Calendar has no clock button to open the date editor");
       await door.click({ timeout: 8_000 });
       await page.locator('dialog[open][aria-label="Your date"]').waitFor({ state: "visible", timeout: 8_000 });
       await page.waitForTimeout(500);
-    } },
+    }
+  },
   // The world's structure, which grew the era list in `5f`(iii) — one row of two inputs and a remove
   // button per era, none of which a closed modal has.
-  { name: "calendar-editor", path: "/codex/calendar", open: async (page) => {
+  {
+    name: "calendar-editor",
+    path: "/codex/calendar",
+    open: async (page) => {
       await page.getByRole("button", { name: "Edit calendar" }).first().click({ timeout: 8_000 });
       const sheet = page.locator('dialog[open][aria-label="Calendar"]');
       await sheet.waitFor({ state: "visible", timeout: 8_000 });
       await sheet.getByRole("button", { name: "Add era" }).click({ timeout: 8_000 });
       await page.waitForTimeout(500);
-    } },
+    }
+  },
   // …with the "Who" chooser OPEN (`5e.3`): same reason as `session-editor` above. The list carries one
   // row per character page, marked "Archived" where the table has retired one, and a closed box shows
   // none of them.
-  { name: "downtime", path: "/codex/downtime", open: (page) =>
-      openCombobox(page, "#codex-downtime-who", 'the downtime composer has no "Who" chooser to open') },
+  {
+    name: "downtime",
+    path: "/codex/downtime",
+    open: (page) => openCombobox(page, "#codex-downtime-who", 'the downtime composer has no "Who" chooser to open')
+  },
   { name: "audit", path: "/codex/audit" },
   { name: "backup", path: "/codex/backup" },
   { name: "settings", path: "/codex/settings" },
@@ -569,42 +633,70 @@ const SURFACES = [
   // every tag chip in the app) that no verification pass has ever loaded.
   { name: "tag-view", path: "/codex/tags/dungeon" },
   // D7's one create dialog — the door every create path in the Codex goes through, never opened here.
-  { name: "quick-create", path: "/codex", open: async (page) => {
+  {
+    name: "quick-create",
+    path: "/codex",
+    open: async (page) => {
       await page.keyboard.press("Control+k");
       await page.waitForTimeout(700);
       const palette = page.locator('dialog[open][aria-label="Codex command palette"]');
       const input = palette.locator("input").first();
-      if (await input.count() === 0) throw new Error("the palette did not open");
+      if ((await input.count()) === 0) throw new Error("the palette did not open");
       await input.fill(`Audit ${Date.now() % 100000}`);
       await page.waitForTimeout(900);
       const create = palette.locator(".codex-palette-item").filter({ hasText: "New page" }).first();
-      if (await create.count() === 0) throw new Error("the palette offered no New page verb");
+      if ((await create.count()) === 0) throw new Error("the palette offered no New page verb");
       await create.click({ timeout: 8_000 });
-      const sheet = page.locator("dialog[open]").filter({ hasText: /New page/i }).first();
+      const sheet = page
+        .locator("dialog[open]")
+        .filter({ hasText: /New page/i })
+        .first();
       await sheet.waitFor({ state: "visible", timeout: 8_000 });
       await page.waitForTimeout(600);
-    } },
-  { name: "palette", path: "/codex", open: async (page) => {
+    }
+  },
+  {
+    name: "palette",
+    path: "/codex",
+    open: async (page) => {
       await page.keyboard.press("Control+k");
       await page.waitForTimeout(700);
       const input = page.locator('dialog[open][aria-label="Codex command palette"] input');
-      if (await input.count() === 0) throw new Error("the palette did not open");
+      if ((await input.count()) === 0) throw new Error("the palette did not open");
       await input.fill("a");
       await page.waitForTimeout(1200);
-    } },
+    }
+  },
   // The nav drawer only exists below 761px; measured there because it is the phone's whole navigation.
-  { name: "nav-drawer", path: "/codex", narrowOnly: true, open: async (page) => {
+  {
+    name: "nav-drawer",
+    path: "/codex",
+    narrowOnly: true,
+    open: async (page) => {
       const opener = page.locator('button[aria-label="Codex sections"]').first();
       await opener.scrollIntoViewIfNeeded();
-      try { await opener.click({ timeout: 4_000 }); } catch { await opener.dispatchEvent("click"); }
+      try {
+        await opener.click({ timeout: 4_000 });
+      } catch {
+        await opener.dispatchEvent("click");
+      }
       await page.waitForTimeout(700);
-    } },
-  { name: "session-prep", path: "/codex", open: async (page) => {
+    }
+  },
+  {
+    name: "session-prep",
+    path: "/codex",
+    open: async (page) => {
       const prep = page.getByRole("button", { name: "Session prep" }).first();
       await prep.scrollIntoViewIfNeeded();
-      try { await prep.click({ timeout: 4_000 }); } catch { await prep.dispatchEvent("click"); }
+      try {
+        await prep.click({ timeout: 4_000 });
+      } catch {
+        await prep.dispatchEvent("click");
+      }
       await page.waitForTimeout(700);
-    } },
+    }
+  },
   // ---- The play shell + its phase-A surfaces. `root: "main"` measures the whole shell
   // (tab bar included); each `ready` is the surface's own render root, since none of these
   // has a `.codex-shell-content`. One line per address, as §6b step 4 wants. ----
@@ -630,9 +722,18 @@ const SURFACES = [
    * therefore reports NOT MEASURED rather than measuring the empty state twice.
    */
   { name: "play-homebrew", path: "/homebrew", root: "main", ready: ".hb-root" },
-  { name: "play-homebrew-record", path: "/homebrew", root: "main", ready: ".hb-root", open: (page) => openFirstRecord(page, {
-      rows: ".hb-rail button.hb-row", expect: ".hb-detail", what: "homebrew"
-    }) },
+  {
+    name: "play-homebrew-record",
+    path: "/homebrew",
+    root: "main",
+    ready: ".hb-root",
+    open: (page) =>
+      openFirstRecord(page, {
+        rows: ".hb-rail button.hb-row",
+        expect: ".hb-detail",
+        what: "homebrew"
+      })
+  },
   /**
    * ...and one with a CHOOSER OPEN, on the same reasoning as the pin inspector's Appearance
    * disclosure above: `Combobox`'s option rows take the 44px floor as real paint (route 1,
@@ -644,22 +745,28 @@ const SURFACES = [
    * open-slug picker (a spell list, say) reports THIS surface unmeasured and still measures the
    * editor. Substituting one for the other is the failure this file's docblock is about.
    */
-  { name: "play-homebrew-picker", path: "/homebrew", root: "main", ready: ".hb-root", open: async (page) => {
+  {
+    name: "play-homebrew-picker",
+    path: "/homebrew",
+    root: "main",
+    ready: ".hb-root",
+    open: async (page) => {
       // Only if a record is not ALREADY open. `walk` navigates by pushing the same address the
       // previous surface used, which the router correctly treats as a no-op — so the editor the
       // entry above opened is still on screen, and at 375px the rail it would be re-opened from is
       // the half of the master-detail that is currently hidden. This is not the "measure the previous
       // surface" substitution the docblock forbids: the surface still ends at a homebrew editor with
       // a chooser open, and still fails loudly below if there is no chooser to open.
-      if (await page.locator(".hb-detail").count() === 0) {
+      if ((await page.locator(".hb-detail").count()) === 0) {
         await openFirstRecord(page, { rows: ".hb-rail button.hb-row", expect: ".hb-detail", what: "homebrew" });
       }
       const chooser = page.locator(".hb-detail .nh-combobox input[role=combobox]").first();
-      if (await chooser.count() === 0) throw new Error("the first homebrew record has no open-slug chooser to open");
+      if ((await chooser.count()) === 0) throw new Error("the first homebrew record has no open-slug chooser to open");
       await chooser.click({ timeout: 8_000 });
       await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
       await page.waitForTimeout(600);
-    } },
+    }
+  },
   /**
    * ...and one with a FEATURE PANEL OPEN. See `openHomebrewFeature` for the measurement that made this
    * a surface: with every feature collapsed — which is how `play-homebrew-record` finds the editor and
@@ -675,8 +782,15 @@ const SURFACES = [
   // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
   // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
   // inside the sheet frame now, which is exactly the row this measurement should see.
-  { name: "play-sheet", path: "/table", root: "main", ready: ".table-layout", open: async (page) => {
-      const id = await page.evaluate(() => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null);
+  {
+    name: "play-sheet",
+    path: "/table",
+    root: "main",
+    ready: ".table-layout",
+    open: async (page) => {
+      const id = await page.evaluate(
+        () => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null
+      );
       if (!id) throw new Error("no character token on the table to open a sheet from");
       await page.evaluate((target) => {
         history.pushState(null, "", target);
@@ -685,19 +799,27 @@ const SURFACES = [
       }, `/characters/${id}`);
       await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
       await page.waitForTimeout(700);
-    } },
+    }
+  },
   // The sheet's browse-and-add picker, a MODAL over that layer and reachable from no address, so
   // the entry above stopped one tap short of it and nothing had ever measured its rows. Its Add
   // button paints 45x27 and reaches the floor only through `.tap-target`'s centred `::after`; it
   // sat under the floor unnoticed because until the catalog->inventory payload was fixed, tapping
   // it did nothing at all, and a control that does nothing is a control nobody reports. The
   // `<dialog>` renders inline inside the sheet, so `root: "main"` sees it.
-  { name: "play-sheet-picker", path: "/table", root: "main", ready: ".table-layout", open: async (page) => {
+  {
+    name: "play-sheet-picker",
+    path: "/table",
+    root: "main",
+    ready: ".table-layout",
+    open: async (page) => {
       // Same not-already-open guard as `play-homebrew-picker`, and for the same reason: `walk`
       // re-pushes the previous address, which the router treats as a no-op, so the sheet the entry
       // above opened is still on screen.
-      if (await page.locator(".sheet-standalone").count() === 0) {
-        const id = await page.evaluate(() => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null);
+      if ((await page.locator(".sheet-standalone").count()) === 0) {
+        const id = await page.evaluate(
+          () => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null
+        );
         if (!id) throw new Error("no character token on the table to open a sheet from");
         await page.evaluate((target) => {
           history.pushState(null, "", target);
@@ -707,14 +829,15 @@ const SURFACES = [
         await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
       }
       const browse = page.getByRole("button", { name: /Browse SRD gear/i }).first();
-      if (await browse.count() === 0) throw new Error("the sheet has no browse-and-add picker to open");
+      if ((await browse.count()) === 0) throw new Error("the sheet has no browse-and-add picker to open");
       await browse.scrollIntoViewIfNeeded();
       await browse.click({ timeout: 8_000 });
       // The list, not the dialog: an empty catalog renders `.sheet-picker-empty` and would measure
       // the search and the filter chips while silently contributing no item rows at all.
       await page.waitForSelector(".sheet-picker-list", { timeout: 8_000 });
       await page.waitForTimeout(600);
-    } }
+    }
+  }
 ];
 
 /**
@@ -725,21 +848,29 @@ const SURFACES = [
 const PLAYER_SURFACES = [
   { name: "player-home", path: "/codex" },
   { name: "player-pages", path: "/codex/pages" },
-  { name: "player-page", path: "/codex/pages", open: async (page) => {
+  {
+    name: "player-page",
+    path: "/codex/pages",
+    open: async (page) => {
       const row = page.locator(".codex-rail button.codex-list-item").first();
-      if (await row.count() === 0) throw new Error("the player can see no pages to open");
+      if ((await row.count()) === 0) throw new Error("the player can see no pages to open");
       await row.click({ timeout: 10_000 });
       await page.waitForTimeout(1200);
-    } },
+    }
+  },
   { name: "player-atlas", path: "/codex/atlas" },
   // D14/G24: a pin tap opens PinDetails — `.codex-marker-link-open` rows and a close button that exist
   // nowhere in the GM shell.
-  { name: "player-pin", path: "/codex/atlas", open: async (page) => {
+  {
+    name: "player-pin",
+    path: "/codex/atlas",
+    open: async (page) => {
       await page.waitForTimeout(1400);
       if (!(await openPinWithLinks(page))) throw new Error("no revealed pin opens a sheet with a linked page");
       await page.waitForSelector(".codex-pindetails", { timeout: 8_000 });
       await page.waitForTimeout(600);
-    } },
+    }
+  },
   { name: "player-graph", path: "/codex/graph" },
   { name: "player-sessions", path: "/codex/sessions" },
   { name: "player-quests", path: "/codex/quests" },
@@ -747,12 +878,21 @@ const PLAYER_SURFACES = [
   { name: "player-calendar", path: "/codex/calendar" },
   { name: "player-downtime", path: "/codex/downtime" },
   { name: "player-tag", path: "/codex/tags/dungeon" },
-  { name: "player-drawer", path: "/codex", narrowOnly: true, open: async (page) => {
+  {
+    name: "player-drawer",
+    path: "/codex",
+    narrowOnly: true,
+    open: async (page) => {
       const opener = page.locator('button[aria-label="Codex sections"]').first();
       await opener.scrollIntoViewIfNeeded();
-      try { await opener.click({ timeout: 4_000 }); } catch { await opener.dispatchEvent("click"); }
+      try {
+        await opener.click({ timeout: 4_000 });
+      } catch {
+        await opener.dispatchEvent("click");
+      }
       await page.waitForTimeout(700);
-    } },
+    }
+  },
   // ---- The player's own play shell (see the GM `play-*` block above). ----
   { name: "player-play-table", path: "/table", root: "main", ready: ".table-layout" },
   // D9 — MY CHARACTER, the player's first tab and the only player-ONLY address in the app. It
@@ -764,12 +904,19 @@ const PLAYER_SURFACES = [
 ];
 
 const report = [];
-let totalControls = 0, totalBad = 0, unmeasured = 0;
-let totalUnreachable = 0, totalOverlaid = 0, totalClosed = 0;
+let totalControls = 0,
+  totalBad = 0,
+  unmeasured = 0;
+let totalUnreachable = 0,
+  totalOverlaid = 0,
+  totalClosed = 0;
 
 async function walk(page, surfaces, rootSelector) {
   for (const surface of surfaces) {
-    if (surface.narrowOnly && width >= 761) { report.push(`### ${surface.name}: not present at ${width}px (>=761)`); continue; }
+    if (surface.narrowOnly && width >= 761) {
+      report.push(`### ${surface.name}: not present at ${width}px (>=761)`);
+      continue;
+    }
     // Per-surface root/ready: codex surfaces keep the pass default (`rootSelector` and its
     // `.codex-shell-content` gate); a play surface names its own root and render gate.
     const root = surface.root ?? rootSelector;
@@ -785,19 +932,35 @@ async function walk(page, surfaces, rootSelector) {
       dispatchEvent(new PopStateEvent("popstate", { state: null }));
       dispatchEvent(new PopStateEvent("popstate", { state: null }));
     }, surface.path);
-    try { await page.waitForSelector(ready, { timeout: 15_000 }); }
-    catch { report.push(`### ${surface.name}: ${surface.path} DID NOT RENDER - NOT MEASURED`); unmeasured += 1; continue; }
+    try {
+      await page.waitForSelector(ready, { timeout: 15_000 });
+    } catch {
+      report.push(`### ${surface.name}: ${surface.path} DID NOT RENDER - NOT MEASURED`);
+      unmeasured += 1;
+      continue;
+    }
     await page.waitForTimeout(900);
     if (surface.open) {
       // Never measure a surface we did not actually reach: a silent zero is worse than a loud failure,
       // and silently measuring the PREVIOUS surface again is worse than either.
-      try { await surface.open(page); }
-      catch (error) { report.push(`### ${surface.name}: could not open - NOT MEASURED - ${String(error).split("\n")[0].slice(0, 90)}`); unmeasured += 1; continue; }
+      try {
+        await surface.open(page);
+      } catch (error) {
+        report.push(
+          `### ${surface.name}: could not open - NOT MEASURED - ${String(error).split("\n")[0].slice(0, 90)}`
+        );
+        unmeasured += 1;
+        continue;
+      }
     }
     // A string `pageFunction` is evaluated as an EXPRESSION and never receives `arg`, so the call is
     // built into the expression instead of passed alongside it.
     const { out, error } = await page.evaluate(`${MEASURE}(${JSON.stringify(root)})`);
-    if (error) { report.push(`### ${surface.name}: ${error} - NOT MEASURED`); unmeasured += 1; continue; }
+    if (error) {
+      report.push(`### ${surface.name}: ${error} - NOT MEASURED`);
+      unmeasured += 1;
+      continue;
+    }
     // SIZE IS MEASURED IN EVERY LAYER; REACH IS JUDGED IN ONE. `bad` deliberately keeps the whole
     // population, closed disclosures included: a menu item's box is laid out whether or not its
     // <details> is open, so its size is a real measurement of a real tap target, and dropping those
@@ -813,13 +976,20 @@ async function walk(page, surfaces, rootSelector) {
     const unreachable = judged.filter((c) => c.h >= 44 && c.w >= 44 && c.reach === 0);
     const overlaid = out.filter((c) => c.layer === "overlaid");
     const closed = out.filter((c) => c.layer === "closed");
-    totalControls += out.length; totalBad += bad.length;
-    totalUnreachable += unreachable.length; totalOverlaid += overlaid.length; totalClosed += closed.length;
-    report.push(`### ${surface.name} (${surface.path}) - ${out.length} controls, ${bad.length} below 44px, ${stolen.length} with taps stolen, ${unreachable.length} unreachable in the active layer`);
+    totalControls += out.length;
+    totalBad += bad.length;
+    totalUnreachable += unreachable.length;
+    totalOverlaid += overlaid.length;
+    totalClosed += closed.length;
+    report.push(
+      `### ${surface.name} (${surface.path}) - ${out.length} controls, ${bad.length} below 44px, ${stolen.length} with taps stolen, ${unreachable.length} unreachable in the active layer`
+    );
     // Counted over controls of EVERY size, unlike the three metrics above, which are >=44 questions:
     // reach goes unjudged for a 20px control in a closed menu exactly as it does for a 44px one.
     if (overlaid.length + closed.length > 0)
-      report.push(`  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay (a modal, a Drawer, or a Combobox listbox), ${closed.length} inside a closed disclosure - sizes above still count them`);
+      report.push(
+        `  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay (a modal, a Drawer, or a Combobox listbox), ${closed.length} inside a closed disclosure - sizes above still count them`
+      );
     for (const c of bad) report.push(`  SIZE  ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     for (const c of stolen) report.push(`  STEAL ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     // Printed per row, unlike the count this replaces: `unresolved` was a header number with no
@@ -837,8 +1007,11 @@ async function walk(page, surfaces, rootSelector) {
 // Before the walk, not during it: the atlas reads its markers when the route renders, and the player
 // pass opens a second context later that has to see the same pin.
 let fixture = { note: "", undo: async () => {} };
-try { fixture = await ensureLinkedPin(); }
-catch (error) { fixture = { note: `pin fixture: FAILED - ${String(error).split("\n")[0].slice(0, 90)}`, undo: async () => {} }; }
+try {
+  fixture = await ensureLinkedPin();
+} catch (error) {
+  fixture = { note: `pin fixture: FAILED - ${String(error).split("\n")[0].slice(0, 90)}`, undo: async () => {} };
+}
 report.push(fixture.note, "");
 
 await walk(p, SURFACES, ".codex-root");
@@ -855,13 +1028,20 @@ try {
 
 // Leave the database as it was found. A failure here is reported rather than thrown: the measurement
 // is already taken, and losing the whole report to a failed cleanup would be the worse trade.
-try { await fixture.undo(); }
-catch (error) { report.push(`### PIN FIXTURE NOT RESTORED - ${String(error).split("\n")[0].slice(0, 120)}`); }
+try {
+  await fixture.undo();
+} catch (error) {
+  report.push(`### PIN FIXTURE NOT RESTORED - ${String(error).split("\n")[0].slice(0, 120)}`);
+}
 
 console.log(`===== Codex tap-target audit @ ${width}px =====`);
 console.log(report.join("\n"));
-console.log(`\n${totalControls} interactive controls measured, ${totalBad} below the 44px floor, ${totalUnreachable} unreachable in the active layer, ${unmeasured} surfaces NOT MEASURED.`);
-console.log(`Reach not judged for ${totalOverlaid + totalClosed}: ${totalOverlaid} behind an open overlay (a modal <dialog> or an open Drawer), ${totalClosed} inside a closed disclosure. Both are sized and counted in the total above.`);
+console.log(
+  `\n${totalControls} interactive controls measured, ${totalBad} below the 44px floor, ${totalUnreachable} unreachable in the active layer, ${unmeasured} surfaces NOT MEASURED.`
+);
+console.log(
+  `Reach not judged for ${totalOverlaid + totalClosed}: ${totalOverlaid} behind an open overlay (a modal <dialog> or an open Drawer), ${totalClosed} inside a closed disclosure. Both are sized and counted in the total above.`
+);
 await b.close();
 // `totalUnreachable` JOINED THE GATE on 2026-08-05, at 0. It was never gated before because the number
 // it replaces (`unresolved`) stood at 184 and could not be read: every one of those 184 was a control

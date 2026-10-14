@@ -17,16 +17,23 @@ export type InitiativeRowEntry = Readonly<{
 }>;
 
 /** Condition presence as plain dots (up to 4, then +N), from the entry's ids + labels. */
-function InitiativeConditionDots({ conditionIds, conditions }: Readonly<{ conditionIds?: readonly string[]; conditions?: readonly string[] }>) {
+function InitiativeConditionDots({
+  conditionIds,
+  conditions
+}: Readonly<{ conditionIds?: readonly string[]; conditions?: readonly string[] }>) {
   const ids = conditionIds ?? [];
   const labels = conditions ?? [];
   const count = Math.max(ids.length, labels.length);
   if (count === 0) return null;
   const shown = Math.min(count, 4);
-  return <span className="init-row-dots" role="img" aria-label={(labels.length ? labels : ids).join(", ")}>
-    {Array.from({ length: shown }, (_, index) => <span key={ids[index] ?? index} className="init-row-dot" title={labels[index] ?? ids[index] ?? ""} />)}
-    {count > shown && <span className="init-row-dot-more">+{count - shown}</span>}
-  </span>;
+  return (
+    <span className="init-row-dots" role="img" aria-label={(labels.length ? labels : ids).join(", ")}>
+      {Array.from({ length: shown }, (_, index) => (
+        <span key={ids[index] ?? index} className="init-row-dot" title={labels[index] ?? ids[index] ?? ""} />
+      ))}
+      {count > shown && <span className="init-row-dot-more">+{count - shown}</span>}
+    </span>
+  );
 }
 
 /**
@@ -36,17 +43,29 @@ function InitiativeConditionDots({ conditionIds, conditions }: Readonly<{ condit
  * plus the token's ring on the map.
  */
 export function InitiativeRow({ entry, self = false }: Readonly<{ entry: InitiativeRowEntry; self?: boolean }>) {
-  return <div className="init-row">
-    <span className="init-row-avatar" aria-hidden="true">{initialsOf(entry.name)}</span>
-    <span className="init-row-body">
-      <span className="init-row-name-line">
-        {entry.active && <span className="init-row-caret" aria-hidden="true">▶</span>}
-        <strong className="init-row-name">{entry.name}</strong>
-        {self && <span className="init-row-you">YOU</span>}
-        <InitiativeConditionDots conditionIds={entry.conditionIds} conditions={entry.conditions} />
-        {entry.health !== "healthy" && <span className={`init-row-health hp-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}
+  return (
+    <div className="init-row">
+      <span className="init-row-avatar" aria-hidden="true">
+        {initialsOf(entry.name)}
       </span>
-    </span>
-    <span className="init-row-score">{entry.score}</span>
-  </div>;
+      <span className="init-row-body">
+        <span className="init-row-name-line">
+          {entry.active && (
+            <span className="init-row-caret" aria-hidden="true">
+              ▶
+            </span>
+          )}
+          <strong className="init-row-name">{entry.name}</strong>
+          {self && <span className="init-row-you">YOU</span>}
+          <InitiativeConditionDots conditionIds={entry.conditionIds} conditions={entry.conditions} />
+          {entry.health !== "healthy" && (
+            <span className={`init-row-health hp-${entry.health}`}>
+              {entry.health === "down" ? "Down" : "Bloodied"}
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="init-row-score">{entry.score}</span>
+    </div>
+  );
 }

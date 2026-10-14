@@ -128,7 +128,10 @@ const excluded = (rel: string): boolean => PLAY_EXCLUDED.some(([prefix]) => rel.
 export const clientPath = (rel: string): string => `apps/client/src/${rel}`;
 export const uiPath = (rel: string): string => `packages/ui/src/${rel}`;
 
-export interface Source { path: string; read: () => string }
+export interface Source {
+  path: string;
+  read: () => string;
+}
 
 const source = (root: string, rel: string, label: (rel: string) => string): Source => ({
   path: label(rel),
@@ -158,7 +161,10 @@ export function playCopySources(): { file: string; read: () => string }[] {
   return [
     ...walk(CLIENT_SRC, keep)
       .filter((rel) => !excluded(rel))
-      .map((rel) => ({ file: clientPath(rel), read: () => stripComments(readFileSync(`${CLIENT_SRC}/${rel}`, "utf8")) })),
+      .map((rel) => ({
+        file: clientPath(rel),
+        read: () => stripComments(readFileSync(`${CLIENT_SRC}/${rel}`, "utf8"))
+      })),
     ...walk(`${UI_SRC}/primitives`, keep).map((rel) => ({
       file: uiPath(`primitives/${rel}`),
       read: () => stripComments(readFileSync(`${UI_SRC}/primitives/${rel}`, "utf8"))

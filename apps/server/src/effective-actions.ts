@@ -1,12 +1,21 @@
 import type { Actor } from "@vtt/domain";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders } from "@vtt/rules-5e";
-import { deriveEquipment, sourceItemOf, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import {
+  deriveEquipment,
+  sourceItemOf,
+  type EquipmentCatalog,
+  type EquipmentDerivation
+} from "./equipment-derivation.js";
 
 /** The action list every actor-scoped consumer must read instead of `definition.actions`: item-derived
  *  actions plus standing riders folded into the numbers the resolver reads. Nothing is written back.
  *  Moment-gated riders are collected on the roll path instead (the two sets are disjoint). */
-export function effectiveActions(definition: ActorDefinition | undefined, actor: Actor | undefined, catalog: EquipmentCatalog | undefined): readonly ActorAction[] {
+export function effectiveActions(
+  definition: ActorDefinition | undefined,
+  actor: Actor | undefined,
+  catalog: EquipmentCatalog | undefined
+): readonly ActorAction[] {
   const base = definition?.actions ?? [];
   if (!actor || !catalog) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
@@ -22,32 +31,52 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
 
   const attackBonus = sumRiders(riders, "attack-bonus");
   const damageBonus = sumRiders(riders, "damage-bonus");
-  const critDice = sumRiders(riders, "critical-bonus-dice") || riders.reduce((total, rider) => rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total, 0);
+  const critDice =
+    sumRiders(riders, "critical-bonus-dice") ||
+    riders.reduce(
+      (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
+      0
+    );
   const saveDc = sumRiders(riders, "spell-save-dc");
   const poolBonus = usesBonus(action, riders);
   const extraAttacks = extraAttacksFor(action, derivation, riders);
-  if (attackBonus === 0 && damageBonus === 0 && critDice === 0 && saveDc === 0 && poolBonus === 0 && extraAttacks === 0) return action;
+  if (attackBonus === 0 && damageBonus === 0 && critDice === 0 && saveDc === 0 && poolBonus === 0 && extraAttacks === 0)
+    return action;
 
   return {
     ...action,
     ...(action.attack && (attackBonus !== 0 || critDice !== 0 || extraAttacks !== 0)
-      ? { attack: {
-          ...action.attack,
-          bonus: action.attack.bonus + attackBonus,
-          // The resolver turns `attack.count` into a generic `{ attack: n-1 }` pool, so Extra Attack's second
-          // swing may legally use a different weapon.
-          ...(extraAttacks !== 0 ? { count: Math.max(1, Math.min(10, (action.attack.count ?? 1) + extraAttacks)) } : {}),
-          // `criticalBonusDice` is schema-bounded 1-4.
-          ...(critDice !== 0 ? { criticalBonusDice: Math.max(1, Math.min(4, (action.attack.criticalBonusDice ?? 0) + critDice)) } : {})
-        } }
+      ? {
+          attack: {
+            ...action.attack,
+            bonus: action.attack.bonus + attackBonus,
+            // The resolver turns `attack.count` into a generic `{ attack: n-1 }` pool, so Extra Attack's second
+            // swing may legally use a different weapon.
+            ...(extraAttacks !== 0
+              ? { count: Math.max(1, Math.min(10, (action.attack.count ?? 1) + extraAttacks)) }
+              : {}),
+            // `criticalBonusDice` is schema-bounded 1-4.
+            ...(critDice !== 0
+              ? { criticalBonusDice: Math.max(1, Math.min(4, (action.attack.criticalBonusDice ?? 0) + critDice)) }
+              : {})
+          }
+        }
       : {}),
-    ...(action.save && saveDc !== 0 ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } } : {}),
-    ...(action.uses && poolBonus !== 0 ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } } : {}),
+    ...(action.save && saveDc !== 0
+      ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } }
+      : {}),
+    ...(action.uses && poolBonus !== 0
+      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } }
+      : {}),
     // A standing `damage-bonus` (a +1 weapon) folds into the first damage part's formula, so sheet, roll
     // and resolver read one number; the constant is never crit-doubled. Moment-gated ones are added by
     // the resolver as their own line.
     ...(action.damage.length > 0 && damageBonus !== 0
-      ? { damage: action.damage.map((part, index) => index === 0 ? { ...part, formula: withFlatBonus(part.formula, damageBonus) } : part) }
+      ? {
+          damage: action.damage.map((part, index) =>
+            index === 0 ? { ...part, formula: withFlatBonus(part.formula, damageBonus) } : part
+          )
+        }
       : {})
   };
 }
@@ -66,38 +95,62 @@ function withFlatBonus(formula: string, bonus: number): string {
 /** Extra attacks, for weapon swings only (SRD: "whenever you take the Attack action"). A definition
  *  action declaring its own `count` is left alone. Max, not sum: each rider names the total extra swings
  *  at its tier, and Extra Attack from two sources doesn't stack. */
-function extraAttacksFor(action: ActorAction, derivation: EquipmentDerivation, riders: ReturnType<typeof collectRiders>): number {
+function extraAttacksFor(
+  action: ActorAction,
+  derivation: EquipmentDerivation,
+  riders: ReturnType<typeof collectRiders>
+): number {
   if (!action.attack || !derivation.weaponActionIds.includes(action.id)) return 0;
-  return riders.reduce((most, rider) => rider.modifier.type === "extra-attack"
-    ? Math.max(most, rider.modifier.count ?? 0) : most, 0);
+  return riders.reduce(
+    (most, rider) => (rider.modifier.type === "extra-attack" ? Math.max(most, rider.modifier.count ?? 0) : most),
+    0
+  );
 }
 
 /** Extra uses from riders ("+1 use of Lay on Hands"), keyed by the `actor.actionUses` key the engine spends. */
 function usesBonus(action: ActorAction, riders: ReturnType<typeof collectRiders>): number {
   if (!action.uses) return 0;
   const key = action.uses.pool ?? action.id;
-  return riders.reduce((total, rider) => rider.modifier.type === "resource-bonus" && rider.modifier.poolId === key ? total + (rider.modifier.amount ?? 0) : total, 0);
+  return riders.reduce(
+    (total, rider) =>
+      rider.modifier.type === "resource-bonus" && rider.modifier.poolId === key
+        ? total + (rider.modifier.amount ?? 0)
+        : total,
+    0
+  );
 }
 
 /** The natural-d20 threshold at or above which an attack crits (SRD 20; a rider can widen it). */
 export function criticalThreshold(derivation: EquipmentDerivation, actor: Actor, action: ActorAction): number {
   const sourceItemId = sourceItemOf(action, derivation, actor.inventory);
   const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
-  return riders.reduce((lowest, rider) => rider.modifier.type === "critical-range" && rider.modifier.threshold !== undefined
-    ? Math.min(lowest, Math.max(15, rider.modifier.threshold)) : lowest, 20);
+  return riders.reduce(
+    (lowest, rider) =>
+      rider.modifier.type === "critical-range" && rider.modifier.threshold !== undefined
+        ? Math.min(lowest, Math.max(15, rider.modifier.threshold))
+        : lowest,
+    20
+  );
 }
 
 /** The sheet's limited-use pools keyed by `uses.pool ?? action.id`, so a client can show "3 of 5".
  *  `limit` is the max over the pool and rest scope (as `useLimitFor`). Takes an action list so the
  *  player projection, which has no catalog, can pass the stored sheet's actions. */
-export function actionPools(actions: readonly ActorAction[]): Array<{ id: string; name: string; limit: number; per: string }> {
+export function actionPools(
+  actions: readonly ActorAction[]
+): Array<{ id: string; name: string; limit: number; per: string }> {
   const pools = new Map<string, { id: string; name: string; limit: number; per: string }>();
   for (const action of actions) {
     if (!action.uses) continue;
     const id = action.uses.pool ?? action.id;
     const existing = pools.get(id);
     if (!existing) {
-      pools.set(id, { id, name: action.id === id ? action.name : titleCase(id), limit: action.uses.limit, per: action.uses.per });
+      pools.set(id, {
+        id,
+        name: action.id === id ? action.name : titleCase(id),
+        limit: action.uses.limit,
+        per: action.uses.per
+      });
       continue;
     }
     // Same rule as `useLimitFor`: only a sibling in the same rest scope raises the ceiling.
@@ -109,4 +162,8 @@ export function actionPools(actions: readonly ActorAction[]): Array<{ id: string
 }
 
 const titleCase = (slug: string): string =>
-  slug.split("-").filter(Boolean).map((word) => `${word[0].toUpperCase()}${word.slice(1)}`).join(" ");
+  slug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => `${word[0].toUpperCase()}${word.slice(1)}`)
+    .join(" ");

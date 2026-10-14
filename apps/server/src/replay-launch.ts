@@ -46,7 +46,9 @@ function remapIds<T>(value: T, map: ReadonlyMap<string, string>): T {
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
       const colon = key.indexOf(":");
-      const remappedKey = map.get(key) ?? (colon > 0 && map.has(key.slice(0, colon)) ? `${map.get(key.slice(0, colon))!}${key.slice(colon)}` : key);
+      const remappedKey =
+        map.get(key) ??
+        (colon > 0 && map.has(key.slice(0, colon)) ? `${map.get(key.slice(0, colon))!}${key.slice(colon)}` : key);
       out[remappedKey] = remapIds(entry, map);
     }
     return out as unknown as T;
@@ -57,14 +59,27 @@ function remapIds<T>(value: T, map: ReadonlyMap<string, string>): T {
 /** The archived combat, reduced to the scene-shaped fields (no map, no scene bookkeeping, no timeline). */
 function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
   return {
-    active: combat.active, round: combat.round, turnActorId: combat.turnActorId,
-    initiative: combat.initiative, tokens: combat.tokens, annotations: combat.annotations, turn: combat.turn,
-    rulesMode: combat.rulesMode, ruleExceptions: combat.ruleExceptions,
-    playerDamageMode: combat.playerDamageMode, playerInitiativeMode: combat.playerInitiativeMode,
-    healthDisplay: combat.healthDisplay, underwater: combat.underwater,
-    reactionsUsed: combat.reactionsUsed, legendaryUsed: combat.legendaryUsed, fog: combat.fog,
-    pendingSaves: combat.pendingSaves, pendingReactions: combat.pendingReactions, pendingDamage: combat.pendingDamage,
-    pendingRuleAsks: combat.pendingRuleAsks, pendingInitiative: combat.pendingInitiative
+    active: combat.active,
+    round: combat.round,
+    turnActorId: combat.turnActorId,
+    initiative: combat.initiative,
+    tokens: combat.tokens,
+    annotations: combat.annotations,
+    turn: combat.turn,
+    rulesMode: combat.rulesMode,
+    ruleExceptions: combat.ruleExceptions,
+    playerDamageMode: combat.playerDamageMode,
+    playerInitiativeMode: combat.playerInitiativeMode,
+    healthDisplay: combat.healthDisplay,
+    underwater: combat.underwater,
+    reactionsUsed: combat.reactionsUsed,
+    legendaryUsed: combat.legendaryUsed,
+    fog: combat.fog,
+    pendingSaves: combat.pendingSaves,
+    pendingReactions: combat.pendingReactions,
+    pendingDamage: combat.pendingDamage,
+    pendingRuleAsks: combat.pendingRuleAsks,
+    pendingInitiative: combat.pendingInitiative
   };
 }
 
@@ -86,7 +101,10 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
 
   // Definition headroom before cloning: only imported stat blocks not already stored under the same id
   // need a slot; bundled ones resolve through the content library.
-  const definitionsToStore: Array<{ id: string; definition: EncounterArchiveDocument["definitions"][number]["definition"] }> = [];
+  const definitionsToStore: Array<{
+    id: string;
+    definition: EncounterArchiveDocument["definitions"][number]["definition"];
+  }> = [];
   const definitionIdMap = new Map<string, string>();
   for (const actorId of combatantIds) {
     const source = archived.actors.find((actor) => actor.id === actorId);
@@ -104,14 +122,17 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
       // Never overwrite a definition the campaign uses now; the replay's copy gets a namespaced id.
       const replayId = `replay-${input.archiveId}-${definitionId}`;
       definitionIdMap.set(definitionId, replayId);
-      if (!state.definitions.some((entry) => entry.id === replayId)) definitionsToStore.push({ id: replayId, definition: archivedDefinition.definition });
+      if (!state.definitions.some((entry) => entry.id === replayId))
+        definitionsToStore.push({ id: replayId, definition: archivedDefinition.definition });
       continue;
     }
     definitionIdMap.set(definitionId, definitionId);
     definitionsToStore.push({ id: definitionId, definition: archivedDefinition.definition });
   }
   if (state.definitions.length + definitionsToStore.length > MAX_DEFINITIONS) {
-    throw new CommandRejectedError("The table's sheet library is full - delete some imported stat blocks before launching a replay.");
+    throw new CommandRejectedError(
+      "The table's sheet library is full - delete some imported stat blocks before launching a replay."
+    );
   }
 
   // Map all ids first so effect links and combat references can be remapped in one pass.
@@ -122,17 +143,19 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
     const source = archived.actors.find((actor) => actor.id === actorId);
     if (!source) return [];
     const clone = remapIds(structuredClone(source), actorIdMap);
-    return [{
-      ...clone,
-      id: actorIdMap.get(actorId)!,
-      // The recorded name, unchanged, so a replay of a replay can't stack suffixes.
-      name: source.name,
-      ownerSessionId: null,
-      archived: false,
-      // Scoped to this launch; a clone of a clone is re-scoped rather than left pointing at its old scene.
-      replaySceneId: input.sceneId,
-      ...(clone.definitionId ? { definitionId: definitionIdMap.get(clone.definitionId) ?? clone.definitionId } : {})
-    }];
+    return [
+      {
+        ...clone,
+        id: actorIdMap.get(actorId)!,
+        // The recorded name, unchanged, so a replay of a replay can't stack suffixes.
+        name: source.name,
+        ownerSessionId: null,
+        archived: false,
+        // Scoped to this launch; a clone of a clone is re-scoped rather than left pointing at its old scene.
+        replaySceneId: input.sceneId,
+        ...(clone.definitionId ? { definitionId: definitionIdMap.get(clone.definitionId) ?? clone.definitionId } : {})
+      }
+    ];
   });
 
   const combat = remapIds(structuredClone(sceneCombatFrom(archived.combat)), actorIdMap);
@@ -141,7 +164,17 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
 
   state.actors = [...state.actors, ...clones];
   if (definitionsToStore.length > 0) state.definitions = [...state.definitions, ...definitionsToStore];
-  const scene = activateNewScene(state, { sceneId: input.sceneId, name: label, mapAssetId: archived.combat.mapAssetId, combat, replayOf: { archiveId: input.archiveId, actorIds } }, input.implicitSceneId);
+  const scene = activateNewScene(
+    state,
+    {
+      sceneId: input.sceneId,
+      name: label,
+      mapAssetId: archived.combat.mapAssetId,
+      combat,
+      replayOf: { archiveId: input.archiveId, actorIds }
+    },
+    input.implicitSceneId
+  );
 
   return { scene, actorIds, turnIndex: input.turnIndex, label };
 }

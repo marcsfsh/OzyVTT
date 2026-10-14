@@ -16,12 +16,19 @@ import { EMPTY_CONTEXT, type Draft } from "./schema";
 type Row = Record<string, unknown>;
 
 /** One authored effect whose single modifier is the row under test. */
-const withModifier = (modifier: Row): Draft => ({
-  effects: [{
-    rowId: "e1", name: "Striding", tags: ["striding"], duration: { type: "encounter" },
-    modifiers: [{ rowId: "m1", ...modifier }], onEnd: []
-  }]
-}) as unknown as Draft;
+const withModifier = (modifier: Row): Draft =>
+  ({
+    effects: [
+      {
+        rowId: "e1",
+        name: "Striding",
+        tags: ["striding"],
+        duration: { type: "encounter" },
+        modifiers: [{ rowId: "m1", ...modifier }],
+        onEnd: []
+      }
+    ]
+  }) as unknown as Draft;
 
 function mount(scope: "feature" | "item", value: Draft) {
   let latest: Draft = value;
@@ -30,7 +37,10 @@ function mount(scope: "feature" | "item", value: Draft) {
     return (
       <RiderEditor
         value={draft}
-        onChange={(next) => { setDraft(next); latest = next; }}
+        onChange={(next) => {
+          setDraft(next);
+          latest = next;
+        }}
         enabled={["modifiers", "uses", "tags", "actions", "effects"]}
         scope={scope}
         ctx={EMPTY_CONTEXT}
@@ -44,12 +54,15 @@ function mount(scope: "feature" | "item", value: Draft) {
   return {
     container: view.container,
     /** The modifier row sits inside the collapsible effect row, so open both. */
-    openBoth: async (modifierRow: RegExp) => { await open(/Striding/); await open(modifierRow); },
+    openBoth: async (modifierRow: RegExp) => {
+      await open(/Striding/);
+      await open(modifierRow);
+    },
     amount: () => within(view.container).getByRole("textbox", { name: "Amount" }),
     kind: () => within(view.container).getByRole("combobox", { name: "What it does" }),
     /** Every interactive target on the form (what a 375px tap audit walks). */
     controls: () => view.container.querySelectorAll("button, input, select, textarea, [role='switch']").length,
-    stored: () => ((latest as unknown as { effects: Array<{ modifiers: Row[] }> }).effects[0].modifiers[0])
+    stored: () => (latest as unknown as { effects: Array<{ modifiers: Row[] }> }).effects[0].modifiers[0]
   };
 }
 

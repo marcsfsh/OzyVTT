@@ -69,7 +69,11 @@ export function TagInput({
   const add = (raw: string) => {
     const tag = normalize(raw);
     if (tag === "" || full) return;
-    if (values.includes(tag)) { setText(""); setAnnouncement(`${tag} is already added.`); return; }
+    if (values.includes(tag)) {
+      setText("");
+      setAnnouncement(`${tag} is already added.`);
+      return;
+    }
     onChange([...values, tag]);
     setText("");
     setAnnouncement(`${tag} added.`);
@@ -97,7 +101,9 @@ export function TagInput({
         <ul className="nh-taginput-tags" role="list" aria-label={ariaLabel ? `${ariaLabel} — chosen` : "Chosen"}>
           {values.map((tag) => (
             <li key={tag}>
-              <Chip onRemove={() => remove(tag)} removeLabel={`Remove ${tag}`}>{tag}</Chip>
+              <Chip onRemove={() => remove(tag)} removeLabel={`Remove ${tag}`}>
+                {tag}
+              </Chip>
             </li>
           ))}
         </ul>
@@ -110,7 +116,9 @@ export function TagInput({
           options={offered.map((entry) => ({ id: entry, label: optionLabel ? optionLabel(entry) : entry }))}
           /* Always null: the chips hold the values, and the box stays empty for the next entry. */
           value={null}
-          onChange={(next) => { if (next !== null) add(next); }}
+          onChange={(next) => {
+            if (next !== null) add(next);
+          }}
           placeholder={full ? undefined : placeholder}
           disabled={full}
           describedBy={describedBy}
@@ -134,16 +142,30 @@ export function TagInput({
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
           // Commit typed text on blur so a half-entered tag isn't lost by tabbing away.
-          onBlur={() => { if (text.trim() !== "") add(text); }}
+          onBlur={() => {
+            if (text.trim() !== "") add(text);
+          }}
         />
       )}
       {!picking && suggestions && suggestions.length > 0 && (
-        <datalist id={listId}>{suggestions.map((entry) => <option key={entry} value={entry} />)}</datalist>
+        <datalist id={listId}>
+          {suggestions.map((entry) => (
+            <option key={entry} value={entry} />
+          ))}
+        </datalist>
       )}
-      <p className="nh-taginput-hint" id={hintId}>{picking ? "Pick from the list, or type your own." : "Press Enter to add."}</p>
+      <p className="nh-taginput-hint" id={hintId}>
+        {picking ? "Pick from the list, or type your own." : "Press Enter to add."}
+      </p>
       {/* At capacity, annotate rather than hide; the reason stays full strength while the input dims. */}
-      {full && maxReachedReason && <p className="nh-taginput-reason" id={reasonId}>{maxReachedReason}</p>}
-      <span className="nh-sr-only" role="status">{announcement}</span>
+      {full && maxReachedReason && (
+        <p className="nh-taginput-reason" id={reasonId}>
+          {maxReachedReason}
+        </p>
+      )}
+      <span className="nh-sr-only" role="status">
+        {announcement}
+      </span>
     </div>
   );
 }

@@ -14,7 +14,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { applyField, authored, clearField, issuesFor as harnessIssues, parsesAsStored as harnessParses } from "./authoring-harness";
+import {
+  applyField,
+  authored,
+  clearField,
+  issuesFor as harnessIssues,
+  parsesAsStored as harnessParses
+} from "./authoring-harness";
 import { blankDraft, forStorage } from "./defaults";
 import { bodyForPublish } from "./validate";
 import type { Draft } from "./schema";
@@ -59,15 +65,25 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
     const armour = item(["category", "armor"], ["armor.acBase", 14], ["armor.addDexModifier", true]);
     expectPublishable("equipment", armour);
     const stored = bodyForPublish("equipment", forStorage(armour), RECORD_ID) as { armor: Record<string, unknown> };
-    expect(stored.armor).toEqual({ acBase: 14, addDexModifier: true, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null });
+    expect(stored.armor).toEqual({
+      acBase: 14,
+      addDexModifier: true,
+      dexModifierCap: null,
+      stealthDisadvantage: false,
+      strengthRequired: null
+    });
   });
 
   it("5. armour with all five controls touched", () => {
     expectPublishable(
       "equipment",
       item(
-        ["category", "armor"], ["armor.acBase", 16], ["armor.addDexModifier", false],
-        ["armor.dexModifierCap", 2], ["armor.strengthRequired", 15], ["armor.stealthDisadvantage", true]
+        ["category", "armor"],
+        ["armor.acBase", 16],
+        ["armor.addDexModifier", false],
+        ["armor.dexModifierCap", 2],
+        ["armor.strengthRequired", 15],
+        ["armor.stealthDisadvantage", true]
       )
     );
   });
@@ -105,13 +121,20 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
     );
     expectPublishable("equipment", wand);
     // `rowId` is editor identity and the cast schema is `.strict()`, so it must not reach the store.
-    const stored = bodyForPublish("equipment", forStorage(wand), RECORD_ID) as { casts: Array<Record<string, unknown>> };
+    const stored = bodyForPublish("equipment", forStorage(wand), RECORD_ID) as {
+      casts: Array<Record<string, unknown>>;
+    };
     expect(stored.casts[0]).not.toHaveProperty("rowId");
   });
 
   it("10. a cast row whose ability select is returned to “Not set”", () => {
     // Mechanism B inside a row: `ItemSpellCastSchema.ability` is `.optional()` and `.strict()`.
-    const row = applyField("equipment", { rowId: "r1", spellId: "fireball", consumesSpellSlot: false, ability: "int" }, "ability", undefined);
+    const row = applyField(
+      "equipment",
+      { rowId: "r1", spellId: "fireball", consumesSpellSlot: false, ability: "int" },
+      "ability",
+      undefined
+    );
     expect("ability" in row === false || row.ability === undefined).toBe(true);
     expectPublishable("equipment", item(["description", "A wand."], ["isMagic", true], ["casts", [row]]));
   });
@@ -119,7 +142,11 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
   it("11. the weapon-kind select returned to “Not set” — the one case that stays blocked, and now SAYS so", () => {
     // A weapon must be simple or martial, so this stays blocked, but as a named sentence under the
     // button before anything is sent.
-    const draft = clearField("equipment", item(["weapon.damageDice", "1d8"], ["weapon.damageType", "slashing"]), "weapon.category");
+    const draft = clearField(
+      "equipment",
+      item(["weapon.damageDice", "1d8"], ["weapon.damageType", "slashing"]),
+      "weapon.category"
+    );
     expect(issuesFor("equipment", draft)).toContain("Fill in weapon kind.");
     expect(parsesAsStored("equipment", draft)!.success).toBe(false);
   });
@@ -128,12 +155,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
 describe("the checklist and the store agree", () => {
   it("lists every outstanding requirement at once, not one at a time", () => {
     // Three distinct requirements, three lines.
-    const broken = item(
-      ["category", ""],
-      ["weapon.damageDice", "not-dice"],
-      ["isMagic", true],
-      ["cursed", true]
-    );
+    const broken = item(["category", ""], ["weapon.damageDice", "not-dice"], ["isMagic", true], ["cursed", true]);
     const issues = issuesFor("equipment", broken);
     expect(issues.length).toBeGreaterThanOrEqual(3);
     expect(issues.some((text) => text.includes("category"))).toBe(true);
@@ -194,11 +216,28 @@ describe("opening a record never dirties it", () => {
   it("tops up a half-written weapon block but leaves an item with no weapon alone", async () => {
     const { withDefaults } = await import("./defaults");
     // A stored or imported half-written weapon is topped up on open, which makes it publishable.
-    const halfWritten = withDefaults("equipment", { name: "Old Mace", category: "weapon", weapon: { damageDice: "1d6" } });
-    expect(halfWritten.weapon).toEqual({ category: "simple", damageDice: "1d6", damageType: "", rangeFeet: null, longRangeFeet: null });
+    const halfWritten = withDefaults("equipment", {
+      name: "Old Mace",
+      category: "weapon",
+      weapon: { damageDice: "1d6" }
+    });
+    expect(halfWritten.weapon).toEqual({
+      category: "simple",
+      damageDice: "1d6",
+      damageType: "",
+      rangeFeet: null,
+      longRangeFeet: null
+    });
 
     // An absent weapon stays absent, or merely selecting a plain item would PATCH it.
-    const lantern = { name: "Lantern", source: "homebrew", description: null, category: "gear", costGp: 5, weightLb: 2 };
+    const lantern = {
+      name: "Lantern",
+      source: "homebrew",
+      description: null,
+      category: "gear",
+      costGp: 5,
+      weightLb: 2
+    };
     expect(withDefaults("equipment", lantern)).toEqual(lantern);
   });
 });

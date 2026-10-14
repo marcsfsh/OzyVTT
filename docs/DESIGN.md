@@ -28,13 +28,13 @@ used with restraint.
 
 Never hard-code a colour in a component; add a token first and use `var(--...)`.
 
-| Meaning | Token |
-| --- | --- |
-| Primary action, attention | `--magenta` |
-| Positive, heal, confirm, focus | `--success` / `--cyan` |
-| Caution, "not finished" | `--caution` (warm orange; text uses `--caution-hi`) |
-| Damage, destroy | `--danger` (rose; text uses `--danger-hi`) |
-| GM-only content | `--violet` (reserved for this) |
+| Meaning                        | Token                                               |
+| ------------------------------ | --------------------------------------------------- |
+| Primary action, attention      | `--magenta`                                         |
+| Positive, heal, confirm, focus | `--success` / `--cyan`                              |
+| Caution, "not finished"        | `--caution` (warm orange; text uses `--caution-hi`) |
+| Damage, destroy                | `--danger` (rose; text uses `--danger-hi`)          |
+| GM-only content                | `--violet` (reserved for this)                      |
 
 Every state carries an icon or a text label as well as a colour. The palette sits in the band
 that is hardest for red-green colour blindness, and green is absent on purpose.
@@ -44,12 +44,12 @@ sunset and daybreak. They share one token set; only values change.
 
 ## Type
 
-| Role | Token | Use |
-| --- | --- | --- |
-| Wordmark | `--font-wordmark` (Bungee) | App name and top-level view titles only |
-| Display | `--font-display` (Russo One) | Section headers, dice totals |
-| Body | `--font-body` (Manrope) | Everything functional, including control labels |
-| Mono | `--font-mono` (Space Mono) | Dice notation, modifiers, coordinates, HP |
+| Role     | Token                        | Use                                             |
+| -------- | ---------------------------- | ----------------------------------------------- |
+| Wordmark | `--font-wordmark` (Bungee)   | App name and top-level view titles only         |
+| Display  | `--font-display` (Russo One) | Section headers, dice totals                    |
+| Body     | `--font-body` (Manrope)      | Everything functional, including control labels |
+| Mono     | `--font-mono` (Space Mono)   | Dice notation, modifiers, coordinates, HP       |
 
 Use the `--fs-*` size tokens and `tabular-nums` on anything that updates live.
 

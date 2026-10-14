@@ -6,18 +6,20 @@ export type SaveAnswerPayload = Parameters<ClientToServerEvents["save:answer"]>[
  * The `save:answer` payload, in a plain module so `save-damage.mirror.test.ts` can run the server's
  * `answerSave` on it. A named excess property is a type error; a conditional spread is not.
  */
-export function saveAnswerPayload(input: Readonly<{
-  commandId: string;
-  saveId: string;
-  method: "roll" | "manual";
-  commit: boolean;
-  /** The rolled save total: required by the server for `method: "manual"`, absent for a fresh roll. */
-  total?: number;
-  /** The answerer's explicit Adv/Disadv choice; wins over the engine's aggregated sources. */
-  dieMode?: "advantage" | "disadvantage" | "normal";
-  legendaryResistance?: boolean;
-  damageOverride?: number;
-}>): SaveAnswerPayload {
+export function saveAnswerPayload(
+  input: Readonly<{
+    commandId: string;
+    saveId: string;
+    method: "roll" | "manual";
+    commit: boolean;
+    /** The rolled save total: required by the server for `method: "manual"`, absent for a fresh roll. */
+    total?: number;
+    /** The answerer's explicit Adv/Disadv choice; wins over the engine's aggregated sources. */
+    dieMode?: "advantage" | "disadvantage" | "normal";
+    legendaryResistance?: boolean;
+    damageOverride?: number;
+  }>
+): SaveAnswerPayload {
   return {
     commandId: input.commandId,
     saveId: input.saveId,

@@ -40,36 +40,77 @@ const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 /** A Wizard 5 with AC 12, Dex 14 and no save or skill proficiencies, so every number is the item's. */
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
-    name: "Hero", armorClass: 12, proficiencyBonus: 3,
+    name: "Hero",
+    armorClass: 12,
+    proficiencyBonus: 3,
     abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 10 },
     hitPoints: { maximum: 30 },
-    actions: [], extensions: {},
+    actions: [],
+    extensions: {},
     character: { classes: [{ id: "wizard", name: "Wizard", level: 5 }], feats: [] },
     proficiencies: { saves: [], skills: [], weapons: [], armor: [], tools: [] },
     ...over
   } as unknown as ActorDefinition;
 }
 
-const item = (over: Record<string, unknown>): InventoryItem => InventoryItemSchema.parse({ id: "x", name: "X", ...over });
+const item = (over: Record<string, unknown>): InventoryItem =>
+  InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
 function stateWith(inventory: InventoryItem[]): GameState {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.hero, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 30, maximum: 30 }, armorClass: 12, definitionId: "def-hero", inventory },
-    { id: IDS.foe, name: "Foe", kind: "monster", visibility: "public", hp: { current: 60, maximum: 60 }, armorClass: 12 }
-  ] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.hero,
+        name: "Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 30, maximum: 30 },
+        armorClass: 12,
+        definitionId: "def-hero",
+        inventory
+      },
+      {
+        id: IDS.foe,
+        name: "Foe",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 60, maximum: 60 },
+        armorClass: 12
+      }
+    ]
+  });
 }
 
 function fight(state: GameState) {
-  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.foe, score: 10 }] }, () => 1, GEOMETRY);
+  startEncounter(
+    state,
+    {
+      mapAssetId: IDS.map,
+      entries: [
+        { actorId: IDS.hero, score: 20 },
+        { actorId: IDS.foe, score: 10 }
+      ]
+    },
+    () => 1,
+    GEOMETRY
+  );
   return state;
 }
 
 function deps(faces: number[], definition: ActorDefinition): ResolveDependencies {
   let index = 0;
   return {
-    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    random: () => {
+      const face = faces.shift();
+      if (face === undefined) throw new Error("dice queue empty");
+      return face;
+    },
     newRollId: () => `40000000-0000-4000-8000-0000000000${String(index++).padStart(2, "0")}`,
-    gmSessionId: IDS.gmSession, now: () => "2026-08-12T00:00:00.000Z", definition, catalog
+    gmSessionId: IDS.gmSession,
+    now: () => "2026-08-12T00:00:00.000Z",
+    definition,
+    catalog
   };
 }
 
@@ -83,13 +124,32 @@ const carried = (id: string, name: string, over: Record<string, unknown> = {}): 
   item({ id, name, quantity: 1, equipped: true, attuned: true, category: "wondrous-item", ...over });
 
 /** This lane's rows, from the shipped bundle. */
-const LANE_ROWS = loadMagicItems().filter((row) =>
-  ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") && row.id !== "spell-scroll");
+const LANE_ROWS = loadMagicItems().filter(
+  (row) =>
+    ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") &&
+    row.id !== "spell-scroll"
+);
 /** "Carries a rider" over all nine keys `overlay.ts`'s `ITEM_RIDER_KEYS` admits, `tags` included. */
-const carries = (row: { tags?: unknown[]; modifiers: unknown[]; actions: unknown[]; casts: unknown[]; effects: unknown[]; grants?: unknown; grantsFeatIds: unknown[]; uses?: unknown; cursed: boolean }) =>
-  (row.tags ?? []).length > 0
-  || row.modifiers.length > 0 || row.actions.length > 0 || row.casts.length > 0 || row.effects.length > 0
-  || row.grants !== undefined || row.grantsFeatIds.length > 0 || row.uses !== undefined || row.cursed;
+const carries = (row: {
+  tags?: unknown[];
+  modifiers: unknown[];
+  actions: unknown[];
+  casts: unknown[];
+  effects: unknown[];
+  grants?: unknown;
+  grantsFeatIds: unknown[];
+  uses?: unknown;
+  cursed: boolean;
+}) =>
+  (row.tags ?? []).length > 0 ||
+  row.modifiers.length > 0 ||
+  row.actions.length > 0 ||
+  row.casts.length > 0 ||
+  row.effects.length > 0 ||
+  row.grants !== undefined ||
+  row.grantsFeatIds.length > 0 ||
+  row.uses !== undefined ||
+  row.cursed;
 
 describe("C7d far end: the Pipes of Haunting spend a charge, refuse the fourth press, and force a real save", () => {
   it("carries the authored action out of the COMMITTED bundle, through the real content library", () => {
@@ -100,7 +160,9 @@ describe("C7d far end: the Pipes of Haunting spend a charge, refuse the fourth p
     expect(record.attunement).toMatchObject({ required: false });
     expect(record.actions).toHaveLength(1);
     expect(record.actions[0]).toMatchObject({
-      id: "play", name: "Play the Pipes", activation: "action",
+      id: "play",
+      name: "Play the Pipes",
+      activation: "action",
       save: { ability: "wis", dc: 15 },
       uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
     });
@@ -116,54 +178,111 @@ describe("C7d far end: the Pipes of Haunting spend a charge, refuse the fourth p
     const state = fight(stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false })]));
     const actor = state.actors[0];
 
-    const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === "item-pipes-of-haunting-play")!;
+    const action = effectiveActions(definition, actor, catalog).find(
+      (entry) => entry.id === "item-pipes-of-haunting-play"
+    )!;
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" });
     // Nothing else was invented either: no damage, no attack.
     expect(action.damage).toEqual([]);
     expect(action.attack).toBeUndefined();
 
     expect(actor.actionUses["pipes-of-haunting-charges"]).toBeUndefined();
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(1) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(1) },
+      deps([], definition)
+    );
     expect(actor.actionUses["pipes-of-haunting-charges"]).toBe(1); // one of three
 
     newTurn(state);
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(2) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(2) },
+      deps([], definition)
+    );
     newTurn(state);
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) },
+      deps([], definition)
+    );
     expect(actor.actionUses["pipes-of-haunting-charges"]).toBe(3);
 
     // The fourth press is refused.
     newTurn(state);
-    expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(4) }, deps([], definition)))
-      .toThrow("Play the Pipes: no uses remaining (3/long rest).");
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(4) },
+        deps([], definition)
+      )
+    ).toThrow("Play the Pipes: no uses remaining (3/long rest).");
   });
 
   it("NUMBER TWO - a pending save the server ENFORCES at DC 15, naming Frightened off the shipped prose", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false })]));
-    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-pipes-of-haunting-play")!;
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-pipes-of-haunting-play"
+    )!;
 
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) },
+      deps([], definition)
+    );
     // `conditionId` is not an authored field: `conditionFrom` reads it from the shipped description,
     // which is why the module keeps the SRD's word "Frightened" verbatim.
     expect(state.combat.pendingSaves).toHaveLength(1);
-    expect(state.combat.pendingSaves[0]).toMatchObject({ targetActorId: IDS.foe, ability: "wis", dc: 15, conditionId: "frightened" });
+    expect(state.combat.pendingSaves[0]).toMatchObject({
+      targetActorId: IDS.foe,
+      ability: "wis",
+      dc: 15,
+      conditionId: "frightened"
+    });
 
     // And the server enforces the DC: a monster with Wis +0 rolling 14 fails DC 15 and passes DC 13.
-    const answered = answerSave(state, cmd(6), state.combat.pendingSaves[0].id, "roll", undefined, false, { role: "gm" }, {
-      random: () => 14, newRollId: () => "40000000-0000-4000-8000-0000000000aa", sessionId: IDS.gmSession, role: "gm",
-      now: () => "2026-08-12T00:00:00.000Z", resolveDefinition: () => undefined, catalog
-    });
+    const answered = answerSave(
+      state,
+      cmd(6),
+      state.combat.pendingSaves[0].id,
+      "roll",
+      undefined,
+      false,
+      { role: "gm" },
+      {
+        random: () => 14,
+        newRollId: () => "40000000-0000-4000-8000-0000000000aa",
+        sessionId: IDS.gmSession,
+        role: "gm",
+        now: () => "2026-08-12T00:00:00.000Z",
+        resolveDefinition: () => undefined,
+        catalog
+      }
+    );
     expect(answered.outcome).toMatchObject({ total: 14, success: false });
   });
 
   it("NUMBER THREE - the reversal: no pipes in the pack, no action and no charge at all", () => {
     const definition = definitionOf();
-    const unequipped = fight(stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false, equipped: false })]));
-    expect(effectiveActions(definition, unequipped.actors[0], catalog).find((entry) => entry.id === "item-pipes-of-haunting-play")).toBeUndefined();
+    const unequipped = fight(
+      stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false, equipped: false })])
+    );
+    expect(
+      effectiveActions(definition, unequipped.actors[0], catalog).find(
+        (entry) => entry.id === "item-pipes-of-haunting-play"
+      )
+    ).toBeUndefined();
 
     const empty = fight(stateWith([]));
-    expect(effectiveActions(definition, empty.actors[0], catalog).find((entry) => entry.id === "item-pipes-of-haunting-play")).toBeUndefined();
+    expect(
+      effectiveActions(definition, empty.actors[0], catalog).find((entry) => entry.id === "item-pipes-of-haunting-play")
+    ).toBeUndefined();
   });
 });
 
@@ -177,38 +296,67 @@ describe("C7d: the Stone of Good Luck - one half whole, one half short of the ro
     // Worn but not attuned: the SRD gates this one, so the row is inert.
     setInventoryItem(state, IDS.hero, item({ ...ROW, equipped: true, attuned: false }), () => definition, { catalog });
     const bare = deriveEquipment(state.actors[0], definition, catalog);
-    expect(deriveActorSheet(state.actors[0], definition, bare, skillCatalog).skills.find((row) => row.id === "arcana")!.bonus).toBe(3);
+    expect(
+      deriveActorSheet(state.actors[0], definition, bare, skillCatalog).skills.find((row) => row.id === "arcana")!.bonus
+    ).toBe(3);
     expect(saveTotalFor(definition, state.actors[0], "dex", bare)).toBe(2);
 
     setInventoryItem(state, IDS.hero, item({ ...ROW, equipped: true, attuned: true }), () => definition, { catalog });
     const lucky = deriveEquipment(state.actors[0], definition, catalog);
     const sheet = deriveActorSheet(state.actors[0], definition, lucky, skillCatalog);
     // Unnarrowed, which is what "ability checks" means: every skill, whatever its ability.
-    expect(sheet.skills.find((row) => row.id === "arcana")!.bonus).toBe(4);     // Int +3 and the stone
-    expect(sheet.skills.find((row) => row.id === "stealth")!.bonus).toBe(3);    // Dex +2 and the stone
-    expect(sheet.skills.find((row) => row.id === "athletics")!.bonus).toBe(1);  // Str +0 and the stone
+    expect(sheet.skills.find((row) => row.id === "arcana")!.bonus).toBe(4); // Int +3 and the stone
+    expect(sheet.skills.find((row) => row.id === "stealth")!.bonus).toBe(3); // Dex +2 and the stone
+    expect(sheet.skills.find((row) => row.id === "athletics")!.bonus).toBe(1); // Str +0 and the stone
     expect(saveTotalFor(definition, state.actors[0], "dex", lucky)).toBe(3);
 
     // The reversal, on the real inventory write path.
     setInventoryItem(state, IDS.hero, item({ ...ROW, quantity: 0 }), () => definition, { catalog });
     const gone = deriveEquipment(state.actors[0], definition, catalog);
-    expect(deriveActorSheet(state.actors[0], definition, gone, skillCatalog).skills.find((row) => row.id === "arcana")!.bonus).toBe(3);
+    expect(
+      deriveActorSheet(state.actors[0], definition, gone, skillCatalog).skills.find((row) => row.id === "arcana")!.bonus
+    ).toBe(3);
     expect(saveTotalFor(definition, state.actors[0], "dex", gone)).toBe(2);
   });
 
   it("is the difference between a failed and a passed save at the same die and the same DC", () => {
     const definition = definitionOf();
-    for (const [attuned, total, success] of [[true, 16, true], [false, 15, false]] as const) {
+    for (const [attuned, total, success] of [
+      [true, 16, true],
+      [false, 15, false]
+    ] as const) {
       const state = fight(stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck", { attuned })]));
       createPendingSaves(state, {
-        sourceActorId: IDS.foe, sourceName: "Foe", actionName: "Blast", ability: "dex", dc: 16,
-        targetIds: [IDS.hero], proposedDamage: 10, halfOnSuccess: true, conditionId: null,
-        newSaveId: () => `60000000-0000-4000-8000-00000000000${attuned ? 1 : 2}`, createdAt: 0
+        sourceActorId: IDS.foe,
+        sourceName: "Foe",
+        actionName: "Blast",
+        ability: "dex",
+        dc: 16,
+        targetIds: [IDS.hero],
+        proposedDamage: 10,
+        halfOnSuccess: true,
+        conditionId: null,
+        newSaveId: () => `60000000-0000-4000-8000-00000000000${attuned ? 1 : 2}`,
+        createdAt: 0
       });
-      const answered = answerSave(state, cmd(attuned ? 7 : 8), state.combat.pendingSaves[0].id, "roll", undefined, false, { role: "gm" }, {
-        random: () => 13, newRollId: () => `40000000-0000-4000-8000-00000000000${attuned ? 1 : 2}`, sessionId: IDS.gmSession, role: "gm",
-        now: () => "2026-08-12T00:00:00.000Z", resolveDefinition: () => definition, catalog
-      });
+      const answered = answerSave(
+        state,
+        cmd(attuned ? 7 : 8),
+        state.combat.pendingSaves[0].id,
+        "roll",
+        undefined,
+        false,
+        { role: "gm" },
+        {
+          random: () => 13,
+          newRollId: () => `40000000-0000-4000-8000-00000000000${attuned ? 1 : 2}`,
+          sessionId: IDS.gmSession,
+          role: "gm",
+          now: () => "2026-08-12T00:00:00.000Z",
+          resolveDefinition: () => definition,
+          catalog
+        }
+      );
       expect(answered.outcome).toMatchObject({ total, success }); // d20 13, Dex +2, +1 only when attuned
     }
   });
@@ -219,11 +367,20 @@ describe("C7d: the Stone of Good Luck - one half whole, one half short of the ro
     // `skillBonusFromExtension` and `exhaustionPenalty` and never calls it.
     const definition = definitionOf();
     const state = fight(stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]));
-    const sheet = deriveActorSheet(state.actors[0], definition, deriveEquipment(state.actors[0], definition, catalog), skillCatalog);
+    const sheet = deriveActorSheet(
+      state.actors[0],
+      definition,
+      deriveEquipment(state.actors[0], definition, catalog),
+      skillCatalog
+    );
     expect(sheet.skills.find((row) => row.id === "stealth")!.bonus).toBe(3); // Dex +2 and the stone
 
-    const hide = resolveDefinitionAction(state, builtinAction("hide")!,
-      { actorId: IDS.hero, targetIds: [], commandId: cmd(16), builtin: true }, deps([10], definition));
+    const hide = resolveDefinitionAction(
+      state,
+      builtinAction("hide")!,
+      { actorId: IDS.hero, targetIds: [], commandId: cmd(16), builtin: true },
+      deps([10], definition)
+    );
     expect(hide.check!.total).toBe(12); // d20 10 + Dex 2. The stone's +1 is not here.
   });
 });
@@ -242,8 +399,14 @@ describe("C7d: D8 and D9 - what this lane's buttons do outside an encounter", ()
       const state = stateWith([carried(id, name)]); // no `fight()`
       const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === actionId)!;
       expect(action, `${id} - the button is on the sheet`).toBeDefined();
-      expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(17) }, deps([], definition)))
-        .toThrow("Start an encounter before resolving actions.");
+      expect(() =>
+        resolveDefinitionAction(
+          state,
+          action,
+          { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(17) },
+          deps([], definition)
+        )
+      ).toThrow("Start an encounter before resolving actions.");
       // The loose `action.use` route builds from `attack`/`damage` only, and none of these carries either.
       expect({ id, plan: looseRollPlan(action, { includeDamage: true }) }).toEqual({ id, plan: [] });
     }
@@ -255,7 +418,9 @@ describe("C7d: D8 and D9 - what this lane's buttons do outside an encounter", ()
     // dawn. Engine-wide, so this pins the leak rather than removing the rider.
     const definition = definitionOf();
     const state = stateWith([carried("iron-bands", "Iron Bands", { attuned: false })]);
-    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-iron-bands-throw")!;
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-iron-bands-throw"
+    )!;
     expect(looseRollPlan(action, { includeDamage: true })).toEqual([
       { formula: "1d20 + 5", purpose: "attack", label: "Throw the Bands" }
     ]);
@@ -268,17 +433,30 @@ describe("C7d: the one printed to-hit in the lane that the vocabulary can say", 
     // "Iron Bands of Bilarro" is the 2014 name and does not appear in SRD 5.2.1.
     expect(view.equipmentRecord("iron-bands")!.name).toBe("Iron Bands");
     const state = fight(stateWith([carried("iron-bands", "Iron Bands", { attuned: false })]));
-    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-iron-bands-throw")!;
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-iron-bands-throw"
+    )!;
     // "an attack bonus equal to your Dexterity modifier plus your Proficiency Bonus" = 2 + 3.
     expect(action.attack).toMatchObject({ bonus: 5, rangeFeet: 60 });
     expect(action.uses).toEqual({ limit: 1, per: "long-rest", pool: "iron-bands-charges" });
     expect(action.damage).toEqual([]);
 
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) }, deps([12], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) },
+      deps([12], definition)
+    );
     expect(state.actors[0].actionUses["iron-bands-charges"]).toBe(1);
     newTurn(state);
-    expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(10) }, deps([12], definition)))
-      .toThrow("Throw the Bands: no uses remaining (1/long rest).");
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(10) },
+        deps([12], definition)
+      )
+    ).toThrow("Throw the Bands: no uses remaining (1/long rest).");
   });
 });
 
@@ -286,10 +464,34 @@ describe("C7d: the charge-alone items, whose counter is the whole of what they e
   it("rations the four elemental summons at one a day and the three-charge items at three", () => {
     const definition = definitionOf();
     for (const [id, name, actionId, limit, label] of [
-      ["bowl-of-commanding-water-elementals", "Bowl of Commanding Water Elementals", "item-bowl-of-commanding-water-elementals-summon", 1, "Summon Water Elemental"],
-      ["brazier-of-commanding-fire-elementals", "Brazier of Commanding Fire Elementals", "item-brazier-of-commanding-fire-elementals-summon", 1, "Summon Fire Elemental"],
-      ["censer-of-controlling-air-elementals", "Censer of Controlling Air Elementals", "item-censer-of-controlling-air-elementals-summon", 1, "Summon Air Elemental"],
-      ["stone-of-controlling-earth-elementals", "Stone of Controlling Earth Elementals", "item-stone-of-controlling-earth-elementals-summon", 1, "Summon Earth Elemental"],
+      [
+        "bowl-of-commanding-water-elementals",
+        "Bowl of Commanding Water Elementals",
+        "item-bowl-of-commanding-water-elementals-summon",
+        1,
+        "Summon Water Elemental"
+      ],
+      [
+        "brazier-of-commanding-fire-elementals",
+        "Brazier of Commanding Fire Elementals",
+        "item-brazier-of-commanding-fire-elementals-summon",
+        1,
+        "Summon Fire Elemental"
+      ],
+      [
+        "censer-of-controlling-air-elementals",
+        "Censer of Controlling Air Elementals",
+        "item-censer-of-controlling-air-elementals-summon",
+        1,
+        "Summon Air Elemental"
+      ],
+      [
+        "stone-of-controlling-earth-elementals",
+        "Stone of Controlling Earth Elementals",
+        "item-stone-of-controlling-earth-elementals-summon",
+        1,
+        "Summon Earth Elemental"
+      ],
       ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull", 3, "Pull a Fuzzy Object"],
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
       ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
@@ -304,8 +506,14 @@ describe("C7d: the charge-alone items, whose counter is the whole of what they e
       expect(action.save).toBeUndefined();
 
       actor.actionUses = { [`${id}-charges`]: limit };
-      expect(() => resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [], commandId: cmd(11) }, deps([], definition)))
-        .toThrow(`${label}: no uses remaining (${limit}/long rest).`);
+      expect(() =>
+        resolveDefinitionAction(
+          state,
+          action,
+          { actorId: IDS.hero, targetIds: [], commandId: cmd(11) },
+          deps([], definition)
+        )
+      ).toThrow(`${label}: no uses remaining (${limit}/long rest).`);
     }
   });
 });
@@ -313,9 +521,16 @@ describe("C7d: the charge-alone items, whose counter is the whole of what they e
 describe("C7d: the casts that survived the spell-record check", () => {
   it("holds all four Crystal Balls' Scrying to the orbs' printed DC 17, with nothing else invented", () => {
     const definition = definitionOf();
-    for (const id of ["crystal-ball", "crystal-ball-of-mind-reading", "crystal-ball-of-telepathy", "crystal-ball-of-true-seeing"]) {
+    for (const id of [
+      "crystal-ball",
+      "crystal-ball-of-mind-reading",
+      "crystal-ball-of-telepathy",
+      "crystal-ball-of-true-seeing"
+    ]) {
       const state = fight(stateWith([carried(id, "Crystal Ball")]));
-      const cast = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === `item-${id}-cast-scrying`)!;
+      const cast = effectiveActions(definition, state.actors[0], catalog).find(
+        (entry) => entry.id === `item-${id}-cast-scrying`
+      )!;
       // The save Scrying's own target makes, at the item's printed DC, not the wearer's derived one.
       expect(cast.save).toEqual({ ability: "wis", dc: 17 });
       expect(cast.damage).toEqual([]);
@@ -342,8 +557,12 @@ describe("C7d: the casts that survived the spell-record check", () => {
       expect(actions.find((entry) => entry.id === `item-${id}-cast-scrying`)!.uses).toBeUndefined();
     }
     // The shipped prose still carries the gate, so a GM reads what the button cannot enforce.
-    expect(view.equipmentRecord("crystal-ball-of-telepathy")!.description).toContain("through the sensor on one of those creatures");
-    expect(view.equipmentRecord("crystal-ball-of-mind-reading")!.description).toContain("within 30 feet of the spell's sensor");
+    expect(view.equipmentRecord("crystal-ball-of-telepathy")!.description).toContain(
+      "through the sensor on one of those creatures"
+    );
+    expect(view.equipmentRecord("crystal-ball-of-mind-reading")!.description).toContain(
+      "within 30 feet of the spell's sensor"
+    );
   });
 
   it("shares ONE three-charge pool across the Cubic Gate's two spells, and hands the Sending Stones one a day", () => {
@@ -358,11 +577,18 @@ describe("C7d: the casts that survived the spell-record check", () => {
       expect(cast.attack).toBeUndefined();
     }
     // One pool: casting Gate spends the charge Plane Shift would have used.
-    resolveDefinitionAction(state, actions.find((entry) => entry.id === "item-cubic-gate-cast-gate")!, { actorId: IDS.hero, targetIds: [], commandId: cmd(13) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      actions.find((entry) => entry.id === "item-cubic-gate-cast-gate")!,
+      { actorId: IDS.hero, targetIds: [], commandId: cmd(13) },
+      deps([], definition)
+    );
     expect(state.actors[0].actionUses["cubic-gate-charges"]).toBe(1);
 
     const stones = fight(stateWith([carried("sending-stones", "Sending Stones")]));
-    const sending = effectiveActions(definition, stones.actors[0], catalog).find((entry) => entry.id === "item-sending-stones-cast-sending")!;
+    const sending = effectiveActions(definition, stones.actors[0], catalog).find(
+      (entry) => entry.id === "item-sending-stones-cast-sending"
+    )!;
     expect(sending.uses).toEqual({ limit: 1, per: "long-rest", pool: "sending-stones-charges" });
     expect(sending.damage).toEqual([]);
     expect(sending.save).toBeUndefined();
@@ -374,23 +600,37 @@ describe("C7d: a save with no charge behind it, because the SRD prints no limit"
   it("gives the Rope of Entanglement an unlimited DC 15 Dex save that names Restrained", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("rope-of-entanglement", "Rope of Entanglement", { attuned: false })]));
-    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-rope-of-entanglement-entangle")!;
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-rope-of-entanglement-entangle"
+    )!;
     expect(action.save).toEqual({ ability: "dex", dc: 15 });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
-    expect(action.damage).toEqual([]);   // no damage authored, so no half-on-success to misread
+    expect(action.damage).toEqual([]); // no damage authored, so no half-on-success to misread
 
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(14) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(14) },
+      deps([], definition)
+    );
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, conditionId: "restrained" });
   });
 
   it("gives the Iron Flask a DC 17 Wis save and applies NO condition - nothing spurious off the prose", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("iron-flask", "Iron Flask", { attuned: false })]));
-    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-iron-flask-trap")!;
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-iron-flask-trap"
+    )!;
     expect(action.save).toEqual({ ability: "wis", dc: 17 });
     expect(action.damage).toEqual([]);
 
-    resolveDefinitionAction(state, action, { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(15) }, deps([], definition));
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(15) },
+      deps([], definition)
+    );
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 17, conditionId: null });
   });
 });
@@ -414,8 +654,10 @@ describe("C7d: the lane's counts, measured against the shipped bundle rather tha
     const scroll = loadMagicItems().find((row) => row.id === "spell-scroll")!;
     expect({ category: scroll.category, slot: scroll.slot }).toEqual({ category: "consumable", slot: "consumable" });
     for (const name of ["C7b", "C7d"]) {
-      expect({ name, claims: Object.keys(ITEM_MECHANICS_LANES.find((entry) => entry.lane === name)!.entries).includes("spell-scroll") })
-        .toEqual({ name, claims: false });
+      expect({
+        name,
+        claims: Object.keys(ITEM_MECHANICS_LANES.find((entry) => entry.lane === name)!.entries).includes("spell-scroll")
+      }).toEqual({ name, claims: false });
     }
     expect(ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7b")!.slots).toBeUndefined();
   });
@@ -423,11 +665,24 @@ describe("C7d: the lane's counts, measured against the shipped bundle rather tha
   it("authors 18 and leaves 77 as prose - and the 18 are exactly the module's list", () => {
     const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7d")!;
     expect(Object.keys(lane.entries).sort()).toEqual([
-      "bag-of-tricks", "bowl-of-commanding-water-elementals", "brazier-of-commanding-fire-elementals",
-      "censer-of-controlling-air-elementals", "crystal-ball", "crystal-ball-of-mind-reading",
-      "crystal-ball-of-telepathy", "crystal-ball-of-true-seeing", "cubic-gate", "gem-of-seeing",
-      "iron-bands", "iron-flask", "pipes-of-haunting", "pipes-of-the-sewers", "rope-of-entanglement",
-      "sending-stones", "stone-of-controlling-earth-elementals", "stone-of-good-luck-luckstone"
+      "bag-of-tricks",
+      "bowl-of-commanding-water-elementals",
+      "brazier-of-commanding-fire-elementals",
+      "censer-of-controlling-air-elementals",
+      "crystal-ball",
+      "crystal-ball-of-mind-reading",
+      "crystal-ball-of-telepathy",
+      "crystal-ball-of-true-seeing",
+      "cubic-gate",
+      "gem-of-seeing",
+      "iron-bands",
+      "iron-flask",
+      "pipes-of-haunting",
+      "pipes-of-the-sewers",
+      "rope-of-entanglement",
+      "sending-stones",
+      "stone-of-controlling-earth-elementals",
+      "stone-of-good-luck-luckstone"
     ]);
     // The bundle agrees: 18 rows carry a rider and 77 do not.
     expect(LANE_ROWS.filter(carries)).toHaveLength(18);
@@ -474,7 +729,14 @@ describe("C7d: the absences that were measured and must stay absent", () => {
   });
 
   it("D6: every row whose printed effect restores or grants hit points is prose", () => {
-    for (const id of ["potions-of-healing", "potion-of-vitality", "ioun-stone", "dragon-orb", "potion-of-heroism", "bag-of-beans"]) {
+    for (const id of [
+      "potions-of-healing",
+      "potion-of-vitality",
+      "ioun-stone",
+      "dragon-orb",
+      "potion-of-heroism",
+      "bag-of-beans"
+    ]) {
       const row = view.equipmentRecord(id)!;
       expect({ id, carries: carries(row) }).toEqual({ id, carries: false });
     }
@@ -493,8 +755,15 @@ describe("C7d: the absences that were measured and must stay absent", () => {
 
   it("the seven ability-score refusals in this lane stay prose, and so do the reserved and multi-cost rows", () => {
     // `ability-score` is refused on an item carrier: one potion, three manuals, three tomes.
-    for (const id of ["potion-of-giant-strength", "manual-of-bodily-health", "manual-of-gainful-exercise",
-      "manual-of-quickness-of-action", "tome-of-clear-thought", "tome-of-leadership-and-influence", "tome-of-understanding"]) {
+    for (const id of [
+      "potion-of-giant-strength",
+      "manual-of-bodily-health",
+      "manual-of-gainful-exercise",
+      "manual-of-quickness-of-action",
+      "tome-of-clear-thought",
+      "tome-of-leadership-and-influence",
+      "tome-of-understanding"
+    ]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
     // Rows needing mechanics not modeled yet, and two whose charge table costs more than one charge per use.

@@ -1,8 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
-  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, isPlayerOnlyPath, lastLocation, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath,
-  popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, useRoute, withQuery
+  currentHref,
+  discardTransient,
+  gmTabForPath,
+  isGmOnlyPath,
+  isKnownPath,
+  isPlayerOnlyPath,
+  lastLocation,
+  lastLocationForTab,
+  layerOf,
+  litGmTab,
+  navigate,
+  pathForGmTab,
+  redirectForRetiredPath,
+  popTransient,
+  pushTransient,
+  registerNavigationGuard,
+  rememberLocation,
+  replaceQuery,
+  resumeTarget,
+  useRoute,
+  withQuery
 } from "./router";
 import { codexSectionOf } from "./codex/routes";
 import { goTo } from "../test/route";
@@ -12,7 +31,9 @@ import { goTo } from "../test/route";
  * to the wrong surface, and an address a player can reach and shouldn't.
  */
 
-afterEach(() => { goTo("/"); });
+afterEach(() => {
+  goTo("/");
+});
 
 describe("The address table (D3)", () => {
   it("addresses the Viewer tab /viewer-controls, because the server reserves GET /viewer", () => {
@@ -76,11 +97,23 @@ describe("The address table (D3)", () => {
 describe("Which addresses exist (D3)", () => {
   it("knows the codex sections, and rejects a section that does not exist", () => {
     expect(isKnownPath("/codex")).toBe(true);
-    for (const section of ["pages", "atlas", "graph", "sessions", "quests", "journal", "calendar", "downtime", "audit", "backup", "settings"]) {
+    for (const section of [
+      "pages",
+      "atlas",
+      "graph",
+      "sessions",
+      "quests",
+      "journal",
+      "calendar",
+      "downtime",
+      "audit",
+      "backup",
+      "settings"
+    ]) {
       expect(isKnownPath(`/codex/${section}`)).toBe(true);
     }
-    expect(isKnownPath("/codex/relationships")).toBe(false);   // the retired name
-    expect(isKnownPath("/codex/notebook")).toBe(false);        // the retired word
+    expect(isKnownPath("/codex/relationships")).toBe(false); // the retired name
+    expect(isKnownPath("/codex/notebook")).toBe(false); // the retired word
   });
 
   it("allows a record id only on the sections that HAVE records", () => {
@@ -108,17 +141,37 @@ describe("Which addresses exist (D3)", () => {
    */
   it("answers 'exists' and 'renders' identically for every codex address shape", () => {
     const addresses = [
-      "/codex", "/codex/pages", "/codex/pages/p1", "/codex/pages/p1/edit",
-      "/codex/atlas", "/codex/atlas/m1", "/codex/sessions/s1", "/codex/quests/q1",
-      "/codex/journal", "/codex/journal/j1", "/codex/calendar", "/codex/calendar/x",
-      "/codex/downtime", "/codex/graph", "/codex/graph/g1",
-      "/codex/audit", "/codex/backup", "/codex/settings", "/codex/settings/anything",
-      "/codex/tags", "/codex/tags/dark-gift", "/codex/tags/a/b",
-      "/codex/lore", "/codex/notebook", "/codex/relationships"
+      "/codex",
+      "/codex/pages",
+      "/codex/pages/p1",
+      "/codex/pages/p1/edit",
+      "/codex/atlas",
+      "/codex/atlas/m1",
+      "/codex/sessions/s1",
+      "/codex/quests/q1",
+      "/codex/journal",
+      "/codex/journal/j1",
+      "/codex/calendar",
+      "/codex/calendar/x",
+      "/codex/downtime",
+      "/codex/graph",
+      "/codex/graph/g1",
+      "/codex/audit",
+      "/codex/backup",
+      "/codex/settings",
+      "/codex/settings/anything",
+      "/codex/tags",
+      "/codex/tags/dark-gift",
+      "/codex/tags/a/b",
+      "/codex/lore",
+      "/codex/notebook",
+      "/codex/relationships"
     ];
     for (const address of addresses) {
       const renders = codexSectionOf(address.split("/").filter(Boolean)) !== null;
-      expect(isKnownPath(address), `${address} — router says ${isKnownPath(address)}, shell says ${renders}`).toBe(renders);
+      expect(isKnownPath(address), `${address} — router says ${isKnownPath(address)}, shell says ${renders}`).toBe(
+        renders
+      );
     }
   });
 });
@@ -176,7 +229,16 @@ describe("Which addresses a player may reach (viewer safety, D3)", () => {
    */
   it("marks the My Character tab player-only, and nothing else", () => {
     expect(isPlayerOnlyPath("/me")).toBe(true);
-    for (const path of ["/table", "/settings", "/settings/api", "/codex", "/replays", "/characters/a1", "/builder", "/"]) {
+    for (const path of [
+      "/table",
+      "/settings",
+      "/settings/api",
+      "/codex",
+      "/replays",
+      "/characters/a1",
+      "/builder",
+      "/"
+    ]) {
       expect(isPlayerOnlyPath(path), `${path} must not be player-only`).toBe(false);
     }
     // Not GM-only either: the two answers are independent.
@@ -286,7 +348,8 @@ describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
     navigate("/codex/journal");
     await settle();
     expect(second).not.toHaveBeenCalled();
-    off1(); off2();
+    off1();
+    off2();
   });
 
   it("unregisters cleanly, so an unmounted editor cannot veto anything", async () => {
@@ -310,7 +373,9 @@ describe("Back and forward are guarded too (D6, mobile parity)", () => {
     registered.push(registerNavigationGuard(guard));
     return guard;
   };
-  afterEach(() => { for (const release of registered.splice(0)) release(); });
+  afterEach(() => {
+    for (const release of registered.splice(0)) release();
+  });
 
   it("asks the guard before honouring a Back, and puts the address back when it says no", async () => {
     goTo("/codex/pages/p1");
@@ -405,8 +470,12 @@ describe("Transient history (the phone nav drawer)", () => {
 });
 
 describe("Resume-last-location (D2)", () => {
-  beforeEach(() => { localStorage.clear(); });
-  afterEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
+  afterEach(() => {
+    localStorage.clear();
+  });
 
   it("resumes only from the bare root — a deep link always wins", () => {
     rememberLocation("gm", "/codex/quests");

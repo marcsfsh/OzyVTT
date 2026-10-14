@@ -80,7 +80,10 @@ export function fieldsWithin(type: HomebrewType, within: readonly string[]): rea
   let fields = flattenGroups(top);
   for (const key of within) {
     const container = fields.find((entry) => entry.key === key);
-    if (!container) throw new Error(`No field "${key}" in the ${type} form — the test is addressing a container that does not exist.`);
+    if (!container)
+      throw new Error(
+        `No field "${key}" in the ${type} form — the test is addressing a container that does not exist.`
+      );
     if (!container.rows) throw new Error(`Field "${key}" in the ${type} form has no rows to address.`);
     fields = flattenGroups(container.rows);
   }
@@ -95,7 +98,13 @@ export function hasControl(type: HomebrewType, key: string, within: readonly str
 
 /** Sets one field the way the form does: through the field's own `write`, otherwise `setAt`. `scope`
     is the nearest container; `within` names it when it is a row. Throws when no control exists. */
-export function applyField(type: HomebrewType, scope: Draft, key: string, value: unknown, within: readonly string[] = []): Draft {
+export function applyField(
+  type: HomebrewType,
+  scope: Draft,
+  key: string,
+  value: unknown,
+  within: readonly string[] = []
+): Draft {
   const fields = within.length === 0 ? fieldsOf(type) : fieldsWithin(type, within);
   const field = fields.find((entry) => entry.key === key);
   if (!field) {
@@ -114,11 +123,15 @@ export function authoredRow(
   within: readonly string[],
   edits: ReadonlyArray<readonly [string, unknown]>
 ): Draft {
-  const parent = within.length === 1
-    ? fieldsOf(type).find((entry) => entry.key === within[0])
-    : fieldsWithin(type, within.slice(0, -1)).find((entry) => entry.key === within[within.length - 1]);
+  const parent =
+    within.length === 1
+      ? fieldsOf(type).find((entry) => entry.key === within[0])
+      : fieldsWithin(type, within.slice(0, -1)).find((entry) => entry.key === within[within.length - 1]);
   if (!parent?.newRow) throw new Error(`Field "${within.join(" → ")}" in the ${type} form mints no rows.`);
-  return edits.reduce<Draft>((row, [key, value]) => applyField(type, row, key, value, within), parent.newRow() as Draft);
+  return edits.reduce<Draft>(
+    (row, [key, value]) => applyField(type, row, key, value, within),
+    parent.newRow() as Draft
+  );
 }
 
 /** What a control writes when emptied, per `FieldDef.emptyValue` (omit vs. null). */
@@ -132,12 +145,11 @@ export function clearField(type: HomebrewType, scope: Draft, key: string): Draft
 export const contextFor = (recordId: string): SchemaContext => ({ ...EMPTY_CONTEXT, recordId });
 
 /** Author a record from a blank draft by replaying edits through the real form, in order. */
-export function authored(
-  type: HomebrewType,
-  name: string,
-  edits: ReadonlyArray<readonly [string, unknown]>
-): Draft {
-  return edits.reduce<Draft>((draft, [key, value]) => applyField(type, draft, key, value), { ...blankDraft(type), name });
+export function authored(type: HomebrewType, name: string, edits: ReadonlyArray<readonly [string, unknown]>): Draft {
+  return edits.reduce<Draft>((draft, [key, value]) => applyField(type, draft, key, value), {
+    ...blankDraft(type),
+    name
+  });
 }
 
 /** The publish checklist's sentences, in the order the GM reads them under the button. */

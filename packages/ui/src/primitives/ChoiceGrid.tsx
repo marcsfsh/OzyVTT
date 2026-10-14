@@ -85,13 +85,29 @@ export interface ChoiceGridProps {
     keyboard radiogroup (arrows move and select, Home/End jump, roving tabindex). Filtering is substring
     matching over title + keywords; ordering and ranking belong to the caller. */
 export function ChoiceGrid({
-  options, value, onChange, ariaLabel,
-  selection = "single", values, onToggle, max, maxReachedReason,
-  onInspect, inspectLabel = (option) => `About ${option.title}`,
+  options,
+  value,
+  onChange,
+  ariaLabel,
+  selection = "single",
+  values,
+  onToggle,
+  max,
+  maxReachedReason,
+  onInspect,
+  inspectLabel = (option) => `About ${option.title}`,
   bounded = false,
-  searchable = true, searchPlaceholder = "Search…", searchDelay = 160,
-  facets, facetValue, onFacetChange, facetLabel = "Filter", facetAllValue = "all",
-  emptyTitle = "No matches", emptyText = "Try a different search or clear the filters.", emptyAction,
+  searchable = true,
+  searchPlaceholder = "Search…",
+  searchDelay = 160,
+  facets,
+  facetValue,
+  onFacetChange,
+  facetLabel = "Filter",
+  facetAllValue = "all",
+  emptyTitle = "No matches",
+  emptyText = "Try a different search or clear the filters.",
+  emptyAction,
   className
 }: ChoiceGridProps) {
   const [query, setQuery] = useState("");
@@ -101,7 +117,10 @@ export function ChoiceGrid({
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
 
   useEffect(() => {
-    if (searchDelay <= 0) { setDebounced(query); return; }
+    if (searchDelay <= 0) {
+      setDebounced(query);
+      return;
+    }
     const timer = setTimeout(() => setDebounced(query), searchDelay);
     return () => clearTimeout(timer);
   }, [query, searchDelay]);
@@ -116,16 +135,18 @@ export function ChoiceGrid({
   }, [options, debounced, facets, facetValue, facetAllValue]);
 
   /** Is anything actually narrowing the list right now? */
-  const filtering = debounced.trim().length > 0 || (facets != null && facetValue != null && facetValue !== facetAllValue);
+  const filtering =
+    debounced.trim().length > 0 || (facets != null && facetValue != null && facetValue !== facetAllValue);
 
   const multiple = selection === "multiple";
   const chosen = useMemo(() => new Set(values ?? []), [values]);
-  const isChosen = (option: ChoiceOption) => multiple ? chosen.has(option.value) : option.value === value;
+  const isChosen = (option: ChoiceOption) => (multiple ? chosen.has(option.value) : option.value === value);
   // At capacity the unchosen cards lock (chosen ones stay tappable so a pick can be swapped). The reason is
   // stated once beside the count and locked cards reference it via `aria-describedby`, rather than repeating it
   // on every card.
   const atCapacity = multiple && max != null && chosen.size >= max;
-  const lockedReason = maxReachedReason ?? (max != null ? `You have already chosen ${max}. Unpick one to swap.` : undefined);
+  const lockedReason =
+    maxReachedReason ?? (max != null ? `You have already chosen ${max}. Unpick one to swap.` : undefined);
   const capacityLocked = (option: ChoiceOption) => atCapacity && option.disabled !== true && !chosen.has(option.value);
   const lockedOf = (option: ChoiceOption) => option.disabled === true || capacityLocked(option);
   // Announced only when it is true and there is something it applies to.
@@ -144,9 +165,12 @@ export function ChoiceGrid({
   const move = (from: string, delta: number, toEdge?: "first" | "last") => {
     if (selectable.length === 0) return;
     const index = selectable.findIndex((option) => option.value === from);
-    const next = toEdge === "first" ? 0
-      : toEdge === "last" ? selectable.length - 1
-      : (index + delta + selectable.length) % selectable.length;
+    const next =
+      toEdge === "first"
+        ? 0
+        : toEdge === "last"
+          ? selectable.length - 1
+          : (index + delta + selectable.length) % selectable.length;
     const target = selectable[next];
     if (!target) return;
     if (!multiple) onChange(target.value);
@@ -155,11 +179,26 @@ export function ChoiceGrid({
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, from: string) => {
     switch (event.key) {
-      case "ArrowRight": case "ArrowDown": event.preventDefault(); move(from, 1); break;
-      case "ArrowLeft": case "ArrowUp": event.preventDefault(); move(from, -1); break;
-      case "Home": event.preventDefault(); move(from, 0, "first"); break;
-      case "End": event.preventDefault(); move(from, 0, "last"); break;
-      default: break;
+      case "ArrowRight":
+      case "ArrowDown":
+        event.preventDefault();
+        move(from, 1);
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        event.preventDefault();
+        move(from, -1);
+        break;
+      case "Home":
+        event.preventDefault();
+        move(from, 0, "first");
+        break;
+      case "End":
+        event.preventDefault();
+        move(from, 0, "last");
+        break;
+      default:
+        break;
     }
   };
 
@@ -170,7 +209,9 @@ export function ChoiceGrid({
           <div className="nh-choicegrid-controls">
             {searchable && (
               <div className="nh-choicegrid-search">
-                <span className="nh-choicegrid-search-icon" aria-hidden="true"><IconSearch /></span>
+                <span className="nh-choicegrid-search-icon" aria-hidden="true">
+                  <IconSearch />
+                </span>
                 <Input
                   id={searchId}
                   type="search"
@@ -182,7 +223,13 @@ export function ChoiceGrid({
               </div>
             )}
             {facets && facetValue != null && onFacetChange && (
-              <SegmentedControl size="sm" ariaLabel={facetLabel} options={[...facets]} value={facetValue} onChange={onFacetChange} />
+              <SegmentedControl
+                size="sm"
+                ariaLabel={facetLabel}
+                options={[...facets]}
+                value={facetValue}
+                onChange={onFacetChange}
+              />
             )}
           </div>
         )}
@@ -199,14 +246,18 @@ export function ChoiceGrid({
             point at it as a description. */}
         {showLockedNotice && (
           <p className="nh-choicegrid-locked" id={lockedNoticeId}>
-            <span className="nh-choicegrid-locked-icon" aria-hidden="true"><IconWarning /></span>
+            <span className="nh-choicegrid-locked-icon" aria-hidden="true">
+              <IconWarning />
+            </span>
             {lockedReason}
           </p>
         )}
 
         {shown.length === 0 ? (
           <div className="nh-empty">
-            <span className="nh-empty-icon" aria-hidden="true"><IconSearch /></span>
+            <span className="nh-empty-icon" aria-hidden="true">
+              <IconSearch />
+            </span>
             <span className="nh-empty-title">{emptyTitle}</span>
             <span className="nh-empty-text">{emptyText}</span>
             {emptyAction}
@@ -243,14 +294,18 @@ export function ChoiceGrid({
                   disabledReason={option.disabled === true ? option.disabledReason : undefined}
                   {...(byCapacity && showLockedNotice ? { "aria-describedby": lockedNoticeId } : {})}
                   /* Reading is never locked: the reference control stays live on a disabled card. */
-                  action={onInspect
-                    ? <button
+                  action={
+                    onInspect ? (
+                      <button
                         type="button"
                         className="nh-choice-info interactive"
                         aria-label={inspectLabel(option)}
                         onClick={() => onInspect(option.value)}
-                      ><IconInfo /></button>
-                    : undefined}
+                      >
+                        <IconInfo />
+                      </button>
+                    ) : undefined
+                  }
                 />
               );
             })}

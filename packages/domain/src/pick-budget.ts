@@ -8,11 +8,13 @@ export type PickBudgetScaling = Readonly<{ type: "class-resource-growth"; id: st
 export type PickBudgetGrant = Readonly<{ offer: string; amount?: number | null; scaling?: PickBudgetScaling | null }>;
 
 /** Structural so both the server's `ClassLevelRow` and the wire's `ContentClassLevelRow` satisfy it. */
-export type PrintedResourceRow = Readonly<{ level: number; classResources: ReadonlyArray<Readonly<{ id: string; amount: number | string }>> }>;
+export type PrintedResourceRow = Readonly<{
+  level: number;
+  classResources: ReadonlyArray<Readonly<{ id: string; amount: number | string }>>;
+}>;
 
 /** A printed cell as a count; a dice string ("3d6") reads as absent. */
-const countOf = (amount: number | string | undefined): number | null =>
-  typeof amount === "number" ? amount : null;
+const countOf = (amount: number | string | undefined): number | null => (typeof amount === "number" ? amount : null);
 
 const valueAt = (table: readonly PrintedResourceRow[], level: number, id: string): number | null =>
   countOf(table.find((row) => row.level === level)?.classResources.find((resource) => resource.id === id)?.amount);

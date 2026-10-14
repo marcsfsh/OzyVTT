@@ -33,16 +33,30 @@ export function useCodexSearch(
   useEffect(() => {
     const trimmed = query.trim();
     // An empty box resets immediately and fires nothing.
-    if (!trimmed) { setState({ status: "idle" }); return; }
+    if (!trimmed) {
+      setState({ status: "idle" });
+      return;
+    }
     let live = true;
     // Loading is set on the keystroke, so the previous query's hits never pose as this query's.
     setState({ status: "loading" });
     const timer = setTimeout(() => {
       void search(trimmed)
-        .then((result) => { if (live) setState({ status: "ready", hits: result.hits, truncated: result.truncated }); })
-        .catch((cause: unknown) => { if (live) setState({ status: "error", message: cause instanceof Error ? cause.message : "The search could not be completed." }); });
+        .then((result) => {
+          if (live) setState({ status: "ready", hits: result.hits, truncated: result.truncated });
+        })
+        .catch((cause: unknown) => {
+          if (live)
+            setState({
+              status: "error",
+              message: cause instanceof Error ? cause.message : "The search could not be completed."
+            });
+        });
     }, SEARCH_DEBOUNCE_MS);
-    return () => { live = false; clearTimeout(timer); };
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
   }, [query, search, refreshKey]);
   return state;
 }
@@ -51,7 +65,9 @@ export function useCodexSearch(
  * Kind reads by icon and label, never colour alone. Pages use their entity type's glyph; other kinds get a
  * fixed glyph because the hit doesn't carry a marker's own icon.
  */
-const KIND_MARKS: Readonly<Record<Exclude<CodexRecordKind, "page">, Readonly<{ icon: string; label: string; color: string }>>> = {
+const KIND_MARKS: Readonly<
+  Record<Exclude<CodexRecordKind, "page">, Readonly<{ icon: string; label: string; color: string }>>
+> = {
   // `scroll`, not `hourglass` (an `event` page's glyph), so journal and event hits differ.
   journal: { icon: "scroll", label: "Journal", color: "var(--cyan)" },
   map: { icon: "compass", label: "Map", color: "var(--codex-type-location)" },
@@ -73,11 +89,19 @@ export function searchHitTitle(hit: CodexSearchHit): string {
   const title = hit.title.trim();
   if (title) return title;
   // Session titles are built server-side and never empty; the fallback is just for safety.
-  return hit.kind === "marker" ? "Unlabelled pin" : hit.kind === "journal" ? "Untitled entry" : hit.kind === "session" ? "Untitled session" : "Untitled";
+  return hit.kind === "marker"
+    ? "Unlabelled pin"
+    : hit.kind === "journal"
+      ? "Untitled entry"
+      : hit.kind === "session"
+        ? "Untitled session"
+        : "Untitled";
 }
 
 /** Unique across kinds. */
-export function searchHitKey(hit: CodexSearchHit): string { return `${hit.kind}:${hit.id}`; }
+export function searchHitKey(hit: CodexSearchHit): string {
+  return `${hit.kind}:${hit.id}`;
+}
 
 export type SearchResultRowProps = Readonly<{
   hit: CodexSearchHit;
@@ -90,18 +114,29 @@ export type SearchResultRowProps = Readonly<{
 export function SearchResultRow({ hit, active = false, onOpen, onHover }: SearchResultRowProps) {
   const mark = hit.kind === "page" ? null : KIND_MARKS[hit.kind];
   return (
-    <button type="button" className={`codex-hit${active ? " is-active" : ""}`} onClick={() => onOpen(hit)} onMouseEnter={onHover}>
+    <button
+      type="button"
+      className={`codex-hit${active ? " is-active" : ""}`}
+      onClick={() => onOpen(hit)}
+      onMouseEnter={onHover}
+    >
       <span className="codex-hit-glyph">
-        {mark
-          ? <CodexIcon iconId={mark.icon} className="codex-ent-icon codex-hit-ic" style={{ color: mark.color }} />
-          : <EntityIcon type={hit.entityType ?? "note"} className="codex-hit-ic" />}
+        {mark ? (
+          <CodexIcon iconId={mark.icon} className="codex-ent-icon codex-hit-ic" style={{ color: mark.color }} />
+        ) : (
+          <EntityIcon type={hit.entityType ?? "note"} className="codex-hit-ic" />
+        )}
       </span>
       <span className="codex-hit-text">
         <span className="codex-hit-title">{searchHitTitle(hit)}</span>
         <span className="codex-hit-meta">
           <span className="codex-hit-kind">{searchHitKindLabel(hit)}</span>
           {/* Read-only tags, for scanning. */}
-          {hit.tags.slice(0, 3).map((tag) => <span key={tag} className="codex-hit-tag">#{tag}</span>)}
+          {hit.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="codex-hit-tag">
+              #{tag}
+            </span>
+          ))}
         </span>
       </span>
     </button>
@@ -120,16 +155,35 @@ export type SearchResultListProps = Readonly<{
 /** The whole result list including loading and error states. Renders nothing while idle. */
 export function SearchResultList({ state, onOpen, selectedId = null, emptyLabel }: SearchResultListProps) {
   if (state.status === "idle") return null;
-  if (state.status === "loading") return <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
-  if (state.status === "error") return <Alert tone="danger" title="Search failed">{state.message}</Alert>;
+  if (state.status === "loading")
+    return (
+      <div className="codex-list-loading">
+        {[0, 1, 2].map((row) => (
+          <Skeleton key={row} variant="text" />
+        ))}
+      </div>
+    );
+  if (state.status === "error")
+    return (
+      <Alert tone="danger" title="Search failed">
+        {state.message}
+      </Alert>
+    );
   if (state.hits.length === 0) return <p className="codex-list-empty">{emptyLabel}</p>;
   return (
     <>
       {state.hits.map((hit) => (
-        <SearchResultRow key={searchHitKey(hit)} hit={hit} active={hit.kind === "page" && hit.id === selectedId} onOpen={onOpen} />
+        <SearchResultRow
+          key={searchHitKey(hit)}
+          hit={hit}
+          active={hit.kind === "page" && hit.id === selectedId}
+          onOpen={onOpen}
+        />
       ))}
       {/* The Codex is unpaginated, so a clipped list says so; there is no page 2. */}
-      {state.truncated && <p className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} matches. Narrow the search.</p>}
+      {state.truncated && (
+        <p className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} matches. Narrow the search.</p>
+      )}
     </>
   );
 }

@@ -16,7 +16,13 @@ const ON: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
 const OFF: CodexAutosaveSettings = { enabled: false, intervalSeconds: 1 };
 
 /** A minimal editor: one field, the hook and its readout. */
-function Editor({ settings, save, onConflict, initial = "a", disabled = false }: Readonly<{
+function Editor({
+  settings,
+  save,
+  onConflict,
+  initial = "a",
+  disabled = false
+}: Readonly<{
   settings: CodexAutosaveSettings;
   save: (draft: { text: string }) => Promise<void>;
   onConflict?: () => void;
@@ -30,13 +36,20 @@ function Editor({ settings, save, onConflict, initial = "a", disabled = false }:
       <input aria-label="Body" value={text} onChange={(event) => setText(event.target.value)} />
       <output aria-label="Status">{autosave.status}</output>
       <output aria-label="Dirty">{String(autosave.dirty)}</output>
-      <button type="button" onClick={() => void autosave.flush()}>Save now</button>
+      <button type="button" onClick={() => void autosave.flush()}>
+        Save now
+      </button>
     </div>
   );
 }
 
-afterEach(() => { vi.useRealTimers(); goTo("/"); });
-beforeEach(() => { goTo("/codex/pages/p1"); });
+afterEach(() => {
+  vi.useRealTimers();
+  goTo("/");
+});
+beforeEach(() => {
+  goTo("/codex/pages/p1");
+});
 
 describe("Autosave ON", () => {
   it("saves after the interval and never renders a Save button's job as the GM's", async () => {
@@ -46,9 +59,11 @@ describe("Autosave ON", () => {
     render(<Editor settings={ON} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    expect(save).not.toHaveBeenCalled();               // not on the keystroke
+    expect(save).not.toHaveBeenCalled(); // not on the keystroke
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(save.mock.calls[0][0]).toEqual({ text: "ab" });
     await waitFor(() => expect(screen.getByLabelText("Status")).toHaveTextContent("saved"));
@@ -61,7 +76,9 @@ describe("Autosave ON", () => {
     render(<Editor settings={ON} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "bcdef");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(save.mock.calls[0][0]).toEqual({ text: "abcdef" });
   });
@@ -73,9 +90,13 @@ describe("Autosave ON", () => {
     render(<Editor settings={{ enabled: true, intervalSeconds: 5 }} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
     expect(save).not.toHaveBeenCalled();
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_100); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_100);
+    });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
   });
 
@@ -85,21 +106,30 @@ describe("Autosave ON", () => {
     const inFlight: string[] = [];
     const save = vi.fn((draft: { text: string }) => {
       inFlight.push(draft.text);
-      return new Promise<void>((resolve) => { release = resolve; });
+      return new Promise<void>((resolve) => {
+        release = resolve;
+      });
     });
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Editor settings={ON} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
 
     await user.type(screen.getByLabelText("Body"), "c");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_500); });
-    expect(save).toHaveBeenCalledTimes(1);                 // ...and nothing started
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_500);
+    });
+    expect(save).toHaveBeenCalledTimes(1); // ...and nothing started
 
-    await act(async () => { release!(); await Promise.resolve(); });
+    await act(async () => {
+      release!();
+      await Promise.resolve();
+    });
     // Only once the first settles does the second run, with the latest draft.
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
     expect(inFlight).toEqual(["ab", "abc"]);
@@ -113,7 +143,9 @@ describe("Autosave ON", () => {
     render(<Editor settings={ON} save={save} onConflict={onConflict} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
     await waitFor(() => expect(screen.getByLabelText("Status")).toHaveTextContent("conflict"));
     // "conflict" offers Reload, "error" offers Retry; retrying a 409 with a stale rev fails forever.
     expect(onConflict).toHaveBeenCalledTimes(1);
@@ -126,7 +158,9 @@ describe("Autosave ON", () => {
     render(<Editor settings={ON} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
     await waitFor(() => expect(screen.getByLabelText("Status")).toHaveTextContent("error"));
   });
 
@@ -161,7 +195,9 @@ describe("Autosave OFF", () => {
     render(<Editor settings={OFF} save={save} />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
     expect(save).not.toHaveBeenCalled();
   });
 
@@ -287,7 +323,9 @@ describe("Disabled", () => {
     render(<Editor settings={OFF} save={save} disabled />);
 
     await user.type(screen.getByLabelText("Body"), "b");
-    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
     expect(save).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Dirty")).toHaveTextContent("false");
 

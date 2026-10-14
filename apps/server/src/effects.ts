@@ -16,8 +16,10 @@ export function applyConditionDirect(actor: Actor, conditionId: string, level?: 
   if (actor.conditionImmunities.includes(conditionId)) return false;
   const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
   if (remaining.length >= 20) return false;
-  actor.conditions = [...remaining, { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }]
-    .sort((left, right) => left.id.localeCompare(right.id));
+  actor.conditions = [
+    ...remaining,
+    { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }
+  ].sort((left, right) => left.id.localeCompare(right.id));
   return true;
 }
 
@@ -31,7 +33,12 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
 
 /** Adds an effect (idempotent by id). A grant from the same source actor and action replaces the older
  *  instance (a re-declared Rage refreshes rather than stacks). Applies linked conditions. */
-export function addEffect(state: GameState, actorId: string, effect: EffectInstance, events?: EffectNarration[]): EffectInstance {
+export function addEffect(
+  state: GameState,
+  actorId: string,
+  effect: EffectInstance,
+  events?: EffectNarration[]
+): EffectInstance {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
@@ -41,14 +48,19 @@ export function addEffect(state: GameState, actorId: string, effect: EffectInsta
     const ended = endConcentrationSustainedBy(state, effect.sourceActorId);
     events?.push(...ended);
   }
-  const replaced = effect.sourceActionId !== null
-    ? actor.effects.find((candidate) => candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId)
-    : undefined;
+  const replaced =
+    effect.sourceActionId !== null
+      ? actor.effects.find(
+          (candidate) =>
+            candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId
+        )
+      : undefined;
   if (replaced) {
     // Refresh in place: no onEnd fires, linked conditions stay (re-applied below for safety).
-    actor.effects = actor.effects.map((candidate) => candidate.id === replaced.id ? effect : candidate);
+    actor.effects = actor.effects.map((candidate) => (candidate.id === replaced.id ? effect : candidate));
   } else {
-    if (actor.effects.length >= MAX_EFFECTS) throw new CommandRejectedError("That combatant already has too many active effects.");
+    if (actor.effects.length >= MAX_EFFECTS)
+      throw new CommandRejectedError("That combatant already has too many active effects.");
     actor.effects = [...actor.effects, effect];
   }
   for (const conditionId of effect.linkedConditionIds) applyConditionDirect(actor, conditionId);
@@ -56,7 +68,11 @@ export function addEffect(state: GameState, actorId: string, effect: EffectInsta
 }
 
 /** Exhaustion stacks by level (cap 6); other conditions are simple presence. Engine-owned onEnd path only. */
-function grantConditionOnEnd(actor: Actor, conditionId: string, level: number | undefined): { level: number | undefined; becameFatal: boolean } {
+function grantConditionOnEnd(
+  actor: Actor,
+  conditionId: string,
+  level: number | undefined
+): { level: number | undefined; becameFatal: boolean } {
   if (conditionId === "exhaustion") {
     const existing = actor.conditions.find((condition) => condition.id === "exhaustion")?.level ?? 0;
     const next = Math.min(6, existing + (level ?? 1));
@@ -91,17 +107,30 @@ function endEffectInternal(state: GameState, actor: Actor, effectId: string, eve
   for (const conditionId of effect.linkedConditionIds) {
     if (actor.effects.some((candidate) => candidate.linkedConditionIds.includes(conditionId))) continue;
     removeConditionDirect(actor, conditionId);
-    events.push({ kind: "condition", text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`, actorId: actor.id });
+    events.push({
+      kind: "condition",
+      text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`,
+      actorId: actor.id
+    });
   }
   for (const grant of effect.onEnd) {
     const granted = grantConditionOnEnd(actor, grant.conditionId, grant.level);
-    events.push({ kind: "condition", text: `${actor.name} gains ${conditionLabel(grant.conditionId)}${grant.conditionId === "exhaustion" ? ` ${granted.level ?? 1}` : ""} (${effect.name} ended).`, actorId: actor.id });
+    events.push({
+      kind: "condition",
+      text: `${actor.name} gains ${conditionLabel(grant.conditionId)}${grant.conditionId === "exhaustion" ? ` ${granted.level ?? 1}` : ""} (${effect.name} ended).`,
+      actorId: actor.id
+    });
     if (granted.becameFatal) events.push(...applyExhaustionDeath(state, actor));
   }
   // Cascade: effects that exist only while another tag is present end with it (Frenzy's marker ends with
   // the Rage, firing its Exhaustion once).
   for (const dependent of [...actor.effects]) {
-    if (dependent.endsWithTag !== null && !actor.effects.some((candidate) => candidate.id !== dependent.id && candidate.tags.includes(dependent.endsWithTag!))) {
+    if (
+      dependent.endsWithTag !== null &&
+      !actor.effects.some(
+        (candidate) => candidate.id !== dependent.id && candidate.tags.includes(dependent.endsWithTag!)
+      )
+    ) {
       endEffectInternal(state, actor, dependent.id, events);
     }
   }
@@ -185,7 +214,9 @@ export function expireEffectsAtTurnStart(state: GameState, incomingActorId: stri
         if (remaining <= 0) {
           endEffectInternal(state, actor, effect.id, events);
         } else {
-          actor.effects = actor.effects.map((candidate) => candidate.id === effect.id ? { ...candidate, duration: { type: "rounds", remaining } } : candidate);
+          actor.effects = actor.effects.map((candidate) =>
+            candidate.id === effect.id ? { ...candidate, duration: { type: "rounds", remaining } } : candidate
+          );
         }
       }
     }
@@ -206,7 +237,11 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
 
 /** Damage defences from active effects, merged with the definition's by the caller. One `sources` map
  *  serves both lists, since a type is never both (they cancel). */
-export function effectDamageDefenses(actor: Actor): { resistances: string[]; vulnerabilities: string[]; sources: Map<string, string> } {
+export function effectDamageDefenses(actor: Actor): {
+  resistances: string[];
+  vulnerabilities: string[];
+  sources: Map<string, string>;
+} {
   const resistances: string[] = [];
   const vulnerabilities: string[] = [];
   const sources = new Map<string, string>();

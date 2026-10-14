@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { BuilderPolicySchema, GameStateSchema, extraPickAmount, resolveSpellcasting, type GameState } from "@vtt/domain";
+import {
+  BuilderPolicySchema,
+  GameStateSchema,
+  extraPickAmount,
+  resolveSpellcasting,
+  type GameState
+} from "@vtt/domain";
 import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
-import { buildCharacterDefinition, NAMED_PICK_BUDGETS, type CharacterCreateRequestInput } from "../src/character-build.js";
+import {
+  buildCharacterDefinition,
+  NAMED_PICK_BUDGETS,
+  type CharacterCreateRequestInput
+} from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
@@ -24,7 +34,10 @@ const ACTOR_ID = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 // one field. This mapped type strips readonly (including the nested `choices` array).
 type MutableCreateInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
   choices: Array<CharacterCreateRequestInput["choices"][number]>;
-  backgroundBonusAllocation: Array<{ ability: CharacterCreateRequestInput["backgroundBonusAllocation"][number]["ability"]; amount: number }>;
+  backgroundBonusAllocation: Array<{
+    ability: CharacterCreateRequestInput["backgroundBonusAllocation"][number]["ability"];
+    amount: number;
+  }>;
 };
 
 const fighterInput = (): MutableCreateInput => ({
@@ -36,7 +49,10 @@ const fighterInput = (): MutableCreateInput => ({
   subclassId: "champion",
   abilityMethod: "standard-array",
   baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "str", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -69,7 +85,10 @@ const wizardInput = (): MutableCreateInput => ({
   subclassId: "evoker",
   abilityMethod: "standard-array",
   baseScores: { str: 10, dex: 14, con: 13, int: 15, wis: 12, cha: 8 },
-  backgroundBonusAllocation: [{ ability: "int", amount: 2 }, { ability: "con", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "int", amount: 2 },
+    { ability: "con", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -114,7 +133,10 @@ const warlockInput = (): MutableCreateInput => ({
   subclassId: "fiend-patron",
   abilityMethod: "standard-array",
   baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
-  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "cha", amount: 2 },
+    { ability: "wis", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -126,11 +148,41 @@ const warlockInput = (): MutableCreateInput => ({
     // Five invocations at level 5: the printed Invocations column runs 1 -> 3 (L2) -> 5 (L5), and
     // `class-resource-growth` lets the budget follow it. Each is stamped at the level gained, so a rebuild
     // down drops the ones the smaller column no longer pays for.
-    { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
-    { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "devils-sight", payload: { featureId: "eldritch-invocations" } },
-    { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-mind", payload: { featureId: "eldritch-invocations" } },
-    { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-spear", payload: { featureId: "eldritch-invocations" } },
-    { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "repelling-blast", payload: { featureId: "eldritch-invocations" } },
+    {
+      level: 1,
+      classId: "warlock",
+      kind: "eldritch-invocation",
+      id: "agonizing-blast",
+      payload: { featureId: "eldritch-invocations" }
+    },
+    {
+      level: 2,
+      classId: "warlock",
+      kind: "eldritch-invocation",
+      id: "devils-sight",
+      payload: { featureId: "eldritch-invocations" }
+    },
+    {
+      level: 2,
+      classId: "warlock",
+      kind: "eldritch-invocation",
+      id: "eldritch-mind",
+      payload: { featureId: "eldritch-invocations" }
+    },
+    {
+      level: 5,
+      classId: "warlock",
+      kind: "eldritch-invocation",
+      id: "eldritch-spear",
+      payload: { featureId: "eldritch-invocations" }
+    },
+    {
+      level: 5,
+      classId: "warlock",
+      kind: "eldritch-invocation",
+      id: "repelling-blast",
+      payload: { featureId: "eldritch-invocations" }
+    },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
@@ -145,7 +197,8 @@ const warlockInput = (): MutableCreateInput => ({
 
 describe("2a - a built Warlock carries the SRD's real feature prose, not a pointer at the SRD", () => {
   const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
-  const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> }).traits;
+  const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> })
+    .traits;
   const traitNamed = (name: string) => traits.find((trait) => trait.name === name);
 
   it("lands Pact Magic, Eldritch Invocations and Magical Cunning as readable prose", () => {
@@ -155,11 +208,13 @@ describe("2a - a built Warlock carries the SRD's real feature prose, not a point
   });
 
   it("carries no trait whose description is the SRD-pointer stub", () => {
-    const stubbed = traits.filter((trait) => /^See the .* in SRD 5\.2\.1\.$/.test(trait.description)).map((trait) => trait.name);
+    const stubbed = traits
+      .filter((trait) => /^See the .* in SRD 5\.2\.1\.$/.test(trait.description))
+      .map((trait) => trait.name);
     expect(stubbed, `these traits reached the sheet as a pointer instead of prose: ${stubbed.join(", ")}`).toEqual([]);
   });
 
-  it("does not offer a prose-less \"Subclass Feature\" trait at levels the subclass fills", () => {
+  it('does not offer a prose-less "Subclass Feature" trait at levels the subclass fills', () => {
     // The printed table's "Subclass feature" cell is a reminder, not a class feature, and has no text.
     expect(traits.map((trait) => trait.name)).not.toContain("Subclass Feature");
   });
@@ -193,7 +248,9 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     // Same Defense pick with the "take the gold" equipment option: no body armor, so the rider must not
     // apply and AC falls back to 10 + Dex.
     const unarmored = fighterInput();
-    unarmored.choices = unarmored.choices.map((row) => row.kind === "equipment" && row.id === "fighter-a" ? { ...row, id: "fighter-c" } : row);
+    unarmored.choices = unarmored.choices.map((row) =>
+      row.kind === "equipment" && row.id === "fighter-a" ? { ...row, id: "fighter-c" } : row
+    );
     const built = buildCharacterDefinition(unarmored, library, defaultPolicy);
     const wearsArmor = (built.startingInventory ?? []).some((item) => item.equipped && item.category === "armor");
     expect(wearsArmor).toBe(false);
@@ -222,42 +279,88 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
   });
 
   it("keeps rider-less features as prose traits the sheet already renders", () => {
-    const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
-    for (const name of ["Improved Critical", "Tactical Mind", "Extra Attack", "Alert", "Defense", "Savage Attacker", "Resourceful"]) {
+    const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map(
+      (trait) => trait.name
+    );
+    for (const name of [
+      "Improved Critical",
+      "Tactical Mind",
+      "Extra Attack",
+      "Alert",
+      "Defense",
+      "Savage Attacker",
+      "Resourceful"
+    ]) {
       expect(traits, name).toContain(name);
     }
   });
 
   it("assembles identity, feats, and the verbatim choices ledger", () => {
-    expect(definition.character?.classes).toEqual([{ id: "fighter", name: "Fighter", level: 5, hitDie: "d10", subclass: { id: "champion", name: "Champion" } }]);
+    expect(definition.character?.classes).toEqual([
+      { id: "fighter", name: "Fighter", level: 5, hitDie: "d10", subclass: { id: "champion", name: "Champion" } }
+    ]);
     expect(definition.character?.race).toEqual({ id: "human", name: "Human" });
     expect(definition.character?.background).toEqual({ id: "soldier", name: "Soldier" });
     // The origin feat (Savage Attacker), the versatile pick (Alert), the fighting style (Defense),
     // and the level-4 ASI-as-feat all record on the sheet's feat list.
-    expect(definition.character?.feats.map((feat) => feat.id).sort()).toEqual(["ability-score-improvement", "alert", "defense", "savage-attacker"]);
+    expect(definition.character?.feats.map((feat) => feat.id).sort()).toEqual([
+      "ability-score-improvement",
+      "alert",
+      "defense",
+      "savage-attacker"
+    ]);
     // The ledger is the input's rows verbatim, plus the rolled hit points the build consumed, so a
     // level-down/level-up round trip lands on the same maximum.
-    expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(fighterInput().choices);
-    expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll"))
-      .toEqual((fighterInput().hp.entries ?? []).map((roll, index) => ({ level: index + 2, kind: "hp-roll", id: "hp", payload: { roll } })));
+    expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(
+      fighterInput().choices
+    );
+    expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll")).toEqual(
+      (fighterInput().hp.entries ?? []).map((roll, index) => ({
+        level: index + 2,
+        kind: "hp-roll",
+        id: "hp",
+        payload: { roll }
+      }))
+    );
     expect(definition.summary).toContain("Level 5 Human Fighter (Champion)");
     expect(definition.spellcasting).toBeUndefined();
   });
 
   it("resolves both equipment options into a mechanical inventory plus the gold", () => {
     const ids = (definition.startingInventory ?? []).map((item) => item.id);
-    for (const id of ["chain-mail", "greatsword", "flail", "javelin", "dungeoneers-pack", "spear", "shortbow", "arrows-20", "gaming-set-dice", "healers-kit", "quiver", "travelers-clothes"]) {
+    for (const id of [
+      "chain-mail",
+      "greatsword",
+      "flail",
+      "javelin",
+      "dungeoneers-pack",
+      "spear",
+      "shortbow",
+      "arrows-20",
+      "gaming-set-dice",
+      "healers-kit",
+      "quiver",
+      "travelers-clothes"
+    ]) {
       expect(ids, id).toContain(id);
     }
     expect((definition.startingInventory ?? []).find((item) => item.id === "javelin")?.quantity).toBe(8);
-    expect((definition.startingInventory ?? []).find((item) => item.id === "greatsword")?.weapon?.damageDice).toBe("2d6");
+    expect((definition.startingInventory ?? []).find((item) => item.id === "greatsword")?.weapon?.damageDice).toBe(
+      "2d6"
+    );
     expect(definition.startingCurrency?.gp).toBe(18);
   });
 
   it("supports the built-in 'asi' shorthand as an alternative to the catalog ASI feat", () => {
     const input = fighterInput();
     input.choices = input.choices.filter((row) => row.kind !== "asi-or-feat" && row.kind !== "ability-score");
-    input.choices.push({ level: 4, classId: "fighter", kind: "asi-or-feat", id: "asi", payload: { increases: [{ ability: "str", amount: 2 }] } });
+    input.choices.push({
+      level: 4,
+      classId: "fighter",
+      kind: "asi-or-feat",
+      id: "asi",
+      payload: { increases: [{ ability: "str", amount: 2 }] }
+    });
     const viaShorthand = buildCharacterDefinition(input, library, defaultPolicy);
     expect(viaShorthand.abilityScores.str).toBe(19);
   });
@@ -274,7 +377,12 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     // `instantiate` re-derives AC from the loadout, so the builder's flat rider (Defense +1) must survive.
     expect(actor.armorClass).toBe(17);
     expect(actor.armorClass).toBe(definition.armorClass);
-    expect(actor.hitDice).toMatchObject({ die: "d10", maximum: 5, remaining: 5, entries: [{ die: "d10", maximum: 5, remaining: 5 }] });
+    expect(actor.hitDice).toMatchObject({
+      die: "d10",
+      maximum: 5,
+      remaining: 5,
+      entries: [{ die: "d10", maximum: 5, remaining: 5 }]
+    });
     expect(actor.spellSlots).toBeNull();
     expect(GameStateSchema.parse(state)).toBeTruthy(); // the whole state (definition included) re-parses
   });
@@ -294,24 +402,47 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(definition.spellcasting?.ability).toBe("int");
     expect(definition.spellcasting?.saveDc).toBe(13); // 8 + 2 + 3
     expect(definition.spellcasting?.attackBonus).toBe(5);
-    expect(definition.spellcasting?.slots).toEqual([{ level: 1, max: 4 }, { level: 2, max: 2 }]);
+    expect(definition.spellcasting?.slots).toEqual([
+      { level: 1, max: 4 },
+      { level: 2, max: 2 }
+    ]);
     expect(definition.spellcasting?.classes).toHaveLength(1);
     expect(definition.spellcasting?.classes?.[0]).toMatchObject({ classId: "wizard", ability: "int", prepared: 6 });
     // The assembled sheet answers the documented resolution order: per-class entry by classId, and the
     // top-level fields for single-class readers.
-    expect(resolveSpellcasting(definition.spellcasting, "wizard")).toEqual({ classId: "wizard", ability: "int", saveDc: 13, attackBonus: 5 });
+    expect(resolveSpellcasting(definition.spellcasting, "wizard")).toEqual({
+      classId: "wizard",
+      ability: "int",
+      saveDc: 13,
+      attackBonus: 5
+    });
     expect(resolveSpellcasting(definition.spellcasting)).toMatchObject({ ability: "int", saveDc: 13 });
   });
 
   it("collects chosen cantrips/spells, Evocation Savant picks, Magic Initiate cantrips, and the lineage grant", () => {
     const spells = new Map((definition.spellcasting?.spells ?? []).map((spell) => [spell.id, spell]));
     expect([...spells.keys()].sort()).toEqual([
-      "dancing-lights", "detect-magic", "fire-bolt", "light", "mage-armor", "mage-hand",
-      "magic-missile", "minor-illusion", "misty-step", "prestidigitation", "shatter", "thunderwave"
+      "dancing-lights",
+      "detect-magic",
+      "fire-bolt",
+      "light",
+      "mage-armor",
+      "mage-hand",
+      "magic-missile",
+      "minor-illusion",
+      "misty-step",
+      "prestidigitation",
+      "shatter",
+      "thunderwave"
     ]);
     expect(spells.get("fire-bolt")?.alwaysPrepared).toBe(true); // class cantrip
     expect(spells.get("prestidigitation")?.alwaysPrepared).toBe(true); // High Elf lineage grant
-    expect(spells.get("magic-missile")).toMatchObject({ level: 1, prepared: true, alwaysPrepared: false, classId: "wizard" });
+    expect(spells.get("magic-missile")).toMatchObject({
+      level: 1,
+      prepared: true,
+      alwaysPrepared: false,
+      classId: "wizard"
+    });
     expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: true }); // savant pick, outside the prepared cap
   });
 
@@ -322,7 +453,11 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(definition.proficiencies?.saves).toEqual(["int", "wis"]);
     expect(definition.proficiencies?.tools).toEqual(["calligraphers-supplies"]);
     expect(definition.proficiencies?.languages).toEqual(["common", "elvish", "dwarvish", "giant"]);
-    expect(definition.character?.race).toEqual({ id: "elf", name: "Elf", subrace: { id: "high-elf", name: "High Elf" } });
+    expect(definition.character?.race).toEqual({
+      id: "elf",
+      name: "Elf",
+      subrace: { id: "high-elf", name: "High Elf" }
+    });
   });
 
   it("merges overlapping starting-equipment items instead of duplicating rows", () => {
@@ -348,7 +483,9 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     // Two swings, one character, differing only by Finesse. DEX +2, STR +0, PB +2.
     const state = emptyState();
     importActorDefinition(state, definition, ACTOR_ID, "public");
-    const derivation = deriveEquipment(state.actors[0], definition, { equipmentRecord: (id: string) => library.equipmentRecord(id) });
+    const derivation = deriveEquipment(state.actors[0], definition, {
+      equipmentRecord: (id: string) => library.equipmentRecord(id)
+    });
     const swing = (id: string) => derivation.actions.find((action) => action.id === `item-${id}`)!;
     expect(swing("dagger").attack!.bonus).toBe(4);
     expect(swing("dagger").damage![0].formula).toBe("1d4 + 2");
@@ -360,21 +497,42 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     const state = emptyState();
     importActorDefinition(state, definition, ACTOR_ID, "public");
     const actor = state.actors[0];
-    expect(actor.spellSlots).toEqual([{ level: 1, remaining: 4 }, { level: 2, remaining: 2 }]);
+    expect(actor.spellSlots).toEqual([
+      { level: 1, remaining: 4 },
+      { level: 2, remaining: 2 }
+    ]);
     expect(actor.hitDice).toMatchObject({ die: "d6", maximum: 3, remaining: 3 });
     expect([...actor.preparedSpellIds].sort()).toEqual([
-      "dancing-lights", "detect-magic", "fire-bolt", "light", "mage-armor", "mage-hand",
-      "magic-missile", "minor-illusion", "misty-step", "prestidigitation", "shatter", "thunderwave"
+      "dancing-lights",
+      "detect-magic",
+      "fire-bolt",
+      "light",
+      "mage-armor",
+      "mage-hand",
+      "magic-missile",
+      "minor-illusion",
+      "misty-step",
+      "prestidigitation",
+      "shatter",
+      "thunderwave"
     ]);
   });
 });
 
 describe("buildCharacterDefinition - loud rejections", () => {
   it("rejects unknown identity ids", () => {
-    expect(() => buildCharacterDefinition({ ...fighterInput(), speciesId: "gnoll" }, library, defaultPolicy)).toThrowError(/No species "gnoll"/);
-    expect(() => buildCharacterDefinition({ ...fighterInput(), backgroundId: "pirate" }, library, defaultPolicy)).toThrowError(/No background "pirate"/);
-    expect(() => buildCharacterDefinition({ ...fighterInput(), classId: "warlord" }, library, defaultPolicy)).toThrowError(/No class "warlord"/);
-    expect(() => buildCharacterDefinition({ ...fighterInput(), subclassId: "banneret" }, library, defaultPolicy)).toThrowError(/No subclass "banneret"/);
+    expect(() =>
+      buildCharacterDefinition({ ...fighterInput(), speciesId: "gnoll" }, library, defaultPolicy)
+    ).toThrowError(/No species "gnoll"/);
+    expect(() =>
+      buildCharacterDefinition({ ...fighterInput(), backgroundId: "pirate" }, library, defaultPolicy)
+    ).toThrowError(/No background "pirate"/);
+    expect(() =>
+      buildCharacterDefinition({ ...fighterInput(), classId: "warlord" }, library, defaultPolicy)
+    ).toThrowError(/No class "warlord"/);
+    expect(() =>
+      buildCharacterDefinition({ ...fighterInput(), subclassId: "banneret" }, library, defaultPolicy)
+    ).toThrowError(/No subclass "banneret"/);
   });
 
   it("rejects a missing subclass at or past the class's subclass level", () => {
@@ -390,7 +548,9 @@ describe("buildCharacterDefinition - loud rejections", () => {
     expect(() => buildCharacterDefinition(stray, library, defaultPolicy)).toThrowError(/not an offered option/);
     const over = fighterInput();
     over.choices.push({ level: 1, classId: "fighter", kind: "skill", id: "history" });
-    expect(() => buildCharacterDefinition(over, library, defaultPolicy)).toThrowError(/exceeds what this build may choose/);
+    expect(() => buildCharacterDefinition(over, library, defaultPolicy)).toThrowError(
+      /exceeds what this build may choose/
+    );
     const underfilled = wizardInput();
     underfilled.choices = underfilled.choices.filter((row) => row.kind !== "expertise");
     expect(() => buildCharacterDefinition(underfilled, library, defaultPolicy)).toThrowError(/"Scholar" needs 1 pick/);
@@ -399,20 +559,32 @@ describe("buildCharacterDefinition - loud rejections", () => {
   it("rejects spells that are off-list, over the slot level, or beyond the prepared cap", () => {
     const offList = wizardInput();
     offList.choices.push({ level: 1, kind: "spell", id: "cure-wounds" });
-    expect(() => buildCharacterDefinition(offList, library, defaultPolicy)).toThrowError(/not on the Wizard spell list/);
+    expect(() => buildCharacterDefinition(offList, library, defaultPolicy)).toThrowError(
+      /not on the Wizard spell list/
+    );
     const overCap = wizardInput();
-    overCap.choices.push({ level: 1, kind: "spell", id: "shield" }, { level: 1, kind: "spell", id: "sleep" }, { level: 1, kind: "spell", id: "burning-hands" });
-    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(/prepares 6 spells at level 3; got 7/);
+    overCap.choices.push(
+      { level: 1, kind: "spell", id: "shield" },
+      { level: 1, kind: "spell", id: "sleep" },
+      { level: 1, kind: "spell", id: "burning-hands" }
+    );
+    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(
+      /prepares 6 spells at level 3; got 7/
+    );
     const overLevel = wizardInput();
     overLevel.choices = overLevel.choices.filter((row) => row.id !== "misty-step");
     overLevel.choices.push({ level: 3, kind: "spell", id: "fireball" });
-    expect(() => buildCharacterDefinition(overLevel, library, defaultPolicy)).toThrowError(/above the highest slot level/);
+    expect(() => buildCharacterDefinition(overLevel, library, defaultPolicy)).toThrowError(
+      /above the highest slot level/
+    );
   });
 
   it("rejects hit-point entries outside [1, die] and a wrong entry count", () => {
     const outOfRange = fighterInput();
     outOfRange.hp = { mode: "entries", entries: [1, 10, 4, 11] };
-    expect(() => buildCharacterDefinition(outOfRange, library, defaultPolicy)).toThrowError(/d10 hit-point roll must be 1-10; got 11/);
+    expect(() => buildCharacterDefinition(outOfRange, library, defaultPolicy)).toThrowError(
+      /d10 hit-point roll must be 1-10; got 11/
+    );
     const wrongCount = fighterInput();
     wrongCount.hp = { mode: "entries", entries: [5, 5] };
     expect(() => buildCharacterDefinition(wrongCount, library, defaultPolicy)).toThrowError(/exactly 4 entries/);
@@ -421,23 +593,41 @@ describe("buildCharacterDefinition - loud rejections", () => {
   it("rejects scores that break the chosen method, and methods the policy does not allow", () => {
     const badArray = fighterInput();
     badArray.baseScores = { ...badArray.baseScores, str: 18 };
-    expect(() => buildCharacterDefinition(badArray, library, defaultPolicy)).toThrowError(/Standard-array scores must be exactly/);
+    expect(() => buildCharacterDefinition(badArray, library, defaultPolicy)).toThrowError(
+      /Standard-array scores must be exactly/
+    );
     const restrictive = BuilderPolicySchema.parse({ allowedAbilityMethods: ["point-buy"] });
-    expect(() => buildCharacterDefinition(fighterInput(), library, restrictive)).toThrowError(/does not allow the "standard-array"/);
+    expect(() => buildCharacterDefinition(fighterInput(), library, restrictive)).toThrowError(
+      /does not allow the "standard-array"/
+    );
     const customWithoutFormula = BuilderPolicySchema.parse({ allowedAbilityMethods: ["custom"] });
-    expect(() => buildCharacterDefinition({ ...fighterInput(), abilityMethod: "custom" }, library, customWithoutFormula)).toThrowError(/configure a formula/);
+    expect(() =>
+      buildCharacterDefinition({ ...fighterInput(), abilityMethod: "custom" }, library, customWithoutFormula)
+    ).toThrowError(/configure a formula/);
   });
 
   it("rejects an illegal background spread and a ledger row above the character's level", () => {
     const badSpread = fighterInput();
-    badSpread.backgroundBonusAllocation = [{ ability: "str", amount: 2 }, { ability: "con", amount: 2 }];
-    expect(() => buildCharacterDefinition(badSpread, library, defaultPolicy)).toThrowError(/allows \+2\/\+1 or \+1\/\+1\/\+1/);
+    badSpread.backgroundBonusAllocation = [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 2 }
+    ];
+    expect(() => buildCharacterDefinition(badSpread, library, defaultPolicy)).toThrowError(
+      /allows \+2\/\+1 or \+1\/\+1\/\+1/
+    );
     const wrongAbility = fighterInput();
-    wrongAbility.backgroundBonusAllocation = [{ ability: "cha", amount: 2 }, { ability: "con", amount: 1 }];
-    expect(() => buildCharacterDefinition(wrongAbility, library, defaultPolicy)).toThrowError(/increases STR\/DEX\/CON, not CHA/);
+    wrongAbility.backgroundBonusAllocation = [
+      { ability: "cha", amount: 2 },
+      { ability: "con", amount: 1 }
+    ];
+    expect(() => buildCharacterDefinition(wrongAbility, library, defaultPolicy)).toThrowError(
+      /increases STR\/DEX\/CON, not CHA/
+    );
     const aboveLevel = fighterInput();
     aboveLevel.choices.push({ level: 6, kind: "skill", id: "history" });
-    expect(() => buildCharacterDefinition(aboveLevel, library, defaultPolicy)).toThrowError(/above the character's level/);
+    expect(() => buildCharacterDefinition(aboveLevel, library, defaultPolicy)).toThrowError(
+      /above the character's level/
+    );
   });
 
   it("rejects ASI increases past 20 and malformed increase payloads", () => {
@@ -445,8 +635,21 @@ describe("buildCharacterDefinition - loud rejections", () => {
     past20.baseScores = { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 };
     // str 15 + 2 (background) = 17, then two catalog picks -> 19; cap holds. Use the shorthand to push past 20.
     past20.choices = past20.choices.filter((row) => row.kind !== "asi-or-feat" && row.kind !== "ability-score");
-    past20.choices.push({ level: 4, classId: "fighter", kind: "asi-or-feat", id: "asi", payload: { increases: [{ ability: "str", amount: 2 }, { ability: "str", amount: 2 }] } });
-    expect(() => buildCharacterDefinition(past20, library, defaultPolicy)).toThrowError(/cannot raise a score above 20|exactly \+2/);
+    past20.choices.push({
+      level: 4,
+      classId: "fighter",
+      kind: "asi-or-feat",
+      id: "asi",
+      payload: {
+        increases: [
+          { ability: "str", amount: 2 },
+          { ability: "str", amount: 2 }
+        ]
+      }
+    });
+    expect(() => buildCharacterDefinition(past20, library, defaultPolicy)).toThrowError(
+      /cannot raise a score above 20|exactly \+2/
+    );
     const malformed = fighterInput();
     malformed.choices = malformed.choices.filter((row) => row.kind !== "asi-or-feat" && row.kind !== "ability-score");
     malformed.choices.push({ level: 4, classId: "fighter", kind: "asi-or-feat", id: "asi" });
@@ -470,7 +673,10 @@ const clericInput = (): MutableCreateInput => ({
   subclassId: "life-domain",
   abilityMethod: "standard-array",
   baseScores: { str: 8, dex: 12, con: 14, int: 10, wis: 15, cha: 13 },
-  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "cha", amount: 1 }],
+  backgroundBonusAllocation: [
+    { ability: "wis", amount: 2 },
+    { ability: "cha", amount: 1 }
+  ],
   hp: { mode: "average" },
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
@@ -518,13 +724,21 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
   it("charges exactly the six spells that are not granted against the level-3 cap", () => {
     // Six charged picks + one that deferred to the grant = the seven authored rows.
     const charged = (definition.spellcasting?.spells ?? []).filter((spell) => spell.level > 0 && !spell.alwaysPrepared);
-    expect(charged.map((spell) => spell.id).sort())
-      .toEqual(["guiding-bolt", "healing-word", "hold-person", "prayer-of-healing", "shield-of-faith", "spiritual-weapon"]);
+    expect(charged.map((spell) => spell.id).sort()).toEqual([
+      "guiding-bolt",
+      "healing-word",
+      "hold-person",
+      "prayer-of-healing",
+      "shield-of-faith",
+      "spiritual-weapon"
+    ]);
     expect(definition.spellcasting?.classes?.[0]).toMatchObject({ classId: "cleric", prepared: 6 });
     // One more charged pick does exceed the cap: the exclusion is scoped to grants.
     const overCap = clericInput();
     overCap.choices.push({ level: 1, kind: "spell", id: "bane" });
-    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(/prepares 6 spells at level 3; got 7/);
+    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(
+      /prepares 6 spells at level 3; got 7/
+    );
   });
 
   it("still rejects the same spell recorded twice", () => {
@@ -537,7 +751,9 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
     // Protector grants Martial weapon training and Heavy armor training; option mechanics must reach the sheet.
     expect(definition.proficiencies?.armor).toContain("heavy");
     expect(definition.proficiencies?.weapons).toContain("martial");
-    const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map(
+      (trait) => trait.name
+    );
     expect(traits).toContain("Protector");
   });
 
@@ -545,25 +761,32 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
     // Thaumaturge: "you know one extra cantrip from the Cleric spell list". It is an `extraPicks` grant,
     // so the one class cantrip budget goes from 3 to 4.
     const thaumaturge = clericInput();
-    thaumaturge.choices = thaumaturge.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
+    thaumaturge.choices = thaumaturge.choices.map((row) =>
+      row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row
+    );
     thaumaturge.choices.push({ level: 1, kind: "cantrip", id: "mending" }); // a fourth untagged class cantrip
     const built = buildCharacterDefinition(thaumaturge, library, defaultPolicy);
     expect((built.spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
     expect(built.proficiencies?.armor).not.toContain("heavy"); // the other role's grant does not apply
     // The fifth is still refused, and the message names the composed cap rather than the printed one.
     const overCap = clericInput();
-    overCap.choices = overCap.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
-    overCap.choices.push({ level: 1, kind: "cantrip", id: "mending" }, { level: 1, kind: "cantrip", id: "thaumaturgy" });
-    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy))
-      .toThrowError(/Cleric knows 4 cantrips at level 3; got 5/);
+    overCap.choices = overCap.choices.map((row) => (row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row));
+    overCap.choices.push(
+      { level: 1, kind: "cantrip", id: "mending" },
+      { level: 1, kind: "cantrip", id: "thaumaturgy" }
+    );
+    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(
+      /Cleric knows 4 cantrips at level 3; got 5/
+    );
   });
 
   it("keeps the printed budget for the role that grants no extra pick (Protector)", () => {
     // Negative control: the same fourth cantrip, same class and level, with Protector chosen instead.
     const protector = clericInput(); // clericInput() already picks "protector"
     protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
-    expect(() => buildCharacterDefinition(protector, library, defaultPolicy))
-      .toThrowError(/Cleric knows 3 cantrips at level 3; got 4/);
+    expect(() => buildCharacterDefinition(protector, library, defaultPolicy)).toThrowError(
+      /Cleric knows 3 cantrips at level 3; got 4/
+    );
   });
 });
 
@@ -584,7 +807,7 @@ describe("extra picks raise the budget the server validates against", () => {
   const withCantrips = (count: number): MutableCreateInput => {
     const input = clericInput();
     input.choices = input.choices
-      .map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row)
+      .map((row) => (row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row))
       // Drop the three untagged cantrips clericInput() carries; the Magic Initiate pair is tagged and belongs
       // to the feat's own offer.
       .filter((row) => !(row.kind === "cantrip" && !row.payload));
@@ -599,8 +822,9 @@ describe("extra picks raise the budget the server validates against", () => {
     const composed = printedCantrips + grantedCantrips;
     expect(composed).toBe(4);
     expect(() => buildCharacterDefinition(withCantrips(composed), library, defaultPolicy)).not.toThrow();
-    expect(() => buildCharacterDefinition(withCantrips(composed + 1), library, defaultPolicy))
-      .toThrowError(new RegExp(`Cleric knows ${composed} cantrips at level 3; got ${composed + 1}`));
+    expect(() => buildCharacterDefinition(withCantrips(composed + 1), library, defaultPolicy)).toThrowError(
+      new RegExp(`Cleric knows ${composed} cantrips at level 3; got ${composed + 1}`)
+    );
     // The four are really on the sheet.
     const built = buildCharacterDefinition(withCantrips(composed), library, defaultPolicy);
     const cantrips = (built.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id);
@@ -614,23 +838,41 @@ describe("extra picks raise the budget the server validates against", () => {
       speciesRecord: (id: string) => {
         const real = library.speciesRecord(id);
         if (!real || id !== "human") return real;
-        return { ...real, traits: [...real.traits, {
-          id: "arcane-echo", name: "Arcane Echo", description: "You know one extra cantrip.",
-          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-cantrips", amount: 1 }]
-        }] };
+        return {
+          ...real,
+          traits: [
+            ...real.traits,
+            {
+              id: "arcane-echo",
+              name: "Arcane Echo",
+              description: "You know one extra cantrip.",
+              tags: [],
+              actions: [],
+              effects: [],
+              modifiers: [],
+              replaces: [],
+              extraPicks: [{ offer: "class-cantrips", amount: 1 }]
+            }
+          ]
+        };
       }
     });
     expect(() => buildCharacterDefinition(withCantrips(5), boosted, defaultPolicy)).not.toThrow();
-    expect(() => buildCharacterDefinition(withCantrips(6), boosted, defaultPolicy))
-      .toThrowError(/Cleric knows 5 cantrips at level 3; got 6/);
+    expect(() => buildCharacterDefinition(withCantrips(6), boosted, defaultPolicy)).toThrowError(
+      /Cleric knows 5 cantrips at level 3; got 6/
+    );
     // ...and the same trait on a Protector Cleric adds its +1 to the printed 3, not to 4.
     const protector = clericInput();
     protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
     expect(() => buildCharacterDefinition(protector, boosted, defaultPolicy)).not.toThrow();
     const overCap = clericInput();
-    overCap.choices.push({ level: 1, kind: "cantrip", id: "mending" }, { level: 1, kind: "cantrip", id: "thaumaturgy" });
-    expect(() => buildCharacterDefinition(overCap, boosted, defaultPolicy))
-      .toThrowError(/Cleric knows 4 cantrips at level 3; got 5/);
+    overCap.choices.push(
+      { level: 1, kind: "cantrip", id: "mending" },
+      { level: 1, kind: "cantrip", id: "thaumaturgy" }
+    );
+    expect(() => buildCharacterDefinition(overCap, boosted, defaultPolicy)).toThrowError(
+      /Cleric knows 4 cantrips at level 3; got 5/
+    );
   });
 
   it("raises a LIST offer's capacity (class skills), which the level row has nothing to do with", () => {
@@ -638,61 +880,103 @@ describe("extra picks raise the budget the server validates against", () => {
       speciesRecord: (id: string) => {
         const real = library.speciesRecord(id);
         if (!real || id !== "human") return real;
-        return { ...real, traits: [...real.traits, {
-          id: "temple-scholar", name: "Temple Scholar", description: "One additional Cleric skill.",
-          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-skills", amount: 1 }]
-        }] };
+        return {
+          ...real,
+          traits: [
+            ...real.traits,
+            {
+              id: "temple-scholar",
+              name: "Temple Scholar",
+              description: "One additional Cleric skill.",
+              tags: [],
+              actions: [],
+              effects: [],
+              modifiers: [],
+              replaces: [],
+              extraPicks: [{ offer: "class-skills", amount: 1 }]
+            }
+          ]
+        };
       }
     });
     // The Cleric prints two skill choices; with the trait it owes three, and an underfilled offer is
     // rejected as loudly as an overfilled one.
     const twoSkills = clericInput();
-    expect(() => buildCharacterDefinition(twoSkills, scholarly, defaultPolicy))
-      .toThrowError(/"Cleric skills" needs 3 pick\(s\) of kind "skill"; got 2/);
+    expect(() => buildCharacterDefinition(twoSkills, scholarly, defaultPolicy)).toThrowError(
+      /"Cleric skills" needs 3 pick\(s\) of kind "skill"; got 2/
+    );
     const threeSkills = clericInput();
     threeSkills.choices.push({ level: 1, classId: "cleric", kind: "skill", id: "insight" });
     expect(() => buildCharacterDefinition(threeSkills, scholarly, defaultPolicy)).not.toThrow();
     // Without the trait, the third skill is refused.
-    expect(() => buildCharacterDefinition(threeSkills, library, defaultPolicy))
-      .toThrowError(/exceeds what this build may choose/);
+    expect(() => buildCharacterDefinition(threeSkills, library, defaultPolicy)).toThrowError(
+      /exceeds what this build may choose/
+    );
   });
 
   // Budgets that follow a printed column: Eldritch Invocations, and Weapon Mastery on Fighter and
   // Barbarian. `class-resource-growth` reads the column, so `choose` plus the growth is the printed
   // number at every level without a marker feature at each step.
-  const INVOCATIONS = ["agonizing-blast", "devils-sight", "eldritch-mind", "eldritch-spear", "repelling-blast", "armor-of-shadows"];
+  const INVOCATIONS = [
+    "agonizing-blast",
+    "devils-sight",
+    "eldritch-mind",
+    "eldritch-spear",
+    "repelling-blast",
+    "armor-of-shadows"
+  ];
   const warlockWithInvocations = (count: number): MutableCreateInput => {
     const input = warlockInput();
     input.choices = input.choices
       .filter((row) => row.kind !== "eldritch-invocation")
-      .concat(INVOCATIONS.slice(0, count).map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })));
+      .concat(
+        INVOCATIONS.slice(0, count).map((id) => ({
+          level: 1,
+          classId: "warlock",
+          kind: "eldritch-invocation",
+          id,
+          payload: { featureId: "eldritch-invocations" }
+        }))
+      );
     return input;
   };
 
   it("offers a level-5 Warlock FIVE invocations, and refuses both the sixth and only four", () => {
     // The printed Invocations column reads 1 at level 1 and 5 at level 5.
     expect(() => buildCharacterDefinition(warlockWithInvocations(5), library, defaultPolicy)).not.toThrow();
-    expect(() => buildCharacterDefinition(warlockWithInvocations(6), library, defaultPolicy))
-      .toThrowError(/exceeds what this build may choose \(Eldritch Invocations: 5\)/);
+    expect(() => buildCharacterDefinition(warlockWithInvocations(6), library, defaultPolicy)).toThrowError(
+      /exceeds what this build may choose \(Eldritch Invocations: 5\)/
+    );
     // Underfilled is as loud as overfilled, so the number really moved rather than the ceiling being lifted.
-    expect(() => buildCharacterDefinition(warlockWithInvocations(4), library, defaultPolicy))
-      .toThrowError(/"Eldritch Invocations" needs 5 pick\(s\)/);
+    expect(() => buildCharacterDefinition(warlockWithInvocations(4), library, defaultPolicy)).toThrowError(
+      /"Eldritch Invocations" needs 5 pick\(s\)/
+    );
   });
 
   it("follows the Weapon Mastery column on a HAND_AUTHORED class, which the overlay used to skip", () => {
     // fighterInput() is level 5 and carries four masteries (the column steps to 4 at level 4).
     const five = fighterInput();
     five.choices.push({ level: 4, classId: "fighter", kind: "weapon-mastery", id: "shortsword" });
-    expect(() => buildCharacterDefinition(five, library, defaultPolicy)).toThrowError(/exceeds what this build may choose \(Weapon Mastery: 4\)/);
+    expect(() => buildCharacterDefinition(five, library, defaultPolicy)).toThrowError(
+      /exceeds what this build may choose \(Weapon Mastery: 4\)/
+    );
   });
 
   // An offer can be a catalog plus bespoke options, so "a Fighting Style feat, or instead Blessed
   // Warrior" is pickable for the Paladin and Ranger.
   it("offers a Paladin the whole feat catalog AND Blessed Warrior, whose own pick is two Cleric cantrips", () => {
     const paladin = (styleId: string, cantrips: readonly string[]): MutableCreateInput => ({
-      name: "Var", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
-      abilityMethod: "standard-array", baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 10, cha: 12 },
-      backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+      name: "Var",
+      speciesId: "human",
+      backgroundId: "soldier",
+      classId: "paladin",
+      level: 2,
+      abilityMethod: "standard-array",
+      baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 10, cha: 12 },
+      backgroundBonusAllocation: [
+        { ability: "str", amount: 2 },
+        { ability: "con", amount: 1 }
+      ],
       hp: { mode: "average" },
       choices: [
         { level: 1, kind: "language", id: "dwarvish" },
@@ -704,7 +988,12 @@ describe("extra picks raise the budget the server validates against", () => {
         { level: 1, classId: "paladin", kind: "weapon-mastery", id: "greatsword" },
         { level: 1, classId: "paladin", kind: "weapon-mastery", id: "flail" },
         { level: 2, classId: "paladin", kind: "fighting-style", id: styleId, payload: { featureId: "fighting-style" } },
-        ...cantrips.map((id) => ({ level: 2, kind: "cantrip" as const, id, payload: { featureId: "blessed-warrior" } })),
+        ...cantrips.map((id) => ({
+          level: 2,
+          kind: "cantrip" as const,
+          id,
+          payload: { featureId: "blessed-warrior" }
+        })),
         { level: 1, kind: "spell", id: "bless", payload: undefined },
         { level: 1, kind: "spell", id: "cure-wounds", payload: undefined },
         { level: 1, kind: "tool", id: "gaming-set-dice" },
@@ -715,12 +1004,17 @@ describe("extra picks raise the budget the server validates against", () => {
     // The catalog half: a real Fighting Style feat is accepted, with no cantrips.
     expect(() => buildCharacterDefinition(paladin("defense", []), library, defaultPolicy)).not.toThrow();
     // The bespoke half is offerable, and its nested pick reaches the sheet.
-    const blessed = buildCharacterDefinition(paladin("blessed-warrior", ["sacred-flame", "guidance"]), library, defaultPolicy);
+    const blessed = buildCharacterDefinition(
+      paladin("blessed-warrior", ["sacred-flame", "guidance"]),
+      library,
+      defaultPolicy
+    );
     const cantrips = (blessed.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id);
     expect(cantrips.sort()).toEqual(["guidance", "sacred-flame"]);
     // An id in neither half is still refused.
-    expect(() => buildCharacterDefinition(paladin("eldritch-mind", []), library, defaultPolicy))
-      .toThrowError(/not an offered option/);
+    expect(() => buildCharacterDefinition(paladin("eldritch-mind", []), library, defaultPolicy)).toThrowError(
+      /not an offered option/
+    );
   });
 
   /** One record can carry two picks: Magic Initiate promises "two cantrips ... and one level 1 spell". */
@@ -728,11 +1022,22 @@ describe("extra picks raise the budget the server validates against", () => {
     const built = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
     expect((built.spellcasting?.spells ?? []).map((spell) => spell.id)).toContain("bless");
     const twoSpells = warlockInput();
-    twoSpells.choices.push({ level: 1, kind: "spell", id: "cure-wounds", payload: { featureId: "magic-initiate-cleric" } });
-    expect(() => buildCharacterDefinition(twoSpells, library, defaultPolicy)).toThrowError(/exceeds what this build may choose/);
+    twoSpells.choices.push({
+      level: 1,
+      kind: "spell",
+      id: "cure-wounds",
+      payload: { featureId: "magic-initiate-cleric" }
+    });
+    expect(() => buildCharacterDefinition(twoSpells, library, defaultPolicy)).toThrowError(
+      /exceeds what this build may choose/
+    );
     const noSpell = warlockInput();
-    noSpell.choices = noSpell.choices.filter((row) => !(row.kind === "spell" && row.payload?.featureId === "magic-initiate-cleric"));
-    expect(() => buildCharacterDefinition(noSpell, library, defaultPolicy)).toThrowError(/"Magic Initiate \(Cleric\)" needs 1 pick\(s\) of kind "spell"/);
+    noSpell.choices = noSpell.choices.filter(
+      (row) => !(row.kind === "spell" && row.payload?.featureId === "magic-initiate-cleric")
+    );
+    expect(() => buildCharacterDefinition(noSpell, library, defaultPolicy)).toThrowError(
+      /"Magic Initiate \(Cleric\)" needs 1 pick\(s\) of kind "spell"/
+    );
   });
 
   it("raises the PREPARED-SPELL budget, and the sheet reports the composed number", () => {
@@ -740,10 +1045,23 @@ describe("extra picks raise the budget the server validates against", () => {
       speciesRecord: (id: string) => {
         const real = library.speciesRecord(id);
         if (!real || id !== "human") return real;
-        return { ...real, traits: [...real.traits, {
-          id: "zealous-study", name: "Zealous Study", description: "One additional prepared Cleric spell.",
-          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-spells", amount: 1 }]
-        }] };
+        return {
+          ...real,
+          traits: [
+            ...real.traits,
+            {
+              id: "zealous-study",
+              name: "Zealous Study",
+              description: "One additional prepared Cleric spell.",
+              tags: [],
+              actions: [],
+              effects: [],
+              modifiers: [],
+              replaces: [],
+              extraPicks: [{ offer: "class-spells", amount: 1 }]
+            }
+          ]
+        };
       }
     });
     // clericInput() sits exactly on the printed cap of 6 charged prepared spells; `bane` is the seventh,
@@ -754,8 +1072,9 @@ describe("extra picks raise the budget the server validates against", () => {
     expect(built.spellcasting?.classes?.[0]).toMatchObject({ classId: "cleric", prepared: 7 });
     const eighth = clericInput();
     eighth.choices.push({ level: 1, kind: "spell", id: "bane" }, { level: 1, kind: "spell", id: "command" });
-    expect(() => buildCharacterDefinition(eighth, studious, defaultPolicy))
-      .toThrowError(/Cleric prepares 7 spells at level 3; got 8/);
+    expect(() => buildCharacterDefinition(eighth, studious, defaultPolicy)).toThrowError(
+      /Cleric prepares 7 spells at level 3; got 8/
+    );
   });
 
   it("holds EVERY authored extraPicks key in the bundles to a budget that exists", () => {
@@ -763,13 +1082,21 @@ describe("extra picks raise the budget the server validates against", () => {
     // The census walks the summaries, which are exactly what the wizard receives.
     const featureIds = new Set<string>();
     const authored: Array<{ where: string; offer: string }> = [];
-    const visit = (where: string, features: readonly { id: string; extraPicks: readonly { offer: string }[]; choice: { options: readonly { id: string; extraPicks: readonly { offer: string }[] }[] } | null }[]) => {
+    const visit = (
+      where: string,
+      features: readonly {
+        id: string;
+        extraPicks: readonly { offer: string }[];
+        choice: { options: readonly { id: string; extraPicks: readonly { offer: string }[] }[] } | null;
+      }[]
+    ) => {
       for (const feature of features) {
         featureIds.add(feature.id);
         for (const grant of feature.extraPicks) authored.push({ where: `${where}.${feature.id}`, offer: grant.offer });
         for (const option of feature.choice?.options ?? []) {
           featureIds.add(option.id);
-          for (const grant of option.extraPicks) authored.push({ where: `${where}.${feature.id}:${option.id}`, offer: grant.offer });
+          for (const grant of option.extraPicks)
+            authored.push({ where: `${where}.${feature.id}:${option.id}`, offer: grant.offer });
         }
       }
     };
@@ -780,8 +1107,10 @@ describe("extra picks raise the budget the server validates against", () => {
     for (const record of library.featSummaries()) visit(record.id, [record.feature]);
 
     const named = new Set<string>(NAMED_PICK_BUDGETS);
-    const unresolvable = authored.filter(({ offer }) =>
-      !named.has(offer) && !(offer.startsWith("feature:") && featureIds.has(offer.slice("feature:".length))));
+    const unresolvable = authored.filter(
+      ({ offer }) =>
+        !named.has(offer) && !(offer.startsWith("feature:") && featureIds.has(offer.slice("feature:".length)))
+    );
     expect(unresolvable.map((entry) => `${entry.where} -> ${entry.offer}`)).toEqual([]);
     // ...and the census is not vacuous: Thaumaturge is authored and must be seen.
     expect(authored).toContainEqual({ where: "cleric.divine-order:thaumaturge", offer: "class-cantrips" });
@@ -793,16 +1122,35 @@ describe("extra picks raise the budget the server validates against", () => {
       speciesRecord: (id: string) => {
         const real = library.speciesRecord(id);
         if (!real || id !== "human") return real;
-        return { ...real, traits: [...real.traits, {
-          id: "typo-gift", name: "Typo Gift", description: "Grants a pick to a budget that does not exist.",
-          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-cantrip", amount: 1 }]
-        }] };
+        return {
+          ...real,
+          traits: [
+            ...real.traits,
+            {
+              id: "typo-gift",
+              name: "Typo Gift",
+              description: "Grants a pick to a budget that does not exist.",
+              tags: [],
+              actions: [],
+              effects: [],
+              modifiers: [],
+              replaces: [],
+              extraPicks: [{ offer: "class-cantrip", amount: 1 }]
+            }
+          ]
+        };
       }
     });
     let thrown: unknown;
-    try { buildCharacterDefinition(clericInput(), misnamed, defaultPolicy); } catch (error) { thrown = error; }
+    try {
+      buildCharacterDefinition(clericInput(), misnamed, defaultPolicy);
+    } catch (error) {
+      thrown = error;
+    }
     expect(thrown).toBeInstanceOf(CommandRejectedError);
-    expect((thrown as Error).message).toMatch(/grants an extra pick to "class-cantrip", which is not a pick this build has/);
+    expect((thrown as Error).message).toMatch(
+      /grants an extra pick to "class-cantrip", which is not a pick this build has/
+    );
     expect((thrown as Error).message).toMatch(/feature:<featureId>/);
   });
 });
@@ -812,26 +1160,37 @@ describe("M3 - the same feat cannot be taken twice across different offers", () 
     // A Human Acolyte already holds Magic Initiate (Cleric) from the background; taking it again with
     // Versatile would interpret the feature twice (7 cantrips instead of 5).
     const duplicate = clericInput();
-    duplicate.choices = duplicate.choices.map((row) => row.kind === "feat" ? { ...row, id: "magic-initiate-cleric" } : row);
-    expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy))
-      .toThrowError(/Magic Initiate \(Cleric\) may be taken again only with a DIFFERENT spell list/);
+    duplicate.choices = duplicate.choices.map((row) =>
+      row.kind === "feat" ? { ...row, id: "magic-initiate-cleric" } : row
+    );
+    expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy)).toThrowError(
+      /Magic Initiate \(Cleric\) may be taken again only with a DIFFERENT spell list/
+    );
   });
 
   it("rejects a duplicate of a feat that is not repeatable at all", () => {
     // The Criminal background grants Alert; spending Versatile on Alert again is simply illegal.
     const duplicate = clericInput();
     duplicate.backgroundId = "criminal";
-    duplicate.backgroundBonusAllocation = [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }];
-    duplicate.choices = duplicate.choices.map((row) => row.kind === "equipment" && row.id === "acolyte-a" ? { ...row, id: "criminal-a" } : row);
+    duplicate.backgroundBonusAllocation = [
+      { ability: "dex", amount: 2 },
+      { ability: "con", amount: 1 }
+    ];
+    duplicate.choices = duplicate.choices.map((row) =>
+      row.kind === "equipment" && row.id === "acolyte-a" ? { ...row, id: "criminal-a" } : row
+    );
     // The Criminal's origin feat is Alert, and the ledger already spends Versatile on Alert.
-    expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy))
-      .toThrowError(/Alert is already on this character - a feat can only be taken once/);
+    expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy)).toThrowError(
+      /Alert is already on this character - a feat can only be taken once/
+    );
   });
 
   it("still allows a repeatable feat with a DIFFERENT spell list, and the ASI feat at every ASI level", () => {
     // Positive control 1: Magic Initiate (Wizard) alongside the background's Magic Initiate (Cleric).
     const differentList = clericInput();
-    differentList.choices = differentList.choices.map((row) => row.kind === "feat" ? { ...row, id: "magic-initiate-wizard" } : row);
+    differentList.choices = differentList.choices.map((row) =>
+      row.kind === "feat" ? { ...row, id: "magic-initiate-wizard" } : row
+    );
     differentList.choices.push(
       { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } },
@@ -840,7 +1199,10 @@ describe("M3 - the same feat cannot be taken twice across different offers", () 
     const built = buildCharacterDefinition(differentList, library, defaultPolicy);
     // The Versatile pick replaced Alert here, so the sheet holds both Magic Initiate flavours: same feat
     // name, different spell list, as the SRD allows.
-    expect(built.character?.feats.map((feat) => feat.id).sort()).toEqual(["magic-initiate-cleric", "magic-initiate-wizard"]);
+    expect(built.character?.feats.map((feat) => feat.id).sort()).toEqual([
+      "magic-initiate-cleric",
+      "magic-initiate-wizard"
+    ]);
 
     // Positive control 2: a Fighter 6 spends the level-4 AND level-6 ASI on the same repeatable feat.
     const twoAsis = fighterInput();
@@ -867,7 +1229,10 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
     expect(actionSurge?.activation).toBe("other");
     expect(actionSurge?.uses).toEqual({ limit: 1, per: "short-rest" }); // by-level table, 1 until level 17
     // The Soldier's origin feat is uses-only too, on a different rest scope.
-    expect(definition.actions.find((action) => action.id === "savage-attacker")?.uses).toEqual({ limit: 1, per: "turn" });
+    expect(definition.actions.find((action) => action.id === "savage-attacker")?.uses).toEqual({
+      limit: 1,
+      per: "turn"
+    });
   });
 
   it("makes that action resolvable, so the counter can actually be spent", () => {
@@ -876,14 +1241,42 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
     importActorDefinition(state, definition, ACTOR_ID, "public");
     const other = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d11";
     state.actors.push({ ...state.actors[0], id: other, name: "Sparring Partner", definitionId: undefined });
-    startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: other, score: 20 }, { actorId: ACTOR_ID, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    startEncounter(
+      state,
+      {
+        mapAssetId: "20000000-0000-5000-8000-000000000001",
+        entries: [
+          { actorId: other, score: 20 },
+          { actorId: ACTOR_ID, score: 5 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
     const surge = definition.actions.find((action) => action.id === "action-surge")!;
-    const deps: ResolveDependencies = { random: () => 1, newRollId: () => "40000000-0000-4000-8000-000000000001", gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition };
-    resolveDefinitionAction(state, surge, { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" }, deps);
+    const deps: ResolveDependencies = {
+      random: () => 1,
+      newRollId: () => "40000000-0000-4000-8000-000000000001",
+      gmSessionId: "30000000-0000-4000-8000-00000000000a",
+      now: () => "2026-07-27T00:00:00.000Z",
+      definition
+    };
+    resolveDefinitionAction(
+      state,
+      surge,
+      { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" },
+      deps
+    );
     expect(state.actors[0].actionUses["action-surge"]).toBe(1);
     // ...and the second attempt is refused: the pool is 1 per short rest.
-    expect(() => resolveDefinitionAction(state, surge, { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" }, deps))
-      .toThrowError(/no uses remaining \(1\/short rest\)/);
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        surge,
+        { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" },
+        deps
+      )
+    ).toThrowError(/no uses remaining \(1\/short rest\)/);
   });
 });
 
@@ -895,12 +1288,36 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
   function encounter(): GameState {
     const state = emptyState();
     importActorDefinition(state, definition, CLERIC, "public");
-    state.actors.push({ ...state.actors[0], id: FOE, name: "Ghoul", kind: "monster", definitionId: undefined, actionUses: {} });
+    state.actors.push({
+      ...state.actors[0],
+      id: FOE,
+      name: "Ghoul",
+      kind: "monster",
+      definitionId: undefined,
+      actionUses: {}
+    });
     // The foe holds the turn, so the action-economy slot never masks the limited-use gate.
-    startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: FOE, score: 20 }, { actorId: CLERIC, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    startEncounter(
+      state,
+      {
+        mapAssetId: "20000000-0000-5000-8000-000000000001",
+        entries: [
+          { actorId: FOE, score: 20 },
+          { actorId: CLERIC, score: 5 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
     return state;
   }
-  const deps = (): ResolveDependencies => ({ random: () => 3, newRollId: () => `40000000-0000-4000-8000-00000000000${Math.floor(Math.random() * 9)}`, gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition });
+  const deps = (): ResolveDependencies => ({
+    random: () => 3,
+    newRollId: () => `40000000-0000-4000-8000-00000000000${Math.floor(Math.random() * 9)}`,
+    gmSessionId: "30000000-0000-4000-8000-00000000000a",
+    now: () => "2026-07-27T00:00:00.000Z",
+    definition
+  });
 
   it("authors Preserve Life and Divine Spark onto one Channel Divinity counter", () => {
     const preserveLife = definition.actions.find((action) => action.id === "preserve-life");
@@ -915,13 +1332,29 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
     const state = encounter();
     const spark = definition.actions.find((action) => action.id === "divine-spark")!;
     const preserve = definition.actions.find((action) => action.id === "preserve-life")!;
-    resolveDefinitionAction(state, spark, { actorId: CLERIC, targetIds: [FOE], commandId: "50000000-0000-4000-8000-00000000000a" }, deps());
+    resolveDefinitionAction(
+      state,
+      spark,
+      { actorId: CLERIC, targetIds: [FOE], commandId: "50000000-0000-4000-8000-00000000000a" },
+      deps()
+    );
     expect(state.actors[0].actionUses["channel-divinity"]).toBe(1);
-    resolveDefinitionAction(state, preserve, { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000b" }, deps());
+    resolveDefinitionAction(
+      state,
+      preserve,
+      { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000b" },
+      deps()
+    );
     expect(state.actors[0].actionUses["channel-divinity"]).toBe(2);
     // Both charges spent: the third attempt is refused, naming the pool's size.
-    expect(() => resolveDefinitionAction(state, preserve, { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000c" }, deps()))
-      .toThrowError(/no uses remaining \(2\/long rest\)/);
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        preserve,
+        { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000c" },
+        deps()
+      )
+    ).toThrowError(/no uses remaining \(2\/long rest\)/);
   });
 });
 
@@ -930,19 +1363,36 @@ describe("D3 - a malformed content record rejects instead of throwing a raw Type
     speciesRecord: (id: string) => {
       const real = library.speciesRecord(id);
       if (!real || id !== "human") return real;
-      return { ...real, traits: [...real.traits, {
-        id: "broken-boon", name: "Broken Boon", description: "A boon whose option list was never authored.",
-        tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [],
-        // `{kind, choose, from: []}` must fail the schema's "needs from or fromCatalog" refinement; otherwise
-        // `resolveCatalogChoice` throws a TypeError whose internal message reaches the client.
-        choice: { kind: "boon", choose: 1, from: [], repeatable: false }
-      }] };
+      return {
+        ...real,
+        traits: [
+          ...real.traits,
+          {
+            id: "broken-boon",
+            name: "Broken Boon",
+            description: "A boon whose option list was never authored.",
+            tags: [],
+            actions: [],
+            effects: [],
+            modifiers: [],
+            replaces: [],
+            extraPicks: [],
+            // `{kind, choose, from: []}` must fail the schema's "needs from or fromCatalog" refinement; otherwise
+            // `resolveCatalogChoice` throws a TypeError whose internal message reaches the client.
+            choice: { kind: "boon", choose: 1, from: [], repeatable: false }
+          }
+        ]
+      };
     }
   });
 
   it("rejects with an actionable message, as a CommandRejectedError", () => {
     let thrown: unknown;
-    try { buildCharacterDefinition(fighterInput(), malformedLibrary, defaultPolicy); } catch (error) { thrown = error; }
+    try {
+      buildCharacterDefinition(fighterInput(), malformedLibrary, defaultPolicy);
+    } catch (error) {
+      thrown = error;
+    }
     expect(thrown).toBeInstanceOf(CommandRejectedError);
     expect(thrown).not.toBeInstanceOf(TypeError);
     expect((thrown as Error).message).toMatch(/"Broken Boon" offers a "boon" choice with no options/);
@@ -975,7 +1425,9 @@ describe("D5 - multiclass prerequisites are correct but deliberately uncalled in
 describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
   // Pact Magic is the one caster shape that is not a sparse nine-column row; the assembly must read it,
   // not just `spellSlots`.
-  const warlockInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
+  const warlockInput = (): CharacterCreateRequestInput & {
+    choices: Array<CharacterCreateRequestInput["choices"][number]>;
+  } => ({
     name: "Vex",
     speciesId: "human",
     backgroundId: "soldier",
@@ -984,7 +1436,10 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
     subclassId: "fiend-patron",
     abilityMethod: "standard-array",
     baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
-    backgroundBonusAllocation: [{ ability: "con", amount: 2 }, { ability: "dex", amount: 1 }],
+    backgroundBonusAllocation: [
+      { ability: "con", amount: 2 },
+      { ability: "dex", amount: 1 }
+    ],
     hp: { mode: "average" },
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
@@ -995,18 +1450,72 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
       { level: 1, kind: "tool", id: "gaming-set-dice" },
       { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
       { level: 1, classId: "warlock", kind: "skill", id: "deception" },
-      { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
+      {
+        level: 1,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id: "agonizing-blast",
+        payload: { featureId: "eldritch-invocations" }
+      },
       { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
-      { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "devils-sight", payload: { featureId: "eldritch-invocations" } },
-      { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-mind", payload: { featureId: "eldritch-invocations" } },
-      { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-spear", payload: { featureId: "eldritch-invocations" } },
+      {
+        level: 2,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id: "devils-sight",
+        payload: { featureId: "eldritch-invocations" }
+      },
+      {
+        level: 2,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id: "eldritch-mind",
+        payload: { featureId: "eldritch-invocations" }
+      },
+      {
+        level: 5,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id: "eldritch-spear",
+        payload: { featureId: "eldritch-invocations" }
+      },
       { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "eldritch-spear" } },
-      { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "repelling-blast", payload: { featureId: "eldritch-invocations" } },
+      {
+        level: 5,
+        classId: "warlock",
+        kind: "eldritch-invocation",
+        id: "repelling-blast",
+        payload: { featureId: "eldritch-invocations" }
+      },
       { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
-      { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron", payload: { featureId: "warlock-subclass" } },
-      { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement", payload: { featureId: "ability-score-improvement" } },
-      { level: 4, classId: "warlock", kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-      { level: 4, classId: "warlock", kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } },
+      {
+        level: 3,
+        classId: "warlock",
+        kind: "subclass",
+        id: "fiend-patron",
+        payload: { featureId: "warlock-subclass" }
+      },
+      {
+        level: 4,
+        classId: "warlock",
+        kind: "asi-or-feat",
+        id: "ability-score-improvement",
+        payload: { featureId: "ability-score-improvement" }
+      },
+      {
+        level: 4,
+        classId: "warlock",
+        kind: "ability-score",
+        id: "str",
+        payload: { featureId: "ability-score-improvement" }
+      },
+      {
+        level: 4,
+        classId: "warlock",
+        kind: "ability-score",
+        id: "dex",
+        payload: { featureId: "ability-score-improvement" }
+      },
       { level: 1, classId: "warlock", kind: "cantrip", id: "chill-touch" },
       { level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" },
       { level: 1, classId: "warlock", kind: "cantrip", id: "mage-hand" },

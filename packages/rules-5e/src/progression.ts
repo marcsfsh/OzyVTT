@@ -1,7 +1,12 @@
 // Level progression math for the character builder: hit points, the multiclass hit-dice pool, and spell slots.
 // Class knowledge comes from the overridable `class-data.ts` table so homebrew classes work.
 import {
-  casterProgressionFor, hitDieFor, type CasterProgression, type ClassProgressionTable, type HitDie, SRD_CLASS_PROGRESSION
+  casterProgressionFor,
+  hitDieFor,
+  type CasterProgression,
+  type ClassProgressionTable,
+  type HitDie,
+  SRD_CLASS_PROGRESSION
 } from "./class-data.js";
 
 export function hitDieFaces(hitDie: HitDie): number {
@@ -24,17 +29,28 @@ export function hitPointsAtLevel1(hitDie: HitDie, conModifier: number): number {
  */
 export type HitPointMode = "average" | "roll" | "max-of-both";
 
-export function hitPointsPerLevel(hitDie: HitDie, conModifier: number, mode: HitPointMode = "average", roll?: number): number {
+export function hitPointsPerLevel(
+  hitDie: HitDie,
+  conModifier: number,
+  mode: HitPointMode = "average",
+  roll?: number
+): number {
   const average = hitDieAverage(hitDie);
   if (mode === "average") return Math.max(1, average + conModifier);
   if (roll === undefined) throw new RangeError(`Hit-point mode "${mode}" needs a roll.`);
   const faces = hitDieFaces(hitDie);
-  if (!Number.isInteger(roll) || roll < 1 || roll > faces) throw new RangeError(`A ${hitDie} roll must be 1-${faces}; got ${roll}.`);
+  if (!Number.isInteger(roll) || roll < 1 || roll > faces)
+    throw new RangeError(`A ${hitDie} roll must be 1-${faces}; got ${roll}.`);
   return Math.max(1, (mode === "roll" ? roll : Math.max(roll, average)) + conModifier);
 }
 
 /** One class entry on a (possibly multiclass) sheet, in the order the levels were taken. */
-export type ClassLevelEntry = Readonly<{ classId: string; level: number; hitDie?: HitDie; casterProgression?: CasterProgression }>;
+export type ClassLevelEntry = Readonly<{
+  classId: string;
+  level: number;
+  hitDie?: HitDie;
+  casterProgression?: CasterProgression;
+}>;
 
 /** The entry's explicit hit die first, then the class table's. */
 export function entryHitDie(entry: ClassLevelEntry, table: ClassProgressionTable = SRD_CLASS_PROGRESSION): HitDie {
@@ -42,7 +58,10 @@ export function entryHitDie(entry: ClassLevelEntry, table: ClassProgressionTable
 }
 
 /** The hit-dice pool a multiclass sheet spends on short rests (Fighter 3 / Wizard 2 = 3d10 + 2d6), largest first. */
-export function hitDicePool(classLevels: readonly ClassLevelEntry[], table: ClassProgressionTable = SRD_CLASS_PROGRESSION): Array<{ die: HitDie; count: number }> {
+export function hitDicePool(
+  classLevels: readonly ClassLevelEntry[],
+  table: ClassProgressionTable = SRD_CLASS_PROGRESSION
+): Array<{ die: HitDie; count: number }> {
   const counts = new Map<HitDie, number>();
   for (const entry of classLevels) {
     const die = entryHitDie(entry, table);
@@ -69,9 +88,16 @@ export function hitPointPool(
   for (const entry of classLevels) {
     const die = entryHitDie(entry, table);
     for (let step = 0; step < Math.max(0, entry.level); step += 1) {
-      if (levelsSeen === 0) { total += hitPointsAtLevel1(die, conModifier); levelsSeen += 1; continue; }
+      if (levelsSeen === 0) {
+        total += hitPointsAtLevel1(die, conModifier);
+        levelsSeen += 1;
+        continue;
+      }
       const roll = mode === "average" ? undefined : rolls[rollIndex++];
-      total += roll === undefined ? hitPointsPerLevel(die, conModifier, "average") : hitPointsPerLevel(die, conModifier, mode, roll);
+      total +=
+        roll === undefined
+          ? hitPointsPerLevel(die, conModifier, "average")
+          : hitPointsPerLevel(die, conModifier, mode, roll);
       levelsSeen += 1;
     }
   }
@@ -80,24 +106,58 @@ export function hitPointPool(
 
 /** SRD full-caster slot table: row = caster level - 1, column = spell level - 1. Half- and third-casters and
  * multiclass casters read it at a reduced row. */
-export const FULL_CASTER_SLOTS: readonly (readonly number[])[] = Object.freeze([
-  [2, 0, 0, 0, 0, 0, 0, 0, 0], [3, 0, 0, 0, 0, 0, 0, 0, 0], [4, 2, 0, 0, 0, 0, 0, 0, 0], [4, 3, 0, 0, 0, 0, 0, 0, 0],
-  [4, 3, 2, 0, 0, 0, 0, 0, 0], [4, 3, 3, 0, 0, 0, 0, 0, 0], [4, 3, 3, 1, 0, 0, 0, 0, 0], [4, 3, 3, 2, 0, 0, 0, 0, 0],
-  [4, 3, 3, 3, 1, 0, 0, 0, 0], [4, 3, 3, 3, 2, 0, 0, 0, 0], [4, 3, 3, 3, 2, 1, 0, 0, 0], [4, 3, 3, 3, 2, 1, 0, 0, 0],
-  [4, 3, 3, 3, 2, 1, 1, 0, 0], [4, 3, 3, 3, 2, 1, 1, 0, 0], [4, 3, 3, 3, 2, 1, 1, 1, 0], [4, 3, 3, 3, 2, 1, 1, 1, 0],
-  [4, 3, 3, 3, 2, 1, 1, 1, 1], [4, 3, 3, 3, 3, 1, 1, 1, 1], [4, 3, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 3, 2, 2, 1, 1]
-].map((row) => Object.freeze(row)));
+export const FULL_CASTER_SLOTS: readonly (readonly number[])[] = Object.freeze(
+  [
+    [2, 0, 0, 0, 0, 0, 0, 0, 0],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 2, 0, 0, 0, 0, 0, 0, 0],
+    [4, 3, 0, 0, 0, 0, 0, 0, 0],
+    [4, 3, 2, 0, 0, 0, 0, 0, 0],
+    [4, 3, 3, 0, 0, 0, 0, 0, 0],
+    [4, 3, 3, 1, 0, 0, 0, 0, 0],
+    [4, 3, 3, 2, 0, 0, 0, 0, 0],
+    [4, 3, 3, 3, 1, 0, 0, 0, 0],
+    [4, 3, 3, 3, 2, 0, 0, 0, 0],
+    [4, 3, 3, 3, 2, 1, 0, 0, 0],
+    [4, 3, 3, 3, 2, 1, 0, 0, 0],
+    [4, 3, 3, 3, 2, 1, 1, 0, 0],
+    [4, 3, 3, 3, 2, 1, 1, 0, 0],
+    [4, 3, 3, 3, 2, 1, 1, 1, 0],
+    [4, 3, 3, 3, 2, 1, 1, 1, 0],
+    [4, 3, 3, 3, 2, 1, 1, 1, 1],
+    [4, 3, 3, 3, 3, 1, 1, 1, 1],
+    [4, 3, 3, 3, 3, 2, 1, 1, 1],
+    [4, 3, 3, 3, 3, 2, 2, 1, 1]
+  ].map((row) => Object.freeze(row))
+);
 
 const NO_SLOTS: readonly number[] = Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 /** Warlock Pact Magic: one uniform slot level with its own count, refreshed on a short rest. */
-export const PACT_SLOTS: readonly { level: number; slots: number }[] = Object.freeze([
-  { level: 1, slots: 1 }, { level: 1, slots: 2 }, { level: 2, slots: 2 }, { level: 2, slots: 2 },
-  { level: 3, slots: 2 }, { level: 3, slots: 2 }, { level: 4, slots: 2 }, { level: 4, slots: 2 },
-  { level: 5, slots: 2 }, { level: 5, slots: 2 }, { level: 5, slots: 3 }, { level: 5, slots: 3 },
-  { level: 5, slots: 3 }, { level: 5, slots: 3 }, { level: 5, slots: 3 }, { level: 5, slots: 3 },
-  { level: 5, slots: 4 }, { level: 5, slots: 4 }, { level: 5, slots: 4 }, { level: 5, slots: 4 }
-].map((row) => Object.freeze(row)));
+export const PACT_SLOTS: readonly { level: number; slots: number }[] = Object.freeze(
+  [
+    { level: 1, slots: 1 },
+    { level: 1, slots: 2 },
+    { level: 2, slots: 2 },
+    { level: 2, slots: 2 },
+    { level: 3, slots: 2 },
+    { level: 3, slots: 2 },
+    { level: 4, slots: 2 },
+    { level: 4, slots: 2 },
+    { level: 5, slots: 2 },
+    { level: 5, slots: 2 },
+    { level: 5, slots: 3 },
+    { level: 5, slots: 3 },
+    { level: 5, slots: 3 },
+    { level: 5, slots: 3 },
+    { level: 5, slots: 3 },
+    { level: 5, slots: 3 },
+    { level: 5, slots: 4 },
+    { level: 5, slots: 4 },
+    { level: 5, slots: 4 },
+    { level: 5, slots: 4 }
+  ].map((row) => Object.freeze(row))
+);
 
 const clampLevel = (level: number) => Math.max(0, Math.min(20, Math.trunc(level)));
 
@@ -132,7 +192,10 @@ export function pactSlotsForLevel(level: number): { level: number; slots: number
 
 /** SRD 5.2.1 multiclass caster level: full casters count every level, Paladin/Ranger half rounded up (the SRD's
  * explicit exception), third-casters a third rounded down, Warlocks nothing (Pact Magic stays separate). */
-export function multiclassCasterLevel(classLevels: readonly ClassLevelEntry[], table: ClassProgressionTable = SRD_CLASS_PROGRESSION): number {
+export function multiclassCasterLevel(
+  classLevels: readonly ClassLevelEntry[],
+  table: ClassProgressionTable = SRD_CLASS_PROGRESSION
+): number {
   return classLevels.reduce((total, entry) => {
     const progression = entry.casterProgression ?? casterProgressionFor(entry.classId, table);
     const level = Math.max(0, Math.trunc(entry.level));
@@ -149,7 +212,10 @@ export function multiclassSpellSlots(casterLevel: number): readonly number[] {
 }
 
 /** Warlock pact slots on a multiclass sheet: driven only by the Warlock levels. */
-export function multiclassPactSlots(classLevels: readonly ClassLevelEntry[], table: ClassProgressionTable = SRD_CLASS_PROGRESSION): { level: number; slots: number } | null {
+export function multiclassPactSlots(
+  classLevels: readonly ClassLevelEntry[],
+  table: ClassProgressionTable = SRD_CLASS_PROGRESSION
+): { level: number; slots: number } | null {
   const warlockLevels = classLevels.reduce((total, entry) => {
     const progression = entry.casterProgression ?? casterProgressionFor(entry.classId, table);
     return progression === "pact" ? total + Math.max(0, Math.trunc(entry.level)) : total;

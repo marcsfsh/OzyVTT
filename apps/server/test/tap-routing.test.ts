@@ -20,9 +20,18 @@ const OTHER = "10000000-0000-4000-8000-0000000000b2";
 const GOBLIN = "10000000-0000-4000-8000-0000000000b3";
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
 
-const SWING = { id: "swing", name: "Longsword", activation: "action" as const, description: "Melee Attack Roll: +5.", attack: { bonus: 5, reachFeet: 5 }, damage: [{ formula: "1d8 + 3", type: "slashing" }] };
+const SWING = {
+  id: "swing",
+  name: "Longsword",
+  activation: "action" as const,
+  description: "Melee Attack Roll: +5.",
+  attack: { bonus: 5, reachFeet: 5 },
+  damage: [{ formula: "1d8 + 3", type: "slashing" }]
+};
 const PARRY = { id: "parry", name: "Parry", activation: "reaction" as const, description: "Adds 2 AC.", damage: [] };
 
 /** A real fixture sheet with the two test actions grafted on, so the definition stays schema-valid. */
@@ -32,13 +41,29 @@ function heroDefinition(id: string, name: string) {
 
 /** A live fight: Hero is up, Second Hero and the Goblin are waiting. */
 function fightState(): GameState {
-  return GameStateSchema.parse({ schemaVersion: 1,
+  return GameStateSchema.parse({
+    schemaVersion: 1,
     actors: [
       { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } },
-      { id: OTHER, name: "Second Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } },
+      {
+        id: OTHER,
+        name: "Second Hero",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 }
+      },
       { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
     ],
-    combat: { active: true, round: 1, turnActorId: HERO, initiative: [{ actorId: HERO, score: 20 }, { actorId: OTHER, score: 10 }, { actorId: GOBLIN, score: 1 }] }
+    combat: {
+      active: true,
+      round: 1,
+      turnActorId: HERO,
+      initiative: [
+        { actorId: HERO, score: 20 },
+        { actorId: OTHER, score: 10 },
+        { actorId: GOBLIN, score: 1 }
+      ]
+    }
   });
 }
 
@@ -50,7 +75,12 @@ describe("tap routing (the seam)", () => {
 
     // No fight, and a creature that is not in any fight: telling the GM to "wait their turn" would be
     // nonsense, so it rolls loose.
-    const idle = GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } }] });
+    const idle = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } }
+      ]
+    });
     expect(routeForTap(idle.combat, HERO)).toBe("loose");
     expect(routeForTap(fight.combat, "10000000-0000-4000-8000-0000000000bf")).toBe("loose");
   });
@@ -58,7 +88,9 @@ describe("tap routing (the seam)", () => {
   it("refuses an off-turn action under a strict economy, warns under advise, and stays silent under off", () => {
     const strict = fightState();
     expect(() => offTurnVerdict(strict, SWING, "Hero")).toThrow(RulesBlockedError);
-    try { offTurnVerdict(strict, SWING, "Hero"); } catch (error) {
+    try {
+      offTurnVerdict(strict, SWING, "Hero");
+    } catch (error) {
       const blocked = error as RulesBlockedError;
       expect(blocked.rule).toBe(NOT_YOUR_TURN);
       expect(blocked.message).toBe("Not your turn yet - Hero is up.");
@@ -84,12 +116,17 @@ describe("tap routing (the seam)", () => {
 
   it("stops re-prompting once the GM has waved the economy through this turn (D9)", () => {
     const fight = fightState();
-    fight.combat = { ...fight.combat, turn: { ...fight.combat.turn, rulesOverridden: true, rulesOverriddenFamilies: ["economy"] } };
+    fight.combat = {
+      ...fight.combat,
+      turn: { ...fight.combat.turn, rulesOverridden: true, rulesOverriddenFamilies: ["economy"] }
+    };
     expect(offTurnVerdict(fight, SWING, "Hero").warning).toBeNull();
   });
 
   it("plans the loose route's dice, with damage strictly opt-in", () => {
-    expect(looseRollPlan(SWING, { includeDamage: false })).toEqual([{ formula: "1d20 + 5", purpose: "attack", label: "Longsword" }]);
+    expect(looseRollPlan(SWING, { includeDamage: false })).toEqual([
+      { formula: "1d20 + 5", purpose: "attack", label: "Longsword" }
+    ]);
     expect(looseRollPlan(SWING, { includeDamage: true, rollMode: "advantage" })).toEqual([
       { formula: "2d20kh1 + 5", purpose: "attack", label: "Longsword" },
       { formula: "1d8 + 3", purpose: "damage", label: "Longsword (slashing)" }
@@ -104,7 +141,10 @@ describe("tap routing (the seam)", () => {
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8); buffer.write("IHDR", 12, "ascii"); buffer.writeUInt32BE(width, 16); buffer.writeUInt32BE(height, 20);
+  buffer.writeUInt32BE(13, 8);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
   return buffer;
 }
 
@@ -128,7 +168,10 @@ async function boot(state: GameState) {
   if (!address || typeof address === "string") throw new Error("Server did not bind.");
   const imported = await server.mapAssets.import(png(900, 600), "arena.png");
   server.mapCatalog.register(imported.metadata.id, "Tap Arena", "battlemap");
-  cleanups.push(async () => { server.close(); await rm(directory, { recursive: true, force: true }); });
+  cleanups.push(async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   return { base: `http://127.0.0.1:${address.port}`, server, gmToken, mapAssetId: imported.metadata.id };
 }
 
@@ -140,8 +183,17 @@ const post = (base: string, path: string, token: string, body: unknown = {}) =>
 function withDefinitions(state: GameState): GameState {
   return GameStateSchema.parse({
     ...state,
-    definitions: [{ id: "hero-def", definition: heroDefinition("hero-def", "Hero") }, { id: "other-def", definition: heroDefinition("other-def", "Second Hero") }],
-    actors: state.actors.map((actor) => actor.id === HERO ? { ...actor, definitionId: "hero-def" } : actor.id === OTHER ? { ...actor, definitionId: "other-def" } : actor)
+    definitions: [
+      { id: "hero-def", definition: heroDefinition("hero-def", "Hero") },
+      { id: "other-def", definition: heroDefinition("other-def", "Second Hero") }
+    ],
+    actors: state.actors.map((actor) =>
+      actor.id === HERO
+        ? { ...actor, definitionId: "hero-def" }
+        : actor.id === OTHER
+          ? { ...actor, definitionId: "other-def" }
+          : actor
+    )
   });
 }
 
@@ -153,13 +205,23 @@ describe("action.use over the API", () => {
     await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
     await post(base, GAME_PATHS.claims, otherSession, { actorId: OTHER });
 
-    const onTurn = await post(base, GAME_PATHS.actionUse, heroSession, { commandId: randomUUID(), actorId: HERO, actionId: "swing", targetIds: [GOBLIN] });
+    const onTurn = await post(base, GAME_PATHS.actionUse, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      actionId: "swing",
+      targetIds: [GOBLIN]
+    });
     expect(onTurn.status).toBe(200);
     expect((await onTurn.json()).data.route).toBe("resolved");
     expect(server.store.snapshot.combat.turn.actionUsed).toBe(true);
 
     // Second Hero's turn has not come around: a real block, not a silent loose die.
-    const offTurn = await post(base, GAME_PATHS.actionUse, otherSession, { commandId: randomUUID(), actorId: OTHER, actionId: "swing", targetIds: [GOBLIN] });
+    const offTurn = await post(base, GAME_PATHS.actionUse, otherSession, {
+      commandId: randomUUID(),
+      actorId: OTHER,
+      actionId: "swing",
+      targetIds: [GOBLIN]
+    });
     expect(offTurn.status).toBe(409);
     const error = (await offTurn.json()).error;
     expect(error.details.blocked.rule).toBe(NOT_YOUR_TURN);
@@ -172,7 +234,11 @@ describe("action.use over the API", () => {
     await post(base, GAME_PATHS.claims, otherSession, { actorId: OTHER });
     const payload = { commandId: randomUUID(), actorId: OTHER, actionId: "swing", targetIds: [GOBLIN] };
 
-    const asked = await post(base, GAME_PATHS.rulesAsk, otherSession, { commandId: randomUUID(), type: "action.use", payload });
+    const asked = await post(base, GAME_PATHS.rulesAsk, otherSession, {
+      commandId: randomUUID(),
+      type: "action.use",
+      payload
+    });
     expect(asked.status).toBe(200);
     const askId = (await asked.json()).data.askId as string;
     expect(server.store.snapshot.combat.pendingRuleAsks[0].rule).toBe(NOT_YOUR_TURN);
@@ -185,15 +251,31 @@ describe("action.use over the API", () => {
   });
 
   it("rolls loose, attributed dice outside a fight - and moves no hit points", async () => {
-    const idle = GameStateSchema.parse({ schemaVersion: 1, actors: [
-      { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, definitionId: "hero-def" },
-      { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
-    ], definitions: [{ id: "hero-def", definition: heroDefinition("hero-def", "Hero") }] });
+    const idle = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: HERO,
+          name: "Hero",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 20, maximum: 20 },
+          definitionId: "hero-def"
+        },
+        { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
+      ],
+      definitions: [{ id: "hero-def", definition: heroDefinition("hero-def", "Hero") }]
+    });
     const { base, server } = await boot(idle);
     const heroSession = server.auth.issuePlayerSession();
     await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
 
-    const loose = await post(base, GAME_PATHS.actionUse, heroSession, { commandId: randomUUID(), actorId: HERO, actionId: "swing", includeDamage: true });
+    const loose = await post(base, GAME_PATHS.actionUse, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      actionId: "swing",
+      includeDamage: true
+    });
     expect(loose.status).toBe(200);
     const body = (await loose.json()).data;
     expect(body.route).toBe("loose");
@@ -212,16 +294,37 @@ describe("action.use over the API", () => {
   });
 
   it("routes a GM's tap on a MONSTER sheet structurally - the old client gate sent it loose", async () => {
-    const monsterFight = GameStateSchema.parse({ schemaVersion: 1,
+    const monsterFight = GameStateSchema.parse({
+      schemaVersion: 1,
       actors: [
-        { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 }, definitionId: "goblin-def" },
+        {
+          id: GOBLIN,
+          name: "Goblin",
+          kind: "monster",
+          visibility: "public",
+          hp: { current: 7, maximum: 7 },
+          definitionId: "goblin-def"
+        },
         { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } }
       ],
       definitions: [{ id: "goblin-def", definition: heroDefinition("goblin-def", "Goblin") }],
-      combat: { active: true, round: 1, turnActorId: GOBLIN, initiative: [{ actorId: GOBLIN, score: 20 }, { actorId: HERO, score: 5 }] }
+      combat: {
+        active: true,
+        round: 1,
+        turnActorId: GOBLIN,
+        initiative: [
+          { actorId: GOBLIN, score: 20 },
+          { actorId: HERO, score: 5 }
+        ]
+      }
     });
     const { base, server, gmToken } = await boot(monsterFight);
-    const used = await post(base, GAME_PATHS.actionUse, gmToken, { commandId: randomUUID(), actorId: GOBLIN, actionId: "swing", targetIds: [HERO] });
+    const used = await post(base, GAME_PATHS.actionUse, gmToken, {
+      commandId: randomUUID(),
+      actorId: GOBLIN,
+      actionId: "swing",
+      targetIds: [HERO]
+    });
     expect(used.status).toBe(200);
     expect((await used.json()).data.route).toBe("resolved");
     expect(server.store.snapshot.combat.turn.actionUsed).toBe(true);
@@ -231,7 +334,12 @@ describe("action.use over the API", () => {
     const { base, server } = await boot(withDefinitions(fightState()));
     const otherSession = server.auth.issuePlayerSession();
     await post(base, GAME_PATHS.claims, otherSession, { actorId: OTHER });
-    const stolen = await post(base, GAME_PATHS.actionUse, otherSession, { commandId: randomUUID(), actorId: HERO, actionId: "swing", targetIds: [GOBLIN] });
+    const stolen = await post(base, GAME_PATHS.actionUse, otherSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      actionId: "swing",
+      targetIds: [GOBLIN]
+    });
     expect(stolen.status).toBe(409);
   });
 });
@@ -239,22 +347,47 @@ describe("action.use over the API", () => {
 describe("save.roll over the API", () => {
   it("answers a matching pending save instead of rolling a loose die past it", async () => {
     const pendingId = randomUUID();
-    const state = GameStateSchema.parse({ schemaVersion: 1,
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
       actors: [
         { id: HERO, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 } },
         { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
       ],
       combat: {
-        active: true, round: 1, turnActorId: GOBLIN,
-        initiative: [{ actorId: GOBLIN, score: 20 }, { actorId: HERO, score: 5 }],
-        pendingSaves: [{ id: pendingId, targetActorId: HERO, sourceActorId: GOBLIN, sourceName: "Goblin", actionName: "Firebomb", ability: "dex", dc: 5, proposedDamage: 7, proposedDamageParts: [{ amount: 7, type: "fire" }], halfOnSuccess: true, createdAt: 0 }]
+        active: true,
+        round: 1,
+        turnActorId: GOBLIN,
+        initiative: [
+          { actorId: GOBLIN, score: 20 },
+          { actorId: HERO, score: 5 }
+        ],
+        pendingSaves: [
+          {
+            id: pendingId,
+            targetActorId: HERO,
+            sourceActorId: GOBLIN,
+            sourceName: "Goblin",
+            actionName: "Firebomb",
+            ability: "dex",
+            dc: 5,
+            proposedDamage: 7,
+            proposedDamageParts: [{ amount: 7, type: "fire" }],
+            halfOnSuccess: true,
+            createdAt: 0
+          }
+        ]
       }
     });
     const { base, server } = await boot(state);
     const heroSession = server.auth.issuePlayerSession();
     await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
 
-    const answered = await post(base, GAME_PATHS.saveRoll, heroSession, { commandId: randomUUID(), actorId: HERO, ability: "dex", total: 20 });
+    const answered = await post(base, GAME_PATHS.saveRoll, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      ability: "dex",
+      total: 20
+    });
     expect(answered.status).toBe(200);
     const body = (await answered.json()).data;
     expect(body.route).toBe("answered");
@@ -268,7 +401,11 @@ describe("save.roll over the API", () => {
     const heroSession = server.auth.issuePlayerSession();
     await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
 
-    const loose = await post(base, GAME_PATHS.saveRoll, heroSession, { commandId: randomUUID(), actorId: HERO, ability: "con" });
+    const loose = await post(base, GAME_PATHS.saveRoll, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      ability: "con"
+    });
     expect(loose.status).toBe(200);
     expect((await loose.json()).data.route).toBe("loose");
     const record = server.store.snapshot.rolls.at(-1)!;

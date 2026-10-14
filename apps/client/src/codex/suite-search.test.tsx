@@ -5,8 +5,9 @@ import userEvent from "@testing-library/user-event";
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
 vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) =>
+  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
     <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+  )
 }));
 
 const listPages = vi.fn();
@@ -51,7 +52,12 @@ vi.mock("./api", async (importOriginal) => {
       listAssets: (...a: unknown[]) => listAssets(...a),
       listMarkers: (...a: unknown[]) => listMarkers(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
+      forMarker: (...a: unknown[]) => forMarker(...a)
+    },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     playerCodexApi: {
       ...actual.playerCodexApi,
@@ -71,7 +77,15 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker, CodexSearchHit, PlayerCodexMap, PlayerCodexMarker } from "./api";
+import type {
+  CodexCalendar,
+  CodexChronicleRecord,
+  CodexMap,
+  CodexMarker,
+  CodexSearchHit,
+  PlayerCodexMap,
+  PlayerCodexMarker
+} from "./api";
 
 /**
  * Suite-wide search on the client: every kind reaches the list and states its kind in text; each hit
@@ -79,27 +93,105 @@ import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker, CodexS
  * palette are one search; the player renders whatever kinds the server sends. Fixtures use the real
  * `CodexSearchHit` type.
  */
-const HIT_PAGE: CodexSearchHit = { kind: "page", id: "p1", title: "Strahd von Zarovich", tags: ["villain"], entityType: "character", mapId: null };
-const HIT_JOURNAL: CodexSearchHit = { kind: "journal", id: "j1", title: "The party crossed the mists.", tags: [], entityType: null, mapId: null };
-const HIT_MAP: CodexSearchHit = { kind: "map", id: "m1", title: "Barovia", tags: ["gothic"], entityType: null, mapId: null };
-const HIT_MARKER: CodexSearchHit = { kind: "marker", id: "k1", title: "Old Svalich Road", tags: ["road"], entityType: null, mapId: "m1" };
+const HIT_PAGE: CodexSearchHit = {
+  kind: "page",
+  id: "p1",
+  title: "Strahd von Zarovich",
+  tags: ["villain"],
+  entityType: "character",
+  mapId: null
+};
+const HIT_JOURNAL: CodexSearchHit = {
+  kind: "journal",
+  id: "j1",
+  title: "The party crossed the mists.",
+  tags: [],
+  entityType: null,
+  mapId: null
+};
+const HIT_MAP: CodexSearchHit = {
+  kind: "map",
+  id: "m1",
+  title: "Barovia",
+  tags: ["gothic"],
+  entityType: null,
+  mapId: null
+};
+const HIT_MARKER: CodexSearchHit = {
+  kind: "marker",
+  id: "k1",
+  title: "Old Svalich Road",
+  tags: ["road"],
+  entityType: null,
+  mapId: "m1"
+};
 const HITS: readonly CodexSearchHit[] = [HIT_PAGE, HIT_JOURNAL, HIT_MAP, HIT_MARKER];
 
 /** The target map is second, so a jump ignoring `hit.mapId` lands on the default and fails. */
-const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MAP_OTHER: CodexMap = {
+  id: "m0",
+  assetId: "a0",
+  name: "Castle Ravenloft",
+  kind: "battlemap",
+  parentMapId: null,
+  revealedToPlayers: false,
+  sortKey: 0,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
-const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MARKER: CodexMarker = {
+  id: "k1",
+  mapId: "m1",
+  x: 0.4,
+  y: 0.6,
+  iconId: "pin",
+  iconColor: "#FF2E9A",
+  label: "Old Svalich Road",
+  revealedToPlayers: false,
+  pageIds: [],
+  subMapId: null,
+  sceneIds: [],
+  actorId: null,
+  isParty: false,
+  tags: [],
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
+};
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 /** The Journal reads the chronicle record shape. */
 const RECORD = (id: string, text: string): CodexChronicleRecord => ({
-  kind: "entry", id, title: null, text, gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  kind: "entry",
+  id,
+  title: null,
+  text,
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
-const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () =>
+  (goTo("/codex/pages"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 const searchInRail = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
   await user.type(screen.getAllByLabelText("Search the Codex")[0], query);
@@ -179,7 +271,10 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     listAssets.mockResolvedValue([]);
     listMarkers.mockImplementation(async (_token: string, mapId: string) => (mapId === "m1" ? [MARKER] : []));
     forMarker.mockResolvedValue([]);
-    chronicle.mockResolvedValue([RECORD("j0", "Nothing to do with this."), RECORD("j1", "The party crossed the mists.")]);
+    chronicle.mockResolvedValue([
+      RECORD("j0", "Nothing to do with this."),
+      RECORD("j1", "The party crossed the mists.")
+    ]);
     getCalendar.mockResolvedValue(CALENDAR);
   });
 
@@ -193,7 +288,9 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     // The pin's own map, not the default.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
-    expect(within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })
+    ).toBeInTheDocument();
     // The pin is selected: its inspector is open.
     expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
@@ -226,7 +323,22 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
 
   it("a PAGE hit stays on Pages and opens the page", async () => {
     getPage.mockResolvedValue({
-      page: { id: "p1", title: "Strahd von Zarovich", entityType: "character", fields: {}, gmFields: {}, folder: null, tags: [], revealedToPlayers: false, bannerAssetId: null, rev: 1, playerBody: "", gmBody: "", createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" },
+      page: {
+        id: "p1",
+        title: "Strahd von Zarovich",
+        entityType: "character",
+        fields: {},
+        gmFields: {},
+        folder: null,
+        tags: [],
+        revealedToPlayers: false,
+        bannerAssetId: null,
+        rev: 1,
+        playerBody: "",
+        gmBody: "",
+        createdAt: "2026-07-28T00:00:00.000Z",
+        updatedAt: "2026-07-28T00:00:00.000Z"
+      },
       connections: []
     });
     const user = userEvent.setup();
@@ -303,9 +415,35 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
 });
 
 describe("Suite-wide search — the player surface (CI-1, viewer safety)", () => {
-  const PLAYER_MAP: PlayerCodexMap = { id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null, tags: [] };
-  const PLAYER_OTHER: PlayerCodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, tags: [] };
-  const PLAYER_MARKER: PlayerCodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", pageIds: [], subMapId: null, isParty: false, tags: [] };
+  const PLAYER_MAP: PlayerCodexMap = {
+    id: "m1",
+    assetId: "a1",
+    name: "Barovia",
+    kind: "regional",
+    parentMapId: null,
+    tags: []
+  };
+  const PLAYER_OTHER: PlayerCodexMap = {
+    id: "m0",
+    assetId: "a0",
+    name: "Castle Ravenloft",
+    kind: "battlemap",
+    parentMapId: null,
+    tags: []
+  };
+  const PLAYER_MARKER: PlayerCodexMarker = {
+    id: "k1",
+    mapId: "m1",
+    x: 0.4,
+    y: 0.6,
+    iconId: "pin",
+    iconColor: "#FF2E9A",
+    label: "Old Svalich Road",
+    pageIds: [],
+    subMapId: null,
+    isParty: false,
+    tags: []
+  };
 
   beforeEach(() => {
     playerListPages.mockResolvedValue([]);
@@ -398,7 +536,10 @@ describe("Suite-wide search — one settled query, one request", () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
-    await user.type(within(await screen.findByRole("dialog", { name: "Codex command palette" })).getByLabelText("Search the Codex"), "strahd");
+    await user.type(
+      within(await screen.findByRole("dialog", { name: "Codex command palette" })).getByLabelText("Search the Codex"),
+      "strahd"
+    );
 
     await waitFor(() => expect(search).toHaveBeenCalledWith("gm", "strahd"));
     expect(search).toHaveBeenCalledTimes(1);

@@ -1,5 +1,10 @@
-.nh-tooltip { position: relative; display: inline-flex; }
-.nh-tooltip-trigger { display: inline-flex; }
+.nh-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+.nh-tooltip-trigger {
+  display: inline-flex;
+}
 /* Panel material with the brighter rim, as for menus and popovers. On a backing layer for consistency, even though
    the bubble is `pointer-events: none`. */
 .nh-tooltip-bubble {
@@ -20,7 +25,10 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity var(--dur-hover), transform var(--dur-hover), visibility var(--dur-hover);
+  transition:
+    opacity var(--dur-hover),
+    transform var(--dur-hover),
+    visibility var(--dur-hover);
 }
 .nh-tooltip-bubble::before {
   content: "";
@@ -28,15 +36,23 @@
   inset: 0;
   z-index: -1;
   box-sizing: border-box;
-  clip-path: polygon(0 .34rem, .34rem 0, 100% 0, 100% calc(100% - .34rem), calc(100% - .34rem) 100%, 0 100%);
+  clip-path: polygon(0 0.34rem, 0.34rem 0, 100% 0, 100% calc(100% - 0.34rem), calc(100% - 0.34rem) 100%, 0 100%);
   border: var(--rim-w) solid var(--rim-color-hi);
   background-color: var(--surface-2);
-  background-image: linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap));
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
+  );
   background-size: 100% var(--scanline-gap);
   background-origin: border-box;
   background-clip: border-box;
 }
-.nh-tooltip--bottom .nh-tooltip-bubble { bottom: auto; top: calc(100% + 6px); transform: translateX(-50%) translateY(4px); }
+.nh-tooltip--bottom .nh-tooltip-bubble {
+  bottom: auto;
+  top: calc(100% + 6px);
+  transform: translateX(-50%) translateY(4px);
+}
 .nh-tooltip:hover .nh-tooltip-bubble,
 .nh-tooltip:focus-within .nh-tooltip-bubble {
   opacity: 1;

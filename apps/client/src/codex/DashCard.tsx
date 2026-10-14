@@ -23,29 +23,50 @@ export type DashCardProps = Readonly<{
   children?: ReactNode;
 }>;
 
-export function DashCard({ title, iconId, count, seeAll, loading = false, error = null, empty, children }: DashCardProps) {
+export function DashCard({
+  title,
+  iconId,
+  count,
+  seeAll,
+  loading = false,
+  error = null,
+  empty,
+  children
+}: DashCardProps) {
   const isEmpty = children === null || children === undefined || (Array.isArray(children) && children.length === 0);
   return (
     <section className="codex-dashcard">
       <div className="codex-dashcard-head">
         <CodexIcon iconId={iconId} className="codex-ent-icon codex-dashcard-glyph" />
         <h3 className="codex-dashcard-title">{title}</h3>
-        {count && count.total > count.shown && <Badge>{count.shown} of {count.total}</Badge>}
+        {count && count.total > count.shown && (
+          <Badge>
+            {count.shown} of {count.total}
+          </Badge>
+        )}
       </div>
       <div className="codex-dashcard-body">
-        {error
-          ? <Alert tone="danger">{error}</Alert>
-          : loading && isEmpty
-          ? <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>
-          : isEmpty
+        {error ? (
+          <Alert tone="danger">{error}</Alert>
+        ) : loading && isEmpty ? (
+          <div className="codex-list-loading">
+            {[0, 1].map((row) => (
+              <Skeleton key={row} variant="text" />
+            ))}
+          </div>
+        ) : isEmpty ? (
           /* The default says emptiness is the normal resting state. */
-          ? <p className="codex-dashcard-empty">{empty ?? "Nothing to show — this fills itself as the campaign runs."}</p>
-          : children}
+          <p className="codex-dashcard-empty">{empty ?? "Nothing to show — this fills itself as the campaign runs."}</p>
+        ) : (
+          children
+        )}
       </div>
       {seeAll && (
         /* Last in the card, so the small button's ::after has nothing below to overhang. */
         <div className="codex-dashcard-foot">
-          <Button variant="ghost" size="sm" onClick={seeAll.onClick}>{seeAll.label}</Button>
+          <Button variant="ghost" size="sm" onClick={seeAll.onClick}>
+            {seeAll.label}
+          </Button>
         </div>
       )}
     </section>

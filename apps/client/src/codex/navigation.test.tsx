@@ -30,7 +30,11 @@ vi.mock("./api", async (importOriginal) => {
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a) },
+    journalApi: {
+      ...actual.journalApi,
+      forPage: (...a: unknown[]) => forPage(...a),
+      timeline: (...a: unknown[]) => timeline(...a)
+    },
     atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) }
   };
@@ -42,15 +46,36 @@ import { CodexShell } from "./CodexShell";
 import type { CodexPage, CodexPageSummary } from "./api";
 
 /** Cross-section navigation: which section is active, a type card sets the filter and lands on Pages, and filters clear. */
-const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"], tags: string[] = []): CodexPageSummary => ({
-  id, title, entityType, fields: {}, folder: null, tags, revealedToPlayers: false,
-  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+const summary = (
+  id: string,
+  title: string,
+  entityType: CodexPageSummary["entityType"],
+  tags: string[] = []
+): CodexPageSummary => ({
+  id,
+  title,
+  entityType,
+  fields: {},
+  folder: null,
+  tags,
+  revealedToPlayers: false,
+  bannerAssetId: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  rev: 1,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
 /** `CodexShell` uses `useToast`, so render it inside a ToastProvider as the app does. */
-const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () =>
+  (goTo("/codex/pages"), render)(
+    <ToastProvider>
+      <CodexShell gmToken="gm" />
+    </ToastProvider>
+  );
 
 describe("Codex shell — cross-mode navigation", () => {
   beforeEach(() => {

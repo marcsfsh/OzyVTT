@@ -59,35 +59,70 @@ import { JournalView } from "./JournalView";
 import { goTo } from "../../test/route";
 import { PlayerCodex } from "./PlayerCodex";
 import { CampaignHome } from "./CampaignHome";
-import { CHRONICLE_KIND_META, campaignDeadlines, deadlineFired, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
+import {
+  CHRONICLE_KIND_META,
+  campaignDeadlines,
+  deadlineFired,
+  downtimeProposedDate,
+  downtimeSummaryLabel
+} from "./chronicle";
 import { CODEX_ICONS } from "./icons";
 import type { CodexChronicleRecord, GmCodexCalendar, PlayerCodexChronicleRecord } from "./api";
 
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
-  months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }],
+  months: [
+    { name: "Hammer", days: 30 },
+    { name: "Alturiak", days: 30 }
+  ],
   weekdays: [],
   currentDate: { year: 1492, month: 0, day: 3 },
   publishedDate: { year: 1492, month: 0, day: 3 }
 };
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
-  kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
-  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+  kind: "entry",
+  id: "j1",
+  title: null,
+  text: "The party crossed the mists.",
+  gmText: null,
+  revealedToPlayers: false,
+  sessionId: null,
+  sessionNumber: null,
+  realDate: null,
+  inWorldLabel: null,
+  calendarInstant: null,
+  inWorldDate: null,
+  tags: [],
+  attachPageId: null,
+  attachMarkerId: null,
+  sourceEncounterId: null,
+  payload: null,
+  fired: false,
+  proposedDate: null,
+  createdAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  ...over
 });
 
 const DEADLINE = RECORD({
-  kind: "deadline", id: "d1", text: "The duke's ultimatum expires.",
-  inWorldLabel: "Hammer 10, 1492 DR", calendarInstant: 1492 * 60 + 9, inWorldDate: { year: 1492, month: 0, day: 10 }
+  kind: "deadline",
+  id: "d1",
+  text: "The duke's ultimatum expires.",
+  inWorldLabel: "Hammer 10, 1492 DR",
+  calendarInstant: 1492 * 60 + 9,
+  inWorldDate: { year: 1492, month: 0, day: 10 }
 });
 const DOWNTIME = RECORD({
-  kind: "downtime", id: "w1", text: "A quiet tenday in Daggerford.",
+  kind: "downtime",
+  id: "w1",
+  text: "A quiet tenday in Daggerford.",
   payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null, applied: false },
   // The server's landing date (Hammer 3 + 7). One test makes it disagree with local arithmetic on purpose.
   proposedDate: { year: 1492, month: 0, day: 10 },
-  inWorldLabel: "Hammer 3, 1492 DR", calendarInstant: 1492 * 60 + 2, inWorldDate: { year: 1492, month: 0, day: 3 }
+  inWorldLabel: "Hammer 3, 1492 DR",
+  calendarInstant: 1492 * 60 + 2,
+  inWorldDate: { year: 1492, month: 0, day: 3 }
 });
 
 const renderJournal = async (records: CodexChronicleRecord[], calendar: GmCodexCalendar = CALENDAR) => {
@@ -102,7 +137,6 @@ const rowOf = (id: string) => document.getElementById(`codex-entry-${id}`)!;
 const playerRowOf = (id: string) => document.getElementById(`codex-player-entry-${id}`)!;
 
 beforeEach(() => sessionStorage.clear());
-
 
 /** Filing fields live in the Details panel, whose open state persists across mounts. */
 const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -162,7 +196,11 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     await user.click(screen.getByRole("button", { name: "Log downtime" }));
 
     await waitFor(() => expect(createDowntime).toHaveBeenCalled());
-    expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({ who: "Aldric", activity: "Forging a blade", days: 7 });
+    expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({
+      who: "Aldric",
+      activity: "Forging a blade",
+      days: 7
+    });
     // Creating downtime must not move the clock.
     expect(applyDowntime).not.toHaveBeenCalled();
     expect(setCalendar).not.toHaveBeenCalled();
@@ -185,14 +223,35 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
   /** The fixture is built so each likely bug gives a different number: all 4, ignoring `fired` 3, `<` instead of `<=` 1. */
   it("says how many deadlines confirming would pass", async () => {
     await renderJournal([
-      DOWNTIME,                                                                     // proposes Hammer 10
-      DEADLINE,                                                                     // Hammer 10, exactly the landing day: counts
-      RECORD({ kind: "deadline", id: "d2", text: "The caravan leaves.", fired: false,
-        inWorldLabel: "Hammer 5, 1492 DR", calendarInstant: 1492 * 60 + 4, inWorldDate: { year: 1492, month: 0, day: 5 } }),
-      RECORD({ kind: "deadline", id: "d3", text: "The tax was due.", fired: true,    // already passed: not caused by this
-        inWorldLabel: "Hammer 2, 1492 DR", calendarInstant: 1492 * 60 + 1, inWorldDate: { year: 1492, month: 0, day: 2 } }),
-      RECORD({ kind: "deadline", id: "d4", text: "Midwinter.", fired: false,         // beyond the landing day
-        inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })
+      DOWNTIME, // proposes Hammer 10
+      DEADLINE, // Hammer 10, exactly the landing day: counts
+      RECORD({
+        kind: "deadline",
+        id: "d2",
+        text: "The caravan leaves.",
+        fired: false,
+        inWorldLabel: "Hammer 5, 1492 DR",
+        calendarInstant: 1492 * 60 + 4,
+        inWorldDate: { year: 1492, month: 0, day: 5 }
+      }),
+      RECORD({
+        kind: "deadline",
+        id: "d3",
+        text: "The tax was due.",
+        fired: true, // already passed: not caused by this
+        inWorldLabel: "Hammer 2, 1492 DR",
+        calendarInstant: 1492 * 60 + 1,
+        inWorldDate: { year: 1492, month: 0, day: 2 }
+      }),
+      RECORD({
+        kind: "deadline",
+        id: "d4",
+        text: "Midwinter.",
+        fired: false, // beyond the landing day
+        inWorldLabel: "Alturiak 20, 1492 DR",
+        calendarInstant: 1492 * 60 + 49,
+        inWorldDate: { year: 1492, month: 1, day: 20 }
+      })
     ]);
     const row = within(rowOf("w1"));
 
@@ -201,13 +260,25 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
   it("counts one deadline in the singular", async () => {
     await renderJournal([DOWNTIME, DEADLINE]);
-    expect(within(rowOf("w1")).getByText("Move your date to Hammer 10, 1492 DR. This passes 1 deadline.")).toBeInTheDocument();
+    expect(
+      within(rowOf("w1")).getByText("Move your date to Hammer 10, 1492 DR. This passes 1 deadline.")
+    ).toBeInTheDocument();
   });
 
   /** A warning that is always present stops being read. */
   it("adds no clause when the move passes nothing", async () => {
-    await renderJournal([DOWNTIME, RECORD({ kind: "deadline", id: "d5", text: "Midwinter.", fired: false,
-      inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })]);
+    await renderJournal([
+      DOWNTIME,
+      RECORD({
+        kind: "deadline",
+        id: "d5",
+        text: "Midwinter.",
+        fired: false,
+        inWorldLabel: "Alturiak 20, 1492 DR",
+        calendarInstant: 1492 * 60 + 49,
+        inWorldDate: { year: 1492, month: 1, day: 20 }
+      })
+    ]);
     const row = within(rowOf("w1"));
 
     expect(row.getByText("Move your date to Hammer 10, 1492 DR")).toBeInTheDocument();
@@ -234,7 +305,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
   /** The edit path must guard the date too; a dateless deadline never fires. */
   it("will not let an edit take a deadline's date away", async () => {
-    await renderJournal([DEADLINE, RECORD()]);   // the ordinary entry is the contrast
+    await renderJournal([DEADLINE, RECORD()]); // the ordinary entry is the contrast
     const user = userEvent.setup();
     await user.click(within(rowOf(DEADLINE.id)).getByRole("button", { name: "Edit" }));
 
@@ -255,7 +326,13 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
   });
 
   it("offers no second confirmation once the clock has already been advanced", async () => {
-    await renderJournal([RECORD({ ...DOWNTIME, id: "w2", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null, applied: true } })]);
+    await renderJournal([
+      RECORD({
+        ...DOWNTIME,
+        id: "w2",
+        payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null, applied: true }
+      })
+    ]);
     const row = within(rowOf("w2"));
 
     expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
@@ -303,7 +380,11 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
   });
 
   it("shows what the table is on, and publishes, once the two diverge", async () => {
-    await renderJournal([], { ...CALENDAR, currentDate: { year: 1492, month: 0, day: 20 }, publishedDate: { year: 1492, month: 0, day: 3 } });
+    await renderJournal([], {
+      ...CALENDAR,
+      currentDate: { year: 1492, month: 0, day: 20 },
+      publishedDate: { year: 1492, month: 0, day: 3 }
+    });
     publishCalendar.mockResolvedValue(CALENDAR);
     const user = userEvent.setup();
 
@@ -321,9 +402,21 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
 
 describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   const PLAYER_RECORD = (over: Partial<PlayerCodexChronicleRecord> = {}): PlayerCodexChronicleRecord => ({
-    kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionId: null, sessionNumber: null,
-    realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false,
-    createdAt: "2026-07-20T00:00:00.000Z", ...over
+    kind: "entry",
+    id: "j1",
+    title: null,
+    text: "The party crossed the mists.",
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldLabel: null,
+    inWorldDate: null,
+    calendarInstant: null,
+    tags: [],
+    payload: null,
+    fired: false,
+    createdAt: "2026-07-20T00:00:00.000Z",
+    ...over
   });
 
   const renderPlayer = async (records: PlayerCodexChronicleRecord[]) => {
@@ -334,7 +427,12 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
     playerListRelationships.mockResolvedValue([]);
     playerListLinks.mockResolvedValue(null);
     // The player projection: `currentDate` is the published date; no GM clock on this shape.
-    playerCalendar.mockResolvedValue({ yearName: "DR", months: CALENDAR.months, weekdays: [], currentDate: { year: 1492, month: 0, day: 3 } });
+    playerCalendar.mockResolvedValue({
+      yearName: "DR",
+      months: CALENDAR.months,
+      weekdays: [],
+      currentDate: { year: 1492, month: 0, day: 3 }
+    });
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerChronicle).toHaveBeenCalled());
   };
@@ -342,8 +440,19 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   it("reads a revealed deadline and a revealed downtime with their icon and their word", async () => {
     const user = userEvent.setup();
     await renderPlayer([
-      PLAYER_RECORD({ kind: "deadline", id: "d1", text: "The duke's ultimatum expires.", inWorldLabel: "Hammer 10, 1492 DR", fired: true }),
-      PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null } })
+      PLAYER_RECORD({
+        kind: "deadline",
+        id: "d1",
+        text: "The duke's ultimatum expires.",
+        inWorldLabel: "Hammer 10, 1492 DR",
+        fired: true
+      }),
+      PLAYER_RECORD({
+        kind: "downtime",
+        id: "w1",
+        text: "A quiet tenday.",
+        payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null }
+      })
     ]);
     await user.click(screen.getByRole("button", { name: "Journal" }));
 
@@ -355,7 +464,14 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   });
 
   it("never asks the GM calendar route, and never offers a Confirm", async () => {
-    await renderPlayer([PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null } })]);
+    await renderPlayer([
+      PLAYER_RECORD({
+        kind: "downtime",
+        id: "w1",
+        text: "A quiet tenday.",
+        payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null }
+      })
+    ]);
 
     // What a client test can prove: this surface asks the player route, never `calendarApi.get`.
     expect(playerCalendar).toHaveBeenCalledWith("player");
@@ -376,8 +492,17 @@ describe("The Campaign dashboard's deadlines card (CT-5)", () => {
   it("lists what has passed and what is coming, each saying which, and opens the record", async () => {
     const onOpenEntry = vi.fn();
     const user = userEvent.setup();
-    render(<CampaignHome pages={[]} deadlines={CARDS} onOpenEntry={onOpenEntry}
-      onPickType={vi.fn()} onPickTag={vi.fn()} onOpenPage={vi.fn()} onOpenMap={vi.fn()} />);
+    render(
+      <CampaignHome
+        pages={[]}
+        deadlines={CARDS}
+        onOpenEntry={onOpenEntry}
+        onPickType={vi.fn()}
+        onPickTag={vi.fn()}
+        onOpenPage={vi.fn()}
+        onOpenMap={vi.fn()}
+      />
+    );
 
     const card = within(screen.getByRole("navigation", { name: "Deadlines" }));
     const rows = card.getAllByRole("button").map((row) => row.textContent ?? "");
@@ -392,8 +517,18 @@ describe("The Campaign dashboard's deadlines card (CT-5)", () => {
   });
 
   it("renders no card at all when there are no deadlines", () => {
-    render(<CampaignHome pages={[{ id: "p1", title: "Strahd", entityType: "character", tags: [], updatedAt: "2026-07-28T00:00:00.000Z" }]}
-      onOpenEntry={vi.fn()} onPickType={vi.fn()} onPickTag={vi.fn()} onOpenPage={vi.fn()} onOpenMap={vi.fn()} />);
+    render(
+      <CampaignHome
+        pages={[
+          { id: "p1", title: "Strahd", entityType: "character", tags: [], updatedAt: "2026-07-28T00:00:00.000Z" }
+        ]}
+        onOpenEntry={vi.fn()}
+        onPickType={vi.fn()}
+        onPickTag={vi.fn()}
+        onOpenPage={vi.fn()}
+        onOpenMap={vi.fn()}
+      />
+    );
     expect(screen.queryByRole("navigation", { name: "Deadlines" })).not.toBeInTheDocument();
   });
 });
@@ -422,11 +557,21 @@ describe("The new controls take the tap route §4 requires of a stacked control 
   });
 
   it("a deadline card row is the dashboard's own row chassis, not a new control", () => {
-    render(<CampaignHome pages={[]} deadlines={[{ id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }]}
-      onOpenEntry={vi.fn()} onPickType={vi.fn()} onPickTag={vi.fn()} onOpenPage={vi.fn()} onOpenMap={vi.fn()} />);
+    render(
+      <CampaignHome
+        pages={[]}
+        deadlines={[{ id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }]}
+        onOpenEntry={vi.fn()}
+        onPickType={vi.fn()}
+        onPickTag={vi.fn()}
+        onOpenPage={vi.fn()}
+        onOpenMap={vi.fn()}
+      />
+    );
     // Reuses the row class that carries the floor rather than a bespoke one.
-    expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByRole("button"))
-      .toHaveClass("codex-campaign-recentitem");
+    expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByRole("button")).toHaveClass(
+      "codex-campaign-recentitem"
+    );
   });
 });
 
@@ -446,21 +591,48 @@ describe("The shared reading rules themselves", () => {
   });
 
   it("walks months and years when downtime advances the clock, and never clamps into the wrong day", () => {
-    const calendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: [] };
-    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 3 } }, 7)).toEqual({ year: 1492, month: 0, day: 10 });
+    const calendar = {
+      yearName: "DR",
+      months: [
+        { name: "Hammer", days: 30 },
+        { name: "Alturiak", days: 30 }
+      ],
+      weekdays: []
+    };
+    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 3 } }, 7)).toEqual({
+      year: 1492,
+      month: 0,
+      day: 10
+    });
     // Rolls into the next month.
-    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 28 } }, 5)).toEqual({ year: 1492, month: 1, day: 3 });
+    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 28 } }, 5)).toEqual({
+      year: 1492,
+      month: 1,
+      day: 3
+    });
     // Rolls the year.
-    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 1, day: 28 } }, 5)).toEqual({ year: 1493, month: 0, day: 3 });
+    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 1, day: 28 } }, 5)).toEqual({
+      year: 1493,
+      month: 0,
+      day: 3
+    });
     // A stored day 31 of a 30-day month counts as day 30, as on the server, so +1 is the next month's day 1.
-    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 31 } }, 1)).toEqual({ year: 1492, month: 1, day: 1 });
+    expect(downtimeProposedDate({ ...calendar, currentDate: { year: 1492, month: 0, day: 31 } }, 1)).toEqual({
+      year: 1492,
+      month: 1,
+      day: 1
+    });
     expect(downtimeProposedDate({ ...calendar, currentDate: null }, 7)).toBeNull();
     expect(downtimeProposedDate(null, 7)).toBeNull();
   });
 
   it("says a downtime in one line without inventing punctuation for the halves it was not given", () => {
-    expect(downtimeSummaryLabel({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null })).toBe("Aldric · Forging a blade · 7 days");
-    expect(downtimeSummaryLabel({ who: "", activity: "Carousing", days: 1, characterPageId: null })).toBe("Carousing · 1 day");
+    expect(downtimeSummaryLabel({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null })).toBe(
+      "Aldric · Forging a blade · 7 days"
+    );
+    expect(downtimeSummaryLabel({ who: "", activity: "Carousing", days: 1, characterPageId: null })).toBe(
+      "Carousing · 1 day"
+    );
     expect(downtimeSummaryLabel({ who: "", activity: "", days: 0, characterPageId: null })).toBe("0 days");
   });
 });

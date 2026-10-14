@@ -1,4 +1,20 @@
-import type { Annotation, GameState, GmView, PendingReaction, PendingRuleAsk, PendingSave, PlayerAnnotation, PlayerCombatView, PlayerEffect, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import type {
+  Annotation,
+  GameState,
+  GmView,
+  PendingReaction,
+  PendingRuleAsk,
+  PendingSave,
+  PlayerAnnotation,
+  PlayerCombatView,
+  PlayerEffect,
+  PlayerHp,
+  PlayerInitiativeEntry,
+  PlayerRollRecord,
+  PlayerView,
+  PresenceStatus,
+  RollRecord
+} from "@vtt/domain";
 import { actionPools } from "./effective-actions.js";
 import { healthBandOf } from "./hit-points.js";
 
@@ -13,7 +29,9 @@ export function playerHp(actor: GameState["actors"][number]): PlayerHp {
 }
 
 function visibleToPlayer(roll: RollRecord, playerSessionId?: string) {
-  return roll.visibility === "public" || (roll.visibility === "self-only" && roll.initiatorSessionId === playerSessionId);
+  return (
+    roll.visibility === "public" || (roll.visibility === "self-only" && roll.initiatorSessionId === playerSessionId)
+  );
 }
 
 /** The only roll shape players receive. A session id is credential-shaped, so the roller's is removed. */
@@ -24,25 +42,54 @@ export function playerRoll(roll: RollRecord | PlayerRollRecord): PlayerRollRecor
 
 /** Condition badge labels ("Prone", "Exhaustion 3"): public info, safe for players and the shared screen. */
 export function conditionLabels(actor: GameState["actors"][number]): readonly string[] {
-  return actor.conditions.map((condition) => `${condition.id.split("-").map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`).join(" ")}${condition.level !== undefined ? ` ${condition.level}` : ""}`);
+  return actor.conditions.map(
+    (condition) =>
+      `${condition.id
+        .split("-")
+        .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+        .join(" ")}${condition.level !== undefined ? ` ${condition.level}` : ""}`
+  );
 }
 
 export function projectPublicInitiative(state: GameState): readonly PlayerInitiativeEntry[] {
-  const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
+  const publicActors = new Map(
+    state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor])
+  );
   return state.combat.initiative.flatMap((entry) => {
     const actor = publicActors.get(entry.actorId);
     // Public actors only, so nothing hidden leaks through the condition dots.
-    return actor ? [{ actorId: actor.id, name: actor.name, score: entry.score, active: state.combat.active && state.combat.turnActorId === actor.id, health: healthBandOf(actor.hp), conditionIds: actor.conditions.map((condition) => condition.id), conditions: conditionLabels(actor) }] : [];
+    return actor
+      ? [
+          {
+            actorId: actor.id,
+            name: actor.name,
+            score: entry.score,
+            active: state.combat.active && state.combat.turnActorId === actor.id,
+            health: healthBandOf(actor.hp),
+            conditionIds: actor.conditions.map((condition) => condition.id),
+            conditions: conditionLabels(actor)
+          }
+        ]
+      : [];
   });
 }
 
 function visibleToPlayerAnnotation(state: GameState, annotation: Annotation, playerSessionId: string | undefined) {
   switch (annotation.visibility) {
-    case "public": return true;
-    case "gm-only": return false;
+    case "public":
+      return true;
+    case "gm-only":
+      return false;
     case "owner-only":
-    case "owner-gm": return annotation.ownerSessionId === playerSessionId;
-    case "gm-actor": return playerSessionId !== undefined && state.actors.some((actor) => actor.id === annotation.visibleToActorId && actor.ownerSessionId === playerSessionId);
+    case "owner-gm":
+      return annotation.ownerSessionId === playerSessionId;
+    case "gm-actor":
+      return (
+        playerSessionId !== undefined &&
+        state.actors.some(
+          (actor) => actor.id === annotation.visibleToActorId && actor.ownerSessionId === playerSessionId
+        )
+      );
   }
 }
 
@@ -52,9 +99,17 @@ function safeAnnotation(annotation: Annotation, playerSessionId: string | undefi
   return { ...visible, mine: ownerSessionId === playerSessionId };
 }
 
-export function projectPlayerAnnotations(state: GameState, playerSessionId: string | undefined, now: number): readonly PlayerAnnotation[] {
+export function projectPlayerAnnotations(
+  state: GameState,
+  playerSessionId: string | undefined,
+  now: number
+): readonly PlayerAnnotation[] {
   return state.combat.annotations
-    .filter((annotation) => (annotation.expiresAt === null || annotation.expiresAt > now) && visibleToPlayerAnnotation(state, annotation, playerSessionId))
+    .filter(
+      (annotation) =>
+        (annotation.expiresAt === null || annotation.expiresAt > now) &&
+        visibleToPlayerAnnotation(state, annotation, playerSessionId)
+    )
     .map((annotation) => safeAnnotation(annotation, playerSessionId));
 }
 
@@ -75,7 +130,10 @@ type FieldAudience = "player" | "derived" | "never";
 type PlayerKeys<M> = { [K in keyof M]: M[K] extends "player" ? K : never }[keyof M];
 
 /** Copies the fields a classification map marks "player". "derived" fields are rebuilt by the caller. */
-function copyPlayerFields<T extends object, const M extends Record<keyof T, FieldAudience>>(source: T, map: M): Pick<T, PlayerKeys<M> & keyof T> {
+function copyPlayerFields<T extends object, const M extends Record<keyof T, FieldAudience>>(
+  source: T,
+  map: M
+): Pick<T, PlayerKeys<M> & keyof T> {
   const picked: Partial<T> = {};
   for (const key of Object.keys(map) as (keyof T)[]) {
     if (map[key] === "player" && source[key] !== undefined) picked[key] = structuredClone(source[key]);
@@ -85,27 +143,55 @@ function copyPlayerFields<T extends object, const M extends Record<keyof T, Fiel
 
 // Each map must list every field of its schema, so a new field does not compile until it is classified.
 const PENDING_SAVE_FIELDS = {
-  id: "player", targetActorId: "player", ability: "player", dc: "player", actionName: "player",
-  proposedDamage: "player", proposedDamageParts: "player", halfOnSuccess: "player", conditionId: "player",
-  saveBonus: "player", createdAt: "player",
-  sourceName: "derived", onFailEffect: "derived",
-  sourceActorId: "never", endsEffects: "never"
+  id: "player",
+  targetActorId: "player",
+  ability: "player",
+  dc: "player",
+  actionName: "player",
+  proposedDamage: "player",
+  proposedDamageParts: "player",
+  halfOnSuccess: "player",
+  conditionId: "player",
+  saveBonus: "player",
+  createdAt: "player",
+  sourceName: "derived",
+  onFailEffect: "derived",
+  sourceActorId: "never",
+  endsEffects: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 const ON_FAIL_EFFECT_FIELDS = {
-  tags: "player", linkedConditionIds: "player", escapeDc: "player",
-  name: "derived", sourceName: "derived", sourceActorId: "derived"
+  tags: "player",
+  linkedConditionIds: "player",
+  escapeDc: "player",
+  name: "derived",
+  sourceName: "derived",
+  sourceActorId: "derived"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
-  id: "player", kind: "player", actorId: "player", actionId: "player", actionName: "player", targetActorId: "player",
-  triggerCommandId: "player", proposedDamage: "player", proposedDamageParts: "player", critical: "player", createdAt: "player",
+  id: "player",
+  kind: "player",
+  actorId: "player",
+  actionId: "player",
+  actionName: "player",
+  targetActorId: "player",
+  triggerCommandId: "player",
+  proposedDamage: "player",
+  proposedDamageParts: "player",
+  critical: "player",
+  createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {
-  id: "player", actorId: "player", rule: "player", family: "player", message: "player", createdAt: "player",
+  id: "player",
+  actorId: "player",
+  rule: "player",
+  family: "player",
+  message: "player",
+  createdAt: "player",
   // The parked payload can name target ids the asker may not know.
   command: "never"
 } as const satisfies Record<keyof PendingRuleAsk, FieldAudience>;
@@ -121,7 +207,9 @@ function ownedBy(state: GameState, actorId: string, playerSessionId: string | un
 
 export function projectPlayerCombat(state: GameState, playerSessionId?: string, now = Date.now()): PlayerCombatView {
   const initiative = projectPublicInitiative(state);
-  const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
+  const publicActorIds = new Set(
+    state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id)
+  );
   const currentIsPublic = initiative.some((entry) => entry.active);
   return {
     active: state.combat.active,
@@ -135,7 +223,18 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // A hidden combatant's turn stays opaque: economy flags, action instance and per-turn uses (which
     // name stat-block action ids) reset to idle rather than narrate its activity.
     turn: currentIsPublic
-      ? { actionUsed: state.combat.turn.actionUsed, bonusActionUsed: state.combat.turn.bonusActionUsed, actionInstance: state.combat.turn.actionInstance ? { actorId: state.combat.turn.actionInstance.actorId, components: { ...state.combat.turn.actionInstance.components } } : null, turnUses: { ...state.combat.turn.turnUses }, movementUsedFeet: state.combat.turn.movementUsedFeet }
+      ? {
+          actionUsed: state.combat.turn.actionUsed,
+          bonusActionUsed: state.combat.turn.bonusActionUsed,
+          actionInstance: state.combat.turn.actionInstance
+            ? {
+                actorId: state.combat.turn.actionInstance.actorId,
+                components: { ...state.combat.turn.actionInstance.components }
+              }
+            : null,
+          turnUses: { ...state.combat.turn.turnUses },
+          movementUsedFeet: state.combat.turn.movementUsedFeet
+        }
       : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
     // Rules configuration, not secrets: a player's sheet must know whether a tap will be blocked or warned.
@@ -187,7 +286,10 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
 }
 
 /** An effect as players see it: no source ids, and a hidden source masked in both `sourceName` and `name`. */
-function playerEffect(effect: GameState["actors"][number]["effects"][number], publicActorIds: ReadonlySet<string>): PlayerEffect {
+function playerEffect(
+  effect: GameState["actors"][number]["effects"][number],
+  publicActorIds: ReadonlySet<string>
+): PlayerEffect {
   const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
   if (!isHiddenSource(sourceActorId, publicActorIds)) return visible;
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
@@ -244,9 +346,15 @@ const PLAYER_ACTOR_FIELDS = {
   sheetPreview: "never"
 } as const satisfies Record<keyof Actor, "table" | "party" | "derived" | "never">;
 
-type FieldsFor<Audience> = { [K in keyof typeof PLAYER_ACTOR_FIELDS]: (typeof PLAYER_ACTOR_FIELDS)[K] extends Audience ? K : never }[keyof typeof PLAYER_ACTOR_FIELDS];
-const TABLE_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filter((key) => PLAYER_ACTOR_FIELDS[key] === "table") as FieldsFor<"table">[];
-const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filter((key) => PLAYER_ACTOR_FIELDS[key] === "table" || PLAYER_ACTOR_FIELDS[key] === "party") as FieldsFor<"table" | "party">[];
+type FieldsFor<Audience> = {
+  [K in keyof typeof PLAYER_ACTOR_FIELDS]: (typeof PLAYER_ACTOR_FIELDS)[K] extends Audience ? K : never;
+}[keyof typeof PLAYER_ACTOR_FIELDS];
+const TABLE_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filter(
+  (key) => PLAYER_ACTOR_FIELDS[key] === "table"
+) as FieldsFor<"table">[];
+const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filter(
+  (key) => PLAYER_ACTOR_FIELDS[key] === "table" || PLAYER_ACTOR_FIELDS[key] === "party"
+) as FieldsFor<"table" | "party">[];
 
 /** Copies the listed fields, leaving out optional ones that are unset. */
 function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): Pick<Actor, K> {
@@ -281,9 +389,16 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * a field sits above the `off` line only if the map, tokens or turn order need it; otherwise pick the
  * strictest tier that works (adding a field here is a viewer-safety change).
  */
-export function projectPlayerView(state: GameState, playerSessionId: string | undefined, presenceFor: PresenceLookup, now = Date.now()): PlayerView {
+export function projectPlayerView(
+  state: GameState,
+  playerSessionId: string | undefined,
+  presenceFor: PresenceLookup,
+  now = Date.now()
+): PlayerView {
   // Archived characters are hidden from players entirely, like gm-only actors.
-  const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id));
+  const publicActorIds = new Set(
+    state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id)
+  );
   const tier = state.partyVisibility;
   return {
     revision: state.revision,
@@ -304,46 +419,80 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       .map((actor) => ({ id: actor.id, name: actor.name })),
     combat: projectPlayerCombat(state, playerSessionId, now),
     // Tiers subtract fields, never entries; only gm-only visibility and archiving remove an actor.
-    actors: state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((source) => {
-      const { ownerSessionId, actionUses, choiceOverrides, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, replaySceneId } = source;
-      const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
-      // Another player's claimed character: the only thing `partyVisibility` governs.
-      const theirs = !mine && source.kind === "player-character" && ownerSessionId !== null;
-      // `mine` is never gated by the tier; at `off` all three are false.
-      const cardVisible = mine || (theirs && tier !== "off");
-      const sheetVisible = mine || (theirs && (tier === "full-sheet" || tier === "sheet-and-resources"));
-      const resourcesVisible = mine || (theirs && tier === "sheet-and-resources");
-      // Bar/ring styles reach players only when the GM targets everyone; only the style crosses and the
-      // client derives the fill from `hp`, so exact HP never leaks for someone else's token.
-      const effectiveDisplay = source.healthDisplay ?? state.combat.healthDisplay;
-      const sharedDisplayStyle = effectiveDisplay.audience === "all" && effectiveDisplay.style !== "band" ? effectiveDisplay.style : null;
-      // At `off` another player's sheet is not even looked up.
-      const storedSheet = cardVisible && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
-      const classLine = theirs && cardVisible ? classLineOf(storedSheet) : null;
-      return {
-        ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
-        hp: playerHp(source),
-        effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
-        claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
-        presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
-        // Replay clone marker, copied explicitly. An opaque scene id that keeps clones out of the party strip
-        // and claim screen; the entry stays so the map still renders the clone's token.
-        ...(replaySceneId !== undefined ? { replaySceneId } : {}),
-        ...(classLine !== null ? { classLine } : {}),
-        ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
-        ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
-        // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
-        ...(resourcesVisible ? { choiceOverrides: Object.fromEntries(Object.entries(choiceOverrides).map(([key, value]) => [key, { ...value }])) } : {}),
-        // Pool ceilings derived from the sheet already sent; `resourcesVisible` is narrower than `sheetVisible`,
-        // so this reveals nothing the recipient cannot already read off the definition.
-        ...(resourcesVisible && storedSheet ? { pools: actionPools(storedSheet.actions) } : {}),
-        // Deep-copied: a player projection never hands out a live reference into GameState.
-        ...(resourcesVisible && hitDice ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } } : {}),
-        // Sheet resources reach the owner always and another player only at the top tier.
-        ...(resourcesVisible ? { spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })), pactSlots: pactSlots === null ? null : { ...pactSlots }, preparedSpellIds: [...preparedSpellIds], inventory: inventory.map((item) => ({ ...item })), currency: { ...currency } } : {}),
-        ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
-      };
-    }),
+    actors: state.actors
+      .filter((actor) => actor.visibility === "public" && !actor.archived)
+      .map((source) => {
+        const {
+          ownerSessionId,
+          actionUses,
+          choiceOverrides,
+          hitDice,
+          spellSlots,
+          pactSlots,
+          preparedSpellIds,
+          inventory,
+          currency,
+          replaySceneId
+        } = source;
+        const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
+        // Another player's claimed character: the only thing `partyVisibility` governs.
+        const theirs = !mine && source.kind === "player-character" && ownerSessionId !== null;
+        // `mine` is never gated by the tier; at `off` all three are false.
+        const cardVisible = mine || (theirs && tier !== "off");
+        const sheetVisible = mine || (theirs && (tier === "full-sheet" || tier === "sheet-and-resources"));
+        const resourcesVisible = mine || (theirs && tier === "sheet-and-resources");
+        // Bar/ring styles reach players only when the GM targets everyone; only the style crosses and the
+        // client derives the fill from `hp`, so exact HP never leaks for someone else's token.
+        const effectiveDisplay = source.healthDisplay ?? state.combat.healthDisplay;
+        const sharedDisplayStyle =
+          effectiveDisplay.audience === "all" && effectiveDisplay.style !== "band" ? effectiveDisplay.style : null;
+        // At `off` another player's sheet is not even looked up.
+        const storedSheet =
+          cardVisible && source.definitionId
+            ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition
+            : undefined;
+        const classLine = theirs && cardVisible ? classLineOf(storedSheet) : null;
+        return {
+          ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
+          hp: playerHp(source),
+          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
+          claimStatus:
+            ownerSessionId === null ? ("available" as const) : mine ? ("mine" as const) : ("claimed" as const),
+          presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
+          // Replay clone marker, copied explicitly. An opaque scene id that keeps clones out of the party strip
+          // and claim screen; the entry stays so the map still renders the clone's token.
+          ...(replaySceneId !== undefined ? { replaySceneId } : {}),
+          ...(classLine !== null ? { classLine } : {}),
+          ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
+          ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
+          // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
+          ...(resourcesVisible
+            ? {
+                choiceOverrides: Object.fromEntries(
+                  Object.entries(choiceOverrides).map(([key, value]) => [key, { ...value }])
+                )
+              }
+            : {}),
+          // Pool ceilings derived from the sheet already sent; `resourcesVisible` is narrower than `sheetVisible`,
+          // so this reveals nothing the recipient cannot already read off the definition.
+          ...(resourcesVisible && storedSheet ? { pools: actionPools(storedSheet.actions) } : {}),
+          // Deep-copied: a player projection never hands out a live reference into GameState.
+          ...(resourcesVisible && hitDice
+            ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } }
+            : {}),
+          // Sheet resources reach the owner always and another player only at the top tier.
+          ...(resourcesVisible
+            ? {
+                spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })),
+                pactSlots: pactSlots === null ? null : { ...pactSlots },
+                preparedSpellIds: [...preparedSpellIds],
+                inventory: inventory.map((item) => ({ ...item })),
+                currency: { ...currency }
+              }
+            : {}),
+          ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
+        };
+      }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(playerRoll)
   };
 }
@@ -352,7 +501,15 @@ export function projectGmView(state: GameState, presenceFor: PresenceLookup, now
   return {
     ...state,
     // Expired ephemeral annotations must drop off the GM's screen too; the expiry re-broadcast relies on this.
-    combat: { ...state.combat, annotations: state.combat.annotations.filter((annotation) => annotation.expiresAt === null || annotation.expiresAt > now) },
-    actors: state.actors.map((actor) => ({ ...actor, presence: actor.ownerSessionId === null ? null : presenceFor(actor.ownerSessionId) }))
+    combat: {
+      ...state.combat,
+      annotations: state.combat.annotations.filter(
+        (annotation) => annotation.expiresAt === null || annotation.expiresAt > now
+      )
+    },
+    actors: state.actors.map((actor) => ({
+      ...actor,
+      presence: actor.ownerSessionId === null ? null : presenceFor(actor.ownerSessionId)
+    }))
   };
 }

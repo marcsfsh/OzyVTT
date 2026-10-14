@@ -13,12 +13,20 @@
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "start": "npm run build && npm run start --workspace=@vtt/server",
-    "map": "npm run map --workspace=@vtt/server"
+    "map": "npm run map --workspace=@vtt/server",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^9.1.2",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.71.2"
   }
 }

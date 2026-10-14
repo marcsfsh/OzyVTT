@@ -16,17 +16,32 @@ const histogram = (values: readonly string[]): Record<string, number> =>
 
 /** The five `+1, +2, or +3` ladders, expanded to one row per printed tier. */
 const LADDER_ROWS = [
-  "Ammunition, +1", "Ammunition, +2", "Ammunition, +3",
-  "Armor, +1", "Armor, +2", "Armor, +3",
-  "Shield, +1", "Shield, +2", "Shield, +3",
-  "Wand of the War Mage, +1", "Wand of the War Mage, +2", "Wand of the War Mage, +3",
-  "Weapon, +1", "Weapon, +2", "Weapon, +3"
+  "Ammunition, +1",
+  "Ammunition, +2",
+  "Ammunition, +3",
+  "Armor, +1",
+  "Armor, +2",
+  "Armor, +3",
+  "Shield, +1",
+  "Shield, +2",
+  "Shield, +3",
+  "Wand of the War Mage, +1",
+  "Wand of the War Mage, +2",
+  "Wand of the War Mage, +3",
+  "Weapon, +1",
+  "Weapon, +2",
+  "Weapon, +3"
 ];
 
 /** The seven `Rarity Varies` tables, kept as one row each rather than expanded. */
 const VARIES_ROWS = [
-  "Belt of Giant Strength", "Feather Token", "Figurine of Wondrous Power", "Ioun Stone",
-  "Potion of Giant Strength", "Potions of Healing", "Spell Scroll"
+  "Belt of Giant Strength",
+  "Feather Token",
+  "Figurine of Wondrous Power",
+  "Ioun Stone",
+  "Potion of Giant Strength",
+  "Potions of Healing",
+  "Spell Scroll"
 ];
 
 describe("the generated magic-item bundle", () => {
@@ -39,7 +54,10 @@ describe("the generated magic-item bundle", () => {
     expect(258 - 5 + ladders.length).toBe(268);
     // ...and the seven that deliberately did not expand are each still exactly one row.
     for (const name of VARIES_ROWS) {
-      expect(rows.filter((row) => row.name === name), name).toHaveLength(1);
+      expect(
+        rows.filter((row) => row.name === name),
+        name
+      ).toHaveLength(1);
       expect(rows.find((row) => row.name === name)!.rarity, name).toBe("varies");
     }
   });
@@ -47,18 +65,34 @@ describe("the generated magic-item bundle", () => {
   it("never admits the two creature stat blocks embedded in the A-Z run", () => {
     // The parser skips these by name.
     for (const creature of ["Giant Fly", "Avatar of Death"]) {
-      expect(rows.map((row) => row.name), creature).not.toContain(creature);
+      expect(
+        rows.map((row) => row.name),
+        creature
+      ).not.toContain(creature);
     }
   });
 
   it("classifies every row into a slot that is a member of ItemSlotSchema", () => {
     // `slot` is a closed enum the engine switches on, so name-derived values are checked per item.
-    const bad = rows.filter((row) => !ItemSlotSchema.safeParse(row.slot).success)
+    const bad = rows
+      .filter((row) => !ItemSlotSchema.safeParse(row.slot).success)
       .map((row) => `${row.name} -> ${String(row.slot)}`);
     expect(bad, "rows whose slot is not a member of ItemSlotSchema").toEqual([]);
     expect(histogram(rows.map((row) => row.slot!))).toEqual({
-      wondrous: 71, held: 34, weapon: 33, consumable: 25, ring: 22, neck: 15, shoulders: 15,
-      armor: 14, head: 11, shield: 9, feet: 7, hands: 6, ammunition: 4, belt: 2
+      wondrous: 71,
+      held: 34,
+      weapon: 33,
+      consumable: 25,
+      ring: 22,
+      neck: 15,
+      shoulders: 15,
+      armor: 14,
+      head: 11,
+      shield: 9,
+      feet: 7,
+      hands: 6,
+      ammunition: 4,
+      belt: 2
     });
   });
 
@@ -68,8 +102,16 @@ describe("the generated magic-item bundle", () => {
      * histogram, so a row moving between two legal categories fails too.
      */
     expect(histogram(rows.map((row) => row.category))).toEqual({
-      "wondrous-item": 127, weapon: 33, consumable: 25, ring: 22, wand: 15, armor: 14,
-      staff: 12, shield: 9, rod: 7, ammunition: 4
+      "wondrous-item": 127,
+      weapon: 33,
+      consumable: 25,
+      ring: 22,
+      wand: 15,
+      armor: 14,
+      staff: 12,
+      shield: 9,
+      rod: 7,
+      ammunition: 4
     });
   });
 
@@ -84,44 +126,86 @@ describe("the generated magic-item bundle", () => {
     expect(worn).toHaveLength(56);
     expect(wondrous.filter((row) => row.slot === "wondrous")).toHaveLength(71);
     // Roster first, so a failure names the item that moved rather than a count.
-    const roster = worn.reduce<Record<string, string[]>>((into, row) => (
-      { ...into, [row.slot!]: [...(into[row.slot!] ?? []), row.name].sort() }
-    ), {});
+    const roster = worn.reduce<Record<string, string[]>>(
+      (into, row) => ({ ...into, [row.slot!]: [...(into[row.slot!] ?? []), row.name].sort() }),
+      {}
+    );
     expect(roster).toEqual({
       neck: [
-        "Amulet of Health", "Amulet of Proof against Detection and Location", "Amulet of the Planes",
-        "Brooch of Shielding", "Medallion of Thoughts", "Necklace of Adaptation",
-        "Necklace of Fireballs", "Necklace of Prayer Beads", "Periapt of Health",
-        "Periapt of Proof against Poison", "Periapt of Wound Closure", "Scarab of Protection",
-        "Talisman of Pure Good", "Talisman of Ultimate Evil", "Talisman of the Sphere"
+        "Amulet of Health",
+        "Amulet of Proof against Detection and Location",
+        "Amulet of the Planes",
+        "Brooch of Shielding",
+        "Medallion of Thoughts",
+        "Necklace of Adaptation",
+        "Necklace of Fireballs",
+        "Necklace of Prayer Beads",
+        "Periapt of Health",
+        "Periapt of Proof against Poison",
+        "Periapt of Wound Closure",
+        "Scarab of Protection",
+        "Talisman of Pure Good",
+        "Talisman of Ultimate Evil",
+        "Talisman of the Sphere"
       ],
       shoulders: [
-        "Cape of the Mountebank", "Cloak of Arachnida", "Cloak of Displacement",
-        "Cloak of Elvenkind", "Cloak of Invisibility", "Cloak of Protection", "Cloak of the Bat",
-        "Cloak of the Manta Ray", "Mantle of Spell Resistance", "Robe of Eyes",
-        "Robe of Scintillating Colors", "Robe of Stars", "Robe of Useful Items",
-        "Robe of the Archmagi", "Wings of Flying"
+        "Cape of the Mountebank",
+        "Cloak of Arachnida",
+        "Cloak of Displacement",
+        "Cloak of Elvenkind",
+        "Cloak of Invisibility",
+        "Cloak of Protection",
+        "Cloak of the Bat",
+        "Cloak of the Manta Ray",
+        "Mantle of Spell Resistance",
+        "Robe of Eyes",
+        "Robe of Scintillating Colors",
+        "Robe of Stars",
+        "Robe of Useful Items",
+        "Robe of the Archmagi",
+        "Wings of Flying"
       ],
       head: [
-        "Circlet of Blasting", "Eyes of Charming", "Eyes of Minute Seeing", "Eyes of the Eagle",
-        "Goggles of Night", "Hat of Disguise", "Headband of Intellect",
-        "Helm of Brilliance", "Helm of Comprehending Languages", "Helm of Telepathy",
+        "Circlet of Blasting",
+        "Eyes of Charming",
+        "Eyes of Minute Seeing",
+        "Eyes of the Eagle",
+        "Goggles of Night",
+        "Hat of Disguise",
+        "Headband of Intellect",
+        "Helm of Brilliance",
+        "Helm of Comprehending Languages",
+        "Helm of Telepathy",
         "Helm of Teleportation"
       ],
       feet: [
-        "Boots of Elvenkind", "Boots of Levitation", "Boots of Speed",
-        "Boots of Striding and Springing", "Boots of the Winterlands",
-        "Slippers of Spider Climbing", "Winged Boots"
+        "Boots of Elvenkind",
+        "Boots of Levitation",
+        "Boots of Speed",
+        "Boots of Striding and Springing",
+        "Boots of the Winterlands",
+        "Slippers of Spider Climbing",
+        "Winged Boots"
       ],
       hands: [
-        "Bracers of Archery", "Bracers of Defense", "Gauntlets of Ogre Power",
-        "Gloves of Missile Snaring", "Gloves of Swimming and Climbing", "Gloves of Thievery"
+        "Bracers of Archery",
+        "Bracers of Defense",
+        "Gauntlets of Ogre Power",
+        "Gloves of Missile Snaring",
+        "Gloves of Swimming and Climbing",
+        "Gloves of Thievery"
       ],
       belt: ["Belt of Dwarvenkind", "Belt of Giant Strength"]
     });
     // The counts, derived from the roster above so the two can never disagree.
-    expect(histogram(worn.map((row) => row.slot!)))
-      .toEqual({ neck: 15, shoulders: 15, head: 11, feet: 7, hands: 6, belt: 2 });
+    expect(histogram(worn.map((row) => row.slot!))).toEqual({
+      neck: 15,
+      shoulders: 15,
+      head: 11,
+      feet: 7,
+      hands: 6,
+      belt: 2
+    });
     // `Ioun Stone` orbits rather than occupies the head, and horseshoes are worn by a horse.
     // `Hat of Many Spells` is held, not worn; at `head` it would block a helm (`SLOT_CAPACITY.head` is 1).
     expect(rows.find((row) => row.name === "Hat of Many Spells")!.slot).toBe("wondrous");
@@ -135,34 +219,56 @@ describe("the generated magic-item bundle", () => {
 
   it("reads the two qualifiers a naive category map gets wrong", () => {
     // Both qualifiers are printed in the parenthetical rather than in the category word.
-    const ammunition = rows.filter((row) => row.slot === "ammunition").map((row) => row.name).sort();
+    const ammunition = rows
+      .filter((row) => row.slot === "ammunition")
+      .map((row) => row.name)
+      .sort();
     expect(ammunition).toEqual(["Ammunition of Slaying", "Ammunition, +1", "Ammunition, +2", "Ammunition, +3"]);
     expect(rows.filter((row) => row.slot === "shield")).toHaveLength(9);
     expect(rows.find((row) => row.name === "Animated Shield")!.slot).toBe("shield");
   });
 
   it("declares only rarities RARITY_IDS knows, which is what makes that containment non-vacuous", () => {
-    const bad = rows.filter((row) => !RARITY_IDS.includes(row.rarity ?? "")).map((row) => `${row.name} -> ${String(row.rarity)}`);
+    const bad = rows
+      .filter((row) => !RARITY_IDS.includes(row.rarity ?? ""))
+      .map((row) => `${row.name} -> ${String(row.rarity)}`);
     expect(bad, "rows whose rarity is outside RARITY_IDS").toEqual([]);
-    expect(histogram(rows.map((row) => row.rarity!)))
-      .toEqual({ rare: 87, uncommon: 77, "very-rare": 60, legendary: 33, varies: 8, common: 2, artifact: 1 });
+    expect(histogram(rows.map((row) => row.rarity!))).toEqual({
+      rare: 87,
+      uncommon: 77,
+      "very-rare": 60,
+      legendary: 33,
+      varies: 8,
+      common: 2,
+      artifact: 1
+    });
     // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (eight, not seven).
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.rarity).toBe("varies");
-    expect(rows.find((row) => row.name === "Horn of Valhalla")!.description)
-      .toContain("Rare (Silver or Brass), Very Rare (Bronze), or Legendary (Iron)");
+    expect(rows.find((row) => row.name === "Horn of Valhalla")!.description).toContain(
+      "Rare (Silver or Brass), Very Rare (Bronze), or Legendary (Iron)"
+    );
   });
 
   it("requires attunement on 142 rows - the source's 140, plus the two extra Wand of the War Mage tiers", () => {
     expect(rows.filter((row) => row.attunement?.required === true)).toHaveLength(142);
     // The restriction clause is parsed into slugs, display-only and never enforced.
-    expect(rows.find((row) => row.name === "Wand of the War Mage, +1")!.attunement)
-      .toEqual({ required: true, restrictedTo: ["spellcaster"] });
-    expect(rows.find((row) => row.name === "Robe of the Archmagi")!.attunement!.restrictedTo)
-      .toEqual(["sorcerer", "warlock", "wizard"]);
+    expect(rows.find((row) => row.name === "Wand of the War Mage, +1")!.attunement).toEqual({
+      required: true,
+      restrictedTo: ["spellcaster"]
+    });
+    expect(rows.find((row) => row.name === "Robe of the Archmagi")!.attunement!.restrictedTo).toEqual([
+      "sorcerer",
+      "warlock",
+      "wizard"
+    ]);
     // Audiences that are not a class or species stay as one display-only slug.
-    expect(rows.find((row) => row.name === "Dwarven Thrower")!.attunement!.restrictedTo)
-      .toEqual(["dwarf", "creature-attuned-to-a-belt-of-dwarvenkind"]);
-    expect(rows.filter((row) => row.attunement?.required && row.attunement.restrictedTo.length === 0)).toHaveLength(119);
+    expect(rows.find((row) => row.name === "Dwarven Thrower")!.attunement!.restrictedTo).toEqual([
+      "dwarf",
+      "creature-attuned-to-a-belt-of-dwarvenkind"
+    ]);
+    expect(rows.filter((row) => row.attunement?.required && row.attunement.restrictedTo.length === 0)).toHaveLength(
+      119
+    );
   });
 
   it("prices nothing, because the SRD prints a value band by rarity and not a per-item price", () => {
@@ -177,11 +283,20 @@ describe("the generated magic-item bundle", () => {
      * other direction.
      */
     const authored = new Set(ITEM_MECHANICS_LANES.flatMap((lane) => Object.keys(lane.entries)));
-    const withMechanics = rows.filter((row) =>
-      row.modifiers.length > 0 || row.effects.length > 0 || row.actions.length > 0 ||
-      row.casts.length > 0 || row.grantsFeatIds.length > 0 || row.tags.length > 0 || row.cursed);
-    expect(withMechanics.filter((row) => !authored.has(row.id)).map((row) => row.name),
-      "a rider in the generated bundle that no lane authored was hand-edited in, and the next build destroys it").toEqual([]);
+    const withMechanics = rows.filter(
+      (row) =>
+        row.modifiers.length > 0 ||
+        row.effects.length > 0 ||
+        row.actions.length > 0 ||
+        row.casts.length > 0 ||
+        row.grantsFeatIds.length > 0 ||
+        row.tags.length > 0 ||
+        row.cursed
+    );
+    expect(
+      withMechanics.filter((row) => !authored.has(row.id)).map((row) => row.name),
+      "a rider in the generated bundle that no lane authored was hand-edited in, and the next build destroys it"
+    ).toEqual([]);
     expect(rows.every((row) => row.isMagic)).toBe(true);
     expect(rows.every((row) => row.source === "srd")).toBe(true);
   });
@@ -191,19 +306,22 @@ describe("the generated magic-item bundle", () => {
      * The wire summary carries no `rarity`, so the description leads with the SRD type line to put
      * rarity and attunement in front of the reader.
      */
-    expect(rows.find((row) => row.name === "Wand of the War Mage, +1")!.description)
-      .toBe("Wand, Uncommon (Requires Attunement by a Spellcaster). While holding this wand, you gain a bonus to spell attack rolls determined by the wand's rarity. In addition, you ignore Half Cover when making a spell attack roll.");
+    expect(rows.find((row) => row.name === "Wand of the War Mage, +1")!.description).toBe(
+      "Wand, Uncommon (Requires Attunement by a Spellcaster). While holding this wand, you gain a bonus to spell attack rolls determined by the wand's rarity. In addition, you ignore Half Cover when making a spell attack roll."
+    );
     // The ladder's own rarity per tier, not the printed three-rung line.
     expect(rows.find((row) => row.name === "Wand of the War Mage, +3")!.description).toContain("Wand, Very Rare (");
     // `Armor of Resistance`'s d10 table rides in its text via `tableAsText`.
-    expect(rows.find((row) => row.name === "Armor of Resistance")!.description)
-      .toContain("1d10 1: Damage Type Acid");
+    expect(rows.find((row) => row.name === "Armor of Resistance")!.description).toContain("1d10 1: Damage Type Acid");
   });
 
   it("cuts exactly twelve descriptions at the schema's 2000-char cap, and names them", () => {
     // The cap matches `InventoryItemSchema.description` (add-from-catalog copies this string onto it).
     // Overflow is cut at a sentence boundary and marked; only two long d100 tables are cut.
-    const cut = rows.filter((row) => row.description!.endsWith(" […]")).map((row) => row.name).sort();
+    const cut = rows
+      .filter((row) => row.description!.endsWith(" […]"))
+      .map((row) => row.name)
+      .sort();
     expect(cut).toEqual(["Mysterious Deck", "Wand of Wonder"]);
     expect(rows.every((row) => row.description!.length <= 4000)).toBe(true);
     // Spot-checks mechanics that a lower cap would cut.
@@ -220,10 +338,13 @@ describe("the generated magic-item bundle", () => {
      * already ships; a collision would silently shadow one row in the folded catalog.
      */
     const elsewhere = new Map<string, string>();
-    for (const record of loadEquipment().filter((item) => !item.isMagic)) elsewhere.set(record.id, "the mundane catalog");
+    for (const record of loadEquipment().filter((item) => !item.isMagic))
+      elsewhere.set(record.id, "the mundane catalog");
     for (const record of loadWeapons()) elsewhere.set(record.id, "weapons.v1.json");
     for (const record of loadArmor()) elsewhere.set(record.id, "armor.v1.json");
-    const collisions = rows.filter((row) => elsewhere.has(row.id)).map((row) => `${row.id} also lives in ${elsewhere.get(row.id)}`);
+    const collisions = rows
+      .filter((row) => elsewhere.has(row.id))
+      .map((row) => `${row.id} also lives in ${elsewhere.get(row.id)}`);
     expect(collisions, "a minted id already exists elsewhere").toEqual([]);
     expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
   });
@@ -235,7 +356,11 @@ describe("the generated magic-item bundle", () => {
      */
     const catalog = loadEquipment();
     expect(catalog.find((item) => item.id === "potion-of-healing")).toMatchObject({ isMagic: false, costGp: 50 });
-    expect(catalog.find((item) => item.id === "potions-of-healing")).toMatchObject({ isMagic: true, rarity: "varies", costGp: null });
+    expect(catalog.find((item) => item.id === "potions-of-healing")).toMatchObject({
+      isMagic: true,
+      rarity: "varies",
+      costGp: null
+    });
     expect(rows.filter((row) => /^Potion of Healing/.test(row.name))).toEqual([]);
   });
 
@@ -243,9 +368,16 @@ describe("the generated magic-item bundle", () => {
     const catalog = loadEquipment();
     expect(catalog.filter((item) => item.isMagic)).toHaveLength(268);
     // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have.
-    expect(catalog.filter((item) => item.isMagic).every((item) => item.weapon === null && item.armor === null)).toBe(true);
+    expect(catalog.filter((item) => item.isMagic).every((item) => item.weapon === null && item.armor === null)).toBe(
+      true
+    );
     const wand = catalog.find((item) => item.id === "wand-of-the-war-mage-1")!;
-    expect(wand).toMatchObject({ name: "Wand of the War Mage, +1", category: "wand", slot: "held", rarity: "uncommon" });
+    expect(wand).toMatchObject({
+      name: "Wand of the War Mage, +1",
+      category: "wand",
+      slot: "held",
+      rarity: "uncommon"
+    });
   });
 });
 
@@ -267,7 +399,7 @@ describe("the eligibility column", () => {
       "berserker-axe": "Battleaxe, Greataxe, or Halberd",
       "dagger-of-venom": "Dagger",
       "dancing-sword": "Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
-      "defender": "Any Melee Weapon",
+      defender: "Any Melee Weapon",
       "demon-armor": "Any Light, Medium, or Heavy",
       "dragon-scale-mail": "Scale Mail",
       "dragon-slayer": "Any Simple or Martial",
@@ -287,7 +419,7 @@ describe("the eligibility column", () => {
       "mace-of-terror": "Mace",
       "mithral-armor": "Any Medium or Heavy, Except Hide Armor",
       "nine-lives-stealer": "Any Simple or Martial",
-      "oathbow": "Longbow or Shortbow",
+      oathbow: "Longbow or Shortbow",
       "plate-armor-of-etherealness": "Half Plate Armor or Plate Armor",
       "quarterstaff-of-the-acrobat": "Quarterstaff",
       "scimitar-of-speed": "Scimitar",
@@ -311,34 +443,148 @@ describe("the eligibility column", () => {
     for (const row of rows) {
       if (!row.appliesTo) continue;
       const previous = byLabel.get(row.appliesTo.label);
-      if (previous) expect(row.appliesTo.baseIds, `${row.id} resolves "${row.appliesTo.label}" differently from a sibling`).toEqual(previous);
+      if (previous)
+        expect(row.appliesTo.baseIds, `${row.id} resolves "${row.appliesTo.label}" differently from a sibling`).toEqual(
+          previous
+        );
       byLabel.set(row.appliesTo.label, row.appliesTo.baseIds);
     }
     expect(Object.fromEntries(byLabel), "a rebuild changed a form's RESOLVED base list").toEqual({
-      "Any Light, Medium, or Heavy": ["breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "hide-armor", "leather-armor", "padded-armor", "plate-armor", "ring-mail", "scale-mail", "splint-armor", "studded-leather-armor"],
-      "Any Medium or Heavy, Except Hide Armor": ["breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "plate-armor", "ring-mail", "scale-mail", "splint-armor"],
-      "Any Melee Weapon": ["battleaxe", "club", "dagger", "flail", "glaive", "greataxe", "greatclub", "greatsword", "halberd", "handaxe", "javelin", "lance", "light-hammer", "longsword", "mace", "maul", "morningstar", "pike", "quarterstaff", "rapier", "scimitar", "shortsword", "sickle", "spear", "trident", "war-pick", "warhammer", "whip"],
-      "Any Simple or Martial": ["battleaxe", "blowgun", "club", "dagger", "dart", "flail", "glaive", "greataxe", "greatclub", "greatsword", "halberd", "hand-crossbow", "handaxe", "heavy-crossbow", "javelin", "lance", "light-crossbow", "light-hammer", "longbow", "longsword", "mace", "maul", "morningstar", "musket", "pike", "pistol", "quarterstaff", "rapier", "scimitar", "shortbow", "shortsword", "sickle", "sling", "spear", "trident", "war-pick", "warhammer", "whip"],
+      "Any Light, Medium, or Heavy": [
+        "breastplate",
+        "chain-mail",
+        "chain-shirt",
+        "half-plate-armor",
+        "hide-armor",
+        "leather-armor",
+        "padded-armor",
+        "plate-armor",
+        "ring-mail",
+        "scale-mail",
+        "splint-armor",
+        "studded-leather-armor"
+      ],
+      "Any Medium or Heavy, Except Hide Armor": [
+        "breastplate",
+        "chain-mail",
+        "chain-shirt",
+        "half-plate-armor",
+        "plate-armor",
+        "ring-mail",
+        "scale-mail",
+        "splint-armor"
+      ],
+      "Any Melee Weapon": [
+        "battleaxe",
+        "club",
+        "dagger",
+        "flail",
+        "glaive",
+        "greataxe",
+        "greatclub",
+        "greatsword",
+        "halberd",
+        "handaxe",
+        "javelin",
+        "lance",
+        "light-hammer",
+        "longsword",
+        "mace",
+        "maul",
+        "morningstar",
+        "pike",
+        "quarterstaff",
+        "rapier",
+        "scimitar",
+        "shortsword",
+        "sickle",
+        "spear",
+        "trident",
+        "war-pick",
+        "warhammer",
+        "whip"
+      ],
+      "Any Simple or Martial": [
+        "battleaxe",
+        "blowgun",
+        "club",
+        "dagger",
+        "dart",
+        "flail",
+        "glaive",
+        "greataxe",
+        "greatclub",
+        "greatsword",
+        "halberd",
+        "hand-crossbow",
+        "handaxe",
+        "heavy-crossbow",
+        "javelin",
+        "lance",
+        "light-crossbow",
+        "light-hammer",
+        "longbow",
+        "longsword",
+        "mace",
+        "maul",
+        "morningstar",
+        "musket",
+        "pike",
+        "pistol",
+        "quarterstaff",
+        "rapier",
+        "scimitar",
+        "shortbow",
+        "shortsword",
+        "sickle",
+        "sling",
+        "spear",
+        "trident",
+        "war-pick",
+        "warhammer",
+        "whip"
+      ],
       "Battleaxe, Greataxe, or Halberd": ["battleaxe", "greataxe", "halberd"],
       "Chain Mail or Chain Shirt": ["chain-mail", "chain-shirt"],
-      "Dagger": ["dagger"],
-      "Glaive, Greatsword, Longsword, Rapier, Scimitar, Sickle, or Shortsword": ["glaive", "greatsword", "longsword", "rapier", "scimitar", "sickle", "shortsword"],
-      "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword": ["glaive", "greatsword", "longsword", "rapier", "scimitar", "shortsword"],
+      Dagger: ["dagger"],
+      "Glaive, Greatsword, Longsword, Rapier, Scimitar, Sickle, or Shortsword": [
+        "glaive",
+        "greatsword",
+        "longsword",
+        "rapier",
+        "scimitar",
+        "sickle",
+        "shortsword"
+      ],
+      "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword": [
+        "glaive",
+        "greatsword",
+        "longsword",
+        "rapier",
+        "scimitar",
+        "shortsword"
+      ],
       "Glaive, Greatsword, Longsword, or Scimitar": ["glaive", "greatsword", "longsword", "scimitar"],
-      "Greatclub": ["greatclub"],
-      "Greatsword, Longsword, Rapier, Scimitar, or Shortsword": ["greatsword", "longsword", "rapier", "scimitar", "shortsword"],
+      Greatclub: ["greatclub"],
+      "Greatsword, Longsword, Rapier, Scimitar, or Shortsword": [
+        "greatsword",
+        "longsword",
+        "rapier",
+        "scimitar",
+        "shortsword"
+      ],
       "Half Plate Armor or Plate Armor": ["half-plate-armor", "plate-armor"],
-      "Javelin": ["javelin"],
+      Javelin: ["javelin"],
       "Longbow or Shortbow": ["longbow", "shortbow"],
-      "Mace": ["mace"],
+      Mace: ["mace"],
       "Maul or Warhammer": ["maul", "warhammer"],
       "Plate Armor": ["plate-armor"],
-      "Quarterstaff": ["quarterstaff"],
+      Quarterstaff: ["quarterstaff"],
       "Scale Mail": ["scale-mail"],
-      "Scimitar": ["scimitar"],
+      Scimitar: ["scimitar"],
       "Studded Leather Armor": ["studded-leather-armor"],
-      "Trident": ["trident"],
-      "Warhammer": ["warhammer"]
+      Trident: ["trident"],
+      Warhammer: ["warhammer"]
     });
     // Every resolved id is a row of the base bundle it points into - the cross-bundle half.
     const weaponIds = new Set(loadWeapons().map((weapon) => weapon.id));
@@ -346,19 +592,28 @@ describe("the eligibility column", () => {
     for (const row of rows) {
       if (!row.appliesTo) continue;
       const pool = row.category === "weapon" ? weaponIds : armorIds;
-      for (const id of row.appliesTo.baseIds) expect(pool.has(id), `${row.id}: base "${id}" is not in its base bundle`).toBe(true);
+      for (const id of row.appliesTo.baseIds)
+        expect(pool.has(id), `${row.id}: base "${id}" is not in its base bundle`).toBe(true);
     }
   });
 
   it("is total on weapons and body armor, and absent everywhere else - the ammunition ruling included", () => {
     // Sun Blade and Energy Bow are more than their base (damage type conversion), so binding them to a
     // bare base would derive a wrong attack. Not bound until weapon-swing overrides exist.
-    expect(rows.filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo).map((row) => row.id).sort())
-      .toEqual(["energy-bow", "sun-blade"]);
+    expect(
+      rows
+        .filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo)
+        .map((row) => row.id)
+        .sort()
+    ).toEqual(["energy-bow", "sun-blade"]);
     expect(rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo)).toEqual([]);
     // Magic ammunition is unbound (no ammunition model), and a shield is its own base.
-    expect(rows.filter((row) => row.category === "ammunition").map((row) => row.id).sort())
-      .toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);
+    expect(
+      rows
+        .filter((row) => row.category === "ammunition")
+        .map((row) => row.id)
+        .sort()
+    ).toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);
     expect(rows.filter((row) => row.category === "shield")).toHaveLength(9);
   });
 });

@@ -5,10 +5,21 @@ import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewCont
 import { type ActorDefinition } from "@vtt/schemas";
 import {
   HOMEBREW_BODY_SCHEMAS,
-  type BackgroundReference, type ClassReference, type EquipmentReference, type FeatReference,
-  type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference
+  type BackgroundReference,
+  type ClassReference,
+  type EquipmentReference,
+  type FeatReference,
+  type SpeciesReference,
+  type SpellListReference,
+  type SpellReference,
+  type SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import { EMPTY_HOMEBREW_SLICE, type ContentAudience, type HomebrewCatalogSlice, type HomebrewContentSource } from "./content-library.js";
+import {
+  EMPTY_HOMEBREW_SLICE,
+  type ContentAudience,
+  type HomebrewCatalogSlice,
+  type HomebrewContentSource
+} from "./content-library.js";
 import { mintHomebrewId } from "./homebrew-ids.js";
 
 /**
@@ -67,12 +78,30 @@ export type HomebrewListFilter = Readonly<{
   limit?: number;
   cursor?: string;
 }>;
-export type HomebrewListPage = Readonly<{ rows: readonly HomebrewSummaryRow[]; nextCursor: string | null; total: number }>;
-export type HomebrewRevisionRow = Readonly<{ id: number; recordId: string; rev: number; name: string; state: HomebrewContentState; visibleToPlayers: boolean; authoredAt: string; authorTag: string }>;
+export type HomebrewListPage = Readonly<{
+  rows: readonly HomebrewSummaryRow[];
+  nextCursor: string | null;
+  total: number;
+}>;
+export type HomebrewRevisionRow = Readonly<{
+  id: number;
+  recordId: string;
+  rev: number;
+  name: string;
+  state: HomebrewContentState;
+  visibleToPlayers: boolean;
+  authoredAt: string;
+  authorTag: string;
+}>;
 
 /** Thrown when a write's `expectedRev` does not match the stored row - the editor's copy is stale. */
 export class HomebrewRevisionConflictError extends Error {
-  constructor(message: string, readonly currentRev: number) { super(message); }
+  constructor(
+    message: string,
+    readonly currentRev: number
+  ) {
+    super(message);
+  }
 }
 /** Thrown when the addressed record does not exist (or was never created). */
 export class HomebrewNotFoundError extends Error {}
@@ -87,9 +116,10 @@ const MAX_LIMIT = 200;
 /** Literal because migration SQL must be frozen; a test asserts it still matches the contract. */
 const TYPE_CHECK_LIST = "'class','subclass','species','background','feat','spell','equipment','monster','spell-list'";
 
-export const MIGRATIONS = [{
-  version: 1,
-  sql: `
+export const MIGRATIONS = [
+  {
+    version: 1,
+    sql: `
     CREATE TABLE homebrew_meta (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       homebrew_revision INTEGER NOT NULL
@@ -121,11 +151,20 @@ export const MIGRATIONS = [{
     ) STRICT;
     CREATE INDEX homebrew_record_revisions_record ON homebrew_record_revisions (record_id, rev DESC);
   `
-}];
+  }
+];
 
 type RecordRow = {
-  id: string; type: string; name: string; state: string; visible_to_players: number;
-  deleted_at: string | null; body_json: string; rev: number; created_at: string; updated_at: string;
+  id: string;
+  type: string;
+  name: string;
+  state: string;
+  visible_to_players: number;
+  deleted_at: string | null;
+  body_json: string;
+  rev: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export class HomebrewStore implements HomebrewContentSource {
@@ -139,7 +178,10 @@ export class HomebrewStore implements HomebrewContentSource {
   /** Draft-aware authorship index for the publish gate, on the same revision gate. */
   private authored?: { revision: number; index: HomebrewAuthoredIndex };
 
-  constructor(private readonly databasePath: string, private readonly now: () => number = Date.now) {}
+  constructor(
+    private readonly databasePath: string,
+    private readonly now: () => number = Date.now
+  ) {}
 
   async initialize() {
     if (this.database) return;
@@ -147,10 +189,13 @@ export class HomebrewStore implements HomebrewContentSource {
     const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
     try {
       database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec("CREATE TABLE IF NOT EXISTS homebrew_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+      database.exec(
+        "CREATE TABLE IF NOT EXISTS homebrew_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
+      );
       this.database = database;
       this.migrate();
-      const meta = database.prepare("SELECT homebrew_revision FROM homebrew_meta WHERE id = 1").get() as { homebrew_revision: number } | undefined;
+      const meta = database.prepare("SELECT homebrew_revision FROM homebrew_meta WHERE id = 1").get() as
+        { homebrew_revision: number } | undefined;
       if (!meta) database.prepare("INSERT INTO homebrew_meta (id, homebrew_revision) VALUES (1, 0)").run();
       this.revisionValue = meta?.homebrew_revision ?? 0;
     } catch (error) {
@@ -173,7 +218,9 @@ export class HomebrewStore implements HomebrewContentSource {
   }
 
   /** The coarse counter bumped inside every write transaction - drives `homebrew:changed` and the view cache. */
-  get revision(): number { return this.revisionValue; }
+  get revision(): number {
+    return this.revisionValue;
+  }
 
   // HomebrewContentSource (the ContentLibrary seam)
 
@@ -183,7 +230,8 @@ export class HomebrewStore implements HomebrewContentSource {
    */
   publishedFor(audience: ContentAudience): HomebrewCatalogSlice {
     if (!this.database) return EMPTY_HOMEBREW_SLICE; // pre-initialize: revision -1, SRD-only view
-    if (!this.slices || this.slices.revision !== this.revisionValue) this.slices = { revision: this.revisionValue, ...this.buildSlices() };
+    if (!this.slices || this.slices.revision !== this.revisionValue)
+      this.slices = { revision: this.revisionValue, ...this.buildSlices() };
     return audience === "gm" ? this.slices.gm : this.slices.player;
   }
 
@@ -219,7 +267,11 @@ export class HomebrewStore implements HomebrewContentSource {
       if (row.type !== "subclass") continue;
       // Read the raw JSON: a draft may be invalid and still counts as naming its class.
       let classId: unknown;
-      try { classId = (JSON.parse(row.body_json) as { classId?: unknown }).classId; } catch { continue; }
+      try {
+        classId = (JSON.parse(row.body_json) as { classId?: unknown }).classId;
+      } catch {
+        continue;
+      }
       if (typeof classId !== "string" || classId === "") continue;
       const existing = subclassesByClass.get(classId);
       if (existing) existing.add(row.id);
@@ -236,18 +288,25 @@ export class HomebrewStore implements HomebrewContentSource {
     const gm = emptyDraft();
     const player = emptyDraft();
     const rows = this.requireDatabase()
-      .prepare("SELECT id, type, visible_to_players, body_json FROM homebrew_records WHERE state = 'published' AND deleted_at IS NULL")
+      .prepare(
+        "SELECT id, type, visible_to_players, body_json FROM homebrew_records WHERE state = 'published' AND deleted_at IS NULL"
+      )
       .all() as Array<{ id: string; type: string; visible_to_players: number; body_json: string }>;
     const dropped: string[] = [];
     for (const row of rows) {
       const parsed = parseBody(row.type as HomebrewContentType, row.body_json);
-      if (!parsed) { dropped.push(`${row.type} "${row.id}"`); continue; }
+      if (!parsed) {
+        dropped.push(`${row.type} "${row.id}"`);
+        continue;
+      }
       pushInto(gm, row.type as HomebrewContentType, parsed);
       if (row.visible_to_players === 1) pushInto(player, row.type as HomebrewContentType, parsed);
     }
     if (dropped.length > 0) {
       // Logged once per rebuild: a schema tightening drops every row of a type at once.
-      console.warn(`[homebrew] ${dropped.length} published record(s) no longer parse and were left out of the catalogs: ${dropped.join(", ")}`);
+      console.warn(
+        `[homebrew] ${dropped.length} published record(s) no longer parse and were left out of the catalogs: ${dropped.join(", ")}`
+      );
     }
     return { gm: freezeSlice(gm), player: freezeSlice(player) };
   }
@@ -255,7 +314,9 @@ export class HomebrewStore implements HomebrewContentSource {
   /** Every monster row, ignoring `state` and `deleted_at` - see `monsterForInstance`. */
   private buildMonsterIndex(): Map<string, ActorDefinition> {
     const byId = new Map<string, ActorDefinition>();
-    const rows = this.requireDatabase().prepare("SELECT id, body_json FROM homebrew_records WHERE type = 'monster'").all() as Array<{ id: string; body_json: string }>;
+    const rows = this.requireDatabase()
+      .prepare("SELECT id, body_json FROM homebrew_records WHERE type = 'monster'")
+      .all() as Array<{ id: string; body_json: string }>;
     for (const row of rows) {
       const parsed = parseBody("monster", row.body_json);
       // Keyed by row id, which `create`/`importRecord` force `source.externalId` to equal; `instantiate`
@@ -277,29 +338,51 @@ export class HomebrewStore implements HomebrewContentSource {
     const database = this.requireDatabase();
     const where: string[] = [];
     const parameters: Array<string | number> = [];
-    if (filter.type) { where.push("type = ?"); parameters.push(filter.type); }
-    if (filter.state) { where.push("state = ?"); parameters.push(filter.state); }
-    if (filter.visibleToPlayers !== undefined) { where.push("visible_to_players = ?"); parameters.push(filter.visibleToPlayers ? 1 : 0); }
-    if (filter.q) { where.push("name LIKE ? ESCAPE '\\'"); parameters.push(`%${likeEscape(filter.q)}%`); }
+    if (filter.type) {
+      where.push("type = ?");
+      parameters.push(filter.type);
+    }
+    if (filter.state) {
+      where.push("state = ?");
+      parameters.push(filter.state);
+    }
+    if (filter.visibleToPlayers !== undefined) {
+      where.push("visible_to_players = ?");
+      parameters.push(filter.visibleToPlayers ? 1 : 0);
+    }
+    if (filter.q) {
+      where.push("name LIKE ? ESCAPE '\\'");
+      parameters.push(`%${likeEscape(filter.q)}%`);
+    }
     if (!filter.includeDeleted) where.push("deleted_at IS NULL");
     const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const total = (database.prepare(`SELECT COUNT(*) AS total FROM homebrew_records ${clause}`).get(...parameters) as { total: number }).total;
+    const total = (
+      database.prepare(`SELECT COUNT(*) AS total FROM homebrew_records ${clause}`).get(...parameters) as {
+        total: number;
+      }
+    ).total;
 
     // The cursor carries only the id and the sort key is looked up: name plus id would exceed the
     // contract's 200-character cursor cap.
     const cursorId = decodeCursor(filter.cursor);
     const anchor = cursorId
-      ? database.prepare("SELECT LOWER(name) AS sort_key FROM homebrew_records WHERE id = ?").get(cursorId) as { sort_key: string } | undefined
+      ? (database.prepare("SELECT LOWER(name) AS sort_key FROM homebrew_records WHERE id = ?").get(cursorId) as
+          { sort_key: string } | undefined)
       : undefined;
     const pageWhere = [...where];
     const pageParameters = [...parameters];
     // The cursor is opaque, so an unresolvable one restarts from the top rather than failing.
-    if (anchor && cursorId) { pageWhere.push("(LOWER(name), id) > (?, ?)"); pageParameters.push(anchor.sort_key, cursorId); }
+    if (anchor && cursorId) {
+      pageWhere.push("(LOWER(name), id) > (?, ?)");
+      pageParameters.push(anchor.sort_key, cursorId);
+    }
     const pageClause = pageWhere.length ? `WHERE ${pageWhere.join(" AND ")}` : "";
     const limit = Math.min(Math.max(Math.trunc(filter.limit ?? DEFAULT_LIMIT), 1), MAX_LIMIT);
     // One extra row tells whether another page follows.
-    const rows = database.prepare(`SELECT * FROM homebrew_records ${pageClause} ORDER BY LOWER(name), id LIMIT ?`).all(...pageParameters, limit + 1) as RecordRow[];
+    const rows = database
+      .prepare(`SELECT * FROM homebrew_records ${pageClause} ORDER BY LOWER(name), id LIMIT ?`)
+      .all(...pageParameters, limit + 1) as RecordRow[];
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
     return {
@@ -311,12 +394,28 @@ export class HomebrewStore implements HomebrewContentSource {
 
   listRevisions(id: string): readonly HomebrewRevisionRow[] {
     const rows = this.requireDatabase()
-      .prepare("SELECT id, record_id, rev, name, state, visible_to_players, authored_at, author_tag FROM homebrew_record_revisions WHERE record_id = ? ORDER BY rev DESC")
-      .all(id) as Array<{ id: number; record_id: string; rev: number; name: string; state: string; visible_to_players: number; authored_at: string; author_tag: string }>;
+      .prepare(
+        "SELECT id, record_id, rev, name, state, visible_to_players, authored_at, author_tag FROM homebrew_record_revisions WHERE record_id = ? ORDER BY rev DESC"
+      )
+      .all(id) as Array<{
+      id: number;
+      record_id: string;
+      rev: number;
+      name: string;
+      state: string;
+      visible_to_players: number;
+      authored_at: string;
+      author_tag: string;
+    }>;
     return rows.map((row) => ({
-      id: row.id, recordId: row.record_id, rev: row.rev, name: row.name,
-      state: row.state as HomebrewContentState, visibleToPlayers: row.visible_to_players === 1,
-      authoredAt: row.authored_at, authorTag: row.author_tag
+      id: row.id,
+      recordId: row.record_id,
+      rev: row.rev,
+      name: row.name,
+      state: row.state as HomebrewContentState,
+      visibleToPlayers: row.visible_to_players === 1,
+      authoredAt: row.authored_at,
+      authorTag: row.author_tag
     }));
   }
 
@@ -335,9 +434,16 @@ export class HomebrewStore implements HomebrewContentSource {
     const body = normalizeBody(input.body, id, type);
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, 1, ?, ?)")
+      database
+        .prepare(
+          "INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, 1, ?, ?)"
+        )
         .run(id, type, name, body, stamp, stamp);
-      this.snapshotRevision(id, { rev: 1, name, state: "draft", visibleToPlayers: false, bodyJson: body, at: stamp }, "homebrew:create");
+      this.snapshotRevision(
+        id,
+        { rev: 1, name, state: "draft", visibleToPlayers: false, bodyJson: body, at: stamp },
+        "homebrew:create"
+      );
       this.bumpRevision();
     });
     return this.get(id)!;
@@ -347,7 +453,13 @@ export class HomebrewStore implements HomebrewContentSource {
    * Replace the whole body. The patch always lands (drafts may be invalid, the editor autosaves), but a published
    * record whose new body would not publish is demoted to an invisible draft in the same transaction.
    */
-  update(id: string, body: HomebrewBody, expectedRev: number | undefined, authorTag: string, revalidate?: HomebrewRevalidator): HomebrewRecordRow {
+  update(
+    id: string,
+    body: HomebrewBody,
+    expectedRev: number | undefined,
+    authorTag: string,
+    revalidate?: HomebrewRevalidator
+  ): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
     const type = existing.type as HomebrewContentType;
@@ -358,7 +470,9 @@ export class HomebrewStore implements HomebrewContentSource {
     let state = existing.state as HomebrewContentState;
     let visible = existing.visible_to_players === 1;
     this.transaction(() => {
-      database.prepare("UPDATE homebrew_records SET name = ?, body_json = ?, rev = ?, updated_at = ? WHERE id = ?").run(name, nextBody, rev, stamp, id);
+      database
+        .prepare("UPDATE homebrew_records SET name = ?, body_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(name, nextBody, rev, stamp, id);
       this.bumpRevision();
       // Re-validated after the write: the gate reads a catalog built from published rows, so validating
       // first would check against the record's own previous body. This connection sees its uncommitted row.
@@ -369,7 +483,11 @@ export class HomebrewStore implements HomebrewContentSource {
         // Bump again so cached slices that still hold this record as published are invalidated.
         this.bumpRevision();
       }
-      this.snapshotRevision(id, { rev, name, state, visibleToPlayers: visible, bodyJson: nextBody, at: stamp }, state === existing.state ? authorTag : `${authorTag}:demoted`);
+      this.snapshotRevision(
+        id,
+        { rev, name, state, visibleToPlayers: visible, bodyJson: nextBody, at: stamp },
+        state === existing.state ? authorTag : `${authorTag}:demoted`
+      );
     });
     return this.get(id)!;
   }
@@ -382,7 +500,9 @@ export class HomebrewStore implements HomebrewContentSource {
     if (existing.deleted_at) return { id, deletedAt: existing.deleted_at };
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("UPDATE homebrew_records SET deleted_at = ?, rev = rev + 1, updated_at = ? WHERE id = ?").run(stamp, stamp, id);
+      database
+        .prepare("UPDATE homebrew_records SET deleted_at = ?, rev = rev + 1, updated_at = ? WHERE id = ?")
+        .run(stamp, stamp, id);
       this.bumpRevision();
     });
     return { id, deletedAt: stamp };
@@ -394,7 +514,9 @@ export class HomebrewStore implements HomebrewContentSource {
     this.requireRow(id, undefined);
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("UPDATE homebrew_records SET deleted_at = NULL, rev = rev + 1, updated_at = ? WHERE id = ?").run(stamp, id);
+      database
+        .prepare("UPDATE homebrew_records SET deleted_at = NULL, rev = rev + 1, updated_at = ? WHERE id = ?")
+        .run(stamp, id);
       this.bumpRevision();
     });
     return this.get(id)!;
@@ -406,7 +528,9 @@ export class HomebrewStore implements HomebrewContentSource {
     this.requireRow(id, expectedRev);
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("UPDATE homebrew_records SET state = ?, rev = rev + 1, updated_at = ? WHERE id = ?").run(state, stamp, id);
+      database
+        .prepare("UPDATE homebrew_records SET state = ?, rev = rev + 1, updated_at = ? WHERE id = ?")
+        .run(state, stamp, id);
       this.bumpRevision();
     });
     return this.get(id)!;
@@ -416,10 +540,13 @@ export class HomebrewStore implements HomebrewContentSource {
   setVisibility(id: string, visibleToPlayers: boolean, expectedRev: number | undefined): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
-    if (visibleToPlayers && existing.state !== "published") throw new HomebrewStateError("Publish this first - a draft can't be shown to players.");
+    if (visibleToPlayers && existing.state !== "published")
+      throw new HomebrewStateError("Publish this first - a draft can't be shown to players.");
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("UPDATE homebrew_records SET visible_to_players = ?, rev = rev + 1, updated_at = ? WHERE id = ?").run(visibleToPlayers ? 1 : 0, stamp, id);
+      database
+        .prepare("UPDATE homebrew_records SET visible_to_players = ?, rev = rev + 1, updated_at = ? WHERE id = ?")
+        .run(visibleToPlayers ? 1 : 0, stamp, id);
       this.bumpRevision();
     });
     return this.get(id)!;
@@ -429,16 +556,26 @@ export class HomebrewStore implements HomebrewContentSource {
   duplicate(id: string, name?: string): HomebrewRecordRow {
     const existing = this.recordRow(id);
     if (!existing) throw new HomebrewNotFoundError("That record no longer exists.");
-    const body = { ...(JSON.parse(existing.body_json) as Record<string, unknown>), name: copyName(name ?? existing.name) };
+    const body = {
+      ...(JSON.parse(existing.body_json) as Record<string, unknown>),
+      name: copyName(name ?? existing.name)
+    };
     return this.create({ type: existing.type as HomebrewContentType, body });
   }
 
   /** Import at a caller-chosen id (pack import owns collision policy). Always an invisible draft. */
-  importRecord(id: string, type: HomebrewContentType, body: HomebrewBody, overwrite: boolean, authorTag = "homebrew:import"): HomebrewRecordRow {
+  importRecord(
+    id: string,
+    type: HomebrewContentType,
+    body: HomebrewBody,
+    overwrite: boolean,
+    authorTag = "homebrew:import"
+  ): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.recordRow(id);
     if (existing && !overwrite) throw new HomebrewStateError(`A record already exists at "${id}".`);
-    if (existing && existing.type !== type) throw new HomebrewStateError(`"${id}" is a ${existing.type}, not a ${type}.`);
+    if (existing && existing.type !== type)
+      throw new HomebrewStateError(`"${id}" is a ${existing.type}, not a ${type}.`);
     const refusal = existing ? overwriteRefusal(projectSummary(existing)) : null;
     if (refusal) throw new HomebrewStateError(refusal);
     const name = recordName(body);
@@ -449,13 +586,23 @@ export class HomebrewStore implements HomebrewContentSource {
       if (existing) {
         // `deleted_at` is not cleared: a pack import must not resurrect a deleted record.
         // `overwriteRefusal` already refused a deleted row; this is the second check.
-        database.prepare("UPDATE homebrew_records SET name = ?, body_json = ?, state = 'draft', visible_to_players = 0, rev = ?, updated_at = ? WHERE id = ?")
+        database
+          .prepare(
+            "UPDATE homebrew_records SET name = ?, body_json = ?, state = 'draft', visible_to_players = 0, rev = ?, updated_at = ? WHERE id = ?"
+          )
           .run(name, nextBody, rev, stamp, id);
       } else {
-        database.prepare("INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, ?, ?, ?)")
+        database
+          .prepare(
+            "INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, ?, ?, ?)"
+          )
           .run(id, type, name, nextBody, rev, stamp, stamp);
       }
-      this.snapshotRevision(id, { rev, name, state: "draft", visibleToPlayers: false, bodyJson: nextBody, at: stamp }, authorTag);
+      this.snapshotRevision(
+        id,
+        { rev, name, state: "draft", visibleToPlayers: false, bodyJson: nextBody, at: stamp },
+        authorTag
+      );
       this.bumpRevision();
     });
     return this.get(id)!;
@@ -464,7 +611,8 @@ export class HomebrewStore implements HomebrewContentSource {
   // Internals
 
   private recordRow(id: string): RecordRow | undefined {
-    return this.requireDatabase().prepare("SELECT * FROM homebrew_records WHERE id = ?").get(id) as RecordRow | undefined;
+    return this.requireDatabase().prepare("SELECT * FROM homebrew_records WHERE id = ?").get(id) as
+      RecordRow | undefined;
   }
 
   /** Existence + optimistic-concurrency check, in that order: a stale rev on a missing row is a 404. */
@@ -472,20 +620,42 @@ export class HomebrewStore implements HomebrewContentSource {
     const existing = this.recordRow(id);
     if (!existing) throw new HomebrewNotFoundError("That record no longer exists.");
     if (expectedRev !== undefined && expectedRev !== existing.rev) {
-      throw new HomebrewRevisionConflictError("This record changed since you opened it. Reload to keep editing.", existing.rev);
+      throw new HomebrewRevisionConflictError(
+        "This record changed since you opened it. Reload to keep editing.",
+        existing.rev
+      );
     }
     return existing;
   }
 
-  private snapshotRevision(recordId: string, row: { rev: number; name: string; state: HomebrewContentState; visibleToPlayers: boolean; bodyJson: string; at: string }, authorTag: string) {
+  private snapshotRevision(
+    recordId: string,
+    row: {
+      rev: number;
+      name: string;
+      state: HomebrewContentState;
+      visibleToPlayers: boolean;
+      bodyJson: string;
+      at: string;
+    },
+    authorTag: string
+  ) {
     this.requireDatabase()
-      .prepare("INSERT INTO homebrew_record_revisions (record_id, rev, name, state, visible_to_players, body_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .prepare(
+        "INSERT INTO homebrew_record_revisions (record_id, rev, name, state, visible_to_players, body_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      )
       .run(recordId, row.rev, row.name, row.state, row.visibleToPlayers ? 1 : 0, row.bodyJson, row.at, authorTag);
   }
 
   /** Always called inside a transaction, so the in-memory counter and the row cannot disagree after a rollback. */
   private bumpRevision() {
-    const next = (this.requireDatabase().prepare("UPDATE homebrew_meta SET homebrew_revision = homebrew_revision + 1 WHERE id = 1 RETURNING homebrew_revision").get() as { homebrew_revision: number }).homebrew_revision;
+    const next = (
+      this.requireDatabase()
+        .prepare(
+          "UPDATE homebrew_meta SET homebrew_revision = homebrew_revision + 1 WHERE id = 1 RETURNING homebrew_revision"
+        )
+        .get() as { homebrew_revision: number }
+    ).homebrew_revision;
     this.revisionValue = next;
   }
 
@@ -493,25 +663,42 @@ export class HomebrewStore implements HomebrewContentSource {
     const database = this.requireDatabase();
     const before = this.revisionValue;
     database.exec("BEGIN IMMEDIATE");
-    try { work(); database.exec("COMMIT"); }
-    catch (error) { database.exec("ROLLBACK"); this.revisionValue = before; throw error; }
+    try {
+      work();
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      this.revisionValue = before;
+      throw error;
+    }
   }
 
   private migrate() {
     const database = this.requireDatabase();
-    const applied = new Set((database.prepare("SELECT version FROM homebrew_schema_migrations").all() as Array<{ version: number }>).map(({ version }) => version));
+    const applied = new Set(
+      (database.prepare("SELECT version FROM homebrew_schema_migrations").all() as Array<{ version: number }>).map(
+        ({ version }) => version
+      )
+    );
     for (const migration of MIGRATIONS) {
       if (applied.has(migration.version)) continue;
       database.exec("BEGIN IMMEDIATE");
       try {
         database.exec(migration.sql);
-        database.prepare("INSERT INTO homebrew_schema_migrations (version, applied_at) VALUES (?, ?)").run(migration.version, this.stamp());
+        database
+          .prepare("INSERT INTO homebrew_schema_migrations (version, applied_at) VALUES (?, ?)")
+          .run(migration.version, this.stamp());
         database.exec("COMMIT");
-      } catch (error) { database.exec("ROLLBACK"); throw error; }
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
     }
   }
 
-  private stamp(): string { return new Date(this.now()).toISOString(); }
+  private stamp(): string {
+    return new Date(this.now()).toISOString();
+  }
 
   private requireDatabase(): DatabaseSync {
     if (!this.database) throw new Error("HomebrewStore has not been initialized.");
@@ -522,29 +709,57 @@ export class HomebrewStore implements HomebrewContentSource {
 // Parsing stored bodies back into their bundle shapes
 
 /** One schema per type, shared with the SRD bundle (ADR-0016), so the merge is a plain concat. */
-const BODY_SCHEMAS = HOMEBREW_BODY_SCHEMAS satisfies Record<HomebrewContentType, { safeParse: (value: unknown) => { success: boolean } }>;
+const BODY_SCHEMAS = HOMEBREW_BODY_SCHEMAS satisfies Record<
+  HomebrewContentType,
+  { safeParse: (value: unknown) => { success: boolean } }
+>;
 
 /** Fail-soft by contract: a body that no longer parses is dropped by the caller, never thrown from. */
 function parseBody(type: HomebrewContentType, json: string): unknown {
   try {
     const parsed = BODY_SCHEMAS[type].safeParse(JSON.parse(json) as unknown);
     return parsed.success ? parsed.data : undefined;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 /** The slice under construction - the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */
 type DraftSlice = {
-  classes: ClassReference[]; subclasses: SubclassReference[]; species: SpeciesReference[];
-  backgrounds: BackgroundReference[]; feats: FeatReference[]; spells: SpellReference[];
-  equipment: EquipmentReference[]; monsters: ActorDefinition[]; spellLists: SpellListReference[];
+  classes: ClassReference[];
+  subclasses: SubclassReference[];
+  species: SpeciesReference[];
+  backgrounds: BackgroundReference[];
+  feats: FeatReference[];
+  spells: SpellReference[];
+  equipment: EquipmentReference[];
+  monsters: ActorDefinition[];
+  spellLists: SpellListReference[];
 };
-const emptyDraft = (): DraftSlice => ({ classes: [], subclasses: [], species: [], backgrounds: [], feats: [], spells: [], equipment: [], monsters: [], spellLists: [] });
+const emptyDraft = (): DraftSlice => ({
+  classes: [],
+  subclasses: [],
+  species: [],
+  backgrounds: [],
+  feats: [],
+  spells: [],
+  equipment: [],
+  monsters: [],
+  spellLists: []
+});
 const freezeSlice = (draft: DraftSlice): HomebrewCatalogSlice => Object.freeze(draft);
 
 /** The one place a content type becomes a catalog bucket. A `satisfies` map, so a tenth type fails to compile. */
 const BUCKETS = {
-  class: "classes", subclass: "subclasses", species: "species", background: "backgrounds",
-  feat: "feats", spell: "spells", equipment: "equipment", monster: "monsters", "spell-list": "spellLists"
+  class: "classes",
+  subclass: "subclasses",
+  species: "species",
+  background: "backgrounds",
+  feat: "feats",
+  spell: "spells",
+  equipment: "equipment",
+  monster: "monsters",
+  "spell-list": "spellLists"
 } as const satisfies Record<HomebrewContentType, keyof DraftSlice>;
 
 function pushInto(draft: DraftSlice, type: HomebrewContentType, record: unknown) {
@@ -573,11 +788,19 @@ function projectRecord(row: RecordRow): HomebrewRecordRow {
 }
 
 /** A throwing validator counts as "no": on the autosave path, demoting is safer than failing or staying published. */
-function stillPublishable(revalidate: HomebrewRevalidator, type: HomebrewContentType, bodyJson: string, id: string): boolean {
+function stillPublishable(
+  revalidate: HomebrewRevalidator,
+  type: HomebrewContentType,
+  bodyJson: string,
+  id: string
+): boolean {
   try {
     return revalidate(type, JSON.parse(bodyJson) as HomebrewBody);
   } catch (error) {
-    console.error(`[homebrew] could not re-validate ${type} "${id}" on save; demoting it to a draft rather than leaving it published:`, error);
+    console.error(
+      `[homebrew] could not re-validate ${type} "${id}" on save; demoting it to a draft rather than leaving it published:`,
+      error
+    );
     return false;
   }
 }
@@ -586,8 +809,11 @@ function stillPublishable(revalidate: HomebrewRevalidator, type: HomebrewContent
  * Why a pack import must not overwrite this row (published or deleted), or null. Imported bodies are unvalidated
  * and the report cannot announce a silent demotion. Exported so a dry run reports the same refusal.
  */
-export function overwriteRefusal(row: Pick<HomebrewSummaryRow, "state" | "visibleToPlayers" | "deletedAt">): string | null {
-  if (row.deletedAt) return "That record was deleted here. Restore it before overwriting it, or import with re-mint to land a fresh copy.";
+export function overwriteRefusal(
+  row: Pick<HomebrewSummaryRow, "state" | "visibleToPlayers" | "deletedAt">
+): string | null {
+  if (row.deletedAt)
+    return "That record was deleted here. Restore it before overwriting it, or import with re-mint to land a fresh copy.";
   if (row.state === "published") {
     return row.visibleToPlayers
       ? "That record is published and shown to players - overwriting it would take it away from them mid-session. Unpublish it first, or import with re-mint."
@@ -605,7 +831,8 @@ function contentType(value: string): HomebrewContentType {
 
 /** Validates only that the body is a JSON object with a usable name; drafts may otherwise be invalid. */
 export function recordName(body: unknown): string {
-  if (!body || typeof body !== "object" || Array.isArray(body)) throw new HomebrewStateError("The record must be a JSON object.");
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    throw new HomebrewStateError("The record must be a JSON object.");
   const raw = (body as Record<string, unknown>).name;
   const name = typeof raw === "string" ? raw.trim() : "";
   if (!name) throw new HomebrewStateError("Name this record.");
@@ -620,9 +847,19 @@ export function recordName(body: unknown): string {
 function normalizeBody(body: HomebrewBody, id: string, type: HomebrewContentType): string {
   const { type: _type, ...rest } = body as Record<string, unknown>;
   const source = rest.source;
-  const withIdentity = type === "monster"
-    ? { ...rest, id, source: { ...(source && typeof source === "object" && !Array.isArray(source) ? source : { name: "Homebrew", version: "1" }), externalId: id } }
-    : { ...rest, id };
+  const withIdentity =
+    type === "monster"
+      ? {
+          ...rest,
+          id,
+          source: {
+            ...(source && typeof source === "object" && !Array.isArray(source)
+              ? source
+              : { name: "Homebrew", version: "1" }),
+            externalId: id
+          }
+        }
+      : { ...rest, id };
   const json = JSON.stringify(withIdentity);
   if (json.length > MAX_BODY_BYTES) throw new HomebrewStateError("That record is too large to store.");
   return json;

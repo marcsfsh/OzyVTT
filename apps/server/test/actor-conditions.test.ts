@@ -14,10 +14,20 @@ const GM = { role: "gm" } as const;
 const OWNER = { role: "player", sessionId: IDS.session } as const;
 
 function state() {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.pc, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, ownerSessionId: IDS.session },
-    { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
-  ] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.pc,
+        name: "Alpha",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 20, maximum: 20 },
+        ownerSessionId: IDS.session
+      },
+      { id: IDS.monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 10, maximum: 10 } }
+    ]
+  });
 }
 
 describe("condition tracking", () => {
@@ -45,7 +55,18 @@ describe("condition tracking", () => {
 
   it("projects display labels to the viewer for public combatants only", () => {
     const game = state();
-    startEncounter(game, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: IDS.pc, score: 15 }, { actorId: IDS.monster, score: 10 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    startEncounter(
+      game,
+      {
+        mapAssetId: "20000000-0000-5000-8000-000000000001",
+        entries: [
+          { actorId: IDS.pc, score: 15 },
+          { actorId: IDS.monster, score: 10 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
     setCondition(game, IDS.monster, "prone", true, undefined, GM);
     setCondition(game, IDS.monster, "exhaustion", true, 2, GM);
     game.actors[1].visibility = "public";

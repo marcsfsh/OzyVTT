@@ -48,8 +48,10 @@ export function slugify(raw: string, maxLength: number): string {
 export function homebrewIdProblem(id: string, type: HomebrewContentType): string | null {
   if (!id.startsWith(HOMEBREW_ID_PREFIX)) return `must start with "${HOMEBREW_ID_PREFIX}"`;
   // Re-checked here: an imported pack could carry a name-derived monster id that passes the generic rules.
-  if (type === "monster" && !isOpaqueMonsterId(id)) return "must be an opaque monster id - a name-derived one reaches players through definitionId before the creature is revealed";
-  if (id.length > HOMEBREW_ID_MAX_LENGTH) return `is ${id.length} characters; the persisted budget is ${HOMEBREW_ID_MAX_LENGTH}`;
+  if (type === "monster" && !isOpaqueMonsterId(id))
+    return "must be an opaque monster id - a name-derived one reaches players through definitionId before the creature is revealed";
+  if (id.length > HOMEBREW_ID_MAX_LENGTH)
+    return `is ${id.length} characters; the persisted budget is ${HOMEBREW_ID_MAX_LENGTH}`;
   if (!SLUG_LEGAL.test(id)) return `must match ${SLUG_LEGAL} - lowercase letters, digits and hyphens only`;
   for (const suffix of RESERVED_SUFFIXES) {
     if (id.endsWith(suffix)) return `ends with the reserved catalog-choice family suffix "${suffix}"`;
@@ -79,7 +81,11 @@ export function isMintedHomebrewId(id: string, type: HomebrewContentType): boole
   // Test the whole opaque shape, not the `hb-m-` prefix (a class named "M" mints `hb-m-copy-60a055`).
   if (isOpaqueMonsterId(id)) return false;
   const suffix = id.slice(id.lastIndexOf("-") + 1);
-  return id.lastIndexOf("-") > HOMEBREW_ID_PREFIX.length - 1 && HEX.test(suffix) && (suffix.length === 6 || suffix.length === 8);
+  return (
+    id.lastIndexOf("-") > HOMEBREW_ID_PREFIX.length - 1 &&
+    HEX.test(suffix) &&
+    (suffix.length === 6 || suffix.length === 8)
+  );
 }
 
 /** `isTaken` must include soft-deleted rows, or a dead record's identity could be reused. Slug length fits the suffix. */
@@ -87,9 +93,10 @@ export function mintHomebrewId(type: HomebrewContentType, name: string, isTaken:
   for (let attempt = 0; attempt < 8; attempt += 1) {
     // Widen the random suffix after five collisions rather than looping forever on a wedged generator.
     const suffixLength = type === "monster" ? 12 : attempt < 5 ? 6 : 8;
-    const candidate = type === "monster"
-      ? `${MONSTER_PREFIX}${hex(suffixLength)}`
-      : `${HOMEBREW_ID_PREFIX}${slugFor(type, name, HOMEBREW_ID_MAX_LENGTH - HOMEBREW_ID_PREFIX.length - 1 - suffixLength)}-${hex(suffixLength)}`;
+    const candidate =
+      type === "monster"
+        ? `${MONSTER_PREFIX}${hex(suffixLength)}`
+        : `${HOMEBREW_ID_PREFIX}${slugFor(type, name, HOMEBREW_ID_MAX_LENGTH - HOMEBREW_ID_PREFIX.length - 1 - suffixLength)}-${hex(suffixLength)}`;
     if (!isTaken(candidate)) return assertMintable(candidate, type);
   }
   throw new Error("Could not mint a unique homebrew id.");

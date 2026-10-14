@@ -26,7 +26,14 @@ describe("canInitiateForActor", () => {
     expect(canInitiateForActor({ role: "player", sessionId: playerA }, state, monster, "attack").ok).toBe(false);
   });
   it("rejects an unknown actor", () => {
-    expect(canInitiateForActor({ role: "player", sessionId: playerA }, state, "00000000-0000-4000-8000-000000000000", "check").ok).toBe(false);
+    expect(
+      canInitiateForActor(
+        { role: "player", sessionId: playerA },
+        state,
+        "00000000-0000-4000-8000-000000000000",
+        "check"
+      ).ok
+    ).toBe(false);
   });
 });
 
@@ -34,7 +41,14 @@ describe("canPlayerTarget", () => {
   const withHidden = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: mine, name: "Mine", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 }, ownerSessionId: playerA },
+      {
+        id: mine,
+        name: "Mine",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 10, maximum: 10 },
+        ownerSessionId: playerA
+      },
       { id: monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } },
       { id: hidden, name: "Lurker", kind: "monster", visibility: "gm-only", hp: { current: 20, maximum: 20 } }
     ]

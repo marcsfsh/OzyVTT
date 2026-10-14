@@ -19,7 +19,10 @@ import type { CodexChronicleRecord, GmCodexCalendar } from "./api";
 /** Two 10-day months and a 5-day week, so every cell is countable. */
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
-  months: [{ name: "Hammer", days: 10 }, { name: "Alturiak", days: 10 }],
+  months: [
+    { name: "Hammer", days: 10 },
+    { name: "Alturiak", days: 10 }
+  ],
   weekdays: ["Sul", "Mol", "Zor", "Ches", "Tar"],
   currentDate: { year: 1491, month: 0, day: 4 },
   publishedDate: { year: 1491, month: 0, day: 2 }
@@ -27,17 +30,43 @@ const CALENDAR: GmCodexCalendar = {
 /** Hammer 1 of 1491 = 1491 x 20 = 29820, so day N of Hammer is 29819 + N. */
 const HAMMER = (day: number) => 29819 + day;
 
-const record = (over: Partial<CodexChronicleRecord>): CodexChronicleRecord => ({
-  id: "j1", kind: "entry", title: null, text: "", playerText: "", gmText: "", tags: [], revealedToPlayers: true,
-  sessionId: null, sessionNumber: null, realDate: null, inWorldDate: null, inWorldLabel: null,
-  calendarInstant: null, proposedDate: null, attachPageId: null, attachMarkerId: null, archiveId: null,
-  createdAt: "2026-07-31T00:00:00.000Z", ...over
-} as CodexChronicleRecord);
+const record = (over: Partial<CodexChronicleRecord>): CodexChronicleRecord =>
+  ({
+    id: "j1",
+    kind: "entry",
+    title: null,
+    text: "",
+    playerText: "",
+    gmText: "",
+    tags: [],
+    revealedToPlayers: true,
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldDate: null,
+    inWorldLabel: null,
+    calendarInstant: null,
+    proposedDate: null,
+    attachPageId: null,
+    attachMarkerId: null,
+    archiveId: null,
+    createdAt: "2026-07-31T00:00:00.000Z",
+    ...over
+  }) as CodexChronicleRecord;
 
 const renderCalendar = (over: Partial<React.ComponentProps<typeof CalendarView>> = {}) => {
   const props = {
-    gmToken: "gm", calendar: CALENDAR, records: [] as readonly CodexChronicleRecord[], loading: false, error: null,
-    onChanged: vi.fn(), year: null, month: null, onMonthChange: vi.fn(), onOpenEntry: vi.fn(), onOpenPage: vi.fn(),
+    gmToken: "gm",
+    calendar: CALENDAR,
+    records: [] as readonly CodexChronicleRecord[],
+    loading: false,
+    error: null,
+    onChanged: vi.fn(),
+    year: null,
+    month: null,
+    onMonthChange: vi.fn(),
+    onOpenEntry: vi.fn(),
+    onOpenPage: vi.fn(),
     ...over
   };
   return { props, ...render(<CalendarView {...props} />) };
@@ -48,7 +77,11 @@ describe("The Calendar grid", () => {
     renderCalendar();
 
     const grid = screen.getByRole("grid", { name: "Hammer 1491 DR" });
-    expect(within(grid).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["SulSu", "MolMo", "ZorZo", "ChesCh", "TarTa"]);
+    expect(
+      within(grid)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent)
+    ).toEqual(["SulSu", "MolMo", "ZorZo", "ChesCh", "TarTa"]);
     expect(within(grid).getAllByRole("button")).toHaveLength(10);
     // 29820 % 5 === 0, so Hammer 1 is the first weekday: no lead blanks.
     expect(grid.querySelectorAll(".codex-calendar-cell.is-blank")).toHaveLength(0);
@@ -70,7 +103,15 @@ describe("The Calendar grid", () => {
      * Re-deriving would clamp to Hammer 10.
      */
     renderCalendar({
-      records: [record({ id: "j9", title: "The feast", kind: "deadline", inWorldDate: { year: 1491, month: 0, day: 31 }, calendarInstant: HAMMER(7) })],
+      records: [
+        record({
+          id: "j9",
+          title: "The feast",
+          kind: "deadline",
+          inWorldDate: { year: 1491, month: 0, day: 31 },
+          calendarInstant: HAMMER(7)
+        })
+      ],
       onOpenEntry
     });
 
@@ -156,8 +197,21 @@ describe("The two clocks (D17)", () => {
     expect(onChanged).toHaveBeenCalled();
 
     view.unmount();
-    render(<CalendarView gmToken="gm" calendar={{ ...CALENDAR, publishedDate: CALENDAR.currentDate ?? null }} records={[]} loading={false} error={null}
-      onChanged={vi.fn()} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} onOpenPage={vi.fn()} />);
+    render(
+      <CalendarView
+        gmToken="gm"
+        calendar={{ ...CALENDAR, publishedDate: CALENDAR.currentDate ?? null }}
+        records={[]}
+        loading={false}
+        error={null}
+        onChanged={vi.fn()}
+        year={null}
+        month={null}
+        onMonthChange={vi.fn()}
+        onOpenEntry={vi.fn()}
+        onOpenPage={vi.fn()}
+      />
+    );
     expect(screen.getByRole("button", { name: "Publish the date" })).toBeDisabled();
     expect(screen.getByText(/The party is on your date/)).toBeInTheDocument();
   });
@@ -195,7 +249,10 @@ describe("The two clocks (D17)", () => {
 
 /** Must agree with the server's `formatWorldYear`, which writes the stored `in_world_label`. */
 describe("Eras (5f)", () => {
-  const ERAS = [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }];
+  const ERAS = [
+    { name: "Age of Ruin", startYear: 1000 },
+    { name: "Third Age", startYear: 1400 }
+  ];
 
   it("leads the year with the era the year has reached, and keeps the suffix", () => {
     renderCalendar({ calendar: { ...CALENDAR, eras: ERAS }, year: "1491", month: "0" });
@@ -212,14 +269,28 @@ describe("Eras (5f)", () => {
     const { unmount } = renderCalendar({ calendar: { ...CALENDAR, eras: ERAS }, year: "900", month: "0" });
     expect(screen.getByRole("heading", { name: "Hammer 900 DR" })).toBeInTheDocument();
     unmount();
-    renderCalendar({ year: "1491", month: "0" });                       // no `eras` key at all
+    renderCalendar({ year: "1491", month: "0" }); // no `eras` key at all
     expect(screen.getByRole("heading", { name: "Hammer 1491 DR" })).toBeInTheDocument();
   });
 
   /** Eras are structure, not secrets: both projections carry them. */
   it("gives the player's calendar the same reading of the year", () => {
-    render(<PlayerCalendarView calendar={{ yearName: "DR", eras: ERAS, months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: { year: 1491, month: 0, day: 2 } }}
-      records={[]} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} />);
+    render(
+      <PlayerCalendarView
+        calendar={{
+          yearName: "DR",
+          eras: ERAS,
+          months: CALENDAR.months,
+          weekdays: CALENDAR.weekdays,
+          currentDate: { year: 1491, month: 0, day: 2 }
+        }}
+        records={[]}
+        year={null}
+        month={null}
+        onMonthChange={vi.fn()}
+        onOpenEntry={vi.fn()}
+      />
+    );
     expect(screen.getByText("Hammer 2, Third Age 1491 DR")).toBeInTheDocument();
   });
 });
@@ -245,10 +316,24 @@ describe("Loading, failure and the empty world", () => {
 });
 
 describe("The player's Calendar (D14)", () => {
-  const PLAYER_CALENDAR = { yearName: "DR", months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: { year: 1491, month: 0, day: 2 } };
+  const PLAYER_CALENDAR = {
+    yearName: "DR",
+    months: CALENDAR.months,
+    weekdays: CALENDAR.weekdays,
+    currentDate: { year: 1491, month: 0, day: 2 }
+  };
 
   it("shows ONE clock — the published date — and no way to change the world", () => {
-    render(<PlayerCalendarView calendar={PLAYER_CALENDAR} records={[]} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} />);
+    render(
+      <PlayerCalendarView
+        calendar={PLAYER_CALENDAR}
+        records={[]}
+        year={null}
+        month={null}
+        onMonthChange={vi.fn()}
+        onOpenEntry={vi.fn()}
+      />
+    );
 
     // A player's `currentDate` is the published date, so there is no "your date".
     expect(screen.queryByText("Your date")).toBeNull();
@@ -260,8 +345,16 @@ describe("The player's Calendar (D14)", () => {
   it("places the player's own records on the same grid", async () => {
     const user = userEvent.setup();
     const onOpenEntry = vi.fn();
-    render(<PlayerCalendarView calendar={PLAYER_CALENDAR} onOpenEntry={onOpenEntry} year={null} month={null} onMonthChange={vi.fn()}
-      records={[{ id: "j2", kind: "entry", title: "We reached Vallaki", text: "", calendarInstant: HAMMER(6) }]} />);
+    render(
+      <PlayerCalendarView
+        calendar={PLAYER_CALENDAR}
+        onOpenEntry={onOpenEntry}
+        year={null}
+        month={null}
+        onMonthChange={vi.fn()}
+        records={[{ id: "j2", kind: "entry", title: "We reached Vallaki", text: "", calendarInstant: HAMMER(6) }]}
+      />
+    );
 
     await user.click(screen.getByRole("button", { name: /Hammer 6/ }));
     await user.click(await screen.findByRole("button", { name: /We reached Vallaki/ }));

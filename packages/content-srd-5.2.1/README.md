@@ -119,9 +119,9 @@ anything consumes it.
   those creatures as `small`; the SRD-printed sizes were restored from cross-validation
   (rat, imp, sprite, will-o'-wisp, ...). The SRD's "Medium or Small" NPC statblocks stay at
   open5e's `small`, which is within the SRD's own dual-size statement.
-- **`octopus`** — upstream stores the CON/CHA *modifiers* (0 / −3) where the scores (11 / 4)
+- **`octopus`** — upstream stores the CON/CHA _modifiers_ (0 / −3) where the scores (11 / 4)
   belong, plus a garbage CON-save value; **`mastiff`** and **`swarm-of-rats`** store save
-  *modifiers* where the SRD-printed save bonuses belong.
+  _modifiers_ where the SRD-printed save bonuses belong.
 - **`greater-invisibility`** — upstream ships an empty description; restored from the SRD.
 - Classes, species, feats, and backgrounds were previously deferred as "outside this VTT's
   not-a-character-builder scope". That scope changed (ADR-0021 / the character-builder task
@@ -146,11 +146,11 @@ mis-encoded into a rider that means something else:
   damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived
   bonus scoped to cantrips.
 - **Thaumaturge's Arcana/Religion bonus** — an ability-derived bonus to specific skill checks;
-  there is no skill-check modifier in the vocabulary. The extra cantrip *is* modeled.
+  there is no skill-check modifier in the vocabulary. The extra cantrip _is_ modeled.
 - **Stone's Endurance / Divine Spark healing** — damage reduction and "restore Hit Points equal
   to the roll" have no rider; both actions carry their prose and their use counter.
 - **Frost's Chill's Speed reduction** and **Hill's Tumble's Prone** — `onHit` riders only fire
-  from an attack roll *on the same action*, and these ride an attack made with another action.
+  from an attack roll _on the same action_, and these ride an attack made with another action.
   Encoding them as `onHit` would silently never trigger.
 - **"Necrotic or Radiant, your choice"** (Divine Strike, Divine Spark) — a damage part carries
   one type; both are recorded as Radiant with the choice stated in the action text.
@@ -160,5 +160,5 @@ mis-encoded into a rider that means something else:
 Game content: **CC BY 4.0** — "This work includes material from the System Reference Document
 5.2.1 ('SRD 5.2.1') by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd.
 The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License."
-The vendored fixture *files* come from open5e-api, whose code is MIT; the fixtures carry the
+The vendored fixture _files_ come from open5e-api, whose code is MIT; the fixtures carry the
 SRD's own license per open5e's `Document`/`License` model.

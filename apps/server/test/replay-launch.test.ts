@@ -33,10 +33,22 @@ const newActorId = () => `70000000-0000-4000-8000-0000000000${String(++minted).p
 
 /** The live campaign: the hero is battered and claimed, exactly as tonight left them. */
 function liveState(): GameState {
-  return GameStateSchema.parse({ schemaVersion: 1, actors: [
-    { id: IDS.hero, name: "Borin", kind: "player-character", visibility: "public", hp: { current: 4, maximum: 30 }, ownerSessionId: IDS.session, definitionId: "import-borin" },
-    { id: IDS.goblin, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
-  ], definitions: [{ id: "import-borin", definition: heroDefinition("Borin", 30) }] });
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.hero,
+        name: "Borin",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 4, maximum: 30 },
+        ownerSessionId: IDS.session,
+        definitionId: "import-borin"
+      },
+      { id: IDS.goblin, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } }
+    ],
+    definitions: [{ id: "import-borin", definition: heroDefinition("Borin", 30) }]
+  });
 }
 
 /** A real, schema-valid definition (the shared fixture) with one field varied, so the collision rule has two distinguishable bodies. */
@@ -47,30 +59,89 @@ function heroDefinition(name: string, maximum: number): ActorDefinition {
 
 /** The archived moment: the hero at full health, a hidden ambusher, and an effect linking the two. */
 function archivedState(): GameState {
-  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [
+  const state = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      {
+        id: IDS.archivedHero,
+        name: "Borin",
+        kind: "player-character",
+        visibility: "public",
+        hp: { current: 30, maximum: 30 },
+        ownerSessionId: IDS.session,
+        definitionId: "import-borin",
+        conditions: [{ id: "prone" }],
+        effects: [
+          {
+            id: "grapple-1",
+            name: "Grappled",
+            tags: ["grapple"],
+            sourceActorId: IDS.archivedGoblin,
+            sourceName: "Grick",
+            sourceActionId: null,
+            startedRound: 1,
+            duration: { type: "manual" },
+            modifiers: [],
+            linkedConditionIds: ["grappled"],
+            onEnd: []
+          }
+        ]
+      },
+      {
+        id: IDS.archivedGoblin,
+        name: "Grick",
+        kind: "monster",
+        visibility: "gm-only",
+        hp: { current: 20, maximum: 20 },
+        definitionId: "import-grick"
+      }
+    ],
+    definitions: [
+      { id: "import-borin", definition: heroDefinition("Borin", 44) },
+      { id: "import-grick", definition: heroDefinition("Grick", 20) }
+    ]
+  });
+  startEncounter(
+    state,
     {
-      id: IDS.archivedHero, name: "Borin", kind: "player-character", visibility: "public",
-      hp: { current: 30, maximum: 30 }, ownerSessionId: IDS.session, definitionId: "import-borin",
-      conditions: [{ id: "prone" }],
-      effects: [{ id: "grapple-1", name: "Grappled", tags: ["grapple"], sourceActorId: IDS.archivedGoblin, sourceName: "Grick", sourceActionId: null, startedRound: 1, duration: { type: "manual" }, modifiers: [], linkedConditionIds: ["grappled"], onEnd: [] }]
+      mapAssetId: IDS.otherMap,
+      entries: [
+        { actorId: IDS.archivedHero, score: 18 },
+        { actorId: IDS.archivedGoblin, score: 12 }
+      ]
     },
-    { id: IDS.archivedGoblin, name: "Grick", kind: "monster", visibility: "gm-only", hp: { current: 20, maximum: 20 }, definitionId: "import-grick" }
-  ], definitions: [
-    { id: "import-borin", definition: heroDefinition("Borin", 44) },
-    { id: "import-grick", definition: heroDefinition("Grick", 20) }
-  ] });
-  startEncounter(state, { mapAssetId: IDS.otherMap, entries: [{ actorId: IDS.archivedHero, score: 18 }, { actorId: IDS.archivedGoblin, score: 12 }] }, () => 1, GEOMETRY);
-  state.combat = { ...state.combat, reactionsUsed: [IDS.archivedHero], legendaryUsed: { [IDS.archivedGoblin]: 1 }, turn: { ...state.combat.turn, turnUses: { [`${IDS.archivedHero}:second-wind`]: 1 } } };
+    () => 1,
+    GEOMETRY
+  );
+  state.combat = {
+    ...state.combat,
+    reactionsUsed: [IDS.archivedHero],
+    legendaryUsed: { [IDS.archivedGoblin]: 1 },
+    turn: { ...state.combat.turn, turnUses: { [`${IDS.archivedHero}:second-wind`]: 1 } }
+  };
   return state;
 }
 
 function documentWith(turns: readonly { revision: number; state: GameState }[]): EncounterArchiveDocument {
   const first = turns[0]?.state ?? archivedState();
   return {
-    archiveSchemaVersion: 3, startedAt: "2026-07-01T20:00:00.000Z", endedAt: "2026-07-01T21:30:00.000Z",
+    archiveSchemaVersion: 3,
+    startedAt: "2026-07-01T20:00:00.000Z",
+    endedAt: "2026-07-01T21:30:00.000Z",
     turnCount: turns.length,
-    turns: turns.map((turn, index) => ({ index, kind: "turn" as const, label: "Grick's turn", revision: turn.revision, at: `2026-07-01T20:0${index}:00.000Z`, state: turn.state })),
-    log: [], journal: [], finalState: first, postEncounterState: first, rolls: [],
+    turns: turns.map((turn, index) => ({
+      index,
+      kind: "turn" as const,
+      label: "Grick's turn",
+      revision: turn.revision,
+      at: `2026-07-01T20:0${index}:00.000Z`,
+      state: turn.state
+    })),
+    log: [],
+    journal: [],
+    finalState: first,
+    postEncounterState: first,
+    rolls: [],
     definitions: [
       { id: "import-borin", source: "imported", definition: heroDefinition("Borin", 44) },
       { id: "import-grick", source: "imported", definition: heroDefinition("Grick", 20) }
@@ -80,14 +151,36 @@ function documentWith(turns: readonly { revision: number; state: GameState }[]):
 }
 
 const launch = (state: GameState, document: EncounterArchiveDocument, turnIndex = 0) =>
-  launchReplay(state, { archiveId: 7, document, turnIndex, sceneId: IDS.launchScene, implicitSceneId: IDS.implicit, newActorId });
+  launchReplay(state, {
+    archiveId: 7,
+    document,
+    turnIndex,
+    sceneId: IDS.launchScene,
+    implicitSceneId: IDS.implicit,
+    newActorId
+  });
 
 describe("replay.launch - one table, parked and resumed", () => {
   it("parks the live scene, goes live on the recorded moment, and resumes on the ordinary scene switch", () => {
     const state = liveState();
-    createScene(state, { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] }, GEOMETRY);
+    createScene(
+      state,
+      { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] },
+      GEOMETRY
+    );
     activateScene(state, IDS.scene, IDS.implicit);
-    startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.goblin, score: 5 }] }, () => 1, GEOMETRY);
+    startEncounter(
+      state,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.hero, score: 20 },
+          { actorId: IDS.goblin, score: 5 }
+        ]
+      },
+      () => 1,
+      GEOMETRY
+    );
     state.combat = { ...state.combat, round: 4 };
 
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
@@ -164,10 +257,14 @@ describe("replay.launch - one table, parked and resumed", () => {
   it("refuses while the GM is reviewing history, and when the recording has nothing to launch", () => {
     const reviewing = liveState();
     reviewing.combat = { ...reviewing.combat, historyCursor: 2 };
-    expect(() => launch(reviewing, documentWith([{ revision: 10, state: archivedState() }]))).toThrow(/reviewing the combat history/i);
+    expect(() => launch(reviewing, documentWith([{ revision: 10, state: archivedState() }]))).toThrow(
+      /reviewing the combat history/i
+    );
 
     expect(() => launch(liveState(), documentWith([]))).toThrow(/no turns to launch/i);
-    expect(() => launch(liveState(), documentWith([{ revision: 10, state: archivedState() }]), 5)).toThrow(/not in this recording/i);
+    expect(() => launch(liveState(), documentWith([{ revision: 10, state: archivedState() }]), 5)).toThrow(
+      /not in this recording/i
+    );
   });
 
   it("refuses up front when there is no room to park the table AND stage the replay", () => {
@@ -175,11 +272,22 @@ describe("replay.launch - one table, parked and resumed", () => {
     // 19 prepared scenes plus a live unbound encounter: parking needs one slot, the replay another, and
     // the cap is 20, so this is refused before anything is cloned.
     for (let index = 0; index < 19; index += 1) {
-      createScene(state, { sceneId: `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`, name: `Scene ${index}`, mapAssetId: IDS.map, combatantIds: [] }, GEOMETRY);
+      createScene(
+        state,
+        {
+          sceneId: `40000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`,
+          name: `Scene ${index}`,
+          mapAssetId: IDS.map,
+          combatantIds: []
+        },
+        GEOMETRY
+      );
     }
     startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }] }, () => 1, GEOMETRY);
     const before = state.actors.length;
-    expect(() => launch(state, documentWith([{ revision: 10, state: archivedState() }]))).toThrow(/Remove a prepared scene first/i);
+    expect(() => launch(state, documentWith([{ revision: 10, state: archivedState() }]))).toThrow(
+      /Remove a prepared scene first/i
+    );
     expect(state.actors).toHaveLength(before);
     expect(state.combat.scenes).toHaveLength(19);
   });
@@ -203,7 +311,8 @@ describe("replay.launch - one table, parked and resumed", () => {
 
 const presenceFor = () => null;
 /** Only the campaign's own members - `rosterActors` is the single rule every management surface uses. */
-const rosterOf = (state: GameState) => rosterActors(projectGmView(state, presenceFor).actors).map((actor) => actor.name);
+const rosterOf = (state: GameState) =>
+  rosterActors(projectGmView(state, presenceFor).actors).map((actor) => actor.name);
 
 describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", () => {
   it("keeps the clones in the fight but out of both roster projections, with no name ending (replay)", () => {
@@ -222,7 +331,9 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
     // The clones are still the combatants (initiative, tokens, actor entries); hiding them from the
     // roster must not empty the battlefield.
     expect(state.combat.initiative.map((entry) => entry.actorId)).toEqual(outcome.actorIds);
-    expect(projectGmView(state, presenceFor).actors.map((actor) => actor.id)).toEqual(expect.arrayContaining([...outcome.actorIds]));
+    expect(projectGmView(state, presenceFor).actors.map((actor) => actor.id)).toEqual(
+      expect.arrayContaining([...outcome.actorIds])
+    );
     // The archived ambusher was gm-only, so only the cloned hero is public to a player.
     expect(player.actors.map((actor) => actor.id)).toContain(outcome.actorIds[0]);
     expect(player.actors.find((actor) => actor.id === outcome.actorIds[0])!.replaySceneId).toBe(IDS.launchScene);
@@ -241,14 +352,21 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
 
   it("deletes the clones and the scene when the table switches away from a replay", () => {
     const state = liveState();
-    createScene(state, { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] }, GEOMETRY);
+    createScene(
+      state,
+      { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] },
+      GEOMETRY
+    );
     activateScene(state, IDS.scene, IDS.implicit);
     const baselineScenes = state.combat.scenes.length;
     const baselineActors = state.actors.length;
 
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
     expect(state.combat.scenes).toHaveLength(baselineScenes + 1);
-    expect(state.combat.scenes.find((scene) => scene.id === IDS.launchScene)!.replayOf).toEqual({ archiveId: 7, actorIds: outcome.actorIds });
+    expect(state.combat.scenes.find((scene) => scene.id === IDS.launchScene)!.replayOf).toEqual({
+      archiveId: 7,
+      actorIds: outcome.actorIds
+    });
 
     activateScene(state, IDS.scene, IDS.implicit);
     expect(state.combat.scenes).toHaveLength(baselineScenes);
@@ -261,7 +379,11 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
 
   it("deletes the clones when a parked replay scene is removed", () => {
     const state = liveState();
-    createScene(state, { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] }, GEOMETRY);
+    createScene(
+      state,
+      { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] },
+      GEOMETRY
+    );
     activateScene(state, IDS.scene, IDS.implicit);
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));
     // `scene.remove` refuses the live scene and the activate paths never leave a replay parked, so this
@@ -274,23 +396,49 @@ describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", (
     expect(rosterOf(state)).toEqual(["Borin", "Goblin"]);
 
     // An ordinary prepared scene keeps its combatants; they are campaign members, not clones.
-    createScene(state, { sceneId: IDS.launchScene, name: "Next week", mapAssetId: IDS.map, combatantIds: [IDS.hero] }, GEOMETRY);
+    createScene(
+      state,
+      { sceneId: IDS.launchScene, name: "Next week", mapAssetId: IDS.map, combatantIds: [IDS.hero] },
+      GEOMETRY
+    );
     removeScene(state, IDS.launchScene);
     expect(rosterOf(state)).toEqual(["Borin", "Goblin"]);
   });
 
   it("never refuses across 25 launches in a row - the leak was the block", () => {
     const state = liveState();
-    createScene(state, { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] }, GEOMETRY);
+    createScene(
+      state,
+      { sceneId: IDS.scene, name: "Tonight", mapAssetId: IDS.map, combatantIds: [IDS.hero, IDS.goblin] },
+      GEOMETRY
+    );
     activateScene(state, IDS.scene, IDS.implicit);
-    startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero, score: 20 }, { actorId: IDS.goblin, score: 5 }] }, () => 1, GEOMETRY);
+    startEncounter(
+      state,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.hero, score: 20 },
+          { actorId: IDS.goblin, score: 5 }
+        ]
+      },
+      () => 1,
+      GEOMETRY
+    );
     const document = documentWith([{ revision: 10, state: archivedState() }]);
     const baselineActors = state.actors.length;
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
       // Each launch mints its own scene id, exactly as the command does (sceneId = commandId).
       const sceneId = `40000000-0000-4000-8000-0000000002${String(attempt).padStart(2, "0")}`;
-      const outcome = launchReplay(state, { archiveId: 7, document, turnIndex: 0, sceneId, implicitSceneId: IDS.implicit, newActorId });
+      const outcome = launchReplay(state, {
+        archiveId: 7,
+        document,
+        turnIndex: 0,
+        sceneId,
+        implicitSceneId: IDS.implicit,
+        newActorId
+      });
       expect(state.combat.activeSceneId).toBe(sceneId);
       // Steady state: tonight's parked scene plus the one live replay. Never twenty.
       expect(state.combat.scenes.map((scene) => scene.id)).toEqual([IDS.scene, sceneId]);

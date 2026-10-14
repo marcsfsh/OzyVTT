@@ -28,9 +28,20 @@ export interface NameFieldProps {
     Suggestions are plain buttons so they're visible and tappable without opening anything; the field stays
     editable. */
 export function NameField({
-  value, onChange, label = "Name", placeholder = "Name your character",
-  suggestions, onShuffle, shuffleLabel = "Suggest names",
-  help, error, required, disabled = false, maxLength, id, className
+  value,
+  onChange,
+  label = "Name",
+  placeholder = "Name your character",
+  suggestions,
+  onShuffle,
+  shuffleLabel = "Suggest names",
+  help,
+  error,
+  required,
+  disabled = false,
+  maxLength,
+  id,
+  className
 }: NameFieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -60,7 +71,9 @@ export function NameField({
 
       {suggestions && suggestions.length > 0 && (
         <div className="nh-namefield-suggestions">
-          <span className="nh-namefield-suggestions-label" id={listId}>Suggestions</span>
+          <span className="nh-namefield-suggestions-label" id={listId}>
+            Suggestions
+          </span>
           <ul className="nh-namefield-list" aria-labelledby={listId}>
             {suggestions.map((name) => (
               <li key={name}>

@@ -2,11 +2,21 @@
    their own label (Stepper) or none (Switch) reserve this so they align. Derived from `.nh-field-label`'s line
    box (`--fs-sm` × 1.3) and `.nh-field`'s `gap`; change all three together. `forms-band.test.tsx` checks the
    pairing and `scripts/primitive-align-check.mjs` measures it in a browser. */
-:root { --nh-label-band: calc(var(--fs-sm) * 1.3 + var(--space-2)); }
+:root {
+  --nh-label-band: calc(var(--fs-sm) * 1.3 + var(--space-2));
+}
 
-.nh-field { display: grid; gap: var(--space-2); }
-.nh-field-label { font: 600 var(--fs-sm) / 1.3 var(--font-body); color: var(--text-dim); }
-.nh-field-req { color: var(--magenta); }
+.nh-field {
+  display: grid;
+  gap: var(--space-2);
+}
+.nh-field-label {
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+  color: var(--text-dim);
+}
+.nh-field-req {
+  color: var(--magenta);
+}
 
 /* The rim and a flat fill (`--surface-3`, no texture) in every state: nothing textured sits behind text being
    read or edited. No corner cut: inputs are replaced elements with no `::before` for a backing layer,
@@ -25,16 +35,35 @@
   background: var(--surface-3);
   color: var(--text);
   font: 400 var(--fs-body) / 1.4 var(--font-body);
-  transition: border-color var(--dur-hover), box-shadow var(--dur-hover), background var(--dur-hover);
+  transition:
+    border-color var(--dur-hover),
+    box-shadow var(--dur-hover),
+    background var(--dur-hover);
 }
-.nh-input::placeholder { color: var(--text-muted); }
+.nh-input::placeholder {
+  color: var(--text-muted);
+}
 /* `:active` beside `:hover` for touch; the title variant relies on this to look editable. */
-.nh-input:hover:not(:disabled), .nh-input:active:not(:disabled) { border-color: var(--line-strong); }
+.nh-input:hover:not(:disabled),
+.nh-input:active:not(:disabled) {
+  border-color: var(--line-strong);
+}
 /* Focus is the one place cyan appears in a resting form; replaces the global double ring with border + glow. */
-.nh-input:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.nh-input:disabled { opacity: 0.6; cursor: not-allowed; }
-.nh-input--invalid { border-color: var(--danger); }
-.nh-input--invalid:focus { box-shadow: var(--glow-danger); }
+.nh-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.nh-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.nh-input--invalid {
+  border-color: var(--danger);
+}
+.nh-input--invalid:focus {
+  box-shadow: var(--glow-danger);
+}
 
 .nh-select {
   appearance: none;
@@ -45,9 +74,17 @@
   background-repeat: no-repeat;
   background-position: right 0.7rem center;
 }
-.nh-textarea { min-height: 5rem; resize: vertical; line-height: var(--lh-body); }
+.nh-textarea {
+  min-height: 5rem;
+  resize: vertical;
+  line-height: var(--lh-body);
+}
 
-.nh-field-help { margin: 0; font-size: var(--fs-sm); color: var(--text-dim); }
+.nh-field-help {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
 .nh-field-error {
   margin: 0;
   display: flex;
@@ -56,7 +93,12 @@
   font-size: var(--fs-sm);
   color: var(--danger-hi);
 }
-.nh-field-error-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+.nh-field-error-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 1.05em;
+}
 
 /* Title variant: the field a record's own name is typed into. Display face and no resting well, so it reads as
    a heading; the well returns on hover and focus. */
@@ -67,5 +109,11 @@
   border-color: transparent;
   padding-inline: var(--space-2);
 }
-.nh-input--title:hover:not(:disabled), .nh-input--title:active:not(:disabled) { background: var(--surface-3); border-color: var(--line); }
-.nh-input--title:focus { background: var(--surface-3); }
+.nh-input--title:hover:not(:disabled),
+.nh-input--title:active:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--line);
+}
+.nh-input--title:focus {
+  background: var(--surface-3);
+}
