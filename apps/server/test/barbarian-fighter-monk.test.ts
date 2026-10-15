@@ -231,7 +231,7 @@ function onTheTable(definition: ActorDefinition, { fight = true } = {}): Built {
     ]
   }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
-  // The hero goes first: `attack-advantage` is gated to the bearer's own turn.
+  // The hero goes first, so its swings are on its own turn.
   if (fight)
     startEncounter(
       state,

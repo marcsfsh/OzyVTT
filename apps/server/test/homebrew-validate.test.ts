@@ -671,7 +671,9 @@ describe("riders that parse and could never take effect", () => {
       const rider = { type, ...rest, when: [{ type: "on-attack-roll" }] };
       const refused = validateForPublish("feat", feat(rider), contextWith());
       expect(refused.valid, type).toBe(false);
-      expect(messages(refused)).toContain(`gates a ${type} on "on-attack-roll", a moment the damage roll never collects`);
+      expect(messages(refused)).toContain(
+        `gates a ${type} on "on-attack-roll", a moment the damage roll never collects`
+      );
       expect(refused.issues[0].path).toEqual(["feature", "modifiers", 0]);
     }
     for (const moment of ["on-hit", "on-critical-hit", "on-damage-roll"])
