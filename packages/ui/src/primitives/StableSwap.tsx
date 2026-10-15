@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import "./StableSwap.css";
 
-export interface StableSwapProps {
+interface StableSwapProps {
   /** The text actually being shown right now. */
   current: ReactNode;
   /** The text this control shows in its other state. Reserved for width, never displayed. */

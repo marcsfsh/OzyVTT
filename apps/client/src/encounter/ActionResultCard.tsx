@@ -1,4 +1,4 @@
-import { IconWarning } from "@vtt/ui";
+import { IconRepeat, IconWarning } from "@vtt/ui";
 import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 import { ActionResultHead } from "./ActionResultHead";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
@@ -57,7 +57,7 @@ export function ActionResultCard({
             title="Resolve this action again"
             onClick={() => onAgain(again)}
           >
-            ↻ Again
+            <IconRepeat /> Again
           </button>
         )}
       </ActionResultHead>
@@ -205,8 +205,8 @@ export function ActionResultCard({
         })()}
       {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && (
         <p className="action-result-hint">
-          Remaining: {componentLabel(result.componentsRemaining, actions)} - tap <strong>↻ Again</strong> or pick the
-          next attack from the list below.
+          Remaining: {componentLabel(result.componentsRemaining, actions)} - tap <strong>Again</strong> or pick the next
+          attack from the list below.
         </p>
       )}
     </div>

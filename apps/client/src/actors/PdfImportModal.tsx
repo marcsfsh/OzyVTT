@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Modal, Button, Input } from "@vtt/ui";
+import { Modal, Button, Eyebrow, Input } from "@vtt/ui";
 import { validateDraft, type ImportResult } from "@vtt/dndbeyond-pdf";
 import { useSpellReference } from "../encounter/spells";
 import { command } from "../lib/command";
@@ -83,7 +83,7 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
   return (
     <Modal open={open} onClose={close} size="lg" className="pdf-import" ariaLabel="Import from D&D Beyond PDF">
       <div className="pdf-import-head">
-        <span className="eyebrow">IMPORT</span>
+        <Eyebrow>IMPORT</Eyebrow>
         <h2>Import from D&amp;D Beyond</h2>
         <p>Choose a character PDF exported from D&amp;D Beyond. It's read on your device — nothing is uploaded.</p>
       </div>

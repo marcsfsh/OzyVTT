@@ -4,7 +4,7 @@ import { cx } from "./util";
 import { IconX } from "./icons";
 import "./Drawer.css";
 
-export interface DrawerProps {
+interface DrawerProps {
   open: boolean;
   onClose: () => void;
   title: ReactNode;

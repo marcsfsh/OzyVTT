@@ -11,6 +11,7 @@ import {
   IconChevronRight,
   IconPencil,
   IconCopy,
+  IconPlay,
   IconTrash
 } from "@vtt/ui";
 import type { MapSelection } from "../maps/MapManager";
@@ -313,7 +314,9 @@ export function SceneGallery({
                   </div>
                   {live ? (
                     <div className="nh-card-actions">
-                      <span className="scene-live-note">● Live now</span>
+                      <span className="scene-live-note">
+                        <IconPlay /> Live now
+                      </span>
                     </div>
                   ) : (
                     <div className="nh-card-actions">

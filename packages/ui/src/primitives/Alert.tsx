@@ -3,9 +3,9 @@ import { cx } from "./util";
 import { IconCheck, IconInfo, IconWarning } from "./icons";
 import "./Alert.css";
 
-export type AlertTone = "info" | "success" | "warning" | "danger";
+type AlertTone = "info" | "success" | "warning" | "danger";
 
-export interface AlertProps {
+interface AlertProps {
   tone?: AlertTone;
   /** Optional bold lead line above the body text. */
   title?: ReactNode;

@@ -10,16 +10,16 @@ import "./AbilityScoreAllocator.css";
 
 /** How the six scores are entered: `assign` hands out values from a fixed pool (standard array, rolled scores,
     a GM formula); `spend` nudges each score against a shared budget (point buy). */
-export type AbilityAllocationMode = "assign" | "spend";
+type AbilityAllocationMode = "assign" | "spend";
 
-export interface AbilityPoolValue {
+interface AbilityPoolValue {
   id: string;
   value: number;
   /** Ability id this value is currently assigned to, if any. */
   assignedTo?: string | null;
 }
 
-export interface AbilityRowData {
+interface AbilityRowData {
   id: string;
   /** Full name, e.g. "Strength": the accessible name for the row's control. */
   label: string;
@@ -40,7 +40,7 @@ export interface AbilityRowData {
   disabled?: boolean;
 }
 
-export interface AbilityScoreAllocatorProps {
+interface AbilityScoreAllocatorProps {
   mode: AbilityAllocationMode;
   rows: readonly AbilityRowData[];
 

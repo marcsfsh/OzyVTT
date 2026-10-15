@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Button } from "@vtt/ui";
+import { Button, Eyebrow } from "@vtt/ui";
 
 type Props = { children: ReactNode };
 type State = { error: Error | null };
@@ -20,7 +20,7 @@ export class AppErrorBoundary extends Component<Props, State> {
     return (
       <main>
         <section className="card" role="alert">
-          <span className="eyebrow">SOMETHING BROKE</span>
+          <Eyebrow>SOMETHING BROKE</Eyebrow>
           <h2>The table couldn't finish loading.</h2>
           <p>{this.state.error.message}</p>
           <p>Reload the page. If this keeps happening, copy this message and the browser console error.</p>

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
-import { Button, Input, SegmentedControl, Select, Stepper } from "@vtt/ui";
+import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
+import "./dice-panel.css";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = {
   manual: "Roll",
@@ -61,8 +62,8 @@ export function DicePanel({
   const [modifier, setModifier] = useState(0);
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
-  const [feedback, setFeedback] = useState("");
   const [fallFeet, setFallFeet] = useState("");
+  const { toast } = useToast();
   // The shared per-browser dice-input preference.
   const { rollInput, bonusMode, setRollInput, setBonusMode } = useRollPreference();
   // A player's "self-only" roll is seen by the roller and the GM but no other player. "blind" hides
@@ -70,13 +71,12 @@ export function DicePanel({
   const visibilityOptions = VISIBILITY_OPTIONS[role];
   const visibilityLabel = (value: RollVisibility) => ROLL_VISIBILITY_WORD[value] ?? value;
 
+  // A roll lands in the feed below, so only what the feed cannot show gets a toast.
   const submit = async (rollFormula: string, rollPurpose: RollPurpose) => {
-    setFeedback("Rolling…");
     const result = await command("dice:roll", { formula: rollFormula, purpose: rollPurpose, visibility });
-    if (!result.ok) return setFeedback(result.message ?? "That roll didn't work. Check the formula and try again.");
-    setFeedback(
-      result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "Already rolled." : "Rolled."
-    );
+    if (!result.ok)
+      toast(result.message ?? "That roll didn't work. Check the formula and try again.", { tone: "error" });
+    else if (result.hiddenFromRoller) toast("Secret roll sent to the GM.", { tone: "success" });
   };
   // Advantage/disadvantage arm the next d20 roll only, which clears them. 5e never allows both at
   // once, so arming one while the other is armed cancels both and the player chooses again.
@@ -120,11 +120,12 @@ export function DicePanel({
   // rolls; this builds the formula and reminds about applying damage and Prone.
   const fallDice = Math.min(Math.floor((Number.parseInt(fallFeet, 10) || 0) / 10), 20);
   const rollFall = async () => {
-    if (fallDice < 1) return setFeedback("Falls under 10 feet deal no damage.");
-    setFeedback("Rolling…");
     const result = await command("dice:roll", { formula: `${fallDice}d6`, purpose: "damage", visibility });
-    if (!result.ok) return setFeedback(result.message ?? "That roll didn't work.");
-    setFeedback(`Fall damage rolled (${fallDice}d6 bludgeoning) - apply the total as damage; the faller lands Prone.`);
+    if (!result.ok) toast(result.message ?? "That roll didn't work.", { tone: "error" });
+    else
+      toast(`Fall damage rolled (${fallDice}d6 bludgeoning). Apply the total as damage; the faller lands Prone.`, {
+        tone: "success"
+      });
   };
 
   return (
@@ -239,9 +240,6 @@ export function DicePanel({
         </div>
         <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
       </details>
-      <p className="dice-feedback" aria-live="polite">
-        {feedback}
-      </p>
       {(() => {
         const rolls =
           mineActorId && rollFilter === "mine"

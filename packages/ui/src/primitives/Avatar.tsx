@@ -1,10 +1,10 @@
 import { cx } from "./util";
 import "./Avatar.css";
 
-export type AvatarSize = "sm" | "md" | "lg";
+type AvatarSize = "sm" | "md" | "lg";
 export type AvatarPresence = "online" | "away" | "offline";
 
-export interface AvatarProps {
+interface AvatarProps {
   /** Full name — drives the monogram and the accessible label. */
   name: string;
   /** Optional portrait/token image; falls back to the monogram. */

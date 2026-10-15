@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cx } from "./util";
 import "./Kbd.css";
 
-export interface KbdProps {
+interface KbdProps {
   children: ReactNode;
   className?: string;
 }

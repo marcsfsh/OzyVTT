@@ -1,0 +1,289 @@
+/* The dice panel: quick rolls, the custom formula and the recent-rolls feed. */
+
+.dice-proof h2 {
+  font-size: var(--fs-h2);
+}
+.dice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.dice-visibility {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* A `<select>`'s min-content width is its widest option, so without `min-width: 0` the question label
+   is what gets crushed. Let the control shrink (the open list shows the full text) and keep the label
+   on one line. */
+.dice-visibility select {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+.dice-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  align-items: center;
+}
+.dice-quick button {
+  padding: 0.65rem var(--space-4);
+  text-align: center;
+  background: var(--surface-2);
+}
+.dice-quick button[aria-pressed="true"] {
+  background: var(--surface-3);
+  border-color: var(--magenta);
+  color: var(--text);
+  box-shadow: var(--glow-magenta);
+}
+.dice-armed {
+  margin: 0.6rem 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--magenta-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.dice-roll-pref {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 0.6rem;
+  align-items: center;
+}
+/* The adv/disadv buttons sit beside a labelled Stepper (a label band over the controls), so `end`
+   aligns them with the stepper's control rather than stretching them over both tracks. 46px = the
+   44px stepper button plus its 1px frame; `min-height` so larger text grows rather than clips. */
+.dice-adv-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  align-items: end;
+}
+.dice-adv-row .secondary {
+  min-height: calc(var(--tap-min) + 2px);
+  padding: 0 var(--space-4);
+  text-align: center;
+}
+.dice-adv-row .secondary[aria-pressed="true"] {
+  background: var(--surface-3);
+  border-color: var(--magenta);
+  color: var(--text);
+  box-shadow: var(--glow-magenta);
+}
+.dice-custom {
+  margin-top: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+/* The disclosure row is a control: its paint reaches 44px, since the panel's rows sit too close for an
+   overhang. */
+.dice-custom summary {
+  min-height: var(--tap-min);
+  padding-block: var(--space-3);
+  cursor: pointer;
+}
+.dice-custom .dice-form {
+  margin-top: 0.8rem;
+}
+.dice-hint {
+  margin: 0.6rem 0 0;
+  font-size: var(--fs-sm);
+}
+.dice-form {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr auto;
+  gap: 0.8rem;
+  align-items: end;
+}
+.dice-form label {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.dice-form button {
+  background: var(--primary);
+  color: var(--text-on-neon);
+  border: 0;
+  text-align: center;
+  padding: 0.85rem 1.2rem;
+}
+.dice-form button:hover:not(:disabled) {
+  background: var(--magenta-hi);
+  box-shadow: var(--glow-magenta);
+}
+.roll-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: var(--space-4);
+}
+.roll-list-title {
+  margin: 0;
+  font: 800 var(--fs-xs)/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+/* The feed's scroll is `.scroll-y` in DicePanel's markup. The cap is for the standalone panel; in the
+   dock accordion `max-height: none` gives it the section. */
+.roll-list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 19rem;
+  padding-right: var(--space-1);
+  margin-top: var(--space-2);
+}
+/* `min-width: 0` stops a long roll line (e.g. a player's self-only roll with its audience text)
+   widening the single auto track past the dock: `min-width: 0` on the children alone does not lower
+   the nowrap row's min-content contribution. */
+.roll-card {
+  min-width: 0;
+  padding: var(--space-2) 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.roll-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.roll-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roll-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.16rem 0.55rem;
+  border-radius: 0;
+  font: 700 var(--fs-2xs)/1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.roll-badge--attack {
+  background: color-mix(in srgb, var(--magenta) 26%, var(--surface-3));
+}
+.roll-badge--damage {
+  background: color-mix(in srgb, var(--magenta) 15%, var(--surface-3));
+}
+.roll-badge--save {
+  background: color-mix(in srgb, var(--cyan) 26%, var(--surface-3));
+}
+.roll-badge--check {
+  background: color-mix(in srgb, var(--cyan) 15%, var(--surface-3));
+}
+.roll-badge--manual {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+.roll-readout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem var(--space-2);
+  margin-top: var(--space-2);
+}
+.dice-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.die {
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.die.discarded {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+/* The formula is free text with no length bound; with the list's x axis clipped, it breaks mid-token
+   rather than being cut off. */
+.roll-formula {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.roll-eq {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.roll-total {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  color: var(--text);
+}
+/* The newest roll's total flares once (~250ms) on arrival; the dice do not tumble, because any delay
+   before the answer is paid on every roll. Cards are keyed by roll id, so only the new card animates;
+   `:first-child` prevents every total blooming when the whole panel remounts. Reduced motion keeps
+   the colour as a static accent on the newest total. */
+@keyframes roll-flare {
+  from {
+    color: var(--magenta-hi);
+    text-shadow:
+      0 0 10px var(--magenta),
+      0 0 26px color-mix(in srgb, var(--magenta) 55%, transparent);
+  }
+  70% {
+    color: var(--magenta-hi);
+  }
+  to {
+    color: var(--text);
+    text-shadow: none;
+  }
+}
+.roll-list > .roll-card:first-child .roll-total {
+  animation: roll-flare 250ms var(--ease-settle) 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .roll-list > .roll-card:first-child .roll-total {
+    color: var(--magenta-hi);
+  }
+}
+
+@media (max-width: 760px) {
+  .dice-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .dice-form {
+    grid-template-columns: 1fr;
+  }
+}

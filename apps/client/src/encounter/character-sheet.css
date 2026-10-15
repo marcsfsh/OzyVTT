@@ -175,7 +175,6 @@
   font-style: italic;
 }
 .sheet-skill-list,
-.sheet-item-list,
 .sheet-spell-list {
   list-style: none;
   margin: var(--space-1) 0 0;
@@ -184,7 +183,6 @@
   gap: 0.3rem;
 }
 .sheet-skill-list li,
-.sheet-item-list li,
 .sheet-spell-list li {
   display: flex;
   align-items: baseline;
@@ -194,7 +192,6 @@
   color: var(--text-dim);
 }
 .sheet-skill-list li span,
-.sheet-item-list li span,
 .sheet-spell-list li span {
   color: var(--text);
 }
@@ -202,7 +199,6 @@
   color: var(--text);
   font-family: var(--font-mono);
 }
-.sheet-item-list li small,
 .sheet-spell-list li small {
   color: var(--text-muted);
   font-size: var(--fs-2xs);

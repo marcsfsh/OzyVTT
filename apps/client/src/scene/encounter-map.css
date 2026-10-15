@@ -509,7 +509,7 @@
 /* The "Saving move…" line is out of flow at every width, or mounting it on token release would steal
    height from the flex stage and make the map jump until the server acks. `bottom: 0` puts it in
    the row the feedback line reserves; the two never show together (`submitMove` clears the message
-   first). `scripts/map-stability-audit.mjs` guards this. */
+   first). The smoke suite's fight journey guards this. */
 .encounter-map-interaction .encounter-map-saving {
   position: absolute;
   z-index: 4;
@@ -768,7 +768,7 @@
    holds the status line), and the sheet below takes the rest. 14rem fits the shortest supported phone
    (375x667). In landscape it cannot fit, and `section.table` is content-sized so nothing shrinks it,
    hence the ceiling `100dvh - 204px` (tab bar 44 + sheet floor 132 + padding 20 + gap 8, from
-   styles.css; update together). */
+   shell/table-view.css; update together). */
 @media (max-width: 979px) {
   .encounter-map-interaction:not(.enlarged) {
     flex: 0 1 auto;

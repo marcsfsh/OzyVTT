@@ -7,11 +7,13 @@ import { PartyStrip } from "../actors/PartyStrip";
 import { DicePanel } from "../dice/DicePanel";
 import { DockAccordion } from "../encounter/DockAccordion";
 import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "../encounter/EncounterPanel";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import type { MapSelection } from "../maps/MapManager";
 import { ReplayShelf } from "../replay/ReplayShelf";
 import { EncounterMap } from "../scene/EncounterMap";
 import { SceneBuilder } from "../scenes/SceneBuilder";
 import { navigate, pathForGmTab } from "../router";
+import "./table-view.css";
 
 type StagedScene = GmView["combat"]["scenes"][number];
 
@@ -41,18 +43,6 @@ type TableViewProps = Readonly<
  * belongs to, and whether a side dock may be offered at all.
  */
 const PHONE_TABLE_QUERY = "(max-width: 979px)";
-function usePhoneTable(): boolean {
-  const [phone, setPhone] = useState(() => window.matchMedia?.(PHONE_TABLE_QUERY).matches ?? false);
-  useEffect(() => {
-    if (!window.matchMedia) return;
-    const query = window.matchMedia(PHONE_TABLE_QUERY);
-    const onChange = () => setPhone(query.matches);
-    onChange();
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return phone;
-}
 
 /** Where the encounter panel docks on the map, and how wide; remembered per browser. */
 function useDockPreference() {
@@ -83,7 +73,7 @@ function useDockPreference() {
 export function TableView(props: TableViewProps) {
   const { role, state, token, onOpenLog } = props;
   const gm = props.role === "gm" ? props.gm : null;
-  const phoneTable = usePhoneTable();
+  const phoneTable = useMediaQuery(PHONE_TABLE_QUERY);
   const dock = useDockPreference();
   // Docking is available whenever a map is loaded (a live scene), not only once combat starts.
   // Players' projection nulls mapAssetId until combat, so this never affects them or the viewer.

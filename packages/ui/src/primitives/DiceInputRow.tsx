@@ -8,7 +8,7 @@ import "./DiceInputRow.css";
 
 export type DiceEntryMode = "auto" | "manual";
 
-export interface DiceInputRowProps {
+interface DiceInputRowProps {
   /** What is being rolled, e.g. "Hit points (level 4)". */
   label?: ReactNode;
   /** The notation, shown in mono: "4d6 drop lowest", "1d10". */

@@ -5,7 +5,7 @@ import { IconChevron, IconWarning } from "./icons";
 import { Steps, type StepItem } from "./Steps";
 import "./WizardShell.css";
 
-export interface WizardShellProps {
+interface WizardShellProps {
   /** Flow title, e.g. "Create a character". Set in the display face, not the wordmark. */
   title: ReactNode;
   eyebrow?: ReactNode;

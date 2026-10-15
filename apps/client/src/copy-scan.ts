@@ -20,10 +20,7 @@ export interface CopyString {
   readonly text: string;
 }
 
-/**
- * The props that carry copy, in both spellings (`help="…"`, `help: "…"`). Adding one can move the
- * corpus floors in `design-conventions-shape.ts`.
- */
+/** The props that carry copy, in both spellings (`help="…"`, `help: "…"`). */
 export const COPY_PROPS = [
   "aria-label",
   "ariaLabel",

@@ -14,7 +14,7 @@ export interface SegmentedOption {
   title?: string;
 }
 
-export interface SegmentedControlProps {
+interface SegmentedControlProps {
   options: SegmentedOption[];
   value: string;
   onChange: (value: string) => void;

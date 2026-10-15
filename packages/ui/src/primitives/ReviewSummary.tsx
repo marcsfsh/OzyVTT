@@ -4,7 +4,7 @@ import { Button } from "./Button";
 import { IconPencil, IconWarning } from "./icons";
 import "./ReviewSummary.css";
 
-export interface ReviewItem {
+interface ReviewItem {
   label: ReactNode;
   value: ReactNode;
   /** Render the value in the mono/tabular face (scores, HP, AC, gold); prose stays in the body face. */
@@ -24,7 +24,7 @@ export interface ReviewSection {
   incomplete?: ReactNode;
 }
 
-export interface ReviewSummaryProps {
+interface ReviewSummaryProps {
   sections: readonly ReviewSection[];
   /** Extra content under the sections (the attribution line, a submit note). */
   children?: ReactNode;

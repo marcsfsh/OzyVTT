@@ -534,30 +534,6 @@
     animation: none;
   }
 }
-/* Health bands only, never exact numbers. */
-.viewer-health {
-  display: inline-block;
-  margin-left: 0.6rem;
-  padding: 0.1rem var(--space-2);
-  border-radius: 0;
-  font: 800 0.55em/1.6 var(--font-body);
-  letter-spacing: 0.05em;
-  vertical-align: middle;
-}
-.viewer-health-bloodied {
-  background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta));
-  color: var(--magenta-hi);
-}
-.viewer-health-down {
-  background: color-mix(in srgb, var(--surface-3) 60%, var(--danger));
-  color: var(--danger-hi);
-}
-.viewer-conditions {
-  display: block;
-  margin-top: 0.15rem;
-  color: var(--violet-hi);
-  font-size: 0.6em;
-}
 .token-health {
   stroke: var(--void);
   stroke-width: 1.5;

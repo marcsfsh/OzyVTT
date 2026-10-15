@@ -135,7 +135,7 @@ export function ActionRunner({
           .filter((part) => part.adjustment !== null)
           .map(
             (part) =>
-              `${part.amount} ${part.type} → ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
+              `${part.amount} ${part.type} became ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
           )
           .join("; ");
         onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);

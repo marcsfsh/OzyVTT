@@ -6,7 +6,7 @@ import "./Meter.css";
     the others are fixed brand fills for generic resources (spell slots, XP, uses). */
 export type MeterTone = "health" | "cyan" | "magenta" | "violet";
 
-export interface MeterProps {
+interface MeterProps {
   value: number;
   max: number;
   /** Optional label; when present the value reads "value/max" (tabular) on the right. */

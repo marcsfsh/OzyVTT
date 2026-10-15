@@ -7,6 +7,7 @@ import { PdfImportModal } from "./PdfImportModal";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-display";
 import { command } from "../lib/command";
+import "./party-roster.css";
 
 /**
  * The GM's Roster tab: create, import, approve, archive, restore and delete characters.

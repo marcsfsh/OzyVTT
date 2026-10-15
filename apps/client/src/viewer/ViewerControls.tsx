@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Eyebrow, SegmentedControl, Select } from "@vtt/ui";
+import { Button, Eyebrow, SegmentedControl, Select, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest, jsonRequest } from "../lib/api";
 import { newId } from "../lib/ids";
@@ -53,7 +53,6 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const [viewers, setViewers] = useState<readonly ViewerMetadata[]>([]);
   const [connections, setConnections] = useState<readonly ViewerConnection[]>([]);
   const [pairing, setPairing] = useState<Readonly<{ code: string; expiresAt: string }> | null>(null);
-  const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [tool, setTool] = useState<PresentationTool>("ping");
   const [draftPoints, setDraftPoints] = useState<readonly Point[]>([]);
@@ -66,6 +65,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const image = useAuthorizedMapImage(map?.assetId ?? null, gmToken);
   const previewUrl = image.status === "ready" ? image.url : null;
   const { confirm, dialog } = useConfirm();
+  const { toast } = useToast();
   const suggestedLabel = useMemo(() => measurementLabel(map, draftPoints), [map, draftPoints]);
   const viewerUrl = selectedViewerUrl || viewerUrls[0] || `${window.location.origin}/viewer.html`;
 
@@ -89,10 +89,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     );
   }, [gmToken]);
   useEffect(() => {
-    void refresh().catch((error) => setMessage(error.message));
+    void refresh().catch((error: Error) => toast(error.message, { tone: "error" }));
     const interval = window.setInterval(() => void refresh().catch(() => {}), 5_000);
     return () => window.clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, toast]);
   useEffect(() => {
     setDraftPoints([]);
     setLabelOverride("");
@@ -100,12 +100,11 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
 
   const run = async (operation: () => Promise<void>) => {
     setBusy(true);
-    setMessage("");
     try {
       await operation();
       await refresh();
     } catch (error) {
-      setMessage((error as Error).message);
+      toast((error as Error).message, { tone: "error" });
       await refresh().catch(() => {});
     } finally {
       setBusy(false);
@@ -156,14 +155,16 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
             distanceLabel: labelOverride.trim() || suggestedLabel
           }
         });
-      setMessage(tool === "focus" ? "Viewer focused." : tool === "ping" ? "Ping sent." : "Measurement shown.");
+      toast(tool === "focus" ? "Viewer focused." : tool === "ping" ? "Ping sent." : "Measurement shown.", {
+        tone: "success"
+      });
     });
   const copy = async (value: string, confirmation: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      setMessage(confirmation);
+      toast(confirmation, { tone: "success" });
     } catch {
-      setMessage("Copy was blocked by the browser. Select and copy the value manually.");
+      toast("Copy was blocked by the browser. Select and copy the value manually.", { tone: "error" });
     }
   };
 
@@ -411,11 +412,6 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                 Copy code
               </Button>
             </div>
-          )}
-          {message && (
-            <p className="viewer-control-feedback" role="status">
-              {message}
-            </p>
           )}
           {viewers.length > 0 && (
             <div className="viewer-access-list">

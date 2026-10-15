@@ -148,3 +148,6 @@
   border-color: var(--violet);
   outline-color: color-mix(in srgb, var(--violet) 42%, transparent);
 }
+.scene-prep-modal .scene-panel {
+  margin-top: 0;
+}

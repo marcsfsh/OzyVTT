@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Tabs } from "@vtt/ui";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { socket } from "../socket";
 import "./dock.css";
 
@@ -21,29 +22,13 @@ import "./dock.css";
 export type DockKey = "turn" | "dice";
 
 const MEMORY_KEY = "vtt.dock-open";
-/** Where the sidebar stops being a column. Paired with the `max-width: 979px` block in styles.css. */
+/** Where the sidebar stops being a column. Paired with the `max-width: 979px` block in shell/table-view.css. */
 const SHEET_QUERY = "(max-width: 979px)";
 
 /** In combat the fight leads. Out of combat the GM is staging one and the player is rolling. */
 function defaultFor(role: "gm" | "player", inCombat: boolean): DockKey {
   if (inCombat) return "turn";
   return role === "gm" ? "turn" : "dice";
-}
-
-/** One query string shared by the JS and CSS halves, as in `scene/MapToolbar.tsx`. */
-function useSheet(): boolean {
-  const [sheet, setSheet] = useState(
-    () => typeof window !== "undefined" && (window.matchMedia?.(SHEET_QUERY).matches ?? false)
-  );
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const query = window.matchMedia(SHEET_QUERY);
-    const onChange = () => setSheet(query.matches);
-    onChange();
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return sheet;
 }
 
 /**
@@ -117,7 +102,7 @@ export function DockAccordion({
     setOpen(defaultFor(role, inCombat));
   }, [role, inCombat]);
 
-  const sheet = useSheet();
+  const sheet = useMediaQuery(SHEET_QUERY);
   const waitingAsks = useWaitingAsks();
 
   const choose = (key: DockKey) => {

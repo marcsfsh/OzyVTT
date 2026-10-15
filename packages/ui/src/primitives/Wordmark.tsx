@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cx } from "./util";
 import "./Wordmark.css";
 
-export interface WordmarkProps extends HTMLAttributes<HTMLSpanElement> {
+interface WordmarkProps extends HTMLAttributes<HTMLSpanElement> {
   /** Brand text. Defaults to the working name; swap freely (see --brand-name). */
   children?: ReactNode;
   /** Add the optional chromatic-fringe garnish (wordmark only). */
@@ -19,7 +19,7 @@ export function Wordmark({ children = "OZYVTT", chromatic = false, className, ..
   );
 }
 
-export type EyebrowProps = HTMLAttributes<HTMLSpanElement>;
+type EyebrowProps = HTMLAttributes<HTMLSpanElement>;
 
 /** Small uppercase tracked label. Mono/flavor micro-label; size + contrast are
     governed by accessibility, not style. */

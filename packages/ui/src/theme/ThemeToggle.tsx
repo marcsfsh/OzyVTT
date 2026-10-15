@@ -1,16 +1,18 @@
+import type { ReactNode } from "react";
+import { IconThemeDark, IconThemeDusk, IconThemeLight } from "../primitives/icons";
 import { SegmentedControl } from "../primitives/SegmentedControl";
 import { THEMES, type Theme } from "./theme";
 import { useTheme } from "./useTheme";
 /* No stylesheet of its own: it is a SegmentedControl. */
 
-const THEME_META: Record<Theme, { label: string; glyph: string }> = {
-  dark: { label: "Dark", glyph: "◑" },
-  dusk: { label: "Dusk", glyph: "◐" },
-  light: { label: "Light", glyph: "○" }
+const THEME_META: Record<Theme, { label: string; icon: ReactNode }> = {
+  dark: { label: "Dark", icon: <IconThemeDark /> },
+  dusk: { label: "Dusk", icon: <IconThemeDusk /> },
+  light: { label: "Light", icon: <IconThemeLight /> }
 };
 
-export interface ThemeToggleProps {
-  /** Glyphs only, for tight headers. */
+interface ThemeToggleProps {
+  /** Icons only, for tight headers. */
   compact?: boolean;
   className?: string;
 }
@@ -28,7 +30,7 @@ export function ThemeToggle({ compact = false, className }: ThemeToggleProps) {
         const meta = THEME_META[option];
         return {
           value: option,
-          icon: meta.glyph,
+          icon: meta.icon,
           label: compact ? undefined : meta.label,
           ariaLabel: compact ? `${meta.label} theme` : undefined,
           title: `${meta.label} theme`

@@ -5,7 +5,7 @@ import { cleanup } from "@testing-library/react";
 /**
  * jsdom gaps the primitives hit, shimmed in test setup only. No stylesheet is loaded, so nothing here is
  * evidence about geometry (tap floor, label band, width reservation); tests assert the structure that produces
- * it, and the browser scripts in `scripts/` measure it.
+ * it, and the browser smoke suite (`npm run smoke`) measures it.
  */
 
 // Native <dialog>: Modal calls showModal()/close(). jsdom implements neither.

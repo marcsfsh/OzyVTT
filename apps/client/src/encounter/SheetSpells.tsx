@@ -90,7 +90,7 @@ function SpellCastControls({
           {options.map((slot) => (
             <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>
               {ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}
-              {slot > spell.level ? " ↑" : ""}
+              {slot > spell.level ? " · upcast" : ""}
             </option>
           ))}
         </select>

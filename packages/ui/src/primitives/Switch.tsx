@@ -3,7 +3,7 @@ import { cx } from "./util";
 import { StableSwap } from "./StableSwap";
 import "./Switch.css";
 
-export interface SwitchProps {
+interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   /** Optional visible label (also the accessible name); omit and pass aria-label for icon-tight rows. */

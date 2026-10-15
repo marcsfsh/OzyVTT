@@ -5,7 +5,7 @@ import { IconButton } from "./Button";
 import { IconShuffle } from "./icons";
 import "./NameField.css";
 
-export interface NameFieldProps {
+interface NameFieldProps {
   value: string;
   onChange: (value: string) => void;
   label?: ReactNode;

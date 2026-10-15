@@ -3,13 +3,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cx } from "./util";
 import "./Tabs.css";
 
-export interface TabItem {
+interface TabItem {
   id: string;
   label: ReactNode;
   disabled?: boolean;
 }
 
-export interface TabsProps {
+interface TabsProps {
   tabs: TabItem[];
   activeId: string;
   onChange: (id: string) => void;

@@ -1,5 +1,5 @@
 /* Phone tabbed sheet (below 980px): the dock sits under the map band as one `Tabs` bar over one body
-   (`DockAccordion.tsx`), inside `.table-sheet` (styles.css).
+   (`DockAccordion.tsx`), inside `.table-sheet` (shell/table-view.css).
    The tracker and the log fill the body so their own list scrolls; the log must be the scroller to
    stay pinned to its newest line. Setup and dice flow and the body scrolls them, because their
    chrome does not fit a phone body. */
@@ -152,4 +152,99 @@
   pointer-events: none;
   clip-path: var(--chamfer-cut);
   background: var(--caution);
+}
+
+/* The dock accordion: the open section takes the leftover height and scrolls inside itself; closed
+   sections cost one header row each. */
+.dock-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+}
+.dock-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Only `flex-grow` transitions, so sections trade height without animating their contents; reduced
+   motion makes it instant. */
+.dock-section.is-open {
+  flex: 1;
+  min-height: 0;
+}
+.dock-section {
+  transition: flex-grow 200ms var(--ease-settle);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-section {
+    transition: none;
+  }
+}
+.dock-section-head {
+  margin: 0;
+  font: inherit;
+}
+.dock-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 700 0.82rem/1.3 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-hover),
+    color var(--dur-hover),
+    background var(--dur-hover);
+}
+.dock-section-toggle:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.dock-section.is-open > .dock-section-head > .dock-section-toggle {
+  border-color: color-mix(in srgb, var(--magenta) 45%, var(--line));
+  background: var(--surface-3);
+  color: var(--text);
+}
+/* `display: flex` is required: as a block, the `flex: 1; min-height: 0` on `> .combat-log` is inert, the
+   body scrolls instead of the log, and the log opens at the top instead of its newest line. */
+.dock-section-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
+}
+/* Inside the accordion the panels drop their card margin, fill the section, and hand scrolling to the
+   list that grows. */
+.dock-section-body > .encounter-panel,
+.dock-section-body > .dice-proof,
+.dock-section-body > .combat-log {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* The feeds drop their fixed caps and take the rest of the section; they stay the scrolling elements,
+   which the log's pin-to-newest and the roll list's effects write to by ref. */
+.dock-section-body .roll-list,
+.dock-section-body .combat-log-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+/* The log's door, styled like a section header. It never grows; `flex: none` is stated because
+   `.dock-section` transitions `flex-grow`. */
+.dock-section--door {
+  flex: none;
 }

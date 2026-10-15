@@ -10,7 +10,7 @@ export interface ChecklistItem {
   done: boolean;
 }
 
-export interface ChecklistProps {
+interface ChecklistProps {
   items: readonly ChecklistItem[];
   /** Omit for a read-only list (see the component note). */
   onChange?: (next: readonly ChecklistItem[]) => void;

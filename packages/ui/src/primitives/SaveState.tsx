@@ -6,7 +6,7 @@ import "./SaveState.css";
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "conflict" | "error";
 
-export interface SaveStateProps {
+interface SaveStateProps {
   status: SaveStatus;
   /** Rendered only for "conflict" — the record changed on the server. */
   onReload?: () => void;

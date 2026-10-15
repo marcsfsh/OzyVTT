@@ -4,7 +4,7 @@ import "./Badge.css";
 
 export type BadgeTone = "neutral" | "primary" | "success" | "caution" | "danger" | "info" | "violet";
 
-export interface BadgeProps {
+interface BadgeProps {
   tone?: BadgeTone;
   /** Filled (solid tone) instead of the default soft outline — for counts / high-emphasis tags. */
   solid?: boolean;

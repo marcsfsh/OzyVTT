@@ -1,0 +1,138 @@
+/* The GM's Roster tab. */
+
+.party-heading,
+.party-roster-body {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+}
+.party-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1.4rem;
+}
+/* "Create a character" is this surface's door and takes the resting glow (`--nh-glow`, the Button
+   primitive's hook, which follows the chamfer). It is the only primary on the surface. */
+.party-heading-actions .nh-btn--primary {
+  --nh-glow: var(--glow-drop-magenta);
+}
+.party-queue {
+  margin: 0 0 1.6rem;
+  padding: var(--space-4) 1.1rem;
+  border: 1px solid var(--violet);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.party-section-head {
+  margin: 0 0 0.7rem;
+  font: 400 1.1rem/1.2 var(--font-display);
+  color: var(--violet-hi);
+}
+.party-queue-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.party-queue-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0.6rem var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+}
+.party-queue-name {
+  font-weight: 700;
+}
+.party-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.party-card-preview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0 0.9rem 0.6rem;
+}
+.party-card-preview-label {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.party-archived {
+  margin-top: 1.4rem;
+}
+/* A disclosure row in a stacked list grows its paint to 44px rather than overhanging its neighbours. */
+.party-archived > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.party-archived > summary:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.party-archived-note {
+  margin: 0.7rem 0;
+  font-size: 0.85rem;
+}
+.import-preview {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+.import-preview div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+}
+.import-preview dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.import-preview dd {
+  margin: 0;
+}
+.import-preview-abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) 0.9rem;
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 760px) {
+  .import-preview div {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+}
+@media (max-width: 560px) {
+  .party-queue-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .party-queue-actions .nh-btn {
+    flex: 1 1 auto;
+  }
+}

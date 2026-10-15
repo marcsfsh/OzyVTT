@@ -15,13 +15,6 @@
   margin-top: 0;
 }
 
-.token-library-feedback {
-  min-height: 1.2rem;
-  margin: 0.8rem 0 0;
-  font-size: 0.88rem;
-  color: var(--text-dim);
-}
-
 .token-library-section {
   margin-top: 1.2rem;
 }
