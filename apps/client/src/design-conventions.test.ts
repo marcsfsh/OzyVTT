@@ -59,9 +59,11 @@ const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/g
  */
 const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/encounter/ActionRunner.tsx", "→↻▴▾⚠✕✦"],
+  ["apps/client/src/encounter/ActingConsole.tsx", "⭐"],
   ["apps/client/src/encounter/CharacterSheet.tsx", "✕"],
   ["apps/client/src/encounter/DockPicker.tsx", "▦◧◨"],
-  ["apps/client/src/encounter/GmEncounterPanel.tsx", "→▶⭐"],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", "→"],
+  ["apps/client/src/encounter/GmInitiativeRow.tsx", "▶"],
   ["apps/client/src/encounter/InitiativeList.tsx", "▶"],
   ["apps/client/src/encounter/PendingDamagePrompt.tsx", "✕"],
   ["apps/client/src/encounter/PlayerActionRunner.tsx", "✕"],
@@ -173,7 +175,8 @@ const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = 
  * section). Capitalized `<Input type="number">` is the primitive and out of scope here.
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/encounter/GmEncounterPanel.tsx", 2],
+  ["apps/client/src/encounter/GmInitiativeRow.tsx", 1],
+  ["apps/client/src/encounter/RowTools.tsx", 1],
   ["apps/client/src/encounter/SheetIdentityEditor.tsx", 1],
   ["apps/client/src/encounter/SheetInventory.tsx", 1],
   ["apps/client/src/encounter/SheetVitals.tsx", 1],
@@ -425,7 +428,7 @@ const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 /** Surfaces still awaiting their move to `useToast`. */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/dice/DicePanel.tsx", 7],
-  ["apps/client/src/encounter/GmEncounterPanel.tsx", 14],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", 7],
   ["apps/client/src/encounter/InitiativePrompt.tsx", 2],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],

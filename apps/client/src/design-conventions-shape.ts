@@ -23,7 +23,7 @@ export const CONVENTION_SHAPE = {
   /** Floor on the `.tsx` files the glyph scan reads (play `.tsx` plus `packages/ui` primitives). */
   glyphSourceFloor: 80,
   /** Current glyph offenders as (file, glyph) pairs; both reach 0 once call sites use icons.tsx. */
-  glyphAllowFiles: 22,
+  glyphAllowFiles: 24,
   glyphAllowPairs: 41,
 
   // (b) raw form elements
@@ -33,7 +33,7 @@ export const CONVENTION_SHAPE = {
   rawSearchFiles: 1,
   rawSearchSites: 1,
   /** Raw `<input type="number">` sites (a naive grep misses a `className` before `type`). */
-  rawNumberFiles: 6,
+  rawNumberFiles: 7,
   rawNumberSites: 9,
 
   // (c) the second eyebrow
@@ -55,7 +55,7 @@ export const CONVENTION_SHAPE = {
   // (e) one feedback channel
   /** Inline `setMessage(…)` / `setFeedback(…)` call sites; reaches 0 once every surface uses `useToast`. */
   feedbackAllowFiles: 13,
-  feedbackAllowSites: 79,
+  feedbackAllowSites: 72,
 
   // (f) the breakpoint ladder
   /**

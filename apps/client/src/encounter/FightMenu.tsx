@@ -1,3 +1,9 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
+import { Select, Switch } from "@vtt/ui";
+import { command } from "../lib/command";
+
 /* The ⋯ fight menu's geometry: margin from viewport edges, gap from the trigger, and box width. */
 const MENU_MARGIN = 8;
 const MENU_GAP = 6;
@@ -46,4 +52,343 @@ export function placeFightMenu(
   return up
     ? { top: "auto", bottom: viewport.height - trigger.top + MENU_GAP, left, width, maxHeight: room }
     : { top: trigger.bottom + MENU_GAP, bottom: "auto", left, width, maxHeight: room };
+}
+
+/** How many monsters the menu's `Recent` disclosure offers; matches scene prep (`ScenePrepPanel.tsx`). */
+const RECENT_COUNT = 10;
+
+/**
+ * The ⋯ fight menu: the table's rules settings, the health display, the environment, adding
+ * someone to the fight and ending it. Rich content keeps it a bespoke popover rather than a Menu.
+ */
+export function FightMenu({
+  state,
+  busy,
+  run,
+  onFeedback,
+  onAddMonsters,
+  onEnd
+}: Readonly<{
+  state: GmView;
+  busy: boolean;
+  /** Runs a command with the panel's busy flag and reports `success` on the panel's feedback line. */
+  run: (operation: () => Promise<MutationResult>, success: string) => Promise<void>;
+  onFeedback: (text: string) => void;
+  onAddMonsters: () => void;
+  onEnd: () => void;
+}>) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Close the ⋯ popover on Escape (outside clicks hit the backdrop). Rich content keeps it a bespoke
+  // popover rather than a Menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  // Anchor the ⋯ menu to its button (see `placeFightMenu`), portaled out to clear the dock stacking.
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  /* The scroller is the body, not the menu: every scroll offset read and write goes here. */
+  const menuBodyRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<FightMenuPlacement | null>(null);
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const button = menuButtonRef.current,
+        menu = menuRef.current;
+      if (!button || !menu) return;
+      // Measure the natural height with the cap off, so a menu that gained room gets it back; the width
+      // is applied too, since wrapping depends on it. Uncapping zeroes the body's `scrollTop`, so it is
+      // restored, or every scroll would snap back to the top.
+      const cappedHeight = menu.style.maxHeight,
+        cappedWidth = menu.style.width,
+        scrolled = menuBodyRef.current?.scrollTop ?? 0;
+      menu.style.maxHeight = "none";
+      menu.style.width = `${menuWidthFor(window.innerWidth)}px`;
+      const natural = menu.offsetHeight;
+      menu.style.maxHeight = cappedHeight;
+      menu.style.width = cappedWidth;
+      if (menuBodyRef.current) menuBodyRef.current.scrollTop = scrolled;
+      setMenuPos(
+        placeFightMenu(button.getBoundingClientRect(), natural, {
+          width: window.innerWidth,
+          height: window.innerHeight
+        })
+      );
+    };
+    // Capture phase: the scroll that moves the trigger belongs to an ancestor scroller. The menu's own
+    // scrolls never move the trigger, so they are ignored.
+    const onScroll = (event: Event) => {
+      if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) place();
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [menuOpen]);
+  return (
+    <>
+      {/* An explicit label, since a screen reader would otherwise read `⋯`. */}
+      <button
+        type="button"
+        ref={menuButtonRef}
+        className="encounter-menu-toggle"
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
+        aria-label="Fight options"
+        title="Fight options - rules assistant, environment, roster, end"
+        onClick={() => setMenuOpen((current) => !current)}
+      >
+        ⋯
+      </button>
+      {menuOpen &&
+        createPortal(
+          <>
+            <div className="encounter-menu-backdrop" onPointerDown={() => setMenuOpen(false)} />
+            <div
+              ref={menuRef}
+              className="encounter-menu anim-dialog"
+              role="menu"
+              aria-label="Fight options"
+              style={
+                menuPos
+                  ? {
+                      top: menuPos.top,
+                      bottom: menuPos.bottom,
+                      left: menuPos.left,
+                      width: menuPos.width,
+                      maxHeight: menuPos.maxHeight
+                    }
+                  : { visibility: "hidden" }
+              }
+            >
+              {/* The frame does not scroll; this body does. `.encounter-menu::before` (plate, rim, chamfer)
+              is `inset: -1px`, so if the menu itself scrolled the plate would scroll away with the
+              content. `role="none"` keeps the wrapper out of the menu's accessibility tree. */}
+              <div ref={menuBodyRef} className="encounter-menu-body scroll-y" role="none">
+                <label className="rules-mode-control">
+                  Rules assistant
+                  <Select
+                    value={state.combat.rulesMode}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const mode = event.target.value as "strict" | "assisted" | "freeform";
+                      void command("encounter:set-rules-mode", { mode }).then((result) =>
+                        onFeedback(
+                          result.ok
+                            ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.`
+                            : (result.message ?? "The rules assistant could not be changed.")
+                        )
+                      );
+                    }}
+                  >
+                    <option value="strict">Enforce - blocks illegal moves; you can allow them</option>
+                    <option value="assisted">Advise - allows everything, leaves notes</option>
+                    <option value="freeform">Off - no checks, no prompts</option>
+                  </Select>
+                </label>
+                <label className="rules-mode-control">
+                  Players' hits
+                  <Select
+                    value={state.combat.playerDamageMode}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const mode = event.target.value as "proposal" | "direct";
+                      void command("encounter:set-player-damage-mode", { mode }).then((result) =>
+                        onFeedback(
+                          result.ok
+                            ? `Players' hits ${mode === "direct" ? "apply directly." : "wait for your OK."}`
+                            : (result.message ?? "The player damage mode could not be changed.")
+                        )
+                      );
+                    }}
+                  >
+                    <option value="proposal">GM confirms - apply on your tap</option>
+                    <option value="direct">Direct - players apply damage</option>
+                  </Select>
+                </label>
+                <label className="rules-mode-control">
+                  Player initiative
+                  <Select
+                    value={state.combat.playerInitiativeMode}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const mode = event.target.value as "immediate" | "wait";
+                      void command("encounter:set-player-initiative-mode", { mode }).then((result) =>
+                        onFeedback(
+                          result.ok
+                            ? `Player initiative ${mode === "wait" ? "waits for everyone." : "begins immediately."}`
+                            : (result.message ?? "The player initiative mode could not be changed.")
+                        )
+                      );
+                    }}
+                  >
+                    <option value="immediate">Start now - players roll in</option>
+                    <option value="wait">Wait for all players</option>
+                  </Select>
+                </label>
+                <label className="rules-mode-control">
+                  Health
+                  <Select
+                    value={state.combat.healthDisplay.style}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const style = event.target.value as "band" | "bar" | "ring" | "aura";
+                      void command("encounter:set-health-display", {
+                        style,
+                        audience: state.combat.healthDisplay.audience
+                      }).then((result) =>
+                        onFeedback(
+                          result.ok
+                            ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.`
+                            : (result.message ?? "The health display could not be changed.")
+                        )
+                      );
+                    }}
+                  >
+                    <option value="band">Status badge</option>
+                    <option value="bar">HP bar</option>
+                    <option value="ring">Health ring</option>
+                    <option value="aura">Health aura</option>
+                  </Select>
+                </label>
+                <label className="rules-mode-control">
+                  Health is
+                  <Select
+                    value={state.combat.healthDisplay.audience}
+                    disabled={busy || state.combat.healthDisplay.style === "band"}
+                    onChange={(event) => {
+                      const audience = event.target.value as "gm" | "all";
+                      void command("encounter:set-health-display", {
+                        style: state.combat.healthDisplay.style,
+                        audience
+                      }).then((result) =>
+                        onFeedback(
+                          result.ok
+                            ? `Health is ${audience === "all" ? "shown to players" : "GM only"}.`
+                            : (result.message ?? "The health display could not be changed.")
+                        )
+                      );
+                    }}
+                  >
+                    <option value="gm">GM only</option>
+                    <option value="all">Shown to players</option>
+                  </Select>
+                </label>
+                <Switch
+                  className="environment-control"
+                  label="Underwater fight"
+                  checked={state.combat.underwater}
+                  disabled={busy}
+                  onChange={(underwater) =>
+                    void command("encounter:set-environment", { underwater }).then((result) =>
+                      onFeedback(
+                        result.ok
+                          ? underwater
+                            ? "The fight is now underwater."
+                            : "The fight is no longer underwater."
+                          : (result.message ?? "The environment could not be changed.")
+                      )
+                    )
+                  }
+                />
+                <div className="menu-section" role="group" aria-label="Add to the fight">
+                  <p className="menu-section-title">Add to the fight</p>
+                  {(() => {
+                    // Archived characters are out of play and the server refuses them; `rosterActors` also drops a
+                    // launched replay's clones.
+                    const available = rosterActors(state.actors).filter(
+                      (actor) => !actor.archived && !state.combat.initiative.some((entry) => entry.actorId === actor.id)
+                    );
+                    /* Same shape as scene prep (ScenePrepPanel.tsx): characters and NPCs listed in full; monsters
+                   behind a collapsed `Recent`, ten deep, sorted by the server-stamped `lastUsedAt`. A new monster
+                   comes from `+ Add monsters`. */
+                    const addable = available.filter((actor) => actor.kind !== "monster");
+                    const recent = available
+                      .filter((actor) => actor.kind !== "player-character" && actor.lastUsedAt !== undefined)
+                      .sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0))
+                      .slice(0, RECENT_COUNT);
+                    const row = (actor: GmActor) => (
+                      <div key={actor.id} className="menu-add-row">
+                        <span>
+                          {actor.name}
+                          {actor.visibility === "gm-only" ? " · GM only" : ""}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () =>
+                                command("encounter:add-combatant", {
+                                  actorId: actor.id,
+                                  expectedRevision: state.revision
+                                }),
+                              `${actor.name} joined the fight - their token is in the staging tray.`
+                            )
+                          }
+                        >
+                          Add
+                        </button>
+                      </div>
+                    );
+                    return (
+                      <>
+                        {addable.length > 0 && <div className="menu-add-list">{addable.map(row)}</div>}
+                        {/* Only when the roster is truly exhausted; `Recent` may still offer monsters. */}
+                        {available.length === 0 && (
+                          <p className="menu-empty-note">Everyone on the roster is already in this fight.</p>
+                        )}
+                        {/* No `.scroll-y` here: `RECENT_COUNT` bounds the list, and a nested scroller inside the
+                      body's scroll region is hard to use. */}
+                        <details className="menu-add-recent">
+                          <summary>Recent{recent.length > 0 ? ` (${recent.length})` : ""}</summary>
+                          {recent.length === 0 ? (
+                            <p className="menu-empty-note">Monsters you have used before show up here.</p>
+                          ) : (
+                            <div className="menu-add-list">{recent.map(row)}</div>
+                          )}
+                        </details>
+                      </>
+                    );
+                  })()}
+                  <button
+                    type="button"
+                    className="encounter-add-monsters"
+                    disabled={busy}
+                    onClick={() => {
+                      onAddMonsters();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    + Add monsters
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="encounter-end"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEnd();
+                  }}
+                >
+                  End the fight
+                </button>
+              </div>
+            </div>
+          </>,
+          document.fullscreenElement ?? document.body
+        )}
+    </>
+  );
 }
