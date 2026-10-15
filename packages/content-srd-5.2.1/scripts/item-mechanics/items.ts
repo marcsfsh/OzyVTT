@@ -76,8 +76,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
 
-  // The curse only. Resistance to ranged-weapon damage (resistance is by damage type) and the
-  // redirect of nearby ranged attacks are not expressible.
+  // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
+  // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
+  // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
   "shield-of-missile-attraction": { cursed: true },
 
   /**
