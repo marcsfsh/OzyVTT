@@ -1,6 +1,6 @@
 import { Button, IconButton, IconX } from "@vtt/ui";
 import { CodexIcon, EntityIcon, pinSwatchVar } from "./icons";
-import type { PlayerCodexMap, PlayerCodexMarker, PlayerCodexPageSummary } from "./api";
+import type { PlayerCodexMap, PlayerCodexMarker, PlayerCodexPageSummary } from "@vtt/domain";
 
 /**
  * What a player sees on tapping a pin: its label, tags and every revealed link. Everything comes from

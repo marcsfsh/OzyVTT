@@ -3,7 +3,7 @@
  * JSX: `SidebarNav` is role-blind, so the GM and player shells differ only by which lists they pass.
  */
 
-import type { CodexSearchHit } from "./api";
+import type { CodexSearchHit } from "@vtt/domain";
 import { withQuery } from "../router";
 
 export type CodexSection =

@@ -1,7 +1,13 @@
-import { pageLinkKey, type CodexEntityType } from "@vtt/domain";
+import {
+  pageLinkKey,
+  type CodexConnection,
+  type CodexConnectionSourceKind,
+  type CodexEntityType,
+  type CodexPageConnection
+} from "@vtt/domain";
 import { freshId, stamp, write, type CodexDb } from "./db.js";
 import { getEntry } from "./journal.js";
-import { allPageMentions, mentionsFrom, mentionsOf, type CodexConnectionSourceKind } from "./links.js";
+import { allPageMentions, mentionsFrom, mentionsOf } from "./links.js";
 import { getPage, touchPages } from "./pages.js";
 import { getQuest } from "./quests.js";
 import { getSession } from "./sessions.js";
@@ -12,36 +18,6 @@ import { CodexNotFoundError, CodexValidationError, connectionLabel, connectionLa
  * mentions (`codex_links`, through `links.ts`). Nothing here is gated; the player projections are.
  */
 
-export type { CodexConnectionSourceKind } from "./links.js";
-/** One graph edge, declared or a mention (`id` null). `layer` gates players; a mention takes its text's layer. */
-export type CodexConnectionRow = Readonly<{
-  id: string | null;
-  fromKind: CodexConnectionSourceKind;
-  fromId: string;
-  toPageId: string;
-  /** The out-label ("ally of", "located in"); null for an unlabelled connection. */
-  label: string | null;
-  origin: "declared" | "mention";
-  layer: "player" | "gm";
-  createdAt: string | null;
-}>;
-/** One row of a page's Connections panel: the other end resolved, plus the edge's direction. */
-export type CodexPageConnectionRow = Readonly<{
-  id: string | null;
-  direction: "out" | "in";
-  otherKind: CodexConnectionSourceKind;
-  otherId: string;
-  /** A page title, "Session 4", a quest title, or a bounded excerpt of a journal entry's player text. */
-  otherTitle: string;
-  otherEntityType: CodexEntityType | null;
-  /** The other record's own reveal flag. GM-only on the wire; the player projection drops it. */
-  otherRevealed: boolean;
-  label: string | null;
-  origin: "declared" | "mention";
-  layer: "player" | "gm";
-  /** The heading a mention sits under; null for a declared connection. */
-  section: string | null;
-}>;
 /** One declared connection as stored. */
 export type CodexRelationshipRow = Readonly<{
   id: string;
@@ -236,10 +212,10 @@ function pagesByLinkKey(db: CodexDb): Map<string, LinkTarget> {
  * One page's Connections panel, raw and ungated. `otherRevealed` is a GM fact, weaker than the player rules;
  * never filter on it. An unlabelled declared edge absorbs a mention over the same pair.
  */
-export function connectionsForPage(db: CodexDb, pageId: string): CodexPageConnectionRow[] {
+export function connectionsForPage(db: CodexDb, pageId: string): CodexPageConnection[] {
   const page = getPage(db, pageId);
   if (!page) return [];
-  const rows: CodexPageConnectionRow[] = [];
+  const rows: CodexPageConnection[] = [];
 
   for (const direction of ["out", "in"] as const) {
     const mine = direction === "out" ? "from_page_id" : "to_page_id";
@@ -328,8 +304,8 @@ export function connectionsForPage(db: CodexDb, pageId: string): CodexPageConnec
 }
 
 /** The whole graph. Mentions collapse per `(fromKind, fromId, toPageId)`; one in player text makes a player edge. */
-export function listAllConnections(db: CodexDb): CodexConnectionRow[] {
-  const edges: CodexConnectionRow[] = listAllDeclaredConnections(db).map((relationship) => ({
+export function listAllConnections(db: CodexDb): CodexConnection[] {
+  const edges: CodexConnection[] = listAllDeclaredConnections(db).map((relationship) => ({
     id: relationship.id,
     fromKind: "page",
     fromId: relationship.fromPageId,
@@ -340,7 +316,7 @@ export function listAllConnections(db: CodexDb): CodexConnectionRow[] {
     createdAt: relationship.createdAt
   }));
   const byKey = pagesByLinkKey(db);
-  const mentions = new Map<string, CodexConnectionRow>();
+  const mentions = new Map<string, CodexConnection>();
   for (const mention of allPageMentions(db)) {
     const toPageId = byKey.get(mention.targetRef)?.id;
     if (!toPageId || (mention.sourceKind === "page" && toPageId === mention.sourceId)) continue;

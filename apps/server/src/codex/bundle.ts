@@ -1,4 +1,17 @@
-import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
+import type {
+  CodexCalendar,
+  CodexImportCounts,
+  CodexInWorldDate,
+  CodexJournalEntry,
+  CodexMap,
+  CodexMarker,
+  CodexPage,
+  CodexQuest,
+  CodexQuestObjective,
+  CodexSession,
+  CodexSettingsInput,
+  CodexStanding
+} from "@vtt/domain";
 import {
   DEFAULT_CALENDAR,
   getCalendar,
@@ -8,33 +21,24 @@ import {
   writeCalendar,
   writePublishedDate
 } from "./calendar.js";
-import {
-  insertMap,
-  insertMarker,
-  listMaps,
-  listMarkers,
-  partyMarker,
-  type CodexMapRow,
-  type CodexMarkerRow
-} from "./atlas.js";
+import { insertMap, insertMarker, listMaps, listMarkers, partyMarker } from "./atlas.js";
 import { insertRelationship, listAllDeclaredConnections, type CodexRelationshipRow } from "./connections.js";
 import { stamp, write, type CodexDb } from "./db.js";
 import { journalKind, payloadOf } from "./journal-kinds.js";
-import { insertEntry, listTimeline, type CodexJournalRow } from "./journal.js";
-import { listFolders, listFullPages, registerFolderPath, restorePage, type CodexPageRow } from "./pages.js";
-import { insertQuest, listQuests, type CodexQuestRow } from "./quests.js";
+import { insertEntry, listTimeline } from "./journal.js";
+import { listFolders, listFullPages, registerFolderPath, restorePage } from "./pages.js";
+import { insertQuest, listQuests } from "./quests.js";
 import { insertRevision, listAllRevisions, type CodexPageRevisionExportRow } from "./revisions.js";
 import { CODEX_CONTENT_TABLES } from "./schema.js";
-import { activeSessionId, insertSession, listSessions, writeActiveSession, type CodexSessionRow } from "./sessions.js";
+import { activeSessionId, insertSession, listSessions, writeActiveSession } from "./sessions.js";
 import {
   DEFAULT_AUTOSAVE_SETTINGS,
   DEFAULT_REVISION_SETTINGS,
   autosaveSettings,
   revisionSettings,
-  writeSettings,
-  type CodexSettingsInput
+  writeSettings
 } from "./settings.js";
-import { insertStanding, listStanding, type CodexStandingRow } from "./standing.js";
+import { insertStanding, listStanding } from "./standing.js";
 import {
   CodexValidationError,
   attendees,
@@ -63,8 +67,7 @@ import {
   shortLabel,
   standingValue,
   tags,
-  title,
-  type CodexQuestObjective
+  title
 } from "./validate.js";
 
 /**
@@ -76,34 +79,21 @@ import {
 export const CODEX_BUNDLE_VERSION = 1;
 
 export type CodexBundle = Readonly<{
-  pages: readonly CodexPageRow[];
-  maps: readonly CodexMapRow[];
-  markers: readonly CodexMarkerRow[];
-  journal: readonly CodexJournalRow[];
+  pages: readonly CodexPage[];
+  maps: readonly CodexMap[];
+  markers: readonly CodexMarker[];
+  journal: readonly CodexJournalEntry[];
   relationships: readonly CodexRelationshipRow[];
-  sessions: readonly CodexSessionRow[];
+  sessions: readonly CodexSession[];
   activeSessionId: string | null;
-  quests: readonly CodexQuestRow[];
+  quests: readonly CodexQuest[];
   publishedDate: CodexInWorldDate | null;
-  standing: readonly CodexStandingRow[];
+  standing: readonly CodexStanding[];
   partyMarkerId: string | null;
   calendar: CodexCalendar;
   folders: readonly string[];
   revisions: readonly CodexPageRevisionExportRow[];
   settings?: CodexSettingsInput;
-}>;
-/** What the database holds after a restore: its own row counts, never the bundle's claims. */
-export type CodexImportCounts = Readonly<{
-  pages: number;
-  folders: number;
-  maps: number;
-  markers: number;
-  journal: number;
-  connections: number;
-  sessions: number;
-  quests: number;
-  standing: number;
-  revisions: number;
 }>;
 
 export function exportBundle(db: CodexDb): CodexBundle {
@@ -253,7 +243,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     return { year: Math.trunc(parts.year), month: Math.trunc(parts.month), day: Math.trunc(parts.day) };
   };
 
-  const pages = rows("pages", (row): CodexPageRow => ({
+  const pages = rows("pages", (row): CodexPage => ({
     id: id(text(row.id)),
     title: title(text(row.title)),
     entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
@@ -272,7 +262,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     createdAt: text(row.createdAt),
     updatedAt: text(row.updatedAt)
   }));
-  const maps = rows("maps", (row): CodexMapRow => ({
+  const maps = rows("maps", (row): CodexMap => ({
     id: id(text(row.id)),
     assetId: id(text(row.assetId)),
     name: mapName(text(row.name)),
@@ -284,7 +274,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     createdAt: text(row.createdAt),
     updatedAt: text(row.updatedAt)
   }));
-  const markers = rows("markers", (row): CodexMarkerRow => ({
+  const markers = rows("markers", (row): CodexMarker => ({
     id: id(text(row.id)),
     mapId: id(text(row.mapId)),
     x: coord(real(row.x)),
@@ -302,7 +292,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     createdAt: text(row.createdAt),
     updatedAt: text(row.updatedAt)
   }));
-  const sessions = rows("sessions", (row): CodexSessionRow => ({
+  const sessions = rows("sessions", (row): CodexSession => ({
     id: id(text(row.id)),
     sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
     realDate: shortLabel(nullableText(row.realDate), 40, "date"),
@@ -317,7 +307,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     createdAt: text(row.createdAt),
     updatedAt: text(row.updatedAt)
   }));
-  const journal = rows("journal", (row): CodexJournalRow => {
+  const journal = rows("journal", (row): CodexJournalEntry => {
     const kind = journalKind(text(row.kind));
     return {
       id: id(text(row.id)),
@@ -342,7 +332,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
       updatedAt: text(row.updatedAt)
     };
   });
-  const quests = rows("quests", (row): CodexQuestRow => ({
+  const quests = rows("quests", (row): CodexQuest => ({
     id: id(text(row.id)),
     title: title(text(row.title)),
     status: questStatus(typeof row.status === "string" ? row.status : undefined),
@@ -356,7 +346,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     createdAt: text(row.createdAt),
     updatedAt: text(row.updatedAt)
   }));
-  const standing = rows("standing", (row): CodexStandingRow => ({
+  const standing = rows("standing", (row): CodexStanding => ({
     id: id(text(row.id)),
     factionPageId: id(text(row.factionPageId)),
     value: standingValue(count(row.value)),

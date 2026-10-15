@@ -3,7 +3,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { useCodexAutosave } from "./autosave";
-import { CodexRequestError, type CodexAutosaveSettings } from "./api";
+import type { CodexAutosaveSettings } from "@vtt/domain";
+import { ApiError } from "../lib/api";
 import { navigate } from "../router";
 import { goTo } from "../../test/route";
 
@@ -138,7 +139,7 @@ describe("Autosave ON", () => {
   it("reports a 409 as a conflict and asks the caller to resync, rather than as a generic error", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const onConflict = vi.fn();
-    const save = vi.fn().mockRejectedValue(new CodexRequestError("Someone else saved first.", 409, "conflict"));
+    const save = vi.fn().mockRejectedValue(new ApiError("Someone else saved first.", 409, "conflict"));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Editor settings={ON} save={save} onConflict={onConflict} />);
 
@@ -153,7 +154,7 @@ describe("Autosave ON", () => {
 
   it("reports any other failure as an error, not as a conflict", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const save = vi.fn().mockRejectedValue(new CodexRequestError("The codex request failed (500).", 500, "error"));
+    const save = vi.fn().mockRejectedValue(new ApiError("The codex request failed (500).", 500, "error"));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Editor settings={ON} save={save} />);
 

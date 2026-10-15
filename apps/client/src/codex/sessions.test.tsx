@@ -91,7 +91,7 @@ import { PlayerCodex } from "./PlayerCodex";
 import { useRecapBadge } from "./useRecapBadge";
 import { pickNextSession, sessionByNumber, sessionTitle } from "./sessions";
 import { socket } from "../socket";
-import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSession } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSession } from "@vtt/domain";
 
 /**
  * The console is a view: it fetches nothing of its own and never writes. Journal groups without a session
@@ -109,6 +109,7 @@ const SESSION = (over: Partial<CodexSession> = {}): CodexSession => ({
   recapBody: "The party crossed the mists.",
   revealedToPlayers: false,
   status: "planned",
+  sceneIds: [],
   rev: 1,
   createdAt: "2026-07-01T00:00:00.000Z",
   updatedAt: "2026-07-01T00:00:00.000Z",

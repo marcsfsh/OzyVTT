@@ -35,7 +35,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { JournalView } from "./JournalView";
 import { revealAheadOfPlayers } from "./chronicle";
-import type { CodexChronicleRecord, GmCodexCalendar } from "./api";
+import type { CodexChronicleRecord, GmCodexCalendar } from "@vtt/domain";
 
 /**
  * The prep-clock reveal warning and the publish acknowledgement. Warned tests assert the reveal call did
@@ -43,6 +43,7 @@ import type { CodexChronicleRecord, GmCodexCalendar } from "./api";
  */
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
+  eras: [],
   months: [
     { name: "Hammer", days: 30 },
     { name: "Alturiak", days: 30 }

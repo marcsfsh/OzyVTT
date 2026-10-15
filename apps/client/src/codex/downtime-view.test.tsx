@@ -21,10 +21,11 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { DowntimeView, PlayerDowntimeView } from "./DowntimeView";
-import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "./api";
+import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "@vtt/domain";
 
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
+  eras: [],
   months: [
     { name: "Hammer", days: 30 },
     { name: "Alturiak", days: 30 }

@@ -1,4 +1,5 @@
-import { questApi, sessionApi, type CodexQuest, type CodexSession } from "./api";
+import type { CodexQuest, CodexSession } from "@vtt/domain";
+import { questApi, sessionApi } from "./api";
 import type { SessionRef } from "./sessions";
 import { newId } from "../lib/ids";
 

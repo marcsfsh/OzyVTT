@@ -50,7 +50,7 @@ import { JournalView } from "./JournalView";
 import { MarkerInspector } from "./MarkerInspector";
 import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
-import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "@vtt/domain";
 
 /**
  * Maps, markers and journal entries show and edit tags, and what leaves the client already satisfies the

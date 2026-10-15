@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { NotebookTree, buildFolderTree } from "./NotebookTree";
-import type { CodexPageSummary } from "./api";
+import type { CodexPageSummary } from "@vtt/domain";
 
 /**
  * A folder row has one `Menu` trigger instead of four small icon buttons that couldn't meet the 44px tap

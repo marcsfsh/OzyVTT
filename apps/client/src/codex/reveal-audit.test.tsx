@@ -32,7 +32,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { RevealAudit } from "./RevealAudit";
-import type { CodexJournalKind, CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "./api";
+import type { CodexJournalKind, CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "@vtt/domain";
 
 const KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journal", "session", "quest", "standing"];
 

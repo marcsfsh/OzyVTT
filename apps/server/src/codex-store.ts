@@ -1,6 +1,14 @@
-import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
+import type {
+  CodexCalendar,
+  CodexImportCounts,
+  CodexInWorldDate,
+  CodexJournalEntry,
+  CodexMapKind,
+  CodexRecordKind,
+  CodexSettingsInput
+} from "@vtt/domain";
 import * as atlas from "./codex/atlas.js";
-import { exportBundle, importBundle, type CodexBundle, type CodexImportCounts } from "./codex/bundle.js";
+import { exportBundle, importBundle, type CodexBundle } from "./codex/bundle.js";
 import * as calendar from "./codex/calendar.js";
 import * as connections from "./codex/connections.js";
 import { readRevision, write, type CodexDb } from "./codex/db.js";
@@ -10,7 +18,7 @@ import * as quests from "./codex/quests.js";
 import * as receipts from "./codex/receipts.js";
 import * as revisions from "./codex/revisions.js";
 import { migrateCodex } from "./codex/schema.js";
-import { searchAll, type CodexRecordKind, type CodexSearchResult } from "./codex/search.js";
+import { searchAll, type CodexSearchRefs } from "./codex/search.js";
 import * as sessions from "./codex/sessions.js";
 import * as settings from "./codex/settings.js";
 import * as standing from "./codex/standing.js";
@@ -134,7 +142,7 @@ export class CodexStore {
   getSettings() {
     return settings.getSettings(this.#db);
   }
-  setSettings(input: settings.CodexSettingsInput) {
+  setSettings(input: CodexSettingsInput) {
     const db = this.#db;
     write(db, () => settings.writeSettings(db, input));
     return settings.getSettings(db);
@@ -167,7 +175,7 @@ export class CodexStore {
   // Search
 
   /** The player index holds only player-layer text and its rows are checked against live reveal state. */
-  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchResult {
+  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRefs {
     return searchAll(this.#db, audience, query, kinds);
   }
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
@@ -179,7 +187,7 @@ export class CodexStore {
   createMap(input: atlas.CodexMapCreateInput) {
     return atlas.createMap(this.#db, input);
   }
-  updateMap(mapId: string, input: Readonly<{ name?: string; kind?: atlas.CodexMapKind; tags?: readonly string[] }>) {
+  updateMap(mapId: string, input: Readonly<{ name?: string; kind?: CodexMapKind; tags?: readonly string[] }>) {
     return atlas.updateMap(this.#db, mapId, input);
   }
   setMapParent(mapId: string, parentMapId: string | null) {
@@ -299,7 +307,7 @@ export class CodexStore {
   createMilestone(input: journal.CodexMilestoneCreateInput) {
     return journal.createMilestone(this.#db, input);
   }
-  proposedDateFor(entry: journal.CodexJournalRow) {
+  proposedDateFor(entry: CodexJournalEntry) {
     return journal.proposedDateFor(this.#db, entry);
   }
   applyDowntime(entryId: string) {

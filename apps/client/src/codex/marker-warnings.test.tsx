@@ -8,7 +8,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { MarkerInspector } from "./MarkerInspector";
-import type { CodexMap, CodexMarker } from "./api";
+import type { CodexMap, CodexMarker } from "@vtt/domain";
 
 /**
  * A revealed pin on a hidden map is invisible to players, so the inspector warns. It stays quiet for a

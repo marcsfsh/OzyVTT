@@ -11,7 +11,7 @@ import {
 import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
-import { type CodexConnection, type PlayerCodexConnection } from "./api";
+import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
 
 /**
  * The world as a graph: pages as nodes (sized by degree), joined by one kind of edge. A deterministic

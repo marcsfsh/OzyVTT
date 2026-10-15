@@ -24,7 +24,7 @@ vi.mock("./api", async (importOriginal) => {
 import { charactersFor } from "./characters";
 import { DowntimeView } from "./DowntimeView";
 import { SessionsView } from "./SessionsView";
-import type { CodexPageSummary, CodexSession, GmCodexCalendar } from "./api";
+import type { CodexPageSummary, CodexSession, GmCodexCalendar } from "@vtt/domain";
 
 const page = (
   id: string,
@@ -57,6 +57,7 @@ const ACTORS = [
 
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
+  eras: [],
   months: [{ name: "Hammer", days: 30 }],
   weekdays: ["Sul"],
   currentDate: { year: 1491, month: 0, day: 10 },
@@ -73,6 +74,7 @@ const SESSION: CodexSession = {
   recapBody: "",
   revealedToPlayers: false,
   status: "planned",
+  sceneIds: [],
   rev: 1,
   createdAt: "2026-07-01T00:00:00.000Z",
   updatedAt: "2026-07-01T00:00:00.000Z"

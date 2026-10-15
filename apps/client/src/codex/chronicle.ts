@@ -13,17 +13,18 @@ import {
   instantToDate,
   type CodexCalendar,
   type CodexChronicleKind,
-  type CodexChronicleRecord,
-  type CodexDowntimeSummary,
+  type CodexDowntimePayload,
   type CodexInWorldDate,
   type CodexJournalKind,
   type CodexJournalPayload,
   type CodexMilestonePayload,
-  type CodexPlayerChroniclePayload,
   type CodexQuestStatus,
-  type CodexStandingChange,
-  type GmCodexCalendar
-} from "./api";
+  type GmCodexCalendar,
+  type PlayerCodexDowntimePayload,
+  type PlayerCodexJournalPayload,
+  type PlayerCodexQuestEventPayload,
+  type PlayerCodexStandingPayload
+} from "@vtt/domain";
 
 /** How a record says when it happened, in order of preference. Shared by both journals and the dashboard. */
 export type ChronicleWhen = Readonly<{
@@ -82,14 +83,6 @@ export const QUEST_EVENT_VERB: Readonly<Record<CodexQuestStatus, string>> = {
 export function questEventLabel(payload: Readonly<{ status: CodexQuestStatus }>, questTitle: string | null): string {
   return `${questTitle?.trim() || "A quest"} ${QUEST_EVENT_VERB[payload.status]}`;
 }
-/** The kind gate for a quest-history payload, like `downtimeOf`. */
-export function questEventOf(
-  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
-): Readonly<{ questId: string | null; status: CodexQuestStatus }> | null {
-  const payload = record.payload;
-  return record.kind === "quest" && payload !== null && "questId" in payload ? payload : null;
-}
-
 // ----- What a standing number means -----
 
 /** Worst to best. `uninvested` sits at zero: the faction has taken no position yet. */
@@ -180,31 +173,30 @@ export function standingMeterTone(value: number): MeterTone {
 
 /**
  * The only sanctioned way to open a chronicle payload. The `in` check narrows the union and also guards
- * against a row whose kind and payload disagree. `downtimeOf` is generic because the GM's downtime
- * carries `applied` and the player's does not.
+ * against a row whose kind and payload disagree. The GM's downtime carries `applied` and the player's does not.
  */
 export type ChroniclePayloadRef<P> = Readonly<{ kind: CodexChronicleKind; payload: P | null }>;
-/** Satisfied by both projections (the player's id is nullable). */
-export type CodexQuestEventRef = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
+type AnyPayloadRef = ChroniclePayloadRef<CodexJournalPayload | PlayerCodexJournalPayload>;
 
-export function downtimeOf<P extends CodexDowntimeSummary>(
-  record: ChroniclePayloadRef<P | CodexMilestonePayload | CodexStandingChange | CodexQuestEventRef>
-): P | null {
+export function downtimeOf(record: ChroniclePayloadRef<CodexJournalPayload>): CodexDowntimePayload | null;
+export function downtimeOf(record: AnyPayloadRef): PlayerCodexDowntimePayload | null;
+export function downtimeOf(record: AnyPayloadRef): PlayerCodexDowntimePayload | null {
   const payload = record.payload;
   return record.kind === "downtime" && payload !== null && "days" in payload ? payload : null;
 }
-export function milestoneOf(
-  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
-): CodexMilestonePayload | null {
+export function milestoneOf(record: AnyPayloadRef): CodexMilestonePayload | null {
   const payload = record.payload;
   return record.kind === "milestone" && payload !== null && "level" in payload ? payload : null;
 }
 /** Returns the wide shape with a nullable `factionPageId`, since a player's copy nulls an unrevealed faction. */
-export function standingOf(
-  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
-): CodexStandingChange | null {
+export function standingOf(record: AnyPayloadRef): PlayerCodexStandingPayload | null {
   const payload = record.payload;
   return record.kind === "standing" && payload !== null && "delta" in payload ? payload : null;
+}
+/** The wide shape with a nullable `questId`, since a player's copy nulls an unrevealed quest. */
+export function questEventOf(record: AnyPayloadRef): PlayerCodexQuestEventPayload | null {
+  const payload = record.payload;
+  return record.kind === "quest" && payload !== null && "questId" in payload ? payload : null;
 }
 
 export function milestoneSummaryLabel(payload: CodexMilestonePayload): string {
@@ -214,7 +206,7 @@ export function milestoneSummaryLabel(payload: CodexMilestonePayload): string {
 }
 
 /** The caller supplies the faction name, or null if it cannot resolve the page. */
-export function standingChangeLabel(payload: CodexStandingChange, factionName: string | null): string {
+export function standingChangeLabel(payload: PlayerCodexStandingPayload, factionName: string | null): string {
   const delta = Math.trunc(payload.delta);
   const moved = delta === 0 ? "unchanged" : `${delta > 0 ? "up" : "down"} ${Math.abs(delta)}`;
   const who = factionName?.trim() || "A faction";
@@ -327,8 +319,7 @@ export function revealAheadOfPlayers(
 
 /** One row's text on a summary surface. Standing, milestone and quest records carry their meaning in the payload, not prose. */
 export function chronicleRowSummary(
-  record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> &
-    Readonly<{ text: string; gmText?: string | null }>
+  record: AnyPayloadRef & Readonly<{ text: string; gmText?: string | null }>
 ): string {
   // A quest-history record has no prose; the caller resolves the quest title where it can.
   const questEvent = questEventOf(record);
@@ -343,7 +334,7 @@ export function chronicleRowSummary(
 }
 
 /** Who, what and how long. Blank halves are dropped. */
-export function downtimeSummaryLabel(payload: CodexDowntimeSummary): string {
+export function downtimeSummaryLabel(payload: PlayerCodexDowntimePayload): string {
   const span = `${payload.days} ${payload.days === 1 ? "day" : "days"}`;
   const said = [payload.who.trim(), payload.activity.trim()].filter(Boolean).join(" · ");
   return said ? `${said} · ${span}` : span;
@@ -365,18 +356,19 @@ export const CHRONICLE_LENSES: ReadonlyArray<Readonly<{ id: ChronicleLens; label
   { id: "session", label: "By session" }
 ];
 
-export type ChronicleGroup = Readonly<{ key: string; label: string; records: readonly CodexChronicleRecord[] }>;
+export type ChronicleGroup<R> = Readonly<{ key: string; label: string; records: readonly R[] }>;
+type Groupable = Readonly<{ sessionNumber: number | null; calendarInstant: number | null }>;
 
 /**
  * Both lenses read earliest first, with keyless records last. Within a group the server's order is kept.
- * By session, an `event` page always lands in "No session yet".
+ * By session, an `event` page always lands in "No session yet". Both journals group this way.
  */
-export function groupChronicle(
-  records: readonly CodexChronicleRecord[],
+export function groupChronicle<R extends Groupable>(
+  records: readonly R[],
   lens: ChronicleLens,
   calendar: CodexCalendar | null
-): ChronicleGroup[] {
-  const buckets = new Map<number | null, CodexChronicleRecord[]>();
+): ChronicleGroup<R>[] {
+  const buckets = new Map<number | null, R[]>();
   for (const record of records) {
     const key =
       lens === "session"

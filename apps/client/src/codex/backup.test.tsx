@@ -21,7 +21,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { BackupView } from "./BackupView";
-import { CodexRequestError } from "./api";
+import { ApiError } from "../lib/api";
 
 /**
  * The restore confirm, tested as a safety device: every section is listed with a count (a missing one is
@@ -136,11 +136,7 @@ describe("The restore confirmation states what the file holds (D16)", () => {
   it("quotes the server's refusal verbatim, because it names the section and the row", async () => {
     const user = userEvent.setup();
     importBundle.mockRejectedValue(
-      new CodexRequestError(
-        'That backup\'s "pages" entry 37 is not valid: Codex id is malformed.',
-        400,
-        "validation_failed"
-      )
+      new ApiError('That backup\'s "pages" entry 37 is not valid: Codex id is malformed.', 400, "validation_failed")
     );
     renderBackup();
     await choose(user, bundleFile("bad.json", { codex: { pages: [{ id: "!" }] } }));

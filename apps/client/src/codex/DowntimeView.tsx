@@ -2,17 +2,19 @@ import { useMemo, useState } from "react";
 import { Alert, Badge, Button, Combobox, Field, Input, NumberField, Skeleton } from "@vtt/ui";
 import {
   formatWorldDate,
-  journalApi,
   type CodexChronicleRecord,
   type CodexDowntimePayload,
   type CodexInWorldDate,
   type CodexPageSummary,
   type GmCodexCalendar,
-  type PlayerCodexChronicleRecord
-} from "./api";
+  type PlayerCodexChronicleRecord,
+  type PlayerCodexDowntimePayload
+} from "@vtt/domain";
+import { journalApi } from "./api";
 import { ARCHIVED_META, charactersFor, type ArchivableActor } from "./characters";
 import { deadlinesPassedBy, downtimeOf, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
 import { CodexEditor } from "./CodexEditor";
+import { RecordRow } from "./RecordRow";
 import { CodexIcon, EntityIcon } from "./icons";
 import { newId } from "../lib/ids";
 
@@ -36,6 +38,69 @@ export type DowntimeViewProps = Readonly<{
 }>;
 
 type DowntimeRow = Readonly<{ record: CodexChronicleRecord; payload: CodexDowntimePayload }>;
+
+type DowntimeRecordRef = Readonly<{ id: string; inWorldLabel: string | null; realDate: string | null }>;
+type DowntimeTotal = Readonly<{ key: string; name: string; pageId: string | null; days: number; last: string | null }>;
+
+/** Days per person, most first. A linked character page wins over the typed name, and names the row. */
+function downtimeTotals(
+  rows: ReadonlyArray<Readonly<{ record: DowntimeRecordRef; payload: PlayerCodexDowntimePayload }>>,
+  titles: ReadonlyMap<string, string>
+): DowntimeTotal[] {
+  const byPerson = new Map<
+    string,
+    { key: string; name: string; pageId: string | null; days: number; last: string | null }
+  >();
+  for (const { record, payload } of rows) {
+    const key = payload.characterPageId ?? (payload.who.trim().toLowerCase() || "unnamed");
+    const name = (payload.characterPageId && titles.get(payload.characterPageId)) || payload.who.trim() || "Unnamed";
+    const when = record.inWorldLabel ?? record.realDate ?? null;
+    const existing = byPerson.get(key);
+    if (existing) {
+      existing.days += payload.days;
+      existing.last = when ?? existing.last;
+    } else byPerson.set(key, { key, name, pageId: payload.characterPageId, days: payload.days, last: when });
+  }
+  return [...byPerson.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+}
+
+/** The totals table both audiences read. */
+function DowntimeTotalsTable({
+  totals,
+  onOpenPage
+}: Readonly<{ totals: readonly DowntimeTotal[]; onOpenPage: (pageId: string) => void }>) {
+  return (
+    <table className="nh-table codex-downtime-totals">
+      <thead>
+        <tr>
+          <th scope="col">Who</th>
+          <th scope="col">Days</th>
+          <th scope="col">Last downtime</th>
+        </tr>
+      </thead>
+      <tbody>
+        {totals.map((row) => (
+          <tr key={row.key}>
+            <th scope="row">
+              {row.pageId ? (
+                <button type="button" className="codex-md-link" onClick={() => onOpenPage(row.pageId!)}>
+                  {row.name}
+                </button>
+              ) : (
+                row.name
+              )}
+            </th>
+            <td>{row.days}</td>
+            <td>{row.last ?? "None"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+const titlesOf = (pages: ReadonlyArray<Readonly<{ id: string; title: string }>>) =>
+  new Map(pages.map((page) => [page.id, page.title]));
 
 export function DowntimeView({
   gmToken,
@@ -66,7 +131,7 @@ export function DowntimeView({
   const rows = useMemo<readonly DowntimeRow[]>(
     () =>
       records
-        .map((record) => ({ record, payload: downtimeOf<CodexDowntimePayload>(record) }))
+        .map((record) => ({ record, payload: downtimeOf(record) }))
         .filter((row): row is DowntimeRow => row.payload !== null),
     [records]
   );
@@ -84,29 +149,13 @@ export function DowntimeView({
   );
   /** `Combobox` silently truncates at 8 by default; offer the whole party (the list scrolls). */
   const characterLimit = Math.max(characterOptions.length, 1);
-  const pageTitle = (id: string | null) => (id ? (pages.find((page) => page.id === id)?.title ?? null) : null);
+  const titles = useMemo(() => titlesOf(pages), [pages]);
+  const pageTitle = (id: string | null) => (id ? (titles.get(id) ?? null) : null);
   /** A value that names a character page is a link; anything else is the free-text name the GM typed. */
   const whoPageId = whoValue && characterOptions.some((option) => option.id === whoValue) ? whoValue : null;
   const who = whoPageId ? "" : (whoValue ?? "");
 
-  /** Totals by person. `characterPageId` wins over `who`. */
-  const totals = useMemo(() => {
-    const map = new Map<
-      string,
-      { key: string; name: string; pageId: string | null; days: number; last: string | null }
-    >();
-    for (const { record, payload } of rows) {
-      const key = payload.characterPageId ?? (payload.who.trim().toLowerCase() || "—");
-      const name = pageTitle(payload.characterPageId) ?? (payload.who.trim() || "Unnamed");
-      const existing = map.get(key);
-      const when = record.inWorldLabel ?? record.realDate ?? null;
-      if (existing) {
-        existing.days += payload.days;
-        existing.last = when ?? existing.last;
-      } else map.set(key, { key, name, pageId: payload.characterPageId, days: payload.days, last: when });
-    }
-    return [...map.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
-  }, [rows, pages]);
+  const totals = useMemo(() => downtimeTotals(rows, titles), [rows, titles]);
 
   const proposed = downtimeProposedDate(calendar, days);
   const log = async () => {
@@ -295,32 +344,7 @@ export function DowntimeView({
         {totals.length === 0 ? (
           <p className="codex-list-empty">No downtime recorded yet.</p>
         ) : (
-          <table className="nh-table codex-downtime-totals">
-            <thead>
-              <tr>
-                <th scope="col">Who</th>
-                <th scope="col">Days</th>
-                <th scope="col">Last downtime</th>
-              </tr>
-            </thead>
-            <tbody>
-              {totals.map((row) => (
-                <tr key={row.key}>
-                  <th scope="row">
-                    {row.pageId ? (
-                      <button type="button" className="codex-md-link" onClick={() => onOpenPage(row.pageId!)}>
-                        {row.name}
-                      </button>
-                    ) : (
-                      row.name
-                    )}
-                  </th>
-                  <td>{row.days}</td>
-                  <td>{row.last ?? "None"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DowntimeTotalsTable totals={totals} onOpenPage={onOpenPage} />
         )}
       </section>
 
@@ -373,9 +397,12 @@ export function DowntimeView({
                   </div>
                 ) : (
                   <>
-                    <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
-                      <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
-                      <span className="codex-list-title">{downtimeSummaryLabel(payload)}</span>
+                    <RecordRow
+                      iconId="campfire"
+                      title={downtimeSummaryLabel(payload)}
+                      when={record.inWorldLabel ?? record.realDate}
+                      onClick={() => onOpenEntry(record.id)}
+                    >
                       {payload.characterPageId ? (
                         <Badge tone="info">{pageTitle(payload.characterPageId) ?? "Linked"}</Badge>
                       ) : (
@@ -386,8 +413,7 @@ export function DowntimeView({
                       ) : (
                         <Badge tone="caution">Pending</Badge>
                       )}
-                      <span className="codex-campaign-recentwhen">{record.inWorldLabel ?? record.realDate ?? ""}</span>
-                    </button>
+                    </RecordRow>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -430,30 +456,13 @@ export function PlayerDowntimeView({
     () =>
       records
         .map((record) => ({ record, payload: downtimeOf(record) }))
-        .filter(
-          (row): row is { record: PlayerCodexChronicleRecord; payload: NonNullable<ReturnType<typeof downtimeOf>> } =>
-            row.payload !== null
+        .filter((row): row is { record: PlayerCodexChronicleRecord; payload: PlayerCodexDowntimePayload } =>
+          Boolean(row.payload)
         ),
     [records]
   );
-  const pageTitle = (id: string | null) => (id ? (pages.find((page) => page.id === id)?.title ?? null) : null);
-  const totals = useMemo(() => {
-    const map = new Map<
-      string,
-      { key: string; name: string; pageId: string | null; days: number; last: string | null }
-    >();
-    for (const { record, payload } of rows) {
-      const key = payload.characterPageId ?? (payload.who.trim().toLowerCase() || "—");
-      const name = pageTitle(payload.characterPageId) ?? (payload.who.trim() || "Unnamed");
-      const existing = map.get(key);
-      const when = record.inWorldLabel ?? record.realDate ?? null;
-      if (existing) {
-        existing.days += payload.days;
-        existing.last = when ?? existing.last;
-      } else map.set(key, { key, name, pageId: payload.characterPageId, days: payload.days, last: when });
-    }
-    return [...map.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
-  }, [rows, pages]);
+  const titles = useMemo(() => titlesOf(pages), [pages]);
+  const totals = useMemo(() => downtimeTotals(rows, titles), [rows, titles]);
 
   if (rows.length === 0)
     return (
@@ -466,43 +475,19 @@ export function PlayerDowntimeView({
     <div className="codex-downtime">
       <section className="codex-downtime-section">
         <h3 className="codex-campaign-h">Totals</h3>
-        <table className="nh-table codex-downtime-totals">
-          <thead>
-            <tr>
-              <th scope="col">Who</th>
-              <th scope="col">Days</th>
-              <th scope="col">Last downtime</th>
-            </tr>
-          </thead>
-          <tbody>
-            {totals.map((row) => (
-              <tr key={row.key}>
-                <th scope="row">
-                  {row.pageId ? (
-                    <button type="button" className="codex-md-link" onClick={() => onOpenPage(row.pageId!)}>
-                      {row.name}
-                    </button>
-                  ) : (
-                    row.name
-                  )}
-                </th>
-                <td>{row.days}</td>
-                <td>{row.last ?? "None"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DowntimeTotalsTable totals={totals} onOpenPage={onOpenPage} />
       </section>
       <section className="codex-downtime-section">
         <h3 className="codex-campaign-h">History</h3>
         <ul className="codex-downtime-history">
           {rows.map(({ record, payload }) => (
             <li key={record.id} className="codex-downtime-historyrow">
-              <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
-                <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{downtimeSummaryLabel(payload)}</span>
-                <span className="codex-campaign-recentwhen">{record.inWorldLabel ?? record.realDate ?? ""}</span>
-              </button>
+              <RecordRow
+                iconId="campfire"
+                title={downtimeSummaryLabel(payload)}
+                when={record.inWorldLabel ?? record.realDate}
+                onClick={() => onOpenEntry(record.id)}
+              />
             </li>
           ))}
         </ul>

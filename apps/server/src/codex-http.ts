@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
+import type { CodexConnection } from "@vtt/domain";
 import {
   apiErrorHandler,
   bearerToken,
@@ -153,7 +154,7 @@ function codexError(response: Response, error: unknown, currentRevision?: () => 
 }
 
 /** A declared connection in the graph's edge shape, as the connection writes answer. */
-function declaredConnection(relationship: CodexRelationshipRow) {
+function declaredConnection(relationship: CodexRelationshipRow): CodexConnection {
   return {
     id: relationship.id,
     fromKind: "page" as const,

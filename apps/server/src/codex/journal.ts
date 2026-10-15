@@ -1,4 +1,12 @@
-import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
+import type {
+  CodexCalendar,
+  CodexDowntimePayload,
+  CodexInWorldDate,
+  CodexJournalEntry,
+  CodexJournalKind,
+  CodexJournalPayload,
+  CodexPage
+} from "@vtt/domain";
 import {
   campaignInstant,
   dateForInstant,
@@ -10,18 +18,9 @@ import {
   type ResolvedDate
 } from "./calendar.js";
 import { freshId, stamp, write, type CodexDb } from "./db.js";
-import {
-  downtimePayload,
-  downtimePayloadOf,
-  journalKind,
-  milestonePayload,
-  payloadOf,
-  type CodexDowntimePayload,
-  type CodexEntryPayload,
-  type CodexJournalKind
-} from "./journal-kinds.js";
+import { downtimePayload, downtimePayloadOf, journalKind, milestonePayload, payloadOf } from "./journal-kinds.js";
 import { rebuildLinks, scrubLinks } from "./links.js";
-import { getPage, listDatedEventPages, type CodexPageRow } from "./pages.js";
+import { getPage, listDatedEventPages } from "./pages.js";
 import { indexEntry, unindex } from "./search.js";
 import { activeSessionId, requireSession } from "./sessions.js";
 import {
@@ -42,31 +41,6 @@ import {
  * history records quests and standing write. Each entry has player text, optional GM text and a reveal flag.
  */
 
-export type CodexJournalRow = Readonly<{
-  id: string;
-  playerText: string;
-  gmText: string | null;
-  revealedToPlayers: boolean;
-  attachMarkerId: string | null;
-  attachPageId: string | null;
-  kind: CodexJournalKind;
-  sourceEncounterId: number | null;
-  /** The session this entry is filed under, or null. */
-  sessionId: string | null;
-  /** The joined session's live number, else the number a deleted revealed session left behind. */
-  sessionNumber: number | null;
-  realDate: string | null;
-  inWorldLabel: string | null;
-  calendarInstant: number | null;
-  /** The literal date the GM entered, so instants can be recomputed when the calendar changes. */
-  inWorldDate: CodexInWorldDate | null;
-  sortKey: number;
-  tags: readonly string[];
-  /** Kind-specific structured data; `null` for kinds without a payload. */
-  payload: CodexEntryPayload | null;
-  createdAt: string;
-  updatedAt: string;
-}>;
 /** `sessionId` omitted on create: the active session; `null`: none; an unknown id: not-found. */
 export type CodexJournalCreateInput = Readonly<{
   playerText?: string;
@@ -96,8 +70,8 @@ export type CodexCombatEntryInput = Readonly<{
   revealedToPlayers?: boolean;
 }>;
 /** Raw store rows; flattening and gating happen in `codex-projections.ts`. */
-export type CodexChronicleRecord =
-  Readonly<{ kind: "entry"; entry: CodexJournalRow }> | Readonly<{ kind: "event"; page: CodexPageRow }>;
+export type CodexChronicleSource =
+  Readonly<{ kind: "entry"; entry: CodexJournalEntry }> | Readonly<{ kind: "event"; page: CodexPage }>;
 
 /** Everything one journal INSERT writes. `payload` is required so each kind's creator says what it carries. */
 export type EntryFields = Readonly<{
@@ -112,7 +86,7 @@ export type EntryFields = Readonly<{
   realDate: string | null;
   dated: ResolvedDate;
   tags?: readonly string[];
-  payload: CodexEntryPayload | null;
+  payload: CodexJournalPayload | null;
 }>;
 
 const JOURNAL_COLUMNS =
@@ -144,7 +118,7 @@ type JournalRowRaw = {
   updated_at: string;
 };
 
-function toEntry(row: JournalRowRaw): CodexJournalRow {
+function toEntry(row: JournalRowRaw): CodexJournalEntry {
   const kind = journalKind(row.kind);
   return {
     id: row.id,
@@ -226,7 +200,7 @@ export function writeEntry(db: CodexDb, fields: EntryFields): string {
   return entryId;
 }
 
-function createOne(db: CodexDb, fields: EntryFields): CodexJournalRow {
+function createOne(db: CodexDb, fields: EntryFields): CodexJournalEntry {
   const entryId = write(db, () => writeEntry(db, fields));
   return getEntry(db, entryId)!;
 }
@@ -253,13 +227,13 @@ function authoredFields(db: CodexDb, input: CodexJournalCreateInput, dated: Reso
   };
 }
 
-export function createEntry(db: CodexDb, input: CodexJournalCreateInput): CodexJournalRow {
+export function createEntry(db: CodexDb, input: CodexJournalCreateInput): CodexJournalEntry {
   const dated = resolveDate(db, input.inWorldDate, input.inWorldLabel);
   return createOne(db, { ...authoredFields(db, input, dated), kind: "note", payload: null });
 }
 
 /** A logged encounter, dated at the GM's clock and filed under the active session. */
-export function appendCombatEntry(db: CodexDb, input: CodexCombatEntryInput): CodexJournalRow {
+export function appendCombatEntry(db: CodexDb, input: CodexCombatEntryInput): CodexJournalEntry {
   return createOne(db, {
     playerText: entryText(input.playerText),
     gmText: entryGmText(input.gmText),
@@ -276,14 +250,14 @@ export function appendCombatEntry(db: CodexDb, input: CodexCombatEntryInput): Co
 }
 
 /** A deadline needs a structured date, since a label cannot be compared with a clock. `fired` is derived. */
-export function createDeadline(db: CodexDb, input: CodexJournalCreateInput): CodexJournalRow {
+export function createDeadline(db: CodexDb, input: CodexJournalCreateInput): CodexJournalEntry {
   const dated = resolveDate(db, input.inWorldDate, input.inWorldLabel);
   if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date - the date is when it fires.");
   return createOne(db, { ...authoredFields(db, input, dated), kind: "deadline", payload: null });
 }
 
 /** Never moves the clock (`applyDowntime` does). Dated at the GM's clock unless given a date. */
-export function createDowntime(db: CodexDb, input: CodexDowntimeCreateInput): CodexJournalRow {
+export function createDowntime(db: CodexDb, input: CodexDowntimeCreateInput): CodexJournalEntry {
   const payload = downtimePayload(input.downtime);
   // A linked page must exist, or the tracker would show a dead link. Its type is not checked: NPCs and
   // hirelings may have downtime too.
@@ -294,14 +268,14 @@ export function createDowntime(db: CodexDb, input: CodexDowntimeCreateInput): Co
 }
 
 /** Level history is a journal record, not a table: the timeline already orders it. */
-export function createMilestone(db: CodexDb, input: CodexMilestoneCreateInput): CodexJournalRow {
+export function createMilestone(db: CodexDb, input: CodexMilestoneCreateInput): CodexJournalEntry {
   const payload = milestonePayload(input.milestone);
   const dated = resolveDate(db, input.inWorldDate ?? getCalendar(db).currentDate ?? null, input.inWorldLabel);
   return createOne(db, { ...authoredFields(db, input, dated), kind: "milestone", payload });
 }
 
 /** Where `applyDowntime` would move the clock, so the GM confirms a date first. Null when not applicable. */
-export function proposedDateFor(db: CodexDb, entry: CodexJournalRow): CodexInWorldDate | null {
+export function proposedDateFor(db: CodexDb, entry: CodexJournalEntry): CodexInWorldDate | null {
   const payload = downtimePayloadOf(entry);
   if (!payload || payload.applied) return null;
   const from = campaignInstant(db);
@@ -312,7 +286,7 @@ export function proposedDateFor(db: CodexDb, entry: CodexJournalRow): CodexInWor
 export function applyDowntime(
   db: CodexDb,
   entryId: string
-): Readonly<{ entry: CodexJournalRow; calendar: CodexCalendar }> {
+): Readonly<{ entry: CodexJournalEntry; calendar: CodexCalendar }> {
   const existing = getEntry(db, entryId);
   if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
   if (existing.kind !== "downtime") throw new CodexValidationError("Only a downtime record can pass time.");
@@ -333,7 +307,7 @@ export function applyDowntime(
   return { entry: getEntry(db, entryId)!, calendar: getCalendar(db) };
 }
 
-export function updateEntry(db: CodexDb, entryId: string, input: CodexJournalUpdateInput): CodexJournalRow {
+export function updateEntry(db: CodexDb, entryId: string, input: CodexJournalUpdateInput): CodexJournalEntry {
   const stored = entryRow(db, entryId);
   if (!stored) throw new CodexNotFoundError("That journal entry no longer exists.");
   const existing = toEntry(stored);
@@ -398,7 +372,7 @@ export function updateEntry(db: CodexDb, entryId: string, input: CodexJournalUpd
 /** Only `who`, `activity` and `characterPageId` are editable; `applied` and `days` are kept. */
 function editedDowntime(
   db: CodexDb,
-  existing: CodexJournalRow,
+  existing: CodexJournalEntry,
   edit: NonNullable<CodexJournalUpdateInput["downtime"]>
 ): CodexDowntimePayload {
   if (existing.kind !== "downtime") throw new CodexValidationError("Only downtime entries carry downtime details.");
@@ -423,7 +397,7 @@ function editedDowntime(
   };
 }
 
-export function setEntryRevealed(db: CodexDb, entryId: string, revealed: boolean): CodexJournalRow {
+export function setEntryRevealed(db: CodexDb, entryId: string, revealed: boolean): CodexJournalEntry {
   if (!entryRow(db, entryId)) throw new CodexNotFoundError("That journal entry no longer exists.");
   write(db, () => {
     db.database
@@ -474,13 +448,13 @@ export function unfileSession(db: CodexDb, sessionId: string, keepNumber: number
     .run(keepNumber, sessionId);
 }
 
-export function getEntry(db: CodexDb, entryId: string): CodexJournalRow | null {
+export function getEntry(db: CodexDb, entryId: string): CodexJournalEntry | null {
   const row = entryRow(db, entryId);
   return row ? toEntry(row) : null;
 }
 
 /** By in-world instant (undated last), then session number, then creation time. */
-export function listTimeline(db: CodexDb): CodexJournalRow[] {
+export function listTimeline(db: CodexDb): CodexJournalEntry[] {
   return (
     db.database
       .prepare(
@@ -494,7 +468,7 @@ export function listTimeline(db: CodexDb): CodexJournalRow[] {
 export function listEntriesFor(
   db: CodexDb,
   attach: Readonly<{ markerId?: string; pageId?: string }>
-): CodexJournalRow[] {
+): CodexJournalEntry[] {
   const pinnedTo = (column: "attach_marker_id" | "attach_page_id", target: string) =>
     (
       db.database
@@ -523,7 +497,7 @@ type ChronicleSortKey = Readonly<{
   createdAt: string;
   id: string;
 }>;
-function chronicleSortKey(record: CodexChronicleRecord): ChronicleSortKey {
+function chronicleSortKey(record: CodexChronicleSource): ChronicleSortKey {
   return record.kind === "entry"
     ? {
         calendarInstant: record.entry.calendarInstant,
@@ -552,8 +526,8 @@ function compareChronicle(a: ChronicleSortKey, b: ChronicleSortKey): number {
 }
 
 /** Entries and dated event pages in one order. Ungated by design; `projectPlayerChronicleRecord` gates. */
-export function listChronicle(db: CodexDb): CodexChronicleRecord[] {
-  const records: CodexChronicleRecord[] = [
+export function listChronicle(db: CodexDb): CodexChronicleSource[] {
+  const records: CodexChronicleSource[] = [
     ...listTimeline(db).map((entry) => ({ kind: "entry", entry }) as const),
     ...listDatedEventPages(db).map((page) => ({ kind: "event", page }) as const)
   ];

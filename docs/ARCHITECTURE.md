@@ -30,7 +30,7 @@ and a change to one never bumps another. They are constructed together in
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `apps/server`                | Express + Socket.IO service: stores, command handlers, projections, HTTP routers.                              |
 | `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet). |
-| `packages/domain`            | The realtime wire contract: `GameState`, socket event maps, projection view types.                             |
+| `packages/domain`            | The wire contract: `GameState`, socket event maps, projection view types, the Codex's HTTP shapes.             |
 | `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                     |
 | `packages/api-contract`      | The public HTTP API: OpenAPI document, path constants, command scopes.                                         |
 | `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                     |
@@ -193,9 +193,11 @@ names no family is the GM's own ruling on the whole command.
 The worldbuilding Codex has its own store (`codex-store.ts`, a facade over one module per
 aggregate in `apps/server/src/codex/`), router (`codex-http.ts`) and projection module, and does
 not go through the game command pipeline. Every record has a player half, a GM half and a
-reveal flag. The GM can preview the player view through `POST /api/v1/codex/preview-session`,
-which mints a real player session. The player calendar and the GM calendar are separate clocks;
-a date reaches players only when it is published.
+reveal flag. Its HTTP shapes are defined once in `packages/domain/src/codex-wire.ts`: a record's GM
+shape is the stored row, its player shape is a separate allow-list type, and the projections and
+the client's reads are typed against both. The GM can preview the player view through
+`POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar and
+the GM calendar are separate clocks; a date reaches players only when it is published.
 
 ## Public HTTP API
 

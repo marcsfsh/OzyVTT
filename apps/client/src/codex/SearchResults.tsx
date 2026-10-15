@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Alert, Skeleton } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { entityDef } from "./entities";
-import { SEARCH_HIT_CAP, type CodexRecordKind, type CodexSearchHit } from "./api";
+import type { CodexRecordKind, CodexSearchHit } from "@vtt/domain";
+import { SEARCH_HIT_CAP } from "./api";
 
 /**
  * The suite-wide search result surface (fetch state, row shape, kind marks), shared by the Pages rail,

@@ -1,4 +1,4 @@
-import { pageLinkKey } from "@vtt/domain";
+import { pageLinkKey, type CodexConnectionSourceKind } from "@vtt/domain";
 import type { CodexDb } from "./db.js";
 
 /**
@@ -7,8 +7,6 @@ import type { CodexDb } from "./db.js";
  * table has no foreign key (its sources live in four tables), so each kind scrubs its rows on delete.
  */
 
-/** Which record a connection comes from. Connections always point into a page. */
-export type CodexConnectionSourceKind = "page" | "session" | "quest" | "journal";
 export type CodexLinkTargetKind = "page" | "actor" | "monster" | "spell" | "map" | "marker";
 export type CodexLinkRow = Readonly<{
   sourceKind: CodexConnectionSourceKind;

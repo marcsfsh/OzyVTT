@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Badge, Button, Field, Input, Meter, Modal, RevealSwitch } from "@vtt/ui";
-import { standingApi, type CodexStanding } from "./api";
+import type { CodexStanding } from "@vtt/domain";
+import { standingApi } from "./api";
 import {
   STANDING_MAX,
   STANDING_METER_MAX,

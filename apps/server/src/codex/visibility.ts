@@ -1,3 +1,4 @@
+import type { CodexMap, CodexMarker, CodexQuest, CodexStanding } from "@vtt/domain";
 import type { CodexStore } from "../codex-store.js";
 import {
   projectPlayerJournalEntry,
@@ -9,11 +10,8 @@ import {
   type PlayerConnectionContext,
   type PlayerSessionNumberContext
 } from "../codex-projections.js";
-import type { CodexMapRow, CodexMarkerRow } from "./atlas.js";
 import type { CodexDb } from "./db.js";
-import type { CodexQuestRow } from "./quests.js";
 import type { CodexSearchRef } from "./search.js";
-import type { CodexStandingRow } from "./standing.js";
 import { isId } from "./validate.js";
 
 /**
@@ -81,12 +79,12 @@ export function isMapVisible(store: CodexStore, mapId: string | null): boolean {
 }
 
 /** A map keeps its parent link only when the parent is visible, or it would name a secret ancestor. */
-export function mapContext(store: CodexStore, map: CodexMapRow): Readonly<{ parentRevealed: boolean }> {
+export function mapContext(store: CodexStore, map: CodexMap): Readonly<{ parentRevealed: boolean }> {
   return { parentRevealed: isMapVisible(store, map.parentMapId) };
 }
 
 /** A pin with its map's gate and which of its links lead somewhere visible. */
-export function markerRecord(store: CodexStore, marker: CodexMarkerRow): CodexPageMarkerRecord {
+export function markerRecord(store: CodexStore, marker: CodexMarker): CodexPageMarkerRecord {
   return {
     marker,
     mapRevealed: isMapVisible(store, marker.mapId),
@@ -103,13 +101,13 @@ export function isMarkerVisible(store: CodexStore, markerId: string): boolean {
 /** A quest's linked pages, filtered to those the party may open. */
 export function questContext(
   store: CodexStore,
-  quest: CodexQuestRow
+  quest: CodexQuest
 ): Readonly<{ revealedEntityIds: ReadonlySet<string> }> {
   return { revealedEntityIds: revealedPageIdsIn(store, quest.entityIds) };
 }
 
 /** A standing bar for a secret faction would leak the faction even untitled. */
-export function standingContext(store: CodexStore, standing: CodexStandingRow): Readonly<{ factionRevealed: boolean }> {
+export function standingContext(store: CodexStore, standing: CodexStanding): Readonly<{ factionRevealed: boolean }> {
   return { factionRevealed: isPageVisible(store, standing.factionPageId) };
 }
 

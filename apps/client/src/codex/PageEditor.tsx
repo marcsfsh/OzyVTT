@@ -1,40 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Button,
-  Field,
-  GmOnlyTag,
-  IconButton,
-  IconX,
-  Input,
-  Modal,
-  RevealSwitch,
-  SaveState,
-  Select,
-  TagInput,
-  Textarea
-} from "@vtt/ui";
-import {
-  calendarApi,
-  codexApi,
-  uploadCodexAsset,
-  type CodexAutosaveSettings,
-  type CodexCalendar,
-  type CodexPage,
-  type CodexPageConnection,
-  type CodexPageRevision,
-  type CodexPageSummary,
-  type CodexSettings
-} from "./api";
-import { CodexImage } from "./CodexImage";
+import { Alert, Button, Input, RevealSwitch, SaveState } from "@vtt/ui";
+import type { CodexAutosaveSettings, CodexPage, CodexPageConnection, CodexPageSummary } from "@vtt/domain";
+import { calendarApi, codexApi, uploadCodexAsset } from "./api";
 import { CodexEditor } from "./CodexEditor";
 import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
-import { PageTimeline } from "./PageTimeline";
-import { PageMarkers } from "./PageMarkers";
-import { ConnectionsPanel } from "./ConnectionsPanel";
+import { dateDraftOf, dateOfDraft } from "./InWorldDateFields";
+import { PageDetails, type PageDraft } from "./PageDetails";
+import { RevisionHistory } from "./RevisionHistory";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
-import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
+import { useCodexQuery } from "./useCodexQuery";
+import { ENTITY_DEFS, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 /**
  * The page editor. The centre column holds only the body being written; properties and connections live
@@ -44,23 +20,7 @@ import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type Entit
 const DETAILS_KEY = "codex-page-details";
 const DETAILS_ID = "codex-page-details";
 
-/** In-world date parts are strings, as in the journal composer, so a half-typed year isn't coerced and saved. */
-type Draft = {
-  title: string;
-  entityType: EntityType;
-  fields: Record<string, string>;
-  folder: string;
-  tags: readonly string[];
-  playerBody: string;
-  gmBody: string;
-  bannerAssetId: string | null;
-  dateYear: string;
-  dateMonth: string;
-  dateDay: string;
-};
-
-function draftOf(page: CodexPage): Draft {
-  const date = page.inWorldDate; // the raw date the GM typed, still valid if the calendar changed
+function draftOf(page: CodexPage): PageDraft {
   return {
     title: page.title,
     entityType: page.entityType,
@@ -70,9 +30,8 @@ function draftOf(page: CodexPage): Draft {
     playerBody: page.playerBody,
     gmBody: page.gmBody,
     bannerAssetId: page.bannerAssetId,
-    dateYear: date ? String(date.year) : "",
-    dateMonth: date ? String(date.month) : "0",
-    dateDay: date ? String(date.day) : ""
+    // The raw date the GM typed, still valid if the calendar changed.
+    ...dateDraftOf(page.inWorldDate)
   };
 }
 
@@ -115,12 +74,10 @@ export function PageEditor({
   onPickTag
 }: PageEditorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [draft, setDraft] = useState<Draft>(() => draftOf(page));
+  const [draft, setDraft] = useState<PageDraft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
   const [tab, setTab] = useState<BodyLayer>("player");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
-  const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
-  const [settings, setSettings] = useState<CodexSettings | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const revRef = useRef(page.rev);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -147,7 +104,7 @@ export function PageEditor({
 
   /** Autosave at the GM's cadence; when off, the same hook drives Save, the dirty readout and the navigation guards. */
   const save = useCallback(
-    async (next: Draft) => {
+    async (next: PageDraft) => {
       const { fields, gmFields } = splitEntityFields(next.entityType, next.fields);
       const updated = await codexApi.updatePage(gmToken, page.id, {
         title: next.title.trim() || "Untitled",
@@ -160,17 +117,7 @@ export function PageEditor({
         gmBody: next.gmBody,
         bannerAssetId: next.bannerAssetId,
         // Only `event` pages send a date. Omitting it leaves the stored date alone, so switching kinds is lossless.
-        ...(next.entityType === "event"
-          ? {
-              inWorldDate: next.dateYear.trim()
-                ? {
-                    year: Math.trunc(Number(next.dateYear) || 0),
-                    month: Number(next.dateMonth || 0),
-                    day: Math.max(1, Math.trunc(Number(next.dateDay) || 1))
-                  }
-                : null
-            }
-          : {}),
+        ...(next.entityType === "event" ? { inWorldDate: dateOfDraft(next) } : {}),
         expectedRev: revRef.current
       });
       revRef.current = updated.rev;
@@ -180,7 +127,7 @@ export function PageEditor({
     [gmToken, page.id, onChange]
   );
 
-  const { status, dirty, flush, markSaved } = useCodexAutosave<Draft>({
+  const { status, dirty, flush, markSaved } = useCodexAutosave<PageDraft>({
     settings: autosave,
     draft,
     save,
@@ -212,30 +159,14 @@ export function PageEditor({
     setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
   const setField = (key: string, value: string) =>
     setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
-  const typeDef = entityDef(draft.entityType);
-
   const isEvent = draft.entityType === "event";
-  const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
-  useEffect(() => {
-    if (!isEvent || calendar) return;
-    let live = true;
-    void calendarApi
-      .get(gmToken)
-      .then((next) => {
-        if (live) setCalendar(next);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [isEvent, calendar, gmToken]);
+  const readCalendar = useCallback(() => calendarApi.get(gmToken), [gmToken]);
+  const calendar = useCodexQuery(isEvent ? readCalendar : null, { live: false }).data ?? null;
   // The kind-change copy names the history setting, so read it once when the editor mounts.
-  useEffect(() => {
-    void codexApi
-      .getSettings(gmToken)
-      .then(setSettings)
-      .catch(() => undefined);
-  }, [gmToken]);
+  const settings = useCodexQuery(
+    useCallback(() => codexApi.getSettings(gmToken), [gmToken]),
+    { live: false }
+  ).data;
 
   /**
    * Changing a page's kind always confirms, since a conditional dialog gets dismissed unread. A
@@ -283,19 +214,6 @@ export function PageEditor({
     }
   };
 
-  const openRevisions = async () => {
-    setRevisionsOpen(true);
-    try {
-      setRevisions(await codexApi.listRevisions(gmToken, page.id));
-    } catch {
-      setRevisions([]);
-    }
-    try {
-      setSettings(await codexApi.getSettings(gmToken));
-    } catch {
-      setSettings(null);
-    }
-  };
   const restore = async (revisionId: number) => {
     try {
       const updated = await codexApi.restoreRevision(gmToken, page.id, revisionId);
@@ -326,8 +244,7 @@ export function PageEditor({
       setSaveError("Couldn't delete that page.");
     }
   };
-  const uploadBanner = async (file: File | undefined) => {
-    if (!file) return;
+  const uploadBanner = async (file: File) => {
     try {
       const asset = await uploadCodexAsset(gmToken, file);
       setDraft((prev) => ({ ...prev, bannerAssetId: asset.id }));
@@ -383,7 +300,7 @@ export function PageEditor({
           >
             Details
           </Button>
-          <Button variant="ghost" size="sm" onClick={openRevisions}>
+          <Button variant="ghost" size="sm" onClick={() => setRevisionsOpen(true)}>
             History
           </Button>
           <Button variant="ghost" size="sm" onClick={remove}>
@@ -417,285 +334,39 @@ export function PageEditor({
         </div>
 
         {detailsOpen && (
-          <aside
+          <PageDetails
             id={DETAILS_ID}
-            className="codex-editor-context scroll-y"
-            aria-label="Page details"
-            tabIndex={-1}
-            ref={detailsRef}
-            /* Scoped: Escape closes the panel only for keypresses that started inside it. */
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.stopPropagation();
-                showDetails(false);
-              }
-            }}
-          >
-            <div className="codex-context-head">
-              <h3 className="codex-backlinks-title">Page details</h3>
-              <IconButton label="Close page details" size="sm" onClick={() => showDetails(false)}>
-                <IconX />
-              </IconButton>
-            </div>
-            {draft.bannerAssetId ? (
-              <div className="codex-banner">
-                <CodexImage
-                  assetId={draft.bannerAssetId}
-                  token={gmToken}
-                  alt="Page banner"
-                  className="codex-banner-img"
-                />
-                <div className="codex-banner-actions">
-                  <Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>
-                    Change
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}
-                  >
-                    Remove banner
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="codex-banner-add"
-                onClick={() => bannerInputRef.current?.click()}
-              >
-                Add banner image
-              </Button>
-            )}
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(event) => {
-                void uploadBanner(event.target.files?.[0]);
-                event.target.value = "";
-              }}
-            />
-
-            <div className="codex-meta-row">
-              <Field label="Kind" htmlFor="codex-type">
-                <Select
-                  id="codex-type"
-                  value={draft.entityType}
-                  onChange={(event) => void changeKind(event.target.value as EntityType)}
-                >
-                  {ENTITY_TYPE_LIST.map((type) => (
-                    <option key={type} value={type}>
-                      {ENTITY_DEFS[type].label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains">
-                <Input
-                  id="codex-folder"
-                  value={draft.folder}
-                  placeholder="Unfiled"
-                  onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))}
-                />
-              </Field>
-              <Field label="Tags" htmlFor="codex-tags">
-                <TagInput
-                  id="codex-tags"
-                  ariaLabel="Tags"
-                  placeholder="town, npc"
-                  values={draft.tags}
-                  onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tags: next }))}
-                  max={24}
-                  maxReachedReason="A page may carry at most 24 tags."
-                  suggestions={tagSuggestions}
-                />
-              </Field>
-            </div>
-            {onPickTag && draft.tags.length > 0 && (
-              <div className="codex-editor-tagjumps">
-                {draft.tags.map((tag) => (
-                  <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {isEvent && (
-              <div className="codex-meta-row codex-event-date">
-                <Field label="Year" htmlFor="codex-date-year" help="Places this event on the Journal and the Calendar.">
-                  <Input
-                    id="codex-date-year"
-                    type="number"
-                    inputMode="numeric"
-                    value={draft.dateYear}
-                    placeholder="1492"
-                    onChange={(event) => setDraft((prev) => ({ ...prev, dateYear: event.target.value }))}
-                  />
-                </Field>
-                <Field label="Month" htmlFor="codex-date-month">
-                  <Select
-                    id="codex-date-month"
-                    value={draft.dateMonth}
-                    disabled={!draft.dateYear.trim()}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, dateMonth: event.target.value }))}
-                  >
-                    {(calendar?.months ?? []).map((month, index) => (
-                      <option key={index} value={String(index)}>
-                        {month.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Day" htmlFor="codex-date-day">
-                  <Input
-                    id="codex-date-day"
-                    type="number"
-                    inputMode="numeric"
-                    value={draft.dateDay}
-                    placeholder="1"
-                    disabled={!draft.dateYear.trim()}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, dateDay: event.target.value }))}
-                  />
-                </Field>
-              </div>
-            )}
-
-            {typeDef.fields.some((field) => !field.secret) && (
-              <div className="codex-fields">
-                {typeDef.fields
-                  .filter((field) => !field.secret)
-                  .map((field) => (
-                    <Field
-                      key={field.key}
-                      label={field.label}
-                      htmlFor={`codex-field-${field.key}`}
-                      className={field.kind === "textarea" ? "codex-field-wide" : undefined}
-                    >
-                      {field.kind === "textarea" ? (
-                        <Textarea
-                          id={`codex-field-${field.key}`}
-                          className="codex-field-area"
-                          value={draft.fields[field.key] ?? ""}
-                          placeholder={field.placeholder}
-                          onChange={(event) => setField(field.key, event.target.value)}
-                        />
-                      ) : (
-                        <Input
-                          id={`codex-field-${field.key}`}
-                          value={draft.fields[field.key] ?? ""}
-                          placeholder={field.placeholder}
-                          onChange={(event) => setField(field.key, event.target.value)}
-                        />
-                      )}
-                    </Field>
-                  ))}
-              </div>
-            )}
-            {typeDef.fields.some((field) => field.secret) && (
-              <div className="codex-fields codex-fields-secret codex-gm-block">
-                <span className="codex-fields-secret-tag">
-                  <GmOnlyTag />
-                </span>
-                {typeDef.fields
-                  .filter((field) => field.secret)
-                  .map((field) => (
-                    <Field
-                      key={field.key}
-                      label={field.label}
-                      htmlFor={`codex-field-${field.key}`}
-                      className={field.kind === "textarea" ? "codex-field-wide" : undefined}
-                    >
-                      {field.kind === "textarea" ? (
-                        <Textarea
-                          id={`codex-field-${field.key}`}
-                          className="codex-field-area"
-                          value={draft.fields[field.key] ?? ""}
-                          placeholder={field.placeholder}
-                          onChange={(event) => setField(field.key, event.target.value)}
-                        />
-                      ) : (
-                        <Input
-                          id={`codex-field-${field.key}`}
-                          value={draft.fields[field.key] ?? ""}
-                          placeholder={field.placeholder}
-                          onChange={(event) => setField(field.key, event.target.value)}
-                        />
-                      )}
-                    </Field>
-                  ))}
-              </div>
-            )}
-
-            {/* Where else does this entity appear: connections, atlas pins, journal and graph. */}
-            <section className="codex-connections" aria-labelledby="codex-connections-h">
-              <div className="codex-connections-head">
-                <h4 className="codex-backlinks-title" id="codex-connections-h">
-                  Connections
-                </h4>
-                {onShowInGraph && (
-                  <Button variant="ghost" size="sm" onClick={() => onShowInGraph(page.id)}>
-                    Show in graph
-                  </Button>
-                )}
-              </div>
-              <ConnectionsPanel
-                standalone={false}
-                connections={connections}
-                onOpen={onOpenConnection}
-                write={{ gmToken, pageId: page.id, pages, onChanged: onConnectionsChanged }}
-              />
-              <PageMarkers gmToken={gmToken} pageId={page.id} onOpenMarker={onOpenMarker} />
-              <PageTimeline
-                gmToken={gmToken}
-                pageId={page.id}
-                onOpenReplay={onOpenReplay}
-                onOpenEntry={(entryId) => onOpenConnection("journal", entryId)}
-              />
-            </section>
-          </aside>
+            panelRef={detailsRef}
+            gmToken={gmToken}
+            pageId={page.id}
+            draft={draft}
+            pages={pages}
+            connections={connections}
+            months={calendar?.months ?? []}
+            tagSuggestions={tagSuggestions}
+            bannerInputRef={bannerInputRef}
+            onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+            onFieldChange={setField}
+            onKindChange={(type) => void changeKind(type)}
+            onUploadBanner={(file) => void uploadBanner(file)}
+            onClose={() => showDetails(false)}
+            onConnectionsChanged={onConnectionsChanged}
+            onOpenConnection={onOpenConnection}
+            onOpenMarker={onOpenMarker}
+            onOpenReplay={onOpenReplay}
+            onShowInGraph={onShowInGraph}
+            onPickTag={onPickTag}
+          />
         )}
       </div>
 
       {revisionsOpen && (
-        <Modal
-          open
+        <RevisionHistory
+          gmToken={gmToken}
+          pageId={page.id}
+          onRestore={(revisionId) => void restore(revisionId)}
           onClose={() => setRevisionsOpen(false)}
-          title="Version history"
-          size="md"
-          ariaLabel="Version history"
-        >
-          {settings && (
-            <p className="codex-composer-hint">
-              {!settings.revisionHistory.enabled
-                ? "Version history is off, so nothing new is being saved. These can still be restored. Change it in Settings."
-                : settings.revisionHistory.windowMinutes > 0
-                  ? `One version is saved per ${settings.revisionHistory.windowMinutes} minutes, so the newest below can be that far behind the page. Change it in Settings.`
-                  : "Every save is kept as a version. Change it in Settings."}
-            </p>
-          )}
-          {revisions.length === 0 ? (
-            <p className="codex-preview-empty">No earlier versions.</p>
-          ) : (
-            <ul className="codex-revisions">
-              {revisions.map((revision) => (
-                <li key={revision.id} className="codex-revision">
-                  <div>
-                    <strong>v{revision.rev}</strong> ·{" "}
-                    <span className="codex-revision-when">{new Date(revision.authoredAt).toLocaleString()}</span>
-                  </div>
-                  <div className="codex-revision-title">{revision.title}</div>
-                  <Button variant="secondary" size="sm" onClick={() => restore(revision.id)}>
-                    Restore
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Modal>
+        />
       )}
 
       {confirmDialog}

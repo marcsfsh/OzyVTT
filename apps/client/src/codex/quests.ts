@@ -1,5 +1,5 @@
 import type { BadgeTone } from "@vtt/ui";
-import type { CodexQuestStatus } from "./api";
+import type { CodexQuestStatus } from "@vtt/domain";
 
 /** Shared quest reading rules, typed so both the GM row and the player projection satisfy them. */
 

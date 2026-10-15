@@ -13,7 +13,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { PageTimeline } from "./PageTimeline";
-import type { CodexJournalEntry } from "./api";
+import type { CodexJournalEntry } from "@vtt/domain";
 
 /**
  * The hidden-record cue keys on `revealedToPlayers`, not on empty player text, and says "Hidden from
