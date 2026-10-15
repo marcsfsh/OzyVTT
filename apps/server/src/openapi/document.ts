@@ -2309,7 +2309,7 @@ export const openApiDocument = {
           derived: {
             type: "object",
             additionalProperties: false,
-            required: ["proficiencyBonus", "armorClass", "initiative", "abilities", "skills"],
+            required: ["proficiencyBonus", "armorClass", "initiative", "abilities", "skills", "defences"],
             description:
               "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts - a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
             properties: {
@@ -2370,6 +2370,33 @@ export const openApiDocument = {
                     }
                   }
                 }
+              },
+              defences: {
+                type: "object",
+                additionalProperties: false,
+                required: ["resistances", "immunities", "vulnerabilities"],
+                description:
+                  "The damage defences in force outside any one hit, as the damage pipeline applies them: the stat block's, chosen features', items' and effects'. Petrified and underwater resistance are added per hit and are not listed.",
+                properties: Object.fromEntries(
+                  ["resistances", "immunities", "vulnerabilities"].map((key) => [
+                    key,
+                    {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["type", "source"],
+                        properties: {
+                          type: { type: "string", description: 'A damage type, e.g. "fire"' },
+                          source: {
+                            type: ["string", "null"],
+                            description: "The feature, item or effect that grants it; null for the stat block itself"
+                          }
+                        }
+                      }
+                    }
+                  ])
+                )
               }
             }
           },
