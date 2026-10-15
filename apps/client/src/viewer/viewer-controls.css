@@ -104,6 +104,7 @@
 .viewer-control-actions .nh-btn {
   white-space: normal;
   text-wrap: balance;
+  text-align: center;
 }
 .viewer-pairing-code {
   display: grid;
