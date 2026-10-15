@@ -3975,7 +3975,9 @@
     "damage": [],
     "save": {
      "ability": "wis",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     }
    }
   ],
@@ -4935,7 +4937,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     }
    }
   ],
@@ -6021,7 +6025,9 @@
     },
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     }
    }
   ],
@@ -6334,7 +6340,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "stunned"
     }
    }
   ],
@@ -6620,7 +6628,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     }
    }
   ],
@@ -6710,7 +6720,9 @@
     "damage": [],
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     }
    }
   ],
@@ -7697,7 +7709,9 @@
     },
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     }
    },
    {
@@ -7717,7 +7731,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": "deafened"
     }
    }
   ],
@@ -8616,7 +8632,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "paralyzed"
     }
    }
   ],

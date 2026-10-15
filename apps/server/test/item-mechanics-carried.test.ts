@@ -18,7 +18,7 @@ import { looseRollPlan } from "../src/tap-routing.js";
 // the absences stay absent for their recorded reasons. Runs the real `ContentLibrary` over the committed
 // `magic-items.v1.json`; inventory rows are minted as the equipment picker mints them.
 // The Pipes of Haunting end at a spent counter, a refusal at zero, and a server-enforced save whose
-// Frightened condition `conditionFrom` reads from the shipped description. The Potion of Resistance is
+// Frightened condition the save block declares. The Potion of Resistance is
 // an absence: `itemAction` drops an item action's `grants`, and an item's `effects` rider ignores
 // `duration`, so "for 1 hour" cannot be expressed. Both halves are pinned below.
 
@@ -233,8 +233,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) },
       deps([], definition)
     );
-    // `conditionId` is not an authored field: `conditionFrom` reads it from the shipped description,
-    // which is why the module keeps the SRD's word "Frightened" verbatim.
+    // `conditionId` is the save block's declared condition.
     expect(state.combat.pendingSaves).toHaveLength(1);
     expect(state.combat.pendingSaves[0]).toMatchObject({
       targetActorId: IDS.foe,
@@ -529,7 +528,7 @@ describe("the casts that survived the spell-record check", () => {
         (entry) => entry.id === `item-${id}-cast-scrying`
       )!;
       // The save Scrying's own target makes, at the item's printed DC, not the wearer's derived one.
-      expect(cast.save).toEqual({ ability: "wis", dc: 17 });
+      expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureCondition: null });
       expect(cast.damage).toEqual([]);
       expect(cast.attack).toBeUndefined();
       expect(cast.uses).toBeUndefined(); // no charge limit is printed on any of the four
@@ -600,9 +599,9 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-rope-of-entanglement-entangle"
     )!;
-    expect(action.save).toEqual({ ability: "dex", dc: 15 });
+    expect(action.save).toEqual({ ability: "dex", dc: 15, successDamage: "none", failureCondition: "restrained" });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
-    expect(action.damage).toEqual([]); // no damage authored, so no half-on-success to misread
+    expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(
       state,
@@ -619,7 +618,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-iron-flask-trap"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 17 });
+    expect(action.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureCondition: null });
     expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(

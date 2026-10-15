@@ -17,6 +17,7 @@ import {
   GrantWhenSchema,
   HitDieSchema,
   RollModeVariantSchema,
+  SaveOutcomeFields,
   riderGate
 } from "@vtt/schemas";
 
@@ -132,11 +133,13 @@ export const FeatureSaveDcSchema = z.union([
 ]);
 export type FeatureSaveDc = z.infer<typeof FeatureSaveDcSchema>;
 
-/** A save a feature forces. `ability` is what the target rolls; `dc` is how the number is derived. */
+/** A save a feature forces. `ability` is what the target rolls; `dc` is how the number is derived; what the save
+ * does is `SaveOutcomeFields`, as on a stat block. */
 export const FeatureSaveSchema = z
   .object({
     ability: AbilitySchema,
-    dc: FeatureSaveDcSchema
+    dc: FeatureSaveDcSchema,
+    ...SaveOutcomeFields
   })
   .strict();
 

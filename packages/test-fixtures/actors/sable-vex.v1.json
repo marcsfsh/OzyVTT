@@ -56,7 +56,9 @@
    "description": "*Dexterity Saving Throw:* DC 15, each creature in a **20-foot-radius Sphere** within 150 ft. *Failure:* 9d6 fire damage (cast with a 4th-level pact slot). *Success:* Half damage.",
    "save": {
     "ability": "dex",
-    "dc": 15
+    "dc": 15,
+    "successDamage": "half",
+    "failureCondition": null
    },
    "damage": [
     {
@@ -72,7 +74,9 @@
    "description": "*Reaction, when damaged by a creature within 60 ft:* the attacker makes a DC 15 Dexterity save. *Failure:* 5d10 fire damage. *Success:* Half damage.",
    "save": {
     "ability": "dex",
-    "dc": 15
+    "dc": 15,
+    "successDamage": "half",
+    "failureCondition": null
    },
    "damage": [
     {
@@ -88,7 +92,9 @@
    "description": "*Wisdom Saving Throw:* DC 15, up to **four** creatures within 60 ft. *Failure:* the target obeys a one-word command (Approach, Drop, Flee, Grovel, or Halt) on its next turn.",
    "save": {
     "ability": "wis",
-    "dc": 15
+    "dc": 15,
+    "successDamage": "none",
+    "failureCondition": null
    },
    "damage": []
   }

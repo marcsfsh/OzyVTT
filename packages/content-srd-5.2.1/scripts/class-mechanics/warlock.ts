@@ -173,7 +173,7 @@ export const warlock: ClassMechanicsModule = {
       },
       /**
        * `activation: "other"`: the trigger is "once per turn when you hit", which the action economy has
-       * no slot for. The Incapacitated half and restoring the use with a Pact Magic slot stay prose.
+       * no slot for. The Fiend exemption and restoring the use with a Pact Magic slot stay prose.
        */
       "hurl-through-hell": {
         uses: { limit: 1, per: "long-rest" },
@@ -184,7 +184,7 @@ export const warlock: ClassMechanicsModule = {
             activation: "other",
             description:
               "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
-            save: { ability: "cha", dc: "spellcasting" },
+            save: { ability: "cha", dc: "spellcasting", successDamage: "none", failureCondition: "incapacitated" },
             damage: [{ formula: "8d10", type: "psychic" }]
           }
         ]

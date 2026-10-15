@@ -94,7 +94,9 @@
     "description": "Intelligence Saving Throw: DC 16, one creature within 30 feet that is Charmed or Grappled by the aboleth. Failure: 10 (3d6) Psychic damage. Success: Half damage. Failure or Success: The aboleth gains the target's memories if the target is a Humanoid and is reduced to 0 Hit Points by this action.",
     "save": {
      "ability": "int",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -110,7 +112,9 @@
     "description": "Wisdom Saving Throw: DC 16, one creature the aboleth can see within 30 feet. Failure: The target has the Charmed condition until the aboleth dies or is on a different plane of existence from the target. While Charmed, the target acts as an ally to the aboleth and is under its control while within 60 feet of it. In addition, the aboleth and the target can communicate telepathically with each other over any distance. The target repeats the save whenever it takes damage as well as after every 24 hours it spends at least 1 mile away from the aboleth, ending the effect on itself on a success.",
     "save": {
      "ability": "wis",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     },
     "damage": [],
     "uses": {
@@ -224,7 +228,9 @@
     "description": "Legendary Action. Dexterity Saving Throw: DC 17, one creature the dragon can see within 120 feet. Failure: 22 (4d10) Poison damage, and the target has Disadvantage on saving throws to maintain Concentration until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -286,7 +292,9 @@
     "description": "Dexterity Saving Throw: DC 18, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 54 (12d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -468,7 +476,9 @@
     "description": "Dexterity Saving Throw: DC 19, each creature in a 90-foot-long, 5-foot-wide Line. Failure: 60 (11d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -646,7 +656,9 @@
     "description": "Dexterity Saving Throw: DC 18, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 45 (10d8) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -667,7 +679,9 @@
     "description": "Legendary Action. Dexterity Saving Throw: DC 16, one creature the dragon can see within 120 feet. Failure: 27 (6d8) Fire damage, and the target's Speed is halved until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "dex",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -686,7 +700,9 @@
     "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure The target has the Unconscious condition for 10 minutes. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.",
     "save": {
      "ability": "con",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    },
@@ -844,7 +860,9 @@
     "description": "Dexterity Saving Throw: DC 19, each creature in a 90-foot-long, 5-foot-wide Line. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -865,7 +883,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 90 feet. Failure: 10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": "deafened"
     },
     "damage": [
      {
@@ -884,7 +904,9 @@
     "description": "Strength Saving Throw: DC 19, each creature in a 30-foot Cone. Failure: The target is pushed up to 60 feet straight away from the dragon and has the Prone condition.",
     "save": {
      "ability": "str",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "none",
+     "failureCondition": "prone"
     },
     "damage": []
    },
@@ -993,7 +1015,9 @@
     "description": "Legendary Action. Charisma Saving Throw: DC 17, one creature the dragon can see within 90 feet. Failure: 24 (7d6) Psychic damage. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the D20 Test. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "cha",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1055,7 +1079,9 @@
     "description": "Dexterity Saving Throw: DC 18, each creature in an 60-foot-long, 5-foot-wide Line. Failure: 54 (12d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1086,7 +1112,9 @@
     "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -1191,7 +1219,9 @@
     "description": "Legendary Action. Charisma Saving Throw: DC 21, one creature the dragon can see within 120 feet. Failure: 10 (3d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "cha",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": [
      {
@@ -1253,7 +1283,9 @@
     "description": "Dexterity Saving Throw: DC 21, each creature in a 60-foot Cone. Failure: 66 (12d10) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1284,7 +1316,9 @@
     "description": "Strength Saving Throw: DC 21, each creature that isn't currently affected by this breath in a 60-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Test and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "str",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -1416,7 +1450,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1455,7 +1491,9 @@
     "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: 56 (16d6) Poison damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1640,7 +1678,9 @@
     "description": "Dexterity Saving Throw: DC 21, each creature in a 60-foot Cone. Failure: 59 (17d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1788,7 +1828,9 @@
     "description": "Legendary Action. Dexterity Saving Throw: DC 19, each creature in a 60-foot-long, 10-foot-wide Line. Failure: 14 (4d6) Cold damage, and the target is pushed up to 30 feet straight away from the dragon. Success: Half damage only. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "dex",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1827,7 +1869,9 @@
     "description": "Constitution Saving Throw: DC 20, each creature in a 60-foot Cone. Failure: 54 (12d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -1858,7 +1902,9 @@
     "description": "Constitution Saving Throw: DC 20, each creature in a 60-foot Cone. First Failure The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "con",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    },
@@ -1963,7 +2009,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2025,7 +2073,9 @@
     "description": "Constitution Saving Throw: DC 19, each creature in a 60-foot Cone. Failure: 54 (12d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2176,7 +2226,9 @@
     "description": "Strength Saving Throw: DC 13, one Medium or smaller creature in the elemental's space. Failure: 24 (4d10 + 2) Thunder damage, and the target is pushed up to 20 feet straight away from the elemental and has the Prone condition. Success: Half damage only.",
     "save": {
      "ability": "str",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "half",
+     "failureCondition": "prone"
     },
     "damage": [
      {
@@ -2397,7 +2449,9 @@
     "description": "Legendary Action. Dexterity Saving Throw: DC 21, one creature the dragon can see within 120 feet. Failure: 33 (6d10) Poison damage, and the target has Disadvantage on saving throws to maintain Concentration until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "dex",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2459,7 +2513,9 @@
     "description": "Dexterity Saving Throw: DC 22, each creature in a 90-foot-long, 10-foot-wide Line. Failure: 67 (15d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 22
+     "dc": 22,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2641,7 +2697,9 @@
     "description": "Dexterity Saving Throw: DC 23, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 88 (16d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 23
+     "dc": 23,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2819,7 +2877,9 @@
     "description": "Dexterity Saving Throw: DC 21, each creature in a 90-foot-long, 5-foot-wide Line. Failure: 58 (13d8) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2840,7 +2900,9 @@
     "description": "Legendary Action. Dexterity Saving Throw: DC 20, one creature the dragon can see within 120 feet. Failure: 36 (8d8) Fire damage, and the target's Speed is halved until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "dex",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -2859,7 +2921,9 @@
     "description": "Constitution Saving Throw: DC 21, each creature in a 90-foot Cone. Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure The target has the Unconscious condition for 10 minutes. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.",
     "save": {
      "ability": "con",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    },
@@ -3017,7 +3081,9 @@
     "description": "Dexterity Saving Throw: DC 23, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 82 (15d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 23
+     "dc": 23,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3038,7 +3104,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 22, each creature in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 120 feet. Failure: 13 (3d8) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 22
+     "dc": 22,
+     "successDamage": "none",
+     "failureCondition": "deafened"
     },
     "damage": [
      {
@@ -3057,7 +3125,9 @@
     "description": "Strength Saving Throw: DC 23, each creature in a 30-foot Cone. Failure: The target is pushed up to 60 feet straight away from the dragon and has the Prone condition.",
     "save": {
      "ability": "str",
-     "dc": 23
+     "dc": 23,
+     "successDamage": "none",
+     "failureCondition": "prone"
     },
     "damage": []
    },
@@ -3166,7 +3236,9 @@
     "description": "Legendary Action. Charisma Saving Throw: DC 21, one creature the dragon can see within 120 feet. Failure: 31 (9d6) Psychic damage. Until the end of its next turn, the target rolls 1d8 whenever it makes an ability check or attack roll and subtracts the number rolled from the D20 Test. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "cha",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3228,7 +3300,9 @@
     "description": "Dexterity Saving Throw: DC 22, each creature in an 90-foot-long, 10-foot-wide Line. Failure: 63 (14d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 22
+     "dc": 22,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3259,7 +3333,9 @@
     "description": "Constitution Saving Throw: DC 22, each creature in a 90-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 22
+     "dc": 22,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -3364,7 +3440,9 @@
     "description": "Legendary Action. Charisma Saving Throw: DC 24, one creature the dragon can see within 120 feet. Failure: 24 (7d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "cha",
-     "dc": 24
+     "dc": 24,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": [
      {
@@ -3426,7 +3504,9 @@
     "description": "Dexterity Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 71 (13d10) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 24
+     "dc": 24,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3457,7 +3537,9 @@
     "description": "Strength Saving Throw: DC 24, each creature that isn't currently affected by this breath in a 90-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Test and subtracts 5 (1d10) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "str",
-     "dc": 24
+     "dc": 24,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -3589,7 +3671,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3628,7 +3712,9 @@
     "description": "Constitution Saving Throw: DC 22, each creature in a 90-foot Cone. Failure: 77 (22d6) Poison damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 22
+     "dc": 22,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3813,7 +3899,9 @@
     "description": "Dexterity Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 91 (26d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 24
+     "dc": 24,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -3961,7 +4049,9 @@
     "description": "Legendary Action. Dexterity Saving Throw: DC 23, each creature in a 60-foot-long, 10-foot-wide Line. Failure: 14 (4d6) Cold damage, and the target is pushed up to 30 feet straight away from the dragon. Success: Half damage only. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "dex",
-     "dc": 23
+     "dc": 23,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -4000,7 +4090,9 @@
     "description": "Constitution Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 67 (15d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 24
+     "dc": 24,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -4031,7 +4123,9 @@
     "description": "Constitution Saving Throw: DC 24, each creature in a 90-foot Cone. First Failure The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "con",
-     "dc": 24
+     "dc": 24,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    },
@@ -4136,7 +4230,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 20, each creature in a 30-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 120 feet. Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -4198,7 +4294,9 @@
     "description": "Constitution Saving Throw: DC 22, each creature in a 90-foot Cone. Failure: 63 (14d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 22
+     "dc": 22,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -4673,7 +4771,9 @@
     "description": "Dexterity Saving Throw: DC 12, each creature in a 30-foot-long, 5-foot-wide Line. Failure: 14 (4d6) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -6503,7 +6603,9 @@
     "description": "Constitution Saving Throw: DC 12, each creature in a 30-foot Cone. If the basilisk sees its reflection within the Cone, the basilisk must make this save. First Failure The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure The target has the Petrified condition instead of the Restrained condition.",
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [],
     "uses": {
@@ -6715,7 +6817,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -6828,7 +6932,9 @@
     "description": "Dexterity Saving Throw: DC 18, one Large or smaller creature Grappled by the behir (the behir can have only one creature swallowed at a time). Failure: The behir swallows the target, which is no longer Grappled. While swallowed, a creature has the Blinded and Restrained conditions, has Cover|XPHB|Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns. If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a space within 10 feet of the behir and has the Prone condition. If the behir dies, a swallowed creature is no longer Restrained and can escape from the corpse by using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "dex",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [
      {
@@ -6860,7 +6966,9 @@
     "description": "Strength Saving Throw: DC 18, one Large or smaller creature the behir can see within 5 feet. Failure: 28 (5d8 + 6) Bludgeoning damage. The target has the Grappled condition (escape DC 16), and it has the Restrained condition until the grapple ends.",
     "save": {
      "ability": "str",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -6876,7 +6984,9 @@
     "description": "Dexterity Saving Throw: DC 16, each creature in a 90-foot-long, 5-foot-wide Line. Failure: 66 (12d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -7203,7 +7313,9 @@
     "description": "Dexterity Saving Throw: DC 11, each creature in a 15-foot-long, 5-foot-wide Line. Failure: 22 (5d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -7659,7 +7771,9 @@
     "description": "Dexterity Saving Throw: DC 12, each creature in a 30-foot-long, 5-foot-wide Line. Failure: 21 (6d6) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -8005,7 +8119,9 @@
     "description": "Dexterity Saving Throw: DC 11, each creature in a 20-foot-long, 5-foot-wide Line. Failure: 14 (4d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -8026,7 +8142,9 @@
     "description": "Constitution Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure The target has the Unconscious condition for 1 minute. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.",
     "save": {
      "ability": "con",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    }
@@ -8144,7 +8262,9 @@
     "description": "Dexterity Saving Throw: DC 12, each creature in a 40-foot-long, 5-foot-wide Line. Failure: 16 (3d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -8165,7 +8285,9 @@
     "description": "Strength Saving Throw: DC 12, each creature in a 30-foot Cone. Failure: The target is pushed up to 30 feet straight away from the dragon and has the Prone condition.",
     "save": {
      "ability": "str",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "prone"
     },
     "damage": []
    }
@@ -8399,7 +8521,9 @@
     "description": "Dexterity Saving Throw: DC 13, one Medium or smaller creature the bugbear can see within 10 feet. Failure: The target has the Grappled condition (escape DC 13).",
     "save": {
      "ability": "dex",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": []
    },
@@ -8683,7 +8807,9 @@
     "description": "The bulette spends 5 feet of movement to jump to a space within 15 feet that contains one or more Large or smaller creatures. Dexterity Saving Throw: DC 15, each creature in the bulette's destination space. Failure: 19 (3d12) Bludgeoning damage, and the target has the Prone condition. Success: Half damage, and the target is pushed 5 feet straight away from the bulette.",
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": "prone"
     },
     "damage": [
      {
@@ -8961,7 +9087,9 @@
     "description": "The centaur moves up to its Speed without provoking Opportunity Attacks and can move through the spaces of Medium or smaller creatures. Each creature whose space the centaur enters is targeted once by the following effect. Strength Saving Throw: DC 14. Failure: 7 (1d6 + 4) Bludgeoning damage, and the target has the Prone condition.",
     "save": {
      "ability": "str",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": "prone"
     },
     "damage": [
      {
@@ -9134,7 +9262,9 @@
     "description": "The devil conjures a fiery chain to bind a creature. Dexterity Saving Throw: DC 15, one creature the devil can see within 60 feet. Failure: 9 (2d4 + 4) Fire damage, and the target has the Restrained condition until the end of the devil's next turn, at which point the chain disappears. If the target is Large or smaller, the devil moves the target up to 30 feet straight toward itself. Success: The chain disappears.",
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [
      {
@@ -9308,7 +9438,9 @@
     "description": "Dexterity Saving Throw: DC 15, each creature in a 15-foot Cone. Failure: 31 (7d8) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -9443,7 +9575,9 @@
     "description": "Constitution Saving Throw: DC 13, one creature Grappled by the chuul. Failure: The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
     "save": {
      "ability": "con",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": []
    }
@@ -9688,7 +9822,9 @@
     "description": "Wisdom Saving Throw: DC 13, each creature in a 60-foot Emanation originating from the cloaker. Failure: The target has the Frightened condition until the end of the cloaker's next turn. Success: The target is immune to this cloaker's Moan for the next 24 hours.",
     "save": {
      "ability": "wis",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": []
    },
@@ -9957,7 +10093,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [
      {
@@ -10156,7 +10294,9 @@
     "description": "Strength Saving Throw: DC 12, one Medium or smaller creature the snake can see within 5 feet. Failure: 7 (3d4) Bludgeoning damage, and the target has the Grappled condition (escape DC 12).",
     "save": {
      "ability": "str",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -10262,7 +10402,9 @@
     "description": "Dexterity Saving Throw: DC 11, each creature in a 20-foot-long, 5-foot-wide Line. Failure: 18 (4d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -10283,7 +10425,9 @@
     "description": "Constitution Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    }
@@ -10399,7 +10543,9 @@
     "description": "Strength Saving Throw: DC 15, one Medium or smaller creature the couatl can see within 5 feet. Failure: 8 (1d6 + 5) Bludgeoning damage. The target has the Grappled condition (escape DC 13), and it has the Restrained condition until the grapple ends.",
     "save": {
      "ability": "str",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -11014,7 +11160,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": [
      {
@@ -11490,7 +11638,9 @@
     "description": "The djinni conjures a whirlwind at a point it can see within 120 feet. The whirlwind fills a 20-foot-radius, 60-foot-high Cylinder [Area of Effect]|XPHB|Cylinder centered on that point. The whirlwind lasts until the djinni's Concentration on it ends. The djinni can move the whirlwind up to 20 feet at the start of each of its turns. Whenever the whirlwind enters a creature's space or a creature enters the whirlwind, that creature is subjected to the following effect. Strength Saving Throw: DC 17 (a creature makes this save only once per turn, and the djinni is unaffected). Failure: While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
     "save": {
      "ability": "str",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [
      {
@@ -11640,7 +11790,9 @@
     "description": "Wisdom Saving Throw: DC 12, each creature in a 15-foot Emanation originating from the doppelganger that can see the doppelganger. Failure: The target has the Frightened condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "wis",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": [],
     "uses": {
@@ -11880,7 +12032,9 @@
     "description": "Constitution Saving Throw: DC 19, each creature in a 60-foot Cone. Failure: 56 (16d6) Fire damage. Success: Half damage. Failure or Success: Being underwater doesn't grant Resistance to this Fire damage.",
     "save": {
      "ability": "con",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -11999,7 +12153,9 @@
     "description": "Constitution Saving Throw: DC 11, each creature in a 10-foot Emanation originating from the dretch. Failure: The target has the Poisoned condition until the end of its next turn. While Poisoned, the creature can take either an action or a Bonus Action on its turn, not both, and it can't take Reactions.",
     "save": {
      "ability": "con",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": [],
     "uses": {
@@ -12507,7 +12663,9 @@
     "description": "Dexterity Saving Throw: DC 10, each creature in a 15-foot Cone. Failure: The target has the Blinded condition until the end of the mephit's next turn.",
     "save": {
      "ability": "dex",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [],
     "uses": {
@@ -13000,7 +13158,9 @@
     "description": "Dexterity Saving Throw: DC 16, one creature within 5 feet that has the Prone condition. Failure: 17 (2d10 + 6) Bludgeoning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -13230,7 +13390,9 @@
     "description": "Strength Saving Throw: DC 16, one creature the erinyes can see within 120 feet. Failure: 14 (4d6) Force damage, and the target has the Restrained condition until the rope is destroyed, the erinyes uses a Bonus Action to release the target, or the erinyes uses Entangling Rope again.",
     "save": {
      "ability": "str",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [
      {
@@ -13399,7 +13561,9 @@
     "description": "Dexterity Saving Throw: DC 12, one Large or smaller creature the ettercap can see within 30 feet. Failure: The target has the Restrained condition until the web is destroyed (AC 10; HP 5; Vulnerability to Fire damage; Immunity to Bludgeoning, Poison, and Psychic damage).",
     "save": {
      "ability": "dex",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [],
     "uses": {
@@ -14459,7 +14623,9 @@
     "description": "The cube moves up to its Speed without provoking Opportunity Attacks. The cube can move through the spaces of Large or smaller creatures if it has room inside itself to contain them (see the Ooze Cube [Area of Effect]|XPHB|Cube trait). Dexterity Saving Throw: DC 12, each creature whose space the cube enters for the first time during this move. Failure: 10 (3d6) Acid damage, and the target is engulfed. An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns. When the cube moves, the engulfed target moves with it. An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check. On a successful check, the target escapes and enters the nearest unoccupied space. Success: Half damage, and the target moves to an unoccupied space within 5 feet of the cube. If there is no unoccupied space, the target fails the save instead.",
     "save": {
      "ability": "dex",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": "restrained"
     },
     "damage": [
      {
@@ -14593,7 +14759,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": "paralyzed"
     },
     "damage": [
      {
@@ -14728,7 +14896,9 @@
     "description": "Wisdom Saving Throw: DC 13, each creature in a 60-foot Cone that can see the ghost and isn't an Undead. Failure: 10 (2d6 + 3) Psychic damage, and the target has the Frightened condition until the start of the ghost's next turn. Success: The target is immune to this ghost's Horrific Visage for 24 hours.",
     "save": {
      "ability": "wis",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": [
      {
@@ -14744,7 +14914,9 @@
     "description": "Charisma Saving Throw: DC 13, one Humanoid the ghost can see within 5 feet. Failure: The target is possessed by the ghost; the ghost disappears, and the target has the Incapacitated condition and loses control of its body. The ghost now controls the body, but the target retains awareness. The ghost can't be targeted by any attack, spell, or other effect, except ones that specifically target Undead. The ghost's game statistics are the same, except it uses the possessed target's Speed, as well as the target's Strength, Dexterity, and Constitution modifiers. The possession lasts until the body drops to 0 Hit Points or the ghost leaves as a Bonus Action. When the possession ends, the ghost appears in an unoccupied space within 5 feet of the target, and the target is immune to this ghost's Possession for 24 hours. Success: The target is immune to this ghost's Possession for 24 hours.",
     "save": {
      "ability": "cha",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": [],
     "uses": {
@@ -14905,7 +15077,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": "paralyzed"
     },
     "damage": [
      {
@@ -15039,7 +15213,9 @@
     "description": "The ape hurls a boulder at a point it can see within 90 feet. Dexterity Saving Throw: DC 17, each creature in a 5-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on that point. Failure: 24 (7d6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition. Success: Half damage only.",
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": "prone"
     },
     "damage": [
      {
@@ -15521,7 +15697,9 @@
     "description": "Strength Saving Throw: DC 14, one Large or smaller creature the snake can see within 10 feet. Failure: 13 (2d8 + 4) Bludgeoning damage, and the target has the Grappled condition (escape DC 14).",
     "save": {
      "ability": "str",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -17240,7 +17418,9 @@
     "description": "Dexterity Saving Throw: DC 13, one creature the spider can see within 60 feet. Failure: The target has the Restrained condition until the web is destroyed (AC 10; HP 5; Vulnerability to Fire damage; Immunity to Poison and Psychic damage).",
     "save": {
      "ability": "dex",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [],
     "uses": {
@@ -17949,7 +18129,9 @@
     "description": "Dexterity Saving Throw: DC 10, each creature in a 10-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point within 30 feet. Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
     "save": {
      "ability": "dex",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [
      {
@@ -18093,7 +18275,9 @@
     "description": "Dexterity Saving Throw: DC 17, one creature Grappled by the glabrezu. Failure: 15 (3d6 + 5) Bludgeoning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -18248,7 +18432,9 @@
     "description": "Strength Saving Throw: DC 15, one creature within 5 feet that the gladiator can see. Failure: 9 (2d4 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
     "save": {
      "ability": "str",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "prone"
     },
     "damage": [
      {
@@ -18909,7 +19095,9 @@
     "description": "Dexterity Saving Throw: DC 13, each creature in a 15-foot Cone. Failure: 22 (4d10) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -18930,7 +19118,9 @@
     "description": "Strength Saving Throw: DC 13, each creature that isn't currently affected by this breath in a 15-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Test and subtracts 2 (1d4) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "str",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    }
@@ -19040,7 +19230,9 @@
     "description": "Dexterity Saving Throw: DC 16, one creature within 5 feet that has the Prone condition. Failure: 16 (2d10 + 5) Bludgeoning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -19056,7 +19248,9 @@
     "description": "Constitution Saving Throw: DC 15, each creature in a 30-foot Cone. First Failure The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure The target has the Petrified condition instead of the Restrained condition.",
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [],
     "uses": {
@@ -19283,7 +19477,9 @@
     "description": "Constitution Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: 21 (6d6) Poison damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -20079,7 +20275,9 @@
     "description": "Constitution Saving Throw: DC 16, one creature the naga can see within 60 feet. Failure: 31 (7d8) Poison damage, and the target has the Blinded condition until the start of the naga's next turn. Success: Half damage only.",
     "save": {
      "ability": "con",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "half",
+     "failureCondition": "blinded"
     },
     "damage": [
      {
@@ -20226,7 +20424,9 @@
     "description": "Dexterity Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: 28 (8d6) damage of the type chosen for the Draconic Origin trait. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [],
     "uses": {
@@ -20338,7 +20538,9 @@
     "description": "The harpy sings a magical melody, which lasts until the harpy's Concentration ends on it. Wisdom Saving Throw: DC 11, each Humanoid and Giant in a 300-foot Emanation originating from the harpy when the song starts. Failure: The target has the Charmed condition until the song ends and repeats the save at the end of each of its turns. While Charmed, the target has the Incapacitated condition and ignores the Luring Song of other harpies. If the target is more than 5 feet from the harpy, the target moves on its turn toward the harpy by the most direct route, trying to get within 5 feet of the harpy. It doesn't avoid Opportunity Attacks; however, before moving into damaging terrain (such as lava or a pit) and whenever it takes damage from a source other than the harpy, the target repeats the save. Success: The target is immune to this harpy's Luring Song for 24 hours.",
     "save": {
      "ability": "wis",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     },
     "damage": []
    }
@@ -20533,7 +20735,9 @@
     "description": "Dexterity Saving Throw: DC 12, each creature in a 15-foot Cone. Failure: 17 (5d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -21339,7 +21543,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": []
    }
@@ -21475,7 +21681,9 @@
     "description": "Dexterity Saving Throw: DC 17, one creature the devil can see within 10 feet. Failure: 10 (1d8 + 6) Necrotic damage, and the target receives an infernal wound if it doesn't have one. While wounded, the target loses 10 (3d6) Hit Points at the start of each of its turns. The wound closes after 1 minute, after a spell restores Hit Points to the target, or after the target or a creature within 5 feet of it takes an action to stanch the wound, doing so by succeeding on a DC 17 Wisdom (Medicine) check.",
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -22047,7 +22255,9 @@
     "description": "Constitution Saving Throw: DC 10, each creature in a 15-foot Cone. Failure: 7 (3d4) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -22298,7 +22508,9 @@
     "description": "Wisdom Saving Throw: DC 15, one creature the incubus can see within 60 feet. Failure: If the target has 20 Hit Points or fewer, it has the Unconscious condition for 1 hour, until it takes damage, or until a creature within 5 feet of it takes an action to wake it. Otherwise, the target takes 18 (4d8) Psychic damage.",
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "unconscious"
     },
     "damage": [
      {
@@ -22456,7 +22668,9 @@
     "description": "Constitution Saving Throw: DC 14, one Large or smaller creature in the stalker's space. Failure: 7 (1d8 + 3) Thunder damage, and the target has the Grappled condition (escape DC 13). Until the grapple ends, the target can't cast spells with a Verbal component and takes 7 (2d6) Thunder damage at the start of each of the stalker's turns.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -22611,7 +22825,9 @@
     "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: 55 (10d10) Poison damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -23186,7 +23402,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 23, each creature in a 15-foot Emanation originating from the kraken while it is underwater. Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 23
+     "dc": 23,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [],
     "legendary": {
@@ -23200,7 +23418,9 @@
     "description": "The kraken throws a Large or smaller creature Grappled by it to a space it can see within 60 feet of itself that isn't in the air. Dexterity Saving Throw: DC 25, the creature thrown and each creature in the destination space. Failure: 18 (4d8) Bludgeoning damage, and the target has the Prone condition. Success: Half damage only.",
     "save": {
      "ability": "dex",
-     "dc": 25
+     "dc": 25,
+     "successDamage": "half",
+     "failureCondition": "prone"
     },
     "damage": [
      {
@@ -23216,7 +23436,9 @@
     "description": "Dexterity Saving Throw: DC 23, one creature the kraken can see within 120 feet. Failure: 33 (6d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 23
+     "dc": 23,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -23232,7 +23454,9 @@
     "description": "Dexterity Saving Throw: DC 25, one creature Grappled by the kraken (it can have up to four creatures swallowed at a time). Failure: 23 (3d8 + 10) Piercing damage. If the target is Large or smaller, it is swallowed and no longer Grappled. A swallowed creature has the Restrained condition, has Cover|XPHB|Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns. If the kraken takes 50 damage or more on a single turn from a creature inside it, the kraken must succeed on a DC 25 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the kraken with the Prone condition. If the kraken dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "dex",
-     "dc": 25
+     "dc": 25,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [
      {
@@ -23389,7 +23613,9 @@
     "description": "Wisdom Saving Throw: DC 13, one creature the lamia can see within 5 feet. Failure: 13 (3d8) Psychic damage, and the target is cursed for 1 hour. Until the curse ends, the target has the Charmed and Poisoned conditions.",
     "save": {
      "ability": "wis",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     },
     "damage": [
      {
@@ -23617,7 +23843,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 20, each creature that isn't an Undead in a 20-foot Emanation originating from the lich. Failure: 31 (9d6) Necrotic damage. Success: Half damage. Failure or Success: The lich can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -23817,7 +24045,9 @@
     "description": "Wisdom Saving Throw: DC 11, one creature within 15 feet. Failure: The target has the Frightened condition until the start of the lion's next turn.",
     "save": {
      "ability": "wis",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": []
    }
@@ -24148,7 +24378,9 @@
     "description": "Dexterity Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: 7 (2d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -24374,7 +24606,9 @@
     "description": "Dexterity Saving Throw: DC 18, one creature within 5 feet that has the Prone condition. Failure: 29 (4d10 + 7) Bludgeoning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -24634,7 +24868,9 @@
     "description": "Strength Saving Throw: DC 17, one Medium or smaller creature the marilith can see within 5 feet. Failure: 15 (2d10 + 4) Bludgeoning damage. The target has the Grappled condition (escape DC 14), and it has the Restrained condition until the grapple ends.",
     "save": {
      "ability": "str",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -24861,7 +25097,9 @@
     "description": "Constitution Saving Throw: DC 13, each creature in a 30-foot Cone. If the medusa sees its reflection in the Cone, the medusa must make this save. First Failure The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure The target has the Petrified condition instead of the Restrained condition.",
     "save": {
      "ability": "con",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     },
     "damage": [],
     "uses": {
@@ -25715,7 +25953,9 @@
     "description": "Wisdom Saving Throw: DC 11, one creature the mummy can see within 60 feet. Failure: The target has the Frightened condition until the end of the mummy's next turn. Success: The target is immune to this mummy's Dreadful Glare for 24 hours.",
     "save": {
      "ability": "wis",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": []
    }
@@ -25887,7 +26127,9 @@
     "description": "Wisdom Saving Throw: DC 17, one creature the mummy can see within 60 feet. Failure: 25 (6d6 + 4) Psychic damage, and the target has the Paralyzed condition until the end of the mummy's next turn.",
     "save": {
      "ability": "wis",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": "paralyzed"
     },
     "damage": [
      {
@@ -26012,7 +26254,9 @@
     "description": "Wisdom Saving Throw: DC 15, each creature in a 15-foot Emanation originating from the nalfeshnee. Failure: 28 (8d6) Psychic damage, and the target has the Frightened condition for 1 minute, until it takes damage, or until it ends its turn with the nalfeshnee out of line of sight. Success: The target is immune to this nalfeshnee's Horror Nimbus for 24 hours.",
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": [
      {
@@ -27103,7 +27347,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -27146,7 +27392,9 @@
     "description": "Constitution Saving Throw: DC 14, each creature Grappled by the otyugh. Failure: 16 (3d8 + 3) Bludgeoning damage, and the target has the Stunned condition until the start of the otyugh's next turn. Success: Half damage only.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "half",
+     "failureCondition": "stunned"
     },
     "damage": [
      {
@@ -27858,7 +28106,9 @@
     "description": "Wisdom Saving Throw: DC 12, one creature the pirate can see within 30 feet. Failure: The target has the Charmed condition until the start of the pirate's next turn.",
     "save": {
      "ability": "wis",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     },
     "damage": []
    }
@@ -27941,7 +28191,9 @@
     "description": "Wisdom Saving Throw: DC 14, one creature the pirate can see within 30 feet. Failure: The target has the Charmed condition until the start of the pirate's next turn.",
     "save": {
      "ability": "wis",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     },
     "damage": []
    },
@@ -28082,7 +28334,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": [
      {
@@ -28286,7 +28540,9 @@
     "description": "Dexterity Saving Throw: DC 20, each enemy in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the planetar can see within 120 feet. Failure: 24 (7d6) Radiant damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -28966,7 +29222,9 @@
     "description": "Constitution Saving Throw: DC 12, one creature the pseudodragon can see within 5 feet. Failure: 5 (2d4) Poison damage, and the target has the Poisoned condition for 1 hour. Failure by 5 or More: While Poisoned, the target also has the Unconscious condition, which ends early if the target takes damage or a creature within 5 feet of it takes an action to wake it.",
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": [
      {
@@ -29172,7 +29430,9 @@
     "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the worm (it can have up to three creatures swallowed at a time). Failure: The target is swallowed by the worm, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions, has Cover|XPHB|Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns. If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the worm and has the Prone condition. If the worm dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [
      {
@@ -29327,7 +29587,9 @@
     "description": "Wisdom Saving Throw: DC 10, one creature within 20 feet. Failure: The target has the Frightened condition. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "wis",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": [],
     "uses": {
@@ -29475,7 +29737,9 @@
     "description": "Wisdom Saving Throw: DC 18, each enemy in a 30-foot Emanation originating from the rakshasa. Failure: 28 (8d6) Psychic damage, and the target has the Frightened and Incapacitated conditions until the start of the rakshasa's next turn.",
     "save": {
      "ability": "wis",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     },
     "damage": [
      {
@@ -29797,7 +30061,9 @@
     "description": "Dexterity Saving Throw: DC 13, each creature in a 15-foot Cone. Failure: 24 (7d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -30022,7 +30288,9 @@
     "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the remorhaz (it can have up to two creatures swallowed at a time). Failure: The target is swallowed by the remorhaz, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions, it has Cover|XPHB|Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns. If the remorhaz takes 30 damage or more on a single turn from a creature inside it, the remorhaz must succeed on a DC 15 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the remorhaz and has the Prone condition. If the remorhaz dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse by using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
-     "dc": 19
+     "dc": 19,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [
      {
@@ -30608,7 +30876,9 @@
     "description": "The rust monster targets one nonmagical metal object—armor or a weapon—worn or carried by a creature within 5 feet of itself. Dexterity Saving Throw: DC 11, the creature with the object. Failure: The object takes a -1 penalty to the AC it offers (armor) or to its attack rolls (weapon). Armor is destroyed if the penalty reduces its AC to 10, and a weapon is destroyed if its penalty reaches -5. The penalty can be removed by casting the Mending spell on the armor or weapon.",
     "save": {
      "ability": "dex",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -30978,7 +31248,9 @@
     "description": "Strength Saving Throw: DC 15, one Large or smaller creature the salamander can see within 10 feet. Failure: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage. The target has the Grappled condition (escape DC 14), and it has the Restrained condition until the grapple ends.",
     "save": {
      "ability": "str",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -31096,7 +31368,9 @@
     "description": "Wisdom Saving Throw: DC 12, one creature the satyr can see within 90 feet. Failure: 5 (1d6 + 2) Psychic damage.",
     "save": {
      "ability": "wis",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -31402,7 +31676,9 @@
     "description": "Wisdom Saving Throw: DC 11, one Frightened creature the hag can see within 30 feet. Failure: If the target has 20 Hit Points or fewer, it drops to 0 Hit Points. Otherwise, the target takes 13 (3d8) Psychic damage.",
     "save": {
      "ability": "wis",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -31754,7 +32030,9 @@
     "description": "Strength Saving Throw: DC 15, one Medium or smaller creature within 5 feet. Failure: The target is pulled into the shambling mound's space and has the Grappled condition (escape DC 14). Until the grapple ends, the target has the Blinded and Restrained conditions, and it takes 10 (3d6) Lightning damage at the start of each of its turns. When the shambling mound moves, the Grappled target moves with it, costing it no extra movement. The shambling mound can have only one creature Grappled by this action at a time.",
     "save": {
      "ability": "str",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -32105,7 +32383,9 @@
     "description": "Constitution Saving Throw: DC 13, each creature in a 15-foot Cone. Failure: 18 (4d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -32126,7 +32406,9 @@
     "description": "Constitution Saving Throw: DC 13, each creature in a 15-foot Cone. First Failure The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "con",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    }
@@ -32329,7 +32611,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 25, one creature the solar can see within 120 feet. Failure: The target has the Blinded condition for 1 minute. Failure or Success: The solar can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 25
+     "dc": 25,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [],
     "legendary": {
@@ -32384,7 +32668,9 @@
     "description": "Legendary Action. The solar teleports up to 60 feet to an unoccupied space it can see. Dexterity Saving Throw: DC 25, each creature in a 10-foot Emanation originating from the solar at its destination space. Failure: 11 (2d10) Radiant damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 25
+     "dc": 25,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -32403,7 +32689,9 @@
     "description": "Dexterity Saving Throw: DC 21, one creature the solar can see within 600 feet. Failure: If the creature has 100 Hit Points or fewer, it dies. It otherwise takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
     "save": {
      "ability": "dex",
-     "dc": 21
+     "dc": 21,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -32695,7 +32983,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [],
     "legendary": {
@@ -32709,7 +32999,9 @@
     "description": "Wisdom Saving Throw: DC 16, each enemy in a 300-foot Emanation originating from the sphinx. Failure: 35 (10d6) Psychic damage, and the target has the Incapacitated condition until the start of the sphinx's next turn.",
     "save": {
      "ability": "wis",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": [
      {
@@ -32874,7 +33166,9 @@
     "description": "Legendary Action. Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [],
     "legendary": {
@@ -32888,7 +33182,9 @@
     "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
     "save": {
      "ability": "wis",
-     "dc": 20
+     "dc": 20,
+     "successDamage": "half",
+     "failureCondition": "frightened"
     },
     "damage": [
      {
@@ -33378,7 +33674,9 @@
     "description": "Charisma Saving Throw: DC 10, one creature within 5 feet the sprite can see (Celestials, Fiends, and Undead automatically fail the save). Failure: The sprite knows the target's emotions and alignment.",
     "save": {
      "ability": "cha",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -33596,7 +33894,9 @@
     "description": "Constitution Saving Throw: DC 10, each creature in a 15-foot Cone. Failure: 5 (2d4) Fire damage, and the target's Speed decreases by 10 feet until the end of the mephit's next turn. Success: Half damage only. Failure or Success: Being underwater doesn't grant Resistance to this Fire damage.",
     "save": {
      "ability": "con",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -34119,7 +34419,9 @@
     "description": "Dexterity Saving Throw: DC 18, each creature in a 10-foot-radius, 40-foot-high Cylinder [Area of Effect]|XPHB|Cylinder originating from a point the giant can see within 500 feet. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 18
+     "dc": 18,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -34271,7 +34573,9 @@
     "description": "Constitution Saving Throw: DC 15, one creature Charmed by the succubus within 5 feet. Failure: 13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken.",
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -34898,7 +35202,9 @@
     "description": "Wisdom Saving Throw: DC 10, one creature in the swarm's space. Failure: The target has the Deafened condition until the start of the swarm's next turn. While Deafened, the target also has Disadvantage on ability checks and attack rolls.",
     "save": {
      "ability": "wis",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": "deafened"
     },
     "damage": [],
     "uses": {
@@ -35103,7 +35409,9 @@
     "description": "Strength Saving Throw: DC 27, one Large or smaller creature Grappled by the tarrasque (it can have up to six creatures swallowed at a time). Failure: The target is swallowed, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Cover|XPHB|Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the tarrasque and has the Prone condition. If the tarrasque dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
-     "dc": 27
+     "dc": 27,
+     "successDamage": "none",
+     "failureCondition": "blinded"
     },
     "damage": [
      {
@@ -35197,7 +35505,9 @@
     "description": "Constitution Saving Throw: DC 27, each creature and each object that isn't being worn or carried in a 150-foot Cone. Failure: 78 (12d12) Thunder damage, and the target has the Deafened and Frightened conditions until the end of its next turn. Success: Half damage only.",
     "save": {
      "ability": "con",
-     "dc": 27
+     "dc": 27,
+     "successDamage": "half",
+     "failureCondition": "deafened"
     },
     "damage": [
      {
@@ -36516,7 +36826,9 @@
     "description": "Constitution Saving Throw: DC 17, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 6 (1d4 + 4) Piercing damage plus 13 (3d8) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount. A Humanoid reduced to 0 Hit Points by this damage and then buried rises the following sunset as a Vampire Spawn under the vampire's control.",
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -36801,7 +37113,9 @@
     "description": "Constitution Saving Throw: DC 14, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -37129,7 +37443,9 @@
     "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock. Failure: The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. While Poisoned, the target takes 5 (1d10) Poison damage at the start of each of its turns. Emptying a flask of Holy Water on the target ends the effect early.",
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "poisoned"
     },
     "damage": [
      {
@@ -37150,7 +37466,9 @@
     "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock (demons succeed automatically). Failure: 10 (3d6) Thunder damage, and the target has the Stunned condition until the end of the vrock's next turn.",
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "stunned"
     },
     "damage": [
      {
@@ -37795,7 +38113,9 @@
     "description": "Strength Saving Throw: DC 15, each creature in the elemental's space. Failure: 22 (4d8 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14). Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water, and takes 9 (2d8) Bludgeoning damage at the start of each of the elemental's turns. The elemental can grapple one Large creature or up to two Medium or smaller creatures at a time with Whelm. As an action, a creature within 5 feet of the elemental can pull a creature out of it by succeeding on a DC 14 Strength (Athletics) check. Success: Half damage only.",
     "save": {
      "ability": "str",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": "grappled"
     },
     "damage": [
      {
@@ -38023,7 +38343,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -38165,7 +38487,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -38305,7 +38629,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 11
+     "dc": 11,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -38446,7 +38772,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -38594,7 +38922,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -38755,7 +39085,9 @@
     "description": "Constitution Saving Throw: DC 12, each creature in a 15-foot Cone. Failure: 22 (5d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -38899,7 +39231,9 @@
     "description": "Constitution Saving Throw: DC 13, one creature within 5 feet. Failure: 6 (1d8 + 2) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. A Humanoid slain by this attack rises 24 hours later as a Zombie under the wight's control, unless the Humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at a time.",
     "save": {
      "ability": "con",
-     "dc": 13
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -39004,7 +39338,9 @@
     "description": "Constitution Saving Throw: DC 10, one living creature the wisp can see within 5 feet that has 0 Hit Points. Failure: The target dies, and the wisp regains 10 (3d6) Hit Points.",
     "save": {
      "ability": "con",
-     "dc": 10
+     "dc": 10,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    },
@@ -39171,7 +39507,9 @@
     "description": "Constitution Saving Throw: DC 12, each creature in a 15-foot Cone. Failure: 18 (4d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 12
+     "dc": 12,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -39887,7 +40225,9 @@
     "description": "Dexterity Saving Throw: DC 14, each creature in a 30-foot-long, 5-foot-wide Line. Failure: 49 (14d6) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40024,7 +40364,9 @@
     "description": "Dexterity Saving Throw: DC 16, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 16
+     "dc": 16,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40152,7 +40494,9 @@
     "description": "Dexterity Saving Throw: DC 14, each creature in a 40-foot-long, 5-foot-wide Line. Failure: 38 (11d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40173,7 +40517,9 @@
     "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure The target has the Unconscious condition for 1 minute. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    }
@@ -40291,7 +40637,9 @@
     "description": "Dexterity Saving Throw: DC 15, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 49 (9d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40312,7 +40660,9 @@
     "description": "Strength Saving Throw: DC 15, each creature in a 30-foot Cone. Failure: The target is pushed up to 40 feet straight away from the dragon and has the Prone condition.",
     "save": {
      "ability": "str",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "prone"
     },
     "damage": []
    }
@@ -40435,7 +40785,9 @@
     "description": "Dexterity Saving Throw: DC 14, each creature in a 40-foot-long, 5-foot-wide Line. Failure: 40 (9d8) Acid damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40456,7 +40808,9 @@
     "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    }
@@ -40574,7 +40928,9 @@
     "description": "Dexterity Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 55 (10d10) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40595,7 +40951,9 @@
     "description": "Strength Saving Throw: DC 17, each creature that isn't currently affected by this breath in a 30-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Test and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "str",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     },
     "damage": []
    }
@@ -40722,7 +41080,9 @@
     "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: 42 (12d6) Poison damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 14
+     "dc": 14,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40862,7 +41222,9 @@
     "description": "Dexterity Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 56 (16d6) Fire damage. Success: Half damage.",
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -40990,7 +41352,9 @@
     "description": "Constitution Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 49 (11d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {
@@ -41011,7 +41375,9 @@
     "description": "Constitution Saving Throw: DC 17, each creature in a 30-foot Cone. First Failure The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": "incapacitated"
     },
     "damage": []
    }
@@ -41133,7 +41499,9 @@
     "description": "Constitution Saving Throw: DC 15, each creature in a 30-foot Cone. Failure: 40 (9d8) Cold damage. Success: Half damage.",
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     },
     "damage": [
      {

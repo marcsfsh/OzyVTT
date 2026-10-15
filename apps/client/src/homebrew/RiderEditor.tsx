@@ -19,6 +19,7 @@ import {
   diceValidate,
   grouped,
   opt,
+  saveOutcomeFields,
   suggestionLabel,
   type Draft,
   type FieldDef,
@@ -1104,7 +1105,8 @@ const actionsField = (scope: RiderScope): FieldDef => ({
           min: 1,
           max: 40,
           help: "Leave empty to use the character's own spell save DC."
-        }
+        },
+        ...saveOutcomeFields("save")
       ]
     },
     actionUsesField()

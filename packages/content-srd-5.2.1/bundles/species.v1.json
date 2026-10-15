@@ -103,7 +103,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -176,7 +178,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -249,7 +253,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -322,7 +328,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -395,7 +403,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -468,7 +478,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -541,7 +553,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -614,7 +628,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -687,7 +703,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {
@@ -760,7 +778,9 @@
                     "base": 8,
                     "ability": "con",
                     "proficiencyBonus": true
-                  }
+                  },
+                  "successDamage": "half",
+                  "failureCondition": null
                 },
                 "damage": [
                   {

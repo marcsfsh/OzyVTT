@@ -350,7 +350,12 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
 
   it("rolls the printed damage against the real spell save DC, growing at 10 and 14", () => {
     // WIS 15 + 2 (background) = 17 -> +3, proficiency +2, so DC 13, derived from the character.
-    expect(actionOf(definition, "lands-aid")?.save).toEqual({ ability: "con", dc: 13 });
+    expect(actionOf(definition, "lands-aid")?.save).toEqual({
+      ability: "con",
+      dc: 13,
+      successDamage: "half",
+      failureCondition: null
+    });
     expect(actionOf(definition, "lands-aid")?.damage).toEqual([{ formula: "2d6", type: "necrotic" }]);
     expect(
       actionOf(build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.damage

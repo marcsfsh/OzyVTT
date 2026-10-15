@@ -29,7 +29,7 @@ const BREATH = {
   name: "Fire Breath",
   activation: "action" as const,
   description: "Dexterity Saving Throw: DC 15. Failure: 10 (3d6) Fire damage. Success: Half damage.",
-  save: { ability: "dex" as const, dc: 15 },
+  save: { ability: "dex" as const, dc: 15, successDamage: "half" as const, failureCondition: null },
   damage: [{ formula: "3d6", type: "fire" }]
 };
 

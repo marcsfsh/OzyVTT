@@ -481,7 +481,12 @@ describe("row 4: an item action's attack and save halves", () => {
       {
         id: "burst",
         name: "Burst",
-        save: { ability: "dex", dc: { base: 8, ability: "cha", proficiencyBonus: true } },
+        save: {
+          ability: "dex",
+          dc: { base: 8, ability: "cha", proficiencyBonus: true },
+          successDamage: "half",
+          failureCondition: null
+        },
         damage: [{ formula: "2d6", type: "thunder" }],
         description: "Failure: 2d6 thunder. Success: Half damage."
       }
@@ -514,7 +519,7 @@ describe("row 4: an item action's attack and save halves", () => {
       (entry) => entry.id === "item-rod-of-blasting-burst"
     )!;
     // 8 + cha 10 (+0) + proficiency 2 = 10.
-    expect(burst.save).toEqual({ ability: "dex", dc: 10 });
+    expect(burst.save).toEqual({ ability: "dex", dc: 10, successDamage: "half", failureCondition: null });
     resolveDefinitionAction(
       state,
       burst,
@@ -543,7 +548,7 @@ describe("row 4: an item action's attack and save halves", () => {
           id: "bolt",
           name: "Bolt",
           attack: { ability: "spellcasting" },
-          save: { ability: "wis", dc: 15 },
+          save: { ability: "wis", dc: 15, successDamage: "none", failureCondition: "charmed" },
           damage: [{ formula: "1d10", type: "force" }]
         }
       ]
@@ -558,7 +563,7 @@ describe("row 4: an item action's attack and save halves", () => {
       (entry) => entry.id === "item-wand-of-the-schooled-bolt"
     )!;
     expect(bolt.attack).toMatchObject({ bonus: 6 });
-    expect(bolt.save).toEqual({ ability: "wis", dc: 15 });
+    expect(bolt.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureCondition: "charmed" });
   });
 });
 
@@ -642,8 +647,8 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     level: 3,
     attackRoll: false,
     damage: { roll: "8d6", types: ["fire"] },
-    save: "dex",
-    description: "A bright streak flashes from you. Success: Half damage.",
+    save: { ability: "dex", successDamage: "half", failureCondition: null },
+    description: "A bright streak flashes from you.",
     castingOptions: [
       { type: "slot_level_4", damageRoll: "9d6", targetCount: null },
       { type: "slot_level_5", damageRoll: "10d6", targetCount: null }
@@ -676,7 +681,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     expect(cast.name).toBe("Cast Fireball (Wand of Fireballs)");
     expect(cast.damage).toEqual([{ formula: "8d6", type: "fire" }]);
     // No authored ability or DC: the wielder is no caster, so 8 + cha/int modifier 0 + proficiency 2.
-    expect(cast.save).toEqual({ ability: "dex", dc: 10 });
+    expect(cast.save).toEqual({ ability: "dex", dc: 10, successDamage: "half", failureCondition: null });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest" });
 
     resolveDefinitionAction(
@@ -695,7 +700,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
       (entry) => entry.id === "item-wand-of-fireballs-cast-fireball"
     )!;
     expect(cast.damage).toEqual([{ formula: "10d6", type: "fire" }]);
-    expect(cast.save).toEqual({ ability: "dex", dc: 15 });
+    expect(cast.save).toEqual({ ability: "dex", dc: 15, successDamage: "half", failureCondition: null });
   });
 
   it("spends the wearer's own spell slot when the item says it does, and refuses when the pool is empty", () => {

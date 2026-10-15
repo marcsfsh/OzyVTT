@@ -561,7 +561,7 @@ describe("the charges a worn item rations", () => {
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-robe-of-scintillating-colors-dazzle"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15 });
+    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureCondition: "stunned" });
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
     resolveDefinitionAction(
@@ -570,8 +570,7 @@ describe("the charges a worn item rations", () => {
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) },
       deps([], definition)
     );
-    // The condition is not an authored field: `conditionFrom` reads "Stunned" from the prose, which is
-    // why the module keeps the SRD's word verbatim.
+    // The prompt carries the condition the action's save block declares.
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionId: "stunned" });
     expect(actor.actionUses["robe-of-scintillating-colors-charges"]).toBe(1);
 
@@ -624,8 +623,8 @@ describe("the casts that survived the spell-record check", () => {
     const suggest = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-suggestion")!;
 
     // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
-    expect(detect.save).toEqual({ ability: "wis", dc: 13 });
-    expect(suggest.save).toEqual({ ability: "wis", dc: 13 });
+    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: null });
+    expect(suggest.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: "charmed" });
     // Neither cast synthesizes damage or an attack from the spell's text.
     expect(detect.damage).toEqual([]);
     expect(suggest.damage).toEqual([]);
@@ -656,7 +655,7 @@ describe("the casts that survived the spell-record check", () => {
     const cast = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-eyes-of-charming-cast-charm-person"
     )!;
-    expect(cast.save).toEqual({ ability: "wis", dc: 13 });
+    expect(cast.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: "charmed" });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" });
     resolveDefinitionAction(
       state,
@@ -670,7 +669,7 @@ describe("the casts that survived the spell-record check", () => {
     const detect = effectiveActions(definition, medallion.actors[0], catalog).find(
       (entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts"
     )!;
-    expect(detect.save).toEqual({ ability: "wis", dc: 13 });
+    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: null });
     expect(detect.uses).toEqual({ limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" });
   });
 

@@ -140,6 +140,7 @@ const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly
   { component: "HomebrewMulticlassPrerequisite", schema: bundle.MulticlassPrerequisiteSchema },
   // Hoisted because they are nullable object properties, which `fieldRows` cannot flatten.
   { component: "HomebrewSpellShape", schema: objectOf(bundle.SpellReferenceSchema).shape.shape },
+  { component: "HomebrewSpellSave", schema: objectOf(bundle.SpellReferenceSchema).shape.save },
   { component: "HomebrewEquipmentWeapon", schema: objectOf(bundle.EquipmentReferenceSchema).shape.weapon },
   { component: "HomebrewEquipmentArmor", schema: objectOf(bundle.EquipmentReferenceSchema).shape.armor },
   // The magic-item vocabulary, hoisted for the same one-level flattening reason.
