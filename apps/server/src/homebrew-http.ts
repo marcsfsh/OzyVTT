@@ -44,6 +44,7 @@ import {
   HOMEBREW_ID_PREFIX
 } from "./homebrew-ids.js";
 import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.js";
+import type { HomebrewValidationScenario } from "./homebrew-validate.js";
 
 /**
  * Homebrew authoring REST (`/api/v1/homebrew/*`). Every route is GM-only: players see homebrew only through the
@@ -73,8 +74,12 @@ export const HOMEBREW_PACK_BODY_LIMIT = "4mb";
 const MAX_PACK_RECORDS = 500;
 
 /** Publish validation. The always-valid fallback is only for store-only test fixtures. */
-/** `replacing` is set when `body` is a published record's pending edits; see `createHomebrewValidator`. */
-export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody, replacing?: string) => HomebrewValidity;
+/** `scenario` asks about the table as it would be; see `createHomebrewValidator`. */
+export type HomebrewValidator = (
+  type: HomebrewContentType,
+  body: HomebrewBody,
+  scenario?: HomebrewValidationScenario
+) => HomebrewValidity;
 const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [], warnings: [] });
 
 /** Reference scan over GameState (`homebrew-usages.ts`). */
@@ -153,7 +158,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     // A published record's editor works on its pending edits, so the report describes what Publish would put live.
-    validity: row.pendingBody ? validate(row.type, row.pendingBody, row.id) : validate(row.type, row.body),
+    validity: row.pendingBody ? validate(row.type, row.pendingBody, { without: row.id }) : validate(row.type, row.body),
     pendingChanges: row.pendingBody !== null,
     record: { ...(row.pendingBody ?? row.body), type: row.type }
   });
@@ -274,7 +279,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       const existing = store.get(id);
       if (!existing) return sendFailure(response, 404, "not_found", "That record was not found.");
       const validity = existing.pendingBody
-        ? validate(existing.type, existing.pendingBody, existing.id)
+        ? validate(existing.type, existing.pendingBody, { without: existing.id })
         : validate(existing.type, existing.body);
       if (!validity.valid)
         return sendFailure(
@@ -319,12 +324,35 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  // Always `safeToDelete`: built characters are self-contained, so the count is informational.
+  /** Published records that publish now and would not in `scenario`: what removing or updating a record breaks. */
+  const dependentsIn = (scenario: HomebrewValidationScenario) =>
+    store
+      .listPublished()
+      .filter(
+        (other) =>
+          other.id !== scenario.without &&
+          validate(other.type, other.body).valid &&
+          !validate(other.type, other.body, scenario).valid
+      )
+      .map((other) => ({ id: other.id, type: other.type, name: other.name }));
+
+  // Built characters are self-contained, so `usages` never makes a removal unsafe; a published dependent does.
   router.get(expressPath(HOMEBREW_PATHS.contentUsages), requireGm, (request, response) => {
     const id = pathParam(request, "id");
     const row = store.get(id);
     if (!row) return sendFailure(response, 404, "not_found", "That record was not found.");
-    return sendData(response, 200, { id, usages: usagesOf(row.type, id), safeToDelete: true });
+    // A draft can break a published record too: a class publishes on the strength of a draft subclass.
+    const ifRemoved = dependentsIn({ without: id, archived: true });
+    const ifUpdated =
+      row.pendingBody !== null
+        ? dependentsIn({ without: id, replacement: { type: row.type, body: row.pendingBody } })
+        : [];
+    return sendData(response, 200, {
+      id,
+      usages: usagesOf(row.type, id),
+      safeToDelete: ifRemoved.length === 0,
+      dependents: { ifRemoved, ifUpdated }
+    });
   });
 
   // Packs (GM-to-GM interchange)

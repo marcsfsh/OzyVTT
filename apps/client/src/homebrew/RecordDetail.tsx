@@ -13,6 +13,7 @@ import {
   homebrewApi,
   invalidIssuesOf,
   listAllHomebrew,
+  type HomebrewDependent,
   type HomebrewRecordDocument,
   type HomebrewRecordSummary
 } from "./api";
@@ -238,7 +239,33 @@ export function RecordDetail({
     }
   };
 
-  const publish = () => runStateChange(() => homebrewApi.publish(gmToken, docRef.current.id, docRef.current.rev));
+  /** The published records an action would break, asked of the server first. Best-effort: a failed read
+      never blocks the action itself. */
+  const dependentsFor = async (which: "ifRemoved" | "ifUpdated"): Promise<readonly HomebrewDependent[]> => {
+    try {
+      await autosave.flush();
+      return (await homebrewApi.usages(gmToken, docRef.current.id)).dependents[which];
+    } catch {
+      return [];
+    }
+  };
+
+  const publish = async () => {
+    if (docRef.current.state === "published" && docRef.current.pendingChanges) {
+      const breaks = await dependentsFor("ifUpdated");
+      if (
+        breaks.length > 0 &&
+        !(await confirm({
+          title: "Put these changes live?",
+          body: `${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on this as it is now and would stop working.`,
+          confirmLabel: "Update anyway",
+          danger: true
+        }))
+      )
+        return;
+    }
+    await runStateChange(() => homebrewApi.publish(gmToken, docRef.current.id, docRef.current.rev));
+  };
   const discard = async () => {
     const confirmed = await confirm({
       title: "Discard these changes?",
@@ -264,7 +291,20 @@ export function RecordDetail({
       setBusy(false);
     }
   };
-  const unpublish = () => runStateChange(() => homebrewApi.unpublish(gmToken, docRef.current.id, docRef.current.rev));
+  const unpublish = async () => {
+    const breaks = await dependentsFor("ifRemoved");
+    if (
+      breaks.length > 0 &&
+      !(await confirm({
+        title: "Unpublish this?",
+        body: `${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on it and would stop working until it is published again.`,
+        confirmLabel: "Unpublish anyway",
+        danger: true
+      }))
+    )
+      return;
+    await runStateChange(() => homebrewApi.unpublish(gmToken, docRef.current.id, docRef.current.rev));
+  };
   const setVisible = (visible: boolean) =>
     void runStateChange(() => homebrewApi.setVisibility(gmToken, docRef.current.id, visible, docRef.current.rev));
   const restore = () => runStateChange(() => homebrewApi.restore(gmToken, docRef.current.id));
@@ -277,11 +317,17 @@ export function RecordDetail({
   const remove = async () => {
     const name = nameOf(draft).trim() || `this ${typeLabel(doc.type)}`;
     // `danger: false`: archiving is reversible, so it is a caution, not destruction.
+    const breaks = await dependentsFor("ifRemoved");
+    // `danger` only when a published record would break; otherwise archiving is a reversible caution.
     const confirmed = await confirm({
       title: "Archive this?",
-      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
+      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.${
+        breaks.length > 0
+          ? ` ${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on it and would stop working.`
+          : ""
+      }`,
       confirmLabel: "Archive",
-      danger: false
+      danger: breaks.length > 0
     });
     if (!confirmed) return;
     setBusy(true);
@@ -453,11 +499,9 @@ export function RecordDetail({
         >
           <p>
             {brokeOthers.length === 1
-              ? "It's still published, but it can't be published as it stands"
-              : "They're still published, but they can't be published as they stand"}
-            , so the next edit to {brokeOthers.length === 1 ? "it" : "them"} puts{" "}
-            {brokeOthers.length === 1 ? "it" : "them"} back to Draft. Restore this one, or fix{" "}
-            {brokeOthers.length === 1 ? "it" : "them"}.
+              ? "It's still published, but it names something that's gone, so it won't work as it stands"
+              : "They're still published, but they name something that's gone, so they won't work as they stand"}
+            . Restore this one, or fix {brokeOthers.length === 1 ? "it" : "them"}.
           </p>
           <div className="hb-broke-list">
             {brokeOthers.map((row) => (
@@ -498,4 +542,12 @@ export function RecordDetail({
       {dialog}
     </article>
   );
+}
+
+/** "Hemomancy", "Hemomancy and Bloodline" or "Hemomancy, Bloodline and 2 more", quoted. */
+function dependentNames(dependents: readonly HomebrewDependent[]): string {
+  const quoted = dependents.map((dependent) => `"${dependent.name}"`);
+  if (quoted.length === 1) return quoted[0];
+  if (quoted.length <= 3) return `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`;
+  return `${quoted.slice(0, 2).join(", ")} and ${quoted.length - 2} more`;
 }

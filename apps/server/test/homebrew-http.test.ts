@@ -26,7 +26,7 @@ import {
 } from "../src/homebrew-http.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { findCatalogRecord } from "../src/homebrew-srd-copy.js";
-import { createHomebrewValidator } from "../src/homebrew-validate.js";
+import { createHomebrewValidator, scenarioCatalogs } from "../src/homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "../src/homebrew-usages.js";
 import { requestConventions } from "../src/http-kit.js";
 
@@ -66,7 +66,7 @@ async function fixture(options: { validate?: HomebrewValidator; realValidation?:
         (options.realValidation
           ? createHomebrewValidator({
               forAudience: (audience) => contentLibrary.forAudience(audience),
-              forAudienceWithout: (audience, id) => contentLibrary.forAudienceWithout(audience, id),
+              forScenario: scenarioCatalogs(contentLibrary, store),
               publishedSpellLists: () => store.publishedFor("gm").spellLists,
               authoredIndex: () => store.authoredIndex()
             })
@@ -129,6 +129,7 @@ describe("homebrew HTTP authorization gate", () => {
       ["POST duplicate", () => post(base, sub(HOMEBREW_PATHS.contentDuplicate, draft.id), ANON, {})],
       ["POST publish", () => post(base, sub(HOMEBREW_PATHS.contentPublish, draft.id), ANON, {})],
       ["POST unpublish", () => post(base, sub(HOMEBREW_PATHS.contentUnpublish, draft.id), ANON, {})],
+      ["POST discard", () => post(base, sub(HOMEBREW_PATHS.contentDiscard, draft.id), ANON, {})],
       [
         "POST visibility",
         () => post(base, sub(HOMEBREW_PATHS.contentVisibility, draft.id), ANON, { visibleToPlayers: true })
@@ -150,7 +151,7 @@ describe("homebrew HTTP authorization gate", () => {
           })
       ]
     ];
-    expect(calls).toHaveLength(13); // the contract declares exactly 13 operations across 10 paths
+    expect(calls).toHaveLength(14); // the contract declares exactly 14 operations across 11 paths
 
     for (const [label, call] of calls) {
       const anonymous = await call();
@@ -345,6 +346,42 @@ describe("homebrew HTTP CRUD", () => {
   // A PATCH to a published record goes through validation: an autosave that makes the record invalid
   // demotes it to a hidden draft, so the library never claims "Published - shown to players" for a record
   // `publishedFor` would drop.
+  describe("a record other published records depend on", () => {
+    /** A published list, and a second published list that draws its spells only from the first. */
+    const chain = async (base: string) => {
+      const root = await createRecord(base, { type: "spell-list", name: "Blood Magic", add: ["fireball"] });
+      await post(base, sub(HOMEBREW_PATHS.contentPublish, root.id), GM, {});
+      const leaf = await createRecord(base, { type: "spell-list", name: "Hemomancy", basedOn: [root.id] });
+      const published = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, leaf.id), GM, {}));
+      expect(published.data.record.state).toBe("published");
+      return { root: root.id as string, leaf: leaf.id as string };
+    };
+    const usagesOf = async (base: string, id: string) =>
+      (await body(await get(base, sub(HOMEBREW_PATHS.contentUsages, id), GM))).data;
+
+    it("names the dependents that removing it would break, and is not safe to delete", async () => {
+      const { base } = await fixture({ realValidation: true });
+      const { root, leaf } = await chain(base);
+      const usages = await usagesOf(base, root);
+      expect(usages.safeToDelete).toBe(false);
+      expect(usages.dependents).toEqual({
+        ifRemoved: [{ id: leaf, type: "spell-list", name: "Hemomancy" }],
+        ifUpdated: []
+      });
+      // Nothing depends on the leaf.
+      expect((await usagesOf(base, leaf)).safeToDelete).toBe(true);
+    });
+
+    it("names the dependents its pending edits would break once live", async () => {
+      const { base } = await fixture({ realValidation: true });
+      const { root, leaf } = await chain(base);
+      await patch(base, byId(root), GM, { record: { id: root, name: "Blood Magic", source: "homebrew", add: [] } });
+      expect((await usagesOf(base, root)).dependents.ifUpdated).toEqual([
+        { id: leaf, type: "spell-list", name: "Hemomancy" }
+      ]);
+    });
+  });
+
   describe("editing a published record never pulls it from the players", () => {
     /** A published, player-visible spell list drawing one real spell. */
     const publishAndShare = async (base: string) => {
@@ -611,7 +648,12 @@ describe("homebrew HTTP CRUD", () => {
     expect(HomebrewUsagesResponseSchema.safeParse(usages).success).toBe(true);
     // A built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record
     // never breaks one; the count is informational.
-    expect(usages.data).toEqual({ id: record.id, usages: [], safeToDelete: true });
+    expect(usages.data).toEqual({
+      id: record.id,
+      usages: [],
+      safeToDelete: true,
+      dependents: { ifRemoved: [], ifUpdated: [] }
+    });
     expect((await get(base, sub(HOMEBREW_PATHS.contentUsages, "hb-missing-000000"), GM)).status).toBe(404);
   });
 });

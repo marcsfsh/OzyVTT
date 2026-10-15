@@ -21,10 +21,10 @@ import {
   type SpellListReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import type { ContentView } from "./content-library.js";
+import type { ContentLibrary, ContentView } from "./content-library.js";
 import { STATBLOCK_EXTENSION, statblockFacts } from "./statblock-facts.js";
 import { homebrewIdProblem } from "./homebrew-ids.js";
-import type { HomebrewAuthoredIndex } from "./homebrew-store.js";
+import { sliceReplacing, type HomebrewAuthoredIndex, type HomebrewBody, type HomebrewStore } from "./homebrew-store.js";
 
 /**
  * The publish gate: runs only on Publish (drafts may be invalid) and returns field paths plus messages. Most
@@ -626,23 +626,59 @@ function startingEquipmentIssues(
 // The router seam
 
 /** Always validates against the GM catalog, resolved per call so a just-published record is visible. */
+/**
+ * A "what if" for the gate: the table with one record's live body left out, optionally replaced by another body
+ * (its pending edits going live), or archived outright so it no longer counts as authored either.
+ */
+export type HomebrewValidationScenario = Readonly<{
+  without: string;
+  replacement?: Readonly<{ type: HomebrewContentType; body: HomebrewBody }>;
+  archived?: boolean;
+}>;
+
+/** The catalog and published spell lists of a scenario. */
+export type ScenarioCatalogs = (
+  scenario: HomebrewValidationScenario
+) => Readonly<{ catalog: ContentView; spellLists: readonly SpellListReference[] }>;
+
+/** Builds a scenario's catalogs over the live library and store. */
+export function scenarioCatalogs(
+  library: Pick<ContentLibrary, "forAudienceAdjusted">,
+  store: Pick<HomebrewStore, "publishedFor">
+): ScenarioCatalogs {
+  return (scenario) => {
+    const adjust = (slice: Parameters<typeof sliceReplacing>[0]) =>
+      sliceReplacing(slice, scenario.without, scenario.replacement);
+    return {
+      catalog: library.forAudienceAdjusted("gm", adjust),
+      spellLists: adjust(store.publishedFor("gm")).spellLists
+    };
+  };
+}
+
+/** The authorship index with one record gone, for a scenario that archives it. */
+function authoredWithout(index: HomebrewAuthoredIndex, id: string): HomebrewAuthoredIndex {
+  return {
+    has: (type, candidate) => candidate !== id && index.has(type, candidate),
+    subclassIdsFor: (classId) => new Set([...index.subclassIdsFor(classId)].filter((candidate) => candidate !== id))
+  };
+}
+
 export function createHomebrewValidator(source: {
   forAudience: (audience: "gm" | "player") => ContentView;
-  /** The GM catalog without one record; see `ContentLibrary.forAudienceWithout`. */
-  forAudienceWithout?: (audience: "gm" | "player", id: string) => ContentView;
+  /** Catalogs for a scenario; without it, every validation reads the live table. */
+  forScenario?: ScenarioCatalogs;
   publishedSpellLists: () => readonly SpellListReference[];
   /** Drafts included: the gate asks about authorship, not publication. */
   authoredIndex: () => HomebrewAuthoredIndex;
 }) {
-  /** `replacing` names a published record whose pending edits these are, so its live body is left out of the
-   *  catalog they are checked against. */
-  return (type: HomebrewContentType, body: unknown, replacing?: string): HomebrewValidity =>
-    validateForPublish(type, body, {
-      catalog:
-        replacing !== undefined && source.forAudienceWithout
-          ? source.forAudienceWithout("gm", replacing)
-          : source.forAudience("gm"),
-      spellLists: source.publishedSpellLists().filter((list) => list.id !== replacing),
-      authored: source.authoredIndex()
+  return (type: HomebrewContentType, body: unknown, scenario?: HomebrewValidationScenario): HomebrewValidity => {
+    const adjusted = scenario && source.forScenario ? source.forScenario(scenario) : null;
+    const authored = source.authoredIndex();
+    return validateForPublish(type, body, {
+      catalog: adjusted?.catalog ?? source.forAudience("gm"),
+      spellLists: adjusted?.spellLists ?? source.publishedSpellLists(),
+      authored: scenario?.archived ? authoredWithout(authored, scenario.without) : authored
     });
+  };
 }

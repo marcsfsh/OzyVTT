@@ -75,7 +75,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         deletedAt: next.deletedAt,
         rev: next.rev,
         updatedAt: next.updatedAt,
-        valid: next.validity.valid
+        // Pending edits' validity says nothing about the live record the rail marks.
+        valid: next.pendingChanges ? rows[index].valid : next.validity.valid
       };
       const copy = rows.slice();
       copy[index] = merged;

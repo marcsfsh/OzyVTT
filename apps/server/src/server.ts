@@ -34,7 +34,7 @@ import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
 import { HomebrewStore } from "./homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
-import { createHomebrewValidator } from "./homebrew-validate.js";
+import { createHomebrewValidator, scenarioCatalogs } from "./homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
 import { findCatalogRecord } from "./homebrew-srd-copy.js";
 import { requestConventions, sendFailure } from "./http-kit.js";
@@ -528,7 +528,7 @@ export function createServer(options: CreateServerOptions) {
       // The GM catalog: a dependency that is published but not player-visible is valid here.
       validate: createHomebrewValidator({
         forAudience: (audience) => contentLibrary.forAudience(audience),
-        forAudienceWithout: (audience, id) => contentLibrary.forAudienceWithout(audience, id),
+        forScenario: scenarioCatalogs(contentLibrary, homebrewStore),
         publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
         // Drafts included, only here: the gate asks whether a record exists, so a class and its subclass can
         // publish in either order.

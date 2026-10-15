@@ -166,24 +166,14 @@ export class ContentLibrary {
     return view;
   }
 
-  /** This audience's catalog with one homebrew record left out, built uncached: what a published record's pending
-   *  edits are validated against, so its own live body cannot vouch for them (a spell list's published membership). */
-  forAudienceWithout(audience: ContentAudience, id: string): ContentView {
-    const slice = this.homebrew?.publishedFor(audience);
-    if (!slice) return this.forAudience(audience);
-    const keep = (record: Readonly<{ id: string }>) => record.id !== id;
-    const without: HomebrewCatalogSlice = {
-      classes: slice.classes.filter(keep),
-      subclasses: slice.subclasses.filter(keep),
-      species: slice.species.filter(keep),
-      backgrounds: slice.backgrounds.filter(keep),
-      feats: slice.feats.filter(keep),
-      spells: slice.spells.filter(keep),
-      equipment: slice.equipment.filter(keep),
-      monsters: slice.monsters.filter((monster) => monster.source?.externalId !== id),
-      spellLists: slice.spellLists.filter(keep)
-    };
-    return viewOf(audience, sliceIsEmpty(without) ? SRD_ONLY_CATALOG : buildCatalogData(without), this.attribution);
+  /** This audience's catalog over an adjusted homebrew slice, built uncached: the "what if" a publish gate asks
+   *  (a record's pending edits without its live body, the table after a record is removed). */
+  forAudienceAdjusted(
+    audience: ContentAudience,
+    adjust: (slice: HomebrewCatalogSlice) => HomebrewCatalogSlice
+  ): ContentView {
+    const adjusted = adjust(this.homebrew?.publishedFor(audience) ?? EMPTY_HOMEBREW_SLICE);
+    return viewOf(audience, sliceIsEmpty(adjusted) ? SRD_ONLY_CATALOG : buildCatalogData(adjusted), this.attribution);
   }
 
   /** Play-time only and audience-free: resolves any homebrew monster row (even draft or deleted) so a live

@@ -716,7 +716,12 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewUsages: {
     safeToDelete:
-      "Always true: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks an existing character. The usage list is context, not a blocker"
+      "False when removing this record would break a published one (`dependents.ifRemoved`). Characters never count: a built character carries a flattened, self-contained ActorDefinition, so the usage list is context, not a blocker",
+    dependents:
+      "Published records that publish now and would not: `ifRemoved` once this one is removed or unpublished, `ifUpdated` once its pending edits go live. A warning to show before the action, never a refusal"
+  },
+  HomebrewDependent: {
+    "": "A published record another record's removal or edit would break: enough to name it and open it."
   },
   HomebrewPack: {
     "": "The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One FLAT record array rather than a by-type object: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design.",

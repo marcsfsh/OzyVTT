@@ -152,7 +152,12 @@ describe("homebrew usages", () => {
     ] as const) {
       const usages = index.of(type, type === "monster" ? "hb-m-4f19c8b02de7" : "hb-blood-hunter-a1b2c3");
       expect(
-        HomebrewUsagesSchema.safeParse({ id: "hb-blood-hunter-a1b2c3", usages, safeToDelete: true }).success,
+        HomebrewUsagesSchema.safeParse({
+          id: "hb-blood-hunter-a1b2c3",
+          usages,
+          safeToDelete: true,
+          dependents: { ifRemoved: [], ifUpdated: [] }
+        }).success,
         type
       ).toBe(true);
     }

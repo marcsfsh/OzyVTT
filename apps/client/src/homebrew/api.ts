@@ -64,7 +64,14 @@ export type HomebrewContentList = Readonly<{
 }>;
 
 export type HomebrewUsage = Readonly<{ actorId: string; actorName: string; kind: string; detail: string | null }>;
-export type HomebrewUsages = Readonly<{ id: string; usages: readonly HomebrewUsage[]; safeToDelete: boolean }>;
+/** A published record another record's removal or edit would break. */
+export type HomebrewDependent = Readonly<{ id: string; type: HomebrewType; name: string }>;
+export type HomebrewUsages = Readonly<{
+  id: string;
+  usages: readonly HomebrewUsage[];
+  safeToDelete: boolean;
+  dependents: Readonly<{ ifRemoved: readonly HomebrewDependent[]; ifUpdated: readonly HomebrewDependent[] }>;
+}>;
 
 export type HomebrewPack = Readonly<{
   schemaId: "vtt.homebrew-pack";
@@ -193,7 +200,7 @@ export const homebrewApi = {
       body: { visibleToPlayers, ...withRev(expectedRev) }
     }).then((data) => data.record),
 
-  /** GET /content/{id}/usages — which characters took this, computed on demand. */
+  /** GET /content/{id}/usages — which characters took this, and which published records depend on it. */
   usages: (token: string, id: string) => request<HomebrewUsages>(token, `/content/${encodeURIComponent(id)}/usages`),
 
   /** GET /packs/export — published, non-deleted records as a shareable pack. */

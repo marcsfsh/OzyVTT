@@ -122,6 +122,8 @@
   border-bottom: 0;
 }
 .hb-row-name {
+  /* Takes the slack, so a second badge sits beside the state badge rather than mid-row. */
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

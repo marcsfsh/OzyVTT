@@ -1950,7 +1950,7 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the row's revision",
         description:
-          'Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it.'
+          "Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it."
       }),
       delete: homebrewOp("deleteHomebrewContent", "HomebrewDeletedResponse", {
         bad: false,
@@ -2027,7 +2027,7 @@ export const openApiDocument = {
         params: [homebrewIdParam],
         notFound: true,
         description:
-          "Which characters took this record, computed on demand from the character choice ledger (no persisted reverse index at this data volume). `safeToDelete` is always true and says so calmly: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks one."
+          "Which characters took this record, computed on demand from the character choice ledger (no persisted reverse index at this data volume), and which published records depend on it. A built character carries a flattened, self-contained ActorDefinition, so removing a homebrew record never breaks one. A published record can break: `dependents.ifRemoved` names those that publish now and would not once this one is removed or unpublished (`safeToDelete` is false when any do), and `dependents.ifUpdated` those its pending edits would break once live."
       })
     },
     [HOMEBREW_PATHS.packsExport]: {

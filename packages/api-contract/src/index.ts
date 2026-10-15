@@ -770,8 +770,25 @@ export const HomebrewUsageSchema = z
     detail: z.string().max(300).nullable()
   })
   .strict();
+/** A published record that is publishable now and would stop being so. */
+export const HomebrewDependentSchema = z
+  .object({ id: HomebrewIdSchema, type: HomebrewContentTypeSchema, name: z.string().min(1).max(120) })
+  .strict();
 export const HomebrewUsagesSchema = z
-  .object({ id: HomebrewIdSchema, usages: z.array(HomebrewUsageSchema), safeToDelete: z.boolean() })
+  .object({
+    id: HomebrewIdSchema,
+    usages: z.array(HomebrewUsageSchema),
+    /** False when removing this record would break a published one; built characters never break. */
+    safeToDelete: z.boolean(),
+    dependents: z
+      .object({
+        /** Broken by removing or unpublishing this record. */
+        ifRemoved: z.array(HomebrewDependentSchema),
+        /** Broken by putting this record's pending edits live; empty when nothing is pending. */
+        ifUpdated: z.array(HomebrewDependentSchema)
+      })
+      .strict()
+  })
   .strict();
 /** The GM-to-GM interchange format: authored bodies only, so an import can never inherit the exporter's visibility policy. */
 export const HomebrewPackSchema = z

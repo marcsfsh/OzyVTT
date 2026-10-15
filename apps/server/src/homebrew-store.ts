@@ -335,6 +335,15 @@ export class HomebrewStore implements HomebrewContentSource {
     return row ? projectRecord(row) : undefined;
   }
 
+  /** Every published, live record with its bodies, for checks across the whole published table (its dependents). */
+  listPublished(): readonly HomebrewRecordRow[] {
+    return (
+      this.requireDatabase()
+        .prepare("SELECT * FROM homebrew_records WHERE state = 'published' AND deleted_at IS NULL")
+        .all() as RecordRow[]
+    ).map(projectRecord);
+  }
+
   /** Keyset paging by `LOWER(name), id` (not `updated_at`), so publishing mid-scroll cannot skip or repeat rows. */
   list(filter: HomebrewListFilter = {}): HomebrewListPage {
     const database = this.requireDatabase();
@@ -777,6 +786,34 @@ const BUCKETS = {
   monster: "monsters",
   "spell-list": "spellLists"
 } as const satisfies Record<HomebrewContentType, keyof DraftSlice>;
+
+/**
+ * A published slice with one record left out and, optionally, a body in its place (parsed as the catalogs parse
+ * it; an unparseable one is left out, as `publishedFor` would). For the publish gate's "what if" catalogs.
+ */
+export function sliceReplacing(
+  slice: HomebrewCatalogSlice,
+  id: string,
+  replacement?: Readonly<{ type: HomebrewContentType; body: HomebrewBody }>
+): HomebrewCatalogSlice {
+  const keep = (record: Readonly<{ id: string }>) => record.id !== id;
+  const draft: DraftSlice = {
+    classes: slice.classes.filter(keep),
+    subclasses: slice.subclasses.filter(keep),
+    species: slice.species.filter(keep),
+    backgrounds: slice.backgrounds.filter(keep),
+    feats: slice.feats.filter(keep),
+    spells: slice.spells.filter(keep),
+    equipment: slice.equipment.filter(keep),
+    monsters: slice.monsters.filter((monster) => monster.source?.externalId !== id),
+    spellLists: slice.spellLists.filter(keep)
+  };
+  if (replacement) {
+    const parsed = parseBody(replacement.type, JSON.stringify(replacement.body));
+    if (parsed) pushInto(draft, replacement.type, parsed);
+  }
+  return draft;
+}
 
 function pushInto(draft: DraftSlice, type: HomebrewContentType, record: unknown) {
   // The type column is CHECK-constrained and contract-parsed on write, so this cast is safe.

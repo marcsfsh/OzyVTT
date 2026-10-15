@@ -118,8 +118,13 @@ const FIXTURES: Record<string, unknown> = {
     usages: [
       { actorId: "f84d13cb-a7da-4ef2-9f2f-53d38e49d862", actorName: "Brenna", kind: "character-choice", detail: null }
     ],
-    safeToDelete: true
+    safeToDelete: false,
+    dependents: {
+      ifRemoved: [{ id: "hb-sentinel-feat-a1b2c3", type: "background", name: "Sentinel" }],
+      ifUpdated: []
+    }
   },
+  HomebrewDependent: { id: "hb-sentinel-feat-a1b2c3", type: "background", name: "Sentinel" },
   HomebrewPack: pack,
   HomebrewPackExport: { pack },
   HomebrewPackImport: {
@@ -148,7 +153,12 @@ const FIXTURES: Record<string, unknown> = {
   HomebrewUsagesResponse: {
     ok: true,
     apiVersion: "1",
-    data: { id: "hb-shield-master-a1b2c3", usages: [], safeToDelete: true }
+    data: {
+      id: "hb-shield-master-a1b2c3",
+      usages: [],
+      safeToDelete: true,
+      dependents: { ifRemoved: [], ifUpdated: [] }
+    }
   },
   HomebrewPackExportResponse: { ok: true, apiVersion: "1", data: { pack } },
   HomebrewPackImportResponse: {
